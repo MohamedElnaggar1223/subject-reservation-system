@@ -1,0 +1,32 @@
+{
+    "name": "@repo/validations",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "tsc && tsc-alias",
+        "dev": "tsc -w",
+        "lint": "eslint . --max-warnings 0"
+    },
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "devDependencies": {
+        "@repo/eslint-config": "workspace:*",
+        "@repo/typescript-config": "workspace:*",
+        "@types/eslint": "9.6.1",
+        "@types/node": "^22.15.3",
+        "eslint": "^9.39.1",
+        "typescript": "5.9.2"
+    },
+    "dependencies": {
+        "hono": "^4.11.1",
+        "tsc-alias": "^1.8.16",
+        "zod": "^4.2.1"
+    }
+}
