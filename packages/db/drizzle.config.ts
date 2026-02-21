@@ -5,6 +5,6 @@ export default defineConfig({
     schema: './src/schema.ts',
     dialect: 'postgresql',
     dbCredentials: {
-        url: process.env.DATABASE_URL || 'postgresql://user:password@localhost:5432/students',
+        url: process.env.DATABASE_URL || 'postgresql://user:password@localhost:5432/igcse_reservation',
     },
 });

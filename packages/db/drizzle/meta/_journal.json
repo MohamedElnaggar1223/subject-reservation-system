@@ -36,6 +36,20 @@
       "when": 1766921327000,
       "tag": "0004_public_shiver_man",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1769624484564,
+      "tag": "0005_hot_lady_vermin",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1769624640855,
+      "tag": "0006_nappy_madripoor",
+      "breakpoints": true
     }
   ]
 }

@@ -19,6 +19,8 @@ import { randomUUID } from 'crypto';
  */
 import { todos } from './routes/todo.routes';
 import { files } from './routes/file.routes';
+import { links } from './routes/link.routes';
+import { users } from './routes/user.routes';
 
 /**
  * Rate Limiter for Auth Routes
@@ -153,10 +155,27 @@ const v1 = new Hono<HonoEnv>()
    * - GET    /v1/files/:id      - Get specific file
    * - DELETE /v1/files/:id      - Delete file
    *
+   * Parent-Student Link routes mounted at /v1/links
+   * - POST   /v1/links          - Parent creates link request
+   * - GET    /v1/links/pending  - Get pending requests (role-aware)
+   * - PUT    /v1/links/:id      - Student approves/rejects request
+   * - GET    /v1/links/children - Parent gets linked children
+   * - GET    /v1/links/parents  - Student gets linked parents
+   * - DELETE /v1/links/:id      - Admin removes link
+   *
+   * User profile routes mounted at /v1/users
+   * - GET    /v1/users/me       - Get own profile
+   * - PUT    /v1/users/me       - Update own profile
+   * - GET    /v1/users          - List all users (admin)
+   * - GET    /v1/users/:id      - Get user by ID (admin)
+   * - PUT    /v1/users/:id      - Update user (admin)
+   *
    * Add your own routes below.
    */
   .route('/todos', todos)
-  .route('/files', files);
+  .route('/files', files)
+  .route('/links', links)
+  .route('/users', users);
 
 // Mount v1 under /v1 (keep chaining for proper RPC typing)
 const appWithRoutes = app

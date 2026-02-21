@@ -1,0 +1,309 @@
+# render.yaml - Detroit Promise Zone Authority
+# Infrastructure as Code Blueprint
+#
+# This file defines all Render services for staging and production environments.
+# Place this file at the repository root.
+#
+# Documentation: https://render.com/docs/blueprint-spec
+
+# =============================================================================
+# PREVIEW ENVIRONMENTS (for Pull Requests)
+# =============================================================================
+# Preview environments automatically spin up when PRs are opened.
+# They use smaller plans to reduce costs and auto-expire after inactivity.
+
+previews:
+  generation: automatic  # Create preview for every PR
+  expireAfterDays: 7     # Auto-delete after 7 days of inactivity
+
+# =============================================================================
+# DATABASES
+# =============================================================================
+
+databases:
+  # ---------------------------------------------------------------------------
+  # PRODUCTION DATABASE
+  # ---------------------------------------------------------------------------
+  # Using basic plan during development - UPGRADE TO pro-4gb BEFORE FALL 2026 LAUNCH
+  - name: detroit-promise-db-prod
+    plan: basic-256mb      # Basic 256MB during dev - upgrade before launch
+    region: ohio           # Closest to Detroit, MI
+    databaseName: detroit_promise_prod
+    user: detroit_promise
+    ipAllowList: []        # Empty = only internal Render network access (secure)
+    postgresMajorVersion: "18"
+
+  # ---------------------------------------------------------------------------
+  # STAGING DATABASE
+  # ---------------------------------------------------------------------------
+  - name: detroit-promise-db-staging
+    plan: basic-256mb      # Basic 256MB - sufficient for staging
+    region: ohio
+    databaseName: detroit_promise_staging
+    user: detroit_promise
+    ipAllowList: []
+    postgresMajorVersion: "18"
+
+# =============================================================================
+# SERVICES
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # PGBOUNCER CONNECTION POOLERS
+  # ===========================================================================
+  # PgBouncer manages database connection pooling for efficiency.
+  # Your API connects to PgBouncer, which maintains a pool of DB connections.
+  # Docs: https://render.com/docs/postgresql-connection-pooling
+  
+  # ---------------------------------------------------------------------------
+  # PRODUCTION PGBOUNCER
+  # ---------------------------------------------------------------------------
+  - type: pserv           # Private service (internal network only)
+    name: detroit-promise-pgbouncer-prod
+    runtime: docker
+    plan: starter          # PgBouncer is lightweight
+    region: ohio
+    repo: https://github.com/render-oss/docker-pgbouncer
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: detroit-promise-db-prod
+          property: connectionString
+      - key: POOL_MODE
+        value: transaction  # Best for web apps - connection returned after each transaction
+      - key: SERVER_RESET_QUERY
+        value: DISCARD ALL  # Clean state for each new client
+      - key: MAX_CLIENT_CONN
+        value: "500"        # Max client connections to PgBouncer
+      - key: DEFAULT_POOL_SIZE
+        value: "50"         # Actual DB connections in pool
+
+  # ---------------------------------------------------------------------------
+  # STAGING PGBOUNCER
+  # ---------------------------------------------------------------------------
+  - type: pserv
+    name: detroit-promise-pgbouncer-staging
+    runtime: docker
+    plan: starter
+    region: ohio
+    repo: https://github.com/render-oss/docker-pgbouncer
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: detroit-promise-db-staging
+          property: connectionString
+      - key: POOL_MODE
+        value: transaction
+      - key: SERVER_RESET_QUERY
+        value: DISCARD ALL
+      - key: MAX_CLIENT_CONN
+        value: "200"        # Lower for staging
+      - key: DEFAULT_POOL_SIZE
+        value: "20"         # Lower for staging
+
+  # ===========================================================================
+  # REDIS INSTANCES (for BullMQ job queues)
+  # ===========================================================================
+  # TODO: Add Redis when reaching Communication/Jobs milestone (M4)
+  # Uncomment below when needed:
+  #
+  # - type: redis
+  #   name: detroit-promise-redis-prod
+  #   plan: starter
+  #   region: ohio
+  #   ipAllowList: []
+  #   maxmemoryPolicy: noeviction
+  #
+  # - type: redis
+  #   name: detroit-promise-redis-staging
+  #   plan: starter
+  #   region: ohio
+  #   ipAllowList: []
+  #   maxmemoryPolicy: noeviction
+
+  # ===========================================================================
+  # API SERVICES
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # PRODUCTION API
+  # ---------------------------------------------------------------------------
+  # Using starter during dev - UPGRADE TO pro BEFORE FALL 2026 LAUNCH
+  - type: web
+    name: detroit-promise-api-prod
+    runtime: node
+    region: ohio
+    plan: starter                      # Starter during dev - upgrade before launch
+    branch: main                       # Deploy from main branch
+    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm build --filter @repo/api --force
+    startCommand: pnpm --filter @repo/db db:migrate && pnpm --filter @repo/api start
+    healthCheckPath: /v1/health
+    autoDeploy: true                   # Auto-deploy on push to main
+    
+    # Environment variables
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      
+      # Auth configuration
+      - key: BETTER_AUTH_SECRET
+        generateValue: true            # Render generates secure random value
+      - key: BETTER_AUTH_URL
+        value: https://api.detroitpromisescholarship.com
+      
+      # CORS and cookies
+      - key: CORS_ORIGINS
+        value: https://app.detroitpromisescholarship.com
+      - key: COOKIE_DOMAIN
+        value: .detroitpromisescholarship.com
+      
+      # Database connection - initially direct, update to PgBouncer after deployment
+      # After Blueprint deploys, change DATABASE_URL host to PgBouncer hostname:
+      # Original: postgresql://user:pass@detroit-promise-db-prod/dbname
+      # Pooled:   postgresql://user:pass@detroit-promise-pgbouncer-prod/dbname
+      - key: DATABASE_URL
+        fromDatabase:
+          name: detroit-promise-db-prod
+          property: connectionString
+      
+      # Redis connection - add manually when Redis services are created (M4 milestone)
+      # - key: REDIS_URL
+      #   fromService:
+      #     name: detroit-promise-redis-prod
+      #     type: redis
+      #     property: connectionString
+      
+      # Cloudflare R2 (set manually in dashboard - sync: false)
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        value: detroit-promise-prod
+    
+    # Preview environment overrides (for PRs)
+    # Note: Preview environments inherit env vars from the service definition
+    # They will use staging R2 bucket since that's safer for testing
+    previews:
+      plan: starter                    # Use cheaper plan for previews
+
+  # ---------------------------------------------------------------------------
+  # STAGING API
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: detroit-promise-api-staging
+    runtime: node
+    region: ohio
+    plan: starter                      # Starter plan for staging
+    branch: staging                    # Deploy from staging branch
+    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm build --filter @repo/api --force
+    startCommand: pnpm --filter @repo/db db:migrate && pnpm --filter @repo/api start
+    healthCheckPath: /v1/health
+    autoDeploy: true
+    
+    # Environment variables
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: PORT
+        value: "3001"
+      
+      # Auth configuration
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: BETTER_AUTH_URL
+        value: https://staging-api.detroitpromisescholarship.com
+      
+      # CORS and cookies
+      - key: CORS_ORIGINS
+        value: https://staging.detroitpromisescholarship.com
+      - key: COOKIE_DOMAIN
+        value: .detroitpromisescholarship.com
+      
+      # Database connection - initially direct, update to PgBouncer after deployment
+      # After Blueprint deploys, change DATABASE_URL host to PgBouncer hostname
+      - key: DATABASE_URL
+        fromDatabase:
+          name: detroit-promise-db-staging
+          property: connectionString
+      
+      # Redis connection - add manually when Redis services are created (M4 milestone)
+      # - key: REDIS_URL
+      #   fromService:
+      #     name: detroit-promise-redis-staging
+      #     type: redis
+      #     property: connectionString
+      
+      # Cloudflare R2 (set manually in dashboard)
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        value: detroit-promise-staging
+
+# =============================================================================
+# NOTES
+# =============================================================================
+#
+# SERVICES CREATED:
+# - detroit-promise-db-prod (PostgreSQL 18)
+# - detroit-promise-db-staging (PostgreSQL 18)
+# - detroit-promise-pgbouncer-prod (Connection Pooler)
+# - detroit-promise-pgbouncer-staging (Connection Pooler)
+# - detroit-promise-redis-prod (Redis)
+# - detroit-promise-redis-staging (Redis)
+# - detroit-promise-api-prod (API)
+# - detroit-promise-api-staging (API)
+#
+# MANUAL SETUP REQUIRED AFTER DEPLOYMENT:
+#
+# 1. Set R2 credentials for both API services:
+#    - R2_ACCOUNT_ID
+#    - R2_ACCESS_KEY_ID  
+#    - R2_SECRET_ACCESS_KEY
+#
+# 2. Configure DATABASE_URL to use PgBouncer:
+#    After deployment, get the PgBouncer internal hostname from the dashboard.
+#    Update DATABASE_URL in each API service to use the PgBouncer host:
+#    
+#    Original: postgresql://user:pass@db-host:5432/dbname
+#    Pooled:   postgresql://user:pass@pgbouncer-host:5432/dbname
+#
+#    The username, password, port, and database name stay the same.
+#    Only the host changes to the PgBouncer private service hostname.
+#
+# 3. Add custom domains:
+#    - detroit-promise-api-prod: api.detroitpromisescholarship.com
+#    - detroit-promise-api-staging: staging-api.detroitpromisescholarship.com
+#
+# =============================================================================
+# PGBOUNCER CONNECTION POOLING
+# =============================================================================
+#
+# PgBouncer sits between your API and PostgreSQL to manage connections.
+# Instead of each API request opening a new DB connection, PgBouncer 
+# maintains a pool of connections and reuses them efficiently.
+#
+# Benefits:
+# - Handles more concurrent users with fewer actual DB connections
+# - Reduces connection overhead
+# - Better resource utilization
+#
+# Configuration explained:
+# - POOL_MODE=transaction: Connection returned to pool after each transaction
+# - MAX_CLIENT_CONN=500: Max connections PgBouncer accepts from clients
+# - DEFAULT_POOL_SIZE=50: Actual PostgreSQL connections maintained
+#
+# This means 500 API connections share 50 real database connections.
+#
+# Docs: https://render.com/docs/postgresql-connection-pooling
+#
+# =============================================================================

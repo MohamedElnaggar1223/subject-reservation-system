@@ -2,12 +2,16 @@ import { z } from 'zod';
 
 /**
  * All available roles in the system
+ * 
+ * IGCSE Subject Reservation System roles:
+ * - ADMIN: Full system access, manage subjects, sessions, reports
+ * - STUDENT: Register subjects, manage own account, escrow
+ * - PARENT: Manage linked children, register on behalf, transfer escrow
  */
 export const ROLES = {
   ADMIN: 'admin',
-  COACH: 'coach',
   STUDENT: 'student',
-  USER: 'user',
+  PARENT: 'parent',
 } as const;
 
 /**
@@ -15,9 +19,8 @@ export const ROLES = {
  */
 export const RoleSchema = z.enum([
   ROLES.ADMIN,
-  ROLES.COACH,
   ROLES.STUDENT,
-  ROLES.USER,
+  ROLES.PARENT,
 ]);
 
 /**
@@ -47,7 +50,24 @@ export function hasRole(
 }
 
 /**
+ * Student grade levels
+ */
+export const GRADES = {
+  GRADE_10: 10,
+  GRADE_11: 11,
+  GRADE_12: 12,
+} as const;
+
+export const GradeSchema = z.union([
+  z.literal(GRADES.GRADE_10),
+  z.literal(GRADES.GRADE_11),
+  z.literal(GRADES.GRADE_12),
+]);
+
+export type Grade = z.infer<typeof GradeSchema>;
+
+/**
  * Export individual roles for convenience
  */
-export const { ADMIN, COACH, STUDENT, USER } = ROLES;
+export const { ADMIN, STUDENT, PARENT } = ROLES;
 

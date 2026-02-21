@@ -2,10 +2,20 @@ services:
   postgres:
     image: postgres:17.5
     restart: unless-stopped
-    container_name: turborepo-hono-postgres
+    container_name: igcse-reservation-db
     ports:
       - '5432:5432'
     environment:
       - POSTGRES_PASSWORD=password
       - POSTGRES_USER=user
-      - POSTGRES_DB=students
+      - POSTGRES_DB=igcse_reservation
+    volumes:
+      - igcse_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d igcse_reservation"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  igcse_postgres_data:

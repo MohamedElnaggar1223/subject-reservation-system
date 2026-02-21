@@ -21,3 +21,9 @@ export * from './api-response'
  */
 export * from './todo/todo.validations'
 export * from './file/file.validations'
+
+/**
+ * IGCSE System Validations
+ */
+export * from './link/link.validations'
+export * from './user/user.validations'

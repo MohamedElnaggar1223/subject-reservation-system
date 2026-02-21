@@ -18,7 +18,7 @@
  */
 
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, numeric, integer } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -35,6 +35,10 @@ export const user = pgTable("user", {
   banned: boolean("banned").default(false),
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires"),
+  // IGCSE System Extensions
+  grade: integer("grade"), // 10, 11, 12, or null (for parents/admins/graduated)
+  studentId: text("student_id").unique(), // Auto-generated unique ID for students
+  phone: text("phone"), // Optional contact number
 });
 
 export const session = pgTable(
@@ -282,4 +286,66 @@ export const userRelationsExtended = relations(user, ({ many }) => ({
   accounts: many(account),
   todos: many(todo),
   files: many(file),
+  // Parent-Student Link Relations
+  linkRequestsAsParent: many(parentStudentLink, { relationName: "parentLinks" }),
+  linkRequestsAsStudent: many(parentStudentLink, { relationName: "studentLinks" }),
+}));
+
+/**
+ * ============================================
+ * PARENT-STUDENT LINK TABLE
+ * ============================================
+ *
+ * Manages the relationship between parents and students.
+ * Parents can request to link to students, who must approve.
+ * 
+ * Status workflow: pending -> approved/rejected
+ */
+export const parentStudentLink = pgTable(
+  "parent_student_link",
+  {
+    id: text("id").primaryKey(),
+    // Parent user who initiated the link request
+    parentId: text("parent_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Student user being linked to
+    studentId: text("student_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Link status: 'pending' | 'approved' | 'rejected'
+    status: text("status").notNull().default("pending"),
+    // When the link was requested
+    requestedAt: timestamp("requested_at").defaultNow().notNull(),
+    // When the student responded (approved/rejected)
+    respondedAt: timestamp("responded_at"),
+    // Standard timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    // Indexes for efficient queries
+    index("parentStudentLink_parentId_idx").on(table.parentId),
+    index("parentStudentLink_studentId_idx").on(table.studentId),
+    index("parentStudentLink_status_idx").on(table.status),
+  ]
+);
+
+/**
+ * PARENT-STUDENT LINK RELATIONS
+ */
+export const parentStudentLinkRelations = relations(parentStudentLink, ({ one }) => ({
+  parent: one(user, {
+    fields: [parentStudentLink.parentId],
+    references: [user.id],
+    relationName: "parentLinks",
+  }),
+  student: one(user, {
+    fields: [parentStudentLink.studentId],
+    references: [user.id],
+    relationName: "studentLinks",
+  }),
 }));
