@@ -27,10 +27,11 @@
 ## 1. Executive Summary
 
 ### Project Scope
-- **Total User Stories:** 60
-- **P0 (Critical):** 47
-- **P1 (High):** 12
+- **Total User Stories:** 77
+- **P0 (Critical):** 54
+- **P1 (High):** 15
 - **P2 (Medium):** 1
+- **P3 (Low):** 7
 - **Personas:** Admin, Student, Parent
 
 ### Development Approach
@@ -133,15 +134,16 @@ export const ROLES = {
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    PHASE 3: TRANSACTION LAYER                        │
-│  REG-001 to REG-005 | PAY-001 to PAY-007 | SWAP-001 to SWAP-006     │
-│  ESC-001 to ESC-008                                                  │
+│  REG-001 to REG-007 | PAY-001 to PAY-007 | SWAP-001 to SWAP-007     │
+│  ESC-001 to ESC-007                                                  │
 │                          (Weeks 7-10)                                │
 └─────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    PHASE 4: SUPPORT SYSTEMS                          │
-│  NOT-001 to NOT-008 | REP-001 to REP-008 | GRADE-001 to GRADE-003   │
+│  NOT-001 to NOT-011 | REP-001 to REP-009 | GRADE-001 to GRADE-003   │
+│  GRAD-001 to GRAD-007 (P3 — post-launch)                            │
 │                          (Weeks 11-13)                               │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -157,10 +159,11 @@ User Auth (AUTH-001-008)
             └──► Subject Creation (SUB-001)
                     └──► Core Subjects Definition (CORE-001)
                             └──► Session Windows (SES-001)
-                                    └──► Subject Registration (REG-001)
-                                            └──► Payment Processing (PAY-001-007)
-                                                    └──► Escrow Management (ESC-001-008)
-                                                            └──► Subject Swapping (SWAP-001-006)
+                                    └──► Registration Request (REG-001)
+                                            └──► Parent Approval (REG-002)
+                                                    └──► Payment Processing (PAY-001-007)
+                                                            └──► Escrow Management (ESC-001-007)
+                                                                    └──► Change Requests (SWAP-001-007)
 ```
 
 ### Parallel Development Opportunities
@@ -325,11 +328,14 @@ Table: subject
 ├── code: text (unique)
 ├── council: text ('pearson_edexcel' | 'cambridge' | 'oxford')
 ├── priceInSchool: numeric
-├── priceExternal: numeric (nullable - null means external not available)
+├── isOfferedAtSchool: boolean (default true) - If false, finance sets custom price
+├── customPrice: numeric (nullable - only when isOfferedAtSchool is false)
 ├── isActive: boolean (default true)
 ├── isCore: boolean (default false) - For Grade 10 core subjects
 └── (timestamps)
 ```
+
+> **Note:** There is no separate external registration type. Students taking school subjects with external teachers pay the full in-school price. Custom pricing applies only to subjects not offered at school at all.
 
 #### 7.2 Registration Session Table (NEW)
 
@@ -346,6 +352,8 @@ Table: registration_session
 └── (timestamps)
 ```
 
+> **Unique constraint:** Only one active window per `sessionType` at a time. Multiple sessions of different types (e.g., June and November) may be active simultaneously.
+
 ### User Stories Mapping
 
 | ID | Story | Implementation Notes |
@@ -358,7 +366,7 @@ Table: registration_session
 | SUB-006 | User views subject details | Single subject with all pricing info |
 | SES-001 | Admin creates session | Date range, unique active constraint |
 | SES-002 | Admin views sessions | List with status filter |
-| SES-003 | Admin edits draft session | Only before active |
+| SES-003 | Admin edits session | Draft sessions: any field; active sessions: deadline/endDate only, changes logged to audit trail |
 | SES-004 | Admin closes session early | Manual close with confirmation |
 | SES-005 | User sees session status | Dashboard shows current window |
 | SES-006 | Auto-close sessions | Scheduled job at endDate |
@@ -373,7 +381,7 @@ Table: registration_session
 
 **Validation schemas:**
 - `packages/validations/src/subject/subject.validations.ts`
-  - `CreateSubject` - name, code, council, prices, external option
+  - `CreateSubject` - name, code, council, priceInSchool, isOfferedAtSchool, customPrice (required if not offered at school)
   - `UpdateSubject` - partial, all fields optional
   - `SubjectId` - UUID validation
   - `ListSubjectsQuery` - filters (council, search, active, core)
@@ -403,10 +411,11 @@ Table: registration_session
   - `SessionId` - UUID validation
 
 **Service:** `apps/api/src/services/session.services.ts`
-- `createSession(data)` - Admin only, validates no overlap
+- `createSession(data)` - Admin only, validates no active session of same type exists
 - `getSessions(filters)` - Include status filter
-- `getActiveSession()` - Returns current active or null
-- `updateSession(id, data)` - Only draft sessions
+- `getActiveSessions()` - Returns all currently active sessions (may be multiple, one per type)
+- `getActiveSession(sessionType?)` - Returns active session for a specific type or null
+- `updateSession(id, data, adminId)` - Draft: any field; active: deadline/endDate only, audit logged
 - `closeSession(id, adminId)` - Manual close
 - `autoCloseExpiredSessions()` - Called by scheduler
 
@@ -461,12 +470,12 @@ async function validateCoreSubjects(studentId: string, sessionType: string, subj
 - `apps/web/app/subjects/page.tsx` - Browse subjects (student/parent)
 
 ### Phase 2 Deliverables Checklist
-- [ ] Subject table with council enum and pricing
-- [ ] Session table with status workflow
+- [ ] Subject table with council enum, in-school pricing, and isOfferedAtSchool/customPrice fields
+- [ ] Session table with per-type unique active constraint
 - [ ] Full subject CRUD API (admin)
 - [ ] Subject browse API (public)
-- [ ] Session CRUD API (admin)
-- [ ] Active session check API (public)
+- [ ] Session CRUD API (admin) — including active window deadline edit with audit log
+- [ ] Active session(s) check API (public)
 - [ ] Core subject flag and validation
 - [ ] Session auto-close scheduler
 - [ ] Admin subject management UI
@@ -496,13 +505,17 @@ Table: registration
 ├── studentId: text (FK → user.id)
 ├── sessionId: text (FK → registration_session.id)
 ├── subjectId: text (FK → subject.id)
-├── registrationType: text ('in_school' | 'external')
-├── priceAtRegistration: numeric - Snapshot of price
-├── status: text ('pending_payment' | 'confirmed' | 'dropped')
-├── registeredBy: text (FK → user.id) - Student or parent
+├── priceAtRegistration: numeric - Snapshot of price at time of registration
+├── status: text ('pending_approval' | 'pending_payment' | 'confirmed' | 'dropped' | 'rejected')
+├── requestedBy: text (FK → user.id) - Student or parent who initiated
+├── approvedBy: text (FK → user.id, nullable) - Parent who approved (null if parent-initiated)
+├── approvedAt: timestamp (nullable)
+├── approvalComments: text (nullable)
 ├── droppedAt: timestamp (nullable)
 └── (timestamps)
 ```
+
+> **Status flow:** `pending_approval` (student-initiated) → `pending_payment` (parent approves) → `confirmed` (payment received). Parent-initiated registrations skip `pending_approval` and go directly to `pending_payment`. A `rejected` terminal state is set when parent rejects the request.
 
 #### 8.2 Payment Table (NEW)
 
@@ -572,51 +585,53 @@ Table: withdrawal_request
 
 ### User Stories Mapping
 
-#### Registration (REG-001 to REG-005)
+#### Registration (REG-001 to REG-007)
 
 | ID | Story | Implementation Notes |
 |----|-------|---------------------|
-| REG-001 | Student registers subjects | Cart system → checkout → payment |
-| REG-002 | Parent registers for child | Same flow, specify child |
-| REG-003 | View registered subjects | Per session view with details |
-| REG-004 | Block when window closed | Validate session status |
-| REG-005 | Registration history | All sessions view |
+| REG-001 | Student requests subjects | Cart → submit request → status: pending_approval |
+| REG-002 | Parent approves/rejects request | View pending requests → approve (→ payment) or reject with comments |
+| REG-003 | Parent directly registers for child | Cart → auto-approved → status: pending_payment → checkout |
+| REG-004 | View registered subjects | Per session view with approval status and initiator |
+| REG-005 | Block when window closed | Validate session status |
+| REG-006 | Registration history | All sessions view with approval trail |
+| REG-007 | Admin override approval | Admin processes registration bypassing parent approval, audit logged |
 
 #### Payments (PAY-001 to PAY-007)
 
 | ID | Story | Implementation Notes |
 |----|-------|---------------------|
-| PAY-001 | Fawry payment | Generate code, webhook for confirmation |
-| PAY-002 | Card payment | Integrate payment gateway (e.g., Paymob) |
-| PAY-003 | Mobile wallet | Integrate wallet providers |
-| PAY-004 | Bank transfer | Manual confirmation by admin |
-| PAY-005 | Use escrow balance | Deduct from escrow, pay remainder |
-| PAY-006 | Payment receipt email | Email with PDF attachment |
-| PAY-007 | Admin confirms bank transfer | Admin API + dashboard |
+| PAY-001 | Fawry payment (parent only) | Generate code, webhook for confirmation |
+| PAY-002 | Card payment (parent only) | Integrate payment gateway (e.g., Paymob) |
+| PAY-003 | Mobile wallet (parent only) | Integrate wallet providers |
+| PAY-004 | Bank transfer (parent only) | Manual confirmation by admin |
+| PAY-005 | Use child's escrow balance | Parent applies child's escrow at checkout, pays remainder via other method |
+| PAY-006 | Payment receipt email to parent | Email with PDF attachment sent to parent |
+| PAY-007 | Admin confirms bank transfer | Admin API + dashboard; notifies parent AND student |
 
-#### Swapping (SWAP-001 to SWAP-006)
+#### Swapping / Change Requests (SWAP-001 to SWAP-007)
 
 | ID | Story | Implementation Notes |
 |----|-------|---------------------|
-| SWAP-001 | Drop subject | Full refund to escrow |
-| SWAP-002 | Swap subjects | Price diff calculation |
-| SWAP-003 | Switch registration type | In-school ↔ External |
-| SWAP-004 | Parent performs swaps | Same as student for linked child |
-| SWAP-005 | Block core subject swap | Validate Grade 10 + June |
+| SWAP-001 | Student requests drop | Submit drop request → status: pending_approval |
+| SWAP-002 | Student requests swap | Submit swap request with price diff shown → status: pending_approval |
+| SWAP-003 | Parent approves/rejects drop/swap request | View pending change requests → approve (process financials) or reject |
+| SWAP-004 | Parent directly drops/swaps for child | Auto-approved, immediate financial processing, child notified |
+| SWAP-005 | Block core subject changes | Validate Grade 10 — core subjects cannot be dropped or swapped |
 | SWAP-006 | Block when window closed | Validate session status |
+| SWAP-007 | Student views pending change requests | Dashboard shows all pending drop/swap requests with status and parent comments |
 
-#### Escrow (ESC-001 to ESC-008)
+#### Escrow (ESC-001 to ESC-007)
 
 | ID | Story | Implementation Notes |
 |----|-------|---------------------|
-| ESC-001 | Student views escrow | Balance + transactions |
-| ESC-002 | Parent views children escrows | All linked children |
+| ESC-001 | Student views escrow | Balance + transactions (read-only; no transactional actions) |
+| ESC-002 | Parent views children escrows | All linked children with full escrow control |
 | ESC-003 | Parent transfers escrow | Between linked children |
-| ESC-004 | Student requests withdrawal | Create pending request |
-| ESC-005 | Parent requests withdrawal | On behalf of child |
-| ESC-006 | Admin views withdrawal requests | Dashboard list |
-| ESC-007 | Admin fulfills withdrawal | Partial or full, updates balance |
-| ESC-008 | View withdrawal history | All past requests |
+| ESC-004 | Parent requests withdrawal for child | Create pending request (parent-only action) |
+| ESC-005 | Admin views withdrawal requests | Dashboard list with student and parent name |
+| ESC-006 | Admin fulfills withdrawal | Partial or full, updates balance, notifies parent AND student |
+| ESC-007 | Parent views withdrawal history | Per-child history of all past requests (parent-only view) |
 
 ### Implementation Steps
 
@@ -628,15 +643,25 @@ Table: withdrawal_request
 
 **Service:** `apps/api/src/services/registration.services.ts`
 - `getAvailableSubjects(studentId, sessionId)` - Filter already registered
-- `createPendingRegistrations(studentId, registrations, registeredBy)`
-- `confirmRegistrations(paymentId, registrationIds)`
+- `createRegistrationRequest(studentId, subjectIds, requestedBy)` - Student flow: status = pending_approval
+- `createDirectRegistration(studentId, subjectIds, parentId)` - Parent flow: status = pending_payment
+- `approveRegistrationRequest(registrationIds, parentId, comments?)` - Parent approves → pending_payment
+- `rejectRegistrationRequest(registrationIds, parentId, comments)` - Parent rejects → rejected
+- `adminOverrideApproval(studentId, subjectIds, adminId, reason)` - Admin bypass → pending_payment
+- `confirmRegistrations(paymentId, registrationIds)` - After payment → confirmed
 - `getStudentRegistrations(studentId, sessionId?)`
+- `getPendingApprovalRequests(parentId)` - Parent's pending items from children
 - `getRegistrationHistory(studentId)`
 - `validateCoreSubjectRequirements(studentId, sessionId, subjectIds)`
 
 **Routes:** `apps/api/src/routes/registration.routes.ts`
 - `GET /registrations` - Own or child registrations
-- `POST /registrations/checkout` - Create pending + initiate payment
+- `POST /registrations/request` - Student submits registration request
+- `POST /registrations/direct` - Parent registers directly for child
+- `PUT /registrations/approve` - Parent approves pending request
+- `PUT /registrations/reject` - Parent rejects pending request
+- `POST /registrations/checkout` - Initiate payment for approved/direct registrations
+- `GET /registrations/pending` - Parent views pending approval requests
 - `GET /registrations/history` - All sessions
 
 #### Step 3.2: Payment Service
@@ -670,7 +695,7 @@ Table: withdrawal_request
 
 **Validation schemas:** `packages/validations/src/escrow/escrow.validations.ts`
 - `TransferEscrow` - fromStudentId, toStudentId, amount
-- `RequestWithdrawal` - amount, studentId (for parent)
+- `RequestWithdrawal` - studentId, amount (parent-only; studentId identifies which child)
 - `FulfillWithdrawal` - requestId, amount, notes
 
 **Service:** `apps/api/src/services/escrow.services.ts`
@@ -679,72 +704,97 @@ Table: withdrawal_request
 - `creditEscrow(studentId, amount, reason, relatedIds, initiatedBy)`
 - `debitEscrow(studentId, amount, reason, relatedIds, initiatedBy)`
 - `transferEscrow(fromStudentId, toStudentId, amount, parentId)`
-- `createWithdrawalRequest(studentId, amount, requestedBy)`
-- `fulfillWithdrawalRequest(requestId, amount, adminId, notes?)`
+- `createWithdrawalRequest(studentId, amount, parentId)` - Parent-only; validates parent-child link
+- `fulfillWithdrawalRequest(requestId, amount, adminId, notes?)` - Notifies parent AND student
 - `getEscrowTransactions(studentId)`
-- `getWithdrawalRequests(studentId)`
-- `getPendingWithdrawalRequests()` - Admin view
+- `getWithdrawalRequestsForParent(parentId)` - Parent views all children's withdrawal history
+- `getPendingWithdrawalRequests()` - Admin view (includes parent name)
 
 **Routes:** `apps/api/src/routes/escrow.routes.ts`
-- `GET /escrow` - Own escrow balance
-- `GET /escrow/children` - Parent view of children escrows
+- `GET /escrow` - Own escrow balance (student: read-only; parent: own children)
+- `GET /escrow/children` - Parent view of all linked children's escrow balances
 - `GET /escrow/transactions` - Transaction history
 - `POST /escrow/transfer` - Parent transfers between children
-- `POST /escrow/withdraw` - Request withdrawal
-- `GET /escrow/withdrawals` - Withdrawal history
+- `POST /escrow/withdraw` - Parent requests withdrawal for a child
+- `GET /escrow/withdrawals` - Parent views withdrawal history for children
 
 **Admin routes:**
-- `GET /admin/escrow/withdrawals` - Pending withdrawals
-- `POST /admin/escrow/withdrawals/:id/fulfill` - Fulfill request
+- `GET /admin/escrow/withdrawals` - Pending withdrawals (with parent and student info)
+- `POST /admin/escrow/withdrawals/:id/fulfill` - Fulfill request; notifies parent and student
 
 #### Step 3.4: Swap Service
 
 **Validation schemas:** `packages/validations/src/swap/swap.validations.ts`
-- `DropSubject` - registrationId
-- `SwapSubject` - dropRegistrationId, newSubjectId, newType
-- `SwitchType` - registrationId, newType
+- `RequestDrop` - registrationId, reason
+- `RequestSwap` - dropRegistrationId, newSubjectId, reason
+- `ApproveChangeRequest` - changeRequestId, comments (optional)
+- `RejectChangeRequest` - changeRequestId, comments
 
 **Service:** `apps/api/src/services/swap.services.ts`
-- `validateCanModify(registrationId, userId)` - Session open, ownership, not core
-- `dropSubject(registrationId, userId)` - Refund to escrow
-- `swapSubject(registrationId, newSubjectId, newType, userId)` - Price diff handling
-- `switchRegistrationType(registrationId, newType, userId)` - Price diff handling
+- `validateCanRequestChange(registrationId, userId)` - Session open, ownership, not core, status confirmed
+- `createDropRequest(registrationId, reason, requestedBy)` - Student: creates pending change request
+- `createSwapRequest(registrationId, newSubjectId, reason, requestedBy)` - Student: creates pending change request
+- `approveChangeRequest(changeRequestId, parentId)` - Process financials (escrow credit/debit), apply change
+- `rejectChangeRequest(changeRequestId, parentId, comments)` - Dismiss, no financial impact
+- `executeDirectDrop(registrationId, parentId)` - Parent: immediate drop + escrow credit
+- `executeDirectSwap(registrationId, newSubjectId, parentId)` - Parent: immediate swap + price diff
+- `getPendingChangeRequests(studentId)` - Student views own pending requests
+- `getPendingChangeRequestsForParent(parentId)` - Parent views children's pending requests
 
 **Routes:** `apps/api/src/routes/swap.routes.ts`
-- `POST /registrations/:id/drop` - Drop subject
-- `POST /registrations/:id/swap` - Swap for another
-- `POST /registrations/:id/switch-type` - Change in-school/external
+- `POST /registrations/:id/request-drop` - Student requests drop
+- `POST /registrations/:id/request-swap` - Student requests swap
+- `PUT /change-requests/:id/approve` - Parent approves
+- `PUT /change-requests/:id/reject` - Parent rejects
+- `POST /registrations/:id/drop` - Parent directly drops (own children)
+- `POST /registrations/:id/swap` - Parent directly swaps (own children)
+- `GET /change-requests` - View pending change requests (role-aware)
 
 #### Step 3.5: Web Pages
 
-**Student/Parent pages:**
-- `apps/web/app/register/page.tsx` - Subject selection + checkout
-- `apps/web/app/registrations/page.tsx` - Current registrations
-- `apps/web/app/registrations/history/page.tsx` - All sessions
-- `apps/web/app/escrow/page.tsx` - Balance + transactions
-- `apps/web/app/escrow/withdraw/page.tsx` - Request withdrawal
+**Student pages:**
+- `apps/web/app/register/page.tsx` - Subject selection + submit request
+- `apps/web/app/registrations/page.tsx` - Current registrations (with approval status)
+- `apps/web/app/registrations/history/page.tsx` - All sessions with approval trail
+- `apps/web/app/pending-requests/page.tsx` - View pending drop/swap/registration requests
+
+**Parent pages:**
+- `apps/web/app/register/page.tsx` - Subject selection for child + checkout (direct registration)
+- `apps/web/app/approvals/page.tsx` - Pending registration/change requests from children
+- `apps/web/app/registrations/page.tsx` - Children's current registrations
+- `apps/web/app/escrow/page.tsx` - Children's balances + transactions
+- `apps/web/app/escrow/transfer/page.tsx` - Transfer between children
+- `apps/web/app/escrow/withdraw/page.tsx` - Request withdrawal for child
 
 **Admin pages:**
 - `apps/web/app/admin/payments/page.tsx` - Bank transfer confirmations
 - `apps/web/app/admin/escrow/page.tsx` - Withdrawal fulfillment
 
 ### Phase 3 Deliverables Checklist
-- [ ] Registration table with status workflow
-- [ ] Payment table with method enum
+- [ ] Registration table with approval-aware status workflow
+- [ ] Change request tracking (drop/swap requests with pending_approval state)
+- [ ] Payment table with method enum (parent-only payer)
 - [ ] Escrow tables (balance + transactions + withdrawals)
-- [ ] Subject registration flow API
-- [ ] Payment initiation API (stub for integrations)
+- [ ] Student registration request flow API
+- [ ] Parent approval/rejection flow API
+- [ ] Parent direct registration flow API
+- [ ] Admin override approval API (with audit log)
+- [ ] Payment initiation API (parent-only, stub for integrations)
 - [ ] Fawry integration (or stub)
 - [ ] Card payment integration (or stub)
-- [ ] Bank transfer manual confirmation
-- [ ] Escrow balance and transaction API
+- [ ] Bank transfer manual confirmation (notify parent and student)
+- [ ] Escrow balance and transaction API (student read-only)
 - [ ] Escrow transfer API (parent between children)
-- [ ] Withdrawal request/fulfillment flow
-- [ ] Drop/Swap/Switch API with validations
-- [ ] Core subject swap blocking
-- [ ] Registration UI with cart
-- [ ] Payment selection UI
-- [ ] Escrow management UI
+- [ ] Withdrawal request/fulfillment flow (parent-only request, notify both on fulfillment)
+- [ ] Drop/swap request API (student) with validations
+- [ ] Drop/swap direct API (parent) with validations
+- [ ] Change request approval/rejection API (parent)
+- [ ] Core subject change blocking
+- [ ] Registration UI with cart (student: request flow; parent: direct + approval queue)
+- [ ] Payment selection UI (parent only)
+- [ ] Escrow management UI (student: read-only view; parent: full control)
+- [ ] Pending requests dashboard (student view)
+- [ ] Pending approvals dashboard (parent view)
 - [ ] Admin payment/escrow dashboards
 
 ### Affects Future Development
@@ -794,39 +844,43 @@ Table: audit_log
 
 ### User Stories Mapping
 
-#### Notifications (NOT-001 to NOT-008)
+#### Notifications (NOT-001 to NOT-011)
 
 | ID | Story | Implementation Notes |
 |----|-------|---------------------|
 | NOT-001 | Session window opens | Email blast to all students/parents |
 | NOT-002 | Session closing soon | 24-hour reminder |
-| NOT-003 | Registration confirmed | Email with subjects + receipt |
-| NOT-004 | Drop/swap notification | Email with financial impact |
-| NOT-005 | Escrow balance change | Email with transaction details |
-| NOT-006 | Withdrawal fulfilled | Email with amount + instructions |
-| NOT-007 | Parent notifications | CC parent on child's notifications |
-| NOT-008 | Admin bulk announcements | Admin composes + sends to groups |
+| NOT-003 | Parent: child submitted registration request | Email to parent with subject list, cost, approve/reject link |
+| NOT-004 | Student: registration request approved/rejected | Email to student with parent decision and comments |
+| NOT-005 | Parent: payment receipt | Email with subjects, amount, method, confirmation number |
+| NOT-006 | Parent: child requested drop/swap | Email with change details and financial impact, approve/reject link |
+| NOT-007 | Student: drop/swap request processed | Email to student with parent decision and financial outcome |
+| NOT-008 | Parent: child escrow balance changed | Email with previous/new balance and reason |
+| NOT-009 | Parent: escrow withdrawal fulfilled | Email with amount released and remaining balance |
+| NOT-010 | Parent: all child-related notifications | Parent always CC'd on any action involving their child |
+| NOT-011 | Admin bulk announcements | Admin composes + sends to groups (all, students, parents, grade) |
 
-#### Reports (REP-001 to REP-008)
+#### Reports (REP-001 to REP-009)
 
 | ID | Story | Implementation Notes |
 |----|-------|---------------------|
-| REP-001 | Registration report | Per session, filterable, exportable |
-| REP-002 | Financial summary | Revenue breakdown |
+| REP-001 | Registration report | Per session, includes approval trail (requested by/approved by/processed by), filter by approval status |
+| REP-002 | Financial summary | Revenue breakdown; school vs. non-school subjects breakdown |
 | REP-003 | Escrow report | Balances, liability, pending |
-| REP-004 | Subject enrollment | Students per subject |
-| REP-005 | Grade 10 compliance | Core subject check |
-| REP-006 | Audit trail | All system actions |
-| REP-007 | Student roster | By grade with contacts |
-| REP-008 | Admin dashboard | Key metrics overview |
+| REP-004 | Subject enrollment | Students per subject; school vs. non-school breakdown |
+| REP-005 | Grade 10 compliance | Core subject check with approval status column |
+| REP-006 | Audit trail | Full chain of custody: "Requested by → Approved by → Processed by" for all transactions |
+| REP-007 | Student roster | By grade with contacts and linked parents |
+| REP-008 | Admin dashboard | Key metrics including pending approval requests count |
+| REP-009 | Pending approvals report | All pending registration/change requests with age and parent/student info |
 
 #### Grade Progression (GRADE-001 to GRADE-003)
 
 | ID | Story | Implementation Notes |
 |----|-------|---------------------|
 | GRADE-001 | Auto grade progression | Scheduled job after sessions |
-| GRADE-002 | Admin manual adjustment | Override grade + log reason |
-| GRADE-003 | Graduated student access | Limited to history + escrow |
+| GRADE-002 | Admin manual adjustment | Override grade + log reason; notify student AND parent |
+| GRADE-003 | Graduated student access | Limited to history + escrow view; parent retains withdrawal rights |
 
 ### Implementation Steps
 
@@ -899,13 +953,14 @@ export async function updateSubject(id: string, data: UpdateSubjectType, adminId
 #### Step 4.3: Reports Service
 
 **Service:** `apps/api/src/services/report.services.ts`
-- `generateRegistrationReport(sessionId, filters)`
-- `generateFinancialSummary(sessionId)`
+- `generateRegistrationReport(sessionId, filters)` - Includes approval trail columns
+- `generateFinancialSummary(sessionId)` - School vs. non-school subject breakdown
 - `generateEscrowReport()`
-- `generateSubjectEnrollmentReport(sessionId)`
-- `generateGrade10ComplianceReport(sessionId)`
+- `generateSubjectEnrollmentReport(sessionId)` - School vs. non-school breakdown
+- `generateGrade10ComplianceReport(sessionId)` - Includes approval status
 - `generateStudentRoster(grade?)`
-- `getAdminDashboardMetrics()`
+- `generatePendingApprovalsReport()` - All pending registration/change requests with age
+- `getAdminDashboardMetrics()` - Includes pending approval requests count
 
 **Export functionality:**
 - Create `apps/api/src/lib/export.ts`
@@ -949,29 +1004,58 @@ function getNewGrade(currentGrade: number, sessionType: string): number | null {
 
 **Admin pages:**
 - `apps/web/app/admin/notifications/page.tsx` - Bulk announcement composer
-- `apps/web/app/admin/reports/page.tsx` - Report generator UI
-- `apps/web/app/admin/audit/page.tsx` - Audit log viewer
-- `apps/web/app/admin/dashboard/page.tsx` - Metrics dashboard
+- `apps/web/app/admin/reports/page.tsx` - Report generator UI (includes pending approvals report)
+- `apps/web/app/admin/audit/page.tsx` - Audit log viewer (full chain-of-custody display)
+- `apps/web/app/admin/dashboard/page.tsx` - Metrics dashboard (includes pending approval count)
 
 **User pages:**
 - `apps/web/app/notifications/page.tsx` - Notification center
 
+#### Step 4.6: Graduation Plan & Career Visualization (P3 — Post-Launch)
+
+All stories in this section (GRAD-001 to GRAD-007) are priority P3 and are deferred to a post-launch phase. They do not block any P0 or P1 features.
+
+**New database tables (when implemented):**
+```
+Table: graduation_plan
+├── id: text (PK)
+├── studentId: text (FK → user.id, unique)
+├── careerGoal: text (nullable)
+├── careerDescription: text (nullable)
+└── (timestamps)
+
+Table: graduation_plan_entry
+├── id: text (PK)
+├── planId: text (FK → graduation_plan.id)
+├── subjectId: text (FK → subject.id)
+├── plannedGrade: integer (10 | 11 | 12)
+├── plannedSession: text ('june' | 'november' | 'january')
+└── (timestamps)
+```
+
+**New service (when implemented):** `apps/api/src/services/graduation-plan.services.ts`
+
+**New pages (when implemented):**
+- `apps/web/app/graduation-plan/page.tsx` - Interactive timeline and subject planner
+- `apps/web/app/graduation-plan/career/page.tsx` - Career goal setting
+
 ### Phase 4 Deliverables Checklist
 - [ ] Notification table and service
 - [ ] Email integration (Resend/SendGrid/SES)
-- [ ] Notification triggers in all transactional services
-- [ ] Parent CC on child notifications
-- [ ] Audit log table and service
-- [ ] Audit logging in all CRUD operations
-- [ ] Report generation service
+- [ ] Notification triggers for request-approval flow (NOT-003, NOT-004, NOT-006, NOT-007)
+- [ ] Notification triggers for payments, escrow, withdrawals (NOT-005, NOT-008, NOT-009)
+- [ ] Parent auto-CC on all child-related notifications (NOT-010)
+- [ ] Audit log table and service with chain-of-custody fields
+- [ ] Audit logging in all CRUD and approval operations
+- [ ] Report generation service (including pending approvals report REP-009)
 - [ ] Export functionality (CSV, PDF, Excel)
-- [ ] Grade progression scheduler
+- [ ] Grade progression scheduler (notify student AND parent on change)
 - [ ] Manual grade adjustment API
-- [ ] Graduated student access restrictions
-- [ ] Admin dashboard with metrics
+- [ ] Graduated student access restrictions (parent retains escrow withdrawal rights)
+- [ ] Admin dashboard with metrics (including pending approval requests count)
 - [ ] Report generation UI
 - [ ] Notification center UI
-- [ ] Audit log viewer (admin)
+- [ ] Audit log viewer with full chain display (admin)
 
 ---
 
@@ -984,49 +1068,72 @@ function getNewGrade(currentGrade: number, sessionType: string): number | null {
 | `POST /subjects` | ✅ | ❌ | ❌ |
 | `GET /subjects` | ✅ | ✅ | ✅ |
 | `POST /sessions` | ✅ | ❌ | ❌ |
+| `PUT /sessions/:id` (active window) | ✅ | ❌ | ❌ |
 | `GET /sessions/active` | ✅ | ✅ | ✅ |
-| `POST /registrations/checkout` | ❌ | ✅ (own) | ✅ (child) |
-| `POST /registrations/:id/drop` | ❌ | ✅ (own) | ✅ (child) |
-| `GET /escrow` | ✅ (all) | ✅ (own) | ✅ (child) |
+| `POST /registrations/request` | ❌ | ✅ (own) | ❌ |
+| `POST /registrations/direct` | ❌ | ❌ | ✅ (child) |
+| `PUT /registrations/approve` | ❌ | ❌ | ✅ (child) |
+| `POST /registrations/checkout` | ❌ | ❌ | ✅ (child) |
+| `POST /registrations/:id/request-drop` | ❌ | ✅ (own) | ❌ |
+| `POST /registrations/:id/drop` | ❌ | ❌ | ✅ (child) |
+| `PUT /change-requests/:id/approve` | ❌ | ❌ | ✅ (child) |
+| `GET /escrow` | ✅ (all) | ✅ (own, read-only) | ✅ (children) |
 | `POST /escrow/transfer` | ❌ | ❌ | ✅ |
+| `POST /escrow/withdraw` | ❌ | ❌ | ✅ (child) |
 | `POST /admin/escrow/withdrawals/:id/fulfill` | ✅ | ❌ | ❌ |
 | `GET /admin/reports/*` | ✅ | ❌ | ❌ |
 
 ### 10.2 Data Isolation Rules
 
 1. **Students** can only access:
-   - Own profile, registrations, escrow, notifications
+   - Own profile, registrations, notifications
+   - Own escrow balance and transaction history (read-only; cannot initiate payments or withdrawals)
    - Public subject/session data
    - Link requests involving them
+   - Own pending change requests (drop/swap)
 
 2. **Parents** can only access:
    - Own profile, notifications
-   - Linked children's registrations, escrow
+   - Linked children's registrations, escrow (full control: pay, transfer, withdraw)
+   - Pending registration/change requests from linked children (approve/reject)
    - Cannot see unlinked students' data
 
 3. **Admins** can access:
    - All data (with audit logging)
    - System-level operations
+   - Can override parent approval for exceptional cases (audit logged)
 
 ### 10.3 Validation Checkpoints
 
-**Before Registration:**
+**Before Submitting Registration Request (student) or Direct Registration (parent):**
 - [ ] Session is active
 - [ ] Subject is active
-- [ ] Student not already registered for subject in session
+- [ ] Student not already registered or pending for subject in session
 - [ ] If Grade 10 + June: all core subjects included
-- [ ] External option available if selected
 
-**Before Drop/Swap:**
+**Before Parent Approves Registration Request:**
+- [ ] Request is in `pending_approval` state
+- [ ] Approver is a linked parent of the student
+
+**Before Payment / Checkout:**
+- [ ] Registration is in `pending_payment` state (approved or parent-initiated)
+- [ ] Payer is a linked parent (not the student)
+- [ ] Escrow deduction does not exceed available balance
+
+**Before Drop/Swap Request (student) or Direct Drop/Swap (parent):**
 - [ ] Session is active
 - [ ] Registration belongs to student (or parent's child)
-- [ ] Registration is confirmed (not pending)
+- [ ] Registration status is `confirmed`
 - [ ] Not a core subject (if Grade 10 + June)
+
+**Before Parent Approves Drop/Swap Request:**
+- [ ] Change request is in `pending_approval` state
+- [ ] Approver is a linked parent of the student
 
 **Before Escrow Operations:**
 - [ ] Sufficient balance for debits
 - [ ] Transfer: both students linked to same parent
-- [ ] Withdrawal: not exceeding balance
+- [ ] Withdrawal: requested by a linked parent (not the student); amount does not exceed balance
 
 ### 10.4 Session Window State Machine
 
@@ -1048,10 +1155,19 @@ function getNewGrade(currentGrade: number, sessionType: string): number | null {
 
 ### 10.5 Financial Calculations
 
+> **Note:** All payment actions are parent-only. Students have read-only access to financial information.
+
+**Subject Price Resolution:**
+```
+price = subject.isOfferedAtSchool
+    ? subject.priceInSchool
+    : subject.customPrice
+```
+
 **Registration Total:**
 ```
 total = Σ(registration.priceAtRegistration)
-     - min(escrow.balance, total)  // Escrow applied
+     - min(escrow.balance, total)  // Escrow applied by parent at checkout
      = amountToPay
 ```
 
@@ -1060,17 +1176,11 @@ total = Σ(registration.priceAtRegistration)
 diff = newSubject.price - currentRegistration.priceAtRegistration
 
 if diff > 0:
-    // User pays difference
+    // Parent pays the difference
     paymentRequired = diff
 else:
-    // Credit to escrow
+    // Credited to student's escrow
     escrowCredit = abs(diff)
-```
-
-**Type Switch Price Difference:**
-```
-diff = newTypePrice - currentTypePrice
-// Same logic as swap
 ```
 
 ---
@@ -1140,13 +1250,17 @@ Always store the price at time of transaction:
 ```typescript
 // When creating registration
 const subject = await getSubjectById(subjectId);
+const price = subject.isOfferedAtSchool
+  ? subject.priceInSchool
+  : subject.customPrice;
+
 await db.insert(registration).values({
   ...data,
-  priceAtRegistration: registrationType === 'in_school' 
-    ? subject.priceInSchool 
-    : subject.priceExternal,
+  priceAtRegistration: price,
 });
 ```
+
+> There is no longer a `registrationType` field on registrations. All students pay the same price for a given subject regardless of whether they use an external teacher.
 
 ### 11.4 Escrow Transaction Pattern
 
@@ -1273,13 +1387,24 @@ Sessions:
 
 Registrations:
   GET  /v1/registrations
-  POST /v1/registrations/checkout
+  POST /v1/registrations/request          (student: submit request → pending_approval)
+  POST /v1/registrations/direct           (parent: register directly → pending_payment)
+  PUT  /v1/registrations/approve          (parent: approve pending request)
+  PUT  /v1/registrations/reject           (parent: reject pending request)
+  POST /v1/registrations/checkout         (parent: initiate payment for approved/direct)
+  GET  /v1/registrations/pending          (parent: view children's pending requests)
   GET  /v1/registrations/history
-  POST /v1/registrations/:id/drop
-  POST /v1/registrations/:id/swap
-  POST /v1/registrations/:id/switch-type
 
-Payments:
+Change Requests (Drop / Swap):
+  POST /v1/registrations/:id/request-drop  (student: submit drop request)
+  POST /v1/registrations/:id/request-swap  (student: submit swap request)
+  POST /v1/registrations/:id/drop          (parent: directly drop for child)
+  POST /v1/registrations/:id/swap          (parent: directly swap for child)
+  GET  /v1/change-requests                 (role-aware: student sees own; parent sees children's)
+  PUT  /v1/change-requests/:id/approve     (parent: approve drop/swap)
+  PUT  /v1/change-requests/:id/reject      (parent: reject drop/swap)
+
+Payments (parent-only):
   POST /v1/payments/initiate
   GET  /v1/payments
   GET  /v1/payments/:id
@@ -1288,12 +1413,12 @@ Payments:
   POST /v1/payments/webhook/paymob
 
 Escrow:
-  GET  /v1/escrow
-  GET  /v1/escrow/children
-  GET  /v1/escrow/transactions
-  POST /v1/escrow/transfer
-  POST /v1/escrow/withdraw
-  GET  /v1/escrow/withdrawals
+  GET  /v1/escrow                          (student: own read-only; parent: own children)
+  GET  /v1/escrow/children                 (parent: all linked children's balances)
+  GET  /v1/escrow/transactions             (student/parent)
+  POST /v1/escrow/transfer                 (parent only)
+  POST /v1/escrow/withdraw                 (parent only: request withdrawal for child)
+  GET  /v1/escrow/withdrawals              (parent: children's withdrawal history)
 
 Admin:
   GET  /v1/admin/escrow/withdrawals
@@ -1304,10 +1429,12 @@ Admin:
   GET  /v1/admin/reports/enrollment
   GET  /v1/admin/reports/compliance
   GET  /v1/admin/reports/roster
+  GET  /v1/admin/reports/pending-approvals
   GET  /v1/admin/dashboard
   GET  /v1/admin/audit
   POST /v1/admin/notifications/bulk
   PUT  /v1/admin/users/:id/grade
+  POST /v1/admin/registrations/override    (admin override parent approval)
 
 Notifications:
   GET  /v1/notifications
@@ -1408,20 +1535,23 @@ apps/web/app/
 ├── subjects/page.tsx
 ├── register/page.tsx
 ├── registrations/
-│   ├── page.tsx
-│   └── history/page.tsx
+│   ├── page.tsx                  (shows approval status; student: own; parent: children's)
+│   └── history/page.tsx          (approval trail included)
+├── pending-requests/page.tsx     (student: own pending drop/swap/registration requests)
+├── approvals/page.tsx            (parent: pending registration + change requests from children)
 ├── escrow/
-│   ├── page.tsx
-│   └── withdraw/page.tsx
+│   ├── page.tsx                  (student: read-only view; parent: full control per child)
+│   ├── transfer/page.tsx         (parent: transfer between children)
+│   └── withdraw/page.tsx         (parent: request withdrawal for child)
 ├── notifications/page.tsx
 └── admin/
-    ├── dashboard/page.tsx
+    ├── dashboard/page.tsx        (includes pending approvals count)
     ├── subjects/page.tsx
     ├── sessions/page.tsx
     ├── payments/page.tsx
     ├── escrow/page.tsx
-    ├── reports/page.tsx
-    ├── audit/page.tsx
+    ├── reports/page.tsx          (includes pending approvals report)
+    ├── audit/page.tsx            (chain-of-custody display)
     └── notifications/page.tsx
 ```
 

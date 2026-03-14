@@ -50,6 +50,55 @@
       "when": 1769624640855,
       "tag": "0006_nappy_madripoor",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772488616635,
+      "tag": "0007_slim_fat_cobra",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772567507076,
+      "tag": "0008_cheerful_wendell_vaughn",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772582759203,
+      "tag": "0009_chilly_slipstream",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772586658371,
+      "tag": "0010_nifty_dark_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1772595224842,
+      "tag": "0011_graceful_sandman",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1772706553019,
+      "tag": "0012_kind_red_skull",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1772736528708,
+      "tag": "0013_absurd_meltdown",
+      "breakpoints": true
     }
   ]
 }

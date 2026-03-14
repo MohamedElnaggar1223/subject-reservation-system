@@ -21,6 +21,17 @@ import { todos } from './routes/todo.routes';
 import { files } from './routes/file.routes';
 import { links } from './routes/link.routes';
 import { users } from './routes/user.routes';
+import { subjects } from './routes/subject.routes';
+import { sessions } from './routes/session.routes';
+import { registrations } from './routes/registration.routes';
+import { payments } from './routes/payment.routes';
+import { escrowRoutes } from './routes/escrow.routes';
+import { registrationSwapRoutes, changeRequestRoutes } from './routes/swap.routes';
+import { notificationRoutes } from './routes/notification.routes';
+import { audit } from './routes/audit.routes';
+import { grade } from './routes/grade.routes';
+import { reports } from './routes/report.routes';
+import { startSessionScheduler } from './jobs/session-closer';
 
 /**
  * Rate Limiter for Auth Routes
@@ -82,7 +93,6 @@ const app = new Hono<HonoEnv>()
 .use("/api/auth/*", authRateLimit)
 .use("*", async (c, next) => {
 	const session = await auth.api.getSession({ headers: c.req.raw.headers });
-  console.log(c.req.raw.headers)
 
   	if (!session) {
     	c.set("user", null);
@@ -96,14 +106,7 @@ const app = new Hono<HonoEnv>()
   	await next();
 })
 .on(["POST", "GET"], "/api/auth/*", async (c) => {
-  const response = await auth.handler(c.req.raw);
-
-  console.log('🌍 CORS Origins:', corsOrigins);
-
-  const setCookieHeaders = response.headers.getSetCookie()
-  console.log('🍪 Setting cookies:', setCookieHeaders);
-
-	return response
+  return auth.handler(c.req.raw);
 });
 
 /**
@@ -170,12 +173,110 @@ const v1 = new Hono<HonoEnv>()
    * - GET    /v1/users/:id      - Get user by ID (admin)
    * - PUT    /v1/users/:id      - Update user (admin)
    *
-   * Add your own routes below.
+   * Subject routes mounted at /v1/subjects
+   * - GET    /v1/subjects              - List subjects (auth; admin can filter isActive)
+   * - GET    /v1/subjects/:id          - Get subject by ID (auth)
+   * - POST   /v1/subjects              - Create subject (admin)
+   * - PUT    /v1/subjects/:id          - Update subject (admin)
+   * - DELETE /v1/subjects/:id          - Deactivate subject (admin, soft delete)
+   * - PUT    /v1/subjects/:id/core     - Set core flag (admin)
+   * - PUT    /v1/subjects/:id/activate - Reactivate subject (admin)
+   *
+   * Session routes mounted at /v1/sessions
+   * - GET    /v1/sessions/active               - Get active sessions (auth)
+   * - GET    /v1/sessions                      - List all sessions (admin)
+   * - GET    /v1/sessions/:id                  - Get session by ID (admin)
+   * - POST   /v1/sessions                      - Create session (admin)
+   * - PUT    /v1/sessions/:id                  - Update session (admin)
+   * - POST   /v1/sessions/:id/activate         - Manually activate draft (admin)
+   * - POST   /v1/sessions/:id/close            - Manually close active (admin)
+   *
+   * Registration routes mounted at /v1/registrations
+   * - GET    /v1/registrations/available       - Available subjects for a session (student/parent)
+   * - GET    /v1/registrations/pending         - Pending approval requests (parent/admin)
+   * - GET    /v1/registrations/history         - Registration history across all sessions
+   * - GET    /v1/registrations                 - List registrations (role-aware)
+   * - POST   /v1/registrations/request         - Student submits registration request
+   * - POST   /v1/registrations/direct          - Parent registers directly for child
+   * - PUT    /v1/registrations/approve         - Parent approves pending requests
+   * - PUT    /v1/registrations/reject          - Parent rejects pending requests
+   * - POST   /v1/registrations/admin-override  - Admin bypasses parent approval
+   * - GET    /v1/registrations/:id             - Get single registration
+   *
+   * Payment routes mounted at /v1/payments
+   * - GET    /v1/payments/checkout-summary     - Checkout summary for registrations (parent)
+   * - GET    /v1/payments/pending-bank         - Pending bank transfers (admin)
+   * - GET    /v1/payments                      - Payment history (parent/admin)
+   * - POST   /v1/payments/initiate             - Initiate payment (parent only)
+   * - GET    /v1/payments/:id                  - Single payment with registrations
+   * - POST   /v1/payments/:id/confirm          - Admin confirms bank transfer
+   * - POST   /v1/payments/webhook/fawry              - Fawry webhook
+   * - POST   /v1/payments/webhook/paymob             - Paymob webhook
+   *
+   * Escrow routes mounted at /v1/escrow
+   * - GET    /v1/escrow                              - Own balance (student read-only / parent with ?studentId)
+   * - GET    /v1/escrow/children                     - Parent: all children balances
+   * - GET    /v1/escrow/transactions                 - Transaction history (role-aware)
+   * - POST   /v1/escrow/transfer                     - Parent transfers between children
+   * - POST   /v1/escrow/withdraw                     - Parent requests withdrawal for child
+   * - GET    /v1/escrow/withdrawals                  - Parent: withdrawal history for children
+   * - GET    /v1/escrow/admin/withdrawals            - Admin: pending withdrawal requests
+   * - POST   /v1/escrow/admin/withdrawals/:id/fulfill - Admin fulfills withdrawal
+   * - POST   /v1/escrow/admin/withdrawals/:id/reject  - Admin rejects withdrawal
+   *
+   * Swap routes (registration-scoped) mounted at /v1/registrations:
+   * - POST   /v1/registrations/:id/request-drop   - Student requests drop (SWAP-001)
+   * - POST   /v1/registrations/:id/request-swap   - Student requests swap (SWAP-002)
+   * - POST   /v1/registrations/:id/drop           - Parent direct drop (SWAP-004)
+   * - POST   /v1/registrations/:id/swap           - Parent direct swap (SWAP-004)
+   *
+   * Change request routes mounted at /v1/change-requests:
+   * - GET    /v1/change-requests                  - List (role-aware)
+   * - GET    /v1/change-requests/:id              - Single request
+   * - PUT    /v1/change-requests/:id/approve      - Parent approves (SWAP-003)
+   * - PUT    /v1/change-requests/:id/reject       - Parent rejects (SWAP-003)
+   *
+   * Notification routes mounted at /v1/notifications:
+   * - GET    /v1/notifications                    - Paginated notification list (unreadOnly filter)
+   * - GET    /v1/notifications/unread-count       - Unread count for badge
+   * - PUT    /v1/notifications/read-all           - Mark all as read
+   * - PUT    /v1/notifications/:id/read           - Mark single as read
+   * - POST   /v1/notifications/admin/announce     - Admin bulk announcement (NOT-011)
+   *
+   * Audit log routes mounted at /v1/audit (admin only):
+   * - GET    /v1/audit/logs                       - Paginated audit log with filters (REP-006)
+   * - GET    /v1/audit/entity/:type/:id           - Full chain-of-custody for a single entity
+   *
+   * Grade management routes mounted at /v1/grade (admin only):
+   * - GET    /v1/grade/graduated                  - List all graduated students (GRADE-003)
+   * - PUT    /v1/grade/:studentId                 - Manual grade adjustment (GRADE-002)
+   *
+   * Reports routes mounted at /v1/reports (admin only):
+   * - GET    /v1/reports/dashboard                - Admin dashboard metrics (REP-008)
+   * - GET    /v1/reports/registrations            - Registration report per session (REP-001)
+   * - GET    /v1/reports/financial                - Financial summary per session (REP-002)
+   * - GET    /v1/reports/escrow                   - Escrow balances report (REP-003)
+   * - GET    /v1/reports/enrollment               - Subject enrollment counts (REP-004)
+   * - GET    /v1/reports/compliance               - Grade 10 core compliance (REP-005)
+   * - GET    /v1/reports/roster                   - Student roster by grade (REP-007)
+   * - GET    /v1/reports/pending-approvals        - All pending approvals with age (REP-009)
+   * All report routes support ?format=csv for CSV download.
    */
   .route('/todos', todos)
   .route('/files', files)
   .route('/links', links)
-  .route('/users', users);
+  .route('/users', users)
+  .route('/subjects', subjects)
+  .route('/sessions', sessions)
+  .route('/registrations', registrations)
+  .route('/registrations', registrationSwapRoutes)
+  .route('/payments', payments)
+  .route('/escrow', escrowRoutes)
+  .route('/change-requests', changeRequestRoutes)
+  .route('/notifications', notificationRoutes)
+  .route('/audit', audit)
+  .route('/grade', grade)
+  .route('/reports', reports);
 
 // Mount v1 under /v1 (keep chaining for proper RPC typing)
 const appWithRoutes = app
@@ -183,6 +284,9 @@ const appWithRoutes = app
   .route('/v1', v1);
 
 export type AppType = typeof appWithRoutes;
+
+// Start background jobs
+startSessionScheduler();
 
 serve({
   fetch: appWithRoutes.fetch,

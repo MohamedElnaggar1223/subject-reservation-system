@@ -69,3 +69,17 @@ export const UserQueryFilters = z.object({
   search: z.string().optional(),
 });
 export type UserQueryFiltersType = z.infer<typeof UserQueryFilters>;
+
+/**
+ * Manual Grade Adjustment (GRADE-002)
+ * Admin sets a student's grade with a mandatory reason.
+ * newGrade of null means the student is marked as graduated.
+ */
+export const ManualGradeAdjustment = z.object({
+  newGrade: GradeSchema.nullable(),
+  reason: z
+    .string()
+    .min(5, 'Reason must be at least 5 characters')
+    .max(500, 'Reason too long'),
+});
+export type ManualGradeAdjustmentType = z.infer<typeof ManualGradeAdjustment>;

@@ -17,8 +17,8 @@
  * 5. Use onDelete: "cascade" for automatic cleanup
  */
 
-import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, numeric, integer } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import { pgTable, text, timestamp, boolean, index, numeric, integer, doublePrecision, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -280,15 +280,24 @@ export const fileVariantRelations = relations(fileVariant, ({ one }) => ({
   }),
 }));
 
-// Update user relations to include todos and files
+// Full user relations including auth, profile, links, registrations, and payments
 export const userRelationsExtended = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   todos: many(todo),
   files: many(file),
-  // Parent-Student Link Relations
   linkRequestsAsParent: many(parentStudentLink, { relationName: "parentLinks" }),
   linkRequestsAsStudent: many(parentStudentLink, { relationName: "studentLinks" }),
+  registrationsAsStudent: many(registration, { relationName: "studentRegistrations" }),
+  registrationsRequested: many(registration, { relationName: "requestedRegistrations" }),
+  registrationsApproved: many(registration, { relationName: "approvedRegistrations" }),
+  paymentsAsStudent: many(payment, { relationName: "studentPayments" }),
+  paymentsAsParent: many(payment, { relationName: "parentPayments" }),
+  paymentsConfirmed: many(payment, { relationName: "confirmedPayments" }),
+  changeRequestsRequested: many(changeRequest, { relationName: "requestedChangeRequests" }),
+  changeRequestsApproved: many(changeRequest, { relationName: "approvedChangeRequests" }),
+  notifications: many(notification),
+  auditLogs: many(auditLog),
 }));
 
 /**
@@ -335,6 +344,104 @@ export const parentStudentLink = pgTable(
 );
 
 /**
+ * ============================================
+ * SUBJECT TABLE
+ * ============================================
+ *
+ * Stores all IGCSE subjects available for registration.
+ *
+ * Key fields:
+ * - council: The examination body (Pearson Edexcel, Cambridge, Oxford)
+ * - priceInSchool: Standard price for students taught at school
+ * - isOfferedAtSchool: Whether the school actively teaches this subject
+ * - customPrice: Finance-set price for subjects not offered at school (nullable)
+ * - isCore: If true, Grade 10 students must register this in the June session
+ * - isActive: Soft-delete flag; inactive subjects are hidden from registration
+ */
+export const subject = pgTable(
+  "subject",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    code: text("code").notNull().unique(),
+    council: text("council").notNull(), // 'pearson_edexcel' | 'cambridge' | 'oxford'
+    priceInSchool: doublePrecision("price_in_school").notNull(),
+    isOfferedAtSchool: boolean("is_offered_at_school").notNull().default(true),
+    customPrice: doublePrecision("custom_price"),
+    isActive: boolean("is_active").notNull().default(true),
+    isCore: boolean("is_core").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("subject_code_idx").on(table.code),
+    index("subject_council_idx").on(table.council),
+    index("subject_isActive_idx").on(table.isActive),
+    index("subject_isCore_idx").on(table.isCore),
+  ]
+);
+
+/**
+ * ============================================
+ * REGISTRATION SESSION TABLE
+ * ============================================
+ *
+ * Represents an exam registration window (e.g., "June 2026").
+ *
+ * Lifecycle: draft → active → closed
+ * - draft:  Admin has scheduled the window; students cannot register yet.
+ * - active: Registration is open. Auto-opens when startDate arrives.
+ * - closed: Registration ended (endDate passed or admin closed early).
+ *
+ * Key constraint: only ONE active session per sessionType at a time.
+ * The partial unique index below enforces this at the DB level.
+ *
+ * editHistory stores an audit trail of any field changes made while the
+ * session was in the 'active' state (endDate extensions, etc.).
+ */
+type SessionEditEntry = {
+  editedBy: string;
+  editedAt: string;
+  field: string;
+  oldValue: string;
+  newValue: string;
+  reason?: string;
+};
+
+export const registrationSession = pgTable(
+  "registration_session",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    sessionType: text("session_type").notNull(), // 'june' | 'november' | 'january'
+    startDate: timestamp("start_date", { withTimezone: true }).notNull(),
+    endDate: timestamp("end_date", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("draft"), // 'draft' | 'active' | 'closed'
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    closedBy: text("closed_by").references(() => user.id, { onDelete: "set null" }),
+    editHistory: jsonb("edit_history")
+      .$type<SessionEditEntry[]>()
+      .default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("reg_session_status_idx").on(table.status),
+    index("reg_session_type_idx").on(table.sessionType),
+    // Enforces: only one active window per sessionType at a time
+    uniqueIndex("one_active_per_session_type_idx")
+      .on(table.sessionType)
+      .where(sql`status = 'active'`),
+  ]
+);
+
+/**
  * PARENT-STUDENT LINK RELATIONS
  */
 export const parentStudentLinkRelations = relations(parentStudentLink, ({ one }) => ({
@@ -349,3 +456,631 @@ export const parentStudentLinkRelations = relations(parentStudentLink, ({ one })
     relationName: "studentLinks",
   }),
 }));
+
+/**
+ * ============================================
+ * REGISTRATION TABLE
+ * ============================================
+ *
+ * Records each subject a student registers for in a session.
+ *
+ * Status workflow:
+ * - pending_approval: Student-initiated; awaiting parent approval.
+ * - pending_payment:  Parent-approved (or parent/admin-initiated); awaiting payment.
+ * - confirmed:        Payment received and registration is complete.
+ * - rejected:         Parent rejected the student's request (terminal state).
+ * - dropped:          Previously confirmed registration later dropped via change request.
+ *
+ * priceAtRegistration is a snapshot of the subject price at the time of registration.
+ * Changes to subject pricing do NOT affect existing registrations.
+ *
+ * The partial unique index prevents a student from having more than one
+ * active (non-dropped, non-rejected) registration for the same subject
+ * in the same session.
+ */
+export const registration = pgTable(
+  "registration",
+  {
+    id: text("id").primaryKey(),
+    // The student being registered
+    studentId: text("student_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // The session this registration belongs to
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => registrationSession.id, { onDelete: "restrict" }),
+    // The subject being registered for
+    subjectId: text("subject_id")
+      .notNull()
+      .references(() => subject.id, { onDelete: "restrict" }),
+    // Price snapshot — frozen at time of registration
+    priceAtRegistration: doublePrecision("price_at_registration").notNull(),
+    // Lifecycle status
+    status: text("status").notNull().default("pending_approval"),
+    // Who initiated this registration (student or parent)
+    requestedBy: text("requested_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    // Parent who approved (null for parent-initiated or admin-override until explicitly set)
+    approvedBy: text("approved_by").references(() => user.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    // Parent's comments on approval or rejection
+    approvalComments: text("approval_comments"),
+    // Set when a confirmed registration is dropped
+    droppedAt: timestamp("dropped_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("registration_studentId_idx").on(table.studentId),
+    index("registration_sessionId_idx").on(table.sessionId),
+    index("registration_subjectId_idx").on(table.subjectId),
+    index("registration_status_idx").on(table.status),
+    index("registration_requestedBy_idx").on(table.requestedBy),
+    // One active registration per student per subject per session
+    uniqueIndex("registration_unique_active_idx")
+      .on(table.studentId, table.sessionId, table.subjectId)
+      .where(sql`status NOT IN ('dropped', 'rejected')`),
+  ]
+);
+
+/**
+ * REGISTRATION RELATIONS
+ * (complete definition including payment link — see registrationWithPaymentRelations below)
+ */
+
+/**
+ * REGISTRATION SESSION RELATIONS
+ * (reverse side — one session has many registrations)
+ */
+export const registrationSessionRelations = relations(registrationSession, ({ many }) => ({
+  registrations: many(registration),
+}));
+
+/**
+ * SUBJECT RELATIONS
+ * (reverse side — one subject has many registrations)
+ */
+export const subjectRelations = relations(subject, ({ many }) => ({
+  registrations: many(registration),
+}));
+
+/**
+ * ============================================
+ * PAYMENT TABLE
+ * ============================================
+ *
+ * Records a payment transaction initiated by a parent.
+ * A single payment can cover multiple subject registrations for ONE student.
+ *
+ * - amount: the amount charged to the payment method (after escrow applied)
+ * - escrowAmountApplied: portion deducted from the student's escrow balance
+ * - amount + escrowAmountApplied = total registration cost
+ *
+ * Parent-only payer: parentId is always the authenticated parent.
+ * For bank transfers, confirmedBy is the admin who manually confirmed payment.
+ * metadata stores provider-specific data (Fawry code, payment URL, bank ref).
+ */
+export const payment = pgTable(
+  "payment",
+  {
+    id: text("id").primaryKey(),
+    // The student whose registrations are being paid for
+    studentId: text("student_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    // The parent making the payment (parent-only financial control)
+    parentId: text("parent_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    // Amount charged to the payment method
+    amount: doublePrecision("amount").notNull(),
+    // Portion of the total covered by escrow (deducted from student's escrow)
+    escrowAmountApplied: doublePrecision("escrow_amount_applied").notNull().default(0),
+    // Payment method selected by the parent
+    paymentMethod: text("payment_method").notNull(), // 'fawry' | 'card' | 'mobile_wallet' | 'bank_transfer'
+    // Lifecycle status
+    status: text("status").notNull().default("pending"), // 'pending' | 'completed' | 'failed' | 'refunded'
+    // Provider reference (Fawry code, transaction ID, etc.)
+    externalReference: text("external_reference"),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    // Admin who confirmed a bank transfer (null for automated methods)
+    confirmedBy: text("confirmed_by").references(() => user.id, { onDelete: "set null" }),
+    // Provider-specific data (payment URL, Fawry expiry, bank details)
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("payment_studentId_idx").on(table.studentId),
+    index("payment_parentId_idx").on(table.parentId),
+    index("payment_status_idx").on(table.status),
+    index("payment_method_idx").on(table.paymentMethod),
+  ]
+);
+
+/**
+ * ============================================
+ * PAYMENT-REGISTRATION LINK TABLE
+ * ============================================
+ *
+ * Many-to-many join between payments and registrations.
+ * A payment can cover multiple registrations.
+ * A registration should only appear in one completed payment.
+ */
+export const paymentRegistration = pgTable(
+  "payment_registration",
+  {
+    id: text("id").primaryKey(),
+    paymentId: text("payment_id")
+      .notNull()
+      .references(() => payment.id, { onDelete: "cascade" }),
+    registrationId: text("registration_id")
+      .notNull()
+      .references(() => registration.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("paymentReg_paymentId_idx").on(table.paymentId),
+    index("paymentReg_registrationId_idx").on(table.registrationId),
+    uniqueIndex("paymentReg_unique_idx").on(table.paymentId, table.registrationId),
+  ]
+);
+
+/**
+ * ============================================
+ * ESCROW TABLE
+ * ============================================
+ *
+ * One escrow account per student.
+ * Balance is maintained atomically via escrow_transaction records.
+ * Parents have full control; students have read-only access.
+ *
+ * Escrow is credited when: a confirmed registration is dropped/swapped.
+ * Escrow is debited when: used at checkout or withdrawn.
+ */
+export const escrow = pgTable(
+  "escrow",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id")
+      .notNull()
+      .unique()
+      .references(() => user.id, { onDelete: "cascade" }),
+    balance: doublePrecision("balance").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("escrow_studentId_idx").on(table.studentId)]
+);
+
+/**
+ * ============================================
+ * ESCROW TRANSACTION TABLE
+ * ============================================
+ *
+ * Immutable ledger of all escrow movements.
+ * Every debit and credit has a reason and optional links
+ * to the originating registration or payment.
+ */
+export const escrowTransaction = pgTable(
+  "escrow_transaction",
+  {
+    id: text("id").primaryKey(),
+    escrowId: text("escrow_id")
+      .notNull()
+      .references(() => escrow.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // 'credit' | 'debit'
+    amount: doublePrecision("amount").notNull(),
+    // Reason categories for reporting and audit
+    reason: text("reason").notNull(), // 'drop' | 'swap_refund' | 'transfer_in' | 'transfer_out' | 'withdrawal' | 'payment' | 'payment_refund'
+    // Optional audit links
+    relatedRegistrationId: text("related_registration_id").references(
+      () => registration.id,
+      { onDelete: "set null" }
+    ),
+    relatedPaymentId: text("related_payment_id").references(
+      () => payment.id,
+      { onDelete: "set null" }
+    ),
+    // Who triggered this transaction (parent, admin, or system)
+    initiatedBy: text("initiated_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("escrowTx_escrowId_idx").on(table.escrowId),
+    index("escrowTx_type_idx").on(table.type),
+    index("escrowTx_reason_idx").on(table.reason),
+  ]
+);
+
+/**
+ * ============================================
+ * WITHDRAWAL REQUEST TABLE
+ * ============================================
+ *
+ * Parent requests a cash withdrawal from a student's escrow.
+ * Admin processes the withdrawal offline and marks it fulfilled.
+ * Partial fulfillment is supported (releasedAmount ≤ requestedAmount).
+ */
+export const withdrawalRequest = pgTable(
+  "withdrawal_request",
+  {
+    id: text("id").primaryKey(),
+    escrowId: text("escrow_id")
+      .notNull()
+      .references(() => escrow.id, { onDelete: "cascade" }),
+    requestedAmount: doublePrecision("requested_amount").notNull(),
+    releasedAmount: doublePrecision("released_amount"),
+    status: text("status").notNull().default("pending"), // 'pending' | 'partially_fulfilled' | 'fulfilled' | 'rejected'
+    adminNotes: text("admin_notes"),
+    fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
+    fulfilledBy: text("fulfilled_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("withdrawalReq_escrowId_idx").on(table.escrowId),
+    index("withdrawalReq_status_idx").on(table.status),
+  ]
+);
+
+/**
+ * ============================================
+ * CHANGE REQUEST TABLE
+ * ============================================
+ *
+ * Tracks student-initiated drop and swap requests that require
+ * parent approval before taking effect.
+ *
+ * OI-006 resolved: this table was planned but not yet in schema.
+ *
+ * Workflow (student-initiated):
+ * - Student submits request → pending_approval
+ * - Parent approves → approved (financials processed, registration updated)
+ * - Parent rejects → rejected (no financial impact)
+ *
+ * Direct operations (parent-initiated, SWAP-004):
+ * - No change_request record is created; parent calls executeDirectDrop/Swap directly
+ * - This table only records student requests that go through the approval queue
+ *
+ * Key invariants:
+ * - Only students can create change requests (parents use direct drop/swap)
+ * - Only 'confirmed' registrations can be dropped or swapped
+ * - Core subjects (Grade 10 June session) cannot be dropped or swapped
+ * - At most one 'pending_approval' change request per registration at a time
+ *
+ * For swap requests:
+ * - priceDifference = newSubjectPrice - droppedSubjectPrice
+ * - Negative priceDifference → student gets escrow credit of the difference
+ * - Positive priceDifference → new registration created at 'pending_payment'
+ *
+ * priceAtRequest stores the new subject's price snapshot at time of request.
+ * For drops, it stores the amount that will be credited back (original price).
+ */
+export const changeRequest = pgTable(
+  "change_request",
+  {
+    id: text("id").primaryKey(),
+    // The confirmed registration being requested to drop or swap
+    registrationId: text("registration_id")
+      .notNull()
+      .references(() => registration.id, { onDelete: "restrict" }),
+    // 'drop' | 'swap'
+    type: text("type").notNull(),
+    // Always a student — parents use direct drop/swap
+    requestedBy: text("requested_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    // Student's explanation for the change
+    reason: text("reason").notNull(),
+    // Null for drops; the subject the student wants to swap into
+    newSubjectId: text("new_subject_id").references(() => subject.id, {
+      onDelete: "restrict",
+    }),
+    // Snapshot of the new subject's price at time of request (for swaps)
+    // For drops: stores the priceAtRegistration to be credited back
+    priceAtRequest: doublePrecision("price_at_request").notNull(),
+    // newSubjectPrice - droppedSubjectPrice; negative = escrow credit
+    priceDifference: doublePrecision("price_difference").notNull(),
+    // 'pending_approval' | 'approved' | 'rejected'
+    status: text("status").notNull().default("pending_approval"),
+    // Parent who approved or rejected (null until processed)
+    approvedBy: text("approved_by").references(() => user.id, { onDelete: "set null" }),
+    // Optional comments from the parent
+    comments: text("comments"),
+    // When the parent processed this request
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("changeReq_registrationId_idx").on(table.registrationId),
+    index("changeReq_requestedBy_idx").on(table.requestedBy),
+    index("changeReq_status_idx").on(table.status),
+    // Enforce at most one pending change request per registration
+    uniqueIndex("changeReq_one_pending_per_registration_idx")
+      .on(table.registrationId)
+      .where(sql`status = 'pending_approval'`),
+  ]
+);
+
+/**
+ * CHANGE REQUEST RELATIONS
+ */
+export const changeRequestRelations = relations(changeRequest, ({ one }) => ({
+  registration: one(registration, {
+    fields: [changeRequest.registrationId],
+    references: [registration.id],
+  }),
+  requestedByUser: one(user, {
+    fields: [changeRequest.requestedBy],
+    references: [user.id],
+    relationName: "requestedChangeRequests",
+  }),
+  newSubject: one(subject, {
+    fields: [changeRequest.newSubjectId],
+    references: [subject.id],
+  }),
+  approvedByUser: one(user, {
+    fields: [changeRequest.approvedBy],
+    references: [user.id],
+    relationName: "approvedChangeRequests",
+  }),
+}));
+
+/**
+ * PAYMENT RELATIONS
+ */
+export const paymentRelations = relations(payment, ({ one, many }) => ({
+  student: one(user, {
+    fields: [payment.studentId],
+    references: [user.id],
+    relationName: "studentPayments",
+  }),
+  parent: one(user, {
+    fields: [payment.parentId],
+    references: [user.id],
+    relationName: "parentPayments",
+  }),
+  confirmedByUser: one(user, {
+    fields: [payment.confirmedBy],
+    references: [user.id],
+    relationName: "confirmedPayments",
+  }),
+  paymentRegistrations: many(paymentRegistration),
+}));
+
+export const paymentRegistrationRelations = relations(paymentRegistration, ({ one }) => ({
+  payment: one(payment, {
+    fields: [paymentRegistration.paymentId],
+    references: [payment.id],
+  }),
+  registration: one(registration, {
+    fields: [paymentRegistration.registrationId],
+    references: [registration.id],
+  }),
+}));
+
+/**
+ * ESCROW RELATIONS
+ */
+export const escrowRelations = relations(escrow, ({ one, many }) => ({
+  student: one(user, {
+    fields: [escrow.studentId],
+    references: [user.id],
+  }),
+  transactions: many(escrowTransaction),
+  withdrawalRequests: many(withdrawalRequest),
+}));
+
+export const escrowTransactionRelations = relations(escrowTransaction, ({ one }) => ({
+  escrow: one(escrow, {
+    fields: [escrowTransaction.escrowId],
+    references: [escrow.id],
+  }),
+  relatedRegistration: one(registration, {
+    fields: [escrowTransaction.relatedRegistrationId],
+    references: [registration.id],
+  }),
+  relatedPayment: one(payment, {
+    fields: [escrowTransaction.relatedPaymentId],
+    references: [payment.id],
+  }),
+  initiatedByUser: one(user, {
+    fields: [escrowTransaction.initiatedBy],
+    references: [user.id],
+  }),
+}));
+
+export const withdrawalRequestRelations = relations(withdrawalRequest, ({ one }) => ({
+  escrow: one(escrow, {
+    fields: [withdrawalRequest.escrowId],
+    references: [escrow.id],
+  }),
+  fulfilledByUser: one(user, {
+    fields: [withdrawalRequest.fulfilledBy],
+    references: [user.id],
+  }),
+}));
+
+// Add payment back-references to registration and user
+export const registrationWithPaymentRelations = relations(registration, ({ one, many }) => ({
+  student: one(user, {
+    fields: [registration.studentId],
+    references: [user.id],
+    relationName: "studentRegistrations",
+  }),
+  session: one(registrationSession, {
+    fields: [registration.sessionId],
+    references: [registrationSession.id],
+  }),
+  subject: one(subject, {
+    fields: [registration.subjectId],
+    references: [subject.id],
+  }),
+  requestedByUser: one(user, {
+    fields: [registration.requestedBy],
+    references: [user.id],
+    relationName: "requestedRegistrations",
+  }),
+  approvedByUser: one(user, {
+    fields: [registration.approvedBy],
+    references: [user.id],
+    relationName: "approvedRegistrations",
+  }),
+  paymentRegistrations: many(paymentRegistration),
+  changeRequests: many(changeRequest),
+}));
+
+/**
+ * ============================================
+ * NOTIFICATION TABLE
+ * ============================================
+ *
+ * In-app notifications for all users.
+ * Each notification can optionally trigger an email (tracked by emailSentAt).
+ *
+ * Notification types cover all NOT-001 to NOT-011 user stories:
+ * - SESSION_OPENED / SESSION_CLOSING_SOON
+ * - REGISTRATION_REQUEST_RECEIVED (parent: child submitted)
+ * - REGISTRATION_APPROVED / REGISTRATION_REJECTED (student: decision made)
+ * - PAYMENT_CONFIRMED (parent: receipt after payment)
+ * - DROP_SWAP_REQUEST_RECEIVED (parent: child requested change)
+ * - DROP_SWAP_PROCESSED (student: change request resolved)
+ * - ESCROW_BALANCE_CHANGED (parent: balance updated)
+ * - ESCROW_WITHDRAWAL_FULFILLED (parent: withdrawal processed)
+ * - GRADE_CHANGED (student/parent: grade progression or manual)
+ * - BULK_ANNOUNCEMENT (admin broadcast to all/groups)
+ *
+ * data stores context-specific IDs and links for deep-linking.
+ * readAt is null until the user views/dismisses the notification.
+ * emailSentAt is null if email was not sent (e.g., user opted out or email disabled).
+ */
+export const notification = pgTable(
+  "notification",
+  {
+    id: text("id").primaryKey(),
+    // The user this notification belongs to
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // Notification category (matches NOT-XXX user story types)
+    type: text("type").notNull(),
+    // Short title shown in notification center
+    title: text("title").notNull(),
+    // Full notification body text
+    body: text("body").notNull(),
+    // Context-specific data: related IDs, deep-link URLs, etc.
+    data: jsonb("data").$type<Record<string, unknown>>(),
+    // When the user read/dismissed this notification (null = unread)
+    readAt: timestamp("read_at", { withTimezone: true }),
+    // When the corresponding email was sent (null = email not sent)
+    emailSentAt: timestamp("email_sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("notification_userId_idx").on(table.userId),
+    index("notification_type_idx").on(table.type),
+    // Optimises "unread notifications" queries (null readAt = unread)
+    index("notification_readAt_idx").on(table.readAt),
+  ]
+);
+
+/**
+ * NOTIFICATION RELATIONS
+ */
+export const notificationRelations = relations(notification, ({ one }) => ({
+  user: one(user, {
+    fields: [notification.userId],
+    references: [user.id],
+  }),
+}));
+
+/**
+ * ============================================
+ * AUDIT LOG TABLE
+ * ============================================
+ *
+ * Append-only record of every significant system action (REP-006).
+ * Never updated or deleted — provides full chain of custody.
+ *
+ * Action types cover all critical operations:
+ * - Subject CRUD (SUBJECT_CREATED, SUBJECT_UPDATED, SUBJECT_DEACTIVATED, SUBJECT_ACTIVATED, SUBJECT_CORE_UPDATED)
+ * - Session lifecycle (SESSION_CREATED, SESSION_UPDATED, SESSION_ACTIVATED, SESSION_CLOSED)
+ * - Registration flow (REGISTRATION_REQUESTED, REGISTRATION_DIRECT, REGISTRATION_APPROVED, REGISTRATION_REJECTED,
+ *                      REGISTRATION_ADMIN_OVERRIDE, REGISTRATION_CONFIRMED)
+ * - Payment lifecycle (PAYMENT_INITIATED, PAYMENT_CONFIRMED, PAYMENT_FAILED)
+ * - Change requests (CHANGE_REQUEST_CREATED, CHANGE_REQUEST_APPROVED, CHANGE_REQUEST_REJECTED,
+ *                    DIRECT_DROP_EXECUTED, DIRECT_SWAP_EXECUTED)
+ * - Escrow (ESCROW_TRANSFER, WITHDRAWAL_REQUESTED, WITHDRAWAL_FULFILLED, WITHDRAWAL_REJECTED)
+ * - User/grade management (USER_GRADE_CHANGED, USER_UPDATED)
+ * - Admin (ADMIN_ANNOUNCEMENT)
+ *
+ * userId is nullable to allow system-initiated actions (scheduler jobs).
+ * previousData / newData capture before/after state for diffs (jsonb, optional).
+ * ipAddress / userAgent are populated from the HTTP request context where available.
+ */
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: text("id").primaryKey(),
+    // Who performed the action (null for system-initiated actions)
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    // What was done (enum-style text)
+    action: text("action").notNull(),
+    // The type of entity affected
+    entityType: text("entity_type").notNull(),
+    // The ID of the affected entity
+    entityId: text("entity_id").notNull(),
+    // Snapshot of entity state before the action (nullable)
+    previousData: jsonb("previous_data").$type<Record<string, unknown>>(),
+    // Snapshot of entity state after the action (nullable)
+    newData: jsonb("new_data").$type<Record<string, unknown>>(),
+    // Originating request IP (populated from x-forwarded-for or cf-connecting-ip)
+    ipAddress: text("ip_address"),
+    // Browser / client user agent string
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("audit_log_userId_idx").on(table.userId),
+    index("audit_log_entityType_entityId_idx").on(table.entityType, table.entityId),
+    index("audit_log_action_idx").on(table.action),
+    // Optimises date-range queries in the audit log viewer
+    index("audit_log_createdAt_idx").on(table.createdAt),
+  ]
+);
+
+/**
+ * AUDIT LOG RELATIONS
+ */
+export const auditLogRelations = relations(auditLog, ({ one }) => ({
+  user: one(user, {
+    fields: [auditLog.userId],
+    references: [user.id],
+  }),
+}));
+

@@ -16,6 +16,10 @@
 import { db, parentStudentLink, user, eq, and, or } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { CreateLinkRequestType, RespondToLinkType } from '@repo/validations';
+import {
+  notifyLinkRequestReceived,
+  notifyLinkDecision,
+} from './notification.services';
 
 /**
  * Create a link request from parent to student
@@ -79,6 +83,11 @@ export async function createLinkRequest(
       updatedAt: now,
     })
     .returning();
+
+  // Notify the student of the incoming link request (AUTH-003) — fire-and-forget
+  notifyLinkRequestReceived(student.id, parentId).catch((err) =>
+    console.error('[notify] notifyLinkRequestReceived failed:', err)
+  );
 
   return created;
 }
@@ -172,6 +181,11 @@ export async function respondToLinkRequest(
     })
     .where(eq(parentStudentLink.id, linkId))
     .returning();
+
+  // Notify the parent of the student's decision (AUTH-004) — fire-and-forget
+  notifyLinkDecision(link.parentId, studentId, response.status === 'approved').catch((err) =>
+    console.error('[notify] notifyLinkDecision failed:', err)
+  );
 
   return updated;
 }

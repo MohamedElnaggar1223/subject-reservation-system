@@ -70,8 +70,8 @@ export async function requireAuth() {
 
 // Convenience helpers for specific roles
 export const requireAdmin = () => requireRole(ROLES.ADMIN)
-export const requireCoach = () => requireRole(ROLES.COACH)
 export const requireStudent = () => requireRole(ROLES.STUDENT)
+export const requireParent = () => requireRole(ROLES.PARENT)
 
 // Alias for backwards compatibility
 export const requireAuthenticated = requireAuth
