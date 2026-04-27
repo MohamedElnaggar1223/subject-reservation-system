@@ -89,7 +89,7 @@ export const UploadFile = z.object({
  * Validates file ID in URL parameters.
  */
 export const FileId = z.object({
-  id: z.string().uuid('Invalid file ID'),
+  id: z.string().min(1, 'Invalid file ID'),
 })
 
 /**

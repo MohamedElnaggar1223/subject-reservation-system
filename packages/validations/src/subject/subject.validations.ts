@@ -136,6 +136,23 @@ export const UpdateSubject = z
       message: 'Custom price is required when subject is not offered at school',
       path: ['customPrice'],
     }
+  )
+  .refine(
+    (data) => {
+      // Reject explicitly nulling customPrice without also setting isOfferedAtSchool to true.
+      // Sending { customPrice: null } alone could create an invalid state if the subject
+      // is currently not offered at school (where customPrice is required).
+      // The full state check (current DB state + partial update) happens in the service layer.
+      if (data.customPrice === null && data.isOfferedAtSchool === undefined) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message:
+        'Cannot set customPrice to null without also setting isOfferedAtSchool to true',
+      path: ['customPrice'],
+    }
   );
 
 export type UpdateSubjectType = z.infer<typeof UpdateSubject>;

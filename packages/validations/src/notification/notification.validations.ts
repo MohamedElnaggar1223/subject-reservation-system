@@ -23,6 +23,7 @@ import { z } from 'zod';
 export const NOTIFICATION_TYPES = [
   // Session lifecycle
   'SESSION_OPENED',
+  'SESSION_CLOSED',
   'SESSION_CLOSING_SOON',
   // Registration approval flow
   'REGISTRATION_REQUEST_RECEIVED',
@@ -36,6 +37,7 @@ export const NOTIFICATION_TYPES = [
   // Escrow
   'ESCROW_BALANCE_CHANGED',
   'ESCROW_WITHDRAWAL_FULFILLED',
+  'ESCROW_WITHDRAWAL_REJECTED',
   // Grade progression
   'GRADE_CHANGED',
   // Admin broadcast
@@ -50,6 +52,7 @@ export type NotificationType = z.infer<typeof NotificationTypeSchema>;
 
 export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   SESSION_OPENED:                   'Registration Window Opened',
+  SESSION_CLOSED:                   'Registration Window Closed',
   SESSION_CLOSING_SOON:             'Registration Closing Soon',
   REGISTRATION_REQUEST_RECEIVED:    'New Registration Request',
   REGISTRATION_APPROVED:            'Registration Approved',
@@ -59,6 +62,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   DROP_SWAP_PROCESSED:              'Drop / Swap Processed',
   ESCROW_BALANCE_CHANGED:           'Escrow Balance Updated',
   ESCROW_WITHDRAWAL_FULFILLED:      'Withdrawal Fulfilled',
+  ESCROW_WITHDRAWAL_REJECTED:       'Withdrawal Rejected',
   GRADE_CHANGED:                    'Grade Updated',
   BULK_ANNOUNCEMENT:                'Announcement',
   LINK_REQUEST_RECEIVED:            'New Parent Link Request',
@@ -68,6 +72,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
 // Icons mapped per type (used in the notification center UI)
 export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   SESSION_OPENED:                   '📅',
+  SESSION_CLOSED:                   '📅',
   SESSION_CLOSING_SOON:             '⏰',
   REGISTRATION_REQUEST_RECEIVED:    '📋',
   REGISTRATION_APPROVED:            '✅',
@@ -77,6 +82,7 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   DROP_SWAP_PROCESSED:              '📝',
   ESCROW_BALANCE_CHANGED:           '💰',
   ESCROW_WITHDRAWAL_FULFILLED:      '🏦',
+  ESCROW_WITHDRAWAL_REJECTED:       '🚫',
   GRADE_CHANGED:                    '🎓',
   BULK_ANNOUNCEMENT:                '📢',
   LINK_REQUEST_RECEIVED:            '🔗',
@@ -109,7 +115,7 @@ export const ANNOUNCEMENT_RECIPIENT_LABELS: Record<AnnouncementRecipientGroup, s
 // ─── Param Validation ─────────────────────────────────────────────────────────
 
 export const NotificationId = z.object({
-  id: z.string().uuid('Invalid notification ID'),
+  id: z.string().min(1, 'Invalid notification ID'),
 });
 export type NotificationIdType = z.infer<typeof NotificationId>;
 
@@ -136,11 +142,16 @@ export type GetNotificationsQueryType = z.infer<typeof GetNotificationsQuery>;
 /**
  * Admin composes a bulk announcement to a selected recipient group (NOT-011).
  * sendEmail: true sends both in-app notification AND email.
+ * scheduledAt: optional future date to schedule the announcement instead of sending immediately.
+ *   - If omitted or in the past, the announcement is sent immediately (current behavior).
+ *   - If in the future, the announcement is stored and dispatched by the session-closer cron
+ *     when the scheduled time arrives.
  */
 export const BulkAnnouncement = z.object({
-  title:      z.string().min(3, 'Title must be at least 3 characters').max(150),
-  body:       z.string().min(10, 'Body must be at least 10 characters').max(2000),
-  recipients: AnnouncementRecipientGroupSchema,
-  sendEmail:  z.boolean().default(true),
+  title:       z.string().min(3, 'Title must be at least 3 characters').max(150),
+  body:        z.string().min(10, 'Body must be at least 10 characters').max(2000),
+  recipients:  AnnouncementRecipientGroupSchema,
+  sendEmail:   z.boolean().default(true),
+  scheduledAt: z.coerce.date().optional(),
 });
 export type BulkAnnouncementType = z.infer<typeof BulkAnnouncement>;

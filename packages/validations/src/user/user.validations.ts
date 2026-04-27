@@ -14,7 +14,7 @@ import { GradeSchema } from '../roles';
  * User ID validation (UUID format)
  */
 export const UserId = z.object({
-  id: z.string().uuid('Invalid user ID format'),
+  id: z.string().min(1, 'Invalid user ID format'),
 });
 export type UserIdType = z.infer<typeof UserId>;
 

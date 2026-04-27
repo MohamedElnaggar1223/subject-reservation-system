@@ -86,6 +86,9 @@ export type CreateSessionType = z.infer<typeof CreateSession>;
  * Update Draft Session
  *
  * Admin-only. While session is in draft, any field may be changed.
+ * `reason` is optional on draft edits (the session isn't yet visible to
+ * users) but is captured in the audit log when provided so reviewers can
+ * tell WHY dates or the session type were changed before activation.
  */
 export const UpdateDraftSession = z
   .object({
@@ -97,6 +100,7 @@ export const UpdateDraftSession = z
     sessionType: SessionTypeSchema.optional(),
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
+    reason: z.string().max(500, 'Reason too long').optional(),
   })
   .refine(
     (data) => {

@@ -72,7 +72,7 @@ export const UpdateTodo = z.object({
  * Ensures the ID is a valid UUID.
  */
 export const TodoId = z.object({
-  id: z.string().uuid('Invalid todo ID'),
+  id: z.string().min(1, 'Invalid todo ID'),
 })
 
 /**

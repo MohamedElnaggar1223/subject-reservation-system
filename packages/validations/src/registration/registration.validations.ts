@@ -18,6 +18,7 @@ export const REGISTRATION_STATUSES = [
   'confirmed',
   'dropped',
   'rejected',
+  'expired',
 ] as const;
 
 export const RegistrationStatusSchema = z.enum(REGISTRATION_STATUSES);
@@ -29,12 +30,13 @@ export const REGISTRATION_STATUS_LABELS: Record<typeof REGISTRATION_STATUSES[num
   confirmed:        'Confirmed',
   dropped:          'Dropped',
   rejected:         'Rejected',
+  expired:          'Expired',
 };
 
 // ─── Param Validation ────────────────────────────────────────────────────────
 
 export const RegistrationId = z.object({
-  id: z.string().uuid('Invalid registration ID'),
+  id: z.string().min(1, 'Invalid registration ID'),
 });
 export type RegistrationIdType = z.infer<typeof RegistrationId>;
 
@@ -46,9 +48,9 @@ export type RegistrationIdType = z.infer<typeof RegistrationId>;
  * require parent approval before proceeding to payment.
  */
 export const RequestRegistration = z.object({
-  sessionId: z.string().uuid('Invalid session ID'),
+  sessionId: z.string().min(1, 'Invalid session ID'),
   subjectIds: z
-    .array(z.string().uuid('Invalid subject ID'))
+    .array(z.string().min(1, 'Invalid subject ID'))
     .min(1, 'Select at least one subject')
     .max(20, 'Cannot register more than 20 subjects at once'),
 });
@@ -62,12 +64,12 @@ export type RequestRegistrationType = z.infer<typeof RequestRegistration>;
  * Requires an approved parent-student link.
  */
 export const DirectRegistration = z.object({
-  sessionId: z.string().uuid('Invalid session ID'),
+  sessionId: z.string().min(1, 'Invalid session ID'),
   subjectIds: z
-    .array(z.string().uuid('Invalid subject ID'))
+    .array(z.string().min(1, 'Invalid subject ID'))
     .min(1, 'Select at least one subject')
     .max(20, 'Cannot register more than 20 subjects at once'),
-  studentId: z.string().uuid('Invalid student ID'),
+  studentId: z.string().min(1, 'Invalid student ID'),
 });
 export type DirectRegistrationType = z.infer<typeof DirectRegistration>;
 
@@ -80,7 +82,7 @@ export type DirectRegistrationType = z.infer<typeof DirectRegistration>;
  */
 export const ApproveRegistrations = z.object({
   registrationIds: z
-    .array(z.string().uuid('Invalid registration ID'))
+    .array(z.string().min(1, 'Invalid registration ID'))
     .min(1, 'Select at least one registration to approve'),
   comments: z.string().max(500).optional(),
 });
@@ -95,7 +97,7 @@ export type ApproveRegistrationsType = z.infer<typeof ApproveRegistrations>;
  */
 export const RejectRegistrations = z.object({
   registrationIds: z
-    .array(z.string().uuid('Invalid registration ID'))
+    .array(z.string().min(1, 'Invalid registration ID'))
     .min(1, 'Select at least one registration to reject'),
   comments: z.string().min(1, 'A reason is required when rejecting a request').max(500),
 });
@@ -111,10 +113,10 @@ export type RejectRegistrationsType = z.infer<typeof RejectRegistrations>;
  * to provide a clear audit trail.
  */
 export const AdminOverrideApproval = z.object({
-  studentId:  z.string().uuid('Invalid student ID'),
-  sessionId:  z.string().uuid('Invalid session ID'),
+  studentId:  z.string().min(1, 'Invalid student ID'),
+  sessionId:  z.string().min(1, 'Invalid session ID'),
   subjectIds: z
-    .array(z.string().uuid('Invalid subject ID'))
+    .array(z.string().min(1, 'Invalid subject ID'))
     .min(1, 'Select at least one subject'),
   reason: z.string().min(5, 'Reason must be at least 5 characters').max(500),
 });
@@ -123,8 +125,8 @@ export type AdminOverrideApprovalType = z.infer<typeof AdminOverrideApproval>;
 // ─── Query Filters ────────────────────────────────────────────────────────────
 
 export const ListRegistrationsQuery = z.object({
-  sessionId: z.string().uuid().optional(),
-  studentId: z.string().uuid().optional(),
+  sessionId: z.string().min(1).optional(),
+  studentId: z.string().min(1).optional(),
   status:    RegistrationStatusSchema.optional(),
 });
 export type ListRegistrationsQueryType = z.infer<typeof ListRegistrationsQuery>;
@@ -132,7 +134,7 @@ export type ListRegistrationsQueryType = z.infer<typeof ListRegistrationsQuery>;
 // ─── Available Subjects Query ─────────────────────────────────────────────────
 
 export const AvailableSubjectsQuery = z.object({
-  sessionId:  z.string().uuid('Invalid session ID'),
-  studentId:  z.string().uuid('Invalid student ID').optional(),
+  sessionId:  z.string().min(1, 'Invalid session ID'),
+  studentId:  z.string().min(1, 'Invalid student ID').optional(),
 });
 export type AvailableSubjectsQueryType = z.infer<typeof AvailableSubjectsQuery>;

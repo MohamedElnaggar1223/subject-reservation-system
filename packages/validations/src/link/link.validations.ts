@@ -19,7 +19,7 @@ export type LinkStatusType = z.infer<typeof LinkStatus>;
  * Link ID validation (UUID format)
  */
 export const LinkId = z.object({
-  id: z.string().uuid('Invalid link ID format'),
+  id: z.string().min(1, 'Invalid link ID format'),
 });
 export type LinkIdType = z.infer<typeof LinkId>;
 

@@ -69,7 +69,7 @@ export const WALLET_PROVIDER_LABELS: Record<typeof WALLET_PROVIDERS[number], str
 // ─── Param Validation ─────────────────────────────────────────────────────────
 
 export const PaymentId = z.object({
-  id: z.string().uuid('Invalid payment ID'),
+  id: z.string().min(1, 'Invalid payment ID'),
 });
 export type PaymentIdType = z.infer<typeof PaymentId>;
 
@@ -88,10 +88,10 @@ export type PaymentIdType = z.infer<typeof PaymentId>;
  */
 export const InitiatePayment = z.object({
   registrationIds: z
-    .array(z.string().uuid('Invalid registration ID'))
+    .array(z.string().min(1, 'Invalid registration ID'))
     .min(1, 'Select at least one registration to pay for'),
   paymentMethod: PaymentMethodSchema,
-  escrowAmountToApply: z.number().min(0).default(0),
+  escrowAmountToApply: z.number().min(0).max(1_000_000, 'Amount exceeds maximum allowed').default(0),
   walletProvider: WalletProviderSchema.optional(),
 }).refine(
   (data) => data.paymentMethod !== 'mobile_wallet' || !!data.walletProvider,
@@ -121,7 +121,7 @@ export type ConfirmBankTransferType = z.infer<typeof ConfirmBankTransfer>;
 export const FawryWebhookPayload = z.object({
   merchantRefNum: z.string(),
   orderStatus: z.string(), // 'PAID', 'UNPAID', 'EXPIRED', 'CANCELLED'
-  paymentAmount: z.number(),
+  paymentAmount: z.number().min(0, 'Payment amount cannot be negative').max(1_000_000, 'Amount exceeds maximum allowed'),
   referenceNumber: z.string(),
 });
 export type FawryWebhookPayloadType = z.infer<typeof FawryWebhookPayload>;
@@ -131,22 +131,32 @@ export type FawryWebhookPayloadType = z.infer<typeof FawryWebhookPayload>;
 /**
  * Paymob sends a transaction response via webhook.
  * In production, validate the HMAC hash before processing.
- * The obj.merchant_order_id maps to our payment ID.
+ *
+ * The payload structure varies between the legacy flow and the Intention API:
+ * - Legacy: obj.merchant_order_id is our payment ID
+ * - Intention API: obj.order.merchant_order_id holds our special_reference,
+ *   while obj.merchant_order_id may be null
+ *
+ * We accept both formats with passthrough to avoid rejecting unknown fields.
  */
 export const PaymobWebhookPayload = z.object({
   obj: z.object({
-    merchant_order_id: z.string(),
+    merchant_order_id: z.union([z.string(), z.null()]).optional(),
     success: z.boolean(),
     amount_cents: z.number(),
     id: z.number(),
-  }),
-});
+    order: z.object({
+      merchant_order_id: z.union([z.string(), z.null()]).optional(),
+    }).passthrough().optional(),
+    pending: z.boolean().optional(),
+  }).passthrough(),
+}).passthrough();
 export type PaymobWebhookPayloadType = z.infer<typeof PaymobWebhookPayload>;
 
 // ─── Query Filters ────────────────────────────────────────────────────────────
 
 export const ListPaymentsQuery = z.object({
-  studentId: z.string().uuid().optional(),
+  studentId: z.string().min(1).optional(),
   status:    PaymentStatusSchema.optional(),
   method:    PaymentMethodSchema.optional(),
 });

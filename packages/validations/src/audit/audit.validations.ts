@@ -33,6 +33,7 @@ export const AUDIT_ENTITY_TYPES = [
   'payment',
   'escrow',
   'change_request',
+  'notification',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -46,6 +47,7 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   payment:        'Payment',
   escrow:         'Escrow',
   change_request: 'Change Request',
+  notification:   'Notification',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -62,6 +64,8 @@ export const AUDIT_ACTIONS = [
   'SESSION_UPDATED',
   'SESSION_ACTIVATED',
   'SESSION_CLOSED',
+  'SESSION_AUTO_CLOSED',
+  'SESSION_AUTO_ACTIVATED',
   // Registration flow
   'REGISTRATION_REQUESTED',
   'REGISTRATION_DIRECT',
@@ -77,6 +81,7 @@ export const AUDIT_ACTIONS = [
   'CHANGE_REQUEST_CREATED',
   'CHANGE_REQUEST_APPROVED',
   'CHANGE_REQUEST_REJECTED',
+  'CHANGE_REQUEST_CANCELLED',
   'DIRECT_DROP_EXECUTED',
   'DIRECT_SWAP_EXECUTED',
   // Escrow
@@ -104,6 +109,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   SESSION_UPDATED:            'Session Updated',
   SESSION_ACTIVATED:          'Session Activated',
   SESSION_CLOSED:             'Session Closed',
+  SESSION_AUTO_CLOSED:        'Session Auto-Closed',
+  SESSION_AUTO_ACTIVATED:     'Session Auto-Activated',
   REGISTRATION_REQUESTED:     'Registration Request Submitted',
   REGISTRATION_DIRECT:        'Direct Registration by Parent',
   REGISTRATION_APPROVED:      'Registration Request Approved',
@@ -116,6 +123,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   CHANGE_REQUEST_CREATED:     'Drop/Swap Request Created',
   CHANGE_REQUEST_APPROVED:    'Drop/Swap Request Approved',
   CHANGE_REQUEST_REJECTED:    'Drop/Swap Request Rejected',
+  CHANGE_REQUEST_CANCELLED:   'Drop/Swap Request Cancelled',
   DIRECT_DROP_EXECUTED:       'Direct Drop by Parent',
   DIRECT_SWAP_EXECUTED:       'Direct Swap by Parent',
   ESCROW_TRANSFER:            'Escrow Transfer',
@@ -134,12 +142,13 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
  * All filters are optional — returns all entries when empty.
  */
 export const AuditLogsQuery = z.object({
-  userId:     z.string().uuid('Invalid user ID').optional(),
+  userId:     z.string().min(1, 'Invalid user ID').optional(),
   action:     AuditActionSchema.optional(),
   entityType: AuditEntityTypeSchema.optional(),
   entityId:   z.string().optional(),
   dateFrom:   z.string().optional(),
   dateTo:     z.string().optional(),
+  format:     z.enum(['json', 'csv']).optional(),
   limit: z
     .string()
     .optional()

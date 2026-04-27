@@ -36,7 +36,7 @@ export const WITHDRAWAL_STATUS_LABELS: Record<typeof WITHDRAWAL_STATUSES[number]
 // ─── Param Validation ─────────────────────────────────────────────────────────
 
 export const WithdrawalRequestId = z.object({
-  id: z.string().uuid('Invalid withdrawal request ID'),
+  id: z.string().min(1, 'Invalid withdrawal request ID'),
 });
 export type WithdrawalRequestIdType = z.infer<typeof WithdrawalRequestId>;
 
@@ -48,9 +48,9 @@ export type WithdrawalRequestIdType = z.infer<typeof WithdrawalRequestId>;
  * amount must not exceed the fromStudent's current balance.
  */
 export const TransferEscrow = z.object({
-  fromStudentId: z.string().uuid('Invalid source student ID'),
-  toStudentId:   z.string().uuid('Invalid destination student ID'),
-  amount:        z.number().positive('Transfer amount must be greater than 0'),
+  fromStudentId: z.string().min(1, 'Invalid source student ID'),
+  toStudentId:   z.string().min(1, 'Invalid destination student ID'),
+  amount:        z.number().positive('Transfer amount must be greater than 0').max(1_000_000, 'Amount exceeds maximum allowed'),
 }).refine(
   (data) => data.fromStudentId !== data.toStudentId,
   { message: 'Cannot transfer escrow to the same student', path: ['toStudentId'] }
@@ -65,8 +65,8 @@ export type TransferEscrowType = z.infer<typeof TransferEscrow>;
  * amount must not exceed the child's current balance.
  */
 export const RequestWithdrawal = z.object({
-  studentId: z.string().uuid('Invalid student ID'),
-  amount:    z.number().positive('Withdrawal amount must be greater than 0'),
+  studentId: z.string().min(1, 'Invalid student ID'),
+  amount:    z.number().positive('Withdrawal amount must be greater than 0').max(1_000_000, 'Amount exceeds maximum allowed'),
 });
 export type RequestWithdrawalType = z.infer<typeof RequestWithdrawal>;
 
@@ -80,7 +80,7 @@ export type RequestWithdrawalType = z.infer<typeof RequestWithdrawal>;
  * When cumulative total reaches requestedAmount → status becomes 'fulfilled'.
  */
 export const FulfillWithdrawal = z.object({
-  releasedAmount: z.number().positive('Released amount must be greater than 0'),
+  releasedAmount: z.number().positive('Released amount must be greater than 0').max(1_000_000, 'Amount exceeds maximum allowed'),
   notes:          z.string().max(500).optional(),
 });
 export type FulfillWithdrawalType = z.infer<typeof FulfillWithdrawal>;
@@ -88,8 +88,16 @@ export type FulfillWithdrawalType = z.infer<typeof FulfillWithdrawal>;
 // ─── Admin: Reject Withdrawal Request ────────────────────────────────────────
 
 /**
- * Admin rejects a pending withdrawal request with a mandatory reason.
- * No funds are moved when a request is rejected.
+ * Admin rejects a withdrawal request with a mandatory reason.
+ *
+ * Funds ARE moved on rejection — they were debited from the student's
+ * escrow when the request was created (the "hold"), so rejection must
+ * credit the held-but-unreleased amount back:
+ *   - Rejected from 'pending': full requestedAmount is refunded.
+ *   - Rejected from 'partially_fulfilled': the unreleased remainder
+ *     (requestedAmount − releasedAmount) is refunded.
+ *
+ * See escrow.services.ts → rejectWithdrawalRequest for the accounting.
  */
 export const RejectWithdrawal = z.object({
   notes: z.string().min(1, 'A reason is required when rejecting a withdrawal request').max(500),
@@ -99,12 +107,12 @@ export type RejectWithdrawalType = z.infer<typeof RejectWithdrawal>;
 // ─── Query Filters ────────────────────────────────────────────────────────────
 
 export const EscrowQuery = z.object({
-  studentId: z.string().uuid().optional(),
+  studentId: z.string().min(1).optional(),
 });
 export type EscrowQueryType = z.infer<typeof EscrowQuery>;
 
 export const WithdrawalsQuery = z.object({
-  studentId: z.string().uuid().optional(),
+  studentId: z.string().min(1).optional(),
   status:    WithdrawalStatusSchema.optional(),
 });
 export type WithdrawalsQueryType = z.infer<typeof WithdrawalsQuery>;

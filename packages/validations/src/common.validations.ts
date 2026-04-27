@@ -4,25 +4,13 @@ import { z } from 'zod';
  * Sanitization utilities for user input
  */
 export const sanitizers = {
-  /**
-   * Trims whitespace and collapses multiple spaces into one
-   */
   string: (str: string) => str.trim().replace(/\s+/g, ' '),
-  
-  /**
-   * Trims and converts email to lowercase
-   */
   email: (email: string) => email.trim().toLowerCase(),
-  
-  /**
-   * Sanitizes name - removes special characters, trims, collapses spaces
-   * Allows letters, spaces, hyphens, and apostrophes
-   */
   name: (name: string) => {
     return name
       .trim()
       .replace(/\s+/g, ' ')
-      .replace(/[^a-zA-Z\s-']/g, '');
+      .replace(/[^\p{L}\s\-']/gu, '');
   },
 };
 
@@ -45,10 +33,13 @@ export const CommonSchemas = {
    */
   positiveInt: z.coerce.number().int().positive(),
   
-  /**
-   * ID schema - accepts UUID or any non-empty string
-   */
-  id: z.string().uuid().or(z.string().min(1)),
+  id: z.string().min(1),
+
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number'),
   
   /**
    * Pagination schema for list endpoints

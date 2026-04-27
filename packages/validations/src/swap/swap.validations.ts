@@ -19,6 +19,7 @@ export const CHANGE_REQUEST_STATUSES = [
   'pending_approval',
   'approved',
   'rejected',
+  'cancelled',
 ] as const;
 
 export const ChangeRequestStatusSchema = z.enum(CHANGE_REQUEST_STATUSES);
@@ -31,6 +32,7 @@ export const CHANGE_REQUEST_STATUS_LABELS: Record<
   pending_approval: 'Pending Approval',
   approved:         'Approved',
   rejected:         'Rejected',
+  cancelled:        'Cancelled',
 };
 
 // ─── Change Request Types ─────────────────────────────────────────────────────
@@ -43,12 +45,12 @@ export type ChangeRequestType = z.infer<typeof ChangeRequestTypeSchema>;
 // ─── Param Validation ─────────────────────────────────────────────────────────
 
 export const ChangeRequestId = z.object({
-  id: z.string().uuid('Invalid change request ID'),
+  id: z.string().min(1, 'Invalid change request ID'),
 });
 export type ChangeRequestIdType = z.infer<typeof ChangeRequestId>;
 
 export const RegistrationIdParam = z.object({
-  id: z.string().uuid('Invalid registration ID'),
+  id: z.string().min(1, 'Invalid registration ID'),
 });
 export type RegistrationIdParamType = z.infer<typeof RegistrationIdParam>;
 
@@ -74,7 +76,7 @@ export type RequestDropType = z.infer<typeof RequestDrop>;
  * Requires parent approval; financial impact shown to parent (SWAP-003).
  */
 export const RequestSwap = z.object({
-  newSubjectId: z.string().uuid('Invalid subject ID'),
+  newSubjectId: z.string().min(1, 'Invalid subject ID'),
   reason:       z.string().min(5, 'Please provide a reason for this swap (min 5 chars)').max(500),
 });
 export type RequestSwapType = z.infer<typeof RequestSwap>;
@@ -98,7 +100,7 @@ export type DirectDropType = z.infer<typeof DirectDrop>;
  * No approval queue — takes effect immediately.
  */
 export const DirectSwap = z.object({
-  newSubjectId: z.string().uuid('Invalid subject ID'),
+  newSubjectId: z.string().min(1, 'Invalid subject ID'),
   reason:       z.string().min(5, 'Please provide a reason for this swap (min 5 chars)').max(500).optional(),
 });
 export type DirectSwapType = z.infer<typeof DirectSwap>;
@@ -128,7 +130,7 @@ export type RejectChangeRequestType = z.infer<typeof RejectChangeRequest>;
 // ─── Query Filters ────────────────────────────────────────────────────────────
 
 export const ChangeRequestsQuery = z.object({
-  studentId: z.string().uuid().optional(),
+  studentId: z.string().min(1).optional(),
   status:    ChangeRequestStatusSchema.optional(),
   type:      ChangeRequestTypeSchema.optional(),
 });
