@@ -13,9 +13,13 @@ export const getServerApi = cache(async () => {
   // Filter and get only Better Auth session cookie
   const authCookie = cookieStore.get(cookieName)
   
-  const cookieHeader = authCookie 
+  const cookieHeader = authCookie
     ? `${cookieName}=${authCookie.value}`
     : ''
+
+  if (!authCookie) {
+    console.warn(`[hono-server] Cookie "${cookieName}" not found. Available cookies:`, cookieStore.getAll().map(c => c.name))
+  }
 
   return hc<AppType>(env.apiUrl, {
     headers: {

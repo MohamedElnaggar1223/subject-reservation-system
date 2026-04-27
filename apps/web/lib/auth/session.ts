@@ -37,7 +37,8 @@ export const getSession = cache(async (): Promise<SessionData | null> => {
   const api = await getServerApi()
   try {
     return await apiResponse(api.v1.session.$get())
-  } catch {
+  } catch (err) {
+    console.error('[session] getSession failed:', err instanceof Error ? err.message : err)
     return null
   }
 })
