@@ -18,7 +18,7 @@
  */
 
 import { relations, sql } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, numeric, integer, doublePrecision, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, numeric, integer, jsonb, uniqueIndex, check } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -101,11 +101,6 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const userRelations = relations(user, ({ many }) => ({
-  sessions: many(session),
-  accounts: many(account),
-}));
-
 export const sessionRelations = relations(session, ({ one }) => ({
   user: one(user, {
     fields: [session.userId],
@@ -152,14 +147,13 @@ export const todo = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },
   (table) => [
-    // Index on userId for efficient user-scoped queries
     index("todo_userId_idx").on(table.userId),
   ],
 );
@@ -210,15 +204,13 @@ export const file = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
 
-    // Timestamps
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },
   (table) => [
-    // Index on userId for efficient user-scoped queries
     index("file_userId_idx").on(table.userId),
     // Index on fileType for filtering by type
     index("file_fileType_idx").on(table.fileType),
@@ -254,7 +246,7 @@ export const fileVariant = pgTable(
     height: numeric("height").notNull(),
     size: numeric("size").notNull(),           // Variant size in bytes
 
-    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     // Index on fileId for efficient variant lookups
@@ -280,8 +272,7 @@ export const fileVariantRelations = relations(fileVariant, ({ one }) => ({
   }),
 }));
 
-// Full user relations including auth, profile, links, registrations, and payments
-export const userRelationsExtended = relations(user, ({ many }) => ({
+export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   todos: many(todo),
@@ -325,12 +316,10 @@ export const parentStudentLink = pgTable(
     // Link status: 'pending' | 'approved' | 'rejected'
     status: text("status").notNull().default("pending"),
     // When the link was requested
-    requestedAt: timestamp("requested_at").defaultNow().notNull(),
-    // When the student responded (approved/rejected)
-    respondedAt: timestamp("responded_at"),
-    // Standard timestamps
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    requestedAt: timestamp("requested_at", { withTimezone: true }).defaultNow().notNull(),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -340,6 +329,10 @@ export const parentStudentLink = pgTable(
     index("parentStudentLink_parentId_idx").on(table.parentId),
     index("parentStudentLink_studentId_idx").on(table.studentId),
     index("parentStudentLink_status_idx").on(table.status),
+    // Task 1.1: Prevent duplicate parent-student links at DB level
+    uniqueIndex("parentStudentLink_unique_pair_idx")
+      .on(table.parentId, table.studentId)
+      .where(sql`status IN ('pending', 'approved')`),
   ]
 );
 
@@ -365,13 +358,13 @@ export const subject = pgTable(
     name: text("name").notNull(),
     code: text("code").notNull().unique(),
     council: text("council").notNull(), // 'pearson_edexcel' | 'cambridge' | 'oxford'
-    priceInSchool: doublePrecision("price_in_school").notNull(),
+    priceInSchool: numeric("price_in_school", { precision: 12, scale: 2, mode: "number" }).notNull(),
     isOfferedAtSchool: boolean("is_offered_at_school").notNull().default(true),
-    customPrice: doublePrecision("custom_price"),
+    customPrice: numeric("custom_price", { precision: 12, scale: 2, mode: "number" }),
     isActive: boolean("is_active").notNull().default(true),
     isCore: boolean("is_core").notNull().default(false),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at")
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
@@ -381,6 +374,14 @@ export const subject = pgTable(
     index("subject_council_idx").on(table.council),
     index("subject_isActive_idx").on(table.isActive),
     index("subject_isCore_idx").on(table.isCore),
+    // L-8: Defense-in-depth — block negative prices at the DB layer.
+    // Zod already enforces .positive() on input, but raw SQL or a future
+    // code path bypassing Zod would still be caught here.
+    check("subject_price_in_school_nonneg", sql`${table.priceInSchool} >= 0`),
+    check(
+      "subject_custom_price_nonneg",
+      sql`${table.customPrice} IS NULL OR ${table.customPrice} >= 0`,
+    ),
   ]
 );
 
@@ -422,6 +423,15 @@ export const registrationSession = pgTable(
     status: text("status").notNull().default("draft"), // 'draft' | 'active' | 'closed'
     closedAt: timestamp("closed_at", { withTimezone: true }),
     closedBy: text("closed_by").references(() => user.id, { onDelete: "set null" }),
+    closeReason: text("close_reason"),
+    // Task 1.5: Persistent flag for 24h closing reminder (replaces volatile in-memory Set)
+    reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
+    // GRADE-001 durability (M-10): null until the session-closer has
+    // successfully run progressGrades for this session. The scheduler
+    // retries any closed session with this still-null on each tick, so
+    // a transient failure during progression doesn't leave students
+    // stuck on the wrong grade indefinitely.
+    gradeProgressionCompletedAt: timestamp("grade_progression_completed_at", { withTimezone: true }),
     editHistory: jsonb("edit_history")
       .$type<SessionEditEntry[]>()
       .default([]),
@@ -485,7 +495,7 @@ export const registration = pgTable(
     // The student being registered
     studentId: text("student_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+      .references(() => user.id, { onDelete: "restrict" }),
     // The session this registration belongs to
     sessionId: text("session_id")
       .notNull()
@@ -495,7 +505,12 @@ export const registration = pgTable(
       .notNull()
       .references(() => subject.id, { onDelete: "restrict" }),
     // Price snapshot — frozen at time of registration
-    priceAtRegistration: doublePrecision("price_at_registration").notNull(),
+    priceAtRegistration: numeric("price_at_registration", { precision: 12, scale: 2, mode: "number" }).notNull(),
+    // Core-subject snapshot — frozen at time of registration (URD CORE-002).
+    // Enables the drop/swap core-lock rule to remain stable for existing
+    // registrations even if an admin later clears subject.isCore for future
+    // cohorts. Defaults to false; populated from subject.isCore at insert.
+    wasCoreAtRegistration: boolean("was_core_at_registration").notNull().default(false),
     // Lifecycle status
     status: text("status").notNull().default("pending_approval"),
     // Who initiated this registration (student or parent)
@@ -524,7 +539,12 @@ export const registration = pgTable(
     // One active registration per student per subject per session
     uniqueIndex("registration_unique_active_idx")
       .on(table.studentId, table.sessionId, table.subjectId)
-      .where(sql`status NOT IN ('dropped', 'rejected')`),
+      .where(sql`status NOT IN ('dropped', 'rejected', 'expired')`),
+    // L-8: Price snapshot must never be negative.
+    check(
+      "registration_price_at_registration_nonneg",
+      sql`${table.priceAtRegistration} >= 0`,
+    ),
   ]
 );
 
@@ -578,9 +598,9 @@ export const payment = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
     // Amount charged to the payment method
-    amount: doublePrecision("amount").notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
     // Portion of the total covered by escrow (deducted from student's escrow)
-    escrowAmountApplied: doublePrecision("escrow_amount_applied").notNull().default(0),
+    escrowAmountApplied: numeric("escrow_amount_applied", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
     // Payment method selected by the parent
     paymentMethod: text("payment_method").notNull(), // 'fawry' | 'card' | 'mobile_wallet' | 'bank_transfer'
     // Lifecycle status
@@ -603,6 +623,13 @@ export const payment = pgTable(
     index("payment_parentId_idx").on(table.parentId),
     index("payment_status_idx").on(table.status),
     index("payment_method_idx").on(table.paymentMethod),
+    // L-8: Payment amount may be 0 for fully-escrow-funded payments (C-8
+    // auto-confirm path) but never negative. Same for the escrow portion.
+    check("payment_amount_nonneg", sql`${table.amount} >= 0`),
+    check(
+      "payment_escrow_applied_nonneg",
+      sql`${table.escrowAmountApplied} >= 0`,
+    ),
   ]
 );
 
@@ -653,15 +680,22 @@ export const escrow = pgTable(
     studentId: text("student_id")
       .notNull()
       .unique()
-      .references(() => user.id, { onDelete: "cascade" }),
-    balance: doublePrecision("balance").notNull().default(0),
+      .references(() => user.id, { onDelete: "restrict" }),
+    balance: numeric("balance", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("escrow_studentId_idx").on(table.studentId)]
+  (table) => [
+    index("escrow_studentId_idx").on(table.studentId),
+    // L-8: Core invariant — escrow balance never drops below zero. The
+    // app layer already enforces this via `debitEscrow`'s
+    // `WHERE balance >= amount`, but raw SQL or a future bypass would
+    // otherwise be silently accepted.
+    check("escrow_balance_nonneg", sql`${table.balance} >= 0`),
+  ]
 );
 
 /**
@@ -679,9 +713,9 @@ export const escrowTransaction = pgTable(
     id: text("id").primaryKey(),
     escrowId: text("escrow_id")
       .notNull()
-      .references(() => escrow.id, { onDelete: "cascade" }),
+      .references(() => escrow.id, { onDelete: "restrict" }),
     type: text("type").notNull(), // 'credit' | 'debit'
-    amount: doublePrecision("amount").notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
     // Reason categories for reporting and audit
     reason: text("reason").notNull(), // 'drop' | 'swap_refund' | 'transfer_in' | 'transfer_out' | 'withdrawal' | 'payment' | 'payment_refund'
     // Optional audit links
@@ -703,6 +737,9 @@ export const escrowTransaction = pgTable(
     index("escrowTx_escrowId_idx").on(table.escrowId),
     index("escrowTx_type_idx").on(table.type),
     index("escrowTx_reason_idx").on(table.reason),
+    // L-8: Every ledger entry carries a positive magnitude; direction
+    // lives in `type` ('credit' | 'debit').
+    check("escrowTx_amount_positive", sql`${table.amount} > 0`),
   ]
 );
 
@@ -721,13 +758,13 @@ export const withdrawalRequest = pgTable(
     id: text("id").primaryKey(),
     escrowId: text("escrow_id")
       .notNull()
-      .references(() => escrow.id, { onDelete: "cascade" }),
-    requestedAmount: doublePrecision("requested_amount").notNull(),
-    releasedAmount: doublePrecision("released_amount"),
+      .references(() => escrow.id, { onDelete: "restrict" }),
+    requestedAmount: numeric("requested_amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
+    releasedAmount: numeric("released_amount", { precision: 12, scale: 2, mode: "number" }),
     status: text("status").notNull().default("pending"), // 'pending' | 'partially_fulfilled' | 'fulfilled' | 'rejected'
     adminNotes: text("admin_notes"),
-    fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
-    fulfilledBy: text("fulfilled_by").references(() => user.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: text("resolved_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -737,6 +774,17 @@ export const withdrawalRequest = pgTable(
   (table) => [
     index("withdrawalReq_escrowId_idx").on(table.escrowId),
     index("withdrawalReq_status_idx").on(table.status),
+    // L-8: A parent must request a positive amount, and cumulative
+    // released funds must stay within [0, requestedAmount].
+    check("withdrawal_requested_positive", sql`${table.requestedAmount} > 0`),
+    check(
+      "withdrawal_released_nonneg",
+      sql`${table.releasedAmount} IS NULL OR ${table.releasedAmount} >= 0`,
+    ),
+    check(
+      "withdrawal_released_le_requested",
+      sql`${table.releasedAmount} IS NULL OR ${table.releasedAmount} <= ${table.requestedAmount}`,
+    ),
   ]
 );
 
@@ -795,9 +843,9 @@ export const changeRequest = pgTable(
     }),
     // Snapshot of the new subject's price at time of request (for swaps)
     // For drops: stores the priceAtRegistration to be credited back
-    priceAtRequest: doublePrecision("price_at_request").notNull(),
+    priceAtRequest: numeric("price_at_request", { precision: 12, scale: 2, mode: "number" }).notNull(),
     // newSubjectPrice - droppedSubjectPrice; negative = escrow credit
-    priceDifference: doublePrecision("price_difference").notNull(),
+    priceDifference: numeric("price_difference", { precision: 12, scale: 2, mode: "number" }).notNull(),
     // 'pending_approval' | 'approved' | 'rejected'
     status: text("status").notNull().default("pending_approval"),
     // Parent who approved or rejected (null until processed)
@@ -820,6 +868,12 @@ export const changeRequest = pgTable(
     uniqueIndex("changeReq_one_pending_per_registration_idx")
       .on(table.registrationId)
       .where(sql`status = 'pending_approval'`),
+    // L-8: priceAtRequest is a snapshot of either the new subject's
+    // price (swap) or the registered price being credited back (drop).
+    // Neither use case allows negative values. priceDifference is
+    // intentionally NOT constrained — it is new_price − dropped_price,
+    // so negative values are valid (swap into a cheaper subject).
+    check("change_request_price_at_request_nonneg", sql`${table.priceAtRequest} >= 0`),
   ]
 );
 
@@ -916,8 +970,8 @@ export const withdrawalRequestRelations = relations(withdrawalRequest, ({ one })
     fields: [withdrawalRequest.escrowId],
     references: [escrow.id],
   }),
-  fulfilledByUser: one(user, {
-    fields: [withdrawalRequest.fulfilledBy],
+  resolvedByUser: one(user, {
+    fields: [withdrawalRequest.resolvedBy],
     references: [user.id],
   }),
 }));
@@ -1080,6 +1134,63 @@ export const auditLog = pgTable(
 export const auditLogRelations = relations(auditLog, ({ one }) => ({
   user: one(user, {
     fields: [auditLog.userId],
+    references: [user.id],
+  }),
+}));
+
+/**
+ * ============================================
+ * SCHEDULED ANNOUNCEMENT TABLE
+ * ============================================
+ *
+ * Stores bulk announcements that are scheduled for future delivery.
+ * The session-closer cron job checks this table on each tick and
+ * dispatches any announcements whose scheduledAt has arrived.
+ *
+ * Status workflow: pending -> sent | failed
+ * - pending: Scheduled but not yet dispatched
+ * - sent: Successfully dispatched (in-app + optional email)
+ * - failed: Dispatch attempt failed (will not retry automatically)
+ */
+export const scheduledAnnouncement = pgTable(
+  "scheduled_announcement",
+  {
+    id: text("id").primaryKey(),
+    // Announcement content (matches BulkAnnouncement schema)
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    recipients: text("recipients").notNull(), // 'all' | 'students' | 'parents' | 'grade_10' | etc.
+    sendEmail: boolean("send_email").notNull().default(true),
+    // When to send
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    // Current status
+    status: text("status").notNull().default("pending"), // 'pending' | 'sent' | 'failed' | 'cancelled'
+    // Result tracking
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    notificationCount: integer("notification_count"),
+    errorMessage: text("error_message"),
+    // Who created the scheduled announcement
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("schedAnn_status_idx").on(table.status),
+    index("schedAnn_scheduledAt_idx").on(table.scheduledAt),
+  ]
+);
+
+/**
+ * SCHEDULED ANNOUNCEMENT RELATIONS
+ */
+export const scheduledAnnouncementRelations = relations(scheduledAnnouncement, ({ one }) => ({
+  createdByUser: one(user, {
+    fields: [scheduledAnnouncement.createdBy],
     references: [user.id],
   }),
 }));

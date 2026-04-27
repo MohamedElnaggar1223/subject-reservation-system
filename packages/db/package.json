@@ -10,7 +10,8 @@
         "db:generate:migrations": "drizzle-kit generate",
         "db:migrate": "drizzle-kit migrate",
         "db:studio": "drizzle-kit studio",
-        "db:up": "docker compose up -d"
+        "db:up": "docker compose up -d",
+        "seed": "tsx seed.ts"
     },
     "exports": {
         ".": {
@@ -28,6 +29,7 @@
         "@types/pg": "^8.16.0",
         "drizzle-kit": "^0.31.8",
         "eslint": "^9.39.1",
+        "tsx": "^4.7.1",
         "typescript": "5.9.2"
     },
     "dependencies": {

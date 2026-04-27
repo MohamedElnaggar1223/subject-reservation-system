@@ -99,6 +99,41 @@
       "when": 1772736528708,
       "tag": "0013_absurd_meltdown",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1775612643657,
+      "tag": "0014_furry_selene",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1776110909549,
+      "tag": "0015_wise_tattoo",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1776427653028,
+      "tag": "0016_registration_was_core_snapshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1776429289900,
+      "tag": "0017_session_grade_progression_tracking",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1776430872053,
+      "tag": "0018_financial_check_constraints",
+      "breakpoints": true
     }
   ]
 }
