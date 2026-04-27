@@ -32,10 +32,10 @@ import type { FileType } from '@repo/storage'
  * IMPORTANT: Bucket is PRIVATE - files accessed via signed URLs only
  */
 const r2Client = createR2Client({
-  accountId: env.R2_ACCOUNT_ID,
-  accessKeyId: env.R2_ACCESS_KEY_ID,
-  secretAccessKey: env.R2_SECRET_ACCESS_KEY,
-  bucketName: env.R2_BUCKET_NAME,
+  accountId: env.R2_ACCOUNT_ID ?? '',
+  accessKeyId: env.R2_ACCESS_KEY_ID ?? '',
+  secretAccessKey: env.R2_SECRET_ACCESS_KEY ?? '',
+  bucketName: env.R2_BUCKET_NAME ?? '',
 })
 
 /**
@@ -59,7 +59,7 @@ export async function uploadFile(
 ) {
   // Upload to R2
   const uploadResult = await r2Client.uploadFile(uploadedFile, {
-    bucket: env.R2_BUCKET_NAME,
+    bucket: env.R2_BUCKET_NAME ?? '',
     userId,
     fileType,
     generateThumbnails: fileType === 'avatar', // Auto-generate for avatars

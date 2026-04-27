@@ -26,90 +26,134 @@ import {
 import { success, error } from '../lib/response';
 import { requireAuth, requireAdmin } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
+import { logAction, extractAuditContext } from '../services/audit.services';
 import * as notificationService from '../services/notification.services';
 
-const notificationRoutes = new Hono<HonoEnv>();
+export const notificationRoutes = new Hono<HonoEnv>()
 
-// ─── GET /notifications ────────────────────────────────────────────────────────
-// Returns paginated notifications for the authenticated user (newest first).
-// Query: unreadOnly=true, limit, offset
-notificationRoutes.get(
-  '/',
-  requireAuth,
-  zValidator('query', GetNotificationsQuery),
-  async (c) => {
-    const user = c.get('user')!;
-    const { unreadOnly, limit, offset } = c.req.valid('query');
+  .get(
+    '/',
+    requireAuth(),
+    zValidator('query', GetNotificationsQuery),
+    async (c) => {
+      const user = c.get('user')!;
+      const { unreadOnly, limit, offset } = c.req.valid('query');
 
-    const notifications = await notificationService.getUserNotifications(user.id, {
-      unreadOnly,
-      limit,
-      offset,
-    });
+      const notifications = await notificationService.getUserNotifications(user.id, {
+        unreadOnly,
+        limit,
+        offset,
+      });
 
-    return c.json(success(notifications));
-  }
-);
-
-// ─── GET /notifications/unread-count ──────────────────────────────────────────
-// Returns the count of unread notifications for the badge indicator.
-// Must be defined before /:id routes to avoid route conflicts.
-notificationRoutes.get('/unread-count', requireAuth, async (c) => {
-  const user = c.get('user')!;
-  const count = await notificationService.getUnreadCount(user.id);
-  return c.json(success({ count }));
-});
-
-// ─── PUT /notifications/read-all ──────────────────────────────────────────────
-// Marks all unread notifications for the authenticated user as read.
-// Defined before /:id to avoid pattern conflicts.
-notificationRoutes.put('/read-all', requireAuth, async (c) => {
-  const user = c.get('user')!;
-  await notificationService.markAllAsRead(user.id);
-  return c.json(success({ message: 'All notifications marked as read' }));
-});
-
-// ─── PUT /notifications/:id/read ──────────────────────────────────────────────
-// Marks a single notification as read.
-// Returns 404 if the notification does not exist or does not belong to the user.
-notificationRoutes.put(
-  '/:id/read',
-  requireAuth,
-  zValidator('param', NotificationId),
-  async (c) => {
-    const user = c.get('user')!;
-    const { id } = c.req.valid('param');
-
-    const updated = await notificationService.markAsRead(id, user.id);
-    if (!updated) {
-      return c.json(error('Notification not found or already read', 404), 404);
+      return success(c, notifications);
     }
+  )
 
-    return c.json(success(updated));
-  }
-);
+  .get('/unread-count', requireAuth(), async (c) => {
+    const user = c.get('user')!;
+    const count = await notificationService.getUnreadCount(user.id);
+    return success(c, { count });
+  })
 
-// ─── POST /notifications/admin/announce ───────────────────────────────────────
-// Admin composes and sends a bulk announcement to a recipient group (NOT-011).
-// Creates in-app notifications for all matching users and optionally sends email.
-notificationRoutes.post(
-  '/admin/announce',
-  requireAdmin,
-  zValidator('json', BulkAnnouncement),
-  async (c) => {
-    const payload = c.req.valid('json');
+  .put('/read-all', requireAuth(), async (c) => {
+    const user = c.get('user')!;
+    await notificationService.markAllAsRead(user.id);
+    return success(c, { message: 'All notifications marked as read' });
+  })
 
-    const result = await notificationService.sendAdminAnnouncement(payload);
+  .put(
+    '/:id/read',
+    requireAuth(),
+    zValidator('param', NotificationId),
+    async (c) => {
+      const user = c.get('user')!;
+      const { id } = c.req.valid('param');
 
-    return c.json(
-      success({
+      const updated = await notificationService.markAsRead(id, user.id);
+      if (!updated) {
+        return error(c, 'Notification not found or already read', 404);
+      }
+
+      return success(c, updated);
+    }
+  )
+
+  .post(
+    '/admin/announce',
+    requireAdmin(),
+    zValidator('json', BulkAnnouncement),
+    async (c) => {
+      const user = c.get('user')!;
+      const payload = c.req.valid('json');
+
+      const result = await notificationService.sendAdminAnnouncement(payload, user.id);
+
+      if (result.scheduled) {
+        logAction(user.id, 'ADMIN_ANNOUNCEMENT', 'notification', '', null, {
+          recipients: payload.recipients,
+          scheduled: true,
+          scheduledAt: result.scheduledAt?.toISOString(),
+        }, extractAuditContext(c))
+          .catch(err => console.error('[audit] ADMIN_ANNOUNCEMENT (scheduled) failed:', err));
+
+        return success(c, {
+          message: `Announcement scheduled for ${result.scheduledAt?.toLocaleString()}`,
+          scheduled: true,
+          scheduledAt: result.scheduledAt,
+          notificationCount: 0,
+          emailSent: false,
+          emailStubbed: false,
+        });
+      }
+
+      logAction(user.id, 'ADMIN_ANNOUNCEMENT', 'notification', '', null, { recipients: payload.recipients, notificationCount: result.notificationCount }, extractAuditContext(c))
+        .catch(err => console.error('[audit] ADMIN_ANNOUNCEMENT failed:', err));
+      return success(c, {
         message: `Announcement sent to ${result.notificationCount} user(s)`,
         notificationCount: result.notificationCount,
         emailSent: result.emailResult.success,
         emailStubbed: result.emailResult.stubbed ?? false,
-      })
-    );
-  }
-);
+      });
+    }
+  )
 
-export { notificationRoutes };
+  /**
+   * L-6: Admin list of all scheduled announcements (pending + sent + failed).
+   * Sorted newest-scheduled-first so the queue view is stable.
+   */
+  .get(
+    '/admin/scheduled',
+    requireAdmin(),
+    async (c) => {
+      const rows = await notificationService.getScheduledAnnouncements();
+      return success(c, rows);
+    }
+  )
+
+  /**
+   * L-6: Admin cancels a still-pending scheduled announcement.
+   * Returns 404 if the row isn't found or has already been sent/failed.
+   */
+  .delete(
+    '/admin/scheduled/:id',
+    requireAdmin(),
+    zValidator('param', NotificationId),
+    async (c) => {
+      const user = c.get('user')!;
+      const { id } = c.req.valid('param');
+      const cancelled = await notificationService.cancelScheduledAnnouncement(id);
+      if (!cancelled) {
+        return error(c, 'Scheduled announcement not found or already dispatched', 404);
+      }
+      logAction(
+        user.id,
+        'ADMIN_ANNOUNCEMENT',
+        'notification',
+        id,
+        { status: 'pending' } as Record<string, unknown>,
+        { status: 'cancelled', cancelledBy: user.id },
+        extractAuditContext(c),
+      ).catch(err => console.error('[audit] ADMIN_ANNOUNCEMENT cancel failed:', err));
+      return success(c, cancelled);
+    }
+  );

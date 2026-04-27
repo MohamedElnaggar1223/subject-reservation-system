@@ -42,6 +42,7 @@ import {
   requireAdmin,
   requireStudentOrParent,
   requireAdminOrParent,
+  requireNotGraduated,
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as registrationService from '../services/registration.services';
@@ -75,7 +76,7 @@ export const registrations = new Hono<HonoEnv>()
         }
         // Verify parent-child link
         const children = await linkService.getLinkedChildren(user.id);
-        const isLinked = children.some((child) => child.id === requestedStudentId);
+        const isLinked = children.some((child) => child.studentId === requestedStudentId);
         if (!isLinked) {
           return error(c, 'You are not linked to this student', 403);
         }
@@ -146,7 +147,7 @@ export const registrations = new Hono<HonoEnv>()
 
         // Verify link before returning data
         const children = await linkService.getLinkedChildren(user.id);
-        const isLinked = children.some((child) => child.id === studentId);
+        const isLinked = children.some((child) => child.studentId === studentId);
         if (!isLinked) return error(c, 'You are not linked to this student', 403);
 
         const history = await registrationService.getRegistrationHistory(studentId);
@@ -190,7 +191,7 @@ export const registrations = new Hono<HonoEnv>()
         if (filters.studentId) {
           // Validate parent-child link
           const children = await linkService.getLinkedChildren(user.id);
-          const isLinked = children.some((child) => child.id === filters.studentId);
+          const isLinked = children.some((child) => child.studentId === filters.studentId);
           if (!isLinked) return error(c, 'You are not linked to this student', 403);
           const data = await registrationService.getRegistrations(filters);
           return success(c, data);
@@ -198,7 +199,7 @@ export const registrations = new Hono<HonoEnv>()
 
         // No specific student: return all children's registrations
         const children = await linkService.getLinkedChildren(user.id);
-        const studentIds = children.map((c) => c.id);
+        const studentIds = children.map((c) => c.studentId);
         const data = await registrationService.getRegistrations({
           ...filters,
           studentIds,
@@ -224,6 +225,7 @@ export const registrations = new Hono<HonoEnv>()
    */
   .post('/request',
     requireStudent(),
+    requireNotGraduated(),
     zValidator('json', RequestRegistration),
     async (c) => {
       const user = c.get('user')!;
@@ -235,10 +237,16 @@ export const registrations = new Hono<HonoEnv>()
           data,
           user.id
         );
+        logAction(user.id, 'REGISTRATION_REQUESTED', 'registration', created[0]?.id ?? '', null, { registrations: created } as Record<string, unknown>, extractAuditContext(c))
+          .catch((err) => console.error('[audit] REGISTRATION_REQUESTED failed:', err));
         return success(c, created, 201);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create registration request';
-        const status = message.includes('window is not open') ||
+        // 409 — precondition not yet met (missing parent link)
+        // 422 — semantic violation (closed window, duplicates, core rule)
+        // 400 — generic bad request
+        const status = message.includes('parent link') ? 409 :
+                       message.includes('window is not open') ||
                        message.includes('already registered') ||
                        message.includes('core subjects') ? 422 : 400;
         return error(c, message, status);
@@ -264,6 +272,8 @@ export const registrations = new Hono<HonoEnv>()
           user.id,
           data
         );
+        logAction(user.id, 'REGISTRATION_DIRECT', 'registration', created[0]?.id ?? '', null, { registrations: created } as Record<string, unknown>, extractAuditContext(c))
+          .catch((err) => console.error('[audit] REGISTRATION_DIRECT failed:', err));
         return success(c, created, 201);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create registration';
@@ -294,6 +304,11 @@ export const registrations = new Hono<HonoEnv>()
           data,
           user.id
         );
+        const auditCtx = extractAuditContext(c);
+        for (const regId of data.registrationIds) {
+          logAction(user.id, 'REGISTRATION_APPROVED', 'registration', regId, { status: 'pending_approval' }, { status: 'pending_payment' }, auditCtx)
+            .catch((err) => console.error('[audit] REGISTRATION_APPROVED failed:', err));
+        }
         return success(c, updated);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to approve registrations';
@@ -322,6 +337,11 @@ export const registrations = new Hono<HonoEnv>()
           data,
           user.id
         );
+        const auditCtx = extractAuditContext(c);
+        for (const regId of data.registrationIds) {
+          logAction(user.id, 'REGISTRATION_REJECTED', 'registration', regId, { status: 'pending_approval' }, { status: 'rejected', comments: data.comments }, auditCtx)
+            .catch((err) => console.error('[audit] REGISTRATION_REJECTED failed:', err));
+        }
         return success(c, updated);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to reject registrations';
@@ -393,7 +413,7 @@ export const registrations = new Hono<HonoEnv>()
       // Parents can only see their linked children's registrations
       if (user.role === ROLES.PARENT) {
         const children = await linkService.getLinkedChildren(user.id);
-        const isLinked = children.some((child) => child.id === reg.studentId);
+        const isLinked = children.some((child) => child.studentId === reg.studentId);
         if (!isLinked) return error(c, 'Access denied', 403);
       }
 

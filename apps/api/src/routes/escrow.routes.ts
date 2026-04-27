@@ -46,6 +46,7 @@ import {
   requireStudentOrParent,
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
+import { logAction, extractAuditContext } from '../services/audit.services';
 import * as escrowService from '../services/escrow.services';
 import * as linkService from '../services/link.services';
 
@@ -76,7 +77,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
       } else if (user.role === ROLES.PARENT) {
         if (queryStudentId) {
           const children = await linkService.getLinkedChildren(user.id);
-          const isLinked = children.some((child) => child.id === queryStudentId);
+          const isLinked = children.some((child) => child.studentId === queryStudentId);
           if (!isLinked) return error(c, 'You are not linked to this student', 403);
           targetStudentId = queryStudentId;
         } else {
@@ -136,7 +137,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
       } else if (user.role === ROLES.PARENT) {
         if (!queryStudentId) return error(c, 'studentId is required', 400);
         const children = await linkService.getLinkedChildren(user.id);
-        const isLinked = children.some((child) => child.id === queryStudentId);
+        const isLinked = children.some((child) => child.studentId === queryStudentId);
         if (!isLinked) return error(c, 'You are not linked to this student', 403);
         targetStudentId = queryStudentId;
       } else if (user.role === ROLES.ADMIN) {
@@ -193,6 +194,8 @@ export const escrowRoutes = new Hono<HonoEnv>()
 
       try {
         const result = await escrowService.transferEscrow(data, user.id);
+        logAction(user.id, 'ESCROW_TRANSFER', 'escrow', '', null, result as Record<string, unknown>, extractAuditContext(c))
+          .catch(err => console.error('[audit] ESCROW_TRANSFER failed:', err));
         return success(c, result);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Transfer failed';
@@ -217,8 +220,10 @@ export const escrowRoutes = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const request = await escrowService.createWithdrawalRequest(data, user.id);
-        return success(c, request, 201);
+        const result = await escrowService.createWithdrawalRequest(data, user.id);
+        logAction(user.id, 'WITHDRAWAL_REQUESTED', 'escrow', result.id, null, result as Record<string, unknown>, extractAuditContext(c))
+          .catch(err => console.error('[audit] WITHDRAWAL_REQUESTED failed:', err));
+        return success(c, result, 201);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create withdrawal request';
         const status = message.includes('not linked') ? 403 :
@@ -261,8 +266,10 @@ export const escrowRoutes = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const updated = await escrowService.fulfillWithdrawalRequest(id, data, user.id);
-        return success(c, updated);
+        const result = await escrowService.fulfillWithdrawalRequest(id, data, user.id);
+        logAction(user.id, 'WITHDRAWAL_FULFILLED', 'escrow', id, null, result as Record<string, unknown>, extractAuditContext(c))
+          .catch(err => console.error('[audit] WITHDRAWAL_FULFILLED failed:', err));
+        return success(c, result);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to fulfill withdrawal';
         const status = message.includes('not found') ? 404 :
@@ -288,8 +295,10 @@ export const escrowRoutes = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const updated = await escrowService.rejectWithdrawalRequest(id, data, user.id);
-        return success(c, updated);
+        const result = await escrowService.rejectWithdrawalRequest(id, data, user.id);
+        logAction(user.id, 'WITHDRAWAL_REJECTED', 'escrow', id, null, result as Record<string, unknown>, extractAuditContext(c))
+          .catch(err => console.error('[audit] WITHDRAWAL_REJECTED failed:', err));
+        return success(c, result);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to reject withdrawal';
         const status = message.includes('not found') ? 404 : 400;

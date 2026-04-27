@@ -40,6 +40,28 @@ import {
   count,
 } from '@repo/db';
 
+// ─── Pagination Helper ──────────────────────────────────────────────────────
+
+export interface PaginationParams {
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * In-memory pagination fallback.
+ *
+ * Prefer SQL-level LIMIT/OFFSET (used by REP-001 and REP-007) whenever
+ * the underlying query can be paginated cleanly. This helper exists for
+ * reports that combine data from multiple queries in JS (e.g. aggregations
+ * over parent links where SQL pagination would drop rows mid-join).
+ */
+function paginate<T>(items: T[], params?: PaginationParams): { data: T[]; total: number } {
+  const total = items.length;
+  const offset = params?.offset ?? 0;
+  const limit = params?.limit ?? 500;
+  return { data: items.slice(offset, offset + limit), total };
+}
+
 // ─── REP-008: Admin Dashboard Metrics ────────────────────────────────────────
 
 /**
@@ -60,16 +82,29 @@ export async function getAdminDashboardMetrics() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
+  // URD REP-008 specifies metrics for the CURRENT session. Since multiple
+  // sessions can be active simultaneously (SES-001 — one per sessionType),
+  // we first resolve the set of active session IDs, then aggregate
+  // registrations + revenue scoped to them.
+  const activeSessionRows = await db
+    .select({ id: registrationSession.id, name: registrationSession.name, sessionType: registrationSession.sessionType })
+    .from(registrationSession)
+    .where(eq(registrationSession.status, 'active'));
+  const activeSessionIds = activeSessionRows.map((s) => s.id);
+
   const [
     studentsByGrade,
     parentCount,
-    activeSessions,
     pendingApprovalRegs,
     pendingPaymentRegs,
     pendingChangeRequests,
     pendingBankTransfers,
     confirmedThisMonth,
     escrowLiability,
+    pendingWithdrawalsCount,
+    pendingWithdrawalsAmount,
+    currentSessionRegistrationsRow,
+    currentSessionRevenueRow,
   ] = await Promise.all([
     // Student counts by grade + graduated
     db
@@ -83,12 +118,6 @@ export async function getAdminDashboardMetrics() {
       .select({ count: count() })
       .from(user)
       .where(eq(user.role, 'parent')),
-
-    // Active sessions
-    db
-      .select({ count: count() })
-      .from(registrationSession)
-      .where(eq(registrationSession.status, 'active')),
 
     // Pending approval registrations
     db
@@ -135,6 +164,55 @@ export async function getAdminDashboardMetrics() {
       .select({ total: sql<number>`COALESCE(SUM(${escrow.balance}), 0)` })
       .from(escrow)
       .where(sql`${escrow.balance} > 0`),
+
+    // Pending withdrawal request count — includes partially_fulfilled (H-14):
+    // these still tie up liability and admin attention until either fully
+    // released or rejected.
+    db
+      .select({ count: count() })
+      .from(withdrawalRequest)
+      .where(inArray(withdrawalRequest.status, ['pending', 'partially_fulfilled'])),
+
+    // Pending withdrawal total amount — same inclusion rule as count above.
+    // Uses (requestedAmount - COALESCE(releasedAmount, 0)) so partially
+    // fulfilled requests only contribute the outstanding portion.
+    db
+      .select({
+        total: sql<number>`COALESCE(SUM(${withdrawalRequest.requestedAmount} - COALESCE(${withdrawalRequest.releasedAmount}, 0)), 0)`,
+      })
+      .from(withdrawalRequest)
+      .where(inArray(withdrawalRequest.status, ['pending', 'partially_fulfilled'])),
+
+    // Current session registrations — non-terminal rows in any active session
+    activeSessionIds.length > 0
+      ? db
+          .select({ count: count() })
+          .from(registration)
+          .where(
+            and(
+              inArray(registration.sessionId, activeSessionIds),
+              sql`${registration.status} NOT IN ('dropped', 'rejected', 'expired')`
+            )
+          )
+      : Promise.resolve([{ count: 0 }]),
+
+    // Current session revenue — sum of completed payments' (amount +
+    // escrowAmountApplied) where the payment is linked to a registration
+    // in an active session. `SELECT DISTINCT payment.id` avoids
+    // double-counting multi-registration payments.
+    activeSessionIds.length > 0
+      ? db.execute(sql`
+          SELECT COALESCE(SUM(p.amount + p.escrow_amount_applied), 0) AS total
+          FROM (
+            SELECT DISTINCT pay.id, pay.amount, pay.escrow_amount_applied
+            FROM ${payment} pay
+            JOIN payment_registration pr ON pr.payment_id = pay.id
+            JOIN ${registration} r ON r.id = pr.registration_id
+            WHERE pay.status = 'completed'
+              AND r.session_id IN (${sql.join(activeSessionIds.map((id) => sql`${id}`), sql`, `)})
+          ) p
+        `)
+      : Promise.resolve({ rows: [{ total: 0 }] }),
   ]);
 
   // Map grade counts
@@ -146,20 +224,39 @@ export async function getAdminDashboardMetrics() {
     else                    gradeMap.graduated  = Number(row.count); // grade = null
   }
 
+  const revenueRows = (currentSessionRevenueRow as { rows?: { total: number | string }[] }).rows ?? [];
+  const currentSessionRevenueEGP = Number(revenueRows[0]?.total ?? 0);
+  const currentSessionRegistrations = Number(
+    (currentSessionRegistrationsRow as { count: number }[])[0]?.count ?? 0
+  );
+
+  // Active students = not graduated. Total "students" including graduated
+  // is kept separately so both views are available on the dashboard.
+  const activeStudents =
+    (gradeMap.grade10 ?? 0) + (gradeMap.grade11 ?? 0) + (gradeMap.grade12 ?? 0);
+
   return {
     students: {
       grade10:   gradeMap.grade10,
       grade11:   gradeMap.grade11,
       grade12:   gradeMap.grade12,
       graduated: gradeMap.graduated,
-      total:     gradeMap.grade10 + gradeMap.grade11 + gradeMap.grade12 + gradeMap.graduated,
+      active:    activeStudents,
+      total:     activeStudents + (gradeMap.graduated ?? 0),
     },
     parents:             Number(parentCount[0]?.count ?? 0),
-    activeSessions:      Number(activeSessions[0]?.count ?? 0),
+    activeSessions:      activeSessionRows.length,
+    activeSessionList:   activeSessionRows,
     pendingApprovals:    Number(pendingApprovalRegs[0]?.count ?? 0),
     pendingPayments:     Number(pendingPaymentRegs[0]?.count ?? 0),
     pendingChangeReqs:   Number(pendingChangeRequests[0]?.count ?? 0),
     pendingBankTransfers:Number(pendingBankTransfers[0]?.count ?? 0),
+    pendingWithdrawals:  Number(pendingWithdrawalsCount[0]?.count ?? 0),
+    pendingWithdrawalsAmountEGP: Number(pendingWithdrawalsAmount[0]?.total ?? 0),
+    // URD REP-008 core metrics: registrations and revenue scoped to currently
+    // active sessions. Old `confirmedThisMonth` kept for operational continuity.
+    currentSessionRegistrations,
+    currentSessionRevenueEGP,
     confirmedThisMonth:  Number(confirmedThisMonth[0]?.count ?? 0),
     escrowLiabilityEGP:  Number(escrowLiability[0]?.total ?? 0),
     generatedAt:         now,
@@ -182,42 +279,103 @@ export async function getAdminDashboardMetrics() {
  */
 export async function generateRegistrationReport(
   sessionId: string,
-  filters?: { grade?: number; status?: string }
+  filters?: { grade?: number; status?: string; council?: string },
+  pagination?: PaginationParams
 ) {
+  // M-15: Push filters AND pagination into SQL so this scales beyond what
+  // a JS `Array.slice` after `findMany` can handle. Grade and council
+  // filters previously ran in JS after loading every row; they now live
+  // in the WHERE clause alongside status + sessionId.
+  const limit = Math.min(pagination?.limit ?? 500, 5000);
+  const offset = pagination?.offset ?? 0;
+
+  // 1) Count query — same filters, no joins, used for pagination totals
+  const totalRow = await db
+    .select({ count: sql<number>`COUNT(*)::int` })
+    .from(registration)
+    .innerJoin(user, eq(user.id, registration.studentId))
+    .innerJoin(subject, eq(subject.id, registration.subjectId))
+    .where(
+      and(
+        eq(registration.sessionId, sessionId),
+        ...(filters?.status ? [eq(registration.status, filters.status)] : []),
+        ...(filters?.grade !== undefined ? [eq(user.grade, filters.grade)] : []),
+        ...(filters?.council ? [eq(subject.council, filters.council)] : []),
+      ),
+    );
+  const total = Number(totalRow[0]?.count ?? 0);
+
+  // 2) Page query — same filters, full joins, SQL LIMIT/OFFSET
+  const studentIdsSub = db
+    .select({ id: registration.id })
+    .from(registration)
+    .innerJoin(user, eq(user.id, registration.studentId))
+    .innerJoin(subject, eq(subject.id, registration.subjectId))
+    .where(
+      and(
+        eq(registration.sessionId, sessionId),
+        ...(filters?.status ? [eq(registration.status, filters.status)] : []),
+        ...(filters?.grade !== undefined ? [eq(user.grade, filters.grade)] : []),
+        ...(filters?.council ? [eq(subject.council, filters.council)] : []),
+      ),
+    )
+    .orderBy(registration.createdAt)
+    .limit(limit)
+    .offset(offset);
+
+  const pageIds = (await studentIdsSub).map((r) => r.id);
+  if (pageIds.length === 0) {
+    return { data: [], total };
+  }
+
   const rows = await db.query.registration.findMany({
-    where: (r, { eq, and }) => {
-      const conds = [eq(r.sessionId, sessionId)];
-      if (filters?.status) conds.push(eq(r.status, filters.status));
-      return and(...conds);
-    },
+    where: (r, { inArray: inArr }) => inArr(r.id, pageIds),
     with: {
       student: { columns: { id: true, name: true, grade: true, studentId: true, email: true } },
       subject: { columns: { id: true, name: true, code: true, council: true, isOfferedAtSchool: true } },
-      approvedBy: { columns: { id: true, name: true, role: true } },
+      requestedByUser: { columns: { id: true, name: true, role: true } },
+      approvedByUser: { columns: { id: true, name: true, role: true } },
+      paymentRegistrations: {
+        with: {
+          payment: { columns: { paymentMethod: true, confirmedAt: true, status: true } },
+        },
+      },
     },
     orderBy: (r, { asc }) => [asc(r.createdAt)],
   });
 
-  // Filter by grade in memory (join makes SQL harder with nullable field)
-  const filtered = filters?.grade
-    ? rows.filter((r) => r.student?.grade === filters.grade)
-    : rows;
+  const mapped = rows.map((r) => {
+    // Find the first completed payment for confirmation info
+    const completedPayment = (r.paymentRegistrations ?? [])
+      .map((pr) => pr.payment)
+      .find((p) => p && p.status === 'completed');
 
-  return filtered.map((r) => ({
-    studentName:       r.student?.name ?? '—',
-    studentGrade:      r.student?.grade ?? 'Graduated',
-    studentId:         r.student?.studentId ?? '—',
-    studentEmail:      r.student?.email ?? '—',
-    subjectName:       r.subject?.name ?? '—',
-    subjectCode:       r.subject?.code ?? '—',
-    council:           r.subject?.council ?? '—',
-    offeredAtSchool:   r.subject?.isOfferedAtSchool ? 'Yes' : 'No',
-    status:            r.status,
-    priceEGP:          Number(r.priceAtRegistration),
-    approvedBy:        r.approvedBy?.name ?? '—',
-    approvalComments:  r.approvalComments ?? '—',
-    registeredAt:      r.createdAt.toISOString(),
-  }));
+    return {
+      studentName:       r.student.name,
+      studentGrade:      r.student.grade ?? 'Graduated',
+      studentId:         r.student.studentId ?? '—',
+      studentEmail:      r.student.email,
+      subjectName:       r.subject.name,
+      subjectCode:       r.subject.code,
+      council:           r.subject.council,
+      offeredAtSchool:   r.subject.isOfferedAtSchool ? 'Yes' : 'No',
+      status:            r.status,
+      priceEGP:          Number(r.priceAtRegistration),
+      // Approval trail: Requested by -> Approved by -> Confirmed via payment
+      requestedBy:       r.requestedByUser?.name ?? '—',
+      requestedByRole:   r.requestedByUser?.role ?? '—',
+      approvedBy:        r.approvedByUser?.name ?? '—',
+      approvedAt:        r.approvedAt?.toISOString() ?? '—',
+      approvalComments:  r.approvalComments ?? '—',
+      confirmedVia:      completedPayment?.paymentMethod ?? '—',
+      confirmedAt:       completedPayment?.confirmedAt?.toISOString() ?? '—',
+      registeredAt:      r.createdAt.toISOString(),
+    };
+  });
+
+  // Pagination and filters are applied at SQL level above; `total` is the
+  // filtered total, and `mapped` is already the page slice.
+  return { data: mapped, total };
 }
 
 // ─── REP-002: Financial Summary ───────────────────────────────────────────────
@@ -231,7 +389,10 @@ export async function generateRegistrationReport(
  *
  * Also shows pending revenue (pending_payment registrations).
  */
-export async function generateFinancialSummary(sessionId: string) {
+export async function generateFinancialSummary(
+  sessionId: string,
+  filters?: { council?: string }
+) {
   const rows = await db.query.registration.findMany({
     where: (r, { eq, and, inArray }) =>
       and(
@@ -239,10 +400,10 @@ export async function generateFinancialSummary(sessionId: string) {
         inArray(r.status, ['confirmed', 'pending_payment'])
       ),
     with: {
-      subject: { columns: { isOfferedAtSchool: true } },
-      payments: {
+      subject: { columns: { isOfferedAtSchool: true, council: true } },
+      paymentRegistrations: {
         with: {
-          payment: { columns: { paymentMethod: true, status: true, totalAmount: true } },
+          payment: { columns: { id: true, paymentMethod: true, status: true, amount: true, escrowAmountApplied: true } },
         },
       },
     },
@@ -252,19 +413,38 @@ export async function generateFinancialSummary(sessionId: string) {
   let confirmedNonSchool = 0;
   let pendingRevenue = 0;
   const byMethod: Record<string, number> = {};
+  const byCouncil: Record<string, number> = {};
+
+  // Track which payments we have already counted for the method breakdown
+  // to avoid double-counting when a payment covers multiple registrations.
+  const countedPaymentIds = new Set<string>();
 
   for (const reg of rows) {
     const price = Number(reg.priceAtRegistration);
     const isSchool = reg.subject?.isOfferedAtSchool ?? true;
+    const council = reg.subject?.council ?? 'unknown';
+
+    // Apply optional council filter
+    if (filters?.council && council !== filters.council) continue;
 
     if (reg.status === 'confirmed') {
+      // School vs non-school breakdown uses registration price (one entry per reg)
       if (isSchool) confirmedSchool += price;
       else confirmedNonSchool += price;
 
-      // Aggregate by payment method from linked payments
-      for (const pr of reg.payments ?? []) {
-        const method = pr.payment?.paymentMethod ?? 'unknown';
-        byMethod[method] = (byMethod[method] ?? 0) + price;
+      // Council breakdown
+      byCouncil[council] = (byCouncil[council] ?? 0) + price;
+
+      // Payment-method breakdown: iterate over unique payments only.
+      // Each payment's (amount + escrowAmountApplied) is counted once.
+      for (const pr of reg.paymentRegistrations ?? []) {
+        const pay = pr.payment;
+        if (!pay || countedPaymentIds.has(pay.id)) continue;
+        countedPaymentIds.add(pay.id);
+
+        const paymentTotal = Number(pay.amount) + Number(pay.escrowAmountApplied);
+        const method = pay.paymentMethod ?? 'unknown';
+        byMethod[method] = (byMethod[method] ?? 0) + paymentTotal;
       }
     } else {
       pendingRevenue += price;
@@ -277,6 +457,7 @@ export async function generateFinancialSummary(sessionId: string) {
     confirmedRevenueTotalEGP:     confirmedSchool + confirmedNonSchool,
     pendingRevenueEGP:            pendingRevenue,
     revenueByPaymentMethod:       byMethod,
+    revenueByCouncil:             byCouncil,
     generatedAt:                  new Date(),
   };
 }
@@ -287,7 +468,7 @@ export async function generateFinancialSummary(sessionId: string) {
  * Escrow report — current balances and pending withdrawals (REP-003).
  * Returns one row per escrow account with linked student + parent info.
  */
-export async function generateEscrowReport() {
+export async function generateEscrowReport(pagination?: PaginationParams) {
   const accounts = await db.query.escrow.findMany({
     with: {
       student: {
@@ -300,16 +481,17 @@ export async function generateEscrowReport() {
   // Pending withdrawals per student
   const pendingWithdrawals = await db.query.withdrawalRequest.findMany({
     where: (wr, { eq }) => eq(wr.status, 'pending'),
-    columns: { studentId: true, amount: true },
+    columns: { requestedAmount: true },
+    with: { escrow: { columns: { studentId: true } } },
   });
   const pendingByStudent: Record<string, number> = {};
   for (const pw of pendingWithdrawals) {
-    pendingByStudent[pw.studentId] = (pendingByStudent[pw.studentId] ?? 0) + Number(pw.amount);
+    const sid = pw.escrow.studentId;
+    pendingByStudent[sid] = (pendingByStudent[sid] ?? 0) + Number(pw.requestedAmount);
   }
 
-  // Linked parents per student
   const links = await db.query.parentStudentLink.findMany({
-    where: (l, { eq }) => eq(l.status, 'accepted'),
+    where: (l, { eq }) => eq(l.status, 'approved'),
     with: {
       parent: { columns: { id: true, name: true, email: true } },
     },
@@ -318,10 +500,10 @@ export async function generateEscrowReport() {
   const parentsByStudent: Record<string, { id: string; name: string; email: string }[]> = {};
   for (const link of links) {
     if (!parentsByStudent[link.studentId]) parentsByStudent[link.studentId] = [];
-    if (link.parent) parentsByStudent[link.studentId].push(link.parent);
+    if (link.parent) parentsByStudent[link.studentId]!.push(link.parent);
   }
 
-  return accounts.map((acc) => ({
+  const mapped = accounts.map((acc) => ({
     studentName:          acc.student?.name ?? '—',
     studentGrade:         acc.student?.grade ?? 'Graduated',
     studentIdCode:        acc.student?.studentId ?? '—',
@@ -331,6 +513,8 @@ export async function generateEscrowReport() {
     availableEGP:         Number(acc.balance) - (pendingByStudent[acc.studentId] ?? 0),
     linkedParents:        (parentsByStudent[acc.studentId] ?? []).map((p) => p.name).join(', '),
   }));
+
+  return paginate(mapped, pagination);
 }
 
 // ─── REP-004: Subject Enrollment Report ──────────────────────────────────────
@@ -339,7 +523,7 @@ export async function generateEscrowReport() {
  * Subject enrollment counts for a session (REP-004).
  * Groups by subject, shows school vs. non-school and enrollment counts.
  */
-export async function generateSubjectEnrollmentReport(sessionId: string) {
+export async function generateSubjectEnrollmentReport(sessionId: string, pagination?: PaginationParams) {
   const rows = await db.query.registration.findMany({
     where: (r, { eq, and, inArray }) =>
       and(
@@ -379,7 +563,7 @@ export async function generateSubjectEnrollmentReport(sessionId: string) {
         totalRevenue:    0,
       };
     }
-    const entry = subjectMap[sub.id];
+    const entry = subjectMap[sub.id]!;
     if (reg.status === 'confirmed') {
       entry.confirmed++;
       entry.totalRevenue += Number(reg.priceAtRegistration);
@@ -390,7 +574,8 @@ export async function generateSubjectEnrollmentReport(sessionId: string) {
     }
   }
 
-  return Object.values(subjectMap).sort((a, b) => b.confirmed - a.confirmed);
+  const sorted = Object.values(subjectMap).sort((a, b) => b.confirmed - a.confirmed);
+  return paginate(sorted, pagination);
 }
 
 // ─── REP-005: Grade 10 Compliance Report ─────────────────────────────────────
@@ -435,7 +620,7 @@ export async function generateGrade10ComplianceReport(sessionId: string) {
   const regMap: Record<string, Record<string, string>> = {};
   for (const reg of regs) {
     if (!regMap[reg.studentId]) regMap[reg.studentId] = {};
-    regMap[reg.studentId][reg.subjectId] = reg.status;
+    regMap[reg.studentId]![reg.subjectId] = reg.status;
   }
 
   const students = grade10Students.map((stu) => {
@@ -467,40 +652,58 @@ export async function generateGrade10ComplianceReport(sessionId: string) {
  * Student roster report (REP-007).
  * Optional grade filter. Returns name, contact, linked parent info.
  */
-export async function generateStudentRoster(grade?: number | null) {
+export async function generateStudentRoster(grade?: number | null, pagination?: PaginationParams) {
+  // M-15: Paginate at SQL level. Only after the page slice do we load
+  // parent links for those students (avoids fetching links for every
+  // student in the database when only one page is rendered).
+  const limit = Math.min(pagination?.limit ?? 500, 5000);
+  const offset = pagination?.offset ?? 0;
+
+  const gradeCondition = (u: typeof user) => {
+    if (grade === null) return and(eq(u.role, 'student'), isNull(u.grade));
+    if (grade !== undefined) return and(eq(u.role, 'student'), eq(u.grade, grade));
+    return eq(u.role, 'student');
+  };
+
+  const totalRow = await db
+    .select({ count: sql<number>`COUNT(*)::int` })
+    .from(user)
+    .where(gradeCondition(user));
+  const total = Number(totalRow[0]?.count ?? 0);
+
+  if (total === 0) return { data: [] as Record<string, unknown>[], total };
+
   const students = await db.query.user.findMany({
-    where: (u, { eq, and, isNull }) => {
-      if (grade === null) {
-        return and(eq(u.role, 'student'), isNull(u.grade)); // graduated
-      }
-      if (grade !== undefined) {
-        return and(eq(u.role, 'student'), eq(u.grade, grade));
-      }
-      return eq(u.role, 'student');
+    where: (u, { eq: eqOp, and: andOp, isNull: isNullOp }) => {
+      if (grade === null) return andOp(eqOp(u.role, 'student'), isNullOp(u.grade));
+      if (grade !== undefined) return andOp(eqOp(u.role, 'student'), eqOp(u.grade, grade));
+      return eqOp(u.role, 'student');
     },
     columns: { id: true, name: true, email: true, grade: true, studentId: true, phone: true, createdAt: true },
     orderBy: (u, { asc }) => [asc(u.grade), asc(u.name)],
+    limit,
+    offset,
   });
-
-  if (students.length === 0) return [];
 
   const studentIds = students.map((s) => s.id);
-  const links = await db.query.parentStudentLink.findMany({
-    where: (l, { eq, and, inArray }) =>
-      and(eq(l.status, 'accepted'), inArray(l.studentId, studentIds)),
-    with: {
-      parent: { columns: { name: true, email: true, phone: true } },
-    },
-    columns: { studentId: true },
-  });
+  const links = studentIds.length
+    ? await db.query.parentStudentLink.findMany({
+        where: (l, { eq: eqOp, and: andOp, inArray: inArr }) =>
+          andOp(eqOp(l.status, 'approved'), inArr(l.studentId, studentIds)),
+        with: {
+          parent: { columns: { name: true, email: true, phone: true } },
+        },
+        columns: { studentId: true },
+      })
+    : [];
 
   const parentsByStudent: Record<string, { name: string; email: string; phone: string | null }[]> = {};
   for (const link of links) {
     if (!parentsByStudent[link.studentId]) parentsByStudent[link.studentId] = [];
-    if (link.parent) parentsByStudent[link.studentId].push(link.parent);
+    if (link.parent) parentsByStudent[link.studentId]!.push(link.parent);
   }
 
-  return students.map((stu) => ({
+  const mapped = students.map((stu) => ({
     studentName:   stu.name,
     studentIdCode: stu.studentId ?? '—',
     email:         stu.email,
@@ -511,6 +714,8 @@ export async function generateStudentRoster(grade?: number | null) {
       .map((p) => `${p.name} (${p.email})`)
       .join('; '),
   }));
+
+  return { data: mapped, total };
 }
 
 // ─── REP-009: Pending Approvals Report ───────────────────────────────────────
@@ -525,7 +730,7 @@ export async function generateStudentRoster(grade?: number | null) {
  * Each item includes who submitted it, the student name, subject name,
  * and how many days it has been waiting.
  */
-export async function generatePendingApprovalsReport() {
+export async function generatePendingApprovalsReport(pagination?: PaginationParams) {
   const now = Date.now();
 
   const [pendingRegs, pendingCRs] = await Promise.all([
@@ -535,7 +740,7 @@ export async function generatePendingApprovalsReport() {
         student:  { columns: { id: true, name: true, grade: true, studentId: true } },
         subject:  { columns: { name: true, code: true } },
         session:  { columns: { name: true, sessionType: true } },
-        approvedBy: { columns: { name: true } },
+        approvedByUser: { columns: { name: true } },
       },
       orderBy: (r, { asc }) => [asc(r.createdAt)],
     }),
@@ -558,32 +763,65 @@ export async function generatePendingApprovalsReport() {
 
   const daysSince = (d: Date) => Math.floor((now - new Date(d).getTime()) / 86_400_000);
 
-  return {
-    pendingRegistrations: pendingRegs.map((r) => ({
-      registrationId:  r.id,
-      studentName:     r.student?.name ?? '—',
-      studentIdCode:   r.student?.studentId ?? '—',
-      studentGrade:    r.student?.grade ?? 'Graduated',
-      subjectName:     r.subject?.name ?? '—',
-      subjectCode:     r.subject?.code ?? '—',
-      sessionName:     r.session?.name ?? '—',
-      priceEGP:        Number(r.priceAtRegistration),
-      daysWaiting:     daysSince(r.createdAt),
-      submittedAt:     r.createdAt.toISOString(),
-    })),
+  // URD REP-009 requires a "parent" column alongside the student. Fetch
+  // approved parent links for every student referenced in the two lists
+  // in a single query, then attach parent name/email to each row.
+  const studentIds = [
+    ...new Set([
+      ...pendingRegs.map((r) => r.student?.id).filter((id): id is string => !!id),
+      ...pendingCRs.map((cr) => cr.requestedByUser?.id).filter((id): id is string => !!id),
+    ]),
+  ];
 
-    pendingChangeRequests: pendingCRs.map((cr) => ({
-      changeRequestId: cr.id,
-      type:            cr.type,
-      studentName:     cr.requestedByUser?.name ?? '—',
-      studentGrade:    cr.requestedByUser?.grade ?? 'Graduated',
-      currentSubject:  cr.registration?.subject?.name ?? '—',
-      newSubject:      cr.newSubject?.name ?? '—',
-      sessionName:     cr.registration?.session?.name ?? '—',
-      priceDiffEGP:    Number(cr.priceDifference ?? 0),
-      daysWaiting:     daysSince(cr.createdAt),
-      submittedAt:     cr.createdAt.toISOString(),
-      reason:          cr.reason ?? '—',
-    })),
+  const parentLinks = studentIds.length
+    ? await db.query.parentStudentLink.findMany({
+        where: (l, { and, eq, inArray }) =>
+          and(eq(l.status, 'approved'), inArray(l.studentId, studentIds)),
+        with: { parent: { columns: { name: true, email: true } } },
+        columns: { studentId: true },
+      })
+    : [];
+
+  const parentsByStudent: Record<string, string> = {};
+  for (const link of parentLinks) {
+    if (!link.parent) continue;
+    const row = `${link.parent.name} (${link.parent.email})`;
+    parentsByStudent[link.studentId] = parentsByStudent[link.studentId]
+      ? `${parentsByStudent[link.studentId]}; ${row}`
+      : row;
+  }
+
+  const mappedRegs = pendingRegs.map((r) => ({
+    registrationId:  r.id,
+    studentName:     r.student?.name ?? '—',
+    studentIdCode:   r.student?.studentId ?? '—',
+    studentGrade:    r.student?.grade ?? 'Graduated',
+    parent:          r.student?.id ? parentsByStudent[r.student.id] ?? '— (no linked parent)' : '—',
+    subjectName:     r.subject?.name ?? '—',
+    subjectCode:     r.subject?.code ?? '—',
+    sessionName:     r.session?.name ?? '—',
+    priceEGP:        Number(r.priceAtRegistration),
+    daysWaiting:     daysSince(r.createdAt),
+    submittedAt:     r.createdAt.toISOString(),
+  }));
+
+  const mappedCRs = pendingCRs.map((cr) => ({
+    changeRequestId: cr.id,
+    type:            cr.type,
+    studentName:     cr.requestedByUser?.name ?? '—',
+    studentGrade:    cr.requestedByUser?.grade ?? 'Graduated',
+    parent:          cr.requestedByUser?.id ? parentsByStudent[cr.requestedByUser.id] ?? '— (no linked parent)' : '—',
+    currentSubject:  cr.registration?.subject?.name ?? '—',
+    newSubject:      cr.newSubject?.name ?? '—',
+    sessionName:     cr.registration?.session?.name ?? '—',
+    priceDiffEGP:    Number(cr.priceDifference ?? 0),
+    daysWaiting:     daysSince(cr.createdAt),
+    submittedAt:     cr.createdAt.toISOString(),
+    reason:          cr.reason ?? '—',
+  }));
+
+  return {
+    pendingRegistrations:  paginate(mappedRegs, pagination),
+    pendingChangeRequests: paginate(mappedCRs, pagination),
   };
 }

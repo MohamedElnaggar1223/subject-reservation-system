@@ -43,6 +43,7 @@ import type {
 import {
   notifyRegistrationRequestReceived,
   notifyRegistrationDecision,
+  notifyDirectRegistrationCreated,
 } from './notification.services';
 import { isGraduated } from './grade.services';
 
@@ -94,6 +95,22 @@ async function getLinkedStudentIds(parentId: string): Promise<string[]> {
 }
 
 /**
+ * Return true if a student has at least one approved parent link.
+ *
+ * Used to block student-initiated registration requests when nobody can
+ * approve them — otherwise the requests would sit forever in
+ * pending_approval until session close expires them (silent hang).
+ */
+async function studentHasApprovedParent(studentId: string): Promise<boolean> {
+  const link = await db.query.parentStudentLink.findFirst({
+    where: (l, { eq, and }) =>
+      and(eq(l.studentId, studentId), eq(l.status, 'approved')),
+    columns: { id: true },
+  });
+  return !!link;
+}
+
+/**
  * Return the subject IDs for which a student already has a non-dropped,
  * non-rejected registration in the given session.
  * Used to prevent duplicate registrations.
@@ -107,7 +124,7 @@ async function getExistingRegistrationSubjectIds(
       and(
         eq(r.studentId, studentId),
         eq(r.sessionId, sessionId),
-        notInArray(r.status, ['dropped', 'rejected'])
+        notInArray(r.status, ['dropped', 'rejected', 'expired'])
       ),
     columns: { subjectId: true },
   });
@@ -142,8 +159,16 @@ export async function validateCoreSubjectRequirements(
     }),
   ]);
 
-  if (!studentRecord || !sessionRecord) {
-    return { valid: true, missingCoreSubjects: [] };
+  // Fail closed if either entity is missing: all current callers pre-check
+  // student/session existence, so this branch indicates a programming bug
+  // or a race (student deleted mid-request). Previously this returned
+  // valid=true which would silently bypass the CORE-003 rule if the
+  // helper were ever reused from a path that skipped the pre-check.
+  if (!studentRecord) {
+    throw new Error('Student not found during core-subject validation');
+  }
+  if (!sessionRecord) {
+    throw new Error('Session not found during core-subject validation');
   }
 
   // Core requirement only applies to Grade 10 in the June session
@@ -170,13 +195,20 @@ export async function validateCoreSubjectRequirements(
  * Return all active subjects that a student has not yet registered for
  * in the given session. Used to populate the registration form.
  *
- * For Grade 10 June sessions, core subjects are always included in the result
- * even if already registered (they will be filtered/locked on the client).
+ * Subjects the student already has a non-terminal registration for
+ * (pending_approval, pending_payment, confirmed) are excluded so the
+ * list never contains duplicates of what the student has already acted
+ * on. This includes core subjects — the frontend is responsible for
+ * pre-selecting + locking any missing core subjects for Grade 10 June
+ * (see register.client.tsx).
  */
 export async function getAvailableSubjects(
   studentId: string,
   sessionId: string
 ) {
+  // GRADE-003: Graduated students have no available subjects
+  if (await isGraduated(studentId)) return [];
+
   const alreadyRegistered = await getExistingRegistrationSubjectIds(
     studentId,
     sessionId
@@ -211,6 +243,16 @@ export async function createRegistrationRequest(
   // GRADE-003: Graduated students cannot register for new subjects
   if (await isGraduated(studentId)) {
     throw new Error('Graduated students cannot submit new registration requests');
+  }
+
+  // AUTH-003/REG-001: A student request requires a parent to approve it.
+  // Without an approved link, the request would sit in 'pending_approval'
+  // until the session auto-expires it — a silent hang for orphaned students.
+  // REG-007 covers exceptional cases via admin override.
+  if (!(await studentHasApprovedParent(studentId))) {
+    throw new Error(
+      'You need an approved parent link before submitting a registration request. Ask a parent to link to your account (or contact the admin if you have no guardian).'
+    );
   }
 
   const sess = await db.query.registrationSession.findFirst({
@@ -254,6 +296,7 @@ export async function createRegistrationRequest(
     sessionId: data.sessionId,
     subjectId: sub.id,
     priceAtRegistration: resolveRegistrationPrice(sub),
+    wasCoreAtRegistration: sub.isCore,
     status: 'pending_approval' as const,
     requestedBy,
   }));
@@ -346,21 +389,44 @@ export async function createDirectRegistration(
     sessionId: data.sessionId,
     subjectId: sub.id,
     priceAtRegistration: resolveRegistrationPrice(sub),
+    wasCoreAtRegistration: sub.isCore,
     status: 'pending_payment' as const,
     requestedBy: parentId,
     approvedBy: parentId,
     approvedAt: now,
   }));
 
-  return db.insert(registration).values(records).returning();
+  const created = await db.insert(registration).values(records).returning();
+
+  // REG-003: Notify student via in-app + email that their parent registered
+  // subjects for them. Fire-and-forget so registration creation never fails
+  // because of a notification/email hiccup.
+  notifyDirectRegistrationCreated({
+    studentId: data.studentId,
+    parentId,
+    sessionName: sess.name,
+    subjects: subjects.map((sub) => ({
+      name: sub.name,
+      price: resolveRegistrationPrice(sub),
+    })),
+    totalCost: records.reduce((sum, r) => sum + r.priceAtRegistration, 0),
+  }).catch((err) => console.error('[notification] REG-003 direct student notify failed:', err));
+
+  return created;
 }
 
 /**
  * Parent approves one or more pending registration requests from their child.
  *
- * - All registrations must be in 'pending_approval' status.
- * - Parent must be linked (approved) to the student for each registration.
- * - Registrations move to 'pending_payment' status.
+ * Strict all-or-nothing semantics:
+ * - Every input ID must resolve to an existing registration
+ *   (no silent phantom-ID drops).
+ * - Every registration must be in 'pending_approval' status.
+ * - Parent must be linked (approved) to every involved student.
+ * - The guarded UPDATE is wrapped in a transaction; if any row is no
+ *   longer in 'pending_approval' (concurrent approve/reject/expire),
+ *   the whole operation aborts so the UI never navigates to checkout
+ *   with IDs that weren't actually transitioned.
  */
 export async function approveRegistrationRequest(
   data: ApproveRegistrationsType,
@@ -371,13 +437,31 @@ export async function approveRegistrationRequest(
   });
 
   if (regs.length === 0) throw new Error('No registrations found');
+  if (regs.length !== data.registrationIds.length) {
+    throw new Error('One or more registration IDs are invalid');
+  }
 
   const notPending = regs.filter((r) => r.status !== 'pending_approval');
   if (notPending.length > 0) {
     throw new Error('One or more registrations are not awaiting approval');
   }
 
-  // Validate parent link for every unique student in this batch
+  // GRADE-003: Cannot approve registrations for a graduated student
+  const firstStudentId = regs[0]!.studentId;
+  if (await isGraduated(firstStudentId)) {
+    throw new Error('Cannot approve registrations for a graduated student');
+  }
+
+  // Verify the session is still active
+  const sessionId = regs[0]!.sessionId;
+  const sess = await db.query.registrationSession.findFirst({
+    where: (s, { eq: eqOp }) => eqOp(s.id, sessionId),
+    columns: { status: true },
+  });
+  if (!sess || sess.status !== 'active') {
+    throw new Error('Registration window is closed');
+  }
+
   const studentIds = [...new Set(regs.map((r) => r.studentId))];
   for (const studentId of studentIds) {
     const linked = await validateParentStudentLink(parentId, studentId);
@@ -389,17 +473,31 @@ export async function approveRegistrationRequest(
   }
 
   const now = new Date();
-  const updated = await db
-    .update(registration)
-    .set({
-      status: 'pending_payment',
-      approvedBy: parentId,
-      approvedAt: now,
-      approvalComments: data.comments ?? null,
-      updatedAt: now,
-    })
-    .where(inArray(registration.id, data.registrationIds))
-    .returning();
+  const updated = await db.transaction(async (tx) => {
+    const rows = await tx
+      .update(registration)
+      .set({
+        status: 'pending_payment',
+        approvedBy: parentId,
+        approvedAt: now,
+        approvalComments: data.comments ?? null,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          inArray(registration.id, data.registrationIds),
+          eq(registration.status, 'pending_approval'),
+        )
+      )
+      .returning();
+
+    if (rows.length !== data.registrationIds.length) {
+      throw new Error(
+        'One or more registrations were concurrently processed. Please refresh and try again.'
+      );
+    }
+    return rows;
+  });
 
   // NOT-004: Notify each affected student that their request was approved (fire-and-forget)
   {
@@ -443,10 +541,23 @@ export async function rejectRegistrationRequest(
   });
 
   if (regs.length === 0) throw new Error('No registrations found');
+  if (regs.length !== data.registrationIds.length) {
+    throw new Error('One or more registration IDs are invalid');
+  }
 
   const notPending = regs.filter((r) => r.status !== 'pending_approval');
   if (notPending.length > 0) {
     throw new Error('One or more registrations are not awaiting approval');
+  }
+
+  // Verify the session is still active (consistency with approval path)
+  const sessionId = regs[0]!.sessionId;
+  const sess = await db.query.registrationSession.findFirst({
+    where: (s, { eq: eqOp }) => eqOp(s.id, sessionId),
+    columns: { status: true },
+  });
+  if (!sess || sess.status !== 'active') {
+    throw new Error('Registration window is closed');
   }
 
   const studentIds = [...new Set(regs.map((r) => r.studentId))];
@@ -460,17 +571,31 @@ export async function rejectRegistrationRequest(
   }
 
   const now = new Date();
-  const updated = await db
-    .update(registration)
-    .set({
-      status: 'rejected',
-      approvedBy: parentId,
-      approvedAt: now,
-      approvalComments: data.comments,
-      updatedAt: now,
-    })
-    .where(inArray(registration.id, data.registrationIds))
-    .returning();
+  const updated = await db.transaction(async (tx) => {
+    const rows = await tx
+      .update(registration)
+      .set({
+        status: 'rejected',
+        approvedBy: parentId,
+        approvedAt: now,
+        approvalComments: data.comments,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          inArray(registration.id, data.registrationIds),
+          eq(registration.status, 'pending_approval'),
+        )
+      )
+      .returning();
+
+    if (rows.length !== data.registrationIds.length) {
+      throw new Error(
+        'One or more registrations were concurrently processed. Please refresh and try again.'
+      );
+    }
+    return rows;
+  });
 
   // NOT-004: Notify each affected student that their request was rejected (fire-and-forget)
   {
@@ -509,6 +634,16 @@ export async function adminOverrideApproval(
   data: AdminOverrideApprovalType,
   adminId: string
 ) {
+  const student = await db.query.user.findFirst({
+    where: (u, { eq: eqOp }) => eqOp(u.id, data.studentId),
+    columns: { id: true, grade: true, role: true },
+  });
+  if (!student) throw new Error('Student not found');
+  // GRADE-003: Only students with null grade are graduated; admins/parents also have null grade
+  if (student.role === 'student' && student.grade === null) {
+    throw new Error('Cannot register for a graduated student');
+  }
+
   const sess = await db.query.registrationSession.findFirst({
     where: (s, { eq }) => eq(s.id, data.sessionId),
   });
@@ -532,6 +667,23 @@ export async function adminOverrideApproval(
     throw new Error('Some subjects are already registered for this session');
   }
 
+  // CORE-003: Admin override bypasses parent approval (REG-007), NOT the
+  // Grade 10 June core-subject curriculum rule. Core requirements must
+  // still be satisfied — the admin provides the subject list that will
+  // be registered, which for Grade 10 June must include the subject IDs
+  // of every active core subject not already registered for this session.
+  const coreCheck = await validateCoreSubjectRequirements(
+    data.studentId,
+    data.sessionId,
+    [...data.subjectIds, ...alreadyRegistered]
+  );
+  if (!coreCheck.valid) {
+    const names = coreCheck.missingCoreSubjects.map((s) => s.name).join(', ');
+    throw new Error(
+      `Grade 10 June session requires all core subjects. Missing: ${names}`
+    );
+  }
+
   const now = new Date();
   const records = subjects.map((sub) => ({
     id: randomUUID(),
@@ -539,6 +691,7 @@ export async function adminOverrideApproval(
     sessionId: data.sessionId,
     subjectId: sub.id,
     priceAtRegistration: resolveRegistrationPrice(sub),
+    wasCoreAtRegistration: sub.isCore,
     status: 'pending_payment' as const,
     requestedBy: adminId,
     approvedBy: adminId,
@@ -569,7 +722,7 @@ export async function getRegistrationById(id: string) {
 export async function getRegistrations(filters: ListRegistrationsQueryType & {
   studentIds?: string[]; // Used when a parent queries for multiple children
 }) {
-  return db.query.registration.findMany({
+  const rows = await db.query.registration.findMany({
     where: (r, { eq, and, inArray }) => {
       const conditions = [];
       if (filters.studentId) {
@@ -590,6 +743,27 @@ export async function getRegistrations(filters: ListRegistrationsQueryType & {
     },
     orderBy: (r, { desc }) => [desc(r.createdAt)],
   });
+
+  // M-18: Attach a `hasPendingChangeRequest` flag so the registrations UI
+  // can correctly disable the Drop/Swap actions when an earlier request
+  // is still waiting on parent approval. The DB-level partial unique
+  // index already prevents a second pending change request from being
+  // inserted, but the UI previously let users click through and hit an
+  // error — this flag lets us grey out the buttons instead.
+  if (rows.length === 0) return rows.map((r) => ({ ...r, hasPendingChangeRequest: false }));
+
+  const regIds = rows.map((r) => r.id);
+  const pendingCRs = await db.query.changeRequest.findMany({
+    where: (cr, { inArray: inArr, and: andOp, eq: eqOp }) =>
+      andOp(inArr(cr.registrationId, regIds), eqOp(cr.status, 'pending_approval')),
+    columns: { registrationId: true },
+  });
+  const pendingSet = new Set(pendingCRs.map((c) => c.registrationId));
+
+  return rows.map((r) => ({
+    ...r,
+    hasPendingChangeRequest: pendingSet.has(r.id),
+  }));
 }
 
 /**
@@ -638,7 +812,7 @@ export async function getRegistrationHistory(studentId: string) {
         columns: {
           id: true,
           name: true,
-          subjectCode: true,
+          code: true,
           council: true,
           isCore: true,
         },
@@ -662,7 +836,7 @@ export async function getRegistrationHistory(studentId: string) {
       changeRequests: {
         with: {
           newSubject: {
-            columns: { id: true, name: true, subjectCode: true },
+            columns: { id: true, name: true, code: true },
           },
           requestedByUser: {
             columns: { id: true, name: true },

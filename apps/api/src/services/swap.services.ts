@@ -62,19 +62,10 @@ import { creditEscrow, getEscrowBalance } from './escrow.services';
 import {
   notifyDropSwapRequestReceived,
   notifyDropSwapProcessed,
+  notifyDirectDropSwapExecuted,
   notifyEscrowBalanceChanged,
 } from './notification.services';
 import { isGraduated } from './grade.services';
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-// Subjects required for Grade 10 June sessions — cannot be dropped or swapped
-const CORE_SUBJECT_NAMES = [
-  'English Language',
-  'Arabic Language',
-  'Mathematics',
-  'Islamic Education',
-];
 
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
 
@@ -90,20 +81,27 @@ async function validateParentStudentLink(
   return !!link;
 }
 
+export const isParentLinkedToStudent = validateParentStudentLink;
+
 /**
- * Resolves the price for a subject following the same logic as registration:
- * - Not offered at school (or no school price) → use customPrice
- * - Offered at school → use priceInSchool
+ * Resolves the price for a subject following the same logic as
+ * registration.services.ts → resolveRegistrationPrice.
+ *
+ * Previously this helper fell through to 0 when isOfferedAtSchool=false
+ * and customPrice was null, which under-charged the student on a swap
+ * into such a subject. Registration-time logic uses priceInSchool as the
+ * safety net instead — we mirror that here so a swap into the same
+ * subject charges the same price as a fresh registration into it.
  */
 function resolveSubjectPrice(sub: {
   isOfferedAtSchool: boolean | null;
   priceInSchool: number | null;
   customPrice: number | null;
 }): number {
-  if (!sub.isOfferedAtSchool || sub.priceInSchool == null) {
-    return sub.customPrice ?? 0;
+  if (sub.isOfferedAtSchool && sub.priceInSchool != null) {
+    return sub.priceInSchool;
   }
-  return sub.priceInSchool;
+  return sub.customPrice ?? sub.priceInSchool ?? 0;
 }
 
 /**
@@ -165,11 +163,18 @@ async function validateChangeEligibility(
     columns: { grade: true },
   });
 
-  // Core subject check: Grade 10 June session core subjects are locked
+  // Core subject check: Grade 10 June session core subjects are locked.
+  // URD CORE-002 explicitly requires the lock to survive later admin edits
+  // that toggle subject.isCore — so the authoritative flag is the
+  // registration-time snapshot (wasCoreAtRegistration), not the live
+  // subject.isCore. A fallback to reg.subject.isCore keeps legacy rows
+  // (pre-backfill) safe if ever encountered.
+  const coreAtRegistration =
+    reg.wasCoreAtRegistration ?? reg.subject.isCore;
   if (
     studentRecord?.grade === 10 &&
     reg.session.sessionType === 'june' &&
-    reg.subject.isCore
+    coreAtRegistration
   ) {
     throw new Error('Core subjects cannot be dropped or swapped for Grade 10 students (SWAP-005)');
   }
@@ -208,6 +213,7 @@ async function validateNewSubjectForSwap(
       isOfferedAtSchool: true,
       priceInSchool: true,
       customPrice: true,
+      isCore: true,
     },
   });
 
@@ -221,7 +227,7 @@ async function validateNewSubjectForSwap(
         eq(r.studentId, studentId),
         eq(r.sessionId, sessionId),
         eq(r.subjectId, newSubjectId),
-        notInArray(r.status, ['dropped', 'rejected'])
+        notInArray(r.status, ['dropped', 'rejected', 'expired'])
       ),
     columns: { id: true },
   });
@@ -410,32 +416,76 @@ export async function approveChangeRequest(
     throw new Error('The registration window has closed; this request can no longer be approved');
   }
 
+  let newSubjectIsCore = false;
+  if (cr.type === 'swap' && cr.newSubjectId) {
+    const newSubject = await db.query.subject.findFirst({
+      where: (s, { eq: eqOp }) => eqOp(s.id, cr.newSubjectId!),
+      columns: { id: true, isActive: true, isCore: true },
+    });
+    if (!newSubject || !newSubject.isActive) {
+      throw new Error('The requested subject is no longer available');
+    }
+    newSubjectIsCore = newSubject.isCore;
+
+    const existingReg = await db.query.registration.findFirst({
+      where: (r, { eq: eqOp, and: andOp, notInArray: niArr }) =>
+        andOp(
+          eqOp(r.studentId, cr.registration.studentId),
+          eqOp(r.sessionId, cr.registration.session.id),
+          eqOp(r.subjectId, cr.newSubjectId!),
+          niArr(r.status, ['dropped', 'rejected', 'expired']),
+        ),
+      columns: { id: true },
+    });
+    if (existingReg) {
+      throw new Error('Student is already registered for the requested subject');
+    }
+  }
+
   const now = new Date();
 
-  // Atomic transaction (OI-009)
-  return db.transaction(async (tx) => {
-    // 1. Mark change request approved
-    await tx
+  const result = await db.transaction(async (tx) => {
+    // Status guard: prevent concurrent double-approval
+    const [updatedCR] = await tx
       .update(changeRequest)
       .set({ status: 'approved', approvedBy: parentId, comments: data.comments ?? null, processedAt: now, updatedAt: now })
-      .where(eq(changeRequest.id, changeRequestId));
+      .where(and(eq(changeRequest.id, changeRequestId), eq(changeRequest.status, 'pending_approval')))
+      .returning({ id: changeRequest.id });
 
-    // 2. Drop the original registration
-    await tx
+    if (!updatedCR) {
+      throw new Error('Change request already processed.');
+    }
+
+    // Status-guarded registration drop: prevents double-credit races where
+    // the registration was concurrently dropped by another change request,
+    // expired by session-close finalization, or directly dropped by a parent.
+    // Only transition confirmed → dropped; if nothing updated, abort the tx
+    // so the escrow credit below never runs on an already-dropped row.
+    const droppedRegs = await tx
       .update(registration)
       .set({ status: 'dropped', droppedAt: now, updatedAt: now })
-      .where(eq(registration.id, cr.registrationId));
+      .where(
+        and(
+          eq(registration.id, cr.registrationId),
+          eq(registration.status, 'confirmed')
+        )
+      )
+      .returning({ id: registration.id });
 
-    // 3. Credit escrow with the full original price
+    if (droppedRegs.length === 0) {
+      throw new Error(
+        'The original registration is no longer in a confirmable state (it may have already been dropped or the session has closed).'
+      );
+    }
+
     await creditEscrow({
       studentId:            cr.registration.studentId,
       amount:               cr.registration.priceAtRegistration,
       reason:               cr.type === 'drop' ? 'drop' : 'swap_refund',
       initiatedBy:          parentId,
       relatedRegistrationId: cr.registrationId,
-    });
+    }, tx);
 
-    // 4. For swaps: create a new pending_payment registration
     if (cr.type === 'swap' && cr.newSubjectId) {
       const newSubjectPrice = cr.priceAtRequest;
 
@@ -445,6 +495,7 @@ export async function approveChangeRequest(
         sessionId: cr.registration.sessionId,
         subjectId: cr.newSubjectId,
         priceAtRegistration: newSubjectPrice,
+        wasCoreAtRegistration: newSubjectIsCore,
         status: 'pending_payment',
         requestedBy: cr.registration.studentId,
         approvedBy: parentId,
@@ -458,33 +509,28 @@ export async function approveChangeRequest(
     return { success: true, type: cr.type };
   });
 
-  // NOT-007: Notify student that their request was approved (fire-and-forget)
+  // NOT-007: Notify student of approval (fire-and-forget)
   // NOT-008: Notify parents of escrow balance change (fire-and-forget)
-  {
-    const studentId = cr.registration.studentId;
-    const subjectName = cr.registration.subject?.name ?? 'the subject';
-    const newSubjectName = cr.newSubject?.name;
+  const studentId = cr.registration.studentId;
 
-    notifyDropSwapProcessed({
-      studentId,
-      parentId,
-      changeType:       cr.type as 'drop' | 'swap',
-      subjectName,
-      newSubjectName,
-      approved:         true,
-      financialImpact:  `EGP ${cr.registration.priceAtRegistration.toFixed(2)} credited to your escrow`,
-      comments:         data.comments,
-      changeRequestId,
-    }).catch((err) => console.error('[notification] NOT-007 (approve) failed:', err));
+  notifyDropSwapProcessed({
+    studentId,
+    parentId,
+    changeType:       cr.type as 'drop' | 'swap',
+    subjectName:      cr.registration.subject?.name ?? 'the subject',
+    newSubjectName:   cr.newSubject?.name,
+    approved:         true,
+    financialImpact:  `EGP ${cr.registration.priceAtRegistration.toFixed(2)} credited to your escrow`,
+    comments:         data.comments,
+    changeRequestId,
+  }).catch((err) => console.error('[notification] NOT-007 (approve) failed:', err));
 
-    // Fetch balance after the transaction has committed
-    const newBalance = await getEscrowBalance(studentId);
+  getEscrowBalance(studentId).then(async (newBalance) => {
     const previousBalance = newBalance - cr.registration.priceAtRegistration;
     const studentUser = await db.query.user.findFirst({
       where: (u, { eq: eqOp }) => eqOp(u.id, studentId),
       columns: { name: true },
     });
-
     notifyEscrowBalanceChanged({
       studentId,
       studentName:      studentUser?.name ?? 'Student',
@@ -493,7 +539,7 @@ export async function approveChangeRequest(
       changeAmount:     cr.registration.priceAtRegistration,
       reason:           cr.type === 'drop' ? 'Subject drop refund' : 'Subject swap refund',
     }).catch((err) => console.error('[notification] NOT-008 (approve change) failed:', err));
-  }
+  }).catch((err) => console.error('[notification] NOT-008 balance fetch failed:', err));
 
   return result;
 }
@@ -528,6 +574,12 @@ export async function rejectChangeRequest(
 
   const now = new Date();
 
+  // Status-guarded UPDATE: the read-check above and this UPDATE are
+  // separated by a network round-trip, so two parents clicking reject
+  // near-simultaneously could both pass the pre-check. Adding
+  // status='pending_approval' to the WHERE clause guarantees exactly one
+  // transition; the loser's UPDATE returns zero rows and we surface a
+  // clear error rather than silently duplicate the rejection.
   const [updated] = await db
     .update(changeRequest)
     .set({
@@ -537,8 +589,17 @@ export async function rejectChangeRequest(
       processedAt: now,
       updatedAt: now,
     })
-    .where(eq(changeRequest.id, changeRequestId))
+    .where(
+      and(
+        eq(changeRequest.id, changeRequestId),
+        eq(changeRequest.status, 'pending_approval')
+      )
+    )
     .returning();
+
+  if (!updated) {
+    throw new Error('Change request already processed.');
+  }
 
   // NOT-007: Notify student that their request was rejected (fire-and-forget)
   notifyDropSwapProcessed({
@@ -553,7 +614,7 @@ export async function rejectChangeRequest(
     changeRequestId,
   }).catch((err) => console.error('[notification] NOT-007 (reject) failed:', err));
 
-  return updated!;
+  return updated;
 }
 
 // ─── Parent: Direct Operations ────────────────────────────────────────────────
@@ -581,10 +642,16 @@ export async function executeDirectDrop(
 
   // Atomic transaction (OI-009)
   const result = await db.transaction(async (tx) => {
-    await tx
+    // Status guard: prevent double-credit from concurrent requests
+    const [updatedReg] = await tx
       .update(registration)
       .set({ status: 'dropped', droppedAt: now, updatedAt: now })
-      .where(eq(registration.id, registrationId));
+      .where(and(eq(registration.id, registrationId), eq(registration.status, 'confirmed')))
+      .returning({ id: registration.id });
+
+    if (!updatedReg) {
+      throw new Error('Registration already processed.');
+    }
 
     await creditEscrow({
       studentId:            reg.studentId,
@@ -592,10 +659,20 @@ export async function executeDirectDrop(
       reason:               'drop',
       initiatedBy:          parentId,
       relatedRegistrationId: registrationId,
-    });
+    }, tx);
 
     return { success: true, creditedAmount: reg.priceAtRegistration };
   });
+
+  // NOT-007 / SWAP-004: Student receives email + in-app notification when
+  // a parent directly drops a subject for them.
+  notifyDirectDropSwapExecuted({
+    studentId: reg.studentId,
+    parentId,
+    changeType: 'drop',
+    subjectName: reg.subject.name,
+    financialImpact: `EGP ${reg.priceAtRegistration.toFixed(2)} credited to your escrow.`,
+  }).catch((err) => console.error('[notification] NOT-007 (direct drop) failed:', err));
 
   // NOT-008: Notify parents of escrow credit from direct drop (fire-and-forget)
   {
@@ -650,11 +727,16 @@ export async function executeDirectSwap(
 
   // Atomic transaction (OI-009)
   const result = await db.transaction(async (tx) => {
-    // 1. Drop original registration
-    await tx
+    // 1. Drop original registration — status guard prevents double-credit from concurrent requests
+    const [updatedReg] = await tx
       .update(registration)
       .set({ status: 'dropped', droppedAt: now, updatedAt: now })
-      .where(eq(registration.id, registrationId));
+      .where(and(eq(registration.id, registrationId), eq(registration.status, 'confirmed')))
+      .returning({ id: registration.id });
+
+    if (!updatedReg) {
+      throw new Error('Registration already processed.');
+    }
 
     // 2. Credit escrow with original price
     await creditEscrow({
@@ -663,7 +745,7 @@ export async function executeDirectSwap(
       reason:               'swap_refund',
       initiatedBy:          parentId,
       relatedRegistrationId: registrationId,
-    });
+    }, tx);
 
     // 3. Create new pending_payment registration
     const newRegId = randomUUID();
@@ -673,6 +755,7 @@ export async function executeDirectSwap(
       sessionId: reg.sessionId,
       subjectId: data.newSubjectId,
       priceAtRegistration: newSubjectPrice,
+      wasCoreAtRegistration: newSub.isCore,
       status: 'pending_payment',
       requestedBy: parentId,
       approvedBy: parentId,
@@ -689,6 +772,17 @@ export async function executeDirectSwap(
       newSubjectPrice,
     };
   });
+
+  // NOT-007 / SWAP-004: Student receives email + in-app notification when
+  // a parent directly swaps a subject for them.
+  notifyDirectDropSwapExecuted({
+    studentId: reg.studentId,
+    parentId,
+    changeType: 'swap',
+    subjectName: reg.subject.name,
+    newSubjectName: newSub.name,
+    financialImpact: `EGP ${reg.priceAtRegistration.toFixed(2)} credited to your escrow; payment for the new subject is pending.`,
+  }).catch((err) => console.error('[notification] NOT-007 (direct swap) failed:', err));
 
   // NOT-008: Notify parents of escrow credit from direct swap (fire-and-forget)
   {
@@ -732,11 +826,11 @@ export async function getPendingChangeRequests(
     with: {
       registration: {
         with: {
-          subject: { columns: { id: true, name: true, subjectCode: true } },
+          subject: { columns: { id: true, name: true, code: true } },
           session: { columns: { id: true, name: true, sessionType: true } },
         },
       },
-      newSubject: { columns: { id: true, name: true, subjectCode: true } },
+      newSubject: { columns: { id: true, name: true, code: true } },
     },
     orderBy: (cr, { desc }) => [desc(cr.createdAt)],
   });
@@ -776,20 +870,65 @@ export async function getPendingChangeRequestsForParent(parentId: string) {
     with: {
       registration: {
         with: {
-          subject: { columns: { id: true, name: true, subjectCode: true } },
+          subject: { columns: { id: true, name: true, code: true } },
           session: { columns: { id: true, name: true, sessionType: true } },
           student: {
             columns: { id: true, name: true, grade: true },
           },
         },
       },
-      newSubject: { columns: { id: true, name: true, subjectCode: true } },
+      newSubject: { columns: { id: true, name: true, code: true } },
       requestedByUser: { columns: { id: true, name: true } },
     },
     orderBy: (cr, { asc }) => [asc(cr.createdAt)],
   });
 
   return requests;
+}
+
+/**
+ * Student cancels their own pending change request.
+ *
+ * - The change request must belong to the requesting student (requestedBy === userId).
+ * - Status must be 'pending_approval'.
+ * - Updates status to 'cancelled'.
+ */
+export async function cancelChangeRequest(
+  changeRequestId: string,
+  userId: string
+) {
+  const cr = await db.query.changeRequest.findFirst({
+    where: (c, { eq: eqOp }) => eqOp(c.id, changeRequestId),
+    columns: { id: true, requestedBy: true, status: true },
+  });
+
+  if (!cr) throw new Error('Change request not found');
+
+  if (cr.requestedBy !== userId) {
+    throw new Error('You can only cancel your own change requests');
+  }
+
+  if (cr.status !== 'pending_approval') {
+    throw new Error(`Cannot cancel a request in '${cr.status}' status`);
+  }
+
+  const now = new Date();
+  const [updated] = await db
+    .update(changeRequest)
+    .set({
+      status: 'cancelled',
+      processedAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(changeRequest.id, changeRequestId),
+        eq(changeRequest.status, 'pending_approval'),
+      )
+    )
+    .returning();
+
+  return updated!;
 }
 
 /**

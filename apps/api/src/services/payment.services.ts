@@ -43,7 +43,8 @@ import {
   creditEscrow,
   debitEscrow,
 } from './escrow.services';
-import { notifyPaymentConfirmed } from './notification.services';
+import { logAction } from './audit.services';
+import { notifyPaymentConfirmed, notifyEscrowBalanceChanged } from './notification.services';
 
 // ─── Bank Transfer Static Config ─────────────────────────────────────────────
 
@@ -123,6 +124,21 @@ export async function initiatePayment(
     throw new Error('One or more registrations are not ready for payment');
   }
 
+  // All registrations' sessions must still be open (REG-005, SES-006).
+  // Without this gate, a parent can begin a payment after the window has
+  // closed but before the scheduler's finalizePendingRecords has run —
+  // which would charge them for registrations that are about to be expired.
+  const sessionIds = [...new Set(regs.map((r) => r.sessionId))];
+  const sessions = await db.query.registrationSession.findMany({
+    where: (s, { inArray }) => inArray(s.id, sessionIds),
+    columns: { id: true, status: true, name: true },
+  });
+  const closedSessions = sessions.filter((s) => s.status !== 'active');
+  if (closedSessions.length > 0) {
+    const names = closedSessions.map((s) => s.name).join(', ');
+    throw new Error(`Registration window is closed for: ${names}`);
+  }
+
   // Check for existing pending payments on any of these registrations
   const existingPaymentLinks = await db.query.paymentRegistration.findMany({
     where: (pr, { inArray }) => inArray(pr.registrationId, data.registrationIds),
@@ -160,92 +176,159 @@ export async function initiatePayment(
   const paymentId = randomUUID();
   const student = regs[0]!.student;
 
-  // Generate provider-specific reference / URL
+  // When escrow fully covers the cost, skip the provider entirely —
+  // there is nothing to charge. We still create a payment record so the
+  // transaction has an auditable receipt, then confirm it immediately
+  // after the initiation transaction commits so registrations advance to
+  // 'confirmed' and NOT-005 fires through the same path as a real webhook.
+  const fullyEscrowFunded = paymentMethodAmount === 0 && escrowToApply > 0;
+
+  // Generate provider-specific reference / URL (skipped when escrow covers the whole cost)
   let metadata: Record<string, unknown> = {};
   let externalReference: string | undefined;
 
-  if (data.paymentMethod === 'fawry') {
-    const result = await generateFawryPayment({
-      amount: paymentMethodAmount,
-      merchantRefNum: paymentId,
-      customerName: student.name,
-      customerEmail: student.email,
-      description: `IGCSE Subject Registration — ${regs.length} subject(s)`,
-    });
-    externalReference = result.referenceNumber;
-    metadata = {
-      fawryReferenceNumber: result.referenceNumber,
-      fawryExpiresAt: result.expiresAt,
-      merchantRefNum: paymentId,
-    };
-  } else if (data.paymentMethod === 'card') {
-    const result = await createPaymobOrder({
-      amountCents: Math.round(paymentMethodAmount * 100),
-      merchantOrderId: paymentId,
-      customerEmail: student.email,
-      customerName: student.name,
-    });
-    externalReference = result.orderId;
-    metadata = {
-      paymentUrl: result.paymentUrl,
-      paymobOrderId: result.orderId,
-    };
-  } else if (data.paymentMethod === 'mobile_wallet') {
-    const result = await initiateWalletPayment({
-      amountCents: Math.round(paymentMethodAmount * 100),
-      merchantOrderId: paymentId,
-      walletProvider: data.walletProvider as WalletProvider,
-      customerEmail: student.email,
-      customerName: student.name,
-    });
-    externalReference = result.referenceCode;
-    metadata = {
-      redirectUrl: result.redirectUrl,
-      referenceCode: result.referenceCode,
-      walletProvider: data.walletProvider,
-    };
-  } else if (data.paymentMethod === 'bank_transfer') {
-    const referenceNumber = `IGCSE-${Date.now().toString(36).toUpperCase()}-${paymentId.slice(0, 6).toUpperCase()}`;
-    externalReference = referenceNumber;
-    metadata = {
-      bankDetails: { ...BANK_DETAILS, referenceNumber },
-    };
+  if (!fullyEscrowFunded) {
+    if (data.paymentMethod === 'fawry') {
+      const result = await generateFawryPayment({
+        amount: paymentMethodAmount,
+        merchantRefNum: paymentId,
+        customerName: student.name,
+        customerEmail: student.email,
+        description: `IGCSE Subject Registration — ${regs.length} subject(s)`,
+      });
+      externalReference = result.referenceNumber;
+      metadata = {
+        fawryReferenceNumber: result.referenceNumber,
+        fawryExpiresAt: result.expiresAt,
+        merchantRefNum: paymentId,
+      };
+    } else if (data.paymentMethod === 'card') {
+      const result = await createPaymobOrder({
+        amountCents: Math.round(paymentMethodAmount * 100),
+        merchantOrderId: paymentId,
+        customerEmail: student.email,
+        customerName: student.name,
+      });
+      externalReference = result.orderId;
+      metadata = {
+        paymentUrl: result.paymentUrl,
+        paymobOrderId: result.orderId,
+      };
+    } else if (data.paymentMethod === 'mobile_wallet') {
+      const result = await initiateWalletPayment({
+        amountCents: Math.round(paymentMethodAmount * 100),
+        merchantOrderId: paymentId,
+        walletProvider: data.walletProvider as WalletProvider,
+        customerEmail: student.email,
+        customerName: student.name,
+      });
+      externalReference = result.referenceCode;
+      metadata = {
+        redirectUrl: result.redirectUrl,
+        referenceCode: result.referenceCode,
+        walletProvider: data.walletProvider,
+      };
+    } else if (data.paymentMethod === 'bank_transfer') {
+      const referenceNumber = `IGCSE-${Date.now().toString(36).toUpperCase()}-${paymentId.slice(0, 6).toUpperCase()}`;
+      externalReference = referenceNumber;
+      metadata = {
+        bankDetails: { ...BANK_DETAILS, referenceNumber },
+      };
+    }
+  } else {
+    metadata = { fullyEscrowFunded: true };
   }
 
-  // Debit escrow before creating payment record (escrow is committed at initiation)
+  // Atomic transaction: create payment + debit escrow + link registrations.
+  // Order matters: the escrow_transaction row created by debitEscrow carries
+  // a FK to payment.id, so the payment row MUST exist first. Running the
+  // three operations in the same transaction still preserves all-or-nothing
+  // semantics — if the debit or linking fails, the payment insert rolls back.
+  const created = await db.transaction(async (tx) => {
+    // Re-check for existing pending payments INSIDE the transaction to prevent
+    // concurrent double-debit (EDGE-3). Two concurrent requests both passing the
+    // outer check will be serialized here; the second one will see the first's payment.
+    const existingPaymentLinksInTx = await tx.query.paymentRegistration.findMany({
+      where: (pr, { inArray: inArr }) => inArr(pr.registrationId, data.registrationIds),
+      with: {
+        payment: { columns: { id: true, status: true } },
+      },
+    });
+    const hasPendingPaymentInTx = existingPaymentLinksInTx.some(
+      (pl) => pl.payment.status === 'pending'
+    );
+    if (hasPendingPaymentInTx) {
+      throw new Error(
+        'One or more registrations already have a pending payment. Complete or wait for it to expire first.'
+      );
+    }
+
+    // 1. Create payment record FIRST so the escrow_transaction FK can resolve.
+    const [paymentRecord] = await tx
+      .insert(payment)
+      .values({
+        id: paymentId,
+        studentId,
+        parentId,
+        amount: paymentMethodAmount,
+        escrowAmountApplied: escrowToApply,
+        paymentMethod: data.paymentMethod,
+        status: 'pending',
+        externalReference: externalReference ?? null,
+        metadata,
+      })
+      .returning();
+
+    // 2. Debit escrow now that the payment row exists to be referenced.
+    if (escrowToApply > 0) {
+      await debitEscrow({
+        studentId,
+        amount: escrowToApply,
+        reason: 'payment',
+        initiatedBy: parentId,
+        relatedPaymentId: paymentId,
+      }, tx);
+    }
+
+    // 3. Link registrations to payment.
+    const paymentRegRecords = data.registrationIds.map((regId) => ({
+      id: randomUUID(),
+      paymentId,
+      registrationId: regId,
+    }));
+    await tx.insert(paymentRegistration).values(paymentRegRecords);
+
+    return paymentRecord;
+  });
+
+  // NOT-008: Notify parents of escrow debit from payment initiation (fire-and-forget)
   if (escrowToApply > 0) {
-    await debitEscrow({
+    const newBalance = await getEscrowBalance(studentId);
+    notifyEscrowBalanceChanged({
       studentId,
-      amount: escrowToApply,
-      reason: 'payment',
-      initiatedBy: parentId,
-      relatedPaymentId: paymentId,
-    });
+      studentName: student.name,
+      previousBalance: newBalance + escrowToApply,
+      newBalance,
+      changeAmount: -escrowToApply,
+      reason: `Escrow applied to payment for ${regs.length} subject(s)`,
+    }).catch((err) => console.error('[notification] NOT-008 (payment debit) failed:', err));
   }
 
-  // Create payment record
-  const [created] = await db
-    .insert(payment)
-    .values({
-      id: paymentId,
-      studentId,
+  // Fully escrow-funded: auto-confirm now. Re-uses confirmPayment so the
+  // registration transitions, REGISTRATION_CONFIRMED audit rows, and NOT-005
+  // receipt email fire through the same code path as a real webhook.
+  // confirmPayment is idempotent (status-guarded UPDATE), so it is safe here.
+  if (fullyEscrowFunded) {
+    const confirmed = await confirmPayment(
+      paymentId,
       parentId,
-      amount: paymentMethodAmount,
-      escrowAmountApplied: escrowToApply,
-      paymentMethod: data.paymentMethod,
-      status: 'pending',
-      externalReference: externalReference ?? null,
-      metadata,
-    })
-    .returning();
-
-  // Link registrations to payment
-  const paymentRegRecords = data.registrationIds.map((regId) => ({
-    id: randomUUID(),
-    paymentId,
-    registrationId: regId,
-  }));
-  await db.insert(paymentRegistration).values(paymentRegRecords);
+      undefined,
+      'Auto-confirmed: fully paid from escrow'
+    );
+    if (confirmed) {
+      return { ...confirmed, metadata: { ...metadata, fullyEscrowFunded: true } };
+    }
+  }
 
   return { ...created, metadata };
 }
@@ -262,7 +345,8 @@ export async function initiatePayment(
 export async function confirmPayment(
   paymentId: string,
   confirmedBy?: string,
-  externalRef?: string
+  externalRef?: string,
+  adminNotes?: string,
 ) {
   const pay = await db.query.payment.findFirst({
     where: (p, { eq }) => eq(p.id, paymentId),
@@ -273,38 +357,89 @@ export async function confirmPayment(
     throw new Error(`Payment is already in '${pay.status}' status`);
   }
 
+  // M-12: Reject confirmations whose registrations or sessions have
+  // already been finalized. In normal operation, finalizePendingRecords
+  // fails pending payments as soon as a session closes — but a late
+  // webhook callback (or a slow gateway) could still land here after
+  // the registrations have been expired. We stop the confirmation and
+  // let the scheduler's expiry sweep call failPayment so escrow is
+  // refunded and the student isn't silently confirmed into a closed
+  // session.
+  const linkedRegs = await db.query.paymentRegistration.findMany({
+    where: (pr, { eq }) => eq(pr.paymentId, paymentId),
+    with: {
+      registration: {
+        columns: { id: true, status: true },
+        with: { session: { columns: { status: true } } },
+      },
+    },
+  });
+  const stale = linkedRegs.some(
+    (l) =>
+      l.registration.status !== 'pending_payment' ||
+      l.registration.session.status !== 'active'
+  );
+  if (stale) {
+    throw new Error(
+      'Payment cannot be confirmed — at least one registration is no longer payable (session closed or already expired).'
+    );
+  }
+
   const now = new Date();
 
-  // Update payment status
-  const [updated] = await db
-    .update(payment)
-    .set({
-      status: 'completed',
-      confirmedAt: now,
-      confirmedBy: confirmedBy ?? null,
-      externalReference: externalRef ?? pay.externalReference,
-      updatedAt: now,
-    })
-    .where(eq(payment.id, paymentId))
-    .returning();
+  // Atomic transaction: update payment status + confirm all linked registrations
+  const { updated, registrationIds } = await db.transaction(async (tx) => {
+    // Update payment status — include status guard to prevent concurrent double-confirm
+    const [paymentUpdate] = await tx
+      .update(payment)
+      .set({
+        status: 'completed',
+        confirmedAt: now,
+        confirmedBy: confirmedBy ?? null,
+        externalReference: externalRef ?? pay.externalReference,
+        metadata: adminNotes
+          ? { ...(pay.metadata as Record<string, unknown> ?? {}), adminNotes }
+          : pay.metadata,
+        updatedAt: now,
+      })
+      .where(and(eq(payment.id, paymentId), eq(payment.status, 'pending')))
+      .returning();
 
-  // Move all linked registrations to 'confirmed'
-  const links = await db.query.paymentRegistration.findMany({
-    where: (pr, { eq }) => eq(pr.paymentId, paymentId),
-    columns: { registrationId: true },
+    // Idempotent: if 0 rows updated, another webhook already confirmed this payment
+    if (!paymentUpdate) {
+      return { updated: undefined, registrationIds: [] as string[] };
+    }
+
+    // Move all linked registrations to 'confirmed'
+    const links = await db.query.paymentRegistration.findMany({
+      where: (pr, { eq }) => eq(pr.paymentId, paymentId),
+      columns: { registrationId: true },
+    });
+
+    const regIds = links.map((l) => l.registrationId);
+    if (regIds.length > 0) {
+      await tx
+        .update(registration)
+        .set({ status: 'confirmed', updatedAt: now })
+        .where(
+          and(
+            inArray(registration.id, regIds),
+            eq(registration.status, 'pending_payment')
+          )
+        );
+    }
+
+    return { updated: paymentUpdate, registrationIds: regIds };
   });
 
-  const registrationIds = links.map((l) => l.registrationId);
-  if (registrationIds.length > 0) {
-    await db
-      .update(registration)
-      .set({ status: 'confirmed', updatedAt: now })
-      .where(
-        and(
-          inArray(registration.id, registrationIds),
-          eq(registration.status, 'pending_payment')
-        )
-      );
+  // Idempotent: payment was already processed by a concurrent webhook
+  if (!updated) {
+    return undefined;
+  }
+
+  for (const regId of registrationIds) {
+    logAction(null, 'REGISTRATION_CONFIRMED', 'registration', regId, null, { paymentId })
+      .catch((err) => console.error('[audit] REGISTRATION_CONFIRMED failed:', err));
   }
 
   // NOT-005: Notify parent of payment receipt (fire-and-forget)
@@ -334,6 +469,17 @@ export async function confirmPayment(
       // Total includes both the payment method charge and any escrow applied
       const totalAmount = enriched.amount + enriched.escrowAmountApplied;
 
+      // Generate the PDF receipt so the email can carry it as an attachment
+      // (URD PAY-006 + NOT-005). Failure to generate is non-fatal — the
+      // email still goes out, and the /receipt endpoint remains available
+      // as a fallback.
+      let receiptPdf: Buffer | undefined;
+      try {
+        receiptPdf = await generatePaymentReceipt(paymentId);
+      } catch (err) {
+        console.error('[notification] NOT-005 PDF generation failed — sending without attachment:', err);
+      }
+
       notifyPaymentConfirmed({
         studentId:   enriched.studentId,
         parentId:    enriched.parentId,
@@ -342,6 +488,7 @@ export async function confirmPayment(
         method:      enriched.paymentMethod,
         paymentId:   enriched.id,
         subjects:    subjectNames,
+        receiptPdf,
       }).catch((err) => console.error('[notification] NOT-005 failed:', err));
     }
   }
@@ -356,8 +503,16 @@ export async function confirmPayment(
  * - Fawry code expires without payment
  * - Card transaction declines
  * - Wallet payment rejected
+ * - Session closes with pending payments (finalizePendingRecords)
  *
- * If escrow was applied, it is refunded immediately.
+ * Idempotent: two concurrent callers (e.g. webhook retry + scheduler
+ * expiry sweep) will only transition the payment and refund escrow once.
+ * A second call on an already-failed payment returns undefined without
+ * error and without side effects.
+ *
+ * If escrow was applied at checkout, the full escrowAmountApplied is
+ * credited back to the student exactly once — but only when THIS call
+ * is the one that actually flipped the status from 'pending' to 'failed'.
  */
 export async function failPayment(paymentId: string) {
   const pay = await db.query.payment.findFirst({
@@ -365,25 +520,58 @@ export async function failPayment(paymentId: string) {
   });
 
   if (!pay) throw new Error('Payment not found');
-  if (pay.status !== 'pending') {
-    throw new Error(`Payment is already in '${pay.status}' status`);
-  }
 
-  const [updated] = await db
-    .update(payment)
-    .set({ status: 'failed', updatedAt: new Date() })
-    .where(eq(payment.id, paymentId))
-    .returning();
+  // Non-throwing idempotency for non-pending states so callers
+  // (finalizePendingRecords, scheduler Fawry sweep, webhook retries)
+  // can call freely without error handling.
+  if (pay.status !== 'pending') return undefined;
 
-  // Refund escrow if it was applied at checkout
+  // Atomic transaction: fail payment + refund escrow if applied.
+  // The UPDATE carries a status='pending' guard so only one concurrent
+  // call transitions the row; the refund branch is inside that guard.
+  const updated = await db.transaction(async (tx) => {
+    const [paymentUpdate] = await tx
+      .update(payment)
+      .set({ status: 'failed', updatedAt: new Date() })
+      .where(and(eq(payment.id, paymentId), eq(payment.status, 'pending')))
+      .returning();
+
+    // Idempotent: if 0 rows updated, another caller already failed this payment.
+    if (!paymentUpdate) {
+      return undefined;
+    }
+
+    if (pay.escrowAmountApplied > 0) {
+      await creditEscrow({
+        studentId: pay.studentId,
+        amount: pay.escrowAmountApplied,
+        reason: 'payment_refund',
+        initiatedBy: pay.parentId,
+        relatedPaymentId: paymentId,
+      }, tx);
+    }
+
+    return paymentUpdate;
+  });
+
+  if (!updated) return undefined;
+
+  // NOT-008: Notify parents of escrow refund from failed payment (fire-and-forget).
+  // Only fired on the call that actually transitioned the status.
   if (pay.escrowAmountApplied > 0) {
-    await creditEscrow({
-      studentId: pay.studentId,
-      amount: pay.escrowAmountApplied,
-      reason: 'payment_refund',
-      initiatedBy: pay.parentId, // parent initiated the original debit
-      relatedPaymentId: paymentId,
+    const newBalance = await getEscrowBalance(pay.studentId);
+    const studentUser = await db.query.user.findFirst({
+      where: (u, { eq: eqOp }) => eqOp(u.id, pay.studentId),
+      columns: { name: true },
     });
+    notifyEscrowBalanceChanged({
+      studentId: pay.studentId,
+      studentName: studentUser?.name ?? 'Student',
+      previousBalance: newBalance - pay.escrowAmountApplied,
+      newBalance,
+      changeAmount: pay.escrowAmountApplied,
+      reason: 'Escrow refund — payment failed',
+    }).catch((err) => console.error('[notification] NOT-008 (payment refund) failed:', err));
   }
 
   return updated;
@@ -459,6 +647,251 @@ export async function getPendingBankTransfers() {
     },
     orderBy: (p, { asc }) => [asc(p.createdAt)],
   });
+}
+
+/**
+ * Generate a PDF receipt for a completed payment.
+ *
+ * The receipt includes:
+ * - System header with school/organization name
+ * - Student and parent details
+ * - Session information
+ * - Subject breakdown with prices
+ * - Payment totals (escrow applied, amount paid, total)
+ * - Payment method, confirmation date, and reference number
+ * - Unique confirmation number (payment ID)
+ *
+ * Implementation note:
+ * Uses a text-based PDF generator to avoid external library dependencies.
+ * TODO: Install pdfkit (`npm install pdfkit @types/pdfkit`) for richer PDF output
+ * with logos, styled tables, and proper typography. The function signature
+ * remains the same — just swap the internal implementation.
+ */
+export async function generatePaymentReceipt(paymentId: string): Promise<Buffer> {
+  const pay = await db.query.payment.findFirst({
+    where: (p, { eq }) => eq(p.id, paymentId),
+    with: {
+      student: { columns: { id: true, name: true, email: true, grade: true, studentId: true } },
+      parent: { columns: { id: true, name: true, email: true } },
+      paymentRegistrations: {
+        with: {
+          registration: {
+            with: {
+              subject: { columns: { id: true, name: true, code: true, council: true } },
+              session: { columns: { id: true, name: true, sessionType: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!pay) throw new Error('Payment not found');
+  if (pay.status !== 'completed') throw new Error('Receipt only available for completed payments');
+
+  const totalAmount = pay.amount + pay.escrowAmountApplied;
+  const sessionName = pay.paymentRegistrations[0]?.registration.session.name ?? 'N/A';
+  const confirmDate = pay.confirmedAt
+    ? new Date(pay.confirmedAt).toLocaleDateString('en-GB', {
+        day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      })
+    : new Date(pay.updatedAt).toLocaleDateString('en-GB', {
+        day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+
+  // Build a simple text-based PDF using raw PDF syntax
+  // This avoids needing any external dependency while producing a valid PDF
+  const subjects = pay.paymentRegistrations.map((pr) => ({
+    name: pr.registration.subject.name,
+    code: pr.registration.subject.code,
+    council: pr.registration.subject.council,
+    price: pr.registration.priceAtRegistration,
+  }));
+
+  const PAYMENT_METHOD_DISPLAY: Record<string, string> = {
+    fawry: 'Fawry',
+    card: 'Credit/Debit Card',
+    mobile_wallet: 'Mobile Wallet',
+    bank_transfer: 'Bank Transfer',
+  };
+
+  // Build receipt text content
+  const lines: string[] = [];
+  const hr = '='.repeat(60);
+  const thin = '-'.repeat(60);
+
+  lines.push(hr);
+  lines.push('          IGCSE SUBJECT RESERVATION SYSTEM');
+  lines.push('                 PAYMENT RECEIPT');
+  lines.push(hr);
+  lines.push('');
+  lines.push(`Confirmation #:  ${pay.id}`);
+  lines.push(`Date:            ${confirmDate}`);
+  lines.push('');
+  lines.push(thin);
+  lines.push('STUDENT INFORMATION');
+  lines.push(thin);
+  lines.push(`Name:            ${pay.student.name}`);
+  lines.push(`Student ID:      ${pay.student.studentId ?? 'N/A'}`);
+  lines.push(`Grade:           ${pay.student.grade ? `Grade ${pay.student.grade}` : 'N/A'}`);
+  lines.push(`Email:           ${pay.student.email}`);
+  lines.push('');
+  lines.push(thin);
+  lines.push('PARENT / PAYER INFORMATION');
+  lines.push(thin);
+  lines.push(`Name:            ${pay.parent.name}`);
+  lines.push(`Email:           ${pay.parent.email}`);
+  lines.push('');
+  lines.push(thin);
+  lines.push('SESSION');
+  lines.push(thin);
+  lines.push(`Session:         ${sessionName}`);
+  lines.push('');
+  lines.push(thin);
+  lines.push('REGISTERED SUBJECTS');
+  lines.push(thin);
+
+  for (const subj of subjects) {
+    const councilLabel =
+      subj.council === 'pearson_edexcel' ? 'Pearson Edexcel' :
+      subj.council === 'cambridge' ? 'Cambridge' :
+      subj.council === 'oxford' ? 'Oxford' : subj.council;
+    lines.push(`  ${subj.name} (${subj.code})`);
+    lines.push(`    Council: ${councilLabel}`);
+    lines.push(`    Price:   EGP ${subj.price.toFixed(2)}`);
+    lines.push('');
+  }
+
+  lines.push(thin);
+  lines.push('PAYMENT SUMMARY');
+  lines.push(thin);
+  lines.push(`Subtotal:                 EGP ${totalAmount.toFixed(2)}`);
+  if (pay.escrowAmountApplied > 0) {
+    lines.push(`Escrow Applied:          -EGP ${pay.escrowAmountApplied.toFixed(2)}`);
+  }
+  lines.push(`Amount Charged:           EGP ${pay.amount.toFixed(2)}`);
+  lines.push(`Payment Method:           ${PAYMENT_METHOD_DISPLAY[pay.paymentMethod] ?? pay.paymentMethod}`);
+  if (pay.externalReference) {
+    lines.push(`Provider Reference:       ${pay.externalReference}`);
+  }
+  lines.push(`Status:                   COMPLETED`);
+  lines.push('');
+  lines.push(hr);
+  lines.push('');
+  lines.push('This is a system-generated receipt. No signature is required.');
+  lines.push(`Generated on: ${new Date().toISOString()}`);
+  lines.push('');
+
+  const textContent = lines.join('\n');
+
+  // Generate a minimal valid PDF with the text content
+  // This uses raw PDF operators for a zero-dependency solution
+  const textLines = textContent.split('\n');
+  const fontSize = 10;
+  const lineHeight = 14;
+  const margin = 50;
+  const pageWidth = 595; // A4 width in points
+  const pageHeight = 842; // A4 height in points
+  const usableHeight = pageHeight - 2 * margin;
+  const linesPerPage = Math.floor(usableHeight / lineHeight);
+
+  // Split into pages
+  const pages: string[][] = [];
+  for (let i = 0; i < textLines.length; i += linesPerPage) {
+    pages.push(textLines.slice(i, i + linesPerPage));
+  }
+
+  // Build PDF
+  const objects: string[] = [];
+  let objectCount = 0;
+
+  function addObject(content: string): number {
+    objectCount++;
+    objects.push(content);
+    return objectCount;
+  }
+
+  // Object 1: Catalog
+  addObject('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj');
+
+  // Object 2: Pages (placeholder - will be filled after page objects are created)
+  const pagesObjIndex = 1; // index in objects array
+  addObject(''); // placeholder
+
+  // Object 3: Font
+  addObject('3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\nendobj');
+
+  // Create page objects
+  const pageObjIds: number[] = [];
+  for (const pageLines of pages) {
+    // Content stream
+    let stream = `BT\n/F1 ${fontSize} Tf\n`;
+    let y = pageHeight - margin;
+    for (const line of pageLines) {
+      // Escape special PDF characters in text
+      const escaped = line
+        .replace(/\\/g, '\\\\')
+        .replace(/\(/g, '\\(')
+        .replace(/\)/g, '\\)');
+      stream += `${margin} ${y} Td\n(${escaped}) Tj\n`;
+      y -= lineHeight;
+      // Reset position for next line (Td is relative, so we need absolute positioning)
+      stream = stream.replace(
+        /(\d+) (\d+) Td\n\(([^)]*)\) Tj\n$/,
+        `${margin} ${y + lineHeight} Td\n(${escaped}) Tj\n`
+      );
+    }
+    // Rebuild stream with absolute positioning
+    stream = `BT\n/F1 ${fontSize} Tf\n`;
+    y = pageHeight - margin;
+    for (const line of pageLines) {
+      const escaped = line
+        .replace(/\\/g, '\\\\')
+        .replace(/\(/g, '\\(')
+        .replace(/\)/g, '\\)');
+      stream += `1 0 0 1 ${margin} ${y} Tm\n(${escaped}) Tj\n`;
+      y -= lineHeight;
+    }
+    stream += 'ET';
+
+    const streamBytes = Buffer.from(stream, 'utf-8');
+    const contentObjId = addObject(
+      `${objectCount + 1} 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n${stream}\nendstream\nendobj`
+    );
+
+    // Page object
+    const pageObjId = addObject(
+      `${objectCount + 1} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents ${contentObjId} 0 R /Resources << /Font << /F1 3 0 R >> >> >>\nendobj`
+    );
+    pageObjIds.push(pageObjId);
+  }
+
+  // Update Pages object
+  const kidsStr = pageObjIds.map((id) => `${id} 0 R`).join(' ');
+  objects[pagesObjIndex] = `2 0 obj\n<< /Type /Pages /Kids [${kidsStr}] /Count ${pageObjIds.length} >>\nendobj`;
+
+  // Build final PDF
+  let pdf = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  for (const obj of objects) {
+    offsets.push(Buffer.byteLength(pdf, 'utf-8'));
+    pdf += obj + '\n';
+  }
+
+  const xrefOffset = Buffer.byteLength(pdf, 'utf-8');
+  pdf += 'xref\n';
+  pdf += `0 ${objectCount + 1}\n`;
+  pdf += '0000000000 65535 f \n';
+  for (const offset of offsets) {
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  }
+  pdf += 'trailer\n';
+  pdf += `<< /Size ${objectCount + 1} /Root 1 0 R >>\n`;
+  pdf += 'startxref\n';
+  pdf += `${xrefOffset}\n`;
+  pdf += '%%EOF';
+
+  return Buffer.from(pdf, 'utf-8');
 }
 
 /**

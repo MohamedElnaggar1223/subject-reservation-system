@@ -23,6 +23,9 @@ import {
   parentStudentLink,
   user,
   eq,
+  and,
+  inArray,
+  sql,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type {
@@ -34,6 +37,9 @@ import type {
 import {
   notifyEscrowBalanceChanged,
   notifyWithdrawalFulfilled,
+  notifyWithdrawalRequested,
+  notifyWithdrawalRejected,
+  createNotification,
 } from './notification.services';
 
 // ─── Core Escrow Primitives ───────────────────────────────────────────────────
@@ -43,14 +49,15 @@ import {
  * Get or create the single escrow account for a student.
  * Enforced at DB level by a unique constraint on studentId.
  */
-export async function getOrCreateEscrow(studentId: string) {
-  const existing = await db.query.escrow.findFirst({
+export async function getOrCreateEscrow(studentId: string, tx?: DbConn) {
+  const conn = tx ?? db;
+  const existing = await conn.query.escrow.findFirst({
     where: (e, { eq }) => eq(e.studentId, studentId),
   });
 
   if (existing) return existing;
 
-  const [created] = await db
+  const [created] = await conn
     .insert(escrow)
     .values({ id: randomUUID(), studentId, balance: 0 })
     .returning();
@@ -70,82 +77,105 @@ export async function getEscrowBalance(studentId: string): Promise<number> {
   return account?.balance ?? 0;
 }
 
-/**
- * Credit a student's escrow account.
- * Updates balance atomically and writes an immutable ledger entry.
- * Used for: drop refunds, swap refunds, transfer-in, payment refunds.
- */
-export async function creditEscrow(params: {
+type EscrowMutationParams = {
   studentId: string;
   amount: number;
   reason: string;
   initiatedBy: string;
   relatedRegistrationId?: string;
   relatedPaymentId?: string;
-}): Promise<number> {
-  const account = await getOrCreateEscrow(params.studentId);
-  const newBalance = account.balance + params.amount;
+};
 
-  await db
+type DbConn = Pick<typeof db, 'update' | 'insert' | 'query'>;
+
+/**
+ * Credit a student's escrow account.
+ * Uses a single atomic SQL UPDATE … SET balance = balance + amount … RETURNING balance
+ * to prevent lost updates under concurrency.
+ * Accepts an optional transaction handle for use within broader transactions.
+ */
+export async function creditEscrow(params: EscrowMutationParams, tx?: DbConn): Promise<number> {
+  const conn = tx ?? db;
+  const account = await getOrCreateEscrow(params.studentId, conn);
+
+  const [updated] = await conn
     .update(escrow)
-    .set({ balance: newBalance, updatedAt: new Date() })
-    .where(eq(escrow.id, account.id));
+    .set({
+      balance: sql`${escrow.balance} + ${params.amount}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(escrow.id, account.id))
+    .returning({ balance: escrow.balance });
 
-  await db.insert(escrowTransaction).values({
+  if (!updated) {
+    throw new Error('Failed to credit escrow — account not found during update');
+  }
+
+  await conn.insert(escrowTransaction).values({
     id: randomUUID(),
     escrowId: account.id,
     type: 'credit',
     amount: params.amount,
     reason: params.reason,
     initiatedBy: params.initiatedBy,
-    relatedRegistrationId: params.relatedRegistrationId ?? null,
-    relatedPaymentId: params.relatedPaymentId ?? null,
+    // Defensively treat empty string as null so an accidental `''` from a
+    // caller never reaches the FK columns. `??` only coalesces nullish
+    // values, but a truthy-falsy `||` catches `''` too — safe here because
+    // valid IDs are never the empty string.
+    relatedRegistrationId: params.relatedRegistrationId || null,
+    relatedPaymentId: params.relatedPaymentId || null,
   });
 
-  return newBalance;
+  return updated.balance;
 }
 
 /**
  * Debit a student's escrow account.
- * Updates balance atomically and writes an immutable ledger entry.
- * Throws if the balance is insufficient.
- * Used for: checkout payments, transfers-out, withdrawals.
+ * Uses a single atomic SQL UPDATE … SET balance = balance - amount WHERE balance >= amount
+ * to prevent both lost updates and negative balances under concurrency.
+ * The balance check is in the WHERE clause, eliminating the TOCTOU race condition.
+ * Accepts an optional transaction handle for use within broader transactions.
  */
-export async function debitEscrow(params: {
-  studentId: string;
-  amount: number;
-  reason: string;
-  initiatedBy: string;
-  relatedRegistrationId?: string;
-  relatedPaymentId?: string;
-}): Promise<number> {
-  const account = await getOrCreateEscrow(params.studentId);
+export async function debitEscrow(params: EscrowMutationParams, tx?: DbConn): Promise<number> {
+  const conn = tx ?? db;
+  const account = await getOrCreateEscrow(params.studentId, conn);
 
-  if (account.balance < params.amount) {
+  // Atomic debit: the WHERE clause `balance >= amount` guarantees the balance
+  // never goes negative, even under concurrent requests.
+  const [updated] = await conn
+    .update(escrow)
+    .set({
+      balance: sql`${escrow.balance} - ${params.amount}`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(escrow.id, account.id),
+        sql`${escrow.balance} >= ${params.amount}`
+      )
+    )
+    .returning({ balance: escrow.balance });
+
+  // If no row was updated, the balance was insufficient at the DB level
+  if (!updated) {
     throw new Error(
-      `Insufficient escrow balance. Available: ${account.balance.toFixed(2)} EGP, Requested: ${params.amount.toFixed(2)} EGP`
+      `Insufficient escrow balance. Requested: ${params.amount.toFixed(2)} EGP`
     );
   }
 
-  const newBalance = account.balance - params.amount;
-
-  await db
-    .update(escrow)
-    .set({ balance: newBalance, updatedAt: new Date() })
-    .where(eq(escrow.id, account.id));
-
-  await db.insert(escrowTransaction).values({
+  await conn.insert(escrowTransaction).values({
     id: randomUUID(),
     escrowId: account.id,
     type: 'debit',
     amount: params.amount,
     reason: params.reason,
     initiatedBy: params.initiatedBy,
-    relatedRegistrationId: params.relatedRegistrationId ?? null,
-    relatedPaymentId: params.relatedPaymentId ?? null,
+    // Same defensive coercion as creditEscrow (see comment above).
+    relatedRegistrationId: params.relatedRegistrationId || null,
+    relatedPaymentId: params.relatedPaymentId || null,
   });
 
-  return newBalance;
+  return updated.balance;
 }
 
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
@@ -208,6 +238,7 @@ export async function getChildrenEscrowBalances(parentId: string) {
   });
 
   const children = links.map((l) => l.student);
+  if (children.length === 0) return [];
 
   const escrowAccounts = await db.query.escrow.findMany({
     where: (e, { inArray }) =>
@@ -255,23 +286,23 @@ export async function transferEscrow(
     );
   }
 
-  // Execute both sides atomically in order: debit first, then credit
-  await debitEscrow({
-    studentId:   data.fromStudentId,
-    amount:      data.amount,
-    reason:      'transfer_out',
-    initiatedBy: parentId,
-  });
+  const { newFromBalance, newToBalance } = await db.transaction(async (tx) => {
+    const from = await debitEscrow({
+      studentId:   data.fromStudentId,
+      amount:      data.amount,
+      reason:      'transfer_out',
+      initiatedBy: parentId,
+    }, tx);
 
-  await creditEscrow({
-    studentId:   data.toStudentId,
-    amount:      data.amount,
-    reason:      'transfer_in',
-    initiatedBy: parentId,
-  });
+    const to = await creditEscrow({
+      studentId:   data.toStudentId,
+      amount:      data.amount,
+      reason:      'transfer_in',
+      initiatedBy: parentId,
+    }, tx);
 
-  const newFromBalance = fromBalance - data.amount;
-  const newToBalance = await getEscrowBalance(data.toStudentId);
+    return { newFromBalance: from, newToBalance: to };
+  });
 
   // NOT-008: Notify parents of both students about the balance change (fire-and-forget)
   {
@@ -324,26 +355,56 @@ export async function createWithdrawalRequest(
   const linked = await validateParentStudentLink(parentId, data.studentId);
   if (!linked) throw new Error('You are not linked to this student');
 
-  const balance = await getEscrowBalance(data.studentId);
-  if (data.amount > balance) {
-    throw new Error(
-      `Requested amount exceeds escrow balance. Available: ${balance.toFixed(2)} EGP`
-    );
-  }
-
   const account = await getOrCreateEscrow(data.studentId);
 
-  const [request] = await db
-    .insert(withdrawalRequest)
-    .values({
-      id: randomUUID(),
-      escrowId: account.id,
-      requestedAmount: data.amount,
-      status: 'pending',
-    })
-    .returning();
+  // Atomic: debit escrow to hold funds + create withdrawal request
+  // If insufficient balance, debitEscrow will throw and no request is created.
+  const request = await db.transaction(async (tx) => {
+    await debitEscrow({
+      studentId: data.studentId,
+      amount: data.amount,
+      reason: 'withdrawal_hold',
+      initiatedBy: parentId,
+    }, tx);
 
-  return request!;
+    const [req] = await tx
+      .insert(withdrawalRequest)
+      .values({
+        id: randomUUID(),
+        escrowId: account.id,
+        requestedAmount: data.amount,
+        status: 'pending',
+      })
+      .returning();
+
+    return req!;
+  });
+
+  const studentUser = await db.query.user.findFirst({
+    where: (u, { eq: eqOp }) => eqOp(u.id, data.studentId),
+    columns: { name: true },
+  });
+  const parentUser = await db.query.user.findFirst({
+    where: (u, { eq: eqOp }) => eqOp(u.id, parentId),
+    columns: { name: true },
+  });
+  notifyWithdrawalRequested({
+    studentId: data.studentId,
+    studentName: studentUser?.name ?? 'Student',
+    amount: data.amount,
+    parentName: parentUser?.name ?? 'Parent',
+  }).catch((err) => console.error('[notification] withdrawal-requested failed:', err));
+
+  // Confirm to the parent that their withdrawal request was submitted
+  createNotification(
+    parentId,
+    'ESCROW_BALANCE_CHANGED',
+    `Withdrawal request submitted for ${studentUser?.name ?? 'your child'}`,
+    `Your withdrawal request of EGP ${data.amount.toFixed(2)} from ${studentUser?.name ?? 'your child'}'s escrow has been submitted and is pending admin processing.`,
+    { withdrawalRequested: true, amount: data.amount, studentId: data.studentId },
+  ).catch((err) => console.error('[notification] withdrawal-request parent confirm failed:', err));
+
+  return request;
 }
 
 // ─── Admin Operations ─────────────────────────────────────────────────────────
@@ -398,71 +459,83 @@ export async function getPendingWithdrawalRequests() {
 /**
  * Admin fulfills a withdrawal request (ESC-006).
  *
- * releasedAmount is the amount being released in THIS call (incremental).
- * Partial fulfillment is supported — admin can call multiple times.
- * The escrow is debited immediately upon fulfillment.
+ * Funds were already held (debited from escrow) when the withdrawal was created.
+ * Fulfillment only updates the request status — no additional escrow debit needed.
+ *
+ * The entire operation runs inside a transaction with the request re-read
+ * inside the TX to prevent TOCTOU races (two admins processing the same request).
  *
  * Status progression:
- * - pending → partially_fulfilled (cumulative < requestedAmount)
- * - pending / partially_fulfilled → fulfilled (cumulative >= requestedAmount)
+ * - pending → fulfilled (full release)
+ * - pending → partially_fulfilled (partial release, though funds were fully held)
+ * - partially_fulfilled → fulfilled (remaining release)
  */
 export async function fulfillWithdrawalRequest(
   requestId: string,
   data: FulfillWithdrawalType,
   adminId: string
 ) {
-  const req = await db.query.withdrawalRequest.findFirst({
-    where: (wr, { eq }) => eq(wr.id, requestId),
-    with: {
-      escrow: { columns: { studentId: true, balance: true, id: true } },
-    },
-  });
-
-  if (!req) throw new Error('Withdrawal request not found');
-
-  if (req.status === 'fulfilled') {
-    throw new Error('This withdrawal request has already been fully fulfilled');
-  }
-  if (req.status === 'rejected') {
-    throw new Error('This withdrawal request has been rejected');
-  }
-
-  const currentReleased = req.releasedAmount ?? 0;
-  const newTotalReleased = currentReleased + data.releasedAmount;
-
-  if (newTotalReleased > req.requestedAmount) {
-    throw new Error(
-      `Cannot release more than the requested amount. Remaining: ${(req.requestedAmount - currentReleased).toFixed(2)} EGP`
-    );
-  }
-
-  // Debit the escrow — throws if balance is insufficient
-  await debitEscrow({
-    studentId:   req.escrow.studentId,
-    amount:      data.releasedAmount,
-    reason:      'withdrawal',
-    initiatedBy: adminId,
-  });
-
-  const newStatus = newTotalReleased >= req.requestedAmount ? 'fulfilled' : 'partially_fulfilled';
   const now = new Date();
 
-  const [updated] = await db
-    .update(withdrawalRequest)
-    .set({
-      releasedAmount: newTotalReleased,
-      status:         newStatus,
-      adminNotes:     data.notes ?? req.adminNotes,
-      fulfilledAt:    now,
-      fulfilledBy:    adminId,
-      updatedAt:      now,
-    })
-    .where(eq(withdrawalRequest.id, requestId))
-    .returning();
+  // Atomic transaction with TOCTOU protection: re-read inside TX to prevent
+  // two admins from simultaneously processing the same withdrawal request.
+  const { updated, studentId, requestedAmount } = await db.transaction(async (tx) => {
+    // Re-read the request inside the transaction to get a consistent snapshot
+    const req = await tx.query.withdrawalRequest.findFirst({
+      where: (wr, { eq: eqOp }) => eqOp(wr.id, requestId),
+      with: {
+        escrow: { columns: { studentId: true, balance: true, id: true } },
+      },
+    });
+
+    if (!req) throw new Error('Withdrawal request not found');
+
+    if (req.status === 'fulfilled') {
+      throw new Error('This withdrawal request has already been fully fulfilled');
+    }
+    if (req.status === 'rejected') {
+      throw new Error('This withdrawal request has been rejected');
+    }
+
+    const currentReleased = req.releasedAmount ?? 0;
+    const newTotalReleased = currentReleased + data.releasedAmount;
+
+    if (newTotalReleased > req.requestedAmount) {
+      throw new Error(
+        `Cannot release more than the requested amount. Remaining: ${(req.requestedAmount - currentReleased).toFixed(2)} EGP`
+      );
+    }
+
+    // No escrow debit needed — funds were already held at creation time.
+    const newStatus = newTotalReleased >= req.requestedAmount ? 'fulfilled' : 'partially_fulfilled';
+
+    const [upd] = await tx
+      .update(withdrawalRequest)
+      .set({
+        releasedAmount: newTotalReleased,
+        status:         newStatus,
+        adminNotes:     data.notes ?? req.adminNotes,
+        resolvedAt:     now,
+        resolvedBy:     adminId,
+        updatedAt:      now,
+      })
+      .where(and(
+        eq(withdrawalRequest.id, requestId),
+        inArray(withdrawalRequest.status, ['pending', 'partially_fulfilled']),
+      ))
+      .returning();
+
+    if (!upd) throw new Error('Withdrawal request already processed by another admin');
+
+    return {
+      updated: upd,
+      studentId: req.escrow.studentId,
+      requestedAmount: req.requestedAmount,
+    };
+  });
 
   // NOT-009: Notify all linked parents of this student about the withdrawal (fire-and-forget)
   {
-    const studentId = req.escrow.studentId;
     const remainingBalance = await getEscrowBalance(studentId);
 
     const studentUser = await db.query.user.findFirst({
@@ -481,7 +554,7 @@ export async function fulfillWithdrawalRequest(
         parentId:         pid,
         studentId,
         studentName:      studentUser?.name ?? 'Student',
-        amountRequested:  req.requestedAmount,
+        amountRequested:  requestedAmount,
         amountReleased:   data.releasedAmount,
         remainingBalance,
         adminNotes:       data.notes,
@@ -489,42 +562,99 @@ export async function fulfillWithdrawalRequest(
     }
   }
 
-  return updated!;
+  return updated;
 }
 
 /**
- * Admin rejects a pending withdrawal request.
- * No funds are moved. A mandatory reason is stored in adminNotes.
+ * Admin rejects a withdrawal request.
+ *
+ * Funds were held (debited) at request creation time. On rejection we must
+ * credit the held-but-unreleased portion back to the student's escrow.
+ * Supports rejection from either:
+ *   - 'pending' — no partial fulfillments yet; refund the full requestedAmount.
+ *   - 'partially_fulfilled' — some amount has already been released out;
+ *     refund only (requestedAmount - releasedAmount) which represents the
+ *     remainder that is still being held reserved.
+ * Operations run atomically in a single transaction.
  */
 export async function rejectWithdrawalRequest(
   requestId: string,
   data: RejectWithdrawalType,
   adminId: string
 ) {
-  const req = await db.query.withdrawalRequest.findFirst({
-    where: (wr, { eq }) => eq(wr.id, requestId),
-    columns: { id: true, status: true },
-  });
-
-  if (!req) throw new Error('Withdrawal request not found');
-
-  if (req.status !== 'pending') {
-    throw new Error(`Cannot reject a request in '${req.status}' status`);
-  }
-
   const now = new Date();
 
-  const [updated] = await db
-    .update(withdrawalRequest)
-    .set({
-      status:      'rejected',
-      adminNotes:  data.notes,
-      fulfilledAt: now,
-      fulfilledBy: adminId,
-      updatedAt:   now,
-    })
-    .where(eq(withdrawalRequest.id, requestId))
-    .returning();
+  // Atomic: read + reject request + restore held funds to escrow
+  const { updated, req, refundedAmount } = await db.transaction(async (tx) => {
+    // Read inside transaction for TOCTOU protection
+    const wr = await tx.query.withdrawalRequest.findFirst({
+      where: (w, { eq: eqOp }) => eqOp(w.id, requestId),
+      columns: { id: true, status: true, requestedAmount: true, releasedAmount: true },
+      with: { escrow: { columns: { studentId: true } } },
+    });
+
+    if (!wr) throw new Error('Withdrawal request not found');
+    if (wr.status !== 'pending' && wr.status !== 'partially_fulfilled') {
+      throw new Error(`Cannot reject a request in '${wr.status}' status`);
+    }
+
+    const alreadyReleased = wr.releasedAmount ?? 0;
+    const refund = wr.requestedAmount - alreadyReleased;
+
+    // Credit back the unreleased remainder. For status='pending', refund
+    // equals requestedAmount (nothing released). For 'partially_fulfilled',
+    // refund is strictly less than requestedAmount.
+    if (refund > 0) {
+      await creditEscrow({
+        studentId: wr.escrow.studentId,
+        amount: refund,
+        reason: 'withdrawal_rejected',
+        initiatedBy: adminId,
+      }, tx);
+    }
+
+    const [upd] = await tx
+      .update(withdrawalRequest)
+      .set({
+        status:      'rejected',
+        adminNotes:  data.notes,
+        resolvedAt:  now,
+        resolvedBy:  adminId,
+        updatedAt:   now,
+      })
+      .where(
+        and(
+          eq(withdrawalRequest.id, requestId),
+          inArray(withdrawalRequest.status, ['pending', 'partially_fulfilled'])
+        )
+      )
+      .returning();
+
+    if (!upd) throw new Error('Withdrawal request already processed by another admin');
+
+    return { updated: upd, req: wr, refundedAmount: refund };
+  });
+
+  const studentUser = await db.query.user.findFirst({
+    where: (u, { eq: eqOp }) => eqOp(u.id, req.escrow.studentId),
+    columns: { name: true },
+  });
+  const parentLinks = await db.query.parentStudentLink.findMany({
+    where: (l, { and: a, eq: e }) => a(e(l.studentId, req.escrow.studentId), e(l.status, 'approved')),
+    columns: { parentId: true },
+  });
+  for (const { parentId } of parentLinks) {
+    notifyWithdrawalRejected({
+      parentId,
+      studentId: req.escrow.studentId,
+      studentName: studentUser?.name ?? 'Student',
+      // Refund amount reflects the remainder credited back — equals
+      // requestedAmount when rejected from 'pending', and the unreleased
+      // portion when rejected from 'partially_fulfilled'.
+      amount: refundedAmount,
+      reason: data.notes,
+    }).catch((err) => console.error('[notification] withdrawal-rejected failed:', err));
+  }
 
   return updated!;
 }

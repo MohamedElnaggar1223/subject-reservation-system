@@ -28,6 +28,7 @@
 import { createMiddleware } from 'hono/factory';
 import { HonoEnv } from '../lib/types';
 import { ROLES, hasRole, type Role } from '@repo/validations';
+import { isGraduated } from '../services/grade.services';
 
 /**
  * Require Authentication
@@ -76,10 +77,7 @@ export const requireRole = (...allowedRoles: Role[]) => {
     }
 
         if (!hasRole(user.role, ...allowedRoles)) {
-            return c.json({ 
-                error: 'Forbidden',
-                requiredRoles: allowedRoles 
-            }, 403);
+            return c.json({ error: 'Forbidden' }, 403);
     }
 
     return next();
@@ -97,6 +95,39 @@ export const requireStudent = () => requireRole(ROLES.STUDENT);
 export const requireParent = () => requireRole(ROLES.PARENT);
 export const requireStudentOrParent = () => requireRole(ROLES.STUDENT, ROLES.PARENT);
 export const requireAdminOrParent = () => requireRole(ROLES.ADMIN, ROLES.PARENT);
+
+/**
+ * Require Not Graduated
+ *
+ * Prevents graduated students from performing registration or change-request actions.
+ * A graduated student is one with role='student' AND grade=null.
+ *
+ * Non-student roles (parents, admins) are always allowed through.
+ * Students with a non-null grade are allowed through.
+ *
+ * Must be used after requireAuth() — relies on authenticated user in context.
+ *
+ * Returns 403 if the user is a graduated student.
+ */
+export const requireNotGraduated = () => {
+  return createMiddleware<HonoEnv>(async (c, next) => {
+    const user = c.get('user');
+    const session = c.get('session');
+
+    if (!session || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    // Only block graduated students (role='student' with grade=null).
+    // Uses isGraduated() which queries the DB for current grade, since
+    // the session user type may not include the grade field.
+    if (user.role === ROLES.STUDENT && await isGraduated(user.id)) {
+      return c.json({ error: 'Graduated students cannot perform this action' }, 403);
+    }
+
+    return next();
+  });
+};
 
 /**
  * Alias for backwards compatibility

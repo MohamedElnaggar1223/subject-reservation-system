@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { serve } from '@hono/node-server'
+import { getConnInfo } from '@hono/node-server/conninfo'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { auth } from './lib/auth'
@@ -40,16 +41,39 @@ import { startSessionScheduler } from './jobs/session-closer';
  * - 5 requests per 15 minute window
  * - Keyed by IP address (handles proxies and Cloudflare)
  */
+function getClientIp(c: { req: { header: (name: string) => string | undefined; raw: Request }; env?: any }): string {
+  // Prefer Cloudflare-set header (cannot be spoofed by the client).
+  // Fall back to the socket remote address from @hono/node-server.
+  // Do NOT trust x-forwarded-for — it is trivially spoofable without a
+  // trusted proxy chain.
+  const cfIp = c.req.header('cf-connecting-ip');
+  if (cfIp) return cfIp;
+
+  try {
+    const info = getConnInfo(c as any);
+    if (info.remote.address) return info.remote.address;
+  } catch {
+    // getConnInfo may throw if the adapter doesn't support it
+  }
+
+  return 'unknown';
+}
+
 const authRateLimit = rateLimiter({
   windowMs: 15 * 60 * 1000,
   limit: 5,
   standardHeaders: 'draft-6',
-  keyGenerator: (c) =>
-    c.req.header('x-forwarded-for') ||
-    c.req.header('x-real-ip') ||
-    c.req.header('cf-connecting-ip') ||
-    c.req.raw.headers.get('host') ||
-    'unknown',
+  keyGenerator: (c) => getClientIp(c),
+});
+
+const apiRateLimit = rateLimiter({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-6',
+  keyGenerator: (c) => {
+    const user = c.get?.('user' as never) as { id: string } | null;
+    return user?.id ?? getClientIp(c);
+  },
 });
 
 /**
@@ -90,7 +114,7 @@ const app = new Hono<HonoEnv>()
 		credentials: true,
 	})
 )
-.use("/api/auth/*", authRateLimit)
+// .use("/api/auth/*", authRateLimit)
 .use("*", async (c, next) => {
 	const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
@@ -268,6 +292,10 @@ const v1 = new Hono<HonoEnv>()
   .route('/users', users)
   .route('/subjects', subjects)
   .route('/sessions', sessions)
+  .use('/registrations/*', apiRateLimit)
+  .use('/payments/*', apiRateLimit)
+  .use('/escrow/*', apiRateLimit)
+  .use('/change-requests/*', apiRateLimit)
   .route('/registrations', registrations)
   .route('/registrations', registrationSwapRoutes)
   .route('/payments', payments)

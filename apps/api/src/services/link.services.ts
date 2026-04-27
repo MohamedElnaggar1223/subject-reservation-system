@@ -33,19 +33,49 @@ export async function createLinkRequest(
   parentId: string,
   identifier: { studentEmail?: string; studentIdentifier?: string }
 ) {
-  // Find the student by email or studentId
-  const student = await db.query.user.findFirst({
-    where: (users, { or, eq, and }) => and(
-      eq(users.role, 'student'),
-      or(
-        identifier.studentEmail ? eq(users.email, identifier.studentEmail) : undefined,
-        identifier.studentIdentifier ? eq(users.studentId, identifier.studentIdentifier) : undefined
-      )
-    ),
-  });
+  // Normalize email for case-insensitive matching. Better-auth stores emails
+  // lowercased at signup, but the link request payload has its own schema
+  // (CreateLinkRequest) without the lowercase transform, so a parent typing
+  // "John@school.com" would previously not match the stored "john@school.com"
+  // and the generic "if exists..." response hid the cause (AUTH-003).
+  const emailNormalized = identifier.studentEmail?.trim().toLowerCase();
+  const studentIdNormalized = identifier.studentIdentifier?.trim();
+
+  // If BOTH identifiers are provided, resolve each independently and require
+  // they point to the SAME user. Otherwise a client sending conflicting values
+  // could end up linking to whichever the OR clause found first.
+  let student: { id: string } | undefined;
+  if (emailNormalized && studentIdNormalized) {
+    const [byEmail, byStudentId] = await Promise.all([
+      db.query.user.findFirst({
+        where: (u, { and, eq }) => and(eq(u.role, 'student'), eq(u.email, emailNormalized)),
+        columns: { id: true },
+      }),
+      db.query.user.findFirst({
+        where: (u, { and, eq }) => and(eq(u.role, 'student'), eq(u.studentId, studentIdNormalized)),
+        columns: { id: true },
+      }),
+    ]);
+    if (byEmail && byStudentId && byEmail.id !== byStudentId.id) {
+      throw new Error('The email and student ID belong to different students. Please provide one or confirm they match.');
+    }
+    student = byEmail ?? byStudentId;
+  } else if (emailNormalized) {
+    student = await db.query.user.findFirst({
+      where: (u, { and, eq }) => and(eq(u.role, 'student'), eq(u.email, emailNormalized)),
+      columns: { id: true },
+    });
+  } else if (studentIdNormalized) {
+    student = await db.query.user.findFirst({
+      where: (u, { and, eq }) => and(eq(u.role, 'student'), eq(u.studentId, studentIdNormalized)),
+      columns: { id: true },
+    });
+  }
 
   if (!student) {
-    throw new Error('Student not found');
+    // Return a generic message to prevent student enumeration.
+    // Do NOT reveal whether the student account exists.
+    throw new Error('If a student with that email exists, they will receive a link request.');
   }
 
   // Check if a link already exists (pending or approved)
@@ -61,10 +91,9 @@ export async function createLinkRequest(
   });
 
   if (existingLink) {
-    if (existingLink.status === 'approved') {
-      throw new Error('Already linked to this student');
-    }
-    throw new Error('Link request already pending');
+    // Use the same generic message to avoid leaking whether the student exists
+    // and already has a link/pending request.
+    throw new Error('If a student with that email exists, they will receive a link request.');
   }
 
   // Create the link request

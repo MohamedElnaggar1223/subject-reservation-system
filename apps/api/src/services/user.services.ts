@@ -203,6 +203,23 @@ export async function setStudentFields(userId: string, grade: number) {
 }
 
 /**
+ * Update only the grade for an existing student (preserves studentId).
+ * Used to fix students who have role='student' but a missing grade.
+ */
+export async function updateStudentGrade(userId: string, grade: number) {
+  const [updated] = await db
+    .update(user)
+    .set({
+      grade,
+      updatedAt: new Date(),
+    })
+    .where(eq(user.id, userId))
+    .returning();
+
+  return updated;
+}
+
+/**
  * Set user role
  * 
  * @param userId - The user's ID

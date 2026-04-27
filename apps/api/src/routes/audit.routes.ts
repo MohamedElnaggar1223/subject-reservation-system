@@ -21,10 +21,30 @@ import {
   AuditLogsQuery,
   AuditEntityTypeSchema,
 } from '@repo/validations';
-import { success, error } from '../lib/response';
+import { success } from '../lib/response';
 import { requireAuth, requireAdmin } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import { getAuditLogs, getEntityHistory } from '../services/audit.services';
+
+// ─── CSV Helper ───────────────────────────────────────────────────────────────
+
+function toCSV(rows: Record<string, unknown>[]): string {
+  if (rows.length === 0) return '';
+  const headers = Object.keys(rows[0]!);
+  const escape = (v: unknown) => {
+    let str = v === null || v === undefined ? '' : String(v);
+    if (/^[=+\-@\t\r]/.test(str)) str = `'${str}`;
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+  const lines = [
+    headers.map(escape).join(','),
+    ...rows.map((row) => headers.map((h) => escape(row[h])).join(',')),
+  ];
+  return lines.join('\r\n');
+}
 
 export const audit = new Hono<HonoEnv>()
   .use('*', requireAuth())
@@ -37,6 +57,7 @@ export const audit = new Hono<HonoEnv>()
    * Returns a paginated list of audit log entries, newest first.
    * Supports filtering by userId, action, entityType, entityId, dateFrom, dateTo.
    * Each entry includes the acting user's name, role, and email.
+   * Supports `?format=csv` to download as CSV file.
    *
    * Designed for the admin audit log viewer page (REP-006).
    */
@@ -44,8 +65,31 @@ export const audit = new Hono<HonoEnv>()
     zValidator('query', AuditLogsQuery),
     async (c) => {
       const filters = c.req.valid('query');
-      const logs = await getAuditLogs(filters);
-      return success(c, logs);
+      const { data: logs, total } = await getAuditLogs(filters);
+
+      if (filters.format === 'csv') {
+        const rows = logs.map((log) => ({
+          id:         log.id,
+          action:     log.action,
+          entityType: log.entityType,
+          entityId:   log.entityId,
+          userName:   log.user?.name ?? '—',
+          userRole:   log.user?.role ?? '—',
+          userEmail:  log.user?.email ?? '—',
+          ipAddress:  log.ipAddress ?? '—',
+          userAgent:  log.userAgent ?? '—',
+          createdAt:  log.createdAt instanceof Date ? log.createdAt.toISOString() : String(log.createdAt),
+        }));
+        const csv = toCSV(rows);
+        return new Response(csv, {
+          headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': 'attachment; filename="audit-logs.csv"',
+          },
+        });
+      }
+
+      return success(c, { data: logs, total });
     }
   )
 
@@ -68,11 +112,6 @@ export const audit = new Hono<HonoEnv>()
     async (c) => {
       const { type, id } = c.req.valid('param');
       const history = await getEntityHistory(type, id);
-
-      if (history.length === 0) {
-        return error(c, 'No audit history found for this entity', 404);
-      }
-
       return success(c, history);
     }
   );

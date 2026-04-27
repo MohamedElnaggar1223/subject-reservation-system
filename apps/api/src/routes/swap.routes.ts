@@ -41,6 +41,7 @@ import {
   requireStudent,
   requireParent,
   requireStudentOrParent,
+  requireNotGraduated,
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as swapService from '../services/swap.services';
@@ -60,6 +61,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
    */
   .post('/:id/request-drop',
     requireStudent(),
+    requireNotGraduated(),
     zValidator('param', RegistrationIdParam),
     zValidator('json', RequestDrop),
     async (c) => {
@@ -68,8 +70,10 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const request = await swapService.createDropRequest(id, data, user.id);
-        return success(c, request, 201);
+        const result = await swapService.createDropRequest(id, data, user.id);
+        logAction(user.id, 'CHANGE_REQUEST_CREATED', 'change_request', result.id ?? '', null, result as Record<string, unknown>, extractAuditContext(c))
+          .catch((err) => console.error('[audit] CHANGE_REQUEST_CREATED failed:', err));
+        return success(c, result, 201);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create drop request';
         const status = message.includes('not found') ? 404 :
@@ -89,6 +93,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
    */
   .post('/:id/request-swap',
     requireStudent(),
+    requireNotGraduated(),
     zValidator('param', RegistrationIdParam),
     zValidator('json', RequestSwap),
     async (c) => {
@@ -97,8 +102,10 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const request = await swapService.createSwapRequest(id, data, user.id);
-        return success(c, request, 201);
+        const result = await swapService.createSwapRequest(id, data, user.id);
+        logAction(user.id, 'CHANGE_REQUEST_CREATED', 'change_request', result.id ?? '', null, result as Record<string, unknown>, extractAuditContext(c))
+          .catch((err) => console.error('[audit] CHANGE_REQUEST_CREATED failed:', err));
+        return success(c, result, 201);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create swap request';
         const status = message.includes('not found') ? 404 :
@@ -126,6 +133,8 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
 
       try {
         const result = await swapService.executeDirectDrop(id, data, user.id);
+        logAction(user.id, 'DIRECT_DROP_EXECUTED', 'registration', id, null, result as Record<string, unknown>, extractAuditContext(c))
+          .catch((err) => console.error('[audit] DIRECT_DROP_EXECUTED failed:', err));
         return success(c, result);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to drop registration';
@@ -154,6 +163,8 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
 
       try {
         const result = await swapService.executeDirectSwap(id, data, user.id);
+        logAction(user.id, 'DIRECT_SWAP_EXECUTED', 'registration', id, null, result as Record<string, unknown>, extractAuditContext(c))
+          .catch((err) => console.error('[audit] DIRECT_SWAP_EXECUTED failed:', err));
         return success(c, result);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to swap registration';
@@ -215,9 +226,14 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
       const cr = await swapService.getChangeRequestById(id);
       if (!cr) return error(c, 'Change request not found', 404);
 
-      // Access check: student must own it, parent must be linked
       if (user.role === ROLES.STUDENT && cr.requestedBy !== user.id) {
         return error(c, 'Access denied', 403);
+      }
+
+      if (user.role === ROLES.PARENT) {
+        const studentId = cr.registration?.studentId ?? cr.requestedBy;
+        const isLinked = await swapService.isParentLinkedToStudent(user.id, studentId);
+        if (!isLinked) return error(c, 'Access denied', 403);
       }
 
       return success(c, cr);
@@ -251,7 +267,9 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
         const message = err instanceof Error ? err.message : 'Failed to approve change request';
         const status = message.includes('not found') ? 404 :
                        message.includes('not linked') ? 403 :
-                       message.includes('closed') ? 422 : 400;
+                       message.includes('closed') ||
+                       message.includes('already processed') ||
+                       message.includes('no longer') ? 422 : 400;
         return error(c, message, status);
       }
     }
@@ -283,6 +301,35 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
         const message = err instanceof Error ? err.message : 'Failed to reject change request';
         const status = message.includes('not found') ? 404 :
                        message.includes('not linked') ? 403 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * PUT /change-requests/:id/cancel
+   *
+   * Student cancels their own pending change request.
+   * Only the student who created the request can cancel it.
+   */
+  .put('/:id/cancel',
+    requireStudent(),
+    zValidator('param', ChangeRequestId),
+    async (c) => {
+      const user = c.get('user')!;
+      const { id } = c.req.valid('param');
+
+      try {
+        const result = await swapService.cancelChangeRequest(id, user.id);
+
+        logAction(user.id, 'CHANGE_REQUEST_CANCELLED', 'change_request', id, null, result as Record<string, unknown>, extractAuditContext(c))
+          .catch((err) => console.error('[audit] CHANGE_REQUEST_CANCELLED failed:', err));
+
+        return success(c, result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to cancel change request';
+        const status = message.includes('not found') ? 404 :
+                       message.includes('only cancel your own') ? 403 : 400;
         return error(c, message, status);
       }
     }

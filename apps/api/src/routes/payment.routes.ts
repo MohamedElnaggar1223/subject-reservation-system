@@ -112,7 +112,7 @@ export const payments = new Hono<HonoEnv>()
         if (filters.studentId) {
           // Validate parent-child link before filtering by student
           const children = await linkService.getLinkedChildren(user.id);
-          const isLinked = children.some((child) => child.id === filters.studentId);
+          const isLinked = children.some((child) => child.studentId === filters.studentId);
           if (!isLinked) return error(c, 'You are not linked to this student', 403);
           const data = await paymentService.getPayments({ ...filters, parentId: user.id });
           return success(c, data);
@@ -149,13 +149,71 @@ export const payments = new Hono<HonoEnv>()
 
       try {
         const result = await paymentService.initiatePayment(user.id, data);
+        logAction(user.id, 'PAYMENT_INITIATED', 'payment', result.id ?? '', null, result as Record<string, unknown>, extractAuditContext(c))
+          .catch((err) => console.error('[audit] PAYMENT_INITIATED failed:', err));
         return success(c, result, 201);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to initiate payment';
         const status =
           message.includes('not linked') ? 403 :
-          message.includes('insufficient') || message.includes('already have') ? 422 : 400;
+          message.includes('insufficient') ||
+          message.includes('already have') ||
+          message.includes('window is closed') ? 422 : 400;
         return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * GET /payments/:id/receipt
+   *
+   * Generates and returns a PDF receipt for a completed payment.
+   * Parents can only download receipts for their own payments.
+   * Admins can download any receipt.
+   *
+   * Returns: application/pdf binary stream
+   *
+   * TODO: Install pdfkit (`npm install pdfkit @types/pdfkit`) to enable full PDF generation.
+   * Currently uses a plain-text fallback that produces a readable receipt.
+   */
+  .get('/:id/receipt',
+    requireAuth(),
+    zValidator('param', PaymentId),
+    async (c) => {
+      const user = c.get('user')!;
+      const { id } = c.req.valid('param');
+
+      const pay = await paymentService.getPaymentById(id);
+      if (!pay) return error(c, 'Payment not found', 404);
+
+      if (user.role === ROLES.PARENT && pay.parentId !== user.id) {
+        return error(c, 'Access denied', 403);
+      }
+
+      if (user.role === ROLES.STUDENT) {
+        return error(c, 'Forbidden — payments are managed by parents', 403);
+      }
+
+      if (pay.status !== 'completed') {
+        return error(c, 'Receipts are only available for completed payments', 400);
+      }
+
+      try {
+        const pdfBuffer = await paymentService.generatePaymentReceipt(id);
+        const uint8 = new Uint8Array(pdfBuffer);
+
+        return new Response(uint8, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="receipt-${id.slice(0, 8)}.pdf"`,
+            'Content-Length': String(uint8.byteLength),
+          },
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to generate receipt';
+        logger.error('[receipt] PDF generation failed:', err);
+        return error(c, message, 500);
       }
     }
   )
@@ -216,7 +274,7 @@ export const payments = new Hono<HonoEnv>()
       }
 
       try {
-        const confirmed = await paymentService.confirmPayment(id, user.id, notes);
+        const confirmed = await paymentService.confirmPayment(id, user.id, undefined, notes);
 
         logAction(user.id, 'PAYMENT_CONFIRMED', 'payment', id, pay as Record<string, unknown>, confirmed as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] PAYMENT_CONFIRMED (admin) failed:', err));
@@ -250,16 +308,35 @@ export const payments = new Hono<HonoEnv>()
       }
 
       if (payload.orderStatus !== 'PAID') {
-        // Non-PAID statuses (EXPIRED, CANCELLED, UNPAID) fail the payment
         try {
-          // Find payment by merchantRefNum (stored as our paymentId in metadata)
-          // We search by externalReference (Fawry reference number)
           logger.info(`[Fawry Webhook] Non-PAID status: ${payload.orderStatus} for ref ${payload.merchantRefNum}`);
-          // In the stub: just log; in production, look up by merchantRefNum and fail
+          await paymentService.failPayment(payload.merchantRefNum);
+          logAction(null, 'PAYMENT_FAILED', 'payment', payload.merchantRefNum, null, { provider: 'fawry', status: payload.orderStatus })
+            .catch((err) => console.error('[audit] PAYMENT_FAILED (fawry) failed:', err));
         } catch (err) {
           logger.error('[Fawry Webhook] Error processing failed payment', err);
         }
         return c.json({ received: true }, 200);
+      }
+
+      // Amount verification — compare webhook amount against stored payment amount.
+      // Accept webhook amount >= stored amount (in cents). Strict equality
+      // rejected legitimate payments when Fawry returned slightly larger
+      // values due to rounding or their fee structure. Under-payment is
+      // still rejected since that would mean the student paid less than owed.
+      const fawryPayment = await paymentService.getPaymentById(payload.merchantRefNum);
+      if (!fawryPayment) {
+        logger.warn(`[Fawry Webhook] Payment not found: ${payload.merchantRefNum}`);
+        return error(c, 'Payment not found', 400);
+      }
+      const webhookCents = Math.round(Number(payload.paymentAmount) * 100);
+      const storedCents  = Math.round(fawryPayment.amount * 100);
+      if (webhookCents < storedCents) {
+        logger.error(`[Fawry Webhook] Underpayment for ${payload.merchantRefNum}: webhook=${payload.paymentAmount}, stored=${fawryPayment.amount}`);
+        return error(c, 'Payment amount is less than expected', 400);
+      }
+      if (webhookCents > storedCents) {
+        logger.warn(`[Fawry Webhook] Overpayment detected for ${payload.merchantRefNum}: webhook=${payload.paymentAmount}, stored=${fawryPayment.amount} — proceeding.`);
       }
 
       // Payment confirmed
@@ -269,6 +346,8 @@ export const payments = new Hono<HonoEnv>()
           undefined,
           payload.referenceNumber
         );
+        logAction(null, 'PAYMENT_CONFIRMED', 'payment', payload.merchantRefNum, null, { provider: 'fawry', status: 'PAID' })
+          .catch((err) => console.error('[audit] PAYMENT_CONFIRMED (fawry) failed:', err));
         logger.info(`[Fawry Webhook] Payment confirmed: ${payload.merchantRefNum}`);
       } catch (err) {
         logger.error('[Fawry Webhook] Error confirming payment', err);
@@ -284,37 +363,81 @@ export const payments = new Hono<HonoEnv>()
    * Paymob transaction response for card and wallet payments.
    * No authentication — validated by Paymob HMAC header.
    *
-   * TODO (Production): Enable HMAC validation by calling
-   *   validatePaymobWebhookSignature(payload, hmacHeader)
+   * Validation is always run: validatePaymobWebhookSignature fail-closes
+   * when PAYMOB_HMAC_SECRET is not configured, and rejects missing or
+   * malformed HMAC headers. Never accept an unsigned Paymob webhook.
    */
   .post('/webhook/paymob',
     zValidator('json', PaymobWebhookPayload),
     async (c) => {
       const { obj } = c.req.valid('json');
-      const hmac = c.req.header('x-hmac-sha512') ?? '';
+      // Paymob transmits the HMAC as a `?hmac=` query parameter on the
+      // callback URL itself (not as a header) — this is how their
+      // "Transaction Processed Callback" works on both legacy and
+      // Intention APIs. We still accept the header variants as a
+      // fallback in case a proxy or gateway moves it upstream.
+      const hmacQuery  = c.req.query('hmac');
+      const hmacHeader = c.req.header('x-hmac-sha512') ?? c.req.header('hmac');
+      const hmac = hmacQuery ?? hmacHeader ?? '';
+
+      logger.info(`[Paymob Webhook] Received — success: ${obj.success}, id: ${obj.id}, merchant_order_id: ${obj.merchant_order_id}, order.merchant_order_id: ${obj.order?.merchant_order_id}`);
 
       if (!validatePaymobWebhookSignature(obj as unknown as Record<string, unknown>, hmac)) {
-        logger.warn('[Paymob Webhook] Invalid HMAC rejected');
+        // Log just enough context to distinguish "no signature sent" from
+        // "signature sent but mismatched" so ops can tell a Paymob config
+        // issue apart from a forgery attempt. The hmac itself is NOT
+        // logged to avoid storing someone's forgery attempt verbatim.
+        const where = hmacQuery ? 'query' : hmacHeader ? 'header' : 'none';
+        logger.warn(
+          `[Paymob Webhook] Rejected — reason: ${hmac ? 'signature mismatch' : 'missing hmac'}, source: ${where}, id: ${obj.id}`
+        );
         return error(c, 'Invalid signature', 401);
       }
 
+      // Resolve our payment ID from the callback.
+      // Intention API: special_reference → obj.order.merchant_order_id
+      // Legacy flow: obj.merchant_order_id
+      const paymentId =
+        obj.order?.merchant_order_id ||
+        obj.merchant_order_id ||
+        null;
+
+      if (!paymentId) {
+        logger.error('[Paymob Webhook] Cannot resolve payment ID from callback');
+        return error(c, 'Missing merchant_order_id', 400);
+      }
+
       if (!obj.success) {
-        logger.info(`[Paymob Webhook] Failed transaction for order: ${obj.merchant_order_id}`);
+        logger.info(`[Paymob Webhook] Failed transaction for order: ${paymentId}`);
         try {
-          await paymentService.failPayment(obj.merchant_order_id);
+          await paymentService.failPayment(paymentId);
+          logAction(null, 'PAYMENT_FAILED', 'payment', paymentId, null, { provider: 'paymob', success: obj.success })
+            .catch((err) => console.error('[audit] PAYMENT_FAILED (paymob) failed:', err));
         } catch (err) {
           logger.error('[Paymob Webhook] Error failing payment', err);
         }
         return c.json({ received: true }, 200);
       }
 
+      const paymobPayment = await paymentService.getPaymentById(paymentId);
+      if (!paymobPayment) {
+        logger.warn(`[Paymob Webhook] Payment not found: ${paymentId}`);
+        return error(c, 'Payment not found', 400);
+      }
+      if (obj.amount_cents !== Math.round(paymobPayment.amount * 100)) {
+        logger.error(`[Paymob Webhook] Amount mismatch for ${paymentId}: webhook=${obj.amount_cents / 100}, stored=${paymobPayment.amount}`);
+        return error(c, 'Amount mismatch', 400);
+      }
+
       try {
         await paymentService.confirmPayment(
-          obj.merchant_order_id,
+          paymentId,
           undefined,
           obj.id.toString()
         );
-        logger.info(`[Paymob Webhook] Payment confirmed: ${obj.merchant_order_id}`);
+        logAction(null, 'PAYMENT_CONFIRMED', 'payment', paymentId, null, { provider: 'paymob', status: 'PAID' })
+          .catch((err) => console.error('[audit] PAYMENT_CONFIRMED (paymob) failed:', err));
+        logger.info(`[Paymob Webhook] Payment confirmed: ${paymentId}`);
       } catch (err) {
         logger.error('[Paymob Webhook] Error confirming payment', err);
       }

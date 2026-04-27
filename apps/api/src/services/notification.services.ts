@@ -21,10 +21,15 @@ import {
   notification,
   user,
   parentStudentLink,
+  scheduledAnnouncement,
   eq,
   isNull,
   and,
+  or,
   desc,
+  lte,
+  inArray,
+  sql,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type {
@@ -34,11 +39,14 @@ import type {
 import {
   sendSessionOpenedEmail,
   sendSessionClosingSoonEmail,
+  sendSessionClosedEmail,
   sendRegistrationRequestReceivedEmail,
+  sendDirectRegistrationEmail,
   sendRegistrationDecisionEmail,
   sendPaymentReceiptEmail,
   sendDropSwapRequestEmail,
   sendDropSwapProcessedEmail,
+  sendDirectDropSwapEmail,
   sendEscrowBalanceChangedEmail,
   sendWithdrawalFulfilledEmail,
   sendBulkAnnouncementEmail,
@@ -48,6 +56,52 @@ import {
 } from '../integrations/email';
 
 // ─── Core Primitives ──────────────────────────────────────────────────────────
+
+/**
+ * Return IDs of users who should receive broadcast notifications.
+ *
+ * Excludes:
+ * - banned accounts (URD NOT-001/011 talk about "active" users)
+ * - accounts that haven't completed role setup (role IS NULL or role='user')
+ *
+ * Used by session-opened/closed/reminder blasts and bulk announcements so
+ * that incomplete sign-ups and revoked accounts don't get spammed.
+ */
+export async function getBroadcastRecipientIds(
+  roles: ('student' | 'parent' | 'admin')[],
+): Promise<string[]> {
+  if (roles.length === 0) return [];
+  const rows = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(
+      and(
+        inArray(user.role, roles),
+        or(eq(user.banned, false), isNull(user.banned)),
+      )
+    );
+  return rows.map((r) => r.id);
+}
+
+/** Convenience: return IDs of active students and parents for broadcasts. */
+export async function getStudentAndParentBroadcastIds(): Promise<{
+  studentIds: string[];
+  parentIds: string[];
+}> {
+  const rows = await db
+    .select({ id: user.id, role: user.role })
+    .from(user)
+    .where(
+      and(
+        inArray(user.role, ['student', 'parent']),
+        or(eq(user.banned, false), isNull(user.banned)),
+      )
+    );
+  return {
+    studentIds: rows.filter((r) => r.role === 'student').map((r) => r.id),
+    parentIds: rows.filter((r) => r.role === 'parent').map((r) => r.id),
+  };
+}
 
 /**
  * Creates a single in-app notification for one user.
@@ -128,12 +182,12 @@ export async function getUserNotifications(
 
 /** Returns the count of unread notifications for a user (used for badge display). */
 export async function getUnreadCount(userId: string): Promise<number> {
-  const rows = await db
-    .select()
+  const [result] = await db
+    .select({ count: sql<number>`count(*)` })
     .from(notification)
     .where(and(eq(notification.userId, userId), isNull(notification.readAt)));
 
-  return rows.length;
+  return result?.count ?? 0;
 }
 
 // ─── Write Operations ─────────────────────────────────────────────────────────
@@ -191,69 +245,67 @@ async function getLinkedParents(studentId: string) {
     .where(
       and(
         eq(parentStudentLink.studentId, studentId),
-        eq(parentStudentLink.status, 'accepted')
+        eq(parentStudentLink.status, 'approved')
       )
     );
 }
 
 /**
- * Convenience: create a notification for a user and
- * all confirmed parents of a student (NOT-010).
- *
- * If `parentNotification` is provided, parents receive a different
- * title/body/data than the student/primary recipient.
+ * Fire-and-forget email wrapper.
+ * Logs failures but never throws — email issues must not disrupt core operations.
+ * When notificationIds are provided, marks emailSentAt on success.
  */
-async function notifyWithParentCC(
-  primaryUserId: string,
-  studentId: string,
-  notification: {
-    type: NotificationType;
-    title: string;
-    body: string;
-    data?: Record<string, unknown>;
-  },
-  parentNotification?: {
-    type: NotificationType;
-    title: string;
-    body: string;
-    data?: Record<string, unknown>;
-  }
-) {
-  await createNotification(
-    primaryUserId,
-    notification.type,
-    notification.title,
-    notification.body,
-    notification.data
-  );
-
-  if (parentNotification && primaryUserId !== studentId) {
-    return;
-  }
-
-  // Notify parents (NOT-010): every action involving a student CC's their parents
-  const parents = await getLinkedParents(studentId);
-  if (parents.length > 0) {
-    const pn = parentNotification ?? notification;
-    await createBulkNotifications(
-      parents.map((p) => p.parentId),
-      pn.type,
-      pn.title,
-      pn.body,
-      pn.data
-    );
+async function fireEmail<T>(label: string, fn: () => Promise<T>, notificationIds?: string[]): Promise<void> {
+  try {
+    await fn();
+    if (notificationIds && notificationIds.length > 0) {
+      await db
+        .update(notification)
+        .set({ emailSentAt: new Date() })
+        .where(inArray(notification.id, notificationIds))
+        .catch((err) => console.error(`[notification:email] Failed to update emailSentAt:`, err));
+    }
+  } catch (err) {
+    console.error(`[notification:email] Failed to send ${label}:`, err);
   }
 }
 
 /**
- * Fire-and-forget email wrapper.
- * Logs failures but never throws — email issues must not disrupt core operations.
+ * Send an individual email to every in-app notification just created by a
+ * bulk blast, and update each row's `emailSentAt` as its email goes out.
+ *
+ * Used by session-wide broadcasts (NOT-001, NOT-002, SESSION_CLOSED) so
+ * the admin notification viewer can distinguish between "email delivered"
+ * and "email skipped/failed" rows. Individual send failures don't block
+ * the rest of the batch — each row's emailSentAt is only touched on success.
+ *
+ * The `createdNotifications` array comes straight from
+ * createBulkNotifications; each row has `{ id, userId }` so we can route
+ * the email to the right user without a second DB round-trip.
  */
-async function fireEmail<T>(label: string, fn: () => Promise<T>): Promise<void> {
-  try {
-    await fn();
-  } catch (err) {
-    console.error(`[notification:email] Failed to send ${label}:`, err);
+async function fanOutBlastEmail<Row extends { id: string; userId: string }>(
+  label: string,
+  createdNotifications: Row[],
+  userLookup: Map<string, { email: string | null; name: string }>,
+  buildAndSend: (to: string, recipient: { name: string }) => Promise<unknown>,
+): Promise<void> {
+  const successfullySent: string[] = [];
+  for (const n of createdNotifications) {
+    const recipient = userLookup.get(n.userId);
+    if (!recipient?.email) continue;
+    try {
+      await buildAndSend(recipient.email, { name: recipient.name });
+      successfullySent.push(n.id);
+    } catch (err) {
+      console.error(`[notification:email] Failed to send ${label} to ${recipient.email}:`, err);
+    }
+  }
+  if (successfullySent.length > 0) {
+    await db
+      .update(notification)
+      .set({ emailSentAt: new Date() })
+      .where(inArray(notification.id, successfullySent))
+      .catch((err) => console.error(`[notification:email] Failed to update emailSentAt for ${label} batch:`, err));
   }
 }
 
@@ -287,28 +339,26 @@ export async function notifySessionOpened(data: {
   const title = `Registration Open — ${data.sessionName}`;
   const body = `The registration window for ${data.sessionName} (${data.sessionType}) is now open. Deadline: ${deadline}.`;
 
-  await createBulkNotifications(allUserIds, 'SESSION_OPENED', title, body, {
+  const created = await createBulkNotifications(allUserIds, 'SESSION_OPENED', title, body, {
     sessionId: data.sessionId,
   });
 
-  // Send emails — fetch users in batch, fire-and-forget per user
-  fireEmail('SESSION_OPENED blast', async () => {
-    const allUsers = await db.select().from(user).where(
-      and(
-        // Only fetch users involved
-        eq(user.role, 'student')
-      )
-    );
-    for (const u of allUsers) {
-      if (!u.email) continue;
-      await sendSessionOpenedEmail(u.email, {
-        recipientName: u.name,
-        sessionName: data.sessionName,
-        sessionType: data.sessionType,
-        deadline,
-      });
-    }
-  });
+  // Look up email/name once and drive per-user sends so emailSentAt is
+  // tracked accurately per recipient (M-17).
+  const recipients = await db
+    .select({ id: user.id, email: user.email, name: user.name })
+    .from(user)
+    .where(inArray(user.id, allUserIds));
+  const userLookup = new Map(recipients.map((u) => [u.id, { email: u.email, name: u.name }]));
+
+  fanOutBlastEmail('SESSION_OPENED', created, userLookup, (to, r) =>
+    sendSessionOpenedEmail(to, {
+      recipientName: r.name,
+      sessionName: data.sessionName,
+      sessionType: data.sessionType,
+      deadline,
+    }),
+  ).catch((err) => console.error('[notification] SESSION_OPENED fan-out failed:', err));
 }
 
 /**
@@ -334,9 +384,60 @@ export async function notifySessionClosingSoon(data: {
   const title = `Reminder: ${data.sessionName} closes in 24 hours`;
   const body = `Registration for ${data.sessionName} closes on ${deadline}. Make sure your registration is complete.`;
 
-  await createBulkNotifications(allUserIds, 'SESSION_CLOSING_SOON', title, body, {
+  const created = await createBulkNotifications(allUserIds, 'SESSION_CLOSING_SOON', title, body, {
     sessionId: data.sessionId,
   });
+
+  const recipients = await db
+    .select({ id: user.id, email: user.email, name: user.name })
+    .from(user)
+    .where(inArray(user.id, allUserIds));
+  const userLookup = new Map(recipients.map((u) => [u.id, { email: u.email, name: u.name }]));
+
+  fanOutBlastEmail('NOT-002', created, userLookup, (to, r) =>
+    sendSessionClosingSoonEmail(to, {
+      recipientName: r.name,
+      sessionName: data.sessionName,
+      deadline,
+    }),
+  ).catch((err) => console.error('[notification] NOT-002 fan-out failed:', err));
+}
+
+/**
+ * Session closed notification.
+ * Called from session-closer (auto-close) and session routes (manual close).
+ */
+export async function notifySessionClosed(data: {
+  sessionId: string;
+  sessionName: string;
+  reason?: string;
+  studentIds: string[];
+  parentIds: string[];
+}) {
+  const allUserIds = [...data.studentIds, ...data.parentIds];
+  const title = `Registration Closed — ${data.sessionName}`;
+  const body = data.reason
+    ? `The registration window for ${data.sessionName} has been closed. Reason: ${data.reason}`
+    : `The registration window for ${data.sessionName} has been closed.`;
+
+  const created = await createBulkNotifications(allUserIds, 'SESSION_CLOSED', title, body, {
+    sessionId: data.sessionId,
+    closed: true,
+  });
+
+  const recipients = await db
+    .select({ id: user.id, email: user.email, name: user.name })
+    .from(user)
+    .where(inArray(user.id, allUserIds));
+  const userLookup = new Map(recipients.map((u) => [u.id, { email: u.email, name: u.name }]));
+
+  fanOutBlastEmail('SESSION_CLOSED', created, userLookup, (to, r) =>
+    sendSessionClosedEmail(to, {
+      recipientName: r.name,
+      sessionName: data.sessionName,
+      reason: data.reason,
+    }),
+  ).catch((err) => console.error('[notification] SESSION_CLOSED fan-out failed:', err));
 }
 
 /**
@@ -362,7 +463,7 @@ export async function notifyRegistrationRequestReceived(data: {
     totalCost: data.totalCost,
   };
 
-  await createBulkNotifications(
+  const created = await createBulkNotifications(
     parents.map((p) => p.parentId),
     'REGISTRATION_REQUEST_RECEIVED',
     title,
@@ -375,6 +476,7 @@ export async function notifyRegistrationRequestReceived(data: {
     const parentUser = await getUserDetails(parentId);
     if (!parentUser?.email) continue;
 
+    const matchingNotif = created.find((n) => n.userId === parentId);
     fireEmail('NOT-003 to parent', () =>
       sendRegistrationRequestReceivedEmail(parentUser.email!, {
         parentName: parentUser.name,
@@ -382,7 +484,58 @@ export async function notifyRegistrationRequestReceived(data: {
         sessionName: data.sessionName,
         subjects: data.subjects,
         totalCost: data.totalCost,
-      })
+      }),
+      matchingNotif ? [matchingNotif.id] : undefined
+    );
+  }
+}
+
+/**
+ * REG-003: Student notified when their parent directly registers subjects
+ * for them. Unlike the student-initiated flow there's no approval needed —
+ * this is an informational "your parent did X for you" email + in-app.
+ */
+export async function notifyDirectRegistrationCreated(data: {
+  studentId: string;
+  parentId: string;
+  sessionName: string;
+  subjects: { name: string; price: number }[];
+  totalCost: number;
+}) {
+  const [studentUser, parentUser] = await Promise.all([
+    getUserDetails(data.studentId),
+    getUserDetails(data.parentId),
+  ]);
+  if (!studentUser) return;
+
+  const parentName = parentUser?.name ?? 'Your parent';
+  const subjectNames = data.subjects.map((s) => s.name).join(', ');
+  const title = `${parentName} registered subjects for you`;
+  const body = `${parentName} has registered the following subjects for you in ${data.sessionName}: ${subjectNames}. Total: EGP ${data.totalCost.toFixed(2)}. Payment is now pending.`;
+
+  const created = await createNotification(
+    data.studentId,
+    'REGISTRATION_REQUEST_RECEIVED',
+    title,
+    body,
+    {
+      sessionName: data.sessionName,
+      subjectCount: data.subjects.length,
+      totalCost: data.totalCost,
+      parentInitiated: true,
+    },
+  );
+
+  if (studentUser.email) {
+    fireEmail('REG-003 direct to student', () =>
+      sendDirectRegistrationEmail(studentUser.email!, {
+        studentName: studentUser.name,
+        parentName,
+        sessionName: data.sessionName,
+        subjects: data.subjects,
+        totalCost: data.totalCost,
+      }),
+      created ? [created.id] : undefined
     );
   }
 }
@@ -411,10 +564,30 @@ export async function notifyRegistrationDecision(data: {
     ? `Your registration request for ${data.sessionName} was approved by ${parentUser?.name ?? 'your parent'}. Payment can now be completed.`
     : `Your registration request for ${data.sessionName} was rejected by ${parentUser?.name ?? 'your parent'}.${data.comments ? ` Reason: ${data.comments}` : ''}`;
 
-  await createNotification(data.studentId, 'REGISTRATION_APPROVED', title, body, {
-    sessionName: data.sessionName,
-    approved: data.approved,
-  });
+  const created = await createNotification(
+    data.studentId,
+    data.approved ? 'REGISTRATION_APPROVED' : 'REGISTRATION_REJECTED',
+    title,
+    body,
+    { sessionName: data.sessionName, approved: data.approved },
+  );
+
+  // NOT-010: CC linked parents on registration decision
+  const parents = await getLinkedParents(data.studentId);
+  if (parents.length > 0) {
+    const parentTitle = `Registration ${decision} for ${studentUser.name}`;
+    const parentBody = data.approved
+      ? `${studentUser.name}'s registration request for ${data.sessionName} was approved. Payment can now be completed.`
+      : `${studentUser.name}'s registration request for ${data.sessionName} was rejected.${data.comments ? ` Reason: ${data.comments}` : ''}`;
+
+    await createBulkNotifications(
+      parents.map((p) => p.parentId),
+      data.approved ? 'REGISTRATION_APPROVED' : 'REGISTRATION_REJECTED',
+      parentTitle,
+      parentBody,
+      { sessionName: data.sessionName, approved: data.approved },
+    );
+  }
 
   if (studentUser.email) {
     fireEmail('NOT-004 to student', () =>
@@ -424,7 +597,8 @@ export async function notifyRegistrationDecision(data: {
         approved: data.approved,
         parentName: parentUser?.name ?? 'Your parent',
         comments: data.comments,
-      })
+      }),
+      created ? [created.id] : undefined
     );
   }
 }
@@ -441,6 +615,13 @@ export async function notifyPaymentConfirmed(data: {
   method: string;
   paymentId: string;
   subjects: string[];
+  /**
+   * Optional PDF receipt buffer — when provided, attached to the parent's
+   * confirmation email (NOT-005 / PAY-006). The payment service generates
+   * it after confirmation succeeds and hands it in here so we don't build
+   * the PDF twice (once for the /receipt endpoint, once for the email).
+   */
+  receiptPdf?: Buffer;
 }) {
   const [studentUser, parentUser] = await Promise.all([
     getUserDetails(data.studentId),
@@ -459,7 +640,14 @@ export async function notifyPaymentConfirmed(data: {
   };
 
   // Notify parent
-  await createNotification(data.parentId, 'PAYMENT_CONFIRMED', title, body, notifData);
+  const parentNotif = await createNotification(data.parentId, 'PAYMENT_CONFIRMED', title, body, notifData);
+
+  // Also notify the student that payment was confirmed
+  if (studentUser) {
+    const studentTitle = `Payment confirmed — ${data.sessionName}`;
+    const studentBody = `Payment of EGP ${data.amount.toFixed(2)} via ${data.method} has been confirmed for your registration in ${data.sessionName}. Your subjects are now fully registered.`;
+    await createNotification(data.studentId, 'PAYMENT_CONFIRMED', studentTitle, studentBody, notifData);
+  }
 
   if (parentUser.email) {
     fireEmail('NOT-005 to parent', () =>
@@ -471,7 +659,9 @@ export async function notifyPaymentConfirmed(data: {
         method: data.method,
         paymentId: data.paymentId,
         subjects: data.subjects,
-      })
+        receiptPdf: data.receiptPdf,
+      }),
+      parentNotif ? [parentNotif.id] : undefined
     );
   }
 }
@@ -502,7 +692,7 @@ export async function notifyDropSwapRequestReceived(data: {
     changeType: data.changeType,
   };
 
-  await createBulkNotifications(
+  const created = await createBulkNotifications(
     parents.map((p) => p.parentId),
     'DROP_SWAP_REQUEST_RECEIVED',
     title,
@@ -514,6 +704,7 @@ export async function notifyDropSwapRequestReceived(data: {
     const parentUser = await getUserDetails(parentId);
     if (!parentUser?.email) continue;
 
+    const matchingNotif = created.find((n) => n.userId === parentId);
     fireEmail('NOT-006 to parent', () =>
       sendDropSwapRequestEmail(parentUser.email!, {
         parentName: parentUser.name,
@@ -523,7 +714,8 @@ export async function notifyDropSwapRequestReceived(data: {
         newSubjectName: data.newSubjectName,
         financialImpact: data.financialImpact,
         reason: data.reason,
-      })
+      }),
+      matchingNotif ? [matchingNotif.id] : undefined
     );
   }
 }
@@ -554,10 +746,24 @@ export async function notifyDropSwapProcessed(data: {
   const title = `Your ${data.changeType} request was ${decision}`;
   const body = `Your request to ${data.changeType} ${data.subjectName}${data.newSubjectName ? ` for ${data.newSubjectName}` : ''} was ${decision}. ${data.financialImpact}`;
 
-  await createNotification(data.studentId, 'DROP_SWAP_PROCESSED', title, body, {
+  const created = await createNotification(data.studentId, 'DROP_SWAP_PROCESSED', title, body, {
     changeRequestId: data.changeRequestId,
     approved: data.approved,
   });
+
+  // NOT-010: CC linked parents on drop/swap decision
+  const parents = await getLinkedParents(data.studentId);
+  if (parents.length > 0) {
+    const parentTitle = `${studentUser.name}'s ${data.changeType} request was ${decision}`;
+    const parentBody = `${studentUser.name}'s request to ${data.changeType} ${data.subjectName}${data.newSubjectName ? ` for ${data.newSubjectName}` : ''} was ${decision}. ${data.financialImpact}`;
+    await createBulkNotifications(
+      parents.map((p) => p.parentId),
+      'DROP_SWAP_PROCESSED',
+      parentTitle,
+      parentBody,
+      { changeRequestId: data.changeRequestId, approved: data.approved },
+    );
+  }
 
   if (studentUser.email) {
     fireEmail('NOT-007 to student', () =>
@@ -570,7 +776,60 @@ export async function notifyDropSwapProcessed(data: {
         parentName: parentUser?.name ?? 'Your parent',
         financialImpact: data.financialImpact,
         comments: data.comments,
-      })
+      }),
+      created ? [created.id] : undefined
+    );
+  }
+}
+
+/**
+ * NOT-007 (SWAP-004 variant): Student notified when a parent directly
+ * drops or swaps a subject on their behalf. The change-request variant
+ * (notifyDropSwapProcessed) reports an approval decision on a student-
+ * initiated request; this variant is informational — the parent acted
+ * directly. Also emails the student so SWAP-004's "Child receives email
+ * notification of changes" requirement is met.
+ */
+export async function notifyDirectDropSwapExecuted(data: {
+  studentId: string;
+  parentId: string;
+  changeType: 'drop' | 'swap';
+  subjectName: string;
+  newSubjectName?: string;
+  financialImpact: string;
+}) {
+  const [studentUser, parentUser] = await Promise.all([
+    getUserDetails(data.studentId),
+    getUserDetails(data.parentId),
+  ]);
+
+  if (!studentUser) return;
+
+  const parentName = parentUser?.name ?? 'Your parent';
+  const verb = data.changeType === 'drop' ? 'dropped' : 'swapped';
+  const title = `${parentName} ${verb} a subject for you`;
+  const body = data.newSubjectName
+    ? `${parentName} swapped ${data.subjectName} for ${data.newSubjectName} on your behalf. ${data.financialImpact}`
+    : `${parentName} dropped ${data.subjectName} on your behalf. ${data.financialImpact}`;
+
+  const created = await createNotification(data.studentId, 'DROP_SWAP_PROCESSED', title, body, {
+    changeType: data.changeType,
+    subjectName: data.subjectName,
+    newSubjectName: data.newSubjectName,
+    parentInitiated: true,
+  });
+
+  if (studentUser.email) {
+    fireEmail('NOT-007 direct to student', () =>
+      sendDirectDropSwapEmail(studentUser.email!, {
+        studentName: studentUser.name,
+        changeType: data.changeType,
+        subjectName: data.subjectName,
+        newSubjectName: data.newSubjectName,
+        parentName,
+        financialImpact: data.financialImpact,
+      }),
+      created ? [created.id] : undefined
     );
   }
 }
@@ -601,7 +860,7 @@ export async function notifyEscrowBalanceChanged(data: {
     changeAmount: data.changeAmount,
   };
 
-  await createBulkNotifications(
+  const created = await createBulkNotifications(
     parents.map((p) => p.parentId),
     'ESCROW_BALANCE_CHANGED',
     title,
@@ -613,6 +872,7 @@ export async function notifyEscrowBalanceChanged(data: {
     const parentUser = await getUserDetails(parentId);
     if (!parentUser?.email) continue;
 
+    const matchingNotif = created.find((n) => n.userId === parentId);
     fireEmail('NOT-008 to parent', () =>
       sendEscrowBalanceChangedEmail(parentUser.email!, {
         parentName: parentUser.name,
@@ -621,7 +881,8 @@ export async function notifyEscrowBalanceChanged(data: {
         newBalance: data.newBalance,
         changeAmount: data.changeAmount,
         reason: data.reason,
-      })
+      }),
+      matchingNotif ? [matchingNotif.id] : undefined
     );
   }
 }
@@ -645,7 +906,7 @@ export async function notifyWithdrawalFulfilled(data: {
   const title = `Escrow withdrawal fulfilled for ${data.studentName}`;
   const body = `EGP ${data.amountReleased.toFixed(2)} was released from ${data.studentName}'s escrow. Remaining balance: EGP ${data.remainingBalance.toFixed(2)}.`;
 
-  await createNotification(data.parentId, 'ESCROW_WITHDRAWAL_FULFILLED', title, body, {
+  const parentNotif = await createNotification(data.parentId, 'ESCROW_WITHDRAWAL_FULFILLED', title, body, {
     studentId: data.studentId,
     amountReleased: data.amountReleased,
     remainingBalance: data.remainingBalance,
@@ -669,9 +930,58 @@ export async function notifyWithdrawalFulfilled(data: {
         amountReleased: data.amountReleased,
         remainingBalance: data.remainingBalance,
         adminNotes: data.adminNotes,
-      })
+      }),
+      parentNotif ? [parentNotif.id] : undefined
     );
   }
+}
+
+/**
+ * Notify student when a parent creates a withdrawal request for their escrow.
+ */
+export async function notifyWithdrawalRequested(data: {
+  studentId: string;
+  studentName: string;
+  amount: number;
+  parentName: string;
+}) {
+  const title = `Escrow withdrawal requested`;
+  const body = `${data.parentName} has requested a withdrawal of EGP ${data.amount.toFixed(2)} from your escrow account. The request is pending admin processing.`;
+
+  await createNotification(data.studentId, 'ESCROW_BALANCE_CHANGED', title, body, {
+    withdrawalRequested: true,
+    amount: data.amount,
+  });
+}
+
+/**
+ * Notify parent and student when a withdrawal request is rejected.
+ */
+export async function notifyWithdrawalRejected(data: {
+  parentId: string;
+  studentId: string;
+  studentName: string;
+  /** Amount credited back to escrow (full for 'pending' rejections; unreleased remainder for 'partially_fulfilled'). */
+  amount: number;
+  reason: string;
+}) {
+  const title = `Withdrawal request rejected for ${data.studentName}`;
+  const body = data.amount > 0
+    ? `The withdrawal request for ${data.studentName} was rejected. EGP ${data.amount.toFixed(2)} has been returned to the escrow balance. Reason: ${data.reason}`
+    : `The withdrawal request for ${data.studentName} was rejected. Reason: ${data.reason}`;
+
+  // Dedicated type so the inbox distinguishes fulfilled vs rejected
+  // (previously both shared ESCROW_WITHDRAWAL_FULFILLED, which was misleading).
+  await createNotification(data.parentId, 'ESCROW_WITHDRAWAL_REJECTED', title, body, {
+    studentId: data.studentId,
+    amountRefunded: data.amount,
+    reason: data.reason,
+  });
+
+  await createNotification(data.studentId, 'ESCROW_WITHDRAWAL_REJECTED', title, body, {
+    amountRefunded: data.amount,
+    reason: data.reason,
+  });
 }
 
 /**
@@ -745,11 +1055,64 @@ export async function notifyGradeChanged(data: {
 /**
  * NOT-011: Admin sends a bulk announcement to a recipient group.
  * Called from notification.routes.ts → POST /admin/notifications/announce.
+ *
+ * If `scheduledAt` is provided and in the future, the announcement is stored
+ * in the scheduled_announcement table for later dispatch by the cron job.
+ * Otherwise, it is sent immediately (current behavior).
  */
 export async function sendAdminAnnouncement(
-  payload: BulkAnnouncementType
+  payload: BulkAnnouncementType,
+  createdBy?: string
+): Promise<{
+  notificationCount: number;
+  emailResult: { success: boolean; stubbed?: boolean };
+  scheduled?: boolean;
+  scheduledAt?: Date;
+}> {
+  // Check if this should be scheduled for the future
+  if (payload.scheduledAt) {
+    const scheduledTime = new Date(payload.scheduledAt);
+    const now = new Date();
+
+    if (scheduledTime > now) {
+      // Store for future dispatch
+      await db.insert(scheduledAnnouncement).values({
+        id: randomUUID(),
+        title: payload.title,
+        body: payload.body,
+        recipients: payload.recipients,
+        sendEmail: payload.sendEmail,
+        scheduledAt: scheduledTime,
+        status: 'pending',
+        createdBy: createdBy ?? 'system',
+      });
+
+      return {
+        notificationCount: 0,
+        emailResult: { success: true },
+        scheduled: true,
+        scheduledAt: scheduledTime,
+      };
+    }
+    // scheduledAt is in the past — send immediately (fall through)
+  }
+
+  return dispatchAnnouncement(payload);
+}
+
+/**
+ * Core announcement dispatch logic.
+ * Separated from sendAdminAnnouncement so the cron job can also call it.
+ */
+async function dispatchAnnouncement(
+  payload: Pick<BulkAnnouncementType, 'title' | 'body' | 'recipients' | 'sendEmail'>
 ): Promise<{ notificationCount: number; emailResult: { success: boolean; stubbed?: boolean } }> {
-  // Determine the target user query based on recipient group
+  // Determine the target user query based on recipient group.
+  // All branches exclude banned accounts and accounts stuck at role=null or
+  // role='user' (incomplete sign-up) — URD "all users" / "active" semantics.
+  const notBanned = or(eq(user.banned, false), isNull(user.banned));
+  const hasRealRole = inArray(user.role, ['student', 'parent', 'admin']);
+
   let targetUsers: { id: string; email: string; name: string }[] = [];
 
   if (payload.recipients === 'all') {
@@ -757,19 +1120,19 @@ export async function sendAdminAnnouncement(
       id: user.id,
       email: user.email,
       name: user.name,
-    }).from(user);
+    }).from(user).where(and(hasRealRole, notBanned));
   } else if (payload.recipients === 'students') {
     targetUsers = await db.select({
       id: user.id,
       email: user.email,
       name: user.name,
-    }).from(user).where(eq(user.role, 'student'));
+    }).from(user).where(and(eq(user.role, 'student'), notBanned));
   } else if (payload.recipients === 'parents') {
     targetUsers = await db.select({
       id: user.id,
       email: user.email,
       name: user.name,
-    }).from(user).where(eq(user.role, 'parent'));
+    }).from(user).where(and(eq(user.role, 'parent'), notBanned));
   } else {
     // grade_10, grade_11, grade_12
     const grade = parseInt(payload.recipients.split('_')[1] ?? '0', 10);
@@ -777,35 +1140,176 @@ export async function sendAdminAnnouncement(
       id: user.id,
       email: user.email,
       name: user.name,
-    }).from(user).where(and(eq(user.role, 'student'), eq(user.grade, grade)));
+    }).from(user).where(
+      and(eq(user.role, 'student'), eq(user.grade, grade), notBanned)
+    );
   }
 
   if (targetUsers.length === 0) {
     return { notificationCount: 0, emailResult: { success: true } };
   }
 
-  // Create in-app notifications
-  await createBulkNotifications(
+  // Create in-app notifications — keep the created rows so we can mark
+  // emailSentAt per-recipient as each email actually goes out (M-17).
+  const created = await createBulkNotifications(
     targetUsers.map((u) => u.id),
     'BULK_ANNOUNCEMENT',
     payload.title,
     payload.body
   );
 
-  // Send emails if requested
+  // Send emails if requested. Tracks emailSentAt per notification on success.
   let emailResult: { success: boolean; stubbed?: boolean } = { success: true };
   if (payload.sendEmail) {
-    const allEmails = targetUsers.map((u) => u.email).filter(Boolean);
-    if (allEmails.length > 0) {
-      const result = await sendBulkAnnouncementEmail(allEmails, {
+    const emailByUser = new Map(targetUsers.map((u) => [u.id, u.email]));
+    const successfullySent: string[] = [];
+    let failed = 0;
+    let stubbed = false;
+    for (const n of created) {
+      const email = emailByUser.get(n.userId);
+      if (!email) continue;
+      const result = await sendBulkAnnouncementEmail(email, {
         title: payload.title,
         body: payload.body,
       });
-      emailResult = { success: result.success, stubbed: result.stubbed };
+      if (result.success) {
+        successfullySent.push(n.id);
+      } else {
+        failed++;
+      }
+      if (result.stubbed) stubbed = true;
     }
+    if (successfullySent.length > 0) {
+      await db
+        .update(notification)
+        .set({ emailSentAt: new Date() })
+        .where(inArray(notification.id, successfullySent))
+        .catch((err) => console.error('[notification] BULK_ANNOUNCEMENT emailSentAt update failed:', err));
+    }
+    emailResult = { success: failed === 0, stubbed };
   }
 
   return { notificationCount: targetUsers.length, emailResult };
+}
+
+/**
+ * L-6: Admin read — list every scheduled announcement (pending, sent,
+ * failed, cancelled). Ordered by scheduledAt descending so the soonest
+ * upcoming and most-recently-sent rows rise to the top.
+ */
+export async function getScheduledAnnouncements() {
+  return db.query.scheduledAnnouncement.findMany({
+    orderBy: (s, { desc: descOp }) => [descOp(s.scheduledAt)],
+    with: {
+      createdByUser: { columns: { id: true, name: true, email: true } },
+    },
+  });
+}
+
+/**
+ * L-6: Admin cancels a pending scheduled announcement. Returns undefined
+ * if the row isn't found or has already transitioned out of 'pending'
+ * (sent, failed, or already cancelled). The status-guarded UPDATE means
+ * two admins clicking "Cancel" simultaneously don't both "win".
+ */
+export async function cancelScheduledAnnouncement(id: string) {
+  const [updated] = await db
+    .update(scheduledAnnouncement)
+    .set({
+      status: 'cancelled',
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(scheduledAnnouncement.id, id),
+        eq(scheduledAnnouncement.status, 'pending'),
+      )
+    )
+    .returning();
+  return updated;
+}
+
+/**
+ * Process all scheduled announcements whose scheduledAt has arrived.
+ * Called by the session-closer cron job on each tick (every 60 seconds).
+ *
+ * Finds all 'pending' scheduled announcements where scheduledAt <= now,
+ * dispatches each one, and updates the record status to 'sent' or 'failed'.
+ */
+export async function processScheduledAnnouncements(): Promise<number> {
+  const now = new Date();
+
+  const pending = await db
+    .select()
+    .from(scheduledAnnouncement)
+    .where(
+      and(
+        eq(scheduledAnnouncement.status, 'pending'),
+        lte(scheduledAnnouncement.scheduledAt, now)
+      )
+    );
+
+  if (pending.length === 0) return 0;
+
+  let dispatched = 0;
+
+  for (const ann of pending) {
+    try {
+      const result = await dispatchAnnouncement({
+        title: ann.title,
+        body: ann.body,
+        recipients: ann.recipients as BulkAnnouncementType['recipients'],
+        sendEmail: ann.sendEmail,
+      });
+
+      await db
+        .update(scheduledAnnouncement)
+        .set({
+          status: 'sent',
+          sentAt: new Date(),
+          notificationCount: result.notificationCount,
+        })
+        .where(eq(scheduledAnnouncement.id, ann.id));
+
+      // L-7: Audit the actual dispatch (not just the scheduling).
+      // Imported lazily to avoid a circular dependency between the
+      // notification service and the audit service.
+      try {
+        const { logAction } = await import('./audit.services');
+        await logAction(
+          ann.createdBy ?? null,
+          'ADMIN_ANNOUNCEMENT',
+          'notification',
+          ann.id,
+          { status: 'pending', scheduledAt: ann.scheduledAt } as Record<string, unknown>,
+          {
+            status: 'sent',
+            recipients: ann.recipients,
+            sendEmail: ann.sendEmail,
+            notificationCount: result.notificationCount,
+            dispatchedBy: 'scheduler',
+          },
+        );
+      } catch (auditErr) {
+        console.error(`[audit] ADMIN_ANNOUNCEMENT (cron) failed for ${ann.id}:`, auditErr);
+      }
+
+      dispatched++;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[notification] Failed to dispatch scheduled announcement ${ann.id}:`, errorMsg);
+
+      await db
+        .update(scheduledAnnouncement)
+        .set({
+          status: 'failed',
+          errorMessage: errorMsg.slice(0, 500),
+        })
+        .where(eq(scheduledAnnouncement.id, ann.id));
+    }
+  }
+
+  return dispatched;
 }
 
 // ─── AUTH-003: Parent-Student Link Request Received ───────────────────────────

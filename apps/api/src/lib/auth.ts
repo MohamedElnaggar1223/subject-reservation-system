@@ -1,13 +1,28 @@
 import 'dotenv/config';
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { createAuthMiddleware } from "better-auth/api";
 import { db } from "@repo/db";
 import { expo } from "@better-auth/expo";
 import { admin } from "better-auth/plugins";
 import { ac, studentRole, adminRole, parentRole } from './permissions'
-import { ROLES } from '@repo/validations';
+import { ROLES, CommonSchemas } from '@repo/validations';
 import { corsOrigins, env } from '../env';
 import { nextCookies } from 'better-auth/next-js';
+import { sendPasswordResetEmail, sendEmailVerificationEmail } from '../integrations/email';
+
+/**
+ * Validates password complexity using the shared CommonSchemas.password rules:
+ * min 8 chars, at least 1 uppercase letter, at least 1 number.
+ * Returns null if valid, or an error message string if invalid.
+ */
+function validatePasswordComplexity(password: string): string | null {
+  const result = CommonSchemas.password.safeParse(password);
+  if (!result.success) {
+    return result.error.issues.map((i) => i.message).join('; ');
+  }
+  return null;
+}
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -28,7 +43,54 @@ export const auth = betterAuth({
   ],
 
   emailAndPassword: {
-    enabled: true
+    enabled: true,
+    minPasswordLength: 8,
+    requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION === 'true',
+    sendResetPassword: async ({ user, url }) => {
+      sendPasswordResetEmail(user.email, {
+        recipientName: user.name,
+        resetUrl: url,
+      }).catch(err => console.error('[auth] Email send failed:', err));
+    },
+    resetPasswordTokenExpiresIn: 24 * 60 * 60,
+  },
+
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      const path = (ctx as unknown as { path: string }).path;
+
+      // Enforce password complexity on sign-up
+      if (path === '/sign-up/email') {
+        const password = (ctx.body as { password?: string })?.password;
+        if (password) {
+          const error = validatePasswordComplexity(password);
+          if (error) {
+            throw new Error(error);
+          }
+        }
+      }
+
+      // Enforce password complexity on reset-password and change-password
+      if (path === '/reset-password' || path === '/change-password') {
+        const newPassword = (ctx.body as { newPassword?: string })?.newPassword;
+        if (newPassword) {
+          const error = validatePasswordComplexity(newPassword);
+          if (error) {
+            throw new Error(error);
+          }
+        }
+      }
+    }),
+  },
+
+  emailVerification: {
+    sendOnSignUp: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      sendEmailVerificationEmail(user.email, {
+        recipientName: user.name,
+        verificationUrl: url,
+      }).catch(err => console.error('[auth] Email send failed:', err));
+    },
   },
 
   trustedOrigins: corsOrigins,
@@ -38,10 +100,9 @@ export const auth = betterAuth({
       enabled: env.NODE_ENV === 'production' // Since you're on different ports, not subdomains
     },
     defaultCookieAttributes: {
-      sameSite: env.NODE_ENV === 'production' ? 'lax' : "none",
-      secure: true, // allow local dev over http
-      partitioned: true, // partitioned only when secure
-      domain: env.COOKIE_DOMAIN
+      sameSite: 'lax',
+      secure: env.NODE_ENV === 'production',
+      ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
     }
   }
 });

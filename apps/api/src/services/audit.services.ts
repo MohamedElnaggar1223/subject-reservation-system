@@ -23,13 +23,13 @@
 import {
   db,
   auditLog,
-  user,
   eq,
   and,
   gte,
   lte,
-  desc,
+  count,
 } from '@repo/db';
+import { getConnInfo } from '@hono/node-server/conninfo';
 import { randomUUID } from 'crypto';
 import type { AuditAction, AuditEntityType, AuditLogsQueryType } from '@repo/validations';
 
@@ -101,19 +101,33 @@ export async function getAuditLogs(filters: AuditLogsQueryType) {
     conditions.push(lte(auditLog.createdAt, end));
   }
 
-  const logs = await db.query.auditLog.findMany({
-    where: conditions.length > 0 ? and(...conditions) : undefined,
-    with: {
-      user: {
-        columns: { id: true, name: true, role: true, email: true },
-      },
-    },
-    orderBy: (al, { desc: descOp }) => [descOp(al.createdAt)],
-    limit:  filters.limit,
-    offset: filters.offset,
-  });
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-  return logs;
+  // M-16: Return both the page and the filtered total so the admin UI
+  // can render "page X of Y" / "showing N of TOTAL". Run both queries
+  // in parallel so this adds a round-trip, not a round-trip × 2.
+  const [logs, totalRow] = await Promise.all([
+    db.query.auditLog.findMany({
+      where: whereClause,
+      with: {
+        user: {
+          columns: { id: true, name: true, role: true, email: true },
+        },
+      },
+      orderBy: (al, { desc: descOp }) => [descOp(al.createdAt)],
+      limit:  filters.limit,
+      offset: filters.offset,
+    }),
+    db
+      .select({ total: count() })
+      .from(auditLog)
+      .where(whereClause),
+  ]);
+
+  return {
+    data: logs,
+    total: Number(totalRow[0]?.total ?? 0),
+  };
 }
 
 /**
@@ -141,16 +155,29 @@ export async function getEntityHistory(
 
 /**
  * Extract Hono request context for audit logging.
- * Reads the real client IP from standard proxy headers.
+ * Uses the same trusted IP logic as the rate limiter:
+ * - Prefer `cf-connecting-ip` (set by Cloudflare, cannot be spoofed by client)
+ * - Fall back to socket remote address via `getConnInfo`
+ * - Do NOT trust `x-forwarded-for` — it is trivially spoofable without a trusted proxy chain
  */
 export function extractAuditContext(c: {
-  req: { header: (name: string) => string | undefined };
+  req: { header: (name: string) => string | undefined; raw: Request };
+  env?: unknown;
 }): AuditContext {
+  const cfIp = c.req.header('cf-connecting-ip');
+  let ipAddress: string | undefined = cfIp ?? undefined;
+
+  if (!ipAddress) {
+    try {
+      const info = getConnInfo(c as Parameters<typeof getConnInfo>[0]);
+      ipAddress = info.remote.address ?? undefined;
+    } catch {
+      // getConnInfo may throw if the adapter doesn't support it
+    }
+  }
+
   return {
-    ipAddress:
-      c.req.header('cf-connecting-ip') ??
-      c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ??
-      c.req.header('x-real-ip'),
+    ipAddress,
     userAgent: c.req.header('user-agent'),
   };
 }

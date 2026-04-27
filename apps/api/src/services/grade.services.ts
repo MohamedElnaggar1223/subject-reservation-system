@@ -19,7 +19,7 @@
  *   - The audit log entry is awaited for compliance; notification is fire-and-forget
  */
 
-import { db, user, eq, and, isNotNull } from '@repo/db';
+import { db, user, registration, changeRequest, eq, and, inArray, isNotNull } from '@repo/db';
 import { notifyGradeChanged } from './notification.services';
 import { logAction } from './audit.services';
 
@@ -35,6 +35,59 @@ function getNextGrade(currentGrade: number, sessionType: string): number | null 
   if (currentGrade === 11 && sessionType === 'june')     return 12;
   if (currentGrade === 12 && sessionType === 'november') return null; // graduated
   return currentGrade; // no change
+}
+
+// ─── Cleanup on Graduation ───────────────────────────────────────────────────
+
+/**
+ * Clean up pending records for graduated students.
+ *
+ * When a student graduates (grade becomes null), any lingering pending records
+ * are no longer actionable. This function:
+ * 1. Expires all `pending_approval` and `pending_payment` registrations
+ * 2. Rejects all `pending_approval` change requests for the student's registrations
+ *
+ * Should be called inside a transaction when used with grade progression,
+ * or standalone for manual grade adjustments.
+ */
+async function cleanupPendingRecordsForGraduatedStudents(
+  graduatedStudentIds: string[],
+  executor: typeof db = db
+) {
+  if (graduatedStudentIds.length === 0) return;
+
+  const now = new Date();
+
+  // 1. Expire all pending registrations for graduated students
+  await executor
+    .update(registration)
+    .set({ status: 'expired', updatedAt: now })
+    .where(
+      and(
+        inArray(registration.studentId, graduatedStudentIds),
+        inArray(registration.status, ['pending_approval', 'pending_payment'])
+      )
+    );
+
+  // 2. Find all registration IDs belonging to graduated students
+  const studentRegistrations = await executor.query.registration.findMany({
+    where: (r, { inArray: inArr }) => inArr(r.studentId, graduatedStudentIds),
+    columns: { id: true },
+  });
+  const registrationIds = studentRegistrations.map((r) => r.id);
+
+  if (registrationIds.length > 0) {
+    // 3. Reject all pending change requests for those registrations
+    await executor
+      .update(changeRequest)
+      .set({ status: 'rejected', comments: 'Auto-rejected: student graduated', processedAt: now, updatedAt: now })
+      .where(
+        and(
+          inArray(changeRequest.registrationId, registrationIds),
+          eq(changeRequest.status, 'pending_approval')
+        )
+      );
+  }
 }
 
 // ─── Automatic Progression ────────────────────────────────────────────────────
@@ -64,6 +117,21 @@ export async function progressGrades(sessionType: string): Promise<Array<{
     columns: { id: true, name: true, grade: true },
   });
 
+  // Group students by their grade transition
+  const groups = new Map<string, { fromGrade: number; toGrade: number | null; students: typeof students }>();
+
+  for (const student of students) {
+    const currentGrade = student.grade!;
+    const nextGrade = getNextGrade(currentGrade, sessionType);
+    if (nextGrade === currentGrade) continue;
+
+    const key = `${currentGrade}->${nextGrade}`;
+    if (!groups.has(key)) groups.set(key, { fromGrade: currentGrade, toGrade: nextGrade, students: [] });
+    groups.get(key)!.students.push(student);
+  }
+
+  if (groups.size === 0) return [];
+
   const progressions: Array<{
     studentId: string;
     name: string;
@@ -71,48 +139,53 @@ export async function progressGrades(sessionType: string): Promise<Array<{
     newGrade: number | null;
   }> = [];
 
-  for (const student of students) {
-    const currentGrade = student.grade!;
-    const nextGrade = getNextGrade(currentGrade, sessionType);
+  // Batch update all grade transitions in a single transaction
+  await db.transaction(async (tx) => {
+    const graduatedStudentIds: string[] = [];
 
-    // Skip if no progression applies for this sessionType
-    if (nextGrade === currentGrade) continue;
+    for (const [, { fromGrade, toGrade, students: group }] of groups) {
+      const ids = group.map((s) => s.id);
 
-    // Apply the grade change
-    await db
-      .update(user)
-      .set({ grade: nextGrade })
-      .where(eq(user.id, student.id));
+      await tx
+        .update(user)
+        .set({ grade: toGrade })
+        .where(inArray(user.id, ids));
 
-    progressions.push({
-      studentId: student.id,
-      name:      student.name,
-      previousGrade: currentGrade,
-      newGrade,
-    });
+      // Track newly graduated students (grade 12 -> null)
+      if (toGrade === null) {
+        graduatedStudentIds.push(...ids);
+      }
 
-    const reason = nextGrade === null
+      for (const s of group) {
+        progressions.push({
+          studentId: s.id,
+          name: s.name,
+          previousGrade: fromGrade,
+          newGrade: toGrade,
+        });
+      }
+    }
+
+    // Clean up pending records for newly graduated students
+    await cleanupPendingRecordsForGraduatedStudents(graduatedStudentIds, tx as unknown as typeof db);
+  });
+
+  // Audit + notifications outside the transaction (fire-and-forget)
+  for (const p of progressions) {
+    const reason = p.newGrade === null
       ? `Automatic graduation after ${sessionType} session.`
       : `Automatic grade progression after ${sessionType} session.`;
 
-    // Audit (awaited — compliance record)
-    await logAction(
-      null,
-      'USER_GRADE_CHANGED',
-      'user',
-      student.id,
-      { grade: currentGrade },
-      { grade: nextGrade },
-    ).catch((err) => console.error(`[grade] Audit log failed for ${student.id}:`, err));
+    logAction(null, 'USER_GRADE_CHANGED', 'user', p.studentId, { grade: p.previousGrade }, { grade: p.newGrade })
+      .catch((err) => console.error(`[grade] Audit log failed for ${p.studentId}:`, err));
 
-    // Notification (fire-and-forget — must not block progression loop)
     notifyGradeChanged({
-      studentId:     student.id,
-      studentName:   student.name,
-      previousGrade: currentGrade,
-      newGrade,
+      studentId: p.studentId,
+      studentName: p.name,
+      previousGrade: p.previousGrade,
+      newGrade: p.newGrade,
       reason,
-    }).catch((err) => console.error(`[grade] Notification failed for ${student.id}:`, err));
+    }).catch((err) => console.error(`[grade] Notification failed for ${p.studentId}:`, err));
   }
 
   return progressions;
@@ -155,21 +228,35 @@ export async function manualGradeAdjustment(
     throw new Error(`Student is already at ${newGrade === null ? 'Graduated' : `Grade ${newGrade}`}`);
   }
 
-  const [updated] = await db
-    .update(user)
-    .set({ grade: newGrade })
-    .where(eq(user.id, studentId))
-    .returning();
+  // Wrap grade UPDATE and graduation cleanup in a transaction for atomicity
+  const [updated] = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(user)
+      .set({ grade: newGrade })
+      .where(eq(user.id, studentId))
+      .returning();
+
+    // GRADE-003: If manually graduating (newGrade === null), clean up pending records
+    if (newGrade === null) {
+      await cleanupPendingRecordsForGraduatedStudents([studentId], tx as unknown as typeof db);
+    }
+
+    return [row];
+  });
 
   // Audit (awaited — admin action must always be logged)
-  await logAction(
-    adminId,
-    'USER_GRADE_CHANGED',
-    'user',
-    studentId,
-    { grade: student.grade },
-    { grade: newGrade, reason },
-  ).catch((err) => console.error('[grade] Audit log failed for manual adjustment:', err));
+  try {
+    await logAction(
+      adminId,
+      'USER_GRADE_CHANGED',
+      'user',
+      studentId,
+      { grade: student.grade },
+      { grade: newGrade, reason },
+    );
+  } catch (err) {
+    console.error('[grade] Audit log failed for manual adjustment:', err);
+  }
 
   // Notification (fire-and-forget)
   notifyGradeChanged({
@@ -215,6 +302,8 @@ export async function isGraduated(studentId: string): Promise<boolean> {
     where: (u, { eq }) => eq(u.id, studentId),
     columns: { role: true, grade: true },
   });
-
+  // Called from middleware on every student-authenticated request, so we
+  // keep this quiet. Prior debug logging emitted PII (studentId + grade)
+  // on every call. Re-enable via a scoped logger if ever needed.
   return student?.role === 'student' && student.grade === null;
 }

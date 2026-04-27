@@ -27,7 +27,10 @@ import { success, error } from '../lib/response';
 import { requireAuth, requireAdmin } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as sessionService from '../services/session.services';
+import { notifySessionOpened, notifySessionClosed, getStudentAndParentBroadcastIds } from '../services/notification.services';
+import { progressGrades } from '../services/grade.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
+import { db, registrationSession as registrationSessionTable, eq } from '@repo/db';
 
 export const sessions = new Hono<HonoEnv>()
   .use('*', requireAuth())
@@ -142,13 +145,25 @@ export const sessions = new Hono<HonoEnv>()
           return c.json({ success: false, error: 'Validation failed', details: parsed.error.flatten() }, 422);
         }
 
-        const updated = await sessionService.updateDraftSession(id, parsed.data);
+        // Extract reason before passing the remaining fields to the service.
+        // It isn't a column on registrationSession — it lives in the audit log.
+        const { reason, ...updateFields } = parsed.data;
+        const updated = await sessionService.updateDraftSession(id, updateFields);
         if (!updated) {
           return error(c, 'Session is no longer in draft status', 409);
         }
 
-        logAction(currentUser.id, 'SESSION_UPDATED', 'session', id, session as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
-          .catch((err) => console.error('[audit] SESSION_UPDATED (draft) failed:', err));
+        // Including _updateReason in the audit newData preserves the
+        // rationale alongside the before/after field snapshots.
+        logAction(
+          currentUser.id,
+          'SESSION_UPDATED',
+          'session',
+          id,
+          session as Record<string, unknown>,
+          { ...(updated as Record<string, unknown>), _updateReason: reason ?? null },
+          extractAuditContext(c),
+        ).catch((err) => console.error('[audit] SESSION_UPDATED (draft) failed:', err));
 
         return success(c, updated);
       }
@@ -163,8 +178,15 @@ export const sessions = new Hono<HonoEnv>()
         return error(c, 'New end date must be in the future', 400);
       }
 
-      if (parsed.data.endDate <= session.endDate) {
-        return error(c, 'New end date must be later than the current end date', 400);
+      // URD SES-003 allows "modifying deadlines when necessary" — previously
+      // this endpoint only allowed pushing the deadline later. An admin
+      // needing to bring a deadline earlier had to use "close" (which has
+      // very different side effects). Both directions are now accepted, so
+      // long as the new endDate is still in the future. Reducing the deadline
+      // to now-or-past still requires the explicit close route (to run
+      // finalizePendingRecords + grade progression + notifications).
+      if (parsed.data.endDate.getTime() === session.endDate.getTime()) {
+        return error(c, 'New end date is identical to the current end date', 400);
       }
 
       const updated = await sessionService.extendActiveSessionDeadline(
@@ -210,6 +232,19 @@ export const sessions = new Hono<HonoEnv>()
         logAction(user.id, 'SESSION_ACTIVATED', 'session', id, previous as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] SESSION_ACTIVATED failed:', err));
 
+        // NOT-001: Notify all active students and parents when session is manually activated
+        {
+          const { studentIds, parentIds } = await getStudentAndParentBroadcastIds();
+          notifySessionOpened({
+            sessionId: id,
+            sessionName: updated.name,
+            sessionType: updated.sessionType,
+            deadline: updated.endDate,
+            studentIds,
+            parentIds,
+          }).catch((err) => console.error('[notification] NOT-001 (manual activate) failed:', err));
+        }
+
         return success(c, updated);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to activate session';
@@ -231,6 +266,7 @@ export const sessions = new Hono<HonoEnv>()
     zValidator('json', CloseSession),
     async (c) => {
       const { id } = c.req.valid('param');
+      const { reason } = c.req.valid('json');
       const currentUser = c.get('user')!;
 
       const session = await sessionService.getSessionById(id);
@@ -242,7 +278,7 @@ export const sessions = new Hono<HonoEnv>()
         return error(c, `Cannot close a session that is currently "${session.status}"`, 400);
       }
 
-      const updated = await sessionService.closeSession(id, currentUser.id);
+      const updated = await sessionService.closeSession(id, currentUser.id, reason);
 
       if (!updated) {
         return error(c, 'Failed to close session', 500);
@@ -250,6 +286,40 @@ export const sessions = new Hono<HonoEnv>()
 
       logAction(currentUser.id, 'SESSION_CLOSED', 'session', id, session as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] SESSION_CLOSED failed:', err));
+
+      // GRADE-001 + M-10: Await so admins see failures. On success, stamp
+      // gradeProgressionCompletedAt so the scheduler's retry sweep knows
+      // this session is done. On failure, leave the column null — the
+      // scheduler will retry on its next tick.
+      try {
+        const progressed = await progressGrades(session.sessionType);
+        await db
+          .update(registrationSessionTable)
+          .set({ gradeProgressionCompletedAt: new Date() })
+          .where(eq(registrationSessionTable.id, id));
+        if (progressed.length > 0) {
+          console.log(`[session:close] Progressed ${progressed.length} student(s) after manual close.`);
+        }
+      } catch (err) {
+        console.error('[session:close] Grade progression failed:', err);
+        return error(
+          c,
+          'Session was closed, but automatic grade progression failed. The scheduler will retry it on the next tick. You can also re-run it manually.',
+          500
+        );
+      }
+
+      // Notify all active students and parents that the session has been closed
+      {
+        const { studentIds, parentIds } = await getStudentAndParentBroadcastIds();
+        notifySessionClosed({
+          sessionId: id,
+          sessionName: session.name,
+          reason,
+          studentIds,
+          parentIds,
+        }).catch((err) => console.error('[notification] SESSION_CLOSED (manual) failed:', err));
+      }
 
       return success(c, updated);
     }

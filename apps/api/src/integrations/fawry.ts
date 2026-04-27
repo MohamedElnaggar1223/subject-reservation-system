@@ -4,17 +4,14 @@
  * Stub implementation for Fawry payment gateway.
  * Returns structurally correct data for development and testing.
  *
- * TODO (Production): Replace stub functions with actual Fawry API calls:
- * - Authenticate with merchant credentials from env
- * - POST to https://www.atfawry.com/ECommerceWeb/Fawry/payments/charge
- * - Validate webhook signatures using SHA256(merchantCode + merchantRefNum + paymentAmount + sharedSecret)
- * - Handle payment status: PAID, UNPAID, EXPIRED, CANCELLED
+ * TODO (Production): Replace generateFawryPayment stub with actual Fawry API calls.
  *
- * Required env vars (add when integrating):
- * - FAWRY_MERCHANT_CODE
- * - FAWRY_MERCHANT_SECRET
- * - FAWRY_API_URL
+ * Webhook signature validation is implemented below using SHA-256.
+ * Confirm the exact concatenation order against official Fawry docs before going live —
+ * gateway specifications can change between API versions.
  */
+
+import { createHash, timingSafeEqual } from 'crypto';
 
 export type FawryPaymentParams = {
   amount: number;           // Amount in EGP
@@ -51,18 +48,44 @@ export async function generateFawryPayment(
   };
 }
 
+const FAWRY_MERCHANT_CODE = process.env.FAWRY_MERCHANT_CODE ?? '';
+const FAWRY_SECURE_KEY = process.env.FAWRY_SECURE_KEY ?? '';
+
 /**
  * Validate a Fawry webhook notification signature.
  *
- * Stub: always returns true in development.
- * Production: validate SHA256(merchantCode + merchantRefNum + paymentAmount + sharedSecret)
+ * Fail-closed: when credentials are not configured, ALL webhooks are REJECTED.
+ * When configured: validates SHA-256(merchantCode + merchantRefNum + orderAmount +
+ *   orderStatus + paymentMethod + fawryFees + statusDescription + shippingFees + secureKey).
+ *
+ * NOTE: Confirm the exact field concatenation order against official Fawry API docs before production deployment.
  */
 export function validateFawryWebhookSignature(
-  _payload: Record<string, unknown>,
-  _signature: string
+  payload: Record<string, unknown>,
+  signature: string
 ): boolean {
-  // TODO: Implement actual signature validation
-  // const expected = sha256(merchantCode + payload.merchantRefNum + payload.paymentAmount + sharedSecret)
-  // return expected === signature
-  return true;
+  if (!FAWRY_MERCHANT_CODE || !FAWRY_SECURE_KEY) {
+    console.error('[fawry] No merchant credentials configured — rejecting webhook (fail-closed)');
+    return false;
+  }
+
+  const raw = [
+    FAWRY_MERCHANT_CODE,
+    String(payload.merchantRefNum ?? ''),
+    String(payload.paymentAmount ?? ''),
+    String(payload.orderStatus ?? ''),
+    String(payload.paymentMethod ?? ''),
+    String(payload.fawryFees ?? ''),
+    String(payload.statusDescription ?? ''),
+    String(payload.shippingFees ?? ''),
+    FAWRY_SECURE_KEY,
+  ].join('');
+
+  const expected = createHash('sha256').update(raw).digest('hex');
+
+  try {
+    return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  } catch {
+    return false;
+  }
 }

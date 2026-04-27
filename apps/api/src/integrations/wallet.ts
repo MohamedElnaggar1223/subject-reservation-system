@@ -50,11 +50,27 @@ const STUB_WALLET_NUMBERS: Record<WalletProvider, string> = {
  * Stub: returns a placeholder redirect URL and random reference code.
  * Production: creates a Paymob order with the appropriate wallet integration ID
  *             and redirects the user to the OTP authentication page.
+ *
+ * M-11: In production we log a loud error so ops knows wallet payments
+ * are non-functional even though the validation accepts the method. The
+ * stubbed return value is fine for local development but would confuse
+ * real customers in production — this is a URD PAY-003 gap tracked
+ * separately, not a runtime crash.
  */
 export async function initiateWalletPayment(
   params: WalletPaymentParams
 ): Promise<WalletPaymentResult> {
-  // TODO: Replace with actual Paymob wallet integration
+  if (process.env.NODE_ENV === 'production') {
+    console.error(
+      '[wallet] Mobile wallet integration is not yet implemented. Returning a stub redirect — customers will NOT be able to complete the payment. ' +
+      `Provider: ${params.walletProvider}, merchantOrderId: ${params.merchantOrderId}`
+    );
+  } else {
+    console.warn(
+      `[wallet:stub] Simulating ${params.walletProvider} payment for order ${params.merchantOrderId}`
+    );
+  }
+
   const referenceCode = Math.floor(Math.random() * 900000 + 100000).toString();
   const walletNumber = STUB_WALLET_NUMBERS[params.walletProvider];
 

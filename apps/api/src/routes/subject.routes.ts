@@ -141,7 +141,16 @@ export const subjects = new Hono<HonoEnv>()
         }
       }
 
-      const updated = await subjectService.updateSubject(id, data);
+      let updated;
+      try {
+        updated = await subjectService.updateSubject(id, data);
+      } catch (err) {
+        // Post-merge validation errors (e.g. removing customPrice from a non-school subject)
+        if (err instanceof Error) {
+          return error(c, err.message, 400);
+        }
+        throw err;
+      }
 
       if (!updated) {
         return error(c, 'Failed to update subject', 500);
@@ -209,6 +218,11 @@ export const subjects = new Hono<HonoEnv>()
 
       if (!existing.isActive) {
         return error(c, 'Subject is already deactivated', 400);
+      }
+
+      // Prevent deactivating core subjects without removing the core designation first
+      if (existing.isCore) {
+        return error(c, 'Cannot deactivate a core subject. Remove the core designation first.', 409);
       }
 
       const updated = await subjectService.deactivateSubject(id);

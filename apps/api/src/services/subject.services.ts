@@ -121,9 +121,30 @@ export async function getSubjectById(id: string) {
  *
  * Admin-only operation.
  * Only updates the fields provided (partial update).
+ * Reads the current state first and validates that the merged result
+ * does not create an invalid state (e.g. non-school subject without customPrice).
  * Returns the updated subject or undefined if not found.
  */
 export async function updateSubject(id: string, data: UpdateSubjectType) {
+  // Read current state to validate merged result
+  const current = await db.query.subject.findFirst({
+    where: (s, { eq }) => eq(s.id, id),
+  });
+
+  if (!current) return undefined;
+
+  // Merge current state with partial update
+  const merged = {
+    isOfferedAtSchool: data.isOfferedAtSchool ?? current.isOfferedAtSchool,
+    customPrice: data.customPrice !== undefined ? data.customPrice : current.customPrice,
+  };
+
+  // Post-merge validation: if the merged subject is not offered at school,
+  // it must have a non-null customPrice
+  if (!merged.isOfferedAtSchool && (merged.customPrice === null || merged.customPrice === undefined)) {
+    throw new Error('Custom price is required when subject is not offered at school');
+  }
+
   const [updated] = await db
     .update(subject)
     .set({
