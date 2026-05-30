@@ -24,7 +24,7 @@ export default function CompleteSetupPage(): React.JSX.Element {
 
   useEffect(() => {
     authClient.getSession().then((session) => {
-      const userRole = session?.data?.user?.role;
+      const userRole = (session?.data?.user as { role?: string } | undefined)?.role;
       if (userRole === "student") {
         setRole("student");
         setRoleLocked(true);

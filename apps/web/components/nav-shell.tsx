@@ -8,6 +8,7 @@ import { authClient } from '~/lib/auth-client';
 import { api } from '~/lib/hono';
 import { apiResponse } from '@repo/validations';
 import { cn } from '~/lib/utils';
+import { useI18n, type TranslationKey } from '~/lib/i18n';
 
 /* ─── Icons (inline SVGs to avoid deps) ─────────────────────────────────────── */
 
@@ -43,18 +44,19 @@ const icons = {
   menu: 'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5',
   close: 'M6 18L18 6M6 6l12 12',
   documents: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
+  language: 'M12 21a9 9 0 100-18m0 18a9 9 0 010-18m0 18c2.071 0 3.75-4.03 3.75-9S14.071 3 12 3m0 18c-2.071 0-3.75-4.03-3.75-9S9.929 3 12 3M3.6 9h16.8M3.6 15h16.8',
 } as const;
 
 /* ─── Navigation Config ─────────────────────────────────────────────────────── */
 
 type NavItem = {
-  label: string;
+  labelKey: TranslationKey;
   href: string;
   icon: keyof typeof icons;
 };
 
 type NavSection = {
-  title?: string;
+  titleKey?: TranslationKey;
   items: NavItem[];
 };
 
@@ -63,24 +65,24 @@ function getNavSections(role: string | null | undefined): NavSection[] {
     return [
       {
         items: [
-          { label: 'Dashboard', href: '/admin/dashboard', icon: 'dashboard' },
+          { labelKey: 'nav.dashboard', href: '/admin/dashboard', icon: 'dashboard' },
         ],
       },
       {
-        title: 'Management',
+        titleKey: 'nav.management',
         items: [
-          { label: 'Sessions', href: '/admin/sessions', icon: 'sessions' },
-          { label: 'Subjects', href: '/admin/subjects', icon: 'subjects' },
-          { label: 'Payments', href: '/admin/payments', icon: 'payments' },
-          { label: 'Escrow', href: '/admin/escrow', icon: 'adminEscrow' },
+          { labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' },
+          { labelKey: 'nav.subjects', href: '/admin/subjects', icon: 'subjects' },
+          { labelKey: 'nav.payments', href: '/admin/payments', icon: 'payments' },
+          { labelKey: 'nav.escrow', href: '/admin/escrow', icon: 'adminEscrow' },
         ],
       },
       {
-        title: 'Oversight',
+        titleKey: 'nav.oversight',
         items: [
-          { label: 'Reports', href: '/admin/reports', icon: 'reports' },
-          { label: 'Audit Log', href: '/admin/audit', icon: 'audit' },
-          { label: 'Notifications', href: '/admin/notifications', icon: 'notifications' },
+          { labelKey: 'nav.reports', href: '/admin/reports', icon: 'reports' },
+          { labelKey: 'nav.auditLog', href: '/admin/audit', icon: 'audit' },
+          { labelKey: 'nav.notifications', href: '/admin/notifications', icon: 'notifications' },
         ],
       },
     ];
@@ -90,31 +92,31 @@ function getNavSections(role: string | null | undefined): NavSection[] {
     return [
       {
         items: [
-          { label: 'Home', href: '/', icon: 'home' },
+          { labelKey: 'nav.home', href: '/', icon: 'home' },
         ],
       },
       {
-        title: 'Registration',
+        titleKey: 'nav.registration',
         items: [
-          { label: 'Register Subjects', href: '/register', icon: 'register' },
-          { label: 'My Registrations', href: '/registrations', icon: 'registrations' },
-          { label: 'History', href: '/registrations/history', icon: 'history' },
-          { label: 'Approvals', href: '/approvals', icon: 'approvals' },
+          { labelKey: 'nav.registerSubjects', href: '/register', icon: 'register' },
+          { labelKey: 'nav.myRegistrations', href: '/registrations', icon: 'registrations' },
+          { labelKey: 'nav.history', href: '/registrations/history', icon: 'history' },
+          { labelKey: 'nav.approvals', href: '/approvals', icon: 'approvals' },
         ],
       },
       {
-        title: 'Financial',
+        titleKey: 'nav.financial',
         items: [
-          { label: 'Escrow Balance', href: '/escrow', icon: 'escrow' },
-          { label: 'Checkout', href: '/checkout', icon: 'checkout' },
+          { labelKey: 'nav.escrowBalance', href: '/escrow', icon: 'escrow' },
+          { labelKey: 'nav.checkout', href: '/checkout', icon: 'checkout' },
         ],
       },
       {
-        title: 'Account',
+        titleKey: 'nav.account',
         items: [
-          { label: 'Linked Children', href: '/links', icon: 'links' },
-          { label: 'Notifications', href: '/notifications', icon: 'notifications' },
-          { label: 'Profile', href: '/profile', icon: 'profile' },
+          { labelKey: 'nav.linkedChildren', href: '/links', icon: 'links' },
+          { labelKey: 'nav.notifications', href: '/notifications', icon: 'notifications' },
+          { labelKey: 'nav.profile', href: '/profile', icon: 'profile' },
         ],
       },
     ];
@@ -124,30 +126,30 @@ function getNavSections(role: string | null | undefined): NavSection[] {
   return [
     {
       items: [
-        { label: 'Home', href: '/', icon: 'home' },
+        { labelKey: 'nav.home', href: '/', icon: 'home' },
       ],
     },
     {
-      title: 'Registration',
+      titleKey: 'nav.registration',
       items: [
-        { label: 'Register Subjects', href: '/register', icon: 'register' },
-        { label: 'My Registrations', href: '/registrations', icon: 'registrations' },
-        { label: 'History', href: '/registrations/history', icon: 'history' },
-        { label: 'Browse Subjects', href: '/subjects', icon: 'subjects' },
+        { labelKey: 'nav.registerSubjects', href: '/register', icon: 'register' },
+        { labelKey: 'nav.myRegistrations', href: '/registrations', icon: 'registrations' },
+        { labelKey: 'nav.history', href: '/registrations/history', icon: 'history' },
+        { labelKey: 'nav.browseSubjects', href: '/subjects', icon: 'subjects' },
       ],
     },
     {
-      title: 'Requests',
+      titleKey: 'nav.requests',
       items: [
-        { label: 'Pending Requests', href: '/pending-requests', icon: 'requests' },
+        { labelKey: 'nav.pendingRequests', href: '/pending-requests', icon: 'requests' },
       ],
     },
     {
-      title: 'Account',
+      titleKey: 'nav.account',
       items: [
-        { label: 'Linked Parents', href: '/links', icon: 'links' },
-        { label: 'Notifications', href: '/notifications', icon: 'notifications' },
-        { label: 'Profile', href: '/profile', icon: 'profile' },
+        { labelKey: 'nav.linkedParents', href: '/links', icon: 'links' },
+        { labelKey: 'nav.notifications', href: '/notifications', icon: 'notifications' },
+        { labelKey: 'nav.profile', href: '/profile', icon: 'profile' },
       ],
     },
   ];
@@ -165,9 +167,11 @@ function NavLink({
   badgeCount?: number;
 }) {
   const pathname = usePathname();
+  const { t } = useI18n();
   const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
   const showBadge = typeof badgeCount === 'number' && badgeCount > 0;
   const badgeLabel = showBadge ? (badgeCount > 99 ? '99+' : String(badgeCount)) : '';
+  const label = t(item.labelKey);
 
   return (
     <Link
@@ -179,7 +183,7 @@ function NavLink({
           ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'
           : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
       )}
-      title={collapsed ? item.label : undefined}
+      title={collapsed ? label : undefined}
     >
       <span className="relative">
         <Icon d={icons[item.icon]} className={cn(isActive ? 'opacity-100' : 'opacity-60 group-hover:opacity-100')} />
@@ -194,7 +198,7 @@ function NavLink({
       </span>
       {!collapsed && (
         <>
-          <span className="flex-1">{item.label}</span>
+          <span className="flex-1">{label}</span>
           {showBadge && (
             <span
               aria-label={`${badgeLabel} unread`}
@@ -229,6 +233,7 @@ export default function NavShell({
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { language, toggleLanguage, t } = useI18n();
   const sections = getNavSections(userRole);
 
   // L-5: Unread notification badge. Refetches every 30s so the number
@@ -250,6 +255,8 @@ export default function NavShell({
     window.location.href = '/sign-in';
   };
 
+  const languageLabel = language === 'en' ? t('language.arabic') : t('language.english');
+
   const sidebarContent = (
     <>
       {/* Brand */}
@@ -260,7 +267,7 @@ export default function NavShell({
         {!collapsed && (
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-sidebar-foreground font-display">IGCSE</p>
-            <p className="truncate text-[11px] text-sidebar-foreground/50">Subject Reservation</p>
+            <p className="truncate text-[11px] text-sidebar-foreground/50">{t('app.subjectReservation')}</p>
           </div>
         )}
       </div>
@@ -269,9 +276,9 @@ export default function NavShell({
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
         {sections.map((section, si) => (
           <div key={si} className={si > 0 ? 'mt-5' : ''}>
-            {section.title && !collapsed && (
+            {section.titleKey && !collapsed && (
               <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/40">
-                {section.title}
+                {t(section.titleKey)}
               </p>
             )}
             {collapsed && si > 0 && (
@@ -293,13 +300,26 @@ export default function NavShell({
 
       {/* User footer */}
       <div className={cn('border-t border-sidebar-border p-3', collapsed && 'px-2')}>
+        <button
+          onClick={toggleLanguage}
+          className={cn(
+            'mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            collapsed && 'justify-center px-2',
+          )}
+          title={t('language.switchTo')}
+          type="button"
+          data-i18n-skip="true"
+        >
+          <Icon d={icons.language} className="opacity-60" />
+          {!collapsed && <span>{languageLabel}</span>}
+        </button>
         <div className={cn('flex items-center gap-3 rounded-lg px-3 py-2', collapsed && 'justify-center px-0')}>
           <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground uppercase">
             {(userName || userEmail || '?')[0]}
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-sidebar-foreground">{userName || 'User'}</p>
+              <p className="truncate text-sm font-medium text-sidebar-foreground">{userName || t('common.user')}</p>
               <p className="truncate text-[11px] text-sidebar-foreground/50 capitalize">{userRole || 'user'}</p>
             </div>
           )}
@@ -310,10 +330,11 @@ export default function NavShell({
             'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
             collapsed && 'justify-center px-2',
           )}
-          title="Sign out"
+          title={t('common.signOut')}
+          type="button"
         >
           <Icon d={icons.signOut} className="opacity-60" />
-          {!collapsed && <span>Sign Out</span>}
+          {!collapsed && <span>{t('common.signOut')}</span>}
         </button>
       </div>
     </>
@@ -368,7 +389,7 @@ export default function NavShell({
             <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold font-display">
               IG
             </div>
-            <span className="text-sm font-bold text-foreground font-display">IGCSE Reservation</span>
+            <span className="text-sm font-bold text-foreground font-display">IGCSE {t('app.subjectReservation')}</span>
           </div>
         </header>
 

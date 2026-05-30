@@ -155,13 +155,14 @@ export const users = new Hono<HonoEnv>()
       }
 
       const { grade } = c.req.valid('json');
+      const currentUserWithProfile = currentUser as typeof currentUser & { grade?: number | null };
 
       // Already configured as student — fix grade if missing, otherwise idempotent.
       // M-2: Keep the return shape identical to the first-time success branch
       // (includes grade + studentId) so clients merging state don't see those
       // fields disappear on a re-call.
       if (currentUser.role === 'student') {
-        if (currentUser.grade === null || currentUser.grade === undefined) {
+        if (currentUserWithProfile.grade === null || currentUserWithProfile.grade === undefined) {
           try {
             const fixed = await userService.updateStudentGrade(currentUser.id, grade);
             if (fixed) {

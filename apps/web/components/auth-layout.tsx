@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { cn } from "~/lib/utils";
+import { useI18n } from "~/lib/i18n";
 
 /* ------------------------------------------------------------------ */
 /*  Geometric pattern rendered purely with CSS divs                   */
@@ -153,6 +154,8 @@ export default function AuthLayout({
   className,
   footer,
 }: AuthLayoutProps) {
+  const { language, toggleLanguage, t } = useI18n();
+
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       {/* ── Mobile branded header ── */}
@@ -165,7 +168,17 @@ export default function AuthLayout({
       </div>
 
       {/* ── Right content panel ── */}
-      <div className="flex flex-1 items-center justify-center bg-background px-6 py-10 lg:px-12">
+      <div className="relative flex flex-1 items-center justify-center bg-background px-6 py-10 lg:px-12">
+        <button
+          type="button"
+          onClick={toggleLanguage}
+          className="absolute right-4 top-4 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
+          aria-label={t('language.switchTo')}
+          title={t('language.switchTo')}
+          data-i18n-skip="true"
+        >
+          {language === 'en' ? 'العربية' : 'English'}
+        </button>
         <div className={cn("w-full max-w-[440px] space-y-8", className)}>
           {/* Title block */}
           <div className="animate-fade-up space-y-2">

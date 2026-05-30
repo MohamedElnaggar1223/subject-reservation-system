@@ -31,6 +31,8 @@ import {
   payment,
   changeRequest,
   parentStudentLink,
+  notification,
+  auditLog,
   eq,
   and,
   inArray,
@@ -60,6 +62,14 @@ function paginate<T>(items: T[], params?: PaginationParams): { data: T[]; total:
   const offset = params?.offset ?? 0;
   const limit = params?.limit ?? 500;
   return { data: items.slice(offset, offset + limit), total };
+}
+
+function rowsOf<T extends Record<string, unknown>>(result: unknown): T[] {
+  return ((result as { rows?: T[] }).rows ?? []) as T[];
+}
+
+function numberValue(value: unknown): number {
+  return Number(value ?? 0);
 }
 
 // ─── REP-008: Admin Dashboard Metrics ────────────────────────────────────────
@@ -823,5 +833,528 @@ export async function generatePendingApprovalsReport(pagination?: PaginationPara
   return {
     pendingRegistrations:  paginate(mappedRegs, pagination),
     pendingChangeRequests: paginate(mappedCRs, pagination),
+  };
+}
+
+// ─── Comprehensive Staff Analytics ──────────────────────────────────────────
+
+/**
+ * A broad reporting pack for staff analysis.
+ *
+ * This intentionally goes beyond the REP baseline reports and groups the
+ * system's major relationships into study-ready tables: students, parents,
+ * sessions, subjects, registrations, approvals, payments, escrow, withdrawals,
+ * change requests, notifications, and audit activity.
+ */
+export async function generateComprehensiveStaffReport() {
+  const [
+    userRoleRows,
+    gradeRows,
+    sessionRows,
+    registrationStatusRows,
+    lifecycleFunnelRows,
+    subjectDemandRows,
+    gradeCouncilRows,
+    paymentStatusRows,
+    paymentMethodRows,
+    escrowRows,
+    escrowMovementRows,
+    withdrawalRows,
+    changeRequestRows,
+    parentCoverageRows,
+    notificationRows,
+    auditRows,
+    agingRows,
+    staleApprovalRows,
+    unpaidRegistrationRows,
+    studentSubjectLoadRows,
+    parentLinkGapRows,
+    highEscrowBalanceRows,
+    pendingWithdrawalDetailRows,
+    paymentSettlementRows,
+    subjectPairRows,
+  ] = await Promise.all([
+    db
+      .select({
+        role: sql<string>`COALESCE(${user.role}, 'unknown')`,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(user)
+      .groupBy(user.role)
+      .orderBy(user.role),
+
+    db
+      .select({
+        grade: sql<string>`COALESCE(${user.grade}::text, 'graduated_or_non_student')`,
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(user)
+      .where(eq(user.role, 'student'))
+      .groupBy(user.grade)
+      .orderBy(user.grade),
+
+    db.execute(sql`
+      SELECT
+        rs.name,
+        rs.session_type AS "sessionType",
+        rs.status,
+        COUNT(r.id)::int AS "registrationCount",
+        COALESCE(SUM(r.price_at_registration), 0)::numeric AS "reservedValueEGP",
+        MIN(r.created_at) AS "firstRegistrationAt",
+        MAX(r.created_at) AS "lastRegistrationAt"
+      FROM ${registrationSession} rs
+      LEFT JOIN ${registration} r ON r.session_id = rs.id
+      GROUP BY rs.id, rs.name, rs.session_type, rs.status, rs.start_date
+      ORDER BY rs.start_date DESC
+    `),
+
+    db
+      .select({
+        status: registration.status,
+        count: sql<number>`COUNT(*)::int`,
+        valueEGP: sql<number>`COALESCE(SUM(${registration.priceAtRegistration}), 0)`,
+      })
+      .from(registration)
+      .groupBy(registration.status)
+      .orderBy(registration.status),
+
+    db.execute(sql`
+      SELECT
+        rs.name AS "sessionName",
+        COUNT(r.id)::int AS "totalRequests",
+        COUNT(*) FILTER (WHERE r.status = 'pending_approval')::int AS "pendingApproval",
+        COUNT(*) FILTER (WHERE r.status = 'pending_payment')::int AS "pendingPayment",
+        COUNT(*) FILTER (WHERE r.status = 'confirmed')::int AS "confirmed",
+        COUNT(*) FILTER (WHERE r.status = 'rejected')::int AS "rejected",
+        COUNT(*) FILTER (WHERE r.status = 'dropped')::int AS "dropped",
+        ROUND(
+          100.0 * COUNT(*) FILTER (WHERE r.status = 'confirmed') / NULLIF(COUNT(r.id), 0),
+          2
+        ) AS "confirmationRate"
+      FROM ${registrationSession} rs
+      LEFT JOIN ${registration} r ON r.session_id = rs.id
+      GROUP BY rs.id, rs.name, rs.start_date
+      ORDER BY rs.start_date DESC
+    `),
+
+    db.execute(sql`
+      SELECT
+        s.name AS "subjectName",
+        s.code AS "subjectCode",
+        s.council,
+        s.is_core AS "isCore",
+        s.is_offered_at_school AS "offeredAtSchool",
+        COUNT(r.id)::int AS "requestCount",
+        COUNT(*) FILTER (WHERE r.status = 'confirmed')::int AS "confirmedCount",
+        COUNT(*) FILTER (WHERE r.status IN ('pending_approval', 'pending_payment'))::int AS "pendingCount",
+        COUNT(DISTINCT r.student_id)::int AS "uniqueStudents",
+        COALESCE(SUM(r.price_at_registration) FILTER (WHERE r.status = 'confirmed'), 0)::numeric AS "confirmedRevenueEGP"
+      FROM ${subject} s
+      LEFT JOIN ${registration} r ON r.subject_id = s.id
+      GROUP BY s.id, s.name, s.code, s.council, s.is_core, s.is_offered_at_school
+      ORDER BY "requestCount" DESC, s.name ASC
+    `),
+
+    db.execute(sql`
+      SELECT
+        COALESCE(u.grade::text, 'graduated') AS grade,
+        s.council,
+        COUNT(r.id)::int AS "registrationCount",
+        COUNT(DISTINCT r.student_id)::int AS "studentCount",
+        COALESCE(SUM(r.price_at_registration) FILTER (WHERE r.status = 'confirmed'), 0)::numeric AS "confirmedRevenueEGP"
+      FROM ${registration} r
+      JOIN ${user} u ON u.id = r.student_id
+      JOIN ${subject} s ON s.id = r.subject_id
+      GROUP BY u.grade, s.council
+      ORDER BY u.grade, s.council
+    `),
+
+    db
+      .select({
+        status: payment.status,
+        count: sql<number>`COUNT(*)::int`,
+        amountEGP: sql<number>`COALESCE(SUM(${payment.amount} + ${payment.escrowAmountApplied}), 0)`,
+      })
+      .from(payment)
+      .groupBy(payment.status)
+      .orderBy(payment.status),
+
+    db
+      .select({
+        paymentMethod: payment.paymentMethod,
+        status: payment.status,
+        count: sql<number>`COUNT(*)::int`,
+        amountEGP: sql<number>`COALESCE(SUM(${payment.amount} + ${payment.escrowAmountApplied}), 0)`,
+      })
+      .from(payment)
+      .groupBy(payment.paymentMethod, payment.status)
+      .orderBy(payment.paymentMethod, payment.status),
+
+    db.execute(sql`
+      SELECT
+        COUNT(e.id)::int AS "accountCount",
+        COUNT(*) FILTER (WHERE e.balance > 0)::int AS "accountsWithBalance",
+        COALESCE(SUM(e.balance), 0)::numeric AS "totalBalanceEGP",
+        COALESCE(AVG(e.balance), 0)::numeric AS "averageBalanceEGP",
+        COALESCE(MAX(e.balance), 0)::numeric AS "largestBalanceEGP"
+      FROM ${escrow} e
+    `),
+
+    db
+      .select({
+        type: escrowTransaction.type,
+        reason: escrowTransaction.reason,
+        count: sql<number>`COUNT(*)::int`,
+        amountEGP: sql<number>`COALESCE(SUM(${escrowTransaction.amount}), 0)`,
+      })
+      .from(escrowTransaction)
+      .groupBy(escrowTransaction.type, escrowTransaction.reason)
+      .orderBy(escrowTransaction.type, escrowTransaction.reason),
+
+    db.execute(sql`
+      SELECT
+        status,
+        COUNT(*)::int AS count,
+        COALESCE(SUM(requested_amount), 0)::numeric AS "requestedEGP",
+        COALESCE(SUM(COALESCE(released_amount, 0)), 0)::numeric AS "releasedEGP",
+        COALESCE(SUM(requested_amount - COALESCE(released_amount, 0)), 0)::numeric AS "outstandingEGP"
+      FROM ${withdrawalRequest}
+      GROUP BY status
+      ORDER BY status
+    `),
+
+    db.execute(sql`
+      SELECT
+        type,
+        status,
+        COUNT(*)::int AS count,
+        COALESCE(SUM(price_difference), 0)::numeric AS "netPriceDifferenceEGP",
+        ROUND(AVG(EXTRACT(EPOCH FROM (COALESCE(processed_at, NOW()) - created_at)) / 86400), 2) AS "averageAgeDays"
+      FROM ${changeRequest}
+      GROUP BY type, status
+      ORDER BY type, status
+    `),
+
+    db.execute(sql`
+      SELECT
+        COALESCE(u.grade::text, 'graduated') AS grade,
+        COUNT(DISTINCT u.id)::int AS "studentCount",
+        COUNT(DISTINCT psl.student_id)::int AS "studentsWithApprovedParent",
+        COUNT(psl.id) FILTER (WHERE psl.status = 'pending')::int AS "pendingLinks",
+        ROUND(100.0 * COUNT(DISTINCT psl.student_id) / NULLIF(COUNT(DISTINCT u.id), 0), 2) AS "coveragePercent"
+      FROM ${user} u
+      LEFT JOIN ${parentStudentLink} psl
+        ON psl.student_id = u.id
+       AND psl.status = 'approved'
+      WHERE u.role = 'student'
+      GROUP BY u.grade
+      ORDER BY u.grade
+    `),
+
+    db.execute(sql`
+      SELECT
+        type,
+        COUNT(*)::int AS count,
+        COUNT(*) FILTER (WHERE read_at IS NULL)::int AS unread,
+        COUNT(*) FILTER (WHERE email_sent_at IS NOT NULL)::int AS "emailsSent",
+        ROUND(100.0 * COUNT(*) FILTER (WHERE read_at IS NOT NULL) / NULLIF(COUNT(*), 0), 2) AS "readRate"
+      FROM ${notification}
+      GROUP BY type
+      ORDER BY count DESC, type ASC
+    `),
+
+    db.execute(sql`
+      SELECT
+        entity_type AS "entityType",
+        action,
+        COUNT(*)::int AS count,
+        MAX(created_at) AS "lastSeenAt"
+      FROM ${auditLog}
+      GROUP BY entity_type, action
+      ORDER BY count DESC, entity_type ASC, action ASC
+      LIMIT 200
+    `),
+
+    db.execute(sql`
+      SELECT
+        'registrations_pending_approval' AS queue,
+        COUNT(*)::int AS count,
+        ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400), 2) AS "averageAgeDays",
+        ROUND(MAX(EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400), 2) AS "oldestAgeDays"
+      FROM ${registration}
+      WHERE status = 'pending_approval'
+      UNION ALL
+      SELECT
+        'registrations_pending_payment' AS queue,
+        COUNT(*)::int AS count,
+        ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400), 2) AS "averageAgeDays",
+        ROUND(MAX(EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400), 2) AS "oldestAgeDays"
+      FROM ${registration}
+      WHERE status = 'pending_payment'
+      UNION ALL
+      SELECT
+        'payments_pending' AS queue,
+        COUNT(*)::int AS count,
+        ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400), 2) AS "averageAgeDays",
+        ROUND(MAX(EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400), 2) AS "oldestAgeDays"
+      FROM ${payment}
+      WHERE status = 'pending'
+      UNION ALL
+      SELECT
+        'withdrawals_open' AS queue,
+        COUNT(*)::int AS count,
+        ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400), 2) AS "averageAgeDays",
+        ROUND(MAX(EXTRACT(EPOCH FROM (NOW() - created_at)) / 86400), 2) AS "oldestAgeDays"
+      FROM ${withdrawalRequest}
+      WHERE status IN ('pending', 'partially_fulfilled')
+    `),
+
+    db.execute(sql`
+      SELECT
+        r.id AS "registrationId",
+        u.name AS "studentName",
+        COALESCE(u.grade::text, 'graduated') AS grade,
+        s.name AS "subjectName",
+        s.code AS "subjectCode",
+        rs.name AS "sessionName",
+        r.status,
+        r.price_at_registration AS "priceEGP",
+        ROUND(EXTRACT(EPOCH FROM (NOW() - r.created_at)) / 86400, 2) AS "ageDays",
+        requester.name AS "requestedBy",
+        approver.name AS "approvedBy"
+      FROM ${registration} r
+      JOIN ${user} u ON u.id = r.student_id
+      JOIN ${subject} s ON s.id = r.subject_id
+      JOIN ${registrationSession} rs ON rs.id = r.session_id
+      LEFT JOIN ${user} requester ON requester.id = r.requested_by
+      LEFT JOIN ${user} approver ON approver.id = r.approved_by
+      WHERE r.status IN ('pending_approval', 'pending_payment')
+      ORDER BY r.created_at ASC
+      LIMIT 500
+    `),
+
+    db.execute(sql`
+      SELECT
+        r.id AS "registrationId",
+        u.name AS "studentName",
+        COALESCE(u.grade::text, 'graduated') AS grade,
+        s.name AS "subjectName",
+        s.code AS "subjectCode",
+        rs.name AS "sessionName",
+        r.price_at_registration AS "amountDueEGP",
+        ROUND(EXTRACT(EPOCH FROM (NOW() - r.created_at)) / 86400, 2) AS "daysAwaitingPayment",
+        r.approved_at AS "approvedAt"
+      FROM ${registration} r
+      JOIN ${user} u ON u.id = r.student_id
+      JOIN ${subject} s ON s.id = r.subject_id
+      JOIN ${registrationSession} rs ON rs.id = r.session_id
+      WHERE r.status = 'pending_payment'
+      ORDER BY r.created_at ASC
+      LIMIT 500
+    `),
+
+    db.execute(sql`
+      SELECT
+        u.name AS "studentName",
+        u.student_id AS "studentIdCode",
+        COALESCE(u.grade::text, 'graduated') AS grade,
+        rs.name AS "sessionName",
+        COUNT(r.id)::int AS "activeSubjectCount",
+        COALESCE(SUM(r.price_at_registration), 0)::numeric AS "reservedValueEGP",
+        COUNT(*) FILTER (WHERE r.status = 'confirmed')::int AS "confirmedSubjects",
+        COUNT(*) FILTER (WHERE r.status IN ('pending_approval', 'pending_payment'))::int AS "pendingSubjects"
+      FROM ${registration} r
+      JOIN ${user} u ON u.id = r.student_id
+      JOIN ${registrationSession} rs ON rs.id = r.session_id
+      WHERE r.status NOT IN ('dropped', 'rejected', 'expired')
+      GROUP BY u.id, u.name, u.student_id, u.grade, rs.id, rs.name
+      ORDER BY "activeSubjectCount" DESC, "reservedValueEGP" DESC, u.name ASC
+      LIMIT 500
+    `),
+
+    db.execute(sql`
+      SELECT
+        u.id AS "studentId",
+        u.name AS "studentName",
+        u.student_id AS "studentIdCode",
+        u.email AS "studentEmail",
+        COALESCE(u.grade::text, 'graduated') AS grade,
+        COUNT(psl.id) FILTER (WHERE psl.status = 'pending')::int AS "pendingLinkRequests"
+      FROM ${user} u
+      LEFT JOIN ${parentStudentLink} approved
+        ON approved.student_id = u.id
+       AND approved.status = 'approved'
+      LEFT JOIN ${parentStudentLink} psl
+        ON psl.student_id = u.id
+       AND psl.status = 'pending'
+      WHERE u.role = 'student'
+        AND approved.id IS NULL
+      GROUP BY u.id, u.name, u.student_id, u.email, u.grade
+      ORDER BY u.grade, u.name
+      LIMIT 500
+    `),
+
+    db.execute(sql`
+      SELECT
+        u.name AS "studentName",
+        u.student_id AS "studentIdCode",
+        COALESCE(u.grade::text, 'graduated') AS grade,
+        e.balance AS "balanceEGP",
+        e.updated_at AS "lastUpdatedAt"
+      FROM ${escrow} e
+      JOIN ${user} u ON u.id = e.student_id
+      WHERE e.balance > 0
+      ORDER BY e.balance DESC
+      LIMIT 200
+    `),
+
+    db.execute(sql`
+      SELECT
+        wr.id AS "withdrawalId",
+        u.name AS "studentName",
+        u.student_id AS "studentIdCode",
+        wr.status,
+        wr.requested_amount AS "requestedEGP",
+        COALESCE(wr.released_amount, 0) AS "releasedEGP",
+        wr.requested_amount - COALESCE(wr.released_amount, 0) AS "outstandingEGP",
+        ROUND(EXTRACT(EPOCH FROM (NOW() - wr.created_at)) / 86400, 2) AS "ageDays",
+        wr.admin_notes AS "adminNotes"
+      FROM ${withdrawalRequest} wr
+      JOIN ${escrow} e ON e.id = wr.escrow_id
+      JOIN ${user} u ON u.id = e.student_id
+      WHERE wr.status IN ('pending', 'partially_fulfilled')
+      ORDER BY wr.created_at ASC
+      LIMIT 500
+    `),
+
+    db.execute(sql`
+      SELECT
+        p.id AS "paymentId",
+        student.name AS "studentName",
+        parent.name AS "parentName",
+        p.payment_method AS "paymentMethod",
+        p.status,
+        p.amount AS "chargedAmountEGP",
+        p.escrow_amount_applied AS "escrowAppliedEGP",
+        p.amount + p.escrow_amount_applied AS "coveredValueEGP",
+        COUNT(pr.registration_id)::int AS "registrationCount",
+        p.created_at AS "createdAt",
+        p.confirmed_at AS "confirmedAt"
+      FROM ${payment} p
+      JOIN ${user} student ON student.id = p.student_id
+      JOIN ${user} parent ON parent.id = p.parent_id
+      LEFT JOIN payment_registration pr ON pr.payment_id = p.id
+      GROUP BY p.id, student.name, parent.name, p.payment_method, p.status, p.amount, p.escrow_amount_applied, p.created_at, p.confirmed_at
+      ORDER BY p.created_at DESC
+      LIMIT 500
+    `),
+
+    db.execute(sql`
+      WITH active_regs AS (
+        SELECT student_id, session_id, subject_id
+        FROM ${registration}
+        WHERE status NOT IN ('dropped', 'rejected', 'expired')
+      )
+      SELECT
+        LEAST(s1.name, s2.name) AS "subjectA",
+        GREATEST(s1.name, s2.name) AS "subjectB",
+        COUNT(*)::int AS "studentOverlap"
+      FROM active_regs r1
+      JOIN active_regs r2
+        ON r1.student_id = r2.student_id
+       AND r1.session_id = r2.session_id
+       AND r1.subject_id < r2.subject_id
+      JOIN ${subject} s1 ON s1.id = r1.subject_id
+      JOIN ${subject} s2 ON s2.id = r2.subject_id
+      GROUP BY LEAST(s1.name, s2.name), GREATEST(s1.name, s2.name)
+      ORDER BY "studentOverlap" DESC, "subjectA", "subjectB"
+      LIMIT 200
+    `),
+  ]);
+
+  const registrationsByStatus = registrationStatusRows.map((row) => ({
+    status: row.status,
+    count: numberValue(row.count),
+    valueEGP: numberValue(row.valueEGP),
+  }));
+
+  const paymentsByStatus = paymentStatusRows.map((row) => ({
+    status: row.status,
+    count: numberValue(row.count),
+    amountEGP: numberValue(row.amountEGP),
+  }));
+
+  const totalRegistrations = registrationsByStatus.reduce((sum, row) => sum + row.count, 0);
+  const confirmedRegistrations = registrationsByStatus.find((row) => row.status === 'confirmed')?.count ?? 0;
+  const paymentTotal = paymentsByStatus.reduce((sum, row) => sum + row.amountEGP, 0);
+  const completedPaymentTotal = paymentsByStatus.find((row) => row.status === 'completed')?.amountEGP ?? 0;
+  type ParentCoverageTotals = {
+    studentCount: number;
+    studentsWithApprovedParent: number;
+    pendingLinks: number;
+  };
+  const parentCoverage = rowsOf<{
+    studentCount: unknown;
+    studentsWithApprovedParent: unknown;
+    pendingLinks: unknown;
+  }>(parentCoverageRows).reduce<ParentCoverageTotals>(
+    (sum, row) => ({
+      studentCount: sum.studentCount + numberValue(row.studentCount),
+      studentsWithApprovedParent: sum.studentsWithApprovedParent + numberValue(row.studentsWithApprovedParent),
+      pendingLinks: sum.pendingLinks + numberValue(row.pendingLinks),
+    }),
+    { studentCount: 0, studentsWithApprovedParent: 0, pendingLinks: 0 },
+  );
+
+  return {
+    generatedAt: new Date(),
+    summary: {
+      totalRegistrations,
+      confirmedRegistrations,
+      confirmationRate: totalRegistrations ? Number(((confirmedRegistrations / totalRegistrations) * 100).toFixed(2)) : 0,
+      totalPaymentFlowEGP: paymentTotal,
+      completedPaymentFlowEGP: completedPaymentTotal,
+      parentCoveragePercent: parentCoverage.studentCount
+        ? Number(((parentCoverage.studentsWithApprovedParent / parentCoverage.studentCount) * 100).toFixed(2))
+        : 0,
+      pendingParentLinks: parentCoverage.pendingLinks,
+    },
+    sections: {
+      usersByRole: userRoleRows.map((row) => ({ role: row.role, count: numberValue(row.count) })),
+      studentsByGrade: gradeRows.map((row) => ({ grade: row.grade, count: numberValue(row.count) })),
+      sessionHealth: rowsOf(sessionRows),
+      registrationsByStatus,
+      lifecycleFunnel: rowsOf(lifecycleFunnelRows),
+      subjectDemand: rowsOf(subjectDemandRows),
+      gradeCouncilDemand: rowsOf(gradeCouncilRows),
+      paymentsByStatus,
+      paymentMethodMix: paymentMethodRows.map((row) => ({
+        paymentMethod: row.paymentMethod,
+        status: row.status,
+        count: numberValue(row.count),
+        amountEGP: numberValue(row.amountEGP),
+      })),
+      escrowHealth: rowsOf(escrowRows),
+      escrowMovementByReason: escrowMovementRows.map((row) => ({
+        type: row.type,
+        reason: row.reason,
+        count: numberValue(row.count),
+        amountEGP: numberValue(row.amountEGP),
+      })),
+      withdrawalHealth: rowsOf(withdrawalRows),
+      changeRequestAnalysis: rowsOf(changeRequestRows),
+      parentLinkCoverage: rowsOf(parentCoverageRows),
+      notificationEngagement: rowsOf(notificationRows),
+      auditActivity: rowsOf(auditRows),
+      agingQueues: rowsOf(agingRows),
+      staleApprovalsAndPayments: rowsOf(staleApprovalRows),
+      unpaidRegistrations: rowsOf(unpaidRegistrationRows),
+      studentSubjectLoad: rowsOf(studentSubjectLoadRows),
+      studentsWithoutApprovedParents: rowsOf(parentLinkGapRows),
+      highEscrowBalances: rowsOf(highEscrowBalanceRows),
+      pendingWithdrawalDetails: rowsOf(pendingWithdrawalDetailRows),
+      paymentSettlementDetails: rowsOf(paymentSettlementRows),
+      subjectPairOverlap: rowsOf(subjectPairRows),
+    },
   };
 }

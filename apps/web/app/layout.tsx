@@ -38,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>): JSX.Element {
   return (
-    <html lang="en" className={`${jakarta.variable} ${dmSans.variable} ${geistMono.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${jakarta.variable} ${dmSans.variable} ${geistMono.variable}`}>
       <body className="font-sans">
         <Providers>
           {children}

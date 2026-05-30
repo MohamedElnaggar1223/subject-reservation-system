@@ -27,17 +27,17 @@ function matchMessage(msg: string, errors: Record<string, string>): string | nul
   const lower = msg.toLowerCase();
 
   if (lower.includes("already exist"))
-    return errors.USER_ALREADY_EXISTS ?? SIGN_UP_ERRORS.USER_ALREADY_EXISTS;
+    return errors.USER_ALREADY_EXISTS ?? "An account with this email already exists. Please sign in instead.";
   if (lower.includes("invalid") && (lower.includes("email") || lower.includes("password")))
     return errors.INVALID_EMAIL_OR_PASSWORD ?? errors.INVALID_EMAIL ?? null;
   if (lower.includes("not verified") || lower.includes("email_not_verified"))
-    return errors.EMAIL_NOT_VERIFIED ?? SIGN_IN_ERRORS.EMAIL_NOT_VERIFIED;
+    return errors.EMAIL_NOT_VERIFIED ?? "Your email address has not been verified yet. Please check your inbox for a verification link.";
   if (lower.includes("not found") || lower.includes("credential"))
     return errors.CREDENTIAL_ACCOUNT_NOT_FOUND ?? errors.USER_NOT_FOUND ?? null;
   if (lower.includes("banned") || lower.includes("disabled") || lower.includes("suspended"))
-    return errors.USER_BANNED ?? SIGN_IN_ERRORS.USER_BANNED;
+    return errors.USER_BANNED ?? "This account has been suspended. Please contact the school administration for assistance.";
   if (lower.includes("too many") || lower.includes("rate"))
-    return errors.TOO_MANY_REQUESTS ?? SIGN_IN_ERRORS.TOO_MANY_REQUESTS;
+    return errors.TOO_MANY_REQUESTS ?? "Too many attempts. Please wait a few minutes and try again.";
   if (lower.includes("uppercase") || lower.includes("number") || lower.includes("complexity") || lower.includes("min 8"))
     return "Password must be at least 8 characters with at least one uppercase letter and one number.";
 
@@ -45,8 +45,9 @@ function matchMessage(msg: string, errors: Record<string, string>): string | nul
 }
 
 function resolveError(error: AuthError, map: Record<string, string>, fallbackAction: string): string {
-  if (error.code && map[error.code]) {
-    return map[error.code];
+  if (error.code) {
+    const codeMessage = map[error.code];
+    if (codeMessage) return codeMessage;
   }
 
   if (error.message) {
@@ -55,8 +56,8 @@ function resolveError(error: AuthError, map: Record<string, string>, fallbackAct
   }
 
   if (error.status === 401) return map.INVALID_EMAIL_OR_PASSWORD ?? `${fallbackAction} failed. Please check your credentials.`;
-  if (error.status === 403) return map.EMAIL_NOT_VERIFIED ?? SIGN_IN_ERRORS.EMAIL_NOT_VERIFIED;
-  if (error.status === 429) return map.TOO_MANY_REQUESTS ?? SIGN_IN_ERRORS.TOO_MANY_REQUESTS;
+  if (error.status === 403) return map.EMAIL_NOT_VERIFIED ?? "Your email address has not been verified yet. Please check your inbox for a verification link.";
+  if (error.status === 429) return map.TOO_MANY_REQUESTS ?? "Too many attempts. Please wait a few minutes and try again.";
 
   return error.message || `${fallbackAction} failed (${error.statusText || `status ${error.status}`}). Please try again.`;
 }

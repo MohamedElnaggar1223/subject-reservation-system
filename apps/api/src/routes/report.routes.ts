@@ -12,6 +12,7 @@
  * GET /reports/compliance                 - Grade 10 core subject compliance (REP-005)
  * GET /reports/roster                     - Student roster by grade (REP-007)
  * GET /reports/pending-approvals          - All pending approval items with age (REP-009)
+ * GET /reports/comprehensive              - Broad staff analytics across all major entities
  *
  * All routes support an optional `?format=csv` query parameter to download as CSV.
  * Default format is JSON.
@@ -39,6 +40,7 @@ import {
   generateGrade10ComplianceReport,
   generateStudentRoster,
   generatePendingApprovalsReport,
+  generateComprehensiveStaffReport,
 } from '../services/report.services';
 
 // ─── CSV Helper ───────────────────────────────────────────────────────────────
@@ -63,6 +65,32 @@ function toCSV(rows: Record<string, unknown>[]): string {
     ...rows.map((row) => headers.map((h) => escape(row[h])).join(',')),
   ];
   return lines.join('\r\n');
+}
+
+function flattenComprehensiveReport(report: {
+  summary?: Record<string, unknown>;
+  sections?: Record<string, Record<string, unknown>[]>;
+}) {
+  const rows: Record<string, unknown>[] = [];
+
+  if (report.summary) {
+    for (const [metric, value] of Object.entries(report.summary)) {
+      rows.push({ section: 'summary', metric, value });
+    }
+  }
+
+  for (const [section, sectionRows] of Object.entries(report.sections ?? {})) {
+    if (!Array.isArray(sectionRows) || sectionRows.length === 0) {
+      rows.push({ section, metric: 'noData', value: '' });
+      continue;
+    }
+
+    for (const row of sectionRows) {
+      rows.push({ section, ...row });
+    }
+  }
+
+  return rows;
 }
 
 /**
@@ -114,6 +142,33 @@ export const reports = new Hono<HonoEnv>()
       const { format } = c.req.valid('query');
       const metrics = await getAdminDashboardMetrics();
       return respond(c, 'dashboard-metrics', metrics as Record<string, unknown>, format);
+    }
+  )
+
+  /**
+   * GET /reports/comprehensive
+   *
+   * Broad, multi-section staff analytics report across users, sessions,
+   * registrations, subjects, payments, escrow, withdrawals, notifications,
+   * parent coverage, approval aging, and audit activity.
+   */
+  .get('/comprehensive',
+    zValidator('query', FormatQuery),
+    async (c) => {
+      const { format } = c.req.valid('query');
+      const result = await generateComprehensiveStaffReport();
+
+      if (format === 'csv') {
+        const csv = toCSV(flattenComprehensiveReport(result));
+        return new Response(csv, {
+          headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': 'attachment; filename="comprehensive-staff-report.csv"',
+          },
+        });
+      }
+
+      return success(c, result);
     }
   )
 

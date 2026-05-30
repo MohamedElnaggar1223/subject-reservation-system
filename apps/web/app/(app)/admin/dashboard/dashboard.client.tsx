@@ -16,6 +16,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import { apiResponse } from '@repo/validations';
 import Link from 'next/link';
+import { useI18n } from '~/lib/i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -180,6 +181,7 @@ function MetricCard({
 // ─── Days Badge ───────────────────────────────────────────────────────────────
 
 function DaysBadge({ days }: { days: number }) {
+  const { t } = useI18n();
   const cls =
     days >= 7
       ? 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-800'
@@ -188,7 +190,7 @@ function DaysBadge({ days }: { days: number }) {
         : 'bg-secondary text-muted-foreground ring-border';
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ring-1 ring-inset ${cls}`}>
-      {days}d
+      {days}{t('dashboard.daysShort')}
     </span>
   );
 }
@@ -196,13 +198,18 @@ function DaysBadge({ days }: { days: number }) {
 // ─── Type Badge ───────────────────────────────────────────────────────────────
 
 function TypeBadge({ type }: { type: 'registration' | 'drop' | 'swap' }) {
+  const { t } = useI18n();
   const styles = {
     registration: 'bg-brand-50 text-brand-700 ring-brand-200 dark:bg-brand-50 dark:text-brand-700 dark:ring-brand-200',
     drop: 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-800',
     swap: 'bg-purple-50 text-purple-700 ring-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:ring-purple-800',
   }[type];
 
-  const labels = { registration: 'Registration', drop: 'Drop', swap: 'Swap' };
+  const labels = {
+    registration: t('dashboard.registration'),
+    drop: t('dashboard.drop'),
+    swap: t('dashboard.swap'),
+  };
 
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ring-1 ring-inset ${styles}`}>
@@ -224,6 +231,7 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AdminDashboardClient() {
+  const { t } = useI18n();
   const { data: metrics, isLoading: metricsLoading } = useQuery<DashboardMetrics>({
     queryKey: ['reports', 'dashboard'],
     queryFn: () => apiResponse(api.v1.reports.dashboard.$get({ query: {} })),
@@ -243,11 +251,11 @@ export default function AdminDashboardClient() {
       {/* Header */}
       <div className="animate-fade-up mb-8">
         <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
-          Admin Dashboard
+          {t('dashboard.title')}
         </h1>
         {metrics && (
           <p className="mt-1 text-xs text-muted-foreground">
-            Last updated {new Date(metrics.generatedAt).toLocaleTimeString()}
+            {t('dashboard.lastUpdated')} {new Date(metrics.generatedAt).toLocaleTimeString()}
           </p>
         )}
       </div>
@@ -266,39 +274,39 @@ export default function AdminDashboardClient() {
         <>
           {/* Action-Required row */}
           <div className="animate-fade-up stagger-1 mb-6">
-            <SectionHeader>Action Required</SectionHeader>
+            <SectionHeader>{t('dashboard.actionRequired')}</SectionHeader>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <MetricCard
-                label="Pending Approvals"
+                label={t('dashboard.pendingApprovals')}
                 value={metrics.pendingApprovals}
-                sub="Registration requests"
+                sub={t('dashboard.registrationRequests')}
                 accent="amber"
                 href="/admin/reports"
               />
               <MetricCard
-                label="Pending Payments"
+                label={t('dashboard.pendingPayments')}
                 value={metrics.pendingPayments}
-                sub="Awaiting parent payment"
+                sub={t('dashboard.awaitingParentPayment')}
                 accent="amber"
               />
               <MetricCard
-                label="Change Requests"
+                label={t('dashboard.changeRequests')}
                 value={metrics.pendingChangeReqs}
-                sub="Drop / swap requests"
+                sub={t('dashboard.dropSwapRequests')}
                 accent="amber"
                 href="/admin/reports"
               />
               <MetricCard
-                label="Bank Transfers"
+                label={t('dashboard.bankTransfers')}
                 value={metrics.pendingBankTransfers}
-                sub="Manual confirmation needed"
+                sub={t('dashboard.manualConfirmationNeeded')}
                 accent="red"
                 href="/admin/payments"
               />
               <MetricCard
-                label="Withdrawals"
+                label={t('dashboard.withdrawals')}
                 value={metrics.pendingWithdrawals}
-                sub={`EGP ${(metrics.pendingWithdrawalsAmountEGP ?? 0).toLocaleString('en-EG', { minimumFractionDigits: 2 })} total`}
+                sub={`EGP ${(metrics.pendingWithdrawalsAmountEGP ?? 0).toLocaleString('en-EG', { minimumFractionDigits: 2 })} ${t('dashboard.total')}`}
                 accent="red"
                 href="/admin/escrow"
               />
@@ -307,31 +315,31 @@ export default function AdminDashboardClient() {
 
           {/* Current session row (REP-008 per URD) */}
           <div className="animate-fade-up stagger-3 mb-6">
-            <SectionHeader>Current Session{metrics.activeSessions === 1 ? '' : 's'}</SectionHeader>
+            <SectionHeader>{metrics.activeSessions === 1 ? t('dashboard.currentSession') : t('dashboard.currentSessions')}</SectionHeader>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <MetricCard
-                label="Active Sessions"
+                label={t('dashboard.activeSessions')}
                 value={metrics.activeSessions}
-                sub={metrics.activeSessionList?.map((s) => s.name).join(', ') || 'None open'}
+                sub={metrics.activeSessionList?.map((s) => s.name).join(', ') || t('dashboard.noneOpen')}
                 accent="teal"
                 href="/admin/sessions"
               />
               <MetricCard
-                label="Registrations (Current)"
+                label={t('dashboard.registrationsCurrent')}
                 value={metrics.currentSessionRegistrations}
-                sub="In active session(s)"
+                sub={t('dashboard.inActiveSessions')}
                 accent="indigo"
               />
               <MetricCard
-                label="Revenue (Current)"
+                label={t('dashboard.revenueCurrent')}
                 value={`EGP ${metrics.currentSessionRevenueEGP.toLocaleString('en-EG', { minimumFractionDigits: 2 })}`}
-                sub="Confirmed payments"
+                sub={t('dashboard.confirmedPayments')}
                 accent="teal"
               />
               <MetricCard
-                label="Confirmed This Month"
+                label={t('dashboard.confirmedThisMonth')}
                 value={metrics.confirmedThisMonth}
-                sub="Registrations confirmed"
+                sub={t('dashboard.registrationsConfirmed')}
                 accent="blue"
               />
             </div>
@@ -339,28 +347,28 @@ export default function AdminDashboardClient() {
 
           {/* Overview row */}
           <div className="animate-fade-up stagger-4 mb-6">
-            <SectionHeader>Overview</SectionHeader>
+            <SectionHeader>{t('dashboard.overview')}</SectionHeader>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <MetricCard
-                label="Escrow Liability"
+                label={t('dashboard.escrowLiability')}
                 value={`EGP ${metrics.escrowLiabilityEGP.toLocaleString('en-EG', { minimumFractionDigits: 2 })}`}
-                sub="Total positive balances"
+                sub={t('dashboard.totalPositiveBalances')}
                 accent="purple"
                 href="/admin/escrow"
               />
               <MetricCard
-                label="Active Students"
+                label={t('dashboard.activeStudents')}
                 value={metrics.students.active ?? (metrics.students.total - metrics.students.graduated)}
-                sub="Excluding graduated"
+                sub={t('dashboard.excludingGraduated')}
                 accent="indigo"
               />
               <MetricCard
-                label="Total Parents"
+                label={t('dashboard.totalParents')}
                 value={metrics.parents}
                 accent="blue"
               />
               <MetricCard
-                label="Pending Withdrawals"
+                label={t('dashboard.pendingWithdrawals')}
                 value={metrics.pendingWithdrawals}
                 sub={`EGP ${metrics.pendingWithdrawalsAmountEGP.toLocaleString('en-EG', { minimumFractionDigits: 2 })}`}
                 accent="amber"
@@ -371,15 +379,15 @@ export default function AdminDashboardClient() {
 
           {/* Students by grade */}
           <div className="animate-fade-up stagger-5 mb-8">
-            <SectionHeader>Students by Grade</SectionHeader>
+            <SectionHeader>{t('dashboard.studentsByGrade')}</SectionHeader>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <MetricCard label="Grade 10" value={metrics.students.grade10} accent="indigo" />
-              <MetricCard label="Grade 11" value={metrics.students.grade11} accent="indigo" />
-              <MetricCard label="Grade 12" value={metrics.students.grade12} accent="indigo" />
+              <MetricCard label={t('reports.grade10')} value={metrics.students.grade10} accent="indigo" />
+              <MetricCard label={t('reports.grade11')} value={metrics.students.grade11} accent="indigo" />
+              <MetricCard label={t('reports.grade12')} value={metrics.students.grade12} accent="indigo" />
               <MetricCard
-                label="Graduated"
+                label={t('reports.graduated')}
                 value={metrics.students.graduated}
-                sub={`Total: ${metrics.students.total}`}
+                sub={`${t('dashboard.total')}: ${metrics.students.total}`}
                 accent="indigo"
               />
             </div>
@@ -392,7 +400,7 @@ export default function AdminDashboardClient() {
         <div className="px-5 py-4 border-b border-border flex items-center justify-between">
           <div>
             <h2 className="font-display text-base font-semibold text-card-foreground">
-              Pending Approvals
+              {t('dashboard.pendingApprovals')}
               {totalPending > 0 && (
                 <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-800">
                   {totalPending}
@@ -400,20 +408,20 @@ export default function AdminDashboardClient() {
               )}
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Registration requests + drop/swap requests awaiting parent approval
+              {t('dashboard.pendingApprovalsDescription')}
             </p>
           </div>
           <Link
             href={"/admin/reports" as never}
             className="text-xs font-medium text-brand-600 hover:text-brand-700 transition-colors"
           >
-            Full report &rarr;
+            {t('dashboard.fullReport')} &rarr;
           </Link>
         </div>
 
         {pendingLoading && (
           <div className="py-16 text-center text-muted-foreground text-sm">
-            Loading pending approvals...
+            {t('dashboard.loadingPendingApprovals')}
           </div>
         )}
 
@@ -425,7 +433,7 @@ export default function AdminDashboardClient() {
               </svg>
             </div>
             <p className="text-muted-foreground text-sm font-medium">
-              All approvals are up to date
+              {t('dashboard.allApprovalsUpToDate')}
             </p>
           </div>
         )}
@@ -436,22 +444,22 @@ export default function AdminDashboardClient() {
               <thead>
                 <tr className="border-b border-border bg-secondary/50">
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                    Type
+                    {t('dashboard.type')}
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                    Student
+                    {t('dashboard.student')}
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                    Subject
+                    {t('dashboard.subject')}
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                    Session
+                    {t('dashboard.session')}
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                    Amount
+                    {t('dashboard.amount')}
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                    Waiting
+                    {t('dashboard.waiting')}
                   </th>
                 </tr>
               </thead>
@@ -469,7 +477,7 @@ export default function AdminDashboardClient() {
                         {r.studentName}
                       </div>
                       <div className="text-muted-foreground text-xs">
-                        Grade {r.studentGrade}
+                        {t('reports.grade')} {r.studentGrade}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
@@ -499,7 +507,7 @@ export default function AdminDashboardClient() {
                         {cr.studentName}
                       </div>
                       <div className="text-muted-foreground text-xs">
-                        Grade {cr.studentGrade}
+                        {t('reports.grade')} {cr.studentGrade}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">

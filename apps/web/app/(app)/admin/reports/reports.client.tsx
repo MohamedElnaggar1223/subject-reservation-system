@@ -27,20 +27,23 @@ import { api } from '~/lib/hono';
 import { apiResponse } from '@repo/validations';
 import { env } from '~/env';
 import { Button } from '~/components/ui/button';
+import { useI18n, type TranslationKey } from '~/lib/i18n';
 
 // --- Report Definitions ---
 
 const REPORTS = [
-  { id: 'pending-approvals', label: 'Pending Approvals',    badge: 'REP-009', needsSession: false, needsGrade: false },
-  { id: 'registrations',     label: 'Registration Report',  badge: 'REP-001', needsSession: true,  needsGrade: true  },
-  { id: 'financial',         label: 'Financial Summary',    badge: 'REP-002', needsSession: true,  needsGrade: false },
-  { id: 'enrollment',        label: 'Subject Enrollment',   badge: 'REP-004', needsSession: true,  needsGrade: false },
-  { id: 'compliance',        label: 'Grade 10 Compliance',  badge: 'REP-005', needsSession: true,  needsGrade: false },
-  { id: 'roster',            label: 'Student Roster',       badge: 'REP-007', needsSession: false, needsGrade: true  },
-  { id: 'escrow',            label: 'Escrow Report',        badge: 'REP-003', needsSession: false, needsGrade: false },
+  { id: 'comprehensive',     labelKey: 'reports.comprehensive',     badge: 'ALL',     needsSession: false, needsGrade: false },
+  { id: 'pending-approvals', labelKey: 'reports.pendingApprovals',   badge: 'REP-009', needsSession: false, needsGrade: false },
+  { id: 'registrations',     labelKey: 'reports.registrations',      badge: 'REP-001', needsSession: true,  needsGrade: true  },
+  { id: 'financial',         labelKey: 'reports.financial',          badge: 'REP-002', needsSession: true,  needsGrade: false },
+  { id: 'enrollment',        labelKey: 'reports.enrollment',         badge: 'REP-004', needsSession: true,  needsGrade: false },
+  { id: 'compliance',        labelKey: 'reports.compliance',         badge: 'REP-005', needsSession: true,  needsGrade: false },
+  { id: 'roster',            labelKey: 'reports.roster',             badge: 'REP-007', needsSession: false, needsGrade: true  },
+  { id: 'escrow',            labelKey: 'reports.escrow',             badge: 'REP-003', needsSession: false, needsGrade: false },
 ] as const;
 
 type ReportId = typeof REPORTS[number]['id'];
+type ReportDefinition = typeof REPORTS[number];
 
 // --- Helpers ---
 
@@ -73,7 +76,8 @@ async function downloadCSV(reportId: ReportId, sessionId: string, grade: string)
 
 // Generic flat table renderer
 function DataTable({ rows }: { rows: Record<string, unknown>[] }) {
-  if (!rows.length) return <p className="text-sm text-muted-foreground py-4 text-center">No data found.</p>;
+  const { t } = useI18n();
+  if (!rows.length) return <p className="text-sm text-muted-foreground py-4 text-center">{t('common.noData')}</p>;
   const headers = Object.keys(rows[0]!);
   return (
     <div className="overflow-x-auto bg-card rounded-xl border border-border shadow-sm">
@@ -124,6 +128,7 @@ function extractTotal(data: unknown): number | null {
 
 // Pending approvals specialized renderer
 function PendingApprovalsView({ data }: { data: { pendingRegistrations: unknown; pendingChangeRequests: unknown } }) {
+  const { t } = useI18n();
   const regs = extractRows(data.pendingRegistrations);
   const crs  = extractRows(data.pendingChangeRequests);
   const totalRegs = extractTotal(data.pendingRegistrations) ?? regs.length;
@@ -133,13 +138,13 @@ function PendingApprovalsView({ data }: { data: { pendingRegistrations: unknown;
     <div className="space-y-6">
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-3">
-          Registration Requests <span className="text-muted-foreground font-normal">({totalRegs})</span>
+          {t('reports.registrationRequests')} <span className="text-muted-foreground font-normal">({totalRegs})</span>
         </h3>
         <DataTable rows={regs} />
       </div>
       <div>
         <h3 className="text-sm font-semibold text-foreground mb-3">
-          Drop / Swap Requests <span className="text-muted-foreground font-normal">({totalCRs})</span>
+          {t('reports.dropSwapRequests')} <span className="text-muted-foreground font-normal">({totalCRs})</span>
         </h3>
         <DataTable rows={crs} />
       </div>
@@ -173,19 +178,20 @@ const COMPLIANCE_STATUS_STYLE: Record<string, string> = {
 };
 
 function ComplianceView({ data }: { data: { students: ComplianceStudentRow[]; coreSubjects: string[] } }) {
+  const { t } = useI18n();
   return (
     <div>
       <p className="text-xs text-muted-foreground mb-3">
-        Core subjects: {data.coreSubjects.join(', ') || 'None defined'}
+        {t('reports.coreSubjects')}: {data.coreSubjects.join(', ') || t('reports.noneDefined')}
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="px-3 py-2 text-left font-medium">Student</th>
-              <th className="px-3 py-2 text-left font-medium">Student ID</th>
-              <th className="px-3 py-2 text-left font-medium">Compliant</th>
-              <th className="px-3 py-2 text-left font-medium">Per-subject status</th>
+              <th className="px-3 py-2 text-left font-medium">{t('reports.student')}</th>
+              <th className="px-3 py-2 text-left font-medium">{t('reports.studentId')}</th>
+              <th className="px-3 py-2 text-left font-medium">{t('reports.compliant')}</th>
+              <th className="px-3 py-2 text-left font-medium">{t('reports.perSubjectStatus')}</th>
             </tr>
           </thead>
           <tbody>
@@ -199,7 +205,7 @@ function ComplianceView({ data }: { data: { students: ComplianceStudentRow[]; co
                       ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
                       : 'bg-destructive/10 text-destructive'
                   }`}>
-                    {s.isCompliant ? 'Yes' : 'No'}
+                    {s.isCompliant ? t('common.yes') : t('common.no')}
                   </span>
                 </td>
                 <td className="px-3 py-2">
@@ -226,7 +232,7 @@ function ComplianceView({ data }: { data: { students: ComplianceStudentRow[]; co
             {data.students.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">
-                  No Grade 10 students in this session.
+                  {t('reports.noGrade10')}
                 </td>
               </tr>
             )}
@@ -260,15 +266,48 @@ function FinancialView({ data }: { data: Record<string, unknown> }) {
   return <DataTable rows={flatRows} />;
 }
 
+type ComprehensiveReport = {
+  summary: Record<string, unknown>;
+  sections: Record<string, Record<string, unknown>[]>;
+};
+
+function titleize(value: string) {
+  return value.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
+}
+
+function ComprehensiveView({ data }: { data: ComprehensiveReport }) {
+  const { t } = useI18n();
+  const summaryRows = Object.entries(data.summary ?? {}).map(([metric, value]) => ({ metric: titleize(metric), value }));
+  const sections = Object.entries(data.sections ?? {});
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-3">{t('reports.summary')}</h3>
+        <DataTable rows={summaryRows} />
+      </div>
+      <p className="text-xs text-muted-foreground">{t('reports.comprehensiveDescription')}</p>
+      {sections.map(([section, rows]) => (
+        <section key={section} className="space-y-3">
+          <h3 className="text-sm font-semibold text-foreground">{titleize(section)}</h3>
+          <DataTable rows={rows} />
+        </section>
+      ))}
+    </div>
+  );
+}
+
 // --- Main Component ---
 
 export default function ReportsClient() {
-  const [activeReport, setActiveReport] = useState<ReportId>('pending-approvals');
+  const { t } = useI18n();
+  const [activeReport, setActiveReport] = useState<ReportId>('comprehensive');
   const [sessionId, setSessionId]       = useState('');
   const [grade, setGrade]               = useState('');
   const [submitted, setSubmitted]       = useState(false);
 
-  const reportDef = REPORTS.find((r) => r.id === activeReport)!;
+  const reportDef = REPORTS.find((r) => r.id === activeReport)! as ReportDefinition;
+  const reportLabel = t(reportDef.labelKey as TranslationKey);
 
   const { data: sessions } = useQuery({
     queryKey: ['sessions', 'admin'],
@@ -294,6 +333,8 @@ export default function ReportsClient() {
       if (grade) q.grade = grade;
 
       switch (activeReport) {
+        case 'comprehensive':
+          return apiResponse(api.v1.reports.comprehensive.$get({ query: {} }));
         case 'pending-approvals':
           return apiResponse(api.v1.reports['pending-approvals'].$get({ query: {} }));
         case 'registrations':
@@ -327,10 +368,13 @@ export default function ReportsClient() {
 
   const renderResults = () => {
     if (!submitted) return null;
-    if (isLoading) return <div className="py-12 text-center text-muted-foreground text-sm">Generating report...</div>;
-    if (isError) return <div className="py-12 text-center text-red-500 dark:text-red-400 text-sm">Failed to generate report. Check your session ID and try again.</div>;
+    if (isLoading) return <div className="py-12 text-center text-muted-foreground text-sm">{t('reports.generating')}</div>;
+    if (isError) return <div className="py-12 text-center text-red-500 dark:text-red-400 text-sm">{t('reports.failed')}</div>;
     if (!isFetched || data === null || data === undefined) return null;
 
+    if (activeReport === 'comprehensive') {
+      return <ComprehensiveView data={data as ComprehensiveReport} />;
+    }
     if (activeReport === 'pending-approvals') {
       return <PendingApprovalsView data={data as { pendingRegistrations: unknown; pendingChangeRequests: unknown }} />;
     }
@@ -371,9 +415,9 @@ export default function ReportsClient() {
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Reports</h1>
+        <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">{t('reports.title')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Generate and export data reports. All reports support CSV download.
+          {t('reports.description')}
         </p>
       </div>
 
@@ -392,7 +436,7 @@ export default function ReportsClient() {
                     : 'text-muted-foreground hover:bg-muted'
                 }`}
               >
-                <span className="flex-1">{r.label}</span>
+                <span className="flex-1">{t(r.labelKey as TranslationKey)}</span>
                 <span className="text-xs text-muted-foreground shrink-0">{r.badge}</span>
               </button>
             ))}
@@ -405,7 +449,7 @@ export default function ReportsClient() {
           {/* Filters card */}
           <div className="bg-card rounded-xl border border-border shadow-sm p-5">
             <h2 className="text-sm font-semibold text-foreground mb-4">
-              {reportDef.label}
+              {reportLabel}
               <span className="ml-2 text-xs font-normal text-muted-foreground">{reportDef.badge}</span>
             </h2>
 
@@ -413,14 +457,14 @@ export default function ReportsClient() {
               {reportDef.needsSession && (
                 <div className="flex-1 min-w-[200px]">
                   <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                    Session <span className="text-destructive">*</span>
+                    {t('reports.session')} <span className="text-destructive">*</span>
                   </label>
                   <select
                     value={sessionId}
                     onChange={(e) => { setSessionId(e.target.value); setSubmitted(false); }}
                     className="w-full rounded-lg border border-border bg-background text-sm px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="">Select a session...</option>
+                    <option value="">{t('reports.selectSession')}</option>
                     {sortedSessions?.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name} ({s.sessionType}) — {s.status}
@@ -433,18 +477,18 @@ export default function ReportsClient() {
               {reportDef.needsGrade && (
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                    Grade
+                    {t('reports.grade')}
                   </label>
                   <select
                     value={grade}
                     onChange={(e) => { setGrade(e.target.value); setSubmitted(false); }}
                     className="rounded-lg border border-border bg-background text-sm px-3 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   >
-                    <option value="">All grades</option>
-                    <option value="10">Grade 10</option>
-                    <option value="11">Grade 11</option>
-                    <option value="12">Grade 12</option>
-                    <option value="graduated">Graduated</option>
+                    <option value="">{t('reports.allGrades')}</option>
+                    <option value="10">{t('reports.grade10')}</option>
+                    <option value="11">{t('reports.grade11')}</option>
+                    <option value="12">{t('reports.grade12')}</option>
+                    <option value="graduated">{t('reports.graduated')}</option>
                   </select>
                 </div>
               )}
@@ -454,7 +498,7 @@ export default function ReportsClient() {
                   onClick={handleRun}
                   disabled={!canRun || isLoading}
                 >
-                  {isLoading ? 'Loading...' : 'Run Report'}
+                  {isLoading ? t('common.loading') : t('reports.run')}
                 </Button>
 
                 {submitted && isFetched && !isError && (
@@ -462,7 +506,7 @@ export default function ReportsClient() {
                     variant="outline"
                     onClick={() => downloadCSV(activeReport, sessionId, grade)}
                   >
-                    CSV
+                    {t('common.csv')}
                   </Button>
                 )}
               </div>
@@ -474,9 +518,11 @@ export default function ReportsClient() {
             <div className="bg-card rounded-xl border border-border shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-foreground">
-                  Results
+                  {t('common.results')}
                   {rowCount !== null && (
-                    <span className="ml-2 text-xs font-normal text-muted-foreground">{rowCount} row{rowCount !== 1 ? 's' : ''}</span>
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      {rowCount} {rowCount === 1 ? t('common.row') : t('common.rows')}
+                    </span>
                   )}
                 </h3>
               </div>
