@@ -1,0 +1,192 @@
+'use client';
+
+/**
+ * Results Entry Client — Staff (V3 §5.4)
+ *
+ * Session picker → grid of confirmed registrations → inline grade
+ * inputs → one save. Existing grades prefill (re-recording fixes typos).
+ */
+
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '~/lib/hono';
+import { apiResponse } from '@repo/validations';
+import { Button } from '~/components/ui/button';
+
+type SessionRow = { id: string; name: string; status: string };
+type PendingRow = {
+  id: string;
+  gradeReceived: string | null;
+  student: { id: string; name: string; studentId: string | null; grade: number | null };
+  subject: { id: string; name: string; code: string; council: string };
+};
+
+export default function ResultsEntryClient(): React.JSX.Element {
+  const qc = useQueryClient();
+  const [sessionId, setSessionId] = useState('');
+  const [grades, setGrades] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [search, setSearch] = useState('');
+
+  const { data: sessions = [] } = useQuery<SessionRow[]>({
+    queryKey: ['sessions', 'all-admin'],
+    queryFn: async () => (await apiResponse(api.v1.sessions.$get({ query: {} }))) as SessionRow[],
+  });
+
+  const { data: rows = [], isFetching } = useQuery<PendingRow[]>({
+    queryKey: ['results', 'pending', sessionId],
+    queryFn: async () =>
+      (await apiResponse(
+        api.v1.remarks.results.pending.$get({ query: { sessionId } })
+      )) as PendingRow[],
+    enabled: !!sessionId,
+  });
+
+  // Prefill entered grades when rows load
+  useEffect(() => {
+    if (rows.length === 0) return;
+    setGrades((prev) => {
+      const next = { ...prev };
+      for (const r of rows) {
+        if (next[r.id] === undefined && r.gradeReceived) next[r.id] = r.gradeReceived;
+      }
+      return next;
+    });
+  }, [rows]);
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const results = rows
+        .filter((r) => (grades[r.id] ?? '').trim() && (grades[r.id] ?? '').trim() !== (r.gradeReceived ?? ''))
+        .map((r) => ({ registrationId: r.id, grade: grades[r.id]!.trim() }));
+      return apiResponse(api.v1.remarks.results.$post({ json: { results } }));
+    },
+    onSuccess: (data) => {
+      const d = data as unknown as { recorded: number; skipped: number };
+      setMessage(`Saved ${d.recorded} grade(s)${d.skipped ? ` (${d.skipped} skipped)` : ''}.`);
+      setErrorMsg('');
+      qc.invalidateQueries({ queryKey: ['results'] });
+    },
+    onError: (err: Error) => { setErrorMsg(err.message); setMessage(''); },
+  });
+
+  const changedCount = rows.filter(
+    (r) => (grades[r.id] ?? '').trim() && (grades[r.id] ?? '').trim() !== (r.gradeReceived ?? '')
+  ).length;
+
+  const visible = rows.filter((r) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return (
+      r.student.name.toLowerCase().includes(q) ||
+      (r.student.studentId ?? '').toLowerCase().includes(q) ||
+      r.subject.name.toLowerCase().includes(q) ||
+      r.subject.code.toLowerCase().includes(q)
+    );
+  });
+
+  return (
+    <div className="px-6 py-8 max-w-5xl mx-auto animate-fade-up">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-foreground font-display tracking-tight">Results Entry</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Pick a session, type grades, save. Existing grades prefill — retype to correct.
+        </p>
+      </div>
+
+      <div className="flex gap-3 flex-wrap mb-6">
+        <select
+          value={sessionId}
+          onChange={(e) => { setSessionId(e.target.value); setGrades({}); setMessage(''); }}
+          className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+        >
+          <option value="">Pick a session…</option>
+          {sessions.map((s) => (
+            <option key={s.id} value={s.id}>{s.name} ({s.status})</option>
+          ))}
+        </select>
+        {sessionId && (
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Filter by student or subject…"
+            className="flex-1 min-w-[220px] rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+          />
+        )}
+      </div>
+
+      {message && (
+        <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400">
+          {message}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
+          {errorMsg}
+        </div>
+      )}
+
+      {!sessionId ? null : isFetching ? (
+        <div className="flex justify-center py-10">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-10 text-center shadow-sm">
+          <p className="text-muted-foreground text-sm">No confirmed registrations in this session.</p>
+        </div>
+      ) : (
+        <>
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden mb-4">
+            <table className="w-full text-sm">
+              <thead className="border-b border-border bg-muted">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Student</th>
+                  <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Subject</th>
+                  <th className="px-4 py-3 text-left font-semibold text-muted-foreground w-32">Grade</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {visible.map((r) => (
+                  <tr key={r.id} className="hover:bg-muted/50 transition-colors">
+                    <td className="px-4 py-2">
+                      <div className="font-medium text-foreground">{r.student.name}</div>
+                      <div className="text-xs text-muted-foreground font-mono">{r.student.studentId ?? ''}</div>
+                    </td>
+                    <td className="px-4 py-2 text-card-foreground">
+                      {r.subject.name}
+                      <span className="text-xs text-muted-foreground font-mono ml-1">{r.subject.code}</span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <input
+                        type="text"
+                        value={grades[r.id] ?? ''}
+                        onChange={(e) => setGrades((prev) => ({ ...prev, [r.id]: e.target.value.toUpperCase() }))}
+                        placeholder="A* / 7 / B…"
+                        className={`w-24 rounded-lg border bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground font-mono ${
+                          (grades[r.id] ?? '').trim() && (grades[r.id] ?? '').trim() !== (r.gradeReceived ?? '')
+                            ? 'border-primary'
+                            : 'border-border'
+                        }`}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              disabled={saveMutation.isPending || changedCount === 0}
+              onClick={() => saveMutation.mutate()}
+            >
+              {saveMutation.isPending ? 'Saving…' : `Save ${changedCount} Grade${changedCount === 1 ? '' : 's'}`}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

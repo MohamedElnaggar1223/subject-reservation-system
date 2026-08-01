@@ -39,6 +39,7 @@ export const AUDIT_ENTITY_TYPES = [
   'receipt',
   'refund_window',
   'exception',
+  'remark_request',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -58,6 +59,7 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   receipt:        'Receipt',
   refund_window:  'Refund Window',
   exception:      'Exception',
+  remark_request: 'Remark Request',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -108,6 +110,14 @@ export const AUDIT_ACTIONS = [
   'PREREG_CREATED',
   'PREREG_CANCELLED',
   'PREREG_CAPTURED',
+  'REMARK_REQUESTED',
+  'REMARK_APPROVED',
+  'REMARK_REJECTED',
+  'REMARK_CONSENT_CONFIRMED',
+  'REMARK_SUBMITTED_TO_BOARD',
+  'REMARK_OUTCOME_RECORDED',
+  'REMARK_CANCELLED',
+  'RESULTS_RECORDED',
   // Change requests
   'CHANGE_REQUEST_CREATED',
   'CHANGE_REQUEST_APPROVED',
@@ -172,6 +182,14 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   PREREG_CREATED:             'Preregistration Created',
   PREREG_CANCELLED:           'Preregistration Cancelled',
   PREREG_CAPTURED:            'Preregistration Captured (Session Opened)',
+  REMARK_REQUESTED:           'Remark Requested',
+  REMARK_APPROVED:            'Remark Approved by Parent',
+  REMARK_REJECTED:            'Remark Rejected by Parent',
+  REMARK_CONSENT_CONFIRMED:   'Remark Consent Confirmed',
+  REMARK_SUBMITTED_TO_BOARD:  'Remark Submitted to Board',
+  REMARK_OUTCOME_RECORDED:    'Remark Outcome Recorded',
+  REMARK_CANCELLED:           'Remark Cancelled',
+  RESULTS_RECORDED:           'Exam Results Recorded',
   CHANGE_REQUEST_CREATED:     'Drop/Swap Request Created',
   CHANGE_REQUEST_APPROVED:    'Drop/Swap Request Approved',
   CHANGE_REQUEST_REJECTED:    'Drop/Swap Request Rejected',

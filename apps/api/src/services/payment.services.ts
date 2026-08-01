@@ -55,6 +55,7 @@ import { logAction } from './audit.services';
 import { notifyPaymentConfirmed, notifyEscrowBalanceChanged } from './notification.services';
 import { createReceiptsForRegistrations } from './receipt.services';
 import { creditHeld } from './escrow.services';
+import { onRemarkPaymentCompleted } from './remark.services';
 
 // ─── School Receiving Account (InstaPay destination) ─────────────────────────
 //
@@ -481,6 +482,17 @@ export async function confirmPayment(
   // Idempotent: payment was already processed by a concurrent webhook
   if (!updated) {
     return undefined;
+  }
+
+  // V3 §6.10: a completed remark-fee payment advances its request to
+  // awaiting_submission (idempotent status-guarded update).
+  if (pay.purpose === 'remark') {
+    const remarkId = (pay.metadata as Record<string, unknown> | null)?.remarkRequestId;
+    if (typeof remarkId === 'string') {
+      await onRemarkPaymentCompleted(remarkId).catch((err) =>
+        console.error('[payment] remark completion hook failed:', err)
+      );
+    }
   }
 
   for (const regId of registrationIds) {

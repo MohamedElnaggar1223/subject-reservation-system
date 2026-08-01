@@ -668,6 +668,12 @@ export const registration = pgTable(
     approvalComments: text("approval_comments"),
     // Set when a confirmed registration is dropped
     droppedAt: timestamp("dropped_at", { withTimezone: true }),
+    // V3 §5.4 — minimal results dimension: the board grade the student
+    // received for this sitting (entered by staff after results day).
+    // Remarks and retake detection read this; no analytics beyond that.
+    gradeReceived: text("grade_received"),
+    resultRecordedAt: timestamp("result_recorded_at", { withTimezone: true }),
+    resultRecordedBy: text("result_recorded_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -1373,6 +1379,141 @@ export const subjectTeacherRelations = relations(subjectTeacher, ({ one }) => ({
   teacher: one(teacher, {
     fields: [subjectTeacher.teacherId],
     references: [teacher.id],
+  }),
+}));
+
+/**
+ * ============================================
+ * REMARK TABLES (V3 §6.10)
+ * ============================================
+ *
+ * Post-results services (Enquiries About Results). All three councils
+ * operate at PAPER level, so a request is a header + line items.
+ * Council rules enforced in the service:
+ * - Cambridge: one request ever per (candidate, syllabus, series),
+ *   uniform service type — the atomic one-shot rule.
+ * - OxfordAQA: once per paper.
+ * - Consent is first-class and blocking (missing consent = centre
+ *   malpractice at OxfordAQA).
+ * Fees are admin-configured per (council, service) since Cambridge and
+ * OxfordAQA don't publish theirs.
+ */
+export const remarkRequest = pgTable(
+  "remark_request",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    registrationId: text("registration_id")
+      .notNull()
+      .references(() => registration.id, { onDelete: "restrict" }),
+    // 'clerical_check' | 'review_of_marking' | 'priority_review' | 'script_copy'
+    serviceType: text("service_type").notNull(),
+    // 'pending_approval' | 'pending_consent' | 'pending_payment' |
+    // 'awaiting_submission' | 'submitted' | 'outcome_recorded' |
+    // 'rejected' | 'cancelled'
+    status: text("status").notNull().default("pending_approval"),
+    requestedBy: text("requested_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    approvedBy: text("approved_by").references(() => user.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    // Blocking consent (grades can go DOWN): parent attests + optionally
+    // uploads the signed form; the school retains the paper per board rules.
+    consentFileId: text("consent_file_id").references(() => file.id, { onDelete: "set null" }),
+    consentConfirmedBy: text("consent_confirmed_by").references(() => user.id, { onDelete: "set null" }),
+    consentConfirmedAt: timestamp("consent_confirmed_at", { withTimezone: true }),
+    boardReference: text("board_reference"),
+    feeCharged: numeric("fee_charged", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
+    feeRefunded: boolean("fee_refunded").notNull().default(false),
+    comments: text("comments"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("remark_studentId_idx").on(table.studentId),
+    index("remark_registrationId_idx").on(table.registrationId),
+    index("remark_status_idx").on(table.status),
+    check("remark_fee_nonneg", sql`${table.feeCharged} >= 0`),
+  ]
+);
+
+export const remarkRequestItem = pgTable(
+  "remark_request_item",
+  {
+    id: text("id").primaryKey(),
+    remarkRequestId: text("remark_request_id")
+      .notNull()
+      .references(() => remarkRequest.id, { onDelete: "cascade" }),
+    paperCode: text("paper_code").notNull(),
+    paperName: text("paper_name"),
+    // 'pending' | 'mark_up' | 'mark_down' | 'unchanged'
+    outcome: text("outcome").notNull().default("pending"),
+    gradeAfter: text("grade_after"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("remarkItem_requestId_idx").on(table.remarkRequestId)]
+);
+
+/** Admin-configured remark fees (per paper) — boards don't all publish */
+export const remarkFeeSchedule = pgTable(
+  "remark_fee_schedule",
+  {
+    id: text("id").primaryKey(),
+    council: text("council").notNull(),
+    serviceType: text("service_type").notNull(),
+    amountPerPaper: numeric("amount_per_paper", { precision: 12, scale: 2, mode: "number" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("remarkFee_council_service_idx").on(table.council, table.serviceType),
+    check("remarkFee_amount_nonneg", sql`${table.amountPerPaper} >= 0`),
+  ]
+);
+
+/** Per-service deadlines per session series (priority ≈ 1 week, standard ≈ 5) */
+export const remarkDeadline = pgTable(
+  "remark_deadline",
+  {
+    id: text("id").primaryKey(),
+    council: text("council").notNull(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => registrationSession.id, { onDelete: "cascade" }),
+    serviceType: text("service_type").notNull(),
+    deadline: timestamp("deadline", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("remarkDeadline_unique_idx").on(table.council, table.sessionId, table.serviceType),
+  ]
+);
+
+export const remarkRequestRelations = relations(remarkRequest, ({ one, many }) => ({
+  student: one(user, {
+    fields: [remarkRequest.studentId],
+    references: [user.id],
+    relationName: "studentRemarks",
+  }),
+  registration: one(registration, {
+    fields: [remarkRequest.registrationId],
+    references: [registration.id],
+  }),
+  items: many(remarkRequestItem),
+}));
+
+export const remarkRequestItemRelations = relations(remarkRequestItem, ({ one }) => ({
+  remarkRequest: one(remarkRequest, {
+    fields: [remarkRequestItem.remarkRequestId],
+    references: [remarkRequest.id],
   }),
 }));
 

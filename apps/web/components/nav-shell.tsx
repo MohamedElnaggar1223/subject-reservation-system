@@ -78,6 +78,8 @@ function getNavSections(role: string | null | undefined): NavSection[] {
           { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'checkout' },
           { labelKey: 'nav.schoolFees', href: '/admin/school-fees', icon: 'escrow' },
           { labelKey: 'nav.exceptions', href: '/admin/exceptions', icon: 'approvals' },
+          { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
+          { labelKey: 'nav.resultsEntry', href: '/results-entry', icon: 'reports' },
         ],
       },
       {
@@ -96,6 +98,8 @@ function getNavSections(role: string | null | undefined): NavSection[] {
       {
         items: [
           { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'payments' },
+          { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
+          { labelKey: 'nav.resultsEntry', href: '/results-entry', icon: 'reports' },
         ],
       },
       {
@@ -122,6 +126,7 @@ function getNavSections(role: string | null | undefined): NavSection[] {
           { labelKey: 'nav.myRegistrations', href: '/registrations', icon: 'registrations' },
           { labelKey: 'nav.history', href: '/registrations/history', icon: 'history' },
           { labelKey: 'nav.approvals', href: '/approvals', icon: 'approvals' },
+          { labelKey: 'nav.remarks', href: '/remarks', icon: 'audit' },
         ],
       },
       {
@@ -156,6 +161,7 @@ function getNavSections(role: string | null | undefined): NavSection[] {
         { labelKey: 'nav.myRegistrations', href: '/registrations', icon: 'registrations' },
         { labelKey: 'nav.history', href: '/registrations/history', icon: 'history' },
         { labelKey: 'nav.browseSubjects', href: '/subjects', icon: 'subjects' },
+        { labelKey: 'nav.remarks', href: '/remarks', icon: 'audit' },
       ],
     },
     {
