@@ -2,7 +2,11 @@
 
 **Date:** 31 July 2026
 **Inputs:** 11 stakeholder requirements (school staff feedback), 6 confirmed product decisions, and three research reports (IGCSE operations in Egypt, per-council remark policies, InstaPay integration feasibility).
-**Status:** Awaiting review. No code changes have been made for v3 yet.
+**Status:** ✅ IMPLEMENTED — all six phases landed on `main` (1 Aug 2026), commits
+`1734b4d` (P1 money rails & finance roles), `1b98e25` (P2 fees & pricing),
+`3d6b4df` (P3 receipts & refunds incl. refund windows), `cd96803` (P4 exceptions),
+`3f3405b` (P5 held wallet & preregistration), `a0ad2e9` (P6 results & remarks).
+Migrations 0020–0025 pending `pnpm db:migrate`. Fast-follows in §8 remain open.
 
 ---
 
