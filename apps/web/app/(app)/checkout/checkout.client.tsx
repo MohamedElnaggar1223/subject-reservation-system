@@ -17,10 +17,11 @@
  */
 
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { apiResponse } from '@repo/validations';
+import { invalidateFinancialState } from '~/lib/financial-cache';
 import {
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
@@ -61,6 +62,7 @@ type PaymentResult = {
 
 export default function CheckoutClient({ registrationIds }: CheckoutClientProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('fawry');
   const [selectedWallet, setSelectedWallet] = useState<WalletProvider>('vodafone_cash');
@@ -97,8 +99,52 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
       );
     },
     onSuccess: (data) => {
-      setResult(data as PaymentResult);
+      const payment = data as PaymentResult;
+      setResult(payment);
       setSubmitError('');
+
+      const appliedEscrow = payment.escrowAmountApplied ?? 0;
+      const studentId = summary?.student.id;
+
+      if (studentId && appliedEscrow > 0) {
+        queryClient.setQueryData<CheckoutSummary>(
+          ['payments', 'checkout-summary', summaryKey],
+          (current) =>
+            current
+              ? {
+                  ...current,
+                  escrowBalance: Math.max(0, current.escrowBalance - appliedEscrow),
+                  registrations:
+                    payment.status === 'completed' || payment.metadata?.fullyEscrowFunded === true
+                      ? current.registrations.map((reg) => ({ ...reg, status: 'confirmed' }))
+                      : current.registrations,
+                }
+              : current,
+        );
+
+        queryClient.setQueryData<Array<{ id: string; escrowBalance: number }>>(
+          ['escrow', 'children'],
+          (children) =>
+            children?.map((child) =>
+              child.id === studentId
+                ? { ...child, escrowBalance: Math.max(0, child.escrowBalance - appliedEscrow) }
+                : child,
+            ),
+        );
+
+        queryClient.setQueryData<{ balance: number }>(
+          ['escrow', 'balance', studentId],
+          (balance) =>
+            balance
+              ? { ...balance, balance: Math.max(0, balance.balance - appliedEscrow) }
+              : balance,
+        );
+      }
+
+      invalidateFinancialState(queryClient, {
+        studentId,
+      });
+      router.refresh();
     },
     onError: (err: Error) => {
       setSubmitError(err.message);

@@ -22,6 +22,7 @@
 import {
   db,
   registration,
+  paymentRegistration,
   subject,
   registrationSession,
   parentStudentLink,
@@ -36,6 +37,7 @@ import type {
   RequestRegistrationType,
   DirectRegistrationType,
   ApproveRegistrationsType,
+  RevertApprovedRegistrationsType,
   RejectRegistrationsType,
   AdminOverrideApprovalType,
   ListRegistrationsQueryType,
@@ -520,6 +522,97 @@ export async function approveRegistrationRequest(
       }).catch((err) => console.error('[notification] NOT-004 (approve) failed:', err));
     }
   }
+
+  return updated;
+}
+
+/**
+ * Parent reverts unpaid approvals back to pending approval.
+ *
+ * This is only allowed before checkout creates a payment link. Once a
+ * registration is attached to any payment row, payment/escrow state may exist
+ * elsewhere and the approval cannot be safely moved backward.
+ */
+export async function revertApprovedRegistrationRequest(
+  data: RevertApprovedRegistrationsType,
+  parentId: string
+) {
+  const regs = await db.query.registration.findMany({
+    where: (r, { inArray }) => inArray(r.id, data.registrationIds),
+  });
+
+  if (regs.length === 0) throw new Error('No registrations found');
+  if (regs.length !== data.registrationIds.length) {
+    throw new Error('One or more registration IDs are invalid');
+  }
+
+  const notPendingPayment = regs.filter((r) => r.status !== 'pending_payment');
+  if (notPendingPayment.length > 0) {
+    throw new Error('Only unpaid pending-payment registrations can be reverted');
+  }
+
+  const notOriginalStudentRequests = regs.filter((r) =>
+    r.requestedBy !== r.studentId ||
+    r.approvalComments?.startsWith('Swap from registration') ||
+    r.approvalComments?.startsWith('Direct swap') ||
+    r.approvalComments?.startsWith('[ADMIN OVERRIDE]')
+  );
+  if (notOriginalStudentRequests.length > 0) {
+    throw new Error('Only normal student registration approvals can be reverted');
+  }
+
+  const linkedPayments = await db.query.paymentRegistration.findMany({
+    where: (pr, { inArray }) => inArray(pr.registrationId, data.registrationIds),
+    columns: { registrationId: true },
+  });
+  if (linkedPayments.length > 0) {
+    throw new Error('One or more registrations already have a payment in progress and cannot be reverted');
+  }
+
+  const studentIds = [...new Set(regs.map((r) => r.studentId))];
+  for (const studentId of studentIds) {
+    const linked = await validateParentStudentLink(parentId, studentId);
+    if (!linked) {
+      throw new Error(
+        'You are not authorized to revert approvals for one or more students'
+      );
+    }
+  }
+
+  const updated = await db.transaction(async (tx) => {
+    const paymentLinksInTx = await tx.query.paymentRegistration.findMany({
+      where: (pr, { inArray }) => inArray(pr.registrationId, data.registrationIds),
+      columns: { registrationId: true },
+    });
+    if (paymentLinksInTx.length > 0) {
+      throw new Error('One or more registrations already have a payment in progress and cannot be reverted');
+    }
+
+    const rows = await tx
+      .update(registration)
+      .set({
+        status: 'pending_approval',
+        approvedBy: null,
+        approvedAt: null,
+        approvalComments: null,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          inArray(registration.id, data.registrationIds),
+          eq(registration.status, 'pending_payment'),
+        )
+      )
+      .returning();
+
+    if (rows.length !== data.registrationIds.length) {
+      throw new Error(
+        'One or more registrations were concurrently processed. Please refresh and try again.'
+      );
+    }
+
+    return rows;
+  });
 
   return updated;
 }

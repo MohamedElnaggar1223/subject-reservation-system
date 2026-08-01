@@ -14,7 +14,9 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
+import { invalidateFinancialState } from '~/lib/financial-cache';
 import { apiResponse, WITHDRAWAL_STATUS_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
@@ -54,6 +56,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function EscrowAdminClient() {
   const qc = useQueryClient();
+  const router = useRouter();
 
   // Modal state
   const [fulfillTarget, setFulfillTarget]   = useState<WithdrawalRequest | null>(null);
@@ -63,7 +66,10 @@ export default function EscrowAdminClient() {
   const [rejectNotes, setRejectNotes]       = useState('');
   const [actionError, setActionError]       = useState('');
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['admin', 'escrow', 'withdrawals'] });
+  const invalidate = (studentId?: string, escrowDelta?: number) => {
+    invalidateFinancialState(qc, { studentId, escrowDelta });
+    router.refresh();
+  };
 
   const { data: requests = [], isLoading, refetch } = useQuery<WithdrawalRequest[]>({
     queryKey: ['admin', 'escrow', 'withdrawals'],
@@ -92,7 +98,7 @@ export default function EscrowAdminClient() {
       setFulfillAmount('');
       setFulfillNotes('');
       setActionError('');
-      invalidate();
+      invalidate(fulfillTarget?.escrow.student.id);
     },
     onError: (err: Error) => setActionError(err.message),
   });
@@ -106,10 +112,14 @@ export default function EscrowAdminClient() {
         })
       ),
     onSuccess: () => {
+      const target = rejectTarget;
+      const refundAmount = target
+        ? target.requestedAmount - (target.releasedAmount ?? 0)
+        : undefined;
       setRejectTarget(null);
       setRejectNotes('');
       setActionError('');
-      invalidate();
+      invalidate(target?.escrow.student.id, refundAmount);
     },
     onError: (err: Error) => setActionError(err.message),
   });
@@ -320,7 +330,7 @@ export default function EscrowAdminClient() {
             <p className="text-sm text-muted-foreground">
               Rejecting this request for{' '}
               <span className="font-semibold text-foreground">{rejectTarget.escrow.student.name}</span>{' '}
-              ({rejectTarget.requestedAmount.toFixed(2)} EGP). No funds will be moved.
+              ({rejectTarget.requestedAmount.toFixed(2)} EGP). The unreleased held amount will be returned to escrow.
             </p>
 
             <div>

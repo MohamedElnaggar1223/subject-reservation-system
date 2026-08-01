@@ -6,6 +6,10 @@ const envSchema = z.object({
   COOKIE_DOMAIN: z.string().optional(),
   DATABASE_URL: z.string().url(),
   CORS_ORIGINS: z.string().optional(),
+  AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().min(1).default(15 * 60 * 1000),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().min(1).default(50),
+  API_RATE_LIMIT_WINDOW_MS: z.coerce.number().min(1).default(15 * 60 * 1000),
+  API_RATE_LIMIT_MAX: z.coerce.number().min(1).default(600),
 
   BETTER_AUTH_SECRET: z.string().min(32, 'BETTER_AUTH_SECRET must be at least 32 characters'),
 
@@ -57,4 +61,3 @@ export const corsOrigins = parsed.data.CORS_ORIGINS
           ]
         : []),
     ];
-

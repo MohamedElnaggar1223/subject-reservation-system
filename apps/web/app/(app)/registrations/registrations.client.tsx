@@ -3,8 +3,10 @@
 import { useState, useMemo } from 'react';
 import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { formatPrice } from '~/lib/format';
+import { invalidateFinancialState } from '~/lib/financial-cache';
 import { apiResponse, REGISTRATION_STATUS_LABELS, COUNCIL_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
@@ -82,6 +84,17 @@ function resolvePrice(sub: AvailableSubject): number {
   return sub.priceInSchool;
 }
 
+function canRevertApproval(reg: Registration, userId: string): boolean {
+  return (
+    reg.status === 'pending_payment' &&
+    reg.requestedBy === reg.studentId &&
+    reg.approvedBy === userId &&
+    !reg.approvalComments?.startsWith('Swap from registration') &&
+    !reg.approvalComments?.startsWith('Direct swap') &&
+    !reg.approvalComments?.startsWith('[ADMIN OVERRIDE]')
+  );
+}
+
 // ─── Modal Wrapper ────────────────────────────────────────────────────────────
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -107,19 +120,29 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 function RegistrationCard({
   reg,
   userRole,
+  userId,
   sessionActive,
   onRequestDrop,
   onRequestSwap,
   onDirectDrop,
   onDirectSwap,
+  onRevertApproval,
+  isRevertingApproval,
+  paymentSelected,
+  onTogglePaymentSelection,
 }: {
   reg: Registration;
   userRole: string | null;
+  userId: string;
   sessionActive: boolean;
   onRequestDrop: (reg: Registration) => void;
   onRequestSwap: (reg: Registration) => void;
   onDirectDrop: (reg: Registration) => void;
   onDirectSwap: (reg: Registration) => void;
+  onRevertApproval: (reg: Registration) => void;
+  isRevertingApproval: boolean;
+  paymentSelected: boolean;
+  onTogglePaymentSelection: (reg: Registration) => void;
 }) {
   const statusLabel =
     REGISTRATION_STATUS_LABELS[reg.status as keyof typeof REGISTRATION_STATUS_LABELS] ?? reg.status;
@@ -146,20 +169,31 @@ function RegistrationCard({
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="font-medium text-foreground truncate">{reg.subject.name}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {reg.subject.code} · {councilLabel}
-          </div>
-          {reg.approvalComments && (
-            <div className={`text-xs mt-2 rounded p-2 ${
-              reg.status === 'rejected'
-                ? 'bg-destructive/10 text-destructive'
-                : 'bg-muted text-muted-foreground'
-            }`}>
-              &ldquo;{reg.approvalComments}&rdquo;
-            </div>
+        <div className="min-w-0 flex items-start gap-3">
+          {reg.status === 'pending_payment' && userRole === 'parent' && (
+            <input
+              type="checkbox"
+              checked={paymentSelected}
+              onChange={() => onTogglePaymentSelection(reg)}
+              aria-label={`Select ${reg.subject.name} for payment`}
+              className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
           )}
+          <div className="min-w-0">
+            <div className="font-medium text-foreground truncate">{reg.subject.name}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {reg.subject.code} · {councilLabel}
+            </div>
+            {reg.approvalComments && (
+              <div className={`text-xs mt-2 rounded p-2 ${
+                reg.status === 'rejected'
+                  ? 'bg-destructive/10 text-destructive'
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                &ldquo;{reg.approvalComments}&rdquo;
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium whitespace-nowrap ${STATUS_STYLES[reg.status] ?? 'bg-muted text-muted-foreground'}`}>
@@ -176,6 +210,24 @@ function RegistrationCard({
         <div className="mt-3 text-xs text-brand-700 bg-brand-50 rounded-lg p-2">
           Approved by parent — awaiting payment.
         </div>
+      )}
+
+      {reg.status === 'pending_payment' && userRole === 'parent' && (
+        <>
+          {canRevertApproval(reg, userId) && (
+            <div className="mt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onRevertApproval(reg)}
+              disabled={isRevertingApproval}
+              className="w-full"
+            >
+              {isRevertingApproval ? 'Reverting...' : 'Revert Approval'}
+            </Button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Core subject protection notice */}
@@ -429,7 +481,7 @@ function DirectDropModal({
 }: {
   reg: Registration;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (studentId: string, escrowDelta: number) => void;
 }) {
   const [err, setErr] = useState('');
 
@@ -441,7 +493,7 @@ function DirectDropModal({
           json: {},
         })
       ),
-    onSuccess: () => { onSuccess(); onClose(); },
+    onSuccess: () => { onSuccess(reg.studentId, reg.priceAtRegistration); onClose(); },
     onError: (e: Error) => setErr(e.message),
   });
 
@@ -484,7 +536,7 @@ function DirectSwapModal({
 }: {
   reg: Registration;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (studentId: string, escrowDelta: number) => void;
 }) {
   const [newSubjectId, setNewSubjectId] = useState('');
   const [err, setErr] = useState('');
@@ -511,7 +563,7 @@ function DirectSwapModal({
           json: { newSubjectId },
         })
       ),
-    onSuccess: () => { onSuccess(); onClose(); },
+    onSuccess: () => { onSuccess(reg.studentId, reg.priceAtRegistration); onClose(); },
     onError: (e: Error) => setErr(e.message),
   });
 
@@ -551,7 +603,7 @@ function DirectSwapModal({
               {diff > 0
                 ? ` New registration (${formatPrice(newPrice)}) will require payment.`
                 : diff < 0
-                ? ` Difference of ${formatPrice(Math.abs(diff))} credited to escrow on top.`
+                ? ` New registration is ${formatPrice(Math.abs(diff))} cheaper, leaving that amount available if escrow is applied at checkout.`
                 : ' Same price — full escrow credit then payment of same amount required.'}
             </p>
           </div>
@@ -583,6 +635,7 @@ interface Props {
 export default function RegistrationsClient({ userRole, userId }: Props): React.JSX.Element {
   const isParent = userRole === 'parent';
   const qc = useQueryClient();
+  const router = useRouter();
 
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -592,8 +645,68 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
   const [swapTarget, setSwapTarget]       = useState<Registration | null>(null);
   const [directDropTarget, setDirectDropTarget] = useState<Registration | null>(null);
   const [directSwapTarget, setDirectSwapTarget] = useState<Registration | null>(null);
+  const [actionError, setActionError] = useState('');
+  const [selectedPaymentIds, setSelectedPaymentIds] = useState<Set<string>>(new Set());
 
-  const invalidateRegistrations = () => qc.invalidateQueries({ queryKey: ['registrations'] });
+  const invalidateRegistrations = () => {
+    qc.invalidateQueries({ queryKey: ['registrations'] });
+    qc.invalidateQueries({ queryKey: ['change-requests'] });
+    router.refresh();
+  };
+
+  const invalidateAfterEscrowChange = (studentId: string, escrowDelta: number) => {
+    invalidateFinancialState(qc, { studentId, escrowDelta });
+    router.refresh();
+  };
+
+  const revertApprovalMutation = useMutation({
+    mutationFn: (reg: Registration) =>
+      apiResponse(
+        api.v1.registrations['revert-approval'].$put({
+          json: { registrationIds: [reg.id] },
+        })
+      ),
+    onSuccess: (_data, reg) => {
+      setActionError('');
+      setSelectedPaymentIds((prev) => {
+        const next = new Set(prev);
+        next.delete(reg.id);
+        return next;
+      });
+      invalidateFinancialState(qc);
+      router.refresh();
+    },
+    onError: (err: Error) => setActionError(err.message),
+  });
+
+  const handleRevertApproval = (reg: Registration) => {
+    const ok = window.confirm(
+      `Move ${reg.subject.name} back to pending parent approval? You can approve it again later, but it will not be included in payment right now.`
+    );
+    if (!ok) return;
+    revertApprovalMutation.mutate(reg);
+  };
+
+  const togglePaymentSelection = (reg: Registration) => {
+    if (reg.status !== 'pending_payment') return;
+    setSelectedPaymentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(reg.id)) next.delete(reg.id);
+      else next.add(reg.id);
+      return next;
+    });
+  };
+
+  const setGroupPaymentSelection = (ids: string[], selected: boolean) => {
+    setSelectedPaymentIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (selected) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
 
   const { data: registrations = [] } = useSuspenseQuery<Registration[]>({
     queryKey: ['registrations', 'list'],
@@ -683,6 +796,12 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
           </div>
         </div>
 
+        {actionError && (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {actionError}
+          </div>
+        )}
+
         {/* Filters */}
         <div className="flex flex-wrap gap-2 items-center">
           <div className="flex rounded-lg border border-border overflow-hidden text-sm">
@@ -747,19 +866,49 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
                     </div>
                   </div>
 
-                  {/* Pay Now for parents */}
+                  {/* Pending payment selection for parents */}
                   {isParent && (() => {
                     const ppRegs = regs.filter((r) => r.status === 'pending_payment');
                     if (ppRegs.length === 0) return null;
-                    const ids = ppRegs.map((r) => r.id).join(',');
+                    const pendingIds = ppRegs.map((r) => r.id);
+                    const selectedRegs = ppRegs.filter((r) => selectedPaymentIds.has(r.id));
+                    const selectedTotal = selectedRegs.reduce((sum, r) => sum + r.priceAtRegistration, 0);
+                    const allSelected = selectedRegs.length === ppRegs.length;
+                    const checkoutIds = selectedRegs.map((r) => r.id).join(',');
                     return (
-                      <div className="px-4 py-2 bg-brand-50 border-b border-border flex items-center justify-between">
-                        <span className="text-xs text-brand-700">
-                          {ppRegs.length} registration(s) awaiting payment
-                        </span>
-                        <Link href={`/checkout?ids=${ids}` as never}>
-                          <Button size="sm">Pay Now</Button>
-                        </Link>
+                      <div className="px-4 py-3 bg-brand-50 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+                        <div className="text-xs text-brand-700">
+                          <span className="font-medium">{ppRegs.length}</span> awaiting payment
+                          {selectedRegs.length > 0 && (
+                            <span>
+                              {' '}· {selectedRegs.length} selected · {formatPrice(selectedTotal)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setGroupPaymentSelection(pendingIds, !allSelected)}
+                          >
+                            {allSelected ? 'Clear' : 'Select All'}
+                          </Button>
+                          {selectedRegs.length > 0 ? (
+                            <Link href={`/checkout?ids=${checkoutIds}` as never}>
+                              <Button size="sm">
+                                Pay Selected
+                              </Button>
+                            </Link>
+                          ) : (
+                            <Button size="sm" disabled>
+                              Pay Selected
+                            </Button>
+                          )}
+                          <Link href={`/checkout?ids=${pendingIds.join(',')}` as never}>
+                            <Button size="sm" variant="outline">Pay All</Button>
+                          </Link>
+                        </div>
                       </div>
                     );
                   })()}
@@ -770,11 +919,16 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
                         key={reg.id}
                         reg={reg}
                         userRole={userRole}
+                        userId={userId}
                         sessionActive={session.status === 'active'}
                         onRequestDrop={setDropTarget}
                         onRequestSwap={setSwapTarget}
                         onDirectDrop={setDirectDropTarget}
                         onDirectSwap={setDirectSwapTarget}
+                        onRevertApproval={handleRevertApproval}
+                        isRevertingApproval={revertApprovalMutation.isPending}
+                        paymentSelected={selectedPaymentIds.has(reg.id)}
+                        onTogglePaymentSelection={togglePaymentSelection}
                       />
                     ))}
                   </div>
@@ -812,14 +966,14 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
         <DirectDropModal
           reg={directDropTarget}
           onClose={() => setDirectDropTarget(null)}
-          onSuccess={invalidateRegistrations}
+          onSuccess={invalidateAfterEscrowChange}
         />
       )}
       {directSwapTarget && (
         <DirectSwapModal
           reg={directSwapTarget}
           onClose={() => setDirectSwapTarget(null)}
-          onSuccess={invalidateRegistrations}
+          onSuccess={invalidateAfterEscrowChange}
         />
       )}
     </>

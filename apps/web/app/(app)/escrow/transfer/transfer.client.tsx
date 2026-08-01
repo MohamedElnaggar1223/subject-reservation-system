@@ -9,9 +9,10 @@
  */
 
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
+import { invalidateFinancialState } from '~/lib/financial-cache';
 import { apiResponse } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
@@ -24,6 +25,7 @@ type ChildBalance = {
 
 export default function TransferClient() {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [fromId, setFromId] = useState('');
   const [toId, setToId]     = useState('');
@@ -52,6 +54,15 @@ export default function TransferClient() {
         })
       ),
     onSuccess: () => {
+      invalidateFinancialState(queryClient, {
+        studentId: fromId,
+        escrowDelta: -parsedAmount,
+      });
+      invalidateFinancialState(queryClient, {
+        studentId: toId,
+        escrowDelta: parsedAmount,
+      });
+      router.refresh();
       setSuccess(true);
       setSubmitError('');
     },

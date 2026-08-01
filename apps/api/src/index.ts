@@ -38,7 +38,7 @@ import { startSessionScheduler } from './jobs/session-closer';
  * Rate Limiter for Auth Routes
  *
  * Protects authentication endpoints from brute force attacks.
- * - 5 requests per 15 minute window
+ * - Defaults to 50 requests per 15 minute window
  * - Keyed by IP address (handles proxies and Cloudflare)
  */
 function getClientIp(c: { req: { header: (name: string) => string | undefined; raw: Request }; env?: any }): string {
@@ -60,16 +60,18 @@ function getClientIp(c: { req: { header: (name: string) => string | undefined; r
 }
 
 const authRateLimit = rateLimiter({
-  windowMs: 15 * 60 * 1000,
-  limit: 5,
+  windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
+  limit: env.AUTH_RATE_LIMIT_MAX,
   standardHeaders: 'draft-6',
+  skip: (c) => c.req.method === 'OPTIONS',
   keyGenerator: (c) => getClientIp(c),
 });
 
 const apiRateLimit = rateLimiter({
-  windowMs: 15 * 60 * 1000,
-  limit: 30,
+  windowMs: env.API_RATE_LIMIT_WINDOW_MS,
+  limit: env.API_RATE_LIMIT_MAX,
   standardHeaders: 'draft-6',
+  skip: (c) => c.req.method === 'OPTIONS',
   keyGenerator: (c) => {
     const user = c.get?.('user' as never) as { id: string } | null;
     return user?.id ?? getClientIp(c);

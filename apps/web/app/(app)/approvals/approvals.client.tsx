@@ -3,8 +3,10 @@
 import { useState, useMemo } from 'react';
 import { useSuspenseQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { formatPrice } from '~/lib/format';
+import { invalidateFinancialState } from '~/lib/financial-cache';
 import { apiResponse, COUNCIL_LABELS, CHANGE_REQUEST_STATUS_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
@@ -53,6 +55,7 @@ type PendingRegistration = {
 
 export default function ApprovalsClient(): React.JSX.Element {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -145,7 +148,8 @@ export default function ApprovalsClient(): React.JSX.Element {
       setSelectedIds(new Set());
       setApproveComment('');
       setShowApproveModal(false);
-      queryClient.invalidateQueries({ queryKey: ['registrations'] });
+      invalidateFinancialState(queryClient);
+      router.refresh();
     },
     onError: (err: Error) => setActionError(err.message),
   });
@@ -165,6 +169,8 @@ export default function ApprovalsClient(): React.JSX.Element {
       setRejectComment('');
       setShowRejectModal(false);
       queryClient.invalidateQueries({ queryKey: ['registrations'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      router.refresh();
     },
     onError: (err: Error) => setActionError(err.message),
   });
@@ -636,6 +642,7 @@ type ChangeRequestEntry = {
 
 function ChangeRequestsSection() {
   const qc = useQueryClient();
+  const router = useRouter();
 
   const [approveTarget, setApproveTarget] = useState<ChangeRequestEntry | null>(null);
   const [rejectTarget, setRejectTarget]   = useState<ChangeRequestEntry | null>(null);
@@ -648,9 +655,12 @@ function ChangeRequestsSection() {
     queryFn: () => apiResponse(api.v1['change-requests'].$get({ query: {} })),
   });
 
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['change-requests'] });
-    qc.invalidateQueries({ queryKey: ['registrations'] });
+  const invalidate = (target?: ChangeRequestEntry | null, escrowDelta?: number) => {
+    invalidateFinancialState(qc, {
+      studentId: target?.registration.student.id,
+      escrowDelta,
+    });
+    router.refresh();
   };
 
   const approveCrMutation = useMutation({
@@ -661,7 +671,13 @@ function ChangeRequestsSection() {
           json: { comments: approveComment || undefined },
         })
       ),
-    onSuccess: () => { setApproveTarget(null); setApproveComment(''); setCrError(''); invalidate(); },
+    onSuccess: () => {
+      const target = approveTarget;
+      setApproveTarget(null);
+      setApproveComment('');
+      setCrError('');
+      invalidate(target, target?.registration.priceAtRegistration);
+    },
     onError: (e: Error) => setCrError(e.message),
   });
 
@@ -673,7 +689,7 @@ function ChangeRequestsSection() {
           json: { comments: rejectComment },
         })
       ),
-    onSuccess: () => { setRejectTarget(null); setRejectComment(''); setCrError(''); invalidate(); },
+    onSuccess: () => { setRejectTarget(null); setRejectComment(''); setCrError(''); invalidate(rejectTarget); },
     onError: (e: Error) => setCrError(e.message),
   });
 

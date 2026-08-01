@@ -10,6 +10,7 @@
  * POST /registrations/request       - Student submits a registration request (pending_approval)
  * POST /registrations/direct        - Parent directly registers for a linked child (pending_payment)
  * PUT  /registrations/approve       - Parent approves pending registration requests
+ * PUT  /registrations/revert-approval - Parent reverts unpaid approvals
  * PUT  /registrations/reject        - Parent rejects pending registration requests
  * POST /registrations/admin-override - Admin bypasses parent approval (audit-logged)
  * GET  /registrations/:id           - Get a single registration by ID
@@ -27,6 +28,7 @@ import {
   RequestRegistration,
   DirectRegistration,
   ApproveRegistrations,
+  RevertApprovedRegistrations,
   RejectRegistrations,
   AdminOverrideApproval,
   ListRegistrationsQuery,
@@ -313,6 +315,39 @@ export const registrations = new Hono<HonoEnv>()
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to approve registrations';
         const status = message.includes('not authorized') ? 403 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * PUT /registrations/revert-approval
+   *
+   * Parent reverts unpaid pending-payment registrations back to parent approval.
+   */
+  .put('/revert-approval',
+    requireParent(),
+    zValidator('json', RevertApprovedRegistrations),
+    async (c) => {
+      const user = c.get('user')!;
+      const data = c.req.valid('json');
+
+      try {
+        const updated = await registrationService.revertApprovedRegistrationRequest(
+          data,
+          user.id
+        );
+        const auditCtx = extractAuditContext(c);
+        for (const regId of data.registrationIds) {
+          logAction(user.id, 'REGISTRATION_APPROVAL_REVERTED', 'registration', regId, { status: 'pending_payment' }, { status: 'pending_approval' }, auditCtx)
+            .catch((err) => console.error('[audit] REGISTRATION_APPROVAL_REVERTED failed:', err));
+        }
+        return success(c, updated);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to revert approval';
+        const status = message.includes('not authorized') ? 403 :
+                       message.includes('payment in progress') ||
+                       message.includes('cannot be reverted') ? 409 : 400;
         return error(c, message, status);
       }
     }

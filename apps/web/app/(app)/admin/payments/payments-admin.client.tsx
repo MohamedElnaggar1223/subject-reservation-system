@@ -15,7 +15,9 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
+import { invalidateFinancialState } from '~/lib/financial-cache';
 import { apiResponse } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
@@ -24,6 +26,7 @@ type PendingPayment = Awaited<ReturnType<typeof fetchPendingPayments>>[number];
 
 export default function AdminPaymentsClient() {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const [selectedPayment, setSelectedPayment] = useState<PendingPayment | null>(null);
   const [adminNotes, setAdminNotes] = useState('');
@@ -46,11 +49,13 @@ export default function AdminPaymentsClient() {
       );
     },
     onSuccess: (_, vars) => {
+      const studentId = selectedPayment?.student.id;
       setConfirmedId(vars.id);
       setSelectedPayment(null);
       setAdminNotes('');
       setConfirmError('');
-      queryClient.invalidateQueries({ queryKey: ['payments', 'pending-bank'] });
+      invalidateFinancialState(queryClient, { studentId });
+      router.refresh();
     },
     onError: (err: Error) => {
       setConfirmError(err.message);

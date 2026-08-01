@@ -88,6 +88,19 @@ export const ApproveRegistrations = z.object({
 });
 export type ApproveRegistrationsType = z.infer<typeof ApproveRegistrations>;
 
+// ─── Parent: Revert Approval Before Payment ─────────────────────────────────
+
+/**
+ * Parent moves one or more unpaid, previously approved student requests back
+ * from 'pending_payment' to 'pending_approval'.
+ */
+export const RevertApprovedRegistrations = z.object({
+  registrationIds: z
+    .array(z.string().min(1, 'Invalid registration ID'))
+    .min(1, 'Select at least one registration to revert'),
+});
+export type RevertApprovedRegistrationsType = z.infer<typeof RevertApprovedRegistrations>;
+
 // ─── Parent: Reject Pending Registrations ────────────────────────────────────
 
 /**

@@ -10,7 +10,9 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
+import { invalidateFinancialState } from '~/lib/financial-cache';
 import { apiResponse, WITHDRAWAL_STATUS_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
@@ -42,6 +44,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function WithdrawClient() {
   const qc = useQueryClient();
+  const router = useRouter();
 
   const [selectedChildId, setSelectedChildId] = useState('');
   const [amount, setAmount] = useState('');
@@ -71,7 +74,11 @@ export default function WithdrawClient() {
     onSuccess: () => {
       setSubmitted(true);
       setSubmitError('');
-      qc.invalidateQueries({ queryKey: ['escrow', 'withdrawals'] });
+      invalidateFinancialState(qc, {
+        studentId: selectedChildId,
+        escrowDelta: -parsedAmount,
+      });
+      router.refresh();
     },
     onError: (err: Error) => setSubmitError(err.message),
   });
