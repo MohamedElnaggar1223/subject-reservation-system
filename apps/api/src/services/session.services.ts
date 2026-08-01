@@ -17,6 +17,7 @@
  */
 
 import { db, registrationSession, registration, changeRequest, paymentRegistration, payment, user, eq, and, lte, inArray, sql } from '@repo/db';
+import { capturePreregistrationsForSession } from './prereg.services';
 import { notifySessionOpened, createNotification } from './notification.services';
 import { failPayment } from './payment.services';
 import { randomUUID } from 'crypto';
@@ -319,6 +320,13 @@ export async function activateSession(id: string) {
         )
       )
       .returning();
+
+    // V3 §6.8: capture preregistrations on manual activation too
+    if (updated) {
+      capturePreregistrationsForSession(id).catch((err) =>
+        console.error(`[session] Prereg capture failed for ${id}:`, err)
+      );
+    }
 
     return updated;
   } catch (err) {

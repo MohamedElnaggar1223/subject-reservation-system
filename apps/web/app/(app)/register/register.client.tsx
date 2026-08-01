@@ -163,6 +163,19 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
     queryFn: () => apiResponse(api.v1.sessions.active.$get()),
   });
 
+  // V3 §6.8: parents can preregister for upcoming (draft) sessions
+  const { data: upcomingSessions = [] } = useQuery<Session[]>({
+    queryKey: ['sessions', 'upcoming'],
+    queryFn: async () => (await apiResponse(api.v1.sessions.upcoming.$get())) as Session[],
+    enabled: isParent,
+  });
+
+  const allSelectableSessions = useMemo(
+    () => [...activeSessions, ...(isParent ? upcomingSessions : [])],
+    [activeSessions, upcomingSessions, isParent]
+  );
+  const isPreregSession = selectedSession?.status === 'draft';
+
   const { data: children = [] } = useQuery({
     queryKey: ['links', 'children'],
     queryFn: fetchChildren,
@@ -271,18 +284,29 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
   const directMutation = useMutation({
     mutationFn: () =>
       apiResponse(
-        api.v1.registrations.direct.$post({
-          json: {
-            sessionId: selectedSession!.id,
-            subjectIds: Array.from(selectedSubjectIds),
-            studentId: selectedChild!.student.id,
-            subjectOptions: buildSubjectOptions(),
-          },
-        })
+        isPreregSession
+          ? api.v1.registrations.preregister.$post({
+              json: {
+                sessionId: selectedSession!.id,
+                subjectIds: Array.from(selectedSubjectIds),
+                studentId: selectedChild!.student.id,
+                subjectOptions: buildSubjectOptions(),
+              },
+            })
+          : api.v1.registrations.direct.$post({
+              json: {
+                sessionId: selectedSession!.id,
+                subjectIds: Array.from(selectedSubjectIds),
+                studentId: selectedChild!.student.id,
+                subjectOptions: buildSubjectOptions(),
+              },
+            })
       ),
     onSuccess: () => {
       setSuccessMessage(
-        'Subjects registered successfully! Proceed to payment to confirm.'
+        isPreregSession
+          ? 'Preregistered! Pay now to lock the funds in the held wallet — they auto-apply when the session opens.'
+          : 'Subjects registered successfully! Proceed to payment to confirm.'
       );
       setSelectedSubjectIds(new Set());
       setSubjectChoices({});
@@ -327,7 +351,7 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  if (activeSessions.length === 0) {
+  if (activeSessions.length === 0 && (!isParent || upcomingSessions.length === 0)) {
     return (
       <div className="px-6 py-8 max-w-5xl mx-auto animate-fade-up">
         <div className="bg-card rounded-xl border border-border shadow-sm p-12 text-center">
@@ -452,7 +476,7 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
             {isParent ? 'Step 2' : 'Step 1'} — Select Registration Window
           </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {activeSessions.map((sess) => {
+            {allSelectableSessions.map((sess) => {
               const end = new Date(sess.endDate);
               return (
                 <button
@@ -469,6 +493,11 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
                     <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                       {LEVEL_LABELS[sess.qualificationLevel] ?? sess.qualificationLevel}
                     </span>
+                    {sess.status === 'draft' && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                        Preregistration
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
                     Closes {end.toLocaleDateString()}
@@ -708,6 +737,14 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
             </div>
           )}
 
+          {isPreregSession && (
+            <div className="text-xs text-violet-700 dark:text-violet-400 mb-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-lg p-3">
+              This session hasn&apos;t opened yet. Prices lock now; your payment is held in the
+              wallet and applied automatically when the session opens. You can cancel before then
+              (refund windows apply).
+            </div>
+          )}
+
           {submitError && (
             <div className="mb-4 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
               {submitError}
@@ -724,7 +761,7 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
             {isMutating
               ? 'Submitting...'
               : isParent
-              ? `Register ${selectedSubjectIds.size} Subject${selectedSubjectIds.size !== 1 ? 's' : ''} — ${formatPrice(totalCost)}`
+              ? `${isPreregSession ? 'Preregister' : 'Register'} ${selectedSubjectIds.size} Subject${selectedSubjectIds.size !== 1 ? 's' : ''} — ${formatPrice(totalCost)}`
               : `Submit Request for ${selectedSubjectIds.size} Subject${selectedSubjectIds.size !== 1 ? 's' : ''}`}
           </Button>
         </div>

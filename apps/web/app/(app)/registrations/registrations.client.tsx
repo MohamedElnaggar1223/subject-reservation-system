@@ -74,6 +74,7 @@ type AvailableSubject = {
 const STATUS_STYLES: Record<string, string> = {
   pending_approval: 'bg-amber-50 text-amber-700',
   pending_payment:  'bg-brand-50 text-brand-700',
+  preregistered:    'bg-violet-50 text-violet-700',
   confirmed:        'bg-emerald-50 text-emerald-700',
   dropped_pending_receipt: 'bg-amber-50 text-amber-700',
   dropped:          'bg-muted text-muted-foreground',
@@ -156,6 +157,8 @@ function RegistrationCard({
   onDirectSwap,
   onRevertApproval,
   isRevertingApproval,
+  onCancelPrereg,
+  isCancellingPrereg,
   paymentSelected,
   onTogglePaymentSelection,
 }: {
@@ -169,6 +172,8 @@ function RegistrationCard({
   onDirectSwap: (reg: Registration) => void;
   onRevertApproval: (reg: Registration) => void;
   isRevertingApproval: boolean;
+  onCancelPrereg: (reg: Registration) => void;
+  isCancellingPrereg: boolean;
   paymentSelected: boolean;
   onTogglePaymentSelection: (reg: Registration) => void;
 }) {
@@ -198,7 +203,7 @@ function RegistrationCard({
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex items-start gap-3">
-          {reg.status === 'pending_payment' && userRole === 'parent' && (
+          {(reg.status === 'pending_payment' || reg.status === 'preregistered') && userRole === 'parent' && (
             <input
               type="checkbox"
               checked={paymentSelected}
@@ -237,6 +242,20 @@ function RegistrationCard({
       {reg.status === 'pending_payment' && userRole === 'student' && (
         <div className="mt-3 text-xs text-brand-700 bg-brand-50 rounded-lg p-2">
           Approved by parent — awaiting payment.
+        </div>
+      )}
+
+      {reg.status === 'preregistered' && userRole === 'parent' && (
+        <div className="mt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onCancelPrereg(reg)}
+            disabled={isCancellingPrereg}
+            className="w-full"
+          >
+            {isCancellingPrereg ? 'Cancelling…' : 'Cancel Preregistration'}
+          </Button>
         </div>
       )}
 
@@ -706,6 +725,32 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
     onError: (err: Error) => setActionError(err.message),
   });
 
+  const cancelPreregMutation = useMutation({
+    mutationFn: (reg: Registration) =>
+      apiResponse(
+        api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: reg.id } })
+      ),
+    onSuccess: (_data, reg) => {
+      setActionError('');
+      setSelectedPaymentIds((prev) => {
+        const next = new Set(prev);
+        next.delete(reg.id);
+        return next;
+      });
+      invalidateFinancialState(qc, { studentId: reg.studentId });
+      router.refresh();
+    },
+    onError: (err: Error) => setActionError(err.message),
+  });
+
+  const handleCancelPrereg = (reg: Registration) => {
+    const ok = window.confirm(
+      `Cancel the preregistration for ${reg.subject.name}? Held funds release per the refund policy (receipt return applies if one was issued).`
+    );
+    if (!ok) return;
+    cancelPreregMutation.mutate(reg);
+  };
+
   const handleRevertApproval = (reg: Registration) => {
     const ok = window.confirm(
       `Move ${reg.subject.name} back to pending parent approval? You can approve it again later, but it will not be included in payment right now.`
@@ -714,8 +759,9 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
     revertApprovalMutation.mutate(reg);
   };
 
+  const PAYABLE_STATUSES = ['pending_payment', 'preregistered'];
   const togglePaymentSelection = (reg: Registration) => {
-    if (reg.status !== 'pending_payment') return;
+    if (!PAYABLE_STATUSES.includes(reg.status)) return;
     setSelectedPaymentIds((prev) => {
       const next = new Set(prev);
       if (next.has(reg.id)) next.delete(reg.id);
@@ -895,7 +941,7 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
 
                   {/* Pending payment selection for parents */}
                   {isParent && (() => {
-                    const ppRegs = regs.filter((r) => r.status === 'pending_payment');
+                    const ppRegs = regs.filter((r) => r.status === 'pending_payment' || r.status === 'preregistered');
                     if (ppRegs.length === 0) return null;
                     const pendingIds = ppRegs.map((r) => r.id);
                     const selectedRegs = ppRegs.filter((r) => selectedPaymentIds.has(r.id));
@@ -954,6 +1000,8 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
                         onDirectSwap={setDirectSwapTarget}
                         onRevertApproval={handleRevertApproval}
                         isRevertingApproval={revertApprovalMutation.isPending}
+                        onCancelPrereg={handleCancelPrereg}
+                        isCancellingPrereg={cancelPreregMutation.isPending}
                         paymentSelected={selectedPaymentIds.has(reg.id)}
                         onTogglePaymentSelection={togglePaymentSelection}
                       />

@@ -15,6 +15,7 @@ import { z } from 'zod';
 export const REGISTRATION_STATUSES = [
   'pending_approval',
   'pending_payment',
+  'preregistered',
   'confirmed',
   'dropped_pending_receipt',
   'dropped',
@@ -28,6 +29,7 @@ export type RegistrationStatus = z.infer<typeof RegistrationStatusSchema>;
 export const REGISTRATION_STATUS_LABELS: Record<typeof REGISTRATION_STATUSES[number], string> = {
   pending_approval: 'Pending Parent Approval',
   pending_payment:  'Pending Payment',
+  preregistered:    'Preregistered (Future Session)',
   confirmed:        'Confirmed',
   dropped_pending_receipt: 'Dropped — Return Receipt to School',
   dropped:          'Dropped',
@@ -91,6 +93,16 @@ export const DirectRegistration = z.object({
   subjectOptions: z.record(z.string(), SubjectRegistrationOptions).optional(),
 });
 export type DirectRegistrationType = z.infer<typeof DirectRegistration>;
+
+// ─── Parent: Preregistration for a Future Session (V3 §6.8) ─────────────────
+
+/**
+ * Parent preregisters subjects for a DRAFT (not-yet-open) session.
+ * Price locks at preregistration time (D-E). Payment lands in the
+ * held wallet and is auto-captured when the session activates.
+ */
+export const PreregisterRegistration = DirectRegistration;
+export type PreregisterRegistrationType = z.infer<typeof PreregisterRegistration>;
 
 // ─── Parent: Approve Pending Registrations ───────────────────────────────────
 

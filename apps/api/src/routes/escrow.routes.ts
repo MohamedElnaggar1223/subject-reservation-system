@@ -98,6 +98,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
       return success(c, {
         studentId: targetStudentId,
         balance,
+        heldBalance: account?.heldBalance ?? 0,
         escrowId: account?.id ?? null,
       });
     }

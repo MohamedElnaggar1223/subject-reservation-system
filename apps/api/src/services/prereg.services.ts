@@ -1,0 +1,258 @@
+/**
+ * Preregistration Service (V3 §6.8, D-E/D-J)
+ *
+ * Parents preregister subjects for DRAFT (not-yet-open) sessions —
+ * e.g. paying for the whole of Year 11 at the start of the year:
+ *
+ * 1. Prereg rows are created at status 'preregistered' with the price
+ *    locked at preregistration time (D-E).
+ * 2. The parent pays through the shared pipeline; on completion the
+ *    money credits the HELD wallet (prereg_hold) and receipts are
+ *    issued (D-J).
+ * 3. When the session activates, the scheduler auto-captures: held is
+ *    debited (prereg_capture) and the registration confirms. Unfunded
+ *    preregs fall back to pending_payment.
+ * 4. Cancellation before activation releases held funds and walks the
+ *    normal receipt-gated refund path with refund windows applied (D-J).
+ */
+
+import { db, registration, eq, and } from '@repo/db';
+import { randomUUID } from 'crypto';
+import type { PreregisterRegistrationType } from '@repo/validations';
+import { prepareRegistrationInputs } from './registration.services';
+import { creditHeld, debitHeld, getEscrowBalance } from './escrow.services';
+import { executeReceiptGatedDrop } from './receipt.services';
+import { refundPercentage } from './refund.services';
+import { isGraduated } from './grade.services';
+import { logger } from '../lib/logger';
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+async function validateParentStudentLink(parentId: string, studentId: string): Promise<boolean> {
+  const link = await db.query.parentStudentLink.findFirst({
+    where: (l, { eq, and }) =>
+      and(eq(l.parentId, parentId), eq(l.studentId, studentId), eq(l.status, 'approved')),
+    columns: { id: true },
+  });
+  return !!link;
+}
+
+/**
+ * Parent creates preregistrations against a draft session.
+ */
+export async function createPreregistration(parentId: string, data: PreregisterRegistrationType) {
+  const linked = await validateParentStudentLink(parentId, data.studentId);
+  if (!linked) throw new Error('You are not linked to this student');
+
+  if (await isGraduated(data.studentId)) {
+    throw new Error('Graduated students cannot be preregistered for new subjects');
+  }
+
+  const sess = await db.query.registrationSession.findFirst({
+    where: (s, { eq }) => eq(s.id, data.sessionId),
+  });
+  if (!sess) throw new Error('Session not found');
+  if (sess.status !== 'draft') {
+    throw new Error('Preregistration is only available for upcoming (not-yet-open) sessions');
+  }
+
+  const subjects = await db.query.subject.findMany({
+    where: (s, { eq, and, inArray }) =>
+      and(eq(s.isActive, true), inArray(s.id, data.subjectIds)),
+  });
+  if (subjects.length !== data.subjectIds.length) {
+    throw new Error('One or more subjects are invalid or inactive');
+  }
+
+  const existing = await db.query.registration.findMany({
+    where: (r, { eq, and, notInArray, inArray }) =>
+      and(
+        eq(r.studentId, data.studentId),
+        eq(r.sessionId, data.sessionId),
+        inArray(r.subjectId, data.subjectIds),
+        notInArray(r.status, ['dropped', 'rejected', 'expired'])
+      ),
+    columns: { subjectId: true },
+  });
+  if (existing.length > 0) {
+    throw new Error('Some subjects are already preregistered for this session');
+  }
+
+  // Same V3 pipeline: level match, school-fee gate, retakes, teachers,
+  // pricing engine + exceptions. Price locks NOW (D-E).
+  const prepared = await prepareRegistrationInputs(
+    data.studentId,
+    sess,
+    subjects,
+    data.subjectOptions
+  );
+
+  const now = new Date();
+  const records = subjects.map((sub) => {
+    const p = prepared.get(sub.id)!;
+    return {
+      id: randomUUID(),
+      studentId: data.studentId,
+      sessionId: data.sessionId,
+      subjectId: sub.id,
+      priceAtRegistration: p.pricing.total,
+      courseFeeAtRegistration: p.pricing.courseFee,
+      registrationFeeAtRegistration: p.pricing.registrationFee,
+      isRetake: p.isRetake,
+      takenOutsideSchool: p.pricing.isOutsideSchool,
+      teacherId: p.teacherId,
+      wasCoreAtRegistration: sub.isCore,
+      status: 'preregistered' as const,
+      requestedBy: parentId,
+      approvedBy: parentId,
+      approvedAt: now,
+    };
+  });
+
+  return db.insert(registration).values(records).returning();
+}
+
+/**
+ * Is this prereg funded? (a completed payment covers it)
+ */
+async function isPreregFunded(registrationId: string): Promise<boolean> {
+  const links = await db.query.paymentRegistration.findMany({
+    where: (pr, { eq }) => eq(pr.registrationId, registrationId),
+    with: { payment: { columns: { status: true } } },
+  });
+  return links.some((l) => l.payment.status === 'completed');
+}
+
+/**
+ * Parent cancels a preregistration before the session opens (D-J):
+ * held funds release and the refund walks the normal receipt-gated
+ * path with refund windows applied at cancellation time.
+ */
+export async function cancelPreregistration(registrationId: string, parentId: string) {
+  const reg = await db.query.registration.findFirst({
+    where: (r, { eq }) => eq(r.id, registrationId),
+    with: { session: { columns: { id: true, status: true } } },
+  });
+  if (!reg) throw new Error('Registration not found');
+  if (reg.status !== 'preregistered') {
+    throw new Error('Only preregistered subjects can be cancelled this way');
+  }
+  if (reg.session.status !== 'draft') {
+    throw new Error('The session has already opened — use a normal drop instead');
+  }
+
+  const linked = await validateParentStudentLink(parentId, reg.studentId);
+  if (!linked) throw new Error('You are not linked to this student');
+
+  const funded = await isPreregFunded(registrationId);
+  const pct = funded ? await refundPercentage(new Date(), reg.sessionId, reg.studentId) : 0;
+  const refundAmount = funded ? round2((reg.priceAtRegistration * pct) / 100) : 0;
+
+  const result = await db.transaction(async (tx) => {
+    // Release the full held amount; the refundable portion re-enters the
+    // free balance (receipt-gated); the remainder is retained per the
+    // refund windows.
+    if (funded) {
+      await debitHeld(
+        {
+          studentId: reg.studentId,
+          amount: reg.priceAtRegistration,
+          reason: 'prereg_release',
+          initiatedBy: parentId,
+          relatedRegistrationId: registrationId,
+        },
+        tx
+      );
+    }
+
+    const dropOutcome = await executeReceiptGatedDrop(tx, {
+      registrationId,
+      studentId: reg.studentId,
+      refundAmount,
+      refundReason: 'drop',
+      initiatedBy: parentId,
+      fromStatus: 'preregistered',
+    });
+
+    return { success: true, funded, refundPercentage: pct, ...dropOutcome };
+  });
+
+  return result;
+}
+
+/**
+ * Auto-capture on session activation (V3 §6.8 step 4). Idempotent —
+ * status-guarded updates; safe to run on every scheduler tick.
+ *
+ * Funded preregs: held is debited by the locked price and the
+ * registration confirms. Unfunded preregs: fall back to
+ * pending_payment so the parent pays through the normal open-session
+ * flow.
+ */
+export async function capturePreregistrationsForSession(sessionId: string): Promise<{
+  captured: number;
+  movedToPendingPayment: number;
+}> {
+  const preregs = await db.query.registration.findMany({
+    where: (r, { eq, and }) =>
+      and(eq(r.sessionId, sessionId), eq(r.status, 'preregistered')),
+    columns: { id: true, studentId: true, priceAtRegistration: true },
+  });
+
+  let captured = 0;
+  let movedToPendingPayment = 0;
+
+  for (const reg of preregs) {
+    try {
+      const funded = await isPreregFunded(reg.id);
+      if (funded) {
+        await db.transaction(async (tx) => {
+          const [updated] = await tx
+            .update(registration)
+            .set({ status: 'confirmed', updatedAt: new Date() })
+            .where(and(eq(registration.id, reg.id), eq(registration.status, 'preregistered')))
+            .returning({ id: registration.id });
+          if (!updated) return;
+
+          await debitHeld(
+            {
+              studentId: reg.studentId,
+              amount: reg.priceAtRegistration,
+              reason: 'prereg_capture',
+              initiatedBy: reg.studentId,
+              relatedRegistrationId: reg.id,
+            },
+            tx
+          );
+        });
+        captured++;
+      } else {
+        const [updated] = await db
+          .update(registration)
+          .set({ status: 'pending_payment', updatedAt: new Date() })
+          .where(and(eq(registration.id, reg.id), eq(registration.status, 'preregistered')))
+          .returning({ id: registration.id });
+        if (updated) movedToPendingPayment++;
+      }
+    } catch (err) {
+      // A single failed capture (e.g. insufficient held after manual
+      // intervention) must not block the rest; the row stays
+      // preregistered and the next tick retries.
+      logger.error(`[prereg] Capture failed for registration ${reg.id}:`, err);
+    }
+  }
+
+  return { captured, movedToPendingPayment };
+}
+
+/** Held-balance snapshot used by the escrow UI */
+export async function getHeldSummary(studentId: string) {
+  const balance = await getEscrowBalance(studentId);
+  const account = await db.query.escrow.findFirst({
+    where: (e, { eq }) => eq(e.studentId, studentId),
+    columns: { heldBalance: true },
+  });
+  return { freeBalance: balance, heldBalance: account?.heldBalance ?? 0 };
+}

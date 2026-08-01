@@ -54,6 +54,7 @@ import {
 import { logAction } from './audit.services';
 import { notifyPaymentConfirmed, notifyEscrowBalanceChanged } from './notification.services';
 import { createReceiptsForRegistrations } from './receipt.services';
+import { creditHeld } from './escrow.services';
 
 // ─── School Receiving Account (InstaPay destination) ─────────────────────────
 //
@@ -135,25 +136,38 @@ export async function initiatePayment(
   const linked = await validateParentStudentLink(parentId, studentId);
   if (!linked) throw new Error('You are not linked to this student');
 
-  // All must be in pending_payment
-  const notReady = regs.filter((r) => r.status !== 'pending_payment');
-  if (notReady.length > 0) {
-    throw new Error('One or more registrations are not ready for payment');
+  // All must be in pending_payment, OR (V3 §6.8) all preregistered —
+  // a prereg payment funds the held wallet for a future session.
+  const isPrereg = regs.every((r) => r.status === 'preregistered');
+  if (!isPrereg) {
+    const notReady = regs.filter((r) => r.status !== 'pending_payment');
+    if (notReady.length > 0) {
+      throw new Error('One or more registrations are not ready for payment');
+    }
   }
 
-  // All registrations' sessions must still be open (REG-005, SES-006).
-  // Without this gate, a parent can begin a payment after the window has
-  // closed but before the scheduler's finalizePendingRecords has run —
-  // which would charge them for registrations that are about to be expired.
+  // Session-state gate: open registrations need ACTIVE sessions
+  // (REG-005/SES-006 — otherwise a parent could be charged for rows the
+  // scheduler is about to expire); preregistrations need DRAFT sessions.
   const sessionIds = [...new Set(regs.map((r) => r.sessionId))];
   const sessions = await db.query.registrationSession.findMany({
     where: (s, { inArray }) => inArray(s.id, sessionIds),
     columns: { id: true, status: true, name: true },
   });
-  const closedSessions = sessions.filter((s) => s.status !== 'active');
-  if (closedSessions.length > 0) {
-    const names = closedSessions.map((s) => s.name).join(', ');
-    throw new Error(`Registration window is closed for: ${names}`);
+  const requiredStatus = isPrereg ? 'draft' : 'active';
+  const wrongState = sessions.filter((s) => s.status !== requiredStatus);
+  if (wrongState.length > 0) {
+    const names = wrongState.map((s) => s.name).join(', ');
+    throw new Error(
+      isPrereg
+        ? `These sessions have already opened — pay through the normal flow: ${names}`
+        : `Registration window is closed for: ${names}`
+    );
+  }
+
+  // Held-wallet funding is provider money only — no escrow application
+  if (isPrereg && (data.escrowAmountToApply ?? 0) > 0) {
+    throw new Error('Escrow cannot be applied to preregistration payments');
   }
 
   // Check for existing pending payments on any of these registrations
@@ -267,7 +281,7 @@ export async function initiatePayment(
         amount: paymentMethodAmount,
         escrowAmountApplied: escrowToApply,
         paymentMethod: data.paymentMethod,
-        purpose: 'registration',
+        purpose: isPrereg ? 'preregistration' : 'registration',
         status: 'pending',
         externalReference: externalReference ?? null,
         metadata,
@@ -370,10 +384,15 @@ export async function confirmPayment(
       },
     },
   });
-  const stale = linkedRegs.some(
-    (l) =>
-      l.registration.status !== 'pending_payment' ||
-      l.registration.session.status !== 'active'
+  const isPreregPayment = pay.purpose === 'preregistration';
+  const stale = linkedRegs.some((l) =>
+    isPreregPayment
+      ? // Prereg: rows must still be preregistered in a draft session.
+        // (If the session opened before the money was confirmed, capture
+        // has already moved rows to pending_payment — confirm normally.)
+        l.registration.status !== 'preregistered' && l.registration.status !== 'pending_payment'
+      : l.registration.status !== 'pending_payment' ||
+        l.registration.session.status !== 'active'
   );
   if (stale) {
     throw new Error(
@@ -415,18 +434,44 @@ export async function confirmPayment(
 
     const regIds = links.map((l) => l.registrationId);
     if (regIds.length > 0) {
-      await tx
-        .update(registration)
-        .set({ status: 'confirmed', updatedAt: now })
-        .where(
-          and(
-            inArray(registration.id, regIds),
-            eq(registration.status, 'pending_payment')
-          )
+      if (pay.purpose === 'preregistration') {
+        // V3 §6.8: prereg money lands in the HELD wallet; registrations
+        // stay preregistered until the session activates and the
+        // scheduler captures them. Rows already moved to pending_payment
+        // (session opened early) confirm normally below.
+        await creditHeld(
+          {
+            studentId: pay.studentId,
+            amount: pay.amount,
+            reason: 'prereg_hold',
+            initiatedBy: pay.parentId,
+            relatedPaymentId: paymentId,
+          },
+          tx
         );
+        await tx
+          .update(registration)
+          .set({ status: 'confirmed', updatedAt: now })
+          .where(
+            and(
+              inArray(registration.id, regIds),
+              eq(registration.status, 'pending_payment')
+            )
+          );
+      } else {
+        await tx
+          .update(registration)
+          .set({ status: 'confirmed', updatedAt: now })
+          .where(
+            and(
+              inArray(registration.id, regIds),
+              eq(registration.status, 'pending_payment')
+            )
+          );
+      }
 
       // V3 §6.5 (D-J): physical receipts are born when the money is paid —
-      // one pending_issue receipt per confirmed registration. Idempotent.
+      // one pending_issue receipt per registration. Idempotent.
       await createReceiptsForRegistrations(regIds, tx);
     }
 

@@ -45,6 +45,7 @@ const TRANSACTION_STYLES: Record<string, string> = {
 type EscrowBalance = {
   studentId: string;
   balance: number;
+  heldBalance?: number;
   escrowId: string | null;
 };
 
@@ -124,6 +125,12 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
             {(balance?.balance ?? 0).toFixed(2)}{' '}
             <span className="text-lg text-muted-foreground font-normal font-sans">EGP</span>
           </p>
+          {(balance?.heldBalance ?? 0) > 0 && (
+            <p className="text-sm text-violet-700 dark:text-violet-400 mt-2">
+              + {(balance?.heldBalance ?? 0).toFixed(2)} EGP held for preregistered subjects
+              (auto-applied when their session opens)
+            </p>
+          )}
         </div>
 
         {/* Transaction history */}
@@ -200,6 +207,9 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
             </h2>
             <div className="text-sm font-bold text-foreground">
               Balance: {(balance?.balance ?? 0).toFixed(2)} EGP
+              {(balance?.heldBalance ?? 0) > 0 && (
+                <span className="text-violet-700 dark:text-violet-400"> · Held: {(balance?.heldBalance ?? 0).toFixed(2)} EGP</span>
+              )}
             </div>
           </div>
           <TransactionList transactions={transactions} isLoading={txLoading} />

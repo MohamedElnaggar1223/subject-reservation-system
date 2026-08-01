@@ -19,6 +19,7 @@ import { autoManageSessions, finalizePendingRecords } from '../services/session.
 import { failPayment } from '../services/payment.services';
 import { notifySessionOpened, notifySessionClosingSoon, notifySessionClosed, processScheduledAnnouncements, getStudentAndParentBroadcastIds } from '../services/notification.services';
 import { progressGrades } from '../services/grade.services';
+import { capturePreregistrationsForSession } from '../services/prereg.services';
 import { logAction } from '../services/audit.services';
 import { logger } from '../lib/logger';
 
@@ -279,6 +280,23 @@ export function startSessionScheduler(): void {
         for (const sess of activatedSessions) {
           logAction(null, 'SESSION_AUTO_ACTIVATED', 'session', sess.id, { status: 'draft' }, { status: 'active', name: sess.name, sessionType: sess.sessionType })
             .catch((err) => logger.error(`[session-closer] Audit SESSION_AUTO_ACTIVATED failed for ${sess.id}:`, err));
+        }
+
+        // V3 §6.8: capture preregistrations for each newly opened session —
+        // funded rows confirm (held debited), unfunded fall back to
+        // pending_payment. Idempotent; a failure retries next tick since
+        // rows stay preregistered.
+        for (const sess of activatedSessions) {
+          try {
+            const { captured, movedToPendingPayment } = await capturePreregistrationsForSession(sess.id);
+            if (captured + movedToPendingPayment > 0) {
+              logger.info(
+                `[session-closer] Prereg capture for "${sess.name}": ${captured} confirmed, ${movedToPendingPayment} to pending_payment.`
+              );
+            }
+          } catch (err) {
+            logger.error(`[session-closer] Prereg capture failed for ${sess.id}:`, err);
+          }
         }
 
         // NOT-001: Notify all active students and parents when a session window opens

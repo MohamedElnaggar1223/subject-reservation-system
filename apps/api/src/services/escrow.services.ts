@@ -179,6 +179,82 @@ export async function debitEscrow(params: EscrowMutationParams, tx?: DbConn): Pr
   return updated.balance;
 }
 
+/**
+ * V3 §6.8 — held-balance primitives. Same atomic-update discipline as
+ * the free balance; a separate ledger dimension (balanceType='held').
+ * Held funds exist only to fund their earmarked preregistrations.
+ */
+export async function creditHeld(params: EscrowMutationParams, tx?: DbConn): Promise<number> {
+  const conn = tx ?? db;
+  const account = await getOrCreateEscrow(params.studentId, conn);
+
+  const [updated] = await conn
+    .update(escrow)
+    .set({
+      heldBalance: sql`${escrow.heldBalance} + ${params.amount}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(escrow.id, account.id))
+    .returning({ heldBalance: escrow.heldBalance });
+
+  if (!updated) {
+    throw new Error('Failed to credit held balance — account not found during update');
+  }
+
+  await conn.insert(escrowTransaction).values({
+    id: randomUUID(),
+    escrowId: account.id,
+    type: 'credit',
+    balanceType: 'held',
+    amount: params.amount,
+    reason: params.reason,
+    initiatedBy: params.initiatedBy,
+    relatedRegistrationId: params.relatedRegistrationId || null,
+    relatedPaymentId: params.relatedPaymentId || null,
+  });
+
+  return updated.heldBalance;
+}
+
+export async function debitHeld(params: EscrowMutationParams, tx?: DbConn): Promise<number> {
+  const conn = tx ?? db;
+  const account = await getOrCreateEscrow(params.studentId, conn);
+
+  const [updated] = await conn
+    .update(escrow)
+    .set({
+      heldBalance: sql`${escrow.heldBalance} - ${params.amount}`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(escrow.id, account.id),
+        sql`${escrow.heldBalance} >= ${params.amount}`
+      )
+    )
+    .returning({ heldBalance: escrow.heldBalance });
+
+  if (!updated) {
+    throw new Error(
+      `Insufficient held balance. Requested: ${params.amount.toFixed(2)} EGP`
+    );
+  }
+
+  await conn.insert(escrowTransaction).values({
+    id: randomUUID(),
+    escrowId: account.id,
+    type: 'debit',
+    balanceType: 'held',
+    amount: params.amount,
+    reason: params.reason,
+    initiatedBy: params.initiatedBy,
+    relatedRegistrationId: params.relatedRegistrationId || null,
+    relatedPaymentId: params.relatedPaymentId || null,
+  });
+
+  return updated.heldBalance;
+}
+
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
 
 async function validateParentStudentLink(

@@ -27,6 +27,7 @@ import { zValidator } from '@hono/zod-validator';
 import {
   RequestRegistration,
   DirectRegistration,
+  PreregisterRegistration,
   ApproveRegistrations,
   RevertApprovedRegistrations,
   RejectRegistrations,
@@ -48,6 +49,7 @@ import {
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as registrationService from '../services/registration.services';
+import * as preregService from '../services/prereg.services';
 import * as linkService from '../services/link.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 
@@ -315,6 +317,68 @@ export const registrations = new Hono<HonoEnv>()
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to approve registrations';
         const status = message.includes('not authorized') ? 403 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * POST /registrations/preregister
+   *
+   * V3 §6.8: parent preregisters subjects for a DRAFT (future) session.
+   * Price locks now; payment funds the held wallet; the scheduler
+   * captures on activation. Parent only.
+   */
+  .post('/preregister',
+    requireParent(),
+    zValidator('json', PreregisterRegistration),
+    async (c) => {
+      const user = c.get('user')!;
+      const data = c.req.valid('json');
+
+      try {
+        const created = await preregService.createPreregistration(user.id, data);
+        const auditCtx = extractAuditContext(c);
+        for (const reg of created) {
+          logAction(user.id, 'PREREG_CREATED', 'registration', reg.id, null, reg as Record<string, unknown>, auditCtx)
+            .catch((err) => console.error('[audit] PREREG_CREATED failed:', err));
+        }
+        return success(c, created, 201);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to preregister';
+        const status =
+          message.includes('not linked') ? 403 :
+          message.includes('already') ? 409 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * POST /registrations/:id/cancel-prereg
+   *
+   * Parent cancels a preregistration before the session opens (D-J).
+   * Held funds release; the refundable portion (per refund windows)
+   * walks the receipt-gated path back to the free balance.
+   */
+  .post('/:id/cancel-prereg',
+    requireParent(),
+    zValidator('param', RegistrationId),
+    async (c) => {
+      const user = c.get('user')!;
+      const { id } = c.req.valid('param');
+
+      try {
+        const result = await preregService.cancelPreregistration(id, user.id);
+        logAction(user.id, 'PREREG_CANCELLED', 'registration', id, null, result as Record<string, unknown>, extractAuditContext(c))
+          .catch((err) => console.error('[audit] PREREG_CANCELLED failed:', err));
+        return success(c, result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to cancel preregistration';
+        const status =
+          message.includes('not linked') ? 403 :
+          message.includes('already opened') || message.includes('Only preregistered') ? 409 :
+          message.includes('not found') ? 404 : 400;
         return error(c, message, status);
       }
     }

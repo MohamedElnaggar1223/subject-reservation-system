@@ -169,6 +169,13 @@
       "when": 1785553207558,
       "tag": "0023_v3_phase4_exceptions",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1785553499916,
+      "tag": "0024_v3_phase5_held_wallet",
+      "breakpoints": true
     }
   ]
 }

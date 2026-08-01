@@ -42,6 +42,21 @@ export const sessions = new Hono<HonoEnv>()
    * Returns all currently active registration windows (one per type max).
    * Used on student/parent dashboards. Any authenticated user may call this.
    */
+  /**
+   * GET /sessions/upcoming
+   *
+   * Draft sessions with a future start date — preregistration targets
+   * (V3 §6.8). Any authenticated user.
+   */
+  .get('/upcoming', async (c) => {
+    const { db } = await import('@repo/db');
+    const rows = await db.query.registrationSession.findMany({
+      where: (s, { eq, gt, and }) => and(eq(s.status, 'draft'), gt(s.startDate, new Date())),
+      orderBy: (s, { asc }) => [asc(s.startDate)],
+    });
+    return success(c, rows);
+  })
+
   .get('/active', async (c) => {
     const activeSessions = await sessionService.getActiveSessions();
     return success(c, activeSessions);

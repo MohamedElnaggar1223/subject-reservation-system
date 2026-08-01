@@ -81,7 +81,7 @@ async function getRetakeSubjectIds(
  * the school-fee gate. Returns per-subject computed values keyed by
  * subject ID.
  */
-async function prepareRegistrationInputs(
+export async function prepareRegistrationInputs(
   studentId: string,
   sess: { id: string; qualificationLevel: string; startDate: Date },
   subjects: {

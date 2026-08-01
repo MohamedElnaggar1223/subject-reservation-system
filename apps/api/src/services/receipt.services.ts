@@ -69,6 +69,8 @@ export async function executeReceiptGatedDrop(
     refundAmount: number;
     refundReason: 'drop' | 'swap_refund';
     initiatedBy: string;
+    /** Status the registration must be in (default 'confirmed'; prereg cancellation passes 'preregistered') */
+    fromStatus?: 'confirmed' | 'preregistered';
   }
 ): Promise<{ gated: boolean; refundAmount: number }> {
   const rec = await tx.query.receipt.findFirst({
@@ -86,7 +88,7 @@ export async function executeReceiptGatedDrop(
       droppedAt: now,
       updatedAt: now,
     })
-    .where(and(eq(registration.id, args.registrationId), eq(registration.status, 'confirmed')))
+    .where(and(eq(registration.id, args.registrationId), eq(registration.status, args.fromStatus ?? 'confirmed')))
     .returning({ id: registration.id });
 
   if (!updated) {

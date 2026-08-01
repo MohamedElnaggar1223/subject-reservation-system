@@ -848,6 +848,10 @@ export const escrow = pgTable(
       .unique()
       .references(() => user.id, { onDelete: "restrict" }),
     balance: numeric("balance", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
+    // V3 §6.8: the held part of the wallet — money paid for
+    // preregistrations in not-yet-open sessions. Not spendable,
+    // transferable, or refundable; auto-captured when the session opens.
+    heldBalance: numeric("held_balance", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -856,6 +860,7 @@ export const escrow = pgTable(
   },
   (table) => [
     index("escrow_studentId_idx").on(table.studentId),
+    check("escrow_held_balance_nonneg", sql`${table.heldBalance} >= 0`),
     // L-8: Core invariant — escrow balance never drops below zero. The
     // app layer already enforces this via `debitEscrow`'s
     // `WHERE balance >= amount`, but raw SQL or a future bypass would
@@ -881,9 +886,11 @@ export const escrowTransaction = pgTable(
       .notNull()
       .references(() => escrow.id, { onDelete: "restrict" }),
     type: text("type").notNull(), // 'credit' | 'debit'
+    // V3 §6.8: which side of the wallet moved — 'free' (default) or 'held'
+    balanceType: text("balance_type").notNull().default("free"),
     amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
     // Reason categories for reporting and audit
-    reason: text("reason").notNull(), // 'drop' | 'swap_refund' | 'transfer_in' | 'transfer_out' | 'withdrawal' | 'payment' | 'payment_refund'
+    reason: text("reason").notNull(), // 'drop' | 'swap_refund' | 'transfer_in' | 'transfer_out' | 'withdrawal' | 'payment' | 'payment_refund' | 'prereg_hold' | 'prereg_capture' | 'prereg_release'
     // Optional audit links
     relatedRegistrationId: text("related_registration_id").references(
       () => registration.id,
