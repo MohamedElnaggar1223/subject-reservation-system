@@ -1358,3 +1358,52 @@ export async function generateComprehensiveStaffReport() {
     },
   };
 }
+
+
+/**
+ * Setup checklist (UX_AUDIT G9): what the school has NOT configured yet,
+ * surfaced to the admin before a parent trips over it.
+ */
+export async function getSetupChecklist() {
+  const now = new Date();
+  const year = now.getMonth() >= 6
+    ? `${now.getFullYear()}-${now.getFullYear() + 1}`
+    : `${now.getFullYear() - 1}-${now.getFullYear()}`;
+
+  const [sessions, subjects, subjectTeacherLinks, schoolFeeRows, refundWindows, remarkFees] =
+    await Promise.all([
+      db.query.registrationSession.findMany({
+        where: (s, { inArray }) => inArray(s.status, ['draft', 'active']),
+        columns: { id: true, status: true },
+      }),
+      db.query.subject.findMany({
+        where: (s, { eq }) => eq(s.isActive, true),
+        columns: { id: true, council: true, courseFee: true, registrationFee: true },
+      }),
+      db.query.subjectTeacher.findMany({ columns: { subjectId: true } }),
+      db.query.schoolFeeSchedule.findMany({
+        where: (s, { eq }) => eq(s.academicYear, year),
+        columns: { id: true },
+      }),
+      db.query.refundWindow.findMany({ columns: { id: true } }),
+      db.query.remarkFeeSchedule.findMany({ columns: { council: true, serviceType: true } }),
+    ]);
+
+  const linkedSubjectIds = new Set(subjectTeacherLinks.map((l) => l.subjectId));
+  const councilsInUse = [...new Set(subjects.map((s) => s.council))];
+  const councilsMissingRemarkFees = councilsInUse.filter(
+    (c) => !remarkFees.some((f) => f.council === c && f.serviceType === 'review_of_marking')
+  );
+
+  return {
+    academicYear: year,
+    hasOpenOrUpcomingSession: sessions.length > 0,
+    activeSessionCount: sessions.filter((s) => s.status === 'active').length,
+    subjectCount: subjects.length,
+    zeroFeeSubjects: subjects.filter((s) => s.courseFee + s.registrationFee <= 0).length,
+    subjectsWithoutTeachers: subjects.filter((s) => !linkedSubjectIds.has(s.id)).length,
+    schoolFeeConfigured: schoolFeeRows.length > 0,
+    refundWindowsConfigured: refundWindows.length > 0,
+    councilsMissingRemarkFees,
+  };
+}

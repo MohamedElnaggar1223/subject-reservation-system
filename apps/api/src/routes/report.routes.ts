@@ -41,6 +41,7 @@ import {
   generateStudentRoster,
   generatePendingApprovalsReport,
   generateComprehensiveStaffReport,
+  getSetupChecklist,
 } from '../services/report.services';
 
 // ─── CSV Helper ───────────────────────────────────────────────────────────────
@@ -307,6 +308,14 @@ export const reports = new Hono<HonoEnv>()
 
       return success(c, result);
     }
-  );
+  )
 
+  /**
+   * GET /reports/setup-checklist  (UX_AUDIT G9)
+   * What's still unconfigured — shown on the admin dashboard so the
+   * school never learns about missing setup from a parent's error.
+   */
+  .get('/setup-checklist', async (c) => {
+    return success(c, await getSetupChecklist());
+  });
 export type ReportsApi = typeof reports;

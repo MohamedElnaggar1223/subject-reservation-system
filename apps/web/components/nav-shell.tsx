@@ -82,6 +82,7 @@ function getNavSections(role: string | null | undefined): NavSection[] {
           { labelKey: 'nav.exceptions', href: '/admin/exceptions', icon: 'approvals' },
           { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
           { labelKey: 'nav.resultsEntry', href: '/results-entry', icon: 'reports' },
+          { labelKey: 'nav.dailyTakings', href: '/takings', icon: 'escrow' },
         ],
       },
       {
@@ -101,10 +102,22 @@ function getNavSections(role: string | null | undefined): NavSection[] {
         items: [
           { labelKey: 'nav.desk', href: '/desk', icon: 'home' },
           { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'payments' },
+          { labelKey: 'nav.dailyTakings', href: '/takings', icon: 'escrow' },
           { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
           { labelKey: 'nav.resultsEntry', href: '/results-entry', icon: 'reports' },
         ],
       },
+      ...(role === 'finance_admin'
+        ? [
+            {
+              titleKey: 'nav.management' as const,
+              items: [
+                { labelKey: 'nav.schoolFees' as const, href: '/admin/school-fees', icon: 'escrow' as const },
+                { labelKey: 'nav.exceptions' as const, href: '/admin/exceptions', icon: 'approvals' as const },
+              ],
+            },
+          ]
+        : []),
       {
         titleKey: 'nav.account',
         items: [

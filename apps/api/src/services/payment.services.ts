@@ -773,6 +773,42 @@ export async function getPendingManualPayments() {
 }
 
 /**
+ * Daily takings (UX_AUDIT G4): everything confirmed on one calendar day,
+ * with per-instrument totals — the officer reconciles the cash drawer
+ * against this at closing time.
+ */
+export async function getDailyTakings(dateStr: string) {
+  const start = new Date(`${dateStr}T00:00:00`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+
+  const rows = await db.query.payment.findMany({
+    where: (p, { eq, and, gte, lt }) =>
+      and(eq(p.status, 'completed'), gte(p.confirmedAt, start), lt(p.confirmedAt, end)),
+    columns: {
+      id: true, amount: true, escrowAmountApplied: true, paymentMethod: true,
+      purpose: true, instrumentUsed: true, externalReference: true, confirmedAt: true,
+    },
+    with: {
+      student: { columns: { id: true, name: true } },
+      confirmedByUser: { columns: { id: true, name: true } },
+    },
+    orderBy: (p, { asc }) => [asc(p.confirmedAt)],
+  });
+
+  const byInstrument: Record<string, number> = {};
+  let cashIn = 0;
+  let escrowApplied = 0;
+  for (const r of rows) {
+    const key = r.instrumentUsed ?? r.paymentMethod;
+    byInstrument[key] = (byInstrument[key] ?? 0) + r.amount;
+    cashIn += r.amount;
+    escrowApplied += r.escrowAmountApplied;
+  }
+
+  return { date: dateStr, rows, totals: { cashIn, escrowApplied, byInstrument } };
+}
+
+/**
  * Get all pending bank transfer payments for admin review.
  * Returns payments ordered oldest-first so longest-waiting transfers are prioritized.
  */

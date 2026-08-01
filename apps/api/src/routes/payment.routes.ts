@@ -20,6 +20,7 @@
  */
 
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import {
   InitiatePayment,
@@ -112,6 +113,22 @@ export const payments = new Hono<HonoEnv>()
     async (c) => {
       const pending = await paymentService.getPendingBankTransfers();
       return success(c, pending);
+    }
+  )
+
+  /**
+   * GET /payments/daily-takings?date=YYYY-MM-DD  (UX_AUDIT G4)
+   *
+   * Everything confirmed on one day with per-instrument totals — the
+   * end-of-day cash-drawer reconciliation. Finance roles + admin.
+   */
+  .get('/daily-takings',
+    requireAuth(),
+    requireFinance(),
+    zValidator('query', z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD') })),
+    async (c) => {
+      const { date } = c.req.valid('query');
+      return success(c, await paymentService.getDailyTakings(date));
     }
   )
 

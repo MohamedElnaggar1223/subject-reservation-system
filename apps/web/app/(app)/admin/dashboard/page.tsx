@@ -14,6 +14,7 @@ import { getQueryClient } from '~/lib/query-client';
 import { getServerApi } from '~/lib/hono-server';
 import { apiResponse } from '@repo/validations';
 import AdminDashboardClient from './dashboard.client';
+import SetupChecklist from './setup-checklist.client';
 
 export const metadata = {
   title: 'Dashboard — Admin',
@@ -36,6 +37,9 @@ export default async function AdminDashboardPage(): Promise<React.JSX.Element> {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
+      <div className="px-6 pt-6 max-w-6xl mx-auto">
+        <SetupChecklist />
+      </div>
       <AdminDashboardClient />
     </HydrationBoundary>
   );
