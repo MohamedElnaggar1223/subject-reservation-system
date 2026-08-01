@@ -19,15 +19,17 @@ import { z } from 'zod';
 import {
   UpdateProfile,
   AdminUpdateUser,
+  AdminCreateUser,
   UserId,
   UserQueryFilters,
   StudentRegistrationData,
 } from '@repo/validations';
 import { success, error } from '../lib/response';
-import { requireAuth, requireAdmin } from '../middleware/access-control.middleware';
+import { auth } from '../lib/auth';
+import { getStudentSummary } from '../services/desk.services';
+import { requireAuth, requireAdmin, requireFinance } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import { logAction, extractAuditContext } from '../services/audit.services';
-import { auth } from '../lib/auth';
 import * as userService from '../services/user.services';
 
 export const users = new Hono<HonoEnv>()
@@ -272,6 +274,47 @@ export const users = new Hono<HonoEnv>()
    * 
    * Returns all users with optional filtering.
    */
+  /**
+   * CREATE USER (Admin — team management, G7)
+   * POST /users
+   *
+   * One form creates any account: staff (finance roles), students
+   * (grade required, student ID auto-generated), or parents.
+   */
+  .post('/',
+    requireAdmin(),
+    zValidator('json', AdminCreateUser),
+    async (c) => {
+      const user = c.get('user')!;
+      const data = c.req.valid('json');
+
+      try {
+        const result = await auth.api.createUser({
+          body: {
+            email: data.email,
+            password: data.password,
+            name: data.name,
+            role: data.role as 'admin',
+          },
+          headers: c.req.raw.headers,
+        });
+
+        if (data.role === 'student' && data.grade !== undefined) {
+          await userService.setStudentFields(result.user.id, data.grade);
+        }
+
+        logAction(user.id, 'STAFF_USER_CREATED', 'user', result.user.id, null, { email: data.email, role: data.role }, extractAuditContext(c))
+          .catch((err) => console.error('[audit] STAFF_USER_CREATED failed:', err));
+
+        return success(c, result.user, 201);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to create user';
+        const status = /exists|taken|duplicate/i.test(message) ? 409 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
   .get('/',
     requireAdmin(),
     zValidator('query', UserQueryFilters),
@@ -290,6 +333,29 @@ export const users = new Hono<HonoEnv>()
    * 
    * Returns a specific user's profile.
    */
+  /**
+   * STUDENT 360 (UX_AUDIT G2)
+   * GET /users/:id/summary
+   *
+   * Everything about one student on one screen — registrations with
+   * receipt states, payments, escrow (free+held), school fee, active
+   * exceptions, remarks, linked parents, and what the family owes.
+   * Finance roles + admin.
+   */
+  .get('/:id/summary',
+    requireFinance(),
+    zValidator('param', UserId),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      try {
+        return success(c, await getStudentSummary(id));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to load summary';
+        return error(c, message, message.includes('not found') ? 404 : 400);
+      }
+    }
+  )
+
   .get('/:id',
     requireAdmin(),
     zValidator('param', UserId),

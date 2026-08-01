@@ -174,6 +174,30 @@ export const receipts = new Hono<HonoEnv>()
     } catch (err) {
       return error(c, err instanceof Error ? err.message : 'Failed to void receipt', 409);
     }
+  })
+
+  /**
+   * GET /receipts/:id  (UX_AUDIT G3)
+   *
+   * Full receipt detail for the printable view — the paper the parent
+   * actually holds. Finance roles + admin.
+   */
+  .get('/:id', requireFinance(), zValidator('param', ReceiptId), async (c) => {
+    const { id } = c.req.valid('param');
+    const found = await db.query.receipt.findFirst({
+      where: (r, { eq }) => eq(r.id, id),
+      with: {
+        registration: {
+          with: {
+            student: { columns: { id: true, name: true, studentId: true, grade: true } },
+            subject: { columns: { id: true, name: true, code: true, council: true } },
+            session: { columns: { id: true, name: true } },
+          },
+        },
+      },
+    });
+    if (!found) return error(c, 'Receipt not found', 404);
+    return success(c, found);
   });
 
 export type ReceiptsApi = typeof receipts;

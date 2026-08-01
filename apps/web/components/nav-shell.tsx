@@ -71,6 +71,8 @@ function getNavSections(role: string | null | undefined): NavSection[] {
       {
         titleKey: 'nav.management',
         items: [
+          { labelKey: 'nav.desk', href: '/desk', icon: 'home' },
+          { labelKey: 'nav.team', href: '/admin/team', icon: 'profile' },
           { labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' },
           { labelKey: 'nav.subjects', href: '/admin/subjects', icon: 'subjects' },
           { labelKey: 'nav.payments', href: '/admin/payments', icon: 'payments' },
@@ -97,6 +99,7 @@ function getNavSections(role: string | null | undefined): NavSection[] {
     return [
       {
         items: [
+          { labelKey: 'nav.desk', href: '/desk', icon: 'home' },
           { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'payments' },
           { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
           { labelKey: 'nav.resultsEntry', href: '/results-entry', icon: 'reports' },

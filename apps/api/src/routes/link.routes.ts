@@ -27,6 +27,10 @@ import {
   ROLES 
 } from '@repo/validations';
 import { success, error } from '../lib/response';
+import { logAction, extractAuditContext } from '../services/audit.services';
+import { onboardFamily } from '../services/desk.services';
+import { DeskOnboardFamily } from '@repo/validations';
+import { requireFinance } from '../middleware/access-control.middleware';
 import { 
   requireAuth, 
   requireParent, 
@@ -187,6 +191,35 @@ export const links = new Hono<HonoEnv>()
    * Get details of a specific link.
    * Users can only view links they're part of (or admin).
    */
+  /**
+   * POST /links/desk-onboard  (UX_AUDIT G5)
+   *
+   * Staff enroll a walk-in family in one action: find-or-create the
+   * parent and student accounts and link them APPROVED on the spot
+   * (staff vouch in person — no student-login approval loop).
+   * Finance roles + admin.
+   */
+  .post('/desk-onboard',
+    requireFinance(),
+    zValidator('json', DeskOnboardFamily),
+    async (c) => {
+      const user = c.get('user')!;
+      const data = c.req.valid('json');
+      try {
+        const result = await onboardFamily(c.req.raw.headers, data);
+        logAction(user.id, 'DESK_FAMILY_ONBOARDED', 'user', result.student.id, null, {
+          parent: result.parent.email, student: result.student.email, linkStatus: result.linkStatus,
+        }, extractAuditContext(c))
+          .catch((err) => console.error('[audit] DESK_FAMILY_ONBOARDED failed:', err));
+        return success(c, result, 201);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to onboard family';
+        const status = /already exists with the role/.test(message) ? 409 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
   .get('/:id',
     zValidator('param', LinkId),
     async (c) => {

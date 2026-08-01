@@ -31,6 +31,9 @@ import {
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as schoolFeeService from '../services/school-fee.services';
+import { collectSchoolFeeAtDesk } from '../services/desk.services';
+import { DeskSchoolFeePayment } from '@repo/validations';
+import { requireFinance } from '../middleware/access-control.middleware';
 import { env } from '../env';
 import { logAction, extractAuditContext } from '../services/audit.services';
 
@@ -118,6 +121,28 @@ export const schoolFees = new Hono<HonoEnv>()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load status';
       return error(c, message, message.includes('not found') ? 404 : 400);
+    }
+  })
+
+  /**
+   * POST /school-fees/desk-pay  (UX_AUDIT G1)
+   *
+   * Officer collects the school fee at the desk — recorded and
+   * confirmed in one action; the registration gate unlocks immediately.
+   * Finance roles + admin.
+   */
+  .post('/desk-pay', requireFinance(), zValidator('json', DeskSchoolFeePayment), async (c) => {
+    const user = c.get('user')!;
+    const data = c.req.valid('json');
+    try {
+      const result = await collectSchoolFeeAtDesk(user.id, data.studentId, data.instrumentUsed, data.notes);
+      logAction(user.id, 'DESK_SCHOOL_FEE_COLLECTED', 'payment', result.paymentId, null, result as Record<string, unknown>, extractAuditContext(c))
+        .catch((err) => console.error('[audit] DESK_SCHOOL_FEE_COLLECTED failed:', err));
+      return success(c, result, 201);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to collect school fee';
+      const status = message.includes('already paid') ? 409 : 400;
+      return error(c, message, status);
     }
   })
 

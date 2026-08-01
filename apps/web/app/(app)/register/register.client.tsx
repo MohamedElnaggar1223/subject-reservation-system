@@ -144,6 +144,7 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<Set<string>>(new Set());
   const [subjectChoices, setSubjectChoices] = useState<Record<string, SubjectChoice>>({});
   const [successMessage, setSuccessMessage] = useState('');
+  const [payNowIds, setPayNowIds] = useState<string[]>([]);
   const [submitError, setSubmitError] = useState('');
   const [councilFilter, setCouncilFilter] = useState('all');
 
@@ -302,12 +303,15 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
               },
             })
       ),
-    onSuccess: () => {
+    onSuccess: (created) => {
       setSuccessMessage(
         isPreregSession
           ? 'Preregistered! Pay now to lock the funds in the held wallet — they auto-apply when the session opens.'
-          : 'Subjects registered successfully! Proceed to payment to confirm.'
+          : 'Subjects registered! Pay now to confirm them.'
       );
+      // G12: hand the parent straight to checkout with these registrations
+      const rows = created as unknown as { id: string }[];
+      setPayNowIds(Array.isArray(rows) ? rows.map((r) => r.id) : []);
       setSelectedSubjectIds(new Set());
       setSubjectChoices({});
       queryClient.invalidateQueries({ queryKey: ['registrations'] });
@@ -393,12 +397,22 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
           </div>
           <div>
             <p className="font-medium text-brand-800 dark:text-brand-300 text-sm">{successMessage}</p>
-            <button
-              onClick={() => setSuccessMessage('')}
-              className="text-sm text-brand-600 dark:text-brand-400 underline mt-1"
-            >
-              Register more subjects
-            </button>
+            <div className="flex gap-3 mt-2">
+              {payNowIds.length > 0 && (
+                <a
+                  href={`/checkout?ids=${payNowIds.join(',')}`}
+                  className="inline-flex items-center px-3 py-1.5 rounded-lg bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700"
+                >
+                  Pay now →
+                </a>
+              )}
+              <button
+                onClick={() => { setSuccessMessage(''); setPayNowIds([]); }}
+                className="text-sm text-brand-600 dark:text-brand-400 underline"
+              >
+                Register more subjects
+              </button>
+            </div>
           </div>
         </div>
       )}

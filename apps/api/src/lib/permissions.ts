@@ -46,6 +46,9 @@ export const financeOfficerRole = ac.newRole({
     finance: ["create", "read", "update"],
     student: ["read"],
     parent: ["read"],
+    // Desk onboarding (G5): staff create parent/student accounts for
+    // walk-in families through better-auth's admin createUser.
+    user: ["create", "list"],
 })
 
 /**
@@ -57,6 +60,7 @@ export const financeAdminRole = ac.newRole({
     finance: ["create", "read", "update", "delete", "approve"],
     student: ["read"],
     parent: ["read"],
+    user: ["create", "list", "set-password"],
 })
 
 /**

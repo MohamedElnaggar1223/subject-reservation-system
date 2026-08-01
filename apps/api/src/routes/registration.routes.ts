@@ -28,6 +28,7 @@ import {
   RequestRegistration,
   DirectRegistration,
   PreregisterRegistration,
+  DeskRegistration,
   ApproveRegistrations,
   RevertApprovedRegistrations,
   RejectRegistrations,
@@ -36,6 +37,8 @@ import {
   AvailableSubjectsQuery,
   RegistrationId,
   ROLES,
+  FINANCE_ROLES,
+  hasRole,
 } from '@repo/validations';
 import { success, error } from '../lib/response';
 import {
@@ -45,11 +48,13 @@ import {
   requireAdmin,
   requireStudentOrParent,
   requireAdminOrParent,
+  requireFinance,
   requireNotGraduated,
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as registrationService from '../services/registration.services';
 import * as preregService from '../services/prereg.services';
+import * as deskService from '../services/desk.services';
 import * as linkService from '../services/link.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 
@@ -85,7 +90,8 @@ export const registrations = new Hono<HonoEnv>()
           return error(c, 'You are not linked to this student', 403);
         }
         targetStudentId = requestedStudentId;
-      } else if (user.role === ROLES.ADMIN) {
+      } else if (hasRole(user.role, ...FINANCE_ROLES)) {
+        // Admin + finance staff (desk registration needs the same list)
         if (!requestedStudentId) {
           return error(c, 'studentId is required', 400);
         }
@@ -317,6 +323,37 @@ export const registrations = new Hono<HonoEnv>()
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to approve registrations';
         const status = message.includes('not authorized') ? 403 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * POST /registrations/desk  (UX_AUDIT G1)
+   *
+   * One desk action: staff register subjects for a student and record
+   * the money just taken — registrations confirm and receipts are born
+   * immediately. Omit collectNow to register only (family pays later).
+   * Finance roles + admin.
+   */
+  .post('/desk',
+    requireFinance(),
+    zValidator('json', DeskRegistration),
+    async (c) => {
+      const user = c.get('user')!;
+      const data = c.req.valid('json');
+      try {
+        const result = await deskService.executeDeskRegistration(user.id, data);
+        logAction(user.id, 'DESK_REGISTRATION', 'registration', data.studentId, null, {
+          subjects: data.subjectIds.length, collected: result.collected,
+        }, extractAuditContext(c))
+          .catch((err) => console.error('[audit] DESK_REGISTRATION failed:', err));
+        return success(c, result, 201);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to process desk registration';
+        const status =
+          message.includes('already') ? 409 :
+          message.includes('not open') || message.includes('insufficient') || message.includes('Insufficient') ? 422 : 400;
         return error(c, message, status);
       }
     }
