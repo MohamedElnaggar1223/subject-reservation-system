@@ -85,6 +85,13 @@ Concrete proof-points of the gap (verified in code):
 
 ## 3. The corrective program (build order)
 
+> **Status (1 Aug 2026): all three tiers implemented** — commits `38d1d56`
+> (Tier 1: team mgmt, desk onboarding, desk registration+payment, Student
+> 360, printable receipts, register→pay), `b5177c3` (Tier 2: daily
+> takings, finance-admin access, setup checklist), `ac01c94` (Tier 3:
+> CSV import/export, results paste, Arabic coverage, audited payment
+> reversal). The standing test in §4 applies to everything after this.
+
 **Tier 1 — the desk (the structural fix):**
 1. G7 Team management (staff accounts + roles) — unlocks everything else
 2. G5 Desk onboarding (parent+student+approved link in one form)
