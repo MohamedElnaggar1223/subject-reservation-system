@@ -773,6 +773,88 @@ export async function getPendingManualPayments() {
 }
 
 /**
+ * Reverse a mistaken confirmation (UX_AUDIT G6) — Excel's "fix the cell"
+ * with an audit trail. Finance admin only (enforced at the route).
+ *
+ * Only while the paper hasn't left the desk: every linked receipt must
+ * still be pending_issue (they are voided). Effects: payment →
+ * 'refunded', escrow re-credited if applied, registrations → back to
+ * pending_payment, receipts voided. School-fee reversals re-lock the
+ * registration gate automatically (the gate checks completed payments).
+ */
+export async function reversePayment(paymentId: string, financeAdminId: string, reason: string) {
+  const pay = await db.query.payment.findFirst({
+    where: (p, { eq }) => eq(p.id, paymentId),
+    with: { paymentRegistrations: { columns: { registrationId: true } } },
+  });
+  if (!pay) throw new Error('Payment not found');
+  if (pay.status !== 'completed') throw new Error('Only completed payments can be reversed');
+  if (pay.purpose === 'remark' || pay.purpose === 'preregistration') {
+    throw new Error('Remark and preregistration payments cannot be auto-reversed — contact support flow');
+  }
+
+  const regIds = pay.paymentRegistrations.map((l) => l.registrationId);
+
+  if (regIds.length > 0) {
+    const receipts = await db.query.receipt.findMany({
+      where: (r, { inArray }) => inArray(r.registrationId, regIds),
+      columns: { id: true, status: true, receiptNumber: true },
+    });
+    const outOfDesk = receipts.filter((r) => r.status !== 'pending_issue' && r.status !== 'void');
+    if (outOfDesk.length > 0) {
+      throw new Error(
+        `Receipts already handed out (${outOfDesk.map((r) => r.receiptNumber).join(', ')}) — take them back before reversing`
+      );
+    }
+  }
+
+  const { receipt } = await import('@repo/db');
+
+  await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(payment)
+      .set({
+        status: 'refunded',
+        metadata: {
+          ...((pay.metadata as Record<string, unknown>) ?? {}),
+          reversal: { by: financeAdminId, reason, at: new Date().toISOString() },
+        },
+        updatedAt: new Date(),
+      })
+      .where(and(eq(payment.id, paymentId), eq(payment.status, 'completed')))
+      .returning();
+    if (!updated) throw new Error('Payment was concurrently processed');
+
+    if (regIds.length > 0) {
+      await tx
+        .update(registration)
+        .set({ status: 'pending_payment', updatedAt: new Date() })
+        .where(and(inArray(registration.id, regIds), eq(registration.status, 'confirmed')));
+
+      await tx
+        .update(receipt)
+        .set({ status: 'void', notes: `Voided — payment reversed: ${reason}`, updatedAt: new Date() })
+        .where(and(inArray(receipt.registrationId, regIds), eq(receipt.status, 'pending_issue')));
+    }
+
+    if (pay.escrowAmountApplied > 0) {
+      await creditEscrow(
+        {
+          studentId: pay.studentId,
+          amount: pay.escrowAmountApplied,
+          reason: 'payment_refund',
+          initiatedBy: financeAdminId,
+          relatedPaymentId: paymentId,
+        },
+        tx
+      );
+    }
+  });
+
+  return { reversed: true, registrationsReverted: regIds.length };
+}
+
+/**
  * Daily takings (UX_AUDIT G4): everything confirmed on one calendar day,
  * with per-instrument totals — the officer reconciles the cash drawer
  * against this at closing time.

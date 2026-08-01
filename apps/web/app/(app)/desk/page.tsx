@@ -14,6 +14,6 @@ export const metadata = {
 };
 
 export default async function DeskPage(): Promise<React.JSX.Element> {
-  await requireFinance();
-  return <DeskClient />;
+  const session = await requireFinance();
+  return <DeskClient userRole={session.user.role ?? ''} />;
 }

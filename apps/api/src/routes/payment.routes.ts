@@ -39,6 +39,7 @@ import {
   requireParent,
   requireAdmin,
   requireFinance,
+  requireFinanceAdmin,
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as paymentService from '../services/payment.services';
@@ -368,6 +369,37 @@ export const payments = new Hono<HonoEnv>()
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to confirm payment';
         return error(c, message, 400);
+      }
+    }
+  )
+
+  /**
+   * POST /payments/:id/reverse  (UX_AUDIT G6)
+   *
+   * Finance admin reverses a mistaken confirmation — payment refunded,
+   * registrations back to pending_payment, receipts voided (only while
+   * still at the desk), escrow re-credited. Reason required; audited.
+   */
+  .post('/:id/reverse',
+    requireAuth(),
+    requireFinanceAdmin(),
+    zValidator('param', PaymentId),
+    zValidator('json', z.object({ reason: z.string().min(3, 'A reason is required').max(500) })),
+    async (c) => {
+      const user = c.get('user')!;
+      const { id } = c.req.valid('param');
+      const { reason } = c.req.valid('json');
+      try {
+        const result = await paymentService.reversePayment(id, user.id, reason);
+        logAction(user.id, 'PAYMENT_REVERSED', 'payment', id, null, { reason, ...result }, extractAuditContext(c))
+          .catch((err) => console.error('[audit] PAYMENT_REVERSED failed:', err));
+        return success(c, result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to reverse payment';
+        const status =
+          message.includes('handed out') || message.includes('concurrently') ? 409 :
+          message.includes('not found') ? 404 : 400;
+        return error(c, message, status);
       }
     }
   );

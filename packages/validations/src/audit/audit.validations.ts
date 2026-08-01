@@ -122,6 +122,7 @@ export const AUDIT_ACTIONS = [
   'DESK_FAMILY_ONBOARDED',
   'DESK_REGISTRATION',
   'DESK_SCHOOL_FEE_COLLECTED',
+  'PAYMENT_REVERSED',
   // Change requests
   'CHANGE_REQUEST_CREATED',
   'CHANGE_REQUEST_APPROVED',
@@ -198,6 +199,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   DESK_FAMILY_ONBOARDED:      'Family Onboarded at Desk',
   DESK_REGISTRATION:          'Registration Processed at Desk',
   DESK_SCHOOL_FEE_COLLECTED:  'School Fee Collected at Desk',
+  PAYMENT_REVERSED:           'Payment Confirmation Reversed',
   CHANGE_REQUEST_CREATED:     'Drop/Swap Request Created',
   CHANGE_REQUEST_APPROVED:    'Drop/Swap Request Approved',
   CHANGE_REQUEST_REJECTED:    'Drop/Swap Request Rejected',

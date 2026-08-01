@@ -28,6 +28,8 @@ export default function ResultsEntryClient(): React.JSX.Element {
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [search, setSearch] = useState('');
+  const [showPaste, setShowPaste] = useState(false);
+  const [pasteText, setPasteText] = useState('');
 
   const { data: sessions = [] } = useQuery<SessionRow[]>({
     queryKey: ['sessions', 'all-admin'],
@@ -75,6 +77,33 @@ export default function ResultsEntryClient(): React.JSX.Element {
     (r) => (grades[r.id] ?? '').trim() && (grades[r.id] ?? '').trim() !== (r.gradeReceived ?? '')
   ).length;
 
+  // Paste-from-Excel (UX_AUDIT G10): "studentId <tab/,> subjectCode <tab/,> grade"
+  function applyPaste() {
+    const lines = pasteText.split('\n').map((l) => l.trim()).filter(Boolean);
+    let matched = 0;
+    const misses: string[] = [];
+    const next = { ...grades };
+    for (const line of lines) {
+      const cells = line.split(/[,;\t]/).map((c) => c.trim());
+      if (cells.length < 3) { misses.push(line); continue; }
+      const [sid, code, grade] = cells;
+      const row = rows.find(
+        (r) =>
+          (r.student.studentId ?? '').toLowerCase() === sid!.toLowerCase() &&
+          r.subject.code.toLowerCase() === code!.toLowerCase()
+      );
+      if (row && grade) {
+        next[row.id] = grade.toUpperCase();
+        matched++;
+      } else {
+        misses.push(line);
+      }
+    }
+    setGrades(next);
+    setMessage(`Matched ${matched} row(s) from paste${misses.length ? ` — ${misses.length} not matched` : ''}. Review and Save.`);
+    if (misses.length === 0) { setPasteText(''); setShowPaste(false); }
+  }
+
   const visible = rows.filter((r) => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -107,6 +136,11 @@ export default function ResultsEntryClient(): React.JSX.Element {
           ))}
         </select>
         {sessionId && (
+          <Button variant="outline" onClick={() => setShowPaste((v) => !v)}>
+            {showPaste ? 'Close Paste' : 'Paste from Excel'}
+          </Button>
+        )}
+        {sessionId && (
           <input
             type="search"
             value={search}
@@ -116,6 +150,26 @@ export default function ResultsEntryClient(): React.JSX.Element {
           />
         )}
       </div>
+
+      {showPaste && sessionId && (
+        <div className="mb-4 bg-card rounded-xl border border-border shadow-sm p-4">
+          <p className="text-xs text-muted-foreground mb-2">
+            Paste rows as <span className="font-mono">studentId, subjectCode, grade</span> (tab or comma
+            separated — straight from the results spreadsheet). Rows fill the grid below; nothing saves
+            until you click Save.
+          </p>
+          <textarea
+            rows={5}
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            placeholder={'STU-20260901-A7B3C\t4MB1\tA*\nSTU-20260901-9K2LM\t0610\t7'}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground font-mono"
+          />
+          <div className="mt-2 flex justify-end">
+            <Button size="sm" disabled={!pasteText.trim()} onClick={applyPaste}>Fill Grid</Button>
+          </div>
+        </div>
+      )}
 
       {message && (
         <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400">

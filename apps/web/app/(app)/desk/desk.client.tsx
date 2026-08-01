@@ -61,7 +61,8 @@ type AvailableSubject = {
   outsidePricing: { total: number } | null;
 };
 
-export default function DeskClient(): React.JSX.Element {
+export default function DeskClient({ userRole }: { userRole: string }): React.JSX.Element {
+  const isFinanceAdmin = userRole === 'finance_admin' || userRole === 'admin';
   const qc = useQueryClient();
 
   const [search, setSearch] = useState('');
@@ -119,6 +120,13 @@ export default function DeskClient(): React.JSX.Element {
   const returnReceiptMutation = useMutation({
     mutationFn: (id: string) => apiResponse(api.v1.receipts[':id'].return.$post({ param: { id }, json: {} })),
     onSuccess: () => done('Receipt returned — any pending drop refund is released.'),
+    onError: fail,
+  });
+
+  const reverseMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      apiResponse(api.v1.payments[':id'].reverse.$post({ param: { id }, json: { reason } })),
+    onSuccess: () => done('Payment reversed — registrations back to pending payment, receipts voided.'),
     onError: fail,
   });
 
@@ -361,6 +369,23 @@ export default function DeskClient(): React.JSX.Element {
                       <td className="px-3 py-2.5 text-xs capitalize">{p.status.replace('_', ' ')}</td>
                       <td className="px-5 py-2.5 text-right font-medium text-foreground whitespace-nowrap">
                         {formatPrice(p.amount + p.escrowAmountApplied)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        {isFinanceAdmin && p.status === 'completed' &&
+                          (p.purpose === 'registration' || p.purpose === 'school_fee') && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                            disabled={reverseMutation.isPending}
+                            onClick={() => {
+                              const reason = window.prompt('Reverse this payment? Enter the reason (audited):');
+                              if (reason?.trim()) reverseMutation.mutate({ id: p.id, reason: reason.trim() });
+                            }}
+                          >
+                            Reverse
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}

@@ -60,6 +60,11 @@ export default function SubjectsAdminClient(): React.JSX.Element {
   // Form state
   const [form, setForm] = useState(emptyForm);
 
+  // CSV import (UX_AUDIT G10): paste straight from the Excel price list
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importReport, setImportReport] = useState('');
+
   // Teacher-linking modal state (V3 §6.7)
   type TeacherRow = { id: string; name: string; isActive: boolean };
   const [teacherTarget, setTeacherTarget] = useState<Subject | null>(null);
@@ -161,6 +166,67 @@ export default function SubjectsAdminClient(): React.JSX.Element {
     onError: (err: Error) => setTeacherError(err.message),
   });
 
+  async function runImport() {
+    setImportReport('');
+    const lines = importText.split('\n').map((l) => l.trim()).filter(Boolean);
+    let ok = 0;
+    const errors: string[] = [];
+    for (const [i, line] of lines.entries()) {
+      const cells = line.split(/[,;\t]/).map((c) => c.trim());
+      if (i === 0 && /name/i.test(cells[0] ?? '') && /code/i.test(cells[1] ?? '')) continue; // header row
+      const [name, code, councilRaw, levelRaw, courseFeeRaw, regFeeRaw, coreRaw] = cells;
+      const council = (councilRaw ?? '').toLowerCase().replace(/\s+/g, '_');
+      const level = (levelRaw ?? 'igcse').toLowerCase().replace(/\s+/g, '_');
+      const courseFee = parseFloat(courseFeeRaw ?? '');
+      const registrationFee = parseFloat(regFeeRaw ?? '0');
+      if (!name || !code || isNaN(courseFee)) {
+        errors.push(`Line ${i + 1}: needs name, code, and a course fee`);
+        continue;
+      }
+      if (!['pearson_edexcel', 'cambridge', 'oxford'].includes(council)) {
+        errors.push(`Line ${i + 1}: council must be Pearson Edexcel, Cambridge, or Oxford`);
+        continue;
+      }
+      try {
+        await apiResponse(
+          api.v1.subjects.$post({
+            json: {
+              name,
+              code: code.toUpperCase(),
+              council: council as 'cambridge',
+              qualificationLevel: (['igcse', 'as_level', 'a_level'].includes(level) ? level : 'igcse') as 'igcse',
+              courseFee,
+              registrationFee: isNaN(registrationFee) ? 0 : registrationFee,
+              isOfferedAtSchool: true,
+              isCore: /^(yes|true|core|1)$/i.test(coreRaw ?? ''),
+            },
+          })
+        );
+        ok++;
+      } catch (e) {
+        errors.push(`Line ${i + 1} (${code}): ${e instanceof Error ? e.message : 'failed'}`);
+      }
+    }
+    queryClient.invalidateQueries({ queryKey: ['subjects'] });
+    setImportReport(`Imported ${ok} subject(s).${errors.length ? ` Problems:\n${errors.join('\n')}` : ''}`);
+    if (errors.length === 0) setImportText('');
+  }
+
+  function exportCsv() {
+    const rows = [
+      'name,code,council,level,courseFee,registrationFee,core',
+      ...(subjects as Subject[]).map((x) =>
+        [x.name, x.code, x.council, x.qualificationLevel, x.courseFee, x.registrationFee, x.isCore ? 'yes' : 'no'].join(',')
+      ),
+    ];
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'subjects.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   function openCreateForm() {
     setEditingSubject(null);
     setForm(emptyForm);
@@ -256,13 +322,44 @@ export default function SubjectsAdminClient(): React.JSX.Element {
             {(subjects as Subject[]).filter((s) => s.isActive).length} active
           </p>
         </div>
-        <Button onClick={openCreateForm}>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          New Subject
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportCsv}>Export CSV</Button>
+          <Button variant="outline" onClick={() => { setShowImport((v) => !v); setImportReport(''); }}>
+            {showImport ? 'Close Import' : 'Import CSV'}
+          </Button>
+          <Button onClick={openCreateForm}>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            New Subject
+          </Button>
+        </div>
       </div>
+
+      {/* CSV import (UX_AUDIT G10) — paste straight from the Excel price list */}
+      {showImport && (
+        <div className="mb-6 bg-card rounded-xl border border-border shadow-sm p-5">
+          <h2 className="text-sm font-semibold text-foreground font-display mb-1">Import subjects from Excel</h2>
+          <p className="text-xs text-muted-foreground mb-3">
+            Paste rows as: <span className="font-mono">name, code, council, level, courseFee, registrationFee, core</span>{' '}
+            (comma / semicolon / tab separated — copy-paste from Excel works). Council: Pearson Edexcel, Cambridge, or
+            Oxford. Level: IGCSE, AS Level, or A Level. Core: yes/no.
+          </p>
+          <textarea
+            rows={6}
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+            placeholder={'Mathematics B,4MB1,Pearson Edexcel,IGCSE,5000,7000,yes\nBiology,0610,Cambridge,IGCSE,4500,7100,no'}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground font-mono"
+          />
+          {importReport && (
+            <pre className="mt-3 text-xs text-foreground whitespace-pre-wrap bg-muted rounded-lg p-3">{importReport}</pre>
+          )}
+          <div className="mt-3 flex justify-end">
+            <Button disabled={!importText.trim()} onClick={runImport}>Import</Button>
+          </div>
+        </div>
+      )}
 
       {/* Create / Edit Form Modal */}
       {showForm && (
@@ -646,18 +743,25 @@ export default function SubjectsAdminClient(): React.JSX.Element {
             )}
 
             <div className="flex gap-2 mb-4">
-              <input
-                type="text"
+              <textarea
+                rows={1}
                 value={newTeacherName}
                 onChange={(e) => setNewTeacherName(e.target.value)}
-                placeholder="New teacher name"
+                placeholder="Teacher name — or paste several, one per line"
                 className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <Button
                 variant="outline"
                 size="sm"
                 disabled={createTeacherMutation.isPending || newTeacherName.trim().length === 0}
-                onClick={() => createTeacherMutation.mutate(newTeacherName.trim())}
+                onClick={async () => {
+                  // Bulk paste (UX_AUDIT G10): one name per line
+                  const names = newTeacherName.split('\n').map((n) => n.trim()).filter(Boolean);
+                  for (const n of names) {
+                    await createTeacherMutation.mutateAsync(n).catch(() => undefined);
+                  }
+                  setNewTeacherName('');
+                }}
               >
                 {createTeacherMutation.isPending ? 'Adding…' : 'Add'}
               </Button>

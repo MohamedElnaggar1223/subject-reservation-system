@@ -315,7 +315,9 @@ export const reports = new Hono<HonoEnv>()
    * What's still unconfigured — shown on the admin dashboard so the
    * school never learns about missing setup from a parent's error.
    */
-  .get('/setup-checklist', async (c) => {
+  .get('/setup-checklist', requireAuth(), requireAdmin(), async (c) => {
+    // Explicit guard (defense-in-depth): the chain-level middleware
+    // already covers this, but config state must never leak.
     return success(c, await getSetupChecklist());
   });
 export type ReportsApi = typeof reports;
