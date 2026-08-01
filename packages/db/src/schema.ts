@@ -1061,6 +1061,76 @@ export const refundWindow = pgTable(
 
 /**
  * ============================================
+ * EXCEPTION TABLE (V3 §6.3)
+ * ============================================
+ *
+ * The sanctioned way around the system's own rules — per-student
+ * overrides granted by finance admins (or admins), fully audited.
+ *
+ * Types and their `value` semantics:
+ * - discount_percent:      value = percentage off (0–100)
+ * - discount_fixed:        value = EGP off the total
+ * - custom_price:          value = absolute EGP price
+ * - fee_waiver:            value unused — school-fee gate bypass
+ * - deadline_extension:    value unused — closed window treated open
+ *                          for this student until validUntil
+ * - late_registration:     alias semantics of deadline_extension
+ * - custom_refund_percent: value = refund percentage (0–100) overriding
+ *                          refund windows
+ *
+ * Scope: sessionId/subjectId null = applies to all.
+ */
+export const exception = pgTable(
+  "exception",
+  {
+    id: text("id").primaryKey(),
+    type: text("type").notNull(),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").references(() => registrationSession.id, { onDelete: "cascade" }),
+    subjectId: text("subject_id").references(() => subject.id, { onDelete: "cascade" }),
+    value: numeric("value", { precision: 12, scale: 2, mode: "number" }),
+    reason: text("reason").notNull(),
+    validUntil: timestamp("valid_until", { withTimezone: true }),
+    status: text("status").notNull().default("active"), // 'active' | 'revoked'
+    grantedBy: text("granted_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    revokedBy: text("revoked_by").references(() => user.id, { onDelete: "set null" }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("exception_studentId_idx").on(table.studentId),
+    index("exception_type_idx").on(table.type),
+    index("exception_status_idx").on(table.status),
+    check("exception_value_nonneg", sql`${table.value} IS NULL OR ${table.value} >= 0`),
+  ]
+);
+
+export const exceptionRelations = relations(exception, ({ one }) => ({
+  student: one(user, {
+    fields: [exception.studentId],
+    references: [user.id],
+    relationName: "studentExceptions",
+  }),
+  session: one(registrationSession, {
+    fields: [exception.sessionId],
+    references: [registrationSession.id],
+  }),
+  subject: one(subject, {
+    fields: [exception.subjectId],
+    references: [subject.id],
+  }),
+}));
+
+/**
+ * ============================================
  * CHANGE REQUEST TABLE
  * ============================================
  *

@@ -12,6 +12,7 @@
  */
 
 import { db, payment, schoolFeeSchedule, eq } from '@repo/db';
+import { hasFeeWaiver } from './exception.services';
 import { randomUUID } from 'crypto';
 import type {
   CreateSchoolFeeScheduleType,
@@ -121,6 +122,9 @@ export async function schoolFeeGateReason(
   const academicYear = academicYearForDate(sessionStartDate);
   const fee = await getApplicableFee(academicYear, grade);
   if (!fee) return null; // no configured/open schedule → gate off
+
+  // Hook 3 (§6.3): fee_waiver exception bypasses the gate
+  if (await hasFeeWaiver(studentId)) return null;
 
   if (await hasCompletedSchoolFeePayment(studentId, academicYear)) return null;
 

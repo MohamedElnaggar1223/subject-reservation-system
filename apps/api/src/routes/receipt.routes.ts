@@ -17,6 +17,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
+import { db } from '@repo/db';
 import {
   ReceiptId,
   MarkReceiptReturned,
@@ -24,6 +25,9 @@ import {
   CreateRefundWindow,
   RefundWindowId,
   RefundPreviewQuery,
+  ROLES,
+  FINANCE_ROLES,
+  hasRole,
 } from '@repo/validations';
 import { success, error } from '../lib/response';
 import {
@@ -80,7 +84,33 @@ export const receipts = new Hono<HonoEnv>()
    * receive X% = EGP Y back" BEFORE the user commits.
    */
   .get('/refund-preview', zValidator('query', RefundPreviewQuery), async (c) => {
+    const user = c.get('user')!;
     const { registrationId } = c.req.valid('query');
+
+    // IDOR guard: only the registration's student, a linked parent, or
+    // finance/admin staff may preview it — otherwise any authenticated
+    // user could probe other students' prices and refund amounts.
+    const reg = await db.query.registration.findFirst({
+      where: (r, { eq }) => eq(r.id, registrationId),
+      columns: { studentId: true },
+    });
+    if (!reg) return error(c, 'Registration not found', 404);
+
+    const isStaff = hasRole(user.role, ...FINANCE_ROLES);
+    const isOwnStudent = user.role === ROLES.STUDENT && reg.studentId === user.id;
+    let isLinkedParent = false;
+    if (!isStaff && !isOwnStudent && user.role === ROLES.PARENT) {
+      const link = await db.query.parentStudentLink.findFirst({
+        where: (l, { eq, and }) =>
+          and(eq(l.parentId, user.id), eq(l.studentId, reg.studentId), eq(l.status, 'approved')),
+        columns: { id: true },
+      });
+      isLinkedParent = !!link;
+    }
+    if (!isStaff && !isOwnStudent && !isLinkedParent) {
+      return error(c, 'Forbidden', 403);
+    }
+
     try {
       return success(c, await refundService.previewRefund(registrationId));
     } catch (err) {

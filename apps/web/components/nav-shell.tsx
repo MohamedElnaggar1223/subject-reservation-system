@@ -77,6 +77,7 @@ function getNavSections(role: string | null | undefined): NavSection[] {
           { labelKey: 'nav.escrow', href: '/admin/escrow', icon: 'adminEscrow' },
           { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'checkout' },
           { labelKey: 'nav.schoolFees', href: '/admin/school-fees', icon: 'escrow' },
+          { labelKey: 'nav.exceptions', href: '/admin/exceptions', icon: 'approvals' },
         ],
       },
       {

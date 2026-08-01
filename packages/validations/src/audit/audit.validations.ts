@@ -38,6 +38,7 @@ export const AUDIT_ENTITY_TYPES = [
   'school_fee_schedule',
   'receipt',
   'refund_window',
+  'exception',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -56,6 +57,7 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   school_fee_schedule: 'School Fee Schedule',
   receipt:        'Receipt',
   refund_window:  'Refund Window',
+  exception:      'Exception',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -101,6 +103,8 @@ export const AUDIT_ACTIONS = [
   'REFUND_WINDOW_CREATED',
   'REFUND_WINDOW_DELETED',
   'WITHDRAWAL_APPROVED',
+  'EXCEPTION_GRANTED',
+  'EXCEPTION_REVOKED',
   // Change requests
   'CHANGE_REQUEST_CREATED',
   'CHANGE_REQUEST_APPROVED',
@@ -160,6 +164,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   REFUND_WINDOW_CREATED:      'Refund Window Created',
   REFUND_WINDOW_DELETED:      'Refund Window Deleted',
   WITHDRAWAL_APPROVED:        'Withdrawal Approved (Finance Admin)',
+  EXCEPTION_GRANTED:          'Exception Granted',
+  EXCEPTION_REVOKED:          'Exception Revoked',
   CHANGE_REQUEST_CREATED:     'Drop/Swap Request Created',
   CHANGE_REQUEST_APPROVED:    'Drop/Swap Request Approved',
   CHANGE_REQUEST_REJECTED:    'Drop/Swap Request Rejected',

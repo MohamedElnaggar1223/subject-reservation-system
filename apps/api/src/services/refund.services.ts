@@ -21,6 +21,7 @@ import { db, refundWindow, eq } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { CreateRefundWindowType } from '@repo/validations';
 import { academicYearForDate } from './school-fee.services';
+import { customRefundPercent } from './exception.services';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -30,7 +31,17 @@ function round2(n: number): number {
  * The refund percentage applying to a drop of the given session's
  * registration at `date`. Returns 0–100.
  */
-export async function refundPercentage(date: Date, sessionId: string): Promise<number> {
+export async function refundPercentage(
+  date: Date,
+  sessionId: string,
+  studentId?: string
+): Promise<number> {
+  // Hook 4 (§6.3): a custom_refund_percent exception overrides windows
+  if (studentId) {
+    const override = await customRefundPercent(studentId, sessionId);
+    if (override !== null) return override;
+  }
+
   const sess = await db.query.registrationSession.findFirst({
     where: (s, { eq }) => eq(s.id, sessionId),
     columns: { startDate: true },
@@ -61,11 +72,11 @@ export async function refundPercentage(date: Date, sessionId: string): Promise<n
 export async function previewRefund(registrationId: string) {
   const reg = await db.query.registration.findFirst({
     where: (r, { eq }) => eq(r.id, registrationId),
-    columns: { id: true, sessionId: true, priceAtRegistration: true, status: true },
+    columns: { id: true, sessionId: true, studentId: true, priceAtRegistration: true, status: true },
   });
   if (!reg) throw new Error('Registration not found');
 
-  const percentage = await refundPercentage(new Date(), reg.sessionId);
+  const percentage = await refundPercentage(new Date(), reg.sessionId, reg.studentId);
   return {
     registrationId: reg.id,
     percentage,

@@ -452,7 +452,7 @@ export async function approveChangeRequest(
   const now = new Date();
 
   // V3 §6.12: the refund percentage locks at drop-APPROVAL time
-  const pct = await refundPercentage(now, cr.registration.sessionId);
+  const pct = await refundPercentage(now, cr.registration.sessionId, cr.registration.studentId);
   const refundAmount = round2((cr.registration.priceAtRegistration * pct) / 100);
 
   const result = await db.transaction(async (tx) => {
@@ -643,7 +643,7 @@ export async function executeDirectDrop(
   const now = new Date();
 
   // V3 §6.12: refund percentage locks at drop time
-  const pct = await refundPercentage(now, reg.sessionId);
+  const pct = await refundPercentage(now, reg.sessionId, reg.studentId);
   const refundAmount = round2((reg.priceAtRegistration * pct) / 100);
 
   // Atomic transaction (OI-009) — receipt-gated (D-D)
@@ -727,7 +727,7 @@ export async function executeDirectSwap(
   const now = new Date();
 
   // V3 §6.12: refund percentage locks at swap time (drop leg)
-  const pct = await refundPercentage(now, reg.sessionId);
+  const pct = await refundPercentage(now, reg.sessionId, reg.studentId);
   const refundAmount = round2((reg.priceAtRegistration * pct) / 100);
 
   // Atomic transaction (OI-009) — drop leg receipt-gated (D-D)

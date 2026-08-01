@@ -162,6 +162,13 @@
       "when": 1785552721338,
       "tag": "0022_v3_phase3_receipts_refunds",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1785553207558,
+      "tag": "0023_v3_phase4_exceptions",
+      "breakpoints": true
     }
   ]
 }
