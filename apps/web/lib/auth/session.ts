@@ -73,6 +73,9 @@ export async function requireAuth() {
 export const requireAdmin = () => requireRole(ROLES.ADMIN)
 export const requireStudent = () => requireRole(ROLES.STUDENT)
 export const requireParent = () => requireRole(ROLES.PARENT)
+// Finance desk staff — admin included as a superset
+export const requireFinance = () =>
+  requireRole([ROLES.FINANCE_OFFICER, ROLES.FINANCE_ADMIN, ROLES.ADMIN])
 
 // Alias for backwards compatibility
 export const requireAuthenticated = requireAuth

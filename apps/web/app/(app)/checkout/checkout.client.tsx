@@ -5,15 +5,15 @@
  *
  * Interactive payment flow for pending_payment registrations.
  *
- * Features:
+ * Features (V3 — §6.6/§6.11):
  * - Displays registration summary (subjects, session, prices)
  * - Escrow balance display with apply-to-checkout option
- * - Payment method selection: Fawry, Card, Mobile Wallet, Bank Transfer
- * - Mobile wallet provider sub-selection
+ * - Payment method selection: Pay at School or InstaPay
  * - Real-time total calculation (total − escrow applied)
  * - Submission → POST /v1/payments/initiate
- * - Post-payment display of provider-specific instructions
- *   (Fawry code, payment URL, bank transfer details)
+ * - Pay at School: shows the desk reference to quote at the finance desk
+ * - InstaPay: shows the school account details + a transfer-reference
+ *   submission form; finance verifies against the bank statement
  */
 
 import { useState } from 'react';
@@ -23,12 +23,9 @@ import { api } from '~/lib/hono';
 import { apiResponse } from '@repo/validations';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import {
-  PAYMENT_METHODS,
+  ACTIVE_PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
-  WALLET_PROVIDERS,
-  WALLET_PROVIDER_LABELS,
-  type PaymentMethod,
-  type WalletProvider,
+  type ActivePaymentMethod,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
@@ -64,12 +61,14 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('fawry');
-  const [selectedWallet, setSelectedWallet] = useState<WalletProvider>('vodafone_cash');
+  const [selectedMethod, setSelectedMethod] = useState<ActivePaymentMethod>('in_school');
   const [applyEscrow, setApplyEscrow] = useState(false);
   const [escrowAmount, setEscrowAmount] = useState(0);
   const [result, setResult] = useState<PaymentResult | null>(null);
   const [submitError, setSubmitError] = useState('');
+  const [instapayRef, setInstapayRef] = useState('');
+  const [refSubmitted, setRefSubmitted] = useState(false);
+  const [refError, setRefError] = useState('');
 
   const summaryKey = registrationIds.join(',');
 
@@ -93,7 +92,6 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             registrationIds,
             paymentMethod: selectedMethod,
             escrowAmountToApply: escrowToApply,
-            walletProvider: selectedMethod === 'mobile_wallet' ? selectedWallet : undefined,
           },
         })
       );
@@ -149,6 +147,23 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
     onError: (err: Error) => {
       setSubmitError(err.message);
     },
+  });
+
+  const submitRefMutation = useMutation({
+    mutationFn: ({ paymentId, reference }: { paymentId: string; reference: string }) =>
+      apiResponse(
+        api.v1.payments[':id']['instapay-reference'].$post({
+          param: { id: paymentId },
+          json: { reference },
+        })
+      ),
+    onSuccess: () => {
+      setRefSubmitted(true);
+      setRefError('');
+      invalidateFinancialState(queryClient, { studentId: summary?.student.id });
+      router.refresh();
+    },
+    onError: (err: Error) => setRefError(err.message),
   });
 
   if (isLoading) {
@@ -224,86 +239,79 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               </div>
             )}
 
-            {/* Fawry Code */}
-            {!completed && result.paymentMethod === 'fawry' && (
-              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-5 text-center">
-                <p className="text-sm font-medium text-amber-800 dark:text-amber-300 mb-2">Fawry Reference Code</p>
-                <p className="text-3xl font-bold tracking-widest text-amber-900 dark:text-amber-200 font-mono">
+            {/* Pay at School */}
+            {!completed && result.paymentMethod === 'in_school' && (
+              <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-700 rounded-xl p-5 text-center">
+                <p className="text-sm font-medium text-brand-800 dark:text-brand-300 mb-2">Pay at the School Finance Desk</p>
+                <p className="text-3xl font-bold tracking-widest text-brand-900 dark:text-brand-200 font-mono">
                   {result.externalReference}
                 </p>
-                <p className="text-xs text-amber-700 dark:text-amber-400 mt-3">
-                  Pay this amount at any Fawry outlet within 24 hours.
-                  Expires: {meta.fawryExpiresAt
-                    ? new Date(meta.fawryExpiresAt as string).toLocaleString()
-                    : '24h from now'}
+                <p className="text-xs text-brand-700 dark:text-brand-400 mt-3">
+                  Quote this reference (or the student&apos;s name) at the desk. Your registrations
+                  are confirmed as soon as the finance officer records your payment.
                 </p>
               </div>
             )}
 
-            {/* Card Payment URL */}
-            {!completed && result.paymentMethod === 'card' && !!meta.paymentUrl && (
-              <div className="bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-700 rounded-xl p-5 text-center">
-                <p className="text-sm font-medium text-brand-800 dark:text-brand-300 mb-4">Complete your card payment</p>
-                <a
-                  href={meta.paymentUrl as string}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block"
-                >
-                  <Button>Pay Now</Button>
-                </a>
-                <p className="text-xs text-brand-700 dark:text-brand-400 mt-3">Opens secure payment page in a new tab</p>
-              </div>
-            )}
-
-            {/* Mobile Wallet */}
-            {!completed && result.paymentMethod === 'mobile_wallet' && !!meta.redirectUrl && (
-              <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl p-5 text-center">
-                <p className="text-sm font-medium text-violet-800 dark:text-violet-300 mb-2">Mobile Wallet Payment</p>
-                <p className="text-lg font-bold text-violet-900 dark:text-violet-200 font-mono mb-1">
-                  Ref: {meta.referenceCode as string}
-                </p>
-                <a
-                  href={meta.redirectUrl as string}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block mt-3"
-                >
-                  <Button size="sm" className="bg-violet-600 hover:bg-violet-700 text-white">Open Wallet</Button>
-                </a>
-              </div>
-            )}
-
-            {/* Bank Transfer Details */}
-            {!completed && result.paymentMethod === 'bank_transfer' && !!meta.bankDetails && (() => {
-              const bank = meta.bankDetails as {
-                bankName: string; accountName: string; accountNumber: string;
-                swiftCode: string; branch: string; referenceNumber: string;
-              };
+            {/* InstaPay */}
+            {!completed && result.paymentMethod === 'instapay' && (() => {
+              const instapay = meta.instapay as {
+                account: { bankName: string; accountName: string; accountNumber: string; iban: string | null };
+                amountDue: number;
+              } | undefined;
               return (
-                <div className="bg-muted border border-border rounded-xl p-5">
-                  <p className="text-sm font-medium text-foreground mb-4">Bank Transfer Details</p>
+                <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl p-5">
+                  <p className="text-sm font-medium text-violet-800 dark:text-violet-300 mb-3">
+                    1 — Transfer via InstaPay to the school account
+                  </p>
                   <dl className="space-y-2 text-sm">
                     {[
-                      ['Bank Name', bank.bankName],
-                      ['Account Name', bank.accountName],
-                      ['Account Number', bank.accountNumber],
-                      ['SWIFT Code', bank.swiftCode],
-                      ['Branch', bank.branch],
+                      ['Bank', instapay?.account.bankName],
+                      ['Account Name', instapay?.account.accountName],
+                      ['Account Number', instapay?.account.accountNumber],
+                      ...(instapay?.account.iban ? [['IBAN', instapay.account.iban]] : []),
+                      ['Exact Amount', `${(instapay?.amountDue ?? result.amount).toFixed(2)} EGP`],
                     ].map(([label, value]) => (
-                      <div key={label} className="flex justify-between gap-4">
-                        <dt className="text-muted-foreground">{label}</dt>
-                        <dd className="font-medium text-foreground font-mono text-right">{value}</dd>
+                      <div key={label as string} className="flex justify-between gap-4">
+                        <dt className="text-violet-700 dark:text-violet-400">{label}</dt>
+                        <dd className="font-medium text-violet-900 dark:text-violet-200 font-mono text-right">{value}</dd>
                       </div>
                     ))}
                   </dl>
-                  <div className="mt-4 p-3 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-700 rounded-lg text-center">
-                    <p className="text-xs text-brand-700 dark:text-brand-400 mb-1">Payment Reference (required)</p>
-                    <p className="text-lg font-bold text-brand-900 dark:text-brand-200 font-mono">{bank.referenceNumber}</p>
-                    <p className="text-xs text-brand-700 dark:text-brand-400 mt-1">
-                      Include this reference when making the transfer so it can be matched to your account.
-                    </p>
-                  </div>
+
+                  <p className="text-sm font-medium text-violet-800 dark:text-violet-300 mt-5 mb-2">
+                    2 — Submit your transaction reference
+                  </p>
+                  {refSubmitted ? (
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-lg text-center text-sm text-emerald-700 dark:text-emerald-400">
+                      Reference submitted. The finance team will verify your transfer against the
+                      bank statement and confirm your registrations — usually within one school day.
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        value={instapayRef}
+                        onChange={(e) => setInstapayRef(e.target.value)}
+                        placeholder="Transaction reference from your InstaPay receipt"
+                        className="w-full px-3 py-2 text-sm border border-violet-300 dark:border-violet-700 bg-background rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500 font-mono"
+                      />
+                      {refError && <p className="mt-2 text-xs text-destructive">{refError}</p>}
+                      <Button
+                        size="sm"
+                        className="mt-3 w-full bg-violet-600 hover:bg-violet-700 text-white"
+                        disabled={submitRefMutation.isPending || instapayRef.trim().length < 4}
+                        onClick={() =>
+                          submitRefMutation.mutate({ paymentId: result.id, reference: instapayRef.trim() })
+                        }
+                      >
+                        {submitRefMutation.isPending ? 'Submitting…' : 'Submit Reference'}
+                      </Button>
+                      <p className="text-xs text-violet-700 dark:text-violet-400 mt-2">
+                        You can find the reference in your InstaPay app under the transfer&apos;s details.
+                      </p>
+                    </>
+                  )}
                 </div>
               );
             })()}
@@ -435,7 +443,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               <h2 className="text-sm font-semibold text-foreground font-display">Payment Method</h2>
             </div>
             <div className="p-4 grid grid-cols-2 gap-3">
-              {PAYMENT_METHODS.map((method) => (
+              {ACTIVE_PAYMENT_METHODS.map((method) => (
                 <button
                   key={method}
                   type="button"
@@ -451,36 +459,18 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               ))}
             </div>
 
-            {/* Wallet provider sub-selection */}
-            {selectedMethod === 'mobile_wallet' && (
-              <div className="px-4 pb-4">
-                <label className="block text-xs font-medium text-foreground mb-2">
-                  Select Wallet Provider
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {WALLET_PROVIDERS.map((provider) => (
-                    <button
-                      key={provider}
-                      type="button"
-                      onClick={() => setSelectedWallet(provider)}
-                      className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
-                        selectedWallet === provider
-                          ? 'border-primary bg-primary/5 text-foreground'
-                          : 'border-border text-muted-foreground hover:border-primary/40'
-                      }`}
-                    >
-                      {WALLET_PROVIDER_LABELS[provider]}
-                    </button>
-                  ))}
-                </div>
+            {/* Method-specific notices */}
+            {selectedMethod === 'in_school' && (
+              <div className="mx-4 mb-4 p-3 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-700 rounded-lg text-xs text-brand-700 dark:text-brand-400">
+                You&apos;ll get a payment reference to quote at the school finance desk. Pay by
+                cash, card, or InstaPay at the desk — registrations confirm on the spot.
               </div>
             )}
-
-            {/* Bank transfer info notice */}
-            {selectedMethod === 'bank_transfer' && (
-              <div className="mx-4 mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-700 dark:text-amber-400">
-                Bank transfer requires manual verification by an admin and may take 1-2 business days.
-                You will receive bank details and a reference number after submitting.
+            {selectedMethod === 'instapay' && (
+              <div className="mx-4 mb-4 p-3 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-lg text-xs text-violet-700 dark:text-violet-400">
+                You&apos;ll get the school&apos;s account details to transfer the exact amount via
+                InstaPay, then submit your transaction reference. The finance team verifies the
+                transfer before your registrations are confirmed.
               </div>
             )}
           </div>

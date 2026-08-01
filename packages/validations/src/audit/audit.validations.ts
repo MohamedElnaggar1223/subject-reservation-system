@@ -78,6 +78,7 @@ export const AUDIT_ACTIONS = [
   'PAYMENT_INITIATED',
   'PAYMENT_CONFIRMED',
   'PAYMENT_FAILED',
+  'PAYMENT_REFERENCE_SUBMITTED',
   // Change requests
   'CHANGE_REQUEST_CREATED',
   'CHANGE_REQUEST_APPROVED',
@@ -122,6 +123,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   PAYMENT_INITIATED:          'Payment Initiated',
   PAYMENT_CONFIRMED:          'Payment Confirmed',
   PAYMENT_FAILED:             'Payment Failed',
+  PAYMENT_REFERENCE_SUBMITTED:'InstaPay Reference Submitted',
   CHANGE_REQUEST_CREATED:     'Drop/Swap Request Created',
   CHANGE_REQUEST_APPROVED:    'Drop/Swap Request Approved',
   CHANGE_REQUEST_REJECTED:    'Drop/Swap Request Rejected',

@@ -11,7 +11,15 @@ import { z } from 'zod';
 
 // ─── Payment Method Enum ──────────────────────────────────────────────────────
 
+/**
+ * Full method enum includes legacy values (fawry/card/mobile_wallet/
+ * bank_transfer) so historical payment rows keep validating and
+ * rendering. New payments may only use ACTIVE_PAYMENT_METHODS (V3:
+ * in-school desk payment or InstaPay transfer — see V3_PLAN.md §5.2).
+ */
 export const PAYMENT_METHODS = [
+  'in_school',
+  'instapay',
   'fawry',
   'card',
   'mobile_wallet',
@@ -21,17 +29,76 @@ export const PAYMENT_METHODS = [
 export const PaymentMethodSchema = z.enum(PAYMENT_METHODS);
 export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
 
+export const ACTIVE_PAYMENT_METHODS = ['in_school', 'instapay'] as const;
+export const ActivePaymentMethodSchema = z.enum(ACTIVE_PAYMENT_METHODS);
+export type ActivePaymentMethod = z.infer<typeof ActivePaymentMethodSchema>;
+
 export const PAYMENT_METHOD_LABELS: Record<typeof PAYMENT_METHODS[number], string> = {
+  in_school:     'Pay at School',
+  instapay:      'InstaPay',
   fawry:         'Fawry',
   card:          'Credit / Debit Card',
   mobile_wallet: 'Mobile Wallet',
   bank_transfer: 'Bank Transfer',
 };
 
+// ─── Payment Purpose Enum ─────────────────────────────────────────────────────
+
+/**
+ * One payments pipeline for every kind of money-in (V3_PLAN.md §5.2).
+ * Only 'registration' is used in Phase 1; the rest arrive with school
+ * fees, preregistration, and remarks.
+ */
+export const PAYMENT_PURPOSES = [
+  'registration',
+  'school_fee',
+  'preregistration',
+  'remark',
+] as const;
+
+export const PaymentPurposeSchema = z.enum(PAYMENT_PURPOSES);
+export type PaymentPurpose = z.infer<typeof PaymentPurposeSchema>;
+
+export const PAYMENT_PURPOSE_LABELS: Record<typeof PAYMENT_PURPOSES[number], string> = {
+  registration:    'Subject Registration',
+  school_fee:      'School Fee',
+  preregistration: 'Preregistration',
+  remark:          'Remark Request',
+};
+
+// ─── In-School Instrument Enum ────────────────────────────────────────────────
+
+/**
+ * What the parent actually handed over at the finance desk. Recorded
+ * by the finance officer when confirming an in-school payment.
+ */
+export const IN_SCHOOL_INSTRUMENTS = [
+  'cash',
+  'card',
+  'instapay',
+  'other',
+] as const;
+
+export const InSchoolInstrumentSchema = z.enum(IN_SCHOOL_INSTRUMENTS);
+export type InSchoolInstrument = z.infer<typeof InSchoolInstrumentSchema>;
+
+export const IN_SCHOOL_INSTRUMENT_LABELS: Record<typeof IN_SCHOOL_INSTRUMENTS[number], string> = {
+  cash:     'Cash',
+  card:     'Credit / Debit Card',
+  instapay: 'InstaPay (at desk)',
+  other:    'Other',
+};
+
 // ─── Payment Status Enum ──────────────────────────────────────────────────────
 
+/**
+ * pending_verification: an InstaPay payment whose transfer reference has
+ * been submitted by the parent and is awaiting finance verification
+ * against the bank statement. Never auto-completed.
+ */
 export const PAYMENT_STATUSES = [
   'pending',
+  'pending_verification',
   'completed',
   'failed',
   'refunded',
@@ -41,10 +108,11 @@ export const PaymentStatusSchema = z.enum(PAYMENT_STATUSES);
 export type PaymentStatus = z.infer<typeof PaymentStatusSchema>;
 
 export const PAYMENT_STATUS_LABELS: Record<typeof PAYMENT_STATUSES[number], string> = {
-  pending:   'Pending',
-  completed: 'Completed',
-  failed:    'Failed',
-  refunded:  'Refunded',
+  pending:              'Pending',
+  pending_verification: 'Awaiting Verification',
+  completed:            'Completed',
+  failed:               'Failed',
+  refunded:             'Refunded',
 };
 
 // ─── Mobile Wallet Providers ──────────────────────────────────────────────────
@@ -90,14 +158,44 @@ export const InitiatePayment = z.object({
   registrationIds: z
     .array(z.string().min(1, 'Invalid registration ID'))
     .min(1, 'Select at least one registration to pay for'),
-  paymentMethod: PaymentMethodSchema,
+  // V3: only in_school / instapay accepted for new payments.
+  paymentMethod: ActivePaymentMethodSchema,
   escrowAmountToApply: z.number().min(0).max(1_000_000, 'Amount exceeds maximum allowed').default(0),
-  walletProvider: WalletProviderSchema.optional(),
-}).refine(
-  (data) => data.paymentMethod !== 'mobile_wallet' || !!data.walletProvider,
-  { message: 'walletProvider is required for mobile wallet payments', path: ['walletProvider'] }
-);
+});
 export type InitiatePaymentType = z.infer<typeof InitiatePayment>;
+
+// ─── Parent: Submit InstaPay Transfer Reference ───────────────────────────────
+
+/**
+ * After transferring to the school's account via InstaPay, the parent
+ * submits the transaction reference (opaque string — no published
+ * format exists) and optionally a screenshot upload. This moves the
+ * payment to 'pending_verification'; a finance officer verifies it
+ * against the bank statement before completing. Never auto-confirmed.
+ */
+export const SubmitInstapayReference = z.object({
+  reference: z
+    .string()
+    .trim()
+    .min(4, 'Enter the transaction reference from your InstaPay receipt')
+    .max(100, 'Reference is too long'),
+  screenshotFileId: z.string().min(1).optional(),
+});
+export type SubmitInstapayReferenceType = z.infer<typeof SubmitInstapayReference>;
+
+// ─── Finance: Confirm Manual Payment ──────────────────────────────────────────
+
+/**
+ * Finance officer confirms an in-school or InstaPay payment.
+ * - in_school: instrumentUsed records what the parent handed over.
+ * - instapay: instrument is implicitly 'instapay'; officer confirms after
+ *   matching the reference against the bank statement.
+ */
+export const ConfirmManualPayment = z.object({
+  instrumentUsed: InSchoolInstrumentSchema.optional(),
+  notes: z.string().max(500).optional(),
+});
+export type ConfirmManualPaymentType = z.infer<typeof ConfirmManualPayment>;
 
 // ─── Admin: Confirm Bank Transfer ─────────────────────────────────────────────
 

@@ -12,13 +12,14 @@ import { adminAc, defaultStatements } from "better-auth/plugins/admin/access";
  * 
  * Make sure to use `as const` so typescript can infer the type correctly
  */
-const statement = { 
+const statement = {
     ...defaultStatements,
-    staff: ["create", "read", "update", "delete"], 
+    staff: ["create", "read", "update", "delete"],
     student: ["create", "read", "update", "delete"],
     parent: ["create", "read", "update", "delete"],
     link: ["create", "read", "update", "delete"],
-} as const; 
+    finance: ["create", "read", "update", "delete", "approve"],
+} as const;
 
 export const ac = createAccessControl(statement);
 
@@ -27,11 +28,35 @@ export const ac = createAccessControl(statement);
  * Full access to all resources
  */
 export const adminRole = ac.newRole({
-    staff: ["create", "read", "update", "delete"], 
+    staff: ["create", "read", "update", "delete"],
     student: ["create", "read", "update", "delete"],
     parent: ["create", "read", "update", "delete"],
     link: ["create", "read", "update", "delete"],
+    finance: ["create", "read", "update", "delete", "approve"],
     ...adminAc.statements
+})
+
+/**
+ * Finance Officer Role
+ * Executes money movements at the school desk: confirms in-school and
+ * InstaPay payments, issues/takes back physical receipts, disburses
+ * cash refunds. Cannot approve refunds or grant exceptions.
+ */
+export const financeOfficerRole = ac.newRole({
+    finance: ["create", "read", "update"],
+    student: ["read"],
+    parent: ["read"],
+})
+
+/**
+ * Finance Admin Role
+ * Everything an officer does, plus approvals: completes refunds,
+ * grants/revokes exceptions, manages fee schedules, voids receipts.
+ */
+export const financeAdminRole = ac.newRole({
+    finance: ["create", "read", "update", "delete", "approve"],
+    student: ["read"],
+    parent: ["read"],
 })
 
 /**

@@ -399,7 +399,7 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
     const pendingPaymentIds = [
       ...new Set(
         pendingPaymentLinks
-          .filter((pl) => pl.payment.status === 'pending')
+          .filter((pl) => pl.payment.status === 'pending' || pl.payment.status === 'pending_verification')
           .map((pl) => pl.payment.id)
       ),
     ];

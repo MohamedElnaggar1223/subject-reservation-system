@@ -1,45 +1,50 @@
 /**
  * Payment API Routes
  *
- * GET  /payments/checkout-summary    - Checkout summary for registrations (parent)
- * GET  /payments/pending-bank        - Pending bank transfer list (admin)
- * GET  /payments                     - Payment history (role-aware)
- * GET  /payments/:id                 - Single payment with registrations
- * POST /payments/initiate            - Initiate payment (parent only)
- * POST /payments/:id/confirm         - Admin confirms bank transfer (admin only)
- * POST /payments/webhook/fawry       - Fawry payment confirmation webhook
- * POST /payments/webhook/paymob      - Paymob card/wallet confirmation webhook
+ * GET  /payments/checkout-summary       - Checkout summary for registrations (parent)
+ * GET  /payments/pending-manual         - Payments awaiting finance action (finance)
+ * GET  /payments/pending-bank           - Pending bank transfer list (admin, legacy)
+ * GET  /payments                        - Payment history (role-aware)
+ * GET  /payments/:id                    - Single payment with registrations
+ * POST /payments/initiate               - Initiate payment (parent only)
+ * POST /payments/:id/instapay-reference - Parent submits InstaPay transfer reference
+ * POST /payments/:id/confirm            - Finance confirms a manual payment
+ *
+ * V3: Fawry/Paymob webhooks are commented out along with their provider
+ * integrations — active methods are in_school and instapay only, both
+ * manually verified by finance staff (V3_PLAN §6.11).
  *
  * Authorization:
- * - All routes except webhooks require authentication
- * - Payment initiation: parent only (parent-only financial control — OI-008)
- * - Bank transfer confirmation: admin only
- * - Webhooks: no auth — validated by provider signature instead
+ * - Payment initiation + reference submission: parent only (OI-008)
+ * - Manual confirmation + pending queue: finance roles (officer/finance-admin/admin)
  */
 
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   InitiatePayment,
-  ConfirmBankTransfer,
-  FawryWebhookPayload,
-  PaymobWebhookPayload,
+  SubmitInstapayReference,
+  ConfirmManualPayment,
   ListPaymentsQuery,
   CheckoutSummaryQuery,
   PaymentId,
   ROLES,
+  FINANCE_ROLES,
+  hasRole,
 } from '@repo/validations';
 import { success, error } from '../lib/response';
 import {
   requireAuth,
   requireParent,
   requireAdmin,
+  requireFinance,
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as paymentService from '../services/payment.services';
 import * as linkService from '../services/link.services';
-import { validateFawryWebhookSignature } from '../integrations/fawry';
-import { validatePaymobWebhookSignature } from '../integrations/paymob';
+// V3: provider webhook validators disabled with the webhook routes below.
+// import { validateFawryWebhookSignature } from '../integrations/fawry';
+// import { validatePaymobWebhookSignature } from '../integrations/paymob';
 import { logger } from '../lib/logger';
 import { logAction, extractAuditContext } from '../services/audit.services';
 
@@ -79,11 +84,27 @@ export const payments = new Hono<HonoEnv>()
   )
 
   /**
+   * GET /payments/pending-manual
+   *
+   * Finance Workbench queue: in-school and InstaPay payments awaiting
+   * confirmation (plus any legacy pending bank transfers), oldest first.
+   * Finance roles (officer / finance-admin / admin).
+   */
+  .get('/pending-manual',
+    requireAuth(),
+    requireFinance(),
+    async (c) => {
+      const pending = await paymentService.getPendingManualPayments();
+      return success(c, pending);
+    }
+  )
+
+  /**
    * GET /payments/pending-bank
    *
    * Returns all pending bank transfer payments awaiting admin confirmation.
    * Ordered oldest-first so longest-waiting transfers are prioritised.
-   * Admin only.
+   * Admin only. Legacy — superseded by /pending-manual for finance staff.
    */
   .get('/pending-bank',
     requireAuth(),
@@ -121,7 +142,8 @@ export const payments = new Hono<HonoEnv>()
         return success(c, data);
       }
 
-      if (user.role === ROLES.ADMIN) {
+      // Admin and finance staff see all payments (workbench + admin screens)
+      if (hasRole(user.role, ...FINANCE_ROLES)) {
         const data = await paymentService.getPayments(filters);
         return success(c, data);
       }
@@ -248,36 +270,82 @@ export const payments = new Hono<HonoEnv>()
   )
 
   /**
-   * POST /payments/:id/confirm
+   * POST /payments/:id/instapay-reference
    *
-   * Admin manually confirms a bank transfer payment (PAY-007).
-   * Marks the payment as 'completed' and all linked registrations as 'confirmed'.
-   * Optional admin notes are stored on the payment record.
+   * Parent submits the InstaPay transaction reference (and optional
+   * screenshot file ID) after transferring to the school account.
+   * Moves the payment to 'pending_verification' for finance review.
    *
-   * Admin only.
+   * Parent only — must be the payment's initiator.
    */
-  .post('/:id/confirm',
+  .post('/:id/instapay-reference',
     requireAuth(),
-    requireAdmin(),
+    requireParent(),
     zValidator('param', PaymentId),
-    zValidator('json', ConfirmBankTransfer),
+    zValidator('json', SubmitInstapayReference),
     async (c) => {
       const user = c.get('user')!;
       const { id } = c.req.valid('param');
-      const { notes } = c.req.valid('json');
+      const data = c.req.valid('json');
+
+      try {
+        const updated = await paymentService.submitInstapayReference(id, user.id, data);
+        logAction(user.id, 'PAYMENT_REFERENCE_SUBMITTED', 'payment', id, null, { reference: data.reference }, extractAuditContext(c))
+          .catch((err) => console.error('[audit] PAYMENT_REFERENCE_SUBMITTED failed:', err));
+        return success(c, updated);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to submit reference';
+        const status =
+          message.includes('not authorized') ? 403 :
+          message.includes('already been submitted') ? 409 :
+          message.includes('not found') ? 404 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * POST /payments/:id/confirm
+   *
+   * Finance staff confirms a manual payment (in-school desk payment,
+   * InstaPay after bank-statement verification, or legacy bank transfer).
+   * Marks the payment 'completed' and all linked registrations 'confirmed'.
+   *
+   * - in_school: instrumentUsed (cash/card/instapay/other) is required —
+   *   it records what the parent actually handed over at the desk.
+   * - instapay: instrument is implicitly 'instapay'.
+   *
+   * Finance roles (officer / finance-admin / admin).
+   */
+  .post('/:id/confirm',
+    requireAuth(),
+    requireFinance(),
+    zValidator('param', PaymentId),
+    zValidator('json', ConfirmManualPayment),
+    async (c) => {
+      const user = c.get('user')!;
+      const { id } = c.req.valid('param');
+      const { notes, instrumentUsed } = c.req.valid('json');
 
       const pay = await paymentService.getPaymentById(id);
       if (!pay) return error(c, 'Payment not found', 404);
 
-      if (pay.paymentMethod !== 'bank_transfer') {
-        return error(c, 'Only bank transfer payments require manual confirmation', 400);
+      const manualMethods = ['in_school', 'instapay', 'bank_transfer'];
+      if (!manualMethods.includes(pay.paymentMethod)) {
+        return error(c, 'Only in-school, InstaPay, and bank transfer payments are confirmed manually', 400);
       }
 
+      if (pay.paymentMethod === 'in_school' && !instrumentUsed) {
+        return error(c, 'Record the instrument used (cash, card, InstaPay, other) to confirm an in-school payment', 400);
+      }
+
+      const instrument = pay.paymentMethod === 'instapay' ? 'instapay' : instrumentUsed;
+
       try {
-        const confirmed = await paymentService.confirmPayment(id, user.id, undefined, notes);
+        const confirmed = await paymentService.confirmPayment(id, user.id, undefined, notes, instrument);
 
         logAction(user.id, 'PAYMENT_CONFIRMED', 'payment', id, pay as Record<string, unknown>, confirmed as Record<string, unknown>, extractAuditContext(c))
-          .catch((err) => console.error('[audit] PAYMENT_CONFIRMED (admin) failed:', err));
+          .catch((err) => console.error('[audit] PAYMENT_CONFIRMED (finance) failed:', err));
 
         return success(c, confirmed);
       } catch (err) {
@@ -285,165 +353,23 @@ export const payments = new Hono<HonoEnv>()
         return error(c, message, 400);
       }
     }
-  )
-
-  /**
-   * POST /payments/webhook/fawry
-   *
-   * Fawry payment status notification.
-   * No authentication — validated by Fawry signature header.
-   *
-   * TODO (Production): Enable signature validation by calling
-   *   validateFawryWebhookSignature(payload, signatureHeader)
-   */
-  .post('/webhook/fawry',
-    zValidator('json', FawryWebhookPayload),
-    async (c) => {
-      const payload = c.req.valid('json');
-      const signature = c.req.header('x-fawry-signature') ?? '';
-
-      if (!validateFawryWebhookSignature(payload as unknown as Record<string, unknown>, signature)) {
-        logger.warn('[Fawry Webhook] Invalid signature rejected');
-        return error(c, 'Invalid signature', 401);
-      }
-
-      if (payload.orderStatus !== 'PAID') {
-        try {
-          logger.info(`[Fawry Webhook] Non-PAID status: ${payload.orderStatus} for ref ${payload.merchantRefNum}`);
-          await paymentService.failPayment(payload.merchantRefNum);
-          logAction(null, 'PAYMENT_FAILED', 'payment', payload.merchantRefNum, null, { provider: 'fawry', status: payload.orderStatus })
-            .catch((err) => console.error('[audit] PAYMENT_FAILED (fawry) failed:', err));
-        } catch (err) {
-          logger.error('[Fawry Webhook] Error processing failed payment', err);
-        }
-        return c.json({ received: true }, 200);
-      }
-
-      // Amount verification — compare webhook amount against stored payment amount.
-      // Accept webhook amount >= stored amount (in cents). Strict equality
-      // rejected legitimate payments when Fawry returned slightly larger
-      // values due to rounding or their fee structure. Under-payment is
-      // still rejected since that would mean the student paid less than owed.
-      const fawryPayment = await paymentService.getPaymentById(payload.merchantRefNum);
-      if (!fawryPayment) {
-        logger.warn(`[Fawry Webhook] Payment not found: ${payload.merchantRefNum}`);
-        return error(c, 'Payment not found', 400);
-      }
-      const webhookCents = Math.round(Number(payload.paymentAmount) * 100);
-      const storedCents  = Math.round(fawryPayment.amount * 100);
-      if (webhookCents < storedCents) {
-        logger.error(`[Fawry Webhook] Underpayment for ${payload.merchantRefNum}: webhook=${payload.paymentAmount}, stored=${fawryPayment.amount}`);
-        return error(c, 'Payment amount is less than expected', 400);
-      }
-      if (webhookCents > storedCents) {
-        logger.warn(`[Fawry Webhook] Overpayment detected for ${payload.merchantRefNum}: webhook=${payload.paymentAmount}, stored=${fawryPayment.amount} — proceeding.`);
-      }
-
-      // Payment confirmed
-      try {
-        await paymentService.confirmPayment(
-          payload.merchantRefNum,
-          undefined,
-          payload.referenceNumber
-        );
-        logAction(null, 'PAYMENT_CONFIRMED', 'payment', payload.merchantRefNum, null, { provider: 'fawry', status: 'PAID' })
-          .catch((err) => console.error('[audit] PAYMENT_CONFIRMED (fawry) failed:', err));
-        logger.info(`[Fawry Webhook] Payment confirmed: ${payload.merchantRefNum}`);
-      } catch (err) {
-        logger.error('[Fawry Webhook] Error confirming payment', err);
-      }
-
-      return c.json({ received: true }, 200);
-    }
-  )
-
-  /**
-   * POST /payments/webhook/paymob
-   *
-   * Paymob transaction response for card and wallet payments.
-   * No authentication — validated by Paymob HMAC header.
-   *
-   * Validation is always run: validatePaymobWebhookSignature fail-closes
-   * when PAYMOB_HMAC_SECRET is not configured, and rejects missing or
-   * malformed HMAC headers. Never accept an unsigned Paymob webhook.
-   */
-  .post('/webhook/paymob',
-    zValidator('json', PaymobWebhookPayload),
-    async (c) => {
-      const { obj } = c.req.valid('json');
-      // Paymob transmits the HMAC as a `?hmac=` query parameter on the
-      // callback URL itself (not as a header) — this is how their
-      // "Transaction Processed Callback" works on both legacy and
-      // Intention APIs. We still accept the header variants as a
-      // fallback in case a proxy or gateway moves it upstream.
-      const hmacQuery  = c.req.query('hmac');
-      const hmacHeader = c.req.header('x-hmac-sha512') ?? c.req.header('hmac');
-      const hmac = hmacQuery ?? hmacHeader ?? '';
-
-      logger.info(`[Paymob Webhook] Received — success: ${obj.success}, id: ${obj.id}, merchant_order_id: ${obj.merchant_order_id}, order.merchant_order_id: ${obj.order?.merchant_order_id}`);
-
-      if (!validatePaymobWebhookSignature(obj as unknown as Record<string, unknown>, hmac)) {
-        // Log just enough context to distinguish "no signature sent" from
-        // "signature sent but mismatched" so ops can tell a Paymob config
-        // issue apart from a forgery attempt. The hmac itself is NOT
-        // logged to avoid storing someone's forgery attempt verbatim.
-        const where = hmacQuery ? 'query' : hmacHeader ? 'header' : 'none';
-        logger.warn(
-          `[Paymob Webhook] Rejected — reason: ${hmac ? 'signature mismatch' : 'missing hmac'}, source: ${where}, id: ${obj.id}`
-        );
-        return error(c, 'Invalid signature', 401);
-      }
-
-      // Resolve our payment ID from the callback.
-      // Intention API: special_reference → obj.order.merchant_order_id
-      // Legacy flow: obj.merchant_order_id
-      const paymentId =
-        obj.order?.merchant_order_id ||
-        obj.merchant_order_id ||
-        null;
-
-      if (!paymentId) {
-        logger.error('[Paymob Webhook] Cannot resolve payment ID from callback');
-        return error(c, 'Missing merchant_order_id', 400);
-      }
-
-      if (!obj.success) {
-        logger.info(`[Paymob Webhook] Failed transaction for order: ${paymentId}`);
-        try {
-          await paymentService.failPayment(paymentId);
-          logAction(null, 'PAYMENT_FAILED', 'payment', paymentId, null, { provider: 'paymob', success: obj.success })
-            .catch((err) => console.error('[audit] PAYMENT_FAILED (paymob) failed:', err));
-        } catch (err) {
-          logger.error('[Paymob Webhook] Error failing payment', err);
-        }
-        return c.json({ received: true }, 200);
-      }
-
-      const paymobPayment = await paymentService.getPaymentById(paymentId);
-      if (!paymobPayment) {
-        logger.warn(`[Paymob Webhook] Payment not found: ${paymentId}`);
-        return error(c, 'Payment not found', 400);
-      }
-      if (obj.amount_cents !== Math.round(paymobPayment.amount * 100)) {
-        logger.error(`[Paymob Webhook] Amount mismatch for ${paymentId}: webhook=${obj.amount_cents / 100}, stored=${paymobPayment.amount}`);
-        return error(c, 'Amount mismatch', 400);
-      }
-
-      try {
-        await paymentService.confirmPayment(
-          paymentId,
-          undefined,
-          obj.id.toString()
-        );
-        logAction(null, 'PAYMENT_CONFIRMED', 'payment', paymentId, null, { provider: 'paymob', status: 'PAID' })
-          .catch((err) => console.error('[audit] PAYMENT_CONFIRMED (paymob) failed:', err));
-        logger.info(`[Paymob Webhook] Payment confirmed: ${paymentId}`);
-      } catch (err) {
-        logger.error('[Paymob Webhook] Error confirming payment', err);
-      }
-
-      return c.json({ received: true }, 200);
-    }
   );
+
+/*
+ * ──────────────────────────────────────────────────────────────────────────
+ * V3: Provider webhooks DISABLED (V3_PLAN §6.11)
+ * ──────────────────────────────────────────────────────────────────────────
+ * The Fawry and Paymob webhook routes that previously lived here are
+ * intentionally commented out — the school accepts only in-school and
+ * InstaPay (manually verified) payments now. The full implementations
+ * remain in git history (see commit d779fef and earlier) and the
+ * integration adapters are kept under src/integrations/ for the day a
+ * PSP ships a real InstaPay API (Paymob lists it "Coming Soon").
+ *
+ * To re-enable: restore the `.post('/webhook/fawry', ...)` and
+ * `.post('/webhook/paymob', ...)` handlers from git history, re-import
+ * FawryWebhookPayload / PaymobWebhookPayload and the signature
+ * validators, and move the chain-terminating semicolon back here.
+ */
 
 export type PaymentsApi = typeof payments;

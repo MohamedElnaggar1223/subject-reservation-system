@@ -5,7 +5,7 @@ import { createAuthMiddleware } from "better-auth/api";
 import { db } from "@repo/db";
 import { expo } from "@better-auth/expo";
 import { admin } from "better-auth/plugins";
-import { ac, studentRole, adminRole, parentRole } from './permissions'
+import { ac, studentRole, adminRole, parentRole, financeOfficerRole, financeAdminRole } from './permissions'
 import { ROLES, CommonSchemas } from '@repo/validations';
 import { corsOrigins, env } from '../env';
 import { nextCookies } from 'better-auth/next-js';
@@ -37,6 +37,8 @@ export const auth = betterAuth({
         [ROLES.ADMIN]: adminRole,
         [ROLES.STUDENT]: studentRole,
         [ROLES.PARENT]: parentRole,
+        [ROLES.FINANCE_OFFICER]: financeOfficerRole,
+        [ROLES.FINANCE_ADMIN]: financeAdminRole,
       }
     }),
     nextCookies()

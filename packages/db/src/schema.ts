@@ -601,14 +601,31 @@ export const payment = pgTable(
     amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
     // Portion of the total covered by escrow (deducted from student's escrow)
     escrowAmountApplied: numeric("escrow_amount_applied", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
-    // Payment method selected by the parent
-    paymentMethod: text("payment_method").notNull(), // 'fawry' | 'card' | 'mobile_wallet' | 'bank_transfer'
-    // Lifecycle status
-    status: text("status").notNull().default("pending"), // 'pending' | 'completed' | 'failed' | 'refunded'
+    // Payment method selected by the parent.
+    // V3 active methods: 'in_school' | 'instapay'.
+    // Legacy values retained on historical rows: 'fawry' | 'card' | 'mobile_wallet' | 'bank_transfer'
+    paymentMethod: text("payment_method").notNull(),
+    // What the money is for — one pipeline for all money-in (V3_PLAN §5.2).
+    // 'registration' | 'school_fee' | 'preregistration' | 'remark'
+    purpose: text("purpose").notNull().default("registration"),
+    // Lifecycle status. 'pending_verification' = InstaPay reference submitted,
+    // awaiting finance verification against the bank statement.
+    status: text("status").notNull().default("pending"), // 'pending' | 'pending_verification' | 'completed' | 'failed' | 'refunded'
     // Provider reference (Fawry code, transaction ID, etc.)
     externalReference: text("external_reference"),
+    // InstaPay transaction reference submitted by the parent. Opaque string
+    // (no published format exists); unique so the same transfer can never be
+    // claimed against two payments. Presence is NOT proof of payment.
+    verificationReference: text("verification_reference"),
+    // Optional screenshot upload backing the InstaPay reference
+    verificationFileId: text("verification_file_id").references(() => file.id, {
+      onDelete: "set null",
+    }),
+    // Instrument the parent actually used at the finance desk for in_school
+    // payments: 'cash' | 'card' | 'instapay' | 'other'
+    instrumentUsed: text("instrument_used"),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
-    // Admin who confirmed a bank transfer (null for automated methods)
+    // Staff member (finance/admin) who confirmed a manual payment
     confirmedBy: text("confirmed_by").references(() => user.id, { onDelete: "set null" }),
     // Provider-specific data (payment URL, Fawry expiry, bank details)
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
@@ -623,6 +640,8 @@ export const payment = pgTable(
     index("payment_parentId_idx").on(table.parentId),
     index("payment_status_idx").on(table.status),
     index("payment_method_idx").on(table.paymentMethod),
+    index("payment_purpose_idx").on(table.purpose),
+    uniqueIndex("payment_verification_reference_idx").on(table.verificationReference),
     // L-8: Payment amount may be 0 for fully-escrow-funded payments (C-8
     // auto-confirm path) but never negative. Same for the escrow portion.
     check("payment_amount_nonneg", sql`${table.amount} >= 0`),

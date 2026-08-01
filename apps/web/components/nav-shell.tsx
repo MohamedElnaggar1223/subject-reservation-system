@@ -75,6 +75,7 @@ function getNavSections(role: string | null | undefined): NavSection[] {
           { labelKey: 'nav.subjects', href: '/admin/subjects', icon: 'subjects' },
           { labelKey: 'nav.payments', href: '/admin/payments', icon: 'payments' },
           { labelKey: 'nav.escrow', href: '/admin/escrow', icon: 'adminEscrow' },
+          { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'checkout' },
         ],
       },
       {
@@ -83,6 +84,23 @@ function getNavSections(role: string | null | undefined): NavSection[] {
           { labelKey: 'nav.reports', href: '/admin/reports', icon: 'reports' },
           { labelKey: 'nav.auditLog', href: '/admin/audit', icon: 'audit' },
           { labelKey: 'nav.notifications', href: '/admin/notifications', icon: 'notifications' },
+        ],
+      },
+    ];
+  }
+
+  if (role === 'finance_officer' || role === 'finance_admin') {
+    return [
+      {
+        items: [
+          { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'payments' },
+        ],
+      },
+      {
+        titleKey: 'nav.account',
+        items: [
+          { labelKey: 'nav.notifications', href: '/notifications', icon: 'notifications' },
+          { labelKey: 'nav.profile', href: '/profile', icon: 'profile' },
         ],
       },
     ];

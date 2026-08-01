@@ -33,6 +33,11 @@ export default async function Home(): Promise<JSX.Element> {
   const role = session.user.role ?? null;
   const isAdmin = role === 'admin';
 
+  // Finance staff live in the Workbench, not the student/parent dashboard
+  if (role === 'finance_officer' || role === 'finance_admin') {
+    redirect('/finance');
+  }
+
   // Fetch full profile to get grade info for students
   let grade: number | null = null;
   if (role === 'student') {

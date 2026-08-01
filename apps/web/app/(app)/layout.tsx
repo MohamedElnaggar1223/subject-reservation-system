@@ -11,10 +11,11 @@ import NavShell from '~/components/nav-shell';
  * server policy is, unverified users cannot access the authenticated app
  * shell — they get bounced to /verify-email with a resend prompt.
  *
- * Admins are exempted because they're seeded/provisioned outside the
- * normal sign-up flow and shouldn't be locked out if their emailVerified
- * flag was never set.
+ * Admins and finance staff are exempted because they're seeded/provisioned
+ * outside the normal sign-up flow and shouldn't be locked out if their
+ * emailVerified flag was never set.
  */
+const VERIFICATION_EXEMPT_ROLES = ['admin', 'finance_officer', 'finance_admin'];
 const EMAIL_VERIFICATION_ENFORCED =
   process.env.REQUIRE_EMAIL_VERIFICATION === 'true' ||
   process.env.NODE_ENV === 'production';
@@ -33,7 +34,7 @@ export default async function AppLayout({
 
   if (
     EMAIL_VERIFICATION_ENFORCED &&
-    session.user.role !== 'admin' &&
+    !VERIFICATION_EXEMPT_ROLES.includes(session.user.role) &&
     session.user.emailVerified === false
   ) {
     redirect('/verify-email?reason=unverified');

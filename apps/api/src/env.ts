@@ -15,6 +15,16 @@ const envSchema = z.object({
 
   RESEND_API_KEY: z.string().optional(),
 
+  // School receiving account shown to parents paying via InstaPay (V3 §6.11).
+  // InstaPay has no merchant API; parents transfer to this account and submit
+  // the transaction reference for finance verification.
+  SCHOOL_BANK_NAME: z.string().optional(),
+  SCHOOL_ACCOUNT_NAME: z.string().optional(),
+  SCHOOL_ACCOUNT_NUMBER: z.string().optional(),
+  SCHOOL_IBAN: z.string().optional(),
+
+  // Legacy provider credentials — integrations disabled in V3 (kept for the
+  // future PSP InstaPay path; see V3_PLAN §2.3).
   FAWRY_MERCHANT_CODE: z.string().optional(),
   FAWRY_SECURE_KEY: z.string().optional(),
   PAYMOB_HMAC_SECRET: z.string().optional(),

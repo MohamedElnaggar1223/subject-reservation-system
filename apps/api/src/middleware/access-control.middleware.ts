@@ -95,6 +95,12 @@ export const requireStudent = () => requireRole(ROLES.STUDENT);
 export const requireParent = () => requireRole(ROLES.PARENT);
 export const requireStudentOrParent = () => requireRole(ROLES.STUDENT, ROLES.PARENT);
 export const requireAdminOrParent = () => requireRole(ROLES.ADMIN, ROLES.PARENT);
+// Finance desk operations (payment verification, receipts, refund disbursement).
+// Admin is always included as a superset.
+export const requireFinance = () =>
+  requireRole(ROLES.FINANCE_OFFICER, ROLES.FINANCE_ADMIN, ROLES.ADMIN);
+// Finance approvals (refund completion, exceptions, fee schedules).
+export const requireFinanceAdmin = () => requireRole(ROLES.FINANCE_ADMIN, ROLES.ADMIN);
 
 /**
  * Require Not Graduated

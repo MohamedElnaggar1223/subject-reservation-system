@@ -46,6 +46,7 @@ export function invalidateFinancialState(
 
   queryClient.invalidateQueries({ queryKey: ['escrow'] });
   queryClient.invalidateQueries({ queryKey: ['payments'] });
+  queryClient.invalidateQueries({ queryKey: ['finance'] });
   queryClient.invalidateQueries({ queryKey: ['registrations'] });
   queryClient.invalidateQueries({ queryKey: ['change-requests'] });
   queryClient.invalidateQueries({ queryKey: ['reports'] });

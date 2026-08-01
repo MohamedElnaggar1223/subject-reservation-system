@@ -2,16 +2,22 @@ import { z } from 'zod';
 
 /**
  * All available roles in the system
- * 
+ *
  * IGCSE Subject Reservation System roles:
  * - ADMIN: Full system access, manage subjects, sessions, reports
  * - STUDENT: Register subjects, manage own account, escrow
  * - PARENT: Manage linked children, register on behalf, transfer escrow
+ * - FINANCE_OFFICER: Confirms in-school/InstaPay payments, issues and
+ *   takes back physical receipts, disburses cash refunds
+ * - FINANCE_ADMIN: Everything an officer does, plus approving refunds,
+ *   granting exceptions, and managing fee schedules
  */
 export const ROLES = {
   ADMIN: 'admin',
   STUDENT: 'student',
   PARENT: 'parent',
+  FINANCE_OFFICER: 'finance_officer',
+  FINANCE_ADMIN: 'finance_admin',
 } as const;
 
 /**
@@ -21,7 +27,30 @@ export const RoleSchema = z.enum([
   ROLES.ADMIN,
   ROLES.STUDENT,
   ROLES.PARENT,
+  ROLES.FINANCE_OFFICER,
+  ROLES.FINANCE_ADMIN,
 ]);
+
+/**
+ * Roles allowed to perform finance-desk operations (payment
+ * verification, receipts, refund disbursement). Admin is included as
+ * a superset everywhere.
+ */
+export const FINANCE_ROLES = [
+  ROLES.FINANCE_OFFICER,
+  ROLES.FINANCE_ADMIN,
+  ROLES.ADMIN,
+] as const;
+
+/** Roles allowed to approve refunds, grant exceptions, manage fee schedules */
+export const FINANCE_ADMIN_ROLES = [
+  ROLES.FINANCE_ADMIN,
+  ROLES.ADMIN,
+] as const;
+
+export function isFinanceRole(role: string | null | undefined): boolean {
+  return hasRole(role, ...FINANCE_ROLES);
+}
 
 /**
  * TypeScript type for Role
@@ -69,5 +98,5 @@ export type Grade = z.infer<typeof GradeSchema>;
 /**
  * Export individual roles for convenience
  */
-export const { ADMIN, STUDENT, PARENT } = ROLES;
+export const { ADMIN, STUDENT, PARENT, FINANCE_OFFICER, FINANCE_ADMIN } = ROLES;
 

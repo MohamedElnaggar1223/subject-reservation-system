@@ -8,7 +8,7 @@
  */
 
 import { z } from 'zod';
-import { GradeSchema } from '../roles';
+import { GradeSchema, RoleSchema } from '../roles';
 
 /**
  * User ID validation (UUID format)
@@ -46,6 +46,8 @@ export const AdminUpdateUser = z.object({
     .optional()
     .nullable(),
   grade: GradeSchema.optional().nullable(),
+  // V3: admins provision finance staff by promoting an account's role
+  role: RoleSchema.optional(),
   banned: z.boolean().optional(),
   banReason: z.string().max(500, 'Ban reason too long').optional().nullable(),
 });
@@ -64,7 +66,7 @@ export type StudentRegistrationDataType = z.infer<typeof StudentRegistrationData
  * User query filters (for admin)
  */
 export const UserQueryFilters = z.object({
-  role: z.enum(['admin', 'student', 'parent']).optional(),
+  role: RoleSchema.optional(),
   grade: GradeSchema.optional(),
   search: z.string().optional(),
 });

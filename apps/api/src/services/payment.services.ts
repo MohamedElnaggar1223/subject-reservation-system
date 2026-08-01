@@ -33,10 +33,18 @@ import {
   inArray,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
-import type { InitiatePaymentType, ListPaymentsQueryType } from '@repo/validations';
-import { generateFawryPayment } from '../integrations/fawry';
-import { createPaymobOrder } from '../integrations/paymob';
-import { initiateWalletPayment, type WalletProvider } from '../integrations/wallet';
+import type {
+  InitiatePaymentType,
+  ListPaymentsQueryType,
+  SubmitInstapayReferenceType,
+} from '@repo/validations';
+// V3 (§6.11): legacy provider integrations are disabled — only in-school and
+// InstaPay (manual verification) are active. Kept for when a PSP ships a real
+// InstaPay API (Paymob lists it "Coming Soon").
+// import { generateFawryPayment } from '../integrations/fawry';
+// import { createPaymobOrder } from '../integrations/paymob';
+// import { initiateWalletPayment, type WalletProvider } from '../integrations/wallet';
+import { env } from '../env';
 import {
   getOrCreateEscrow,
   getEscrowBalance,
@@ -46,15 +54,23 @@ import {
 import { logAction } from './audit.services';
 import { notifyPaymentConfirmed, notifyEscrowBalanceChanged } from './notification.services';
 
-// ─── Bank Transfer Static Config ─────────────────────────────────────────────
+// ─── School Receiving Account (InstaPay destination) ─────────────────────────
+//
+// InstaPay has no merchant API and the app is individuals-only, so the school
+// publishes its corporate account; parents transfer to it via InstaPay and
+// submit the transaction reference for finance verification (V3_PLAN §2.3).
+// Statuses that mean "money may still arrive for this payment" — used by the
+// double-payment guards and the manual-confirmation queue.
+const OPEN_PAYMENT_STATUSES = ['pending', 'pending_verification'] as const;
 
-const BANK_DETAILS = {
-  bankName:      'National Bank of Egypt',
-  accountName:   'IGCSE School',
-  accountNumber: '0012345678901234',
-  swiftCode:     'NBEGEGCXXXX',
-  branch:        'Main Branch',
-};
+function getSchoolAccountDetails() {
+  return {
+    bankName:      env.SCHOOL_BANK_NAME ?? 'National Bank of Egypt',
+    accountName:   env.SCHOOL_ACCOUNT_NAME ?? 'IGCSE School',
+    accountNumber: env.SCHOOL_ACCOUNT_NUMBER ?? '0012345678901234',
+    iban:          env.SCHOOL_IBAN ?? null,
+  };
+}
 
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
 
@@ -147,7 +163,7 @@ export async function initiatePayment(
     },
   });
   const hasPendingPayment = existingPaymentLinks.some(
-    (pl) => pl.payment.status === 'pending'
+    (pl) => (OPEN_PAYMENT_STATUSES as readonly string[]).includes(pl.payment.status)
   );
   if (hasPendingPayment) {
     throw new Error(
@@ -183,58 +199,35 @@ export async function initiatePayment(
   // 'confirmed' and NOT-005 fires through the same path as a real webhook.
   const fullyEscrowFunded = paymentMethodAmount === 0 && escrowToApply > 0;
 
-  // Generate provider-specific reference / URL (skipped when escrow covers the whole cost)
+  // Build method-specific metadata (skipped when escrow covers the whole cost).
+  // V3: both active methods are manual — no provider call happens here.
   let metadata: Record<string, unknown> = {};
   let externalReference: string | undefined;
 
   if (!fullyEscrowFunded) {
-    if (data.paymentMethod === 'fawry') {
-      const result = await generateFawryPayment({
-        amount: paymentMethodAmount,
-        merchantRefNum: paymentId,
-        customerName: student.name,
-        customerEmail: student.email,
-        description: `IGCSE Subject Registration — ${regs.length} subject(s)`,
-      });
-      externalReference = result.referenceNumber;
-      metadata = {
-        fawryReferenceNumber: result.referenceNumber,
-        fawryExpiresAt: result.expiresAt,
-        merchantRefNum: paymentId,
-      };
-    } else if (data.paymentMethod === 'card') {
-      const result = await createPaymobOrder({
-        amountCents: Math.round(paymentMethodAmount * 100),
-        merchantOrderId: paymentId,
-        customerEmail: student.email,
-        customerName: student.name,
-      });
-      externalReference = result.orderId;
-      metadata = {
-        paymentUrl: result.paymentUrl,
-        paymobOrderId: result.orderId,
-      };
-    } else if (data.paymentMethod === 'mobile_wallet') {
-      const result = await initiateWalletPayment({
-        amountCents: Math.round(paymentMethodAmount * 100),
-        merchantOrderId: paymentId,
-        walletProvider: data.walletProvider as WalletProvider,
-        customerEmail: student.email,
-        customerName: student.name,
-      });
-      externalReference = result.referenceCode;
-      metadata = {
-        redirectUrl: result.redirectUrl,
-        referenceCode: result.referenceCode,
-        walletProvider: data.walletProvider,
-      };
-    } else if (data.paymentMethod === 'bank_transfer') {
-      const referenceNumber = `IGCSE-${Date.now().toString(36).toUpperCase()}-${paymentId.slice(0, 6).toUpperCase()}`;
+    if (data.paymentMethod === 'in_school') {
+      // Parent pays at the finance desk; a payment reference makes the
+      // desk lookup instant (searchable in the Finance Workbench).
+      const referenceNumber = `SCH-${paymentId.slice(0, 8).toUpperCase()}`;
       externalReference = referenceNumber;
       metadata = {
-        bankDetails: { ...BANK_DETAILS, referenceNumber },
+        inSchool: { referenceNumber },
+        instructions: 'Pay at the school finance desk. Quote this reference or the student name.',
+      };
+    } else if (data.paymentMethod === 'instapay') {
+      // Parent transfers to the school's corporate account via InstaPay,
+      // then submits the transaction reference for finance verification.
+      metadata = {
+        instapay: {
+          account: getSchoolAccountDetails(),
+          amountDue: paymentMethodAmount,
+        },
+        instructions:
+          'Transfer the exact amount via InstaPay to the school account, then submit your transaction reference.',
       };
     }
+    // Legacy providers (fawry/card/mobile_wallet/bank_transfer) are disabled
+    // in V3 — InitiatePayment validation no longer accepts them.
   } else {
     metadata = { fullyEscrowFunded: true };
   }
@@ -255,7 +248,7 @@ export async function initiatePayment(
       },
     });
     const hasPendingPaymentInTx = existingPaymentLinksInTx.some(
-      (pl) => pl.payment.status === 'pending'
+      (pl) => (OPEN_PAYMENT_STATUSES as readonly string[]).includes(pl.payment.status)
     );
     if (hasPendingPaymentInTx) {
       throw new Error(
@@ -273,6 +266,7 @@ export async function initiatePayment(
         amount: paymentMethodAmount,
         escrowAmountApplied: escrowToApply,
         paymentMethod: data.paymentMethod,
+        purpose: 'registration',
         status: 'pending',
         externalReference: externalReference ?? null,
         metadata,
@@ -347,13 +341,14 @@ export async function confirmPayment(
   confirmedBy?: string,
   externalRef?: string,
   adminNotes?: string,
+  instrumentUsed?: string,
 ) {
   const pay = await db.query.payment.findFirst({
     where: (p, { eq }) => eq(p.id, paymentId),
   });
 
   if (!pay) throw new Error('Payment not found');
-  if (pay.status !== 'pending') {
+  if (!(OPEN_PAYMENT_STATUSES as readonly string[]).includes(pay.status)) {
     throw new Error(`Payment is already in '${pay.status}' status`);
   }
 
@@ -397,12 +392,13 @@ export async function confirmPayment(
         confirmedAt: now,
         confirmedBy: confirmedBy ?? null,
         externalReference: externalRef ?? pay.externalReference,
+        instrumentUsed: instrumentUsed ?? null,
         metadata: adminNotes
           ? { ...(pay.metadata as Record<string, unknown> ?? {}), adminNotes }
           : pay.metadata,
         updatedAt: now,
       })
-      .where(and(eq(payment.id, paymentId), eq(payment.status, 'pending')))
+      .where(and(eq(payment.id, paymentId), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])))
       .returning();
 
     // Idempotent: if 0 rows updated, another webhook already confirmed this payment
@@ -521,10 +517,10 @@ export async function failPayment(paymentId: string) {
 
   if (!pay) throw new Error('Payment not found');
 
-  // Non-throwing idempotency for non-pending states so callers
+  // Non-throwing idempotency for non-open states so callers
   // (finalizePendingRecords, scheduler Fawry sweep, webhook retries)
   // can call freely without error handling.
-  if (pay.status !== 'pending') return undefined;
+  if (!(OPEN_PAYMENT_STATUSES as readonly string[]).includes(pay.status)) return undefined;
 
   // Atomic transaction: fail payment + refund escrow if applied.
   // The UPDATE carries a status='pending' guard so only one concurrent
@@ -533,7 +529,7 @@ export async function failPayment(paymentId: string) {
     const [paymentUpdate] = await tx
       .update(payment)
       .set({ status: 'failed', updatedAt: new Date() })
-      .where(and(eq(payment.id, paymentId), eq(payment.status, 'pending')))
+      .where(and(eq(payment.id, paymentId), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])))
       .returning();
 
     // Idempotent: if 0 rows updated, another caller already failed this payment.
@@ -627,6 +623,94 @@ export async function getPayments(filters: ListPaymentsQueryType & {
 }
 
 /**
+ * Parent submits the InstaPay transaction reference after transferring
+ * to the school account. Moves the payment to 'pending_verification'.
+ *
+ * Rules:
+ * - Payment must belong to the calling parent and use the instapay method
+ * - Allowed while 'pending' or 'pending_verification' (re-submission
+ *   corrects a typo before finance verifies — the audit log keeps both)
+ * - The reference is unique across all payments: the same transfer can
+ *   never be claimed twice. Uniqueness is enforced by the DB index; the
+ *   violation is translated to a friendly error here.
+ *
+ * The reference is an opaque string (no published InstaPay format) and
+ * its presence is NOT proof of payment — finance verifies against the
+ * bank statement before confirming (V3_PLAN §2.3).
+ */
+export async function submitInstapayReference(
+  paymentId: string,
+  parentId: string,
+  data: SubmitInstapayReferenceType
+) {
+  const pay = await db.query.payment.findFirst({
+    where: (p, { eq }) => eq(p.id, paymentId),
+  });
+
+  if (!pay) throw new Error('Payment not found');
+  if (pay.parentId !== parentId) throw new Error('You are not authorized to update this payment');
+  if (pay.paymentMethod !== 'instapay') {
+    throw new Error('Only InstaPay payments accept a transfer reference');
+  }
+  if (!(OPEN_PAYMENT_STATUSES as readonly string[]).includes(pay.status)) {
+    throw new Error(`Payment is already in '${pay.status}' status`);
+  }
+
+  try {
+    const [updated] = await db
+      .update(payment)
+      .set({
+        verificationReference: data.reference,
+        verificationFileId: data.screenshotFileId ?? null,
+        status: 'pending_verification',
+        updatedAt: new Date(),
+      })
+      .where(and(eq(payment.id, paymentId), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])))
+      .returning();
+
+    if (!updated) {
+      throw new Error('Payment was concurrently processed. Please refresh and try again.');
+    }
+    return updated;
+  } catch (err) {
+    if (err instanceof Error && /unique|duplicate/i.test(err.message)) {
+      throw new Error(
+        'This transaction reference has already been submitted for another payment. Double-check your InstaPay receipt.'
+      );
+    }
+    throw err;
+  }
+}
+
+/**
+ * Finance Workbench queue: all payments awaiting manual action —
+ * in-school payments waiting for the desk, InstaPay payments (with or
+ * without a submitted reference), and any legacy pending bank transfers.
+ * Ordered oldest-first so the longest-waiting parents are served first.
+ */
+export async function getPendingManualPayments() {
+  return db.query.payment.findMany({
+    where: (p, { and, inArray }) =>
+      and(
+        inArray(p.status, [...OPEN_PAYMENT_STATUSES]),
+        inArray(p.paymentMethod, ['in_school', 'instapay', 'bank_transfer'])
+      ),
+    with: {
+      paymentRegistrations: {
+        with: {
+          registration: {
+            with: { subject: { columns: { id: true, name: true, code: true } } },
+          },
+        },
+      },
+      student: { columns: { id: true, name: true, email: true, grade: true, studentId: true } },
+      parent: { columns: { id: true, name: true, email: true } },
+    },
+    orderBy: (p, { asc }) => [asc(p.createdAt)],
+  });
+}
+
+/**
  * Get all pending bank transfer payments for admin review.
  * Returns payments ordered oldest-first so longest-waiting transfers are prioritized.
  */
@@ -709,6 +793,8 @@ export async function generatePaymentReceipt(paymentId: string): Promise<Buffer>
   }));
 
   const PAYMENT_METHOD_DISPLAY: Record<string, string> = {
+    in_school: 'Paid at School',
+    instapay: 'InstaPay',
     fawry: 'Fawry',
     card: 'Credit/Debit Card',
     mobile_wallet: 'Mobile Wallet',

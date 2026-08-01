@@ -42,7 +42,7 @@ import { success, error } from '../lib/response';
 import {
   requireAuth,
   requireParent,
-  requireAdmin,
+  requireFinance,
   requireStudentOrParent,
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
@@ -238,11 +238,11 @@ export const escrowRoutes = new Hono<HonoEnv>()
   /**
    * GET /escrow/admin/withdrawals
    *
-   * Admin view of all pending and partially-fulfilled withdrawal requests.
+   * Finance view of all pending and partially-fulfilled withdrawal requests.
    * Includes student and parent info. Ordered oldest-first (ESC-005).
    */
   .get('/admin/withdrawals',
-    requireAdmin(),
+    requireFinance(),
     async (c) => {
       const requests = await escrowService.getPendingWithdrawalRequests();
       return success(c, requests);
@@ -252,12 +252,12 @@ export const escrowRoutes = new Hono<HonoEnv>()
   /**
    * POST /escrow/admin/withdrawals/:id/fulfill
    *
-   * Admin releases funds from a withdrawal request (ESC-006).
+   * Finance staff release funds from a withdrawal request (ESC-006).
    * releasedAmount is incremental — can be called multiple times for partial fulfillment.
    * Escrow is debited immediately; parent and student notified (Phase 4 notifications).
    */
   .post('/admin/withdrawals/:id/fulfill',
-    requireAdmin(),
+    requireFinance(),
     zValidator('param', WithdrawalRequestId),
     zValidator('json', FulfillWithdrawal),
     async (c) => {
@@ -282,11 +282,11 @@ export const escrowRoutes = new Hono<HonoEnv>()
   /**
    * POST /escrow/admin/withdrawals/:id/reject
    *
-   * Admin rejects a pending withdrawal request. No funds are moved.
+   * Finance staff reject a pending withdrawal request. No funds are moved.
    * A mandatory reason is stored in adminNotes.
    */
   .post('/admin/withdrawals/:id/reject',
-    requireAdmin(),
+    requireFinance(),
     zValidator('param', WithdrawalRequestId),
     zValidator('json', RejectWithdrawal),
     async (c) => {
