@@ -21,7 +21,7 @@ export const metadata = {
 };
 
 export default async function FinanceWorkbenchPage(): Promise<React.JSX.Element> {
-  await requireFinance();
+  const session = await requireFinance();
 
   const queryClient = getQueryClient();
   const api = await getServerApi();
@@ -35,11 +35,15 @@ export default async function FinanceWorkbenchPage(): Promise<React.JSX.Element>
       queryKey: ['finance', 'withdrawals'],
       queryFn: () => apiResponse(api.v1.escrow.admin.withdrawals.$get()),
     }),
+    queryClient.prefetchQuery({
+      queryKey: ['finance', 'receipts'],
+      queryFn: () => apiResponse(api.v1.receipts.queue.$get()),
+    }),
   ]);
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <FinanceWorkbenchClient />
+      <FinanceWorkbenchClient userRole={session.user.role ?? ''} />
     </HydrationBoundary>
   );
 }

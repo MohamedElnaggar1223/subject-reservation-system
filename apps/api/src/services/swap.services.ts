@@ -59,6 +59,9 @@ import type {
   ChangeRequestsQueryType,
 } from '@repo/validations';
 import { creditEscrow, getEscrowBalance } from './escrow.services';
+import { refundPercentage } from './refund.services';
+import { executeReceiptGatedDrop } from './receipt.services';
+import { computeRegistrationPricing } from './pricing.services';
 import {
   notifyDropSwapRequestReceived,
   notifyDropSwapProcessed,
@@ -94,14 +97,18 @@ export const isParentLinkedToStudent = validateParentStudentLink;
  * subject charges the same price as a fresh registration into it.
  */
 function resolveSubjectPrice(sub: {
-  isOfferedAtSchool: boolean | null;
-  priceInSchool: number | null;
-  customPrice: number | null;
+  isOfferedAtSchool: boolean;
+  courseFee: number;
+  registrationFee: number;
 }): number {
-  if (sub.isOfferedAtSchool && sub.priceInSchool != null) {
-    return sub.priceInSchool;
-  }
-  return sub.customPrice ?? sub.priceInSchool ?? 0;
+  // V3 (§5.3): swaps price the new subject through the shared engine —
+  // in-school by default; the 50% rule applies automatically when the
+  // subject isn't offered at school.
+  return computeRegistrationPricing(sub, { isRetake: false, takeOutsideSchool: false }).total;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
 
 /**
@@ -211,8 +218,8 @@ async function validateNewSubjectForSwap(
       name: true,
       isActive: true,
       isOfferedAtSchool: true,
-      priceInSchool: true,
-      customPrice: true,
+      courseFee: true,
+      registrationFee: true,
       isCore: true,
     },
   });
@@ -444,6 +451,10 @@ export async function approveChangeRequest(
 
   const now = new Date();
 
+  // V3 §6.12: the refund percentage locks at drop-APPROVAL time
+  const pct = await refundPercentage(now, cr.registration.sessionId);
+  const refundAmount = round2((cr.registration.priceAtRegistration * pct) / 100);
+
   const result = await db.transaction(async (tx) => {
     // Status guard: prevent concurrent double-approval
     const [updatedCR] = await tx
@@ -456,35 +467,16 @@ export async function approveChangeRequest(
       throw new Error('Change request already processed.');
     }
 
-    // Status-guarded registration drop: prevents double-credit races where
-    // the registration was concurrently dropped by another change request,
-    // expired by session-close finalization, or directly dropped by a parent.
-    // Only transition confirmed → dropped; if nothing updated, abort the tx
-    // so the escrow credit below never runs on an already-dropped row.
-    const droppedRegs = await tx
-      .update(registration)
-      .set({ status: 'dropped', droppedAt: now, updatedAt: now })
-      .where(
-        and(
-          eq(registration.id, cr.registrationId),
-          eq(registration.status, 'confirmed')
-        )
-      )
-      .returning({ id: registration.id });
-
-    if (droppedRegs.length === 0) {
-      throw new Error(
-        'The original registration is no longer in a confirmable state (it may have already been dropped or the session has closed).'
-      );
-    }
-
-    await creditEscrow({
-      studentId:            cr.registration.studentId,
-      amount:               cr.registration.priceAtRegistration,
-      reason:               cr.type === 'drop' ? 'drop' : 'swap_refund',
-      initiatedBy:          parentId,
-      relatedRegistrationId: cr.registrationId,
-    }, tx);
+    // V3 D-D: receipt-gated, status-guarded drop. If the paper receipt
+    // is out with the parent, the drop parks at dropped_pending_receipt
+    // and the (window-scaled) refund fires when the receipt comes back.
+    const dropOutcome = await executeReceiptGatedDrop(tx, {
+      registrationId: cr.registrationId,
+      studentId: cr.registration.studentId,
+      refundAmount,
+      refundReason: cr.type === 'drop' ? 'drop' : 'swap_refund',
+      initiatedBy: parentId,
+    });
 
     if (cr.type === 'swap' && cr.newSubjectId) {
       const newSubjectPrice = cr.priceAtRequest;
@@ -495,6 +487,7 @@ export async function approveChangeRequest(
         sessionId: cr.registration.sessionId,
         subjectId: cr.newSubjectId,
         priceAtRegistration: newSubjectPrice,
+        courseFeeAtRegistration: newSubjectPrice,
         wasCoreAtRegistration: newSubjectIsCore,
         status: 'pending_payment',
         requestedBy: cr.registration.studentId,
@@ -506,12 +499,19 @@ export async function approveChangeRequest(
       });
     }
 
-    return { success: true, type: cr.type };
+    return { success: true, type: cr.type, ...dropOutcome, refundPercentage: pct };
   });
 
   // NOT-007: Notify student of approval (fire-and-forget)
   // NOT-008: Notify parents of escrow balance change (fire-and-forget)
   const studentId = cr.registration.studentId;
+
+  const refundText =
+    result.refundAmount <= 0
+      ? `No refund applies (${result.refundPercentage}% refund window)`
+      : result.gated
+        ? `EGP ${result.refundAmount.toFixed(2)} (${result.refundPercentage}%) will be credited once the subject's receipt is returned to the school`
+        : `EGP ${result.refundAmount.toFixed(2)} (${result.refundPercentage}%) credited to your escrow`;
 
   notifyDropSwapProcessed({
     studentId,
@@ -520,26 +520,28 @@ export async function approveChangeRequest(
     subjectName:      cr.registration.subject?.name ?? 'the subject',
     newSubjectName:   cr.newSubject?.name,
     approved:         true,
-    financialImpact:  `EGP ${cr.registration.priceAtRegistration.toFixed(2)} credited to your escrow`,
+    financialImpact:  refundText,
     comments:         data.comments,
     changeRequestId,
   }).catch((err) => console.error('[notification] NOT-007 (approve) failed:', err));
 
-  getEscrowBalance(studentId).then(async (newBalance) => {
-    const previousBalance = newBalance - cr.registration.priceAtRegistration;
-    const studentUser = await db.query.user.findFirst({
-      where: (u, { eq: eqOp }) => eqOp(u.id, studentId),
-      columns: { name: true },
-    });
-    notifyEscrowBalanceChanged({
-      studentId,
-      studentName:      studentUser?.name ?? 'Student',
-      previousBalance,
-      newBalance,
-      changeAmount:     cr.registration.priceAtRegistration,
-      reason:           cr.type === 'drop' ? 'Subject drop refund' : 'Subject swap refund',
-    }).catch((err) => console.error('[notification] NOT-008 (approve change) failed:', err));
-  }).catch((err) => console.error('[notification] NOT-008 balance fetch failed:', err));
+  if (!result.gated && result.refundAmount > 0) {
+    getEscrowBalance(studentId).then(async (newBalance) => {
+      const previousBalance = newBalance - result.refundAmount;
+      const studentUser = await db.query.user.findFirst({
+        where: (u, { eq: eqOp }) => eqOp(u.id, studentId),
+        columns: { name: true },
+      });
+      notifyEscrowBalanceChanged({
+        studentId,
+        studentName:      studentUser?.name ?? 'Student',
+        previousBalance,
+        newBalance,
+        changeAmount:     result.refundAmount,
+        reason:           cr.type === 'drop' ? 'Subject drop refund' : 'Subject swap refund',
+      }).catch((err) => console.error('[notification] NOT-008 (approve change) failed:', err));
+    }).catch((err) => console.error('[notification] NOT-008 balance fetch failed:', err));
+  }
 
   return result;
 }
@@ -640,29 +642,28 @@ export async function executeDirectDrop(
 
   const now = new Date();
 
-  // Atomic transaction (OI-009)
+  // V3 §6.12: refund percentage locks at drop time
+  const pct = await refundPercentage(now, reg.sessionId);
+  const refundAmount = round2((reg.priceAtRegistration * pct) / 100);
+
+  // Atomic transaction (OI-009) — receipt-gated (D-D)
   const result = await db.transaction(async (tx) => {
-    // Status guard: prevent double-credit from concurrent requests
-    const [updatedReg] = await tx
-      .update(registration)
-      .set({ status: 'dropped', droppedAt: now, updatedAt: now })
-      .where(and(eq(registration.id, registrationId), eq(registration.status, 'confirmed')))
-      .returning({ id: registration.id });
-
-    if (!updatedReg) {
-      throw new Error('Registration already processed.');
-    }
-
-    await creditEscrow({
-      studentId:            reg.studentId,
-      amount:               reg.priceAtRegistration,
-      reason:               'drop',
-      initiatedBy:          parentId,
-      relatedRegistrationId: registrationId,
-    }, tx);
-
-    return { success: true, creditedAmount: reg.priceAtRegistration };
+    const dropOutcome = await executeReceiptGatedDrop(tx, {
+      registrationId,
+      studentId: reg.studentId,
+      refundAmount,
+      refundReason: 'drop',
+      initiatedBy: parentId,
+    });
+    return { success: true, creditedAmount: dropOutcome.gated ? 0 : refundAmount, ...dropOutcome, refundPercentage: pct };
   });
+
+  const impact =
+    refundAmount <= 0
+      ? `No refund applies (${pct}% refund window).`
+      : result.gated
+        ? `EGP ${refundAmount.toFixed(2)} (${pct}%) will be credited once the receipt is returned to the school.`
+        : `EGP ${refundAmount.toFixed(2)} (${pct}%) credited to your escrow.`;
 
   // NOT-007 / SWAP-004: Student receives email + in-app notification when
   // a parent directly drops a subject for them.
@@ -671,11 +672,11 @@ export async function executeDirectDrop(
     parentId,
     changeType: 'drop',
     subjectName: reg.subject.name,
-    financialImpact: `EGP ${reg.priceAtRegistration.toFixed(2)} credited to your escrow.`,
+    financialImpact: impact,
   }).catch((err) => console.error('[notification] NOT-007 (direct drop) failed:', err));
 
   // NOT-008: Notify parents of escrow credit from direct drop (fire-and-forget)
-  {
+  if (!result.gated && refundAmount > 0) {
     const newBalance = await getEscrowBalance(reg.studentId);
     const studentUser = await db.query.user.findFirst({
       where: (u, { eq: eqOp }) => eqOp(u.id, reg.studentId),
@@ -685,10 +686,10 @@ export async function executeDirectDrop(
     notifyEscrowBalanceChanged({
       studentId:       reg.studentId,
       studentName:     studentUser?.name ?? 'Student',
-      previousBalance: newBalance - reg.priceAtRegistration,
+      previousBalance: newBalance - refundAmount,
       newBalance,
-      changeAmount:    reg.priceAtRegistration,
-      reason:          'Direct subject drop — full refund to escrow',
+      changeAmount:    refundAmount,
+      reason:          'Direct subject drop — refund to escrow',
     }).catch((err) => console.error('[notification] NOT-008 (direct drop) failed:', err));
   }
 
@@ -725,29 +726,21 @@ export async function executeDirectSwap(
   const newSubjectPrice = resolveSubjectPrice(newSub);
   const now = new Date();
 
-  // Atomic transaction (OI-009)
+  // V3 §6.12: refund percentage locks at swap time (drop leg)
+  const pct = await refundPercentage(now, reg.sessionId);
+  const refundAmount = round2((reg.priceAtRegistration * pct) / 100);
+
+  // Atomic transaction (OI-009) — drop leg receipt-gated (D-D)
   const result = await db.transaction(async (tx) => {
-    // 1. Drop original registration — status guard prevents double-credit from concurrent requests
-    const [updatedReg] = await tx
-      .update(registration)
-      .set({ status: 'dropped', droppedAt: now, updatedAt: now })
-      .where(and(eq(registration.id, registrationId), eq(registration.status, 'confirmed')))
-      .returning({ id: registration.id });
+    const dropOutcome = await executeReceiptGatedDrop(tx, {
+      registrationId,
+      studentId: reg.studentId,
+      refundAmount,
+      refundReason: 'swap_refund',
+      initiatedBy: parentId,
+    });
 
-    if (!updatedReg) {
-      throw new Error('Registration already processed.');
-    }
-
-    // 2. Credit escrow with original price
-    await creditEscrow({
-      studentId:            reg.studentId,
-      amount:               reg.priceAtRegistration,
-      reason:               'swap_refund',
-      initiatedBy:          parentId,
-      relatedRegistrationId: registrationId,
-    }, tx);
-
-    // 3. Create new pending_payment registration
+    // Create new pending_payment registration
     const newRegId = randomUUID();
     await tx.insert(registration).values({
       id: newRegId,
@@ -755,6 +748,7 @@ export async function executeDirectSwap(
       sessionId: reg.sessionId,
       subjectId: data.newSubjectId,
       priceAtRegistration: newSubjectPrice,
+      courseFeeAtRegistration: newSubjectPrice,
       wasCoreAtRegistration: newSub.isCore,
       status: 'pending_payment',
       requestedBy: parentId,
@@ -767,25 +761,34 @@ export async function executeDirectSwap(
 
     return {
       success: true,
-      creditedAmount: reg.priceAtRegistration,
+      creditedAmount: dropOutcome.gated ? 0 : refundAmount,
       newRegistrationId: newRegId,
       newSubjectPrice,
+      ...dropOutcome,
+      refundPercentage: pct,
     };
   });
 
   // NOT-007 / SWAP-004: Student receives email + in-app notification when
   // a parent directly swaps a subject for them.
+  const swapImpact =
+    refundAmount <= 0
+      ? `No refund applies for the dropped subject (${pct}% refund window); payment for the new subject is pending.`
+      : result.gated
+        ? `EGP ${refundAmount.toFixed(2)} (${pct}%) will be credited once the old receipt is returned; payment for the new subject is pending.`
+        : `EGP ${refundAmount.toFixed(2)} (${pct}%) credited to your escrow; payment for the new subject is pending.`;
+
   notifyDirectDropSwapExecuted({
     studentId: reg.studentId,
     parentId,
     changeType: 'swap',
     subjectName: reg.subject.name,
     newSubjectName: newSub.name,
-    financialImpact: `EGP ${reg.priceAtRegistration.toFixed(2)} credited to your escrow; payment for the new subject is pending.`,
+    financialImpact: swapImpact,
   }).catch((err) => console.error('[notification] NOT-007 (direct swap) failed:', err));
 
   // NOT-008: Notify parents of escrow credit from direct swap (fire-and-forget)
-  {
+  if (!result.gated && refundAmount > 0) {
     const newBalance = await getEscrowBalance(reg.studentId);
     const studentUser = await db.query.user.findFirst({
       where: (u, { eq: eqOp }) => eqOp(u.id, reg.studentId),
@@ -795,9 +798,9 @@ export async function executeDirectSwap(
     notifyEscrowBalanceChanged({
       studentId:       reg.studentId,
       studentName:     studentUser?.name ?? 'Student',
-      previousBalance: newBalance - reg.priceAtRegistration,
+      previousBalance: newBalance - refundAmount,
       newBalance,
-      changeAmount:    reg.priceAtRegistration,
+      changeAmount:    refundAmount,
       reason:          `Direct swap: ${reg.subject.name} → ${newSub.name} (escrow refund)`,
     }).catch((err) => console.error('[notification] NOT-008 (direct swap) failed:', err));
   }

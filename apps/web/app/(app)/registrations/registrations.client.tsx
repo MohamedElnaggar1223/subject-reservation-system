@@ -75,9 +75,37 @@ const STATUS_STYLES: Record<string, string> = {
   pending_approval: 'bg-amber-50 text-amber-700',
   pending_payment:  'bg-brand-50 text-brand-700',
   confirmed:        'bg-emerald-50 text-emerald-700',
+  dropped_pending_receipt: 'bg-amber-50 text-amber-700',
   dropped:          'bg-muted text-muted-foreground',
   rejected:         'bg-destructive/10 text-destructive',
 };
+
+// ─── Refund Preview (V3 §6.12) ───────────────────────────────────────────────
+// Transparency rule: every drop/swap dialog shows the exact refund the
+// windows allow BEFORE the user commits.
+
+type RefundPreview = { percentage: number; amount: number; fullPrice: number };
+
+function RefundPreviewNote({ registrationId }: { registrationId: string }) {
+  const { data: preview } = useQuery<RefundPreview>({
+    queryKey: ['refund-preview', registrationId],
+    queryFn: async () =>
+      (await apiResponse(
+        api.v1.receipts['refund-preview'].$get({ query: { registrationId } })
+      )) as RefundPreview,
+    retry: false,
+  });
+
+  if (!preview) return null;
+  return (
+    <div className="bg-muted rounded-lg p-3 text-xs text-foreground">
+      Refund policy: you will receive{' '}
+      <span className="font-semibold">{preview.percentage}% = {formatPrice(preview.amount)}</span>{' '}
+      back (of {formatPrice(preview.fullPrice)}), released to escrow once the subject&apos;s
+      receipt is returned to the school.
+    </div>
+  );
+}
 
 function resolvePrice(sub: AvailableSubject): number {
   if (!sub.isOfferedAtSchool || sub.priceInSchool == null) return sub.customPrice ?? 0;
@@ -332,9 +360,10 @@ function RequestDropModal({
         <div className="bg-destructive/10 rounded-lg p-3 text-sm">
           <p className="font-medium text-destructive">Drop: {reg.subject.name}</p>
           <p className="text-destructive/80 text-xs mt-1">
-            If approved, {formatPrice(reg.priceAtRegistration)} will be credited to your escrow.
+            The refund below is credited after approval and receipt return.
           </p>
         </div>
+        <RefundPreviewNote registrationId={reg.id} />
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">
             Reason <span className="text-destructive">*</span>
@@ -412,6 +441,7 @@ function RequestSwapModal({
           <p className="font-medium text-brand-800 dark:text-brand-300">Swap from: {reg.subject.name}</p>
           <p className="text-brand-600 dark:text-brand-400 text-xs mt-1">Current price: {formatPrice(reg.priceAtRegistration)}</p>
         </div>
+        <RefundPreviewNote registrationId={reg.id} />
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">New Subject</label>
@@ -505,11 +535,7 @@ function DirectDropModal({
           <span className="font-semibold">{reg.subject.name}</span> for{' '}
           <span className="font-semibold">{reg.student.name}</span>.
         </p>
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-3 text-sm">
-          <p className="text-emerald-800 dark:text-emerald-300 font-medium">
-            {formatPrice(reg.priceAtRegistration)} will be credited to the student&apos;s escrow immediately.
-          </p>
-        </div>
+        <RefundPreviewNote registrationId={reg.id} />
         {err && <p className="text-sm text-destructive">{err}</p>}
         <div className="flex gap-3">
           <Button variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
@@ -599,7 +625,7 @@ function DirectSwapModal({
               Financial impact
             </p>
             <p className={`text-xs mt-1 ${diff > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
-              Old price ({formatPrice(reg.priceAtRegistration)}) credited to escrow.
+              Old subject refunded per the refund policy below.
               {diff > 0
                 ? ` New registration (${formatPrice(newPrice)}) will require payment.`
                 : diff < 0
@@ -608,6 +634,7 @@ function DirectSwapModal({
             </p>
           </div>
         )}
+        <RefundPreviewNote registrationId={reg.id} />
 
         {err && <p className="text-sm text-destructive">{err}</p>}
         <div className="flex gap-3">

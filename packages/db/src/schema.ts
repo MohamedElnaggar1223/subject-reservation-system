@@ -931,6 +931,11 @@ export const withdrawalRequest = pgTable(
     adminNotes: text("admin_notes"),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
     resolvedBy: text("resolved_by").references(() => user.id, { onDelete: "set null" }),
+    // V3 maker-checker (D-C): the officer's cash disbursement is never
+    // blocked on approval, but a finance admin must approve afterwards
+    // for the record to reach full completion.
+    approvedBy: text("approved_by").references(() => user.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -950,6 +955,106 @@ export const withdrawalRequest = pgTable(
     check(
       "withdrawal_released_le_requested",
       sql`${table.releasedAmount} IS NULL OR ${table.releasedAmount} <= ${table.requestedAmount}`,
+    ),
+  ]
+);
+
+/**
+ * ============================================
+ * RECEIPT TABLE (V3 §6.5, D-D/D-J)
+ * ============================================
+ *
+ * One physical receipt per subject registration — the paper the parent
+ * holds proving the registration. Created (pending_issue) when the
+ * covering payment completes; a finance officer marks it issued when
+ * physically handed over.
+ *
+ * The receipt gates drop completion: a drop of a registration whose
+ * receipt is out (issued) parks at 'dropped_pending_receipt' with the
+ * refund parked on the receipt row (refundAmountOnReturn); when finance
+ * marks the receipt returned, the escrow credit fires and the
+ * registration becomes 'dropped'. 'lost'/'void' (finance admin only)
+ * unblock the same transitions — the sanctioned escape hatch.
+ */
+export const receipt = pgTable(
+  "receipt",
+  {
+    id: text("id").primaryKey(),
+    registrationId: text("registration_id")
+      .notNull()
+      .unique()
+      .references(() => registration.id, { onDelete: "restrict" }),
+    // Human-friendly number quoted at the desk, e.g. RCP-2026-AB12CD34
+    receiptNumber: text("receipt_number").notNull().unique(),
+    // 'pending_issue' | 'issued' | 'return_required' | 'returned' | 'lost' | 'void'
+    status: text("status").notNull().default("pending_issue"),
+    issuedBy: text("issued_by").references(() => user.id, { onDelete: "set null" }),
+    issuedAt: timestamp("issued_at", { withTimezone: true }),
+    returnedTo: text("returned_to").references(() => user.id, { onDelete: "set null" }),
+    returnedAt: timestamp("returned_at", { withTimezone: true }),
+    // Refund parked by a pending drop, released when the receipt comes
+    // back (or is marked lost/void). Percentage-scaled per refund windows.
+    refundAmountOnReturn: numeric("refund_amount_on_return", { precision: 12, scale: 2, mode: "number" }),
+    refundReason: text("refund_reason"), // 'drop' | 'swap_refund'
+    refundInitiatedBy: text("refund_initiated_by").references(() => user.id, { onDelete: "set null" }),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("receipt_status_idx").on(table.status),
+    index("receipt_number_idx").on(table.receiptNumber),
+    check(
+      "receipt_refund_nonneg",
+      sql`${table.refundAmountOnReturn} IS NULL OR ${table.refundAmountOnReturn} >= 0`,
+    ),
+  ]
+);
+
+export const receiptRelations = relations(receipt, ({ one }) => ({
+  registration: one(registration, {
+    fields: [receipt.registrationId],
+    references: [registration.id],
+  }),
+}));
+
+/**
+ * ============================================
+ * REFUND WINDOW TABLE (V3 §6.12, D-L)
+ * ============================================
+ *
+ * Time-scaled refunds: a drop inside a window refunds that window's
+ * percentage; if ANY windows are configured for the applicable scope,
+ * gaps are 0%; if none exist, refunds stay 100% (pre-V3 behavior).
+ * Session-scoped windows win over academic-year-scoped ones.
+ */
+export const refundWindow = pgTable(
+  "refund_window",
+  {
+    id: text("id").primaryKey(),
+    // Exactly one scope: a specific session, or an academic year label
+    sessionId: text("session_id").references(() => registrationSession.id, { onDelete: "cascade" }),
+    academicYear: text("academic_year"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    percentage: numeric("percentage", { precision: 5, scale: 2, mode: "number" }).notNull(),
+    label: text("label"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("refundWindow_sessionId_idx").on(table.sessionId),
+    index("refundWindow_academicYear_idx").on(table.academicYear),
+    check("refundWindow_pct_range", sql`${table.percentage} >= 0 AND ${table.percentage} <= 100`),
+    check(
+      "refundWindow_one_scope",
+      sql`(${table.sessionId} IS NOT NULL AND ${table.academicYear} IS NULL) OR (${table.sessionId} IS NULL AND ${table.academicYear} IS NOT NULL)`,
     ),
   ]
 );

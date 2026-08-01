@@ -25,6 +25,7 @@ import {
   eq,
   and,
   inArray,
+  isNull,
   sql,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -416,7 +417,13 @@ export async function createWithdrawalRequest(
  */
 export async function getPendingWithdrawalRequests() {
   const requests = await db.query.withdrawalRequest.findMany({
-    where: (wr, { inArray }) => inArray(wr.status, ['pending', 'partially_fulfilled']),
+    // V3 D-C maker-checker: fulfilled rows stay in the queue until a
+    // finance admin approves them (isNull(approvedBy)).
+    where: (wr, { inArray, and, or, eq, isNull }) =>
+      or(
+        inArray(wr.status, ['pending', 'partially_fulfilled']),
+        and(eq(wr.status, 'fulfilled'), isNull(wr.approvedBy))
+      ),
     with: {
       escrow: {
         with: {
@@ -712,4 +719,26 @@ export async function getWithdrawalRequestsForParent(
   });
 
   return requests;
+}
+
+
+/**
+ * Finance admin approves a fulfilled withdrawal (V3 D-C maker-checker).
+ * The officer's cash disbursement was never blocked on this; approval
+ * closes the record. Only fulfilled/partially_fulfilled rows qualify.
+ */
+export async function approveWithdrawalRequest(id: string, financeAdminId: string) {
+  const [updated] = await db
+    .update(withdrawalRequest)
+    .set({ approvedBy: financeAdminId, approvedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(withdrawalRequest.id, id),
+        inArray(withdrawalRequest.status, ['fulfilled', 'partially_fulfilled']),
+        isNull(withdrawalRequest.approvedBy),
+      )
+    )
+    .returning();
+  if (!updated) throw new Error('Withdrawal is not awaiting approval');
+  return updated;
 }

@@ -36,6 +36,8 @@ export const AUDIT_ENTITY_TYPES = [
   'notification',
   'teacher',
   'school_fee_schedule',
+  'receipt',
+  'refund_window',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -52,6 +54,8 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   notification:   'Notification',
   teacher:        'Teacher',
   school_fee_schedule: 'School Fee Schedule',
+  receipt:        'Receipt',
+  refund_window:  'Refund Window',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -90,6 +94,13 @@ export const AUDIT_ACTIONS = [
   'SCHOOL_FEE_SCHEDULE_UPDATED',
   'SCHOOL_FEE_SCHEDULE_DELETED',
   'SCHOOL_FEE_PAYMENT_INITIATED',
+  'RECEIPT_ISSUED',
+  'RECEIPT_RETURNED',
+  'RECEIPT_LOST',
+  'RECEIPT_VOIDED',
+  'REFUND_WINDOW_CREATED',
+  'REFUND_WINDOW_DELETED',
+  'WITHDRAWAL_APPROVED',
   // Change requests
   'CHANGE_REQUEST_CREATED',
   'CHANGE_REQUEST_APPROVED',
@@ -142,6 +153,13 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   SCHOOL_FEE_SCHEDULE_UPDATED:'School Fee Schedule Updated',
   SCHOOL_FEE_SCHEDULE_DELETED:'School Fee Schedule Deleted',
   SCHOOL_FEE_PAYMENT_INITIATED:'School Fee Payment Initiated',
+  RECEIPT_ISSUED:             'Receipt Handed to Parent',
+  RECEIPT_RETURNED:           'Receipt Returned to School',
+  RECEIPT_LOST:               'Receipt Marked Lost',
+  RECEIPT_VOIDED:             'Receipt Voided',
+  REFUND_WINDOW_CREATED:      'Refund Window Created',
+  REFUND_WINDOW_DELETED:      'Refund Window Deleted',
+  WITHDRAWAL_APPROVED:        'Withdrawal Approved (Finance Admin)',
   CHANGE_REQUEST_CREATED:     'Drop/Swap Request Created',
   CHANGE_REQUEST_APPROVED:    'Drop/Swap Request Approved',
   CHANGE_REQUEST_REJECTED:    'Drop/Swap Request Rejected',

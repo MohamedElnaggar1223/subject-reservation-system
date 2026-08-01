@@ -14,6 +14,18 @@ import { apiResponse } from '@repo/validations';
 import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
 
+type RefundWindowRow = {
+  id: string;
+  sessionId: string | null;
+  academicYear: string | null;
+  startsAt: string;
+  endsAt: string;
+  percentage: number;
+  label: string | null;
+};
+
+type SessionOption = { id: string; name: string };
+
 type ScheduleRow = {
   id: string;
   academicYear: string;
@@ -67,6 +79,59 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
       apiResponse(api.v1['school-fees'].schedules[':id'].$delete({ param: { id } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['school-fees'] }),
   });
+
+  // ── Refund windows (V3 §6.12) ──────────────────────────────────────────────
+
+  const [rwForm, setRwForm] = useState({
+    scope: 'year' as 'year' | 'session',
+    sessionId: '',
+    academicYear: '',
+    startsAt: '',
+    endsAt: '',
+    percentage: '',
+    label: '',
+  });
+  const [rwError, setRwError] = useState('');
+
+  const { data: refundWindows = [] } = useQuery<RefundWindowRow[]>({
+    queryKey: ['refund-windows'],
+    queryFn: async () => (await apiResponse(api.v1.receipts['refund-windows'].$get())) as RefundWindowRow[],
+  });
+
+  const { data: allSessions = [] } = useQuery<SessionOption[]>({
+    queryKey: ['sessions', 'all-admin'],
+    queryFn: async () => (await apiResponse(api.v1.sessions.$get({ query: {} }))) as SessionOption[],
+  });
+
+  const createWindowMutation = useMutation({
+    mutationFn: () =>
+      apiResponse(
+        api.v1.receipts['refund-windows'].$post({
+          json: {
+            sessionId: rwForm.scope === 'session' ? rwForm.sessionId : null,
+            academicYear: rwForm.scope === 'year' ? rwForm.academicYear.trim() : null,
+            startsAt: new Date(rwForm.startsAt),
+            endsAt: new Date(rwForm.endsAt),
+            percentage: parseFloat(rwForm.percentage),
+            label: rwForm.label.trim() || null,
+          },
+        })
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['refund-windows'] });
+      setRwForm({ scope: 'year', sessionId: '', academicYear: '', startsAt: '', endsAt: '', percentage: '', label: '' });
+      setRwError('');
+    },
+    onError: (err: Error) => setRwError(err.message),
+  });
+
+  const deleteWindowMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiResponse(api.v1.receipts['refund-windows'][':id'].$delete({ param: { id } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['refund-windows'] }),
+  });
+
+  const sessionName = (id: string | null) => allSessions.find((x) => x.id === id)?.name ?? id ?? '—';
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -208,6 +273,140 @@ export default function SchoolFeesAdminClient(): React.JSX.Element {
                           deleteMutation.mutate(row.id);
                         }
                       }}
+                    >
+                      Delete
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── Refund Windows (V3 §6.12) ─────────────────────────────────── */}
+      <div className="mt-12 mb-6">
+        <h2 className="text-xl font-bold text-foreground font-display tracking-tight">Refund Windows</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Time-scaled drop refunds. While a scope has windows, gaps between them refund 0%; a
+          scope with no windows refunds 100%. Session windows override academic-year windows.
+        </p>
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          setRwError('');
+          const pct = parseFloat(rwForm.percentage);
+          if (isNaN(pct) || pct < 0 || pct > 100) { setRwError('Percentage must be 0–100.'); return; }
+          if (rwForm.scope === 'session' && !rwForm.sessionId) { setRwError('Pick a session.'); return; }
+          if (rwForm.scope === 'year' && !/^\d{4}-\d{4}$/.test(rwForm.academicYear.trim())) { setRwError('Academic year must look like 2026-2027.'); return; }
+          if (!rwForm.startsAt || !rwForm.endsAt) { setRwError('Set both dates.'); return; }
+          createWindowMutation.mutate();
+        }}
+        className="bg-card rounded-xl border border-border shadow-sm p-5 mb-6"
+      >
+        <div className="grid gap-3 sm:grid-cols-6">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-foreground">Scope</label>
+            <select
+              value={rwForm.scope}
+              onChange={(e) => setRwForm({ ...rwForm, scope: e.target.value as 'year' | 'session' })}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+            >
+              <option value="year">Academic year</option>
+              <option value="session">Session</option>
+            </select>
+          </div>
+          {rwForm.scope === 'session' ? (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">Session</label>
+              <select
+                value={rwForm.sessionId}
+                onChange={(e) => setRwForm({ ...rwForm, sessionId: e.target.value })}
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              >
+                <option value="">Pick…</option>
+                {allSessions.map((x) => (
+                  <option key={x.id} value={x.id}>{x.name}</option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground">Academic Year</label>
+              <input
+                type="text"
+                value={rwForm.academicYear}
+                onChange={(e) => setRwForm({ ...rwForm, academicYear: e.target.value })}
+                placeholder="2026-2027"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground"
+              />
+            </div>
+          )}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-foreground">From</label>
+            <input type="date" value={rwForm.startsAt} onChange={(e) => setRwForm({ ...rwForm, startsAt: e.target.value })}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-foreground">To</label>
+            <input type="date" value={rwForm.endsAt} onChange={(e) => setRwForm({ ...rwForm, endsAt: e.target.value })}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-foreground">Refund %</label>
+            <input type="number" min="0" max="100" value={rwForm.percentage} onChange={(e) => setRwForm({ ...rwForm, percentage: e.target.value })}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-foreground">Label</label>
+            <input type="text" value={rwForm.label} onChange={(e) => setRwForm({ ...rwForm, label: e.target.value })}
+              placeholder="Before entry deadline" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground" />
+          </div>
+        </div>
+        {rwError && <p className="mt-3 text-sm text-destructive">{rwError}</p>}
+        <div className="mt-4 flex justify-end">
+          <Button type="submit" disabled={createWindowMutation.isPending}>
+            {createWindowMutation.isPending ? 'Adding…' : 'Add Window'}
+          </Button>
+        </div>
+      </form>
+
+      {refundWindows.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-8 text-center shadow-sm">
+          <p className="text-muted-foreground text-sm">No refund windows — drops refund 100% until configured.</p>
+        </div>
+      ) : (
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="border-b border-border bg-muted">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Scope</th>
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Label</th>
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">From</th>
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">To</th>
+                <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Refund</th>
+                <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {refundWindows.map((w) => (
+                <tr key={w.id} className="hover:bg-muted/50 transition-colors">
+                  <td className="px-4 py-3 text-card-foreground">
+                    {w.sessionId ? sessionName(w.sessionId) : w.academicYear}
+                  </td>
+                  <td className="px-4 py-3 text-card-foreground">{w.label ?? '—'}</td>
+                  <td className="px-4 py-3 text-card-foreground">{new Date(w.startsAt).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-card-foreground">{new Date(w.endsAt).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-right font-medium text-foreground">{w.percentage}%</td>
+                  <td className="px-4 py-3 text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600 hover:text-red-800 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                      disabled={deleteWindowMutation.isPending}
+                      onClick={() => { if (confirm('Delete this refund window?')) deleteWindowMutation.mutate(w.id); }}
                     >
                       Delete
                     </Button>

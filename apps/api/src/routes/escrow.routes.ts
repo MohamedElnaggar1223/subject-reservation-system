@@ -41,6 +41,7 @@ import {
 import { success, error } from '../lib/response';
 import {
   requireAuth,
+  requireFinanceAdmin,
   requireParent,
   requireFinance,
   requireStudentOrParent,
@@ -303,6 +304,31 @@ export const escrowRoutes = new Hono<HonoEnv>()
         const message = err instanceof Error ? err.message : 'Failed to reject withdrawal';
         const status = message.includes('not found') ? 404 : 400;
         return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * POST /escrow/admin/withdrawals/:id/approve
+   *
+   * Finance-admin approval closing a fulfilled withdrawal (V3 D-C
+   * maker-checker). Never blocks the officer's cash disbursement.
+   */
+  .post('/admin/withdrawals/:id/approve',
+    requireFinanceAdmin(),
+    zValidator('param', WithdrawalRequestId),
+    async (c) => {
+      const user = c.get('user')!;
+      const { id } = c.req.valid('param');
+
+      try {
+        const result = await escrowService.approveWithdrawalRequest(id, user.id);
+        logAction(user.id, 'WITHDRAWAL_APPROVED', 'escrow', id, null, result as Record<string, unknown>, extractAuditContext(c))
+          .catch(err => console.error('[audit] WITHDRAWAL_APPROVED failed:', err));
+        return success(c, result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to approve withdrawal';
+        return error(c, message, message.includes('not awaiting') ? 409 : 400);
       }
     }
   );

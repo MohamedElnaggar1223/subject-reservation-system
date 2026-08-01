@@ -53,6 +53,7 @@ import {
 } from './escrow.services';
 import { logAction } from './audit.services';
 import { notifyPaymentConfirmed, notifyEscrowBalanceChanged } from './notification.services';
+import { createReceiptsForRegistrations } from './receipt.services';
 
 // ─── School Receiving Account (InstaPay destination) ─────────────────────────
 //
@@ -423,6 +424,10 @@ export async function confirmPayment(
             eq(registration.status, 'pending_payment')
           )
         );
+
+      // V3 §6.5 (D-J): physical receipts are born when the money is paid —
+      // one pending_issue receipt per confirmed registration. Idempotent.
+      await createReceiptsForRegistrations(regIds, tx);
     }
 
     return { updated: paymentUpdate, registrationIds: regIds };

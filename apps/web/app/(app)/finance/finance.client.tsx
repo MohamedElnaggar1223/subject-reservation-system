@@ -33,6 +33,25 @@ type PendingPayment = Awaited<ReturnType<typeof fetchPendingManual>>[number];
 const fetchWithdrawals = () => apiResponse(api.v1.escrow.admin.withdrawals.$get());
 type WithdrawalRequest = Awaited<ReturnType<typeof fetchWithdrawals>>[number];
 
+// Explicit type — this endpoint's RPC inference degrades in the web
+// compile (same pre-existing quirk as checkout-summary)
+type ReceiptRow = {
+  id: string;
+  receiptNumber: string;
+  status: string;
+  refundAmountOnReturn: number | null;
+  registration: {
+    id: string;
+    status: string;
+    priceAtRegistration: number;
+    student: { id: string; name: string; email: string; grade: number | null };
+    subject: { id: string; name: string; code: string };
+    session: { id: string; name: string };
+  };
+};
+const fetchReceipts = async () =>
+  (await apiResponse(api.v1.receipts.queue.$get())) as ReceiptRow[];
+
 const METHOD_BADGE: Record<string, string> = {
   in_school: 'bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400',
   instapay: 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
@@ -45,7 +64,8 @@ function matchesSearch(term: string, ...fields: (string | null | undefined)[]): 
   return fields.some((f) => f?.toLowerCase().includes(q));
 }
 
-export default function FinanceWorkbenchClient() {
+export default function FinanceWorkbenchClient({ userRole }: { userRole: string }) {
+  const isFinanceAdmin = userRole === 'finance_admin' || userRole === 'admin';
   const queryClient = useQueryClient();
   const router = useRouter();
 
@@ -73,6 +93,12 @@ export default function FinanceWorkbenchClient() {
     refetchInterval: 30_000,
   });
 
+  const { data: receiptRows = [] } = useQuery({
+    queryKey: ['finance', 'receipts'],
+    queryFn: fetchReceipts,
+    refetchInterval: 30_000,
+  });
+
   const filteredPayments = useMemo(
     () =>
       payments.filter((p) =>
@@ -88,6 +114,21 @@ export default function FinanceWorkbenchClient() {
         )
       ),
     [payments, search]
+  );
+
+  const filteredReceipts = useMemo(
+    () =>
+      receiptRows.filter((r) =>
+        matchesSearch(
+          search,
+          r.receiptNumber,
+          r.registration.student.name,
+          r.registration.student.email,
+          r.registration.subject.name,
+          r.registration.subject.code,
+        )
+      ),
+    [receiptRows, search]
   );
 
   const filteredWithdrawals = useMemo(
@@ -165,6 +206,34 @@ export default function FinanceWorkbenchClient() {
       setWithdrawalNotes('');
       afterAction('Withdrawal rejected — unreleased amount returned to escrow.', w?.escrow.studentId);
     },
+    onError: (err: Error) => setActionError(err.message),
+  });
+
+  const issueReceiptMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiResponse(api.v1.receipts[':id'].issue.$post({ param: { id } })),
+    onSuccess: () => afterAction('Receipt handed to parent.'),
+    onError: (err: Error) => setActionError(err.message),
+  });
+
+  const returnReceiptMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiResponse(api.v1.receipts[':id'].return.$post({ param: { id }, json: {} })),
+    onSuccess: () => afterAction('Receipt returned — any pending drop refund has been released to escrow.'),
+    onError: (err: Error) => setActionError(err.message),
+  });
+
+  const lostReceiptMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      apiResponse(api.v1.receipts[':id'].lost.$post({ param: { id }, json: { reason } })),
+    onSuccess: () => afterAction('Receipt written off as lost — pending drop completed.'),
+    onError: (err: Error) => setActionError(err.message),
+  });
+
+  const approveWithdrawalMutation = useMutation({
+    mutationFn: (id: string) =>
+      apiResponse(api.v1.escrow.admin.withdrawals[':id'].approve.$post({ param: { id } })),
+    onSuccess: () => afterAction('Withdrawal approved and closed.'),
     onError: (err: Error) => setActionError(err.message),
   });
 
@@ -299,6 +368,75 @@ export default function FinanceWorkbenchClient() {
         </div>
       )}
 
+      {/* ── Receipts queue (V3 §6.5) ───────────────────────────────────── */}
+      <h2 className="text-lg font-semibold text-foreground mb-3">
+        Receipts{' '}
+        <span className="text-sm font-normal text-muted-foreground">({filteredReceipts.length})</span>
+      </h2>
+
+      {filteredReceipts.length === 0 ? (
+        <div className="bg-card rounded-xl border border-border p-8 text-center shadow-sm mb-8">
+          <p className="text-sm text-muted-foreground">
+            {search ? 'No receipts match your search.' : 'No receipts waiting for the desk.'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3 mb-8">
+          {filteredReceipts.map((r) => (
+            <div key={r.id} className="bg-card rounded-xl border border-border shadow-sm px-5 py-3.5 flex items-start justify-between gap-4 flex-wrap">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-semibold text-foreground font-mono">{r.receiptNumber}</p>
+                  {r.status === 'pending_issue' ? (
+                    <span className="px-2 py-0.5 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400 rounded text-xs font-medium">
+                      Hand to parent
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded text-xs font-medium">
+                      Must be returned
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {r.registration.student.name} · {r.registration.subject.name} ({r.registration.subject.code}) · {r.registration.session.name}
+                </p>
+                {r.status === 'return_required' && r.refundAmountOnReturn != null && (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                    Releases {r.refundAmountOnReturn.toFixed(2)} EGP to escrow on return
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                {r.status === 'pending_issue' ? (
+                  <Button size="sm" disabled={issueReceiptMutation.isPending} onClick={() => issueReceiptMutation.mutate(r.id)}>
+                    Mark Handed Over
+                  </Button>
+                ) : (
+                  <>
+                    <Button size="sm" disabled={returnReceiptMutation.isPending} onClick={() => returnReceiptMutation.mutate(r.id)}>
+                      Mark Returned
+                    </Button>
+                    {isFinanceAdmin && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={lostReceiptMutation.isPending}
+                        onClick={() => {
+                          const reason = window.prompt('Reason for writing this receipt off as lost?');
+                          if (reason?.trim()) lostReceiptMutation.mutate({ id: r.id, reason: reason.trim() });
+                        }}
+                      >
+                        Lost
+                      </Button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── Cash refunds queue ─────────────────────────────────────────── */}
       <h2 className="text-lg font-semibold text-foreground mb-3">
         Cash refunds to hand out{' '}
@@ -326,6 +464,11 @@ export default function FinanceWorkbenchClient() {
                         Partially released
                       </span>
                     )}
+                    {w.status === 'fulfilled' && (
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded text-xs font-medium">
+                        Cash released — approval pending
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Parent: {w.parent?.name ?? '—'} · Requested {new Date(w.createdAt).toLocaleDateString()}
@@ -337,28 +480,46 @@ export default function FinanceWorkbenchClient() {
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setFulfillTarget(w);
-                      setAmountInput(remaining.toFixed(2));
-                      setWithdrawalNotes('');
-                      setActionError('');
-                    }}
-                  >
-                    Release Cash
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setRejectTarget(w);
-                      setWithdrawalNotes('');
-                      setActionError('');
-                    }}
-                  >
-                    Reject
-                  </Button>
+                  {w.status !== 'fulfilled' && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setFulfillTarget(w);
+                          setAmountInput(remaining.toFixed(2));
+                          setWithdrawalNotes('');
+                          setActionError('');
+                        }}
+                      >
+                        Release Cash
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setRejectTarget(w);
+                          setWithdrawalNotes('');
+                          setActionError('');
+                        }}
+                      >
+                        Reject
+                      </Button>
+                    </>
+                  )}
+                  {(w.status === 'fulfilled' || w.status === 'partially_fulfilled') && !w.approvedBy && (
+                    isFinanceAdmin ? (
+                      <Button
+                        size="sm"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                        disabled={approveWithdrawalMutation.isPending}
+                        onClick={() => approveWithdrawalMutation.mutate(w.id)}
+                      >
+                        Approve
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground self-center">Awaiting finance-admin approval</span>
+                    )
+                  )}
                 </div>
               </div>
             );
