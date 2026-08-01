@@ -75,8 +75,8 @@ export const CreateRemarkRequest = z.object({
     )
     .min(1, 'Add at least one paper')
     .max(10, 'Too many papers'),
-  // Parent flow passes the child; students default to themselves
-  studentId: z.string().min(1).optional(),
+  // NOTE: no client-supplied studentId — the student is always derived
+  // server-side from the registration row (prevents any spoofing).
 });
 export type CreateRemarkRequestType = z.infer<typeof CreateRemarkRequest>;
 

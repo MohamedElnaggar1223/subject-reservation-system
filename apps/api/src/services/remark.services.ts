@@ -24,7 +24,7 @@
  * - Grades can go DOWN: consent is blocking and audited.
  */
 
-import { db, remarkRequest, remarkRequestItem, remarkFeeSchedule, remarkDeadline, registration, payment, eq, and, inArray, isNull } from '@repo/db';
+import { db, remarkRequest, remarkRequestItem, remarkFeeSchedule, remarkDeadline, registration, payment, eq, and, inArray, isNull, sql } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type {
   CreateRemarkRequestType,
@@ -332,17 +332,6 @@ export async function initiateRemarkPayment(
     throw new Error('You are not linked to this student');
   }
 
-  const existing = await db.query.payment.findFirst({
-    where: (p, { eq, and, inArray, sql: sqlOp }) =>
-      and(
-        eq(p.purpose, 'remark'),
-        inArray(p.status, ['pending', 'pending_verification']),
-        sqlOp`${p.metadata} ->> 'remarkRequestId' = ${id}`
-      ),
-    columns: { id: true },
-  });
-  if (existing) throw new Error('A payment for this remark request is already pending');
-
   const paymentId = randomUUID();
   let metadata: Record<string, unknown>;
   let externalReference: string | null = null;
@@ -363,21 +352,42 @@ export async function initiateRemarkPayment(
     };
   }
 
-  const [created] = await db
-    .insert(payment)
-    .values({
-      id: paymentId,
-      studentId: rr.studentId,
-      parentId,
-      amount: rr.feeCharged,
-      escrowAmountApplied: 0,
-      paymentMethod,
-      purpose: 'remark',
-      status: 'pending',
-      externalReference,
-      metadata,
-    })
-    .returning();
+  // Serialize concurrent pay clicks: lock the remark row, then re-check
+  // for an open payment before inserting — two racing requests can no
+  // longer both mint a pending payment for the same remark.
+  const created = await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT id FROM remark_request WHERE id = ${id} FOR UPDATE`
+    );
+
+    const existing = await tx.query.payment.findFirst({
+      where: (p, { eq, and, inArray, sql: sqlOp }) =>
+        and(
+          eq(p.purpose, 'remark'),
+          inArray(p.status, ['pending', 'pending_verification']),
+          sqlOp`${p.metadata} ->> 'remarkRequestId' = ${id}`
+        ),
+      columns: { id: true },
+    });
+    if (existing) throw new Error('A payment for this remark request is already pending');
+
+    const [row] = await tx
+      .insert(payment)
+      .values({
+        id: paymentId,
+        studentId: rr.studentId,
+        parentId,
+        amount: rr.feeCharged,
+        escrowAmountApplied: 0,
+        paymentMethod,
+        purpose: 'remark',
+        status: 'pending',
+        externalReference,
+        metadata,
+      })
+      .returning();
+    return row;
+  });
 
   return created;
 }
@@ -489,26 +499,34 @@ export async function cancelRemarkRequest(id: string, userId: string, role: stri
   });
   if (!rr) throw new Error('Remark request not found');
 
+  // Students may only cancel their OWN requests while still awaiting
+  // parent approval — once a parent has approved/consented/paid, undoing
+  // it is a parent decision (parent-only financial control). Parents may
+  // cancel any pre-payment/pre-submission state for a linked child.
+  const cancellableStatuses =
+    role === 'student'
+      ? ['pending_approval']
+      : ['pending_approval', 'pending_consent', 'pending_payment'];
+
   const isOwner =
-    (role === 'student' && rr.studentId === userId) ||
+    (role === 'student' && rr.studentId === userId && rr.requestedBy === userId) ||
     (role === 'parent' && (await validateParentStudentLink(userId, rr.studentId)));
   if (!isOwner) throw new Error('You are not authorized to cancel this request');
 
+  // The status allow-list lives in the WHERE clause: the row is only
+  // mutated when it is genuinely cancellable, so a concurrent transition
+  // (payment confirmed, board submission) can never be clobbered.
   const [updated] = await db
     .update(remarkRequest)
     .set({ status: 'cancelled', updatedAt: new Date() })
     .where(
       and(
         eq(remarkRequest.id, id),
-        // Cancellable until money/board involvement
-        eq(remarkRequest.status, rr.status)
+        inArray(remarkRequest.status, cancellableStatuses)
       )
     )
     .returning();
-  if (
-    !updated ||
-    !['pending_approval', 'pending_consent', 'pending_payment'].includes(rr.status)
-  ) {
+  if (!updated) {
     throw new Error('This request can no longer be cancelled');
   }
   return updated;
