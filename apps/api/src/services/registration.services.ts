@@ -48,21 +48,113 @@ import {
   notifyDirectRegistrationCreated,
 } from './notification.services';
 import { isGraduated } from './grade.services';
+import { computeRegistrationPricing } from './pricing.services';
+import { schoolFeeGateReason } from './school-fee.services';
+import type { SubjectRegistrationOptionsType } from '@repo/validations';
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
 
 /**
- * Resolve the price to charge for a subject at the time of registration.
- * Uses customPrice when the subject is not offered at school; falls back
- * to priceInSchool as a safety net if customPrice was not set.
+ * Subject IDs the student has previously sat (confirmed) or dropped in
+ * OTHER sessions — registering one of these again is a retake (V3 §6.9).
  */
-function resolveRegistrationPrice(sub: {
-  isOfferedAtSchool: boolean;
-  priceInSchool: number;
-  customPrice: number | null;
-}): number {
-  if (sub.isOfferedAtSchool) return sub.priceInSchool;
-  return sub.customPrice ?? sub.priceInSchool;
+async function getRetakeSubjectIds(
+  studentId: string,
+  excludeSessionId: string
+): Promise<Set<string>> {
+  const prior = await db.query.registration.findMany({
+    where: (r, { eq, and, ne, inArray }) =>
+      and(
+        eq(r.studentId, studentId),
+        ne(r.sessionId, excludeSessionId),
+        inArray(r.status, ['confirmed', 'dropped'])
+      ),
+    columns: { subjectId: true },
+  });
+  return new Set(prior.map((r) => r.subjectId));
+}
+
+/**
+ * Shared V3 pre-insert pipeline for both request and direct registration:
+ * level match, teacher validation, retake detection, pricing engine, and
+ * the school-fee gate. Returns per-subject computed values keyed by
+ * subject ID.
+ */
+async function prepareRegistrationInputs(
+  studentId: string,
+  sess: { id: string; qualificationLevel: string; startDate: Date },
+  subjects: {
+    id: string;
+    qualificationLevel: string;
+    courseFee: number;
+    registrationFee: number;
+    isOfferedAtSchool: boolean;
+    name: string;
+  }[],
+  subjectOptions: Record<string, SubjectRegistrationOptionsType> | undefined
+) {
+  // Level match: an IGCSE session only takes IGCSE subjects, etc.
+  const wrongLevel = subjects.filter((s) => s.qualificationLevel !== sess.qualificationLevel);
+  if (wrongLevel.length > 0) {
+    throw new Error(
+      `These subjects don't match the session's qualification level: ${wrongLevel.map((s) => s.name).join(', ')}`
+    );
+  }
+
+  // School-fee gate (D-H): unpaid school fee blocks registration
+  const studentRow = await db.query.user.findFirst({
+    where: (u, { eq }) => eq(u.id, studentId),
+    columns: { grade: true },
+  });
+  const gate = await schoolFeeGateReason(studentId, studentRow?.grade ?? null, sess.startDate);
+  if (gate) throw new Error(gate);
+
+  // Teacher validation: chosen teacher must be linked to that subject
+  const requestedTeacherIds = Object.values(subjectOptions ?? {})
+    .map((o) => o.teacherId)
+    .filter((t): t is string => !!t);
+  const teacherLinks = requestedTeacherIds.length
+    ? await db.query.subjectTeacher.findMany({
+        where: (st, { inArray }) => inArray(st.teacherId, requestedTeacherIds),
+        columns: { subjectId: true, teacherId: true },
+      })
+    : [];
+
+  const retakeSet = await getRetakeSubjectIds(studentId, sess.id);
+
+  const result = new Map<
+    string,
+    {
+      pricing: ReturnType<typeof computeRegistrationPricing>;
+      isRetake: boolean;
+      teacherId: string | null;
+    }
+  >();
+
+  for (const sub of subjects) {
+    const opts = subjectOptions?.[sub.id] ?? {};
+    const isRetake = retakeSet.has(sub.id);
+
+    const pricing = computeRegistrationPricing(sub, {
+      isRetake,
+      takeOutsideSchool: opts.takeOutsideSchool ?? false,
+    });
+
+    let teacherId: string | null = null;
+    if (opts.teacherId && !pricing.isOutsideSchool) {
+      const linked = teacherLinks.some(
+        (l) => l.subjectId === sub.id && l.teacherId === opts.teacherId
+      );
+      if (!linked) {
+        throw new Error(`The chosen teacher is not linked to ${sub.name}`);
+      }
+      teacherId = opts.teacherId;
+    }
+
+    result.set(sub.id, { pricing, isRetake, teacherId });
+  }
+
+  return result;
 }
 
 /**
@@ -204,27 +296,92 @@ export async function validateCoreSubjectRequirements(
  * pre-selecting + locking any missing core subjects for Grade 10 June
  * (see register.client.tsx).
  */
+export type AvailableSubjectRow = {
+  id: string;
+  name: string;
+  code: string;
+  council: string;
+  qualificationLevel: string;
+  courseFee: number;
+  registrationFee: number;
+  priceInSchool: number;
+  isOfferedAtSchool: boolean;
+  customPrice: number | null;
+  isActive: boolean;
+  isCore: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  teachers: { id: string; name: string }[];
+  isRetake: boolean;
+  pricing: { courseFee: number; registrationFee: number; total: number; isOutsideSchool: boolean };
+  outsidePricing: { courseFee: number; registrationFee: number; total: number; isOutsideSchool: boolean } | null;
+};
+
+// Explicit return type: the drizzle relational inference chained through
+// Hono RPC + JSONParsed exceeds TS instantiation depth in the web compile
+// and silently degrades the client type — a concrete type short-circuits it.
 export async function getAvailableSubjects(
   studentId: string,
   sessionId: string
-) {
+): Promise<AvailableSubjectRow[]> {
   // GRADE-003: Graduated students have no available subjects
   if (await isGraduated(studentId)) return [];
+
+  const sess = await db.query.registrationSession.findFirst({
+    where: (s, { eq }) => eq(s.id, sessionId),
+    columns: { id: true, qualificationLevel: true },
+  });
+  if (!sess) return [];
 
   const alreadyRegistered = await getExistingRegistrationSubjectIds(
     studentId,
     sessionId
   );
 
-  return db.query.subject.findMany({
+  const subjects = await db.query.subject.findMany({
     where: (s, { eq, and, notInArray }) => {
-      const conditions = [eq(s.isActive, true)];
+      const conditions = [
+        eq(s.isActive, true),
+        eq(s.qualificationLevel, sess.qualificationLevel),
+      ];
       if (alreadyRegistered.length > 0) {
         conditions.push(notInArray(s.id, alreadyRegistered));
       }
       return and(...conditions);
     },
+    with: {
+      subjectTeachers: {
+        with: { teacher: { columns: { id: true, name: true, isActive: true } } },
+      },
+    },
     orderBy: (s, { asc }) => [asc(s.name)],
+  });
+
+  // V3 enrichment: teachers to pick from, retake flag, and both price
+  // variants so the UI can show exactly what each choice costs.
+  const retakeSet = await getRetakeSubjectIds(studentId, sessionId);
+
+  return subjects.map(({ subjectTeachers, ...sub }) => {
+    const isRetake = retakeSet.has(sub.id);
+    const inSchoolPricing = computeRegistrationPricing(sub, {
+      isRetake,
+      takeOutsideSchool: false,
+    });
+    const outsidePricing =
+      !sub.isOfferedAtSchool || isRetake
+        ? computeRegistrationPricing(sub, { isRetake, takeOutsideSchool: true })
+        : null;
+
+    return {
+      ...sub,
+      teachers: subjectTeachers
+        .map((st) => st.teacher)
+        .filter((t) => t.isActive)
+        .map((t) => ({ id: t.id, name: t.name })),
+      isRetake,
+      pricing: inSchoolPricing,
+      outsidePricing,
+    };
   });
 }
 
@@ -292,16 +449,31 @@ export async function createRegistrationRequest(
     );
   }
 
-  const records = subjects.map((sub) => ({
-    id: randomUUID(),
+  const prepared = await prepareRegistrationInputs(
     studentId,
-    sessionId: data.sessionId,
-    subjectId: sub.id,
-    priceAtRegistration: resolveRegistrationPrice(sub),
-    wasCoreAtRegistration: sub.isCore,
-    status: 'pending_approval' as const,
-    requestedBy,
-  }));
+    sess,
+    subjects,
+    data.subjectOptions
+  );
+
+  const records = subjects.map((sub) => {
+    const p = prepared.get(sub.id)!;
+    return {
+      id: randomUUID(),
+      studentId,
+      sessionId: data.sessionId,
+      subjectId: sub.id,
+      priceAtRegistration: p.pricing.total,
+      courseFeeAtRegistration: p.pricing.courseFee,
+      registrationFeeAtRegistration: p.pricing.registrationFee,
+      isRetake: p.isRetake,
+      takenOutsideSchool: p.pricing.isOutsideSchool,
+      teacherId: p.teacherId,
+      wasCoreAtRegistration: sub.isCore,
+      status: 'pending_approval' as const,
+      requestedBy,
+    };
+  });
 
   const inserted = await db.insert(registration).values(records).returning();
 
@@ -319,7 +491,7 @@ export async function createRegistrationRequest(
       sessionName: sess.name,
       subjects: subjects.map((sub) => ({
         name: sub.name,
-        price: resolveRegistrationPrice(sub),
+        price: prepared.get(sub.id)!.pricing.total,
       })),
       totalCost,
     }).catch((err) => console.error('[notification] NOT-003 failed:', err));
@@ -384,19 +556,34 @@ export async function createDirectRegistration(
     );
   }
 
+  const prepared = await prepareRegistrationInputs(
+    data.studentId,
+    sess,
+    subjects,
+    data.subjectOptions
+  );
+
   const now = new Date();
-  const records = subjects.map((sub) => ({
-    id: randomUUID(),
-    studentId: data.studentId,
-    sessionId: data.sessionId,
-    subjectId: sub.id,
-    priceAtRegistration: resolveRegistrationPrice(sub),
-    wasCoreAtRegistration: sub.isCore,
-    status: 'pending_payment' as const,
-    requestedBy: parentId,
-    approvedBy: parentId,
-    approvedAt: now,
-  }));
+  const records = subjects.map((sub) => {
+    const p = prepared.get(sub.id)!;
+    return {
+      id: randomUUID(),
+      studentId: data.studentId,
+      sessionId: data.sessionId,
+      subjectId: sub.id,
+      priceAtRegistration: p.pricing.total,
+      courseFeeAtRegistration: p.pricing.courseFee,
+      registrationFeeAtRegistration: p.pricing.registrationFee,
+      isRetake: p.isRetake,
+      takenOutsideSchool: p.pricing.isOutsideSchool,
+      teacherId: p.teacherId,
+      wasCoreAtRegistration: sub.isCore,
+      status: 'pending_payment' as const,
+      requestedBy: parentId,
+      approvedBy: parentId,
+      approvedAt: now,
+    };
+  });
 
   const created = await db.insert(registration).values(records).returning();
 
@@ -409,7 +596,7 @@ export async function createDirectRegistration(
     sessionName: sess.name,
     subjects: subjects.map((sub) => ({
       name: sub.name,
-      price: resolveRegistrationPrice(sub),
+      price: prepared.get(sub.id)!.pricing.total,
     })),
     totalCost: records.reduce((sum, r) => sum + r.priceAtRegistration, 0),
   }).catch((err) => console.error('[notification] REG-003 direct student notify failed:', err));
@@ -777,20 +964,37 @@ export async function adminOverrideApproval(
     );
   }
 
+  // V3: same pricing/level/teacher pipeline as normal registrations.
+  // (The school-fee gate applies to admin overrides too — an admin can
+  // grant a fee_waiver exception when that's the intent.)
+  const prepared = await prepareRegistrationInputs(
+    data.studentId,
+    sess,
+    subjects,
+    undefined
+  );
+
   const now = new Date();
-  const records = subjects.map((sub) => ({
-    id: randomUUID(),
-    studentId: data.studentId,
-    sessionId: data.sessionId,
-    subjectId: sub.id,
-    priceAtRegistration: resolveRegistrationPrice(sub),
-    wasCoreAtRegistration: sub.isCore,
-    status: 'pending_payment' as const,
-    requestedBy: adminId,
-    approvedBy: adminId,
-    approvedAt: now,
-    approvalComments: `[ADMIN OVERRIDE] ${data.reason}`,
-  }));
+  const records = subjects.map((sub) => {
+    const p = prepared.get(sub.id)!;
+    return {
+      id: randomUUID(),
+      studentId: data.studentId,
+      sessionId: data.sessionId,
+      subjectId: sub.id,
+      priceAtRegistration: p.pricing.total,
+      courseFeeAtRegistration: p.pricing.courseFee,
+      registrationFeeAtRegistration: p.pricing.registrationFee,
+      isRetake: p.isRetake,
+      takenOutsideSchool: p.pricing.isOutsideSchool,
+      wasCoreAtRegistration: sub.isCore,
+      status: 'pending_payment' as const,
+      requestedBy: adminId,
+      approvedBy: adminId,
+      approvedAt: now,
+      approvalComments: `[ADMIN OVERRIDE] ${data.reason}`,
+    };
+  });
 
   return db.insert(registration).values(records).returning();
 }

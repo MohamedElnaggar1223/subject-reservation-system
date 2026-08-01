@@ -19,6 +19,7 @@ import {
   CreateSubject,
   UpdateSubject,
   SetSubjectCore,
+  SetSubjectTeachers,
   SubjectId,
   ListSubjectsQuery,
 } from '@repo/validations';
@@ -53,6 +54,7 @@ export const subjects = new Hono<HonoEnv>()
 
       const list = await subjectService.getSubjects({
         council: query.council,
+        qualificationLevel: query.qualificationLevel,
         search: query.search,
         isActive: isActiveFilter,
         isCore: query.isCore,
@@ -270,6 +272,52 @@ export const subjects = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] SUBJECT_ACTIVATED failed:', err));
 
       return success(c, updated);
+    }
+  )
+
+  /**
+   * GET SUBJECT TEACHERS (V3 §6.7)
+   * GET /subjects/:id/teachers
+   */
+  .get('/:id/teachers',
+    zValidator('param', SubjectId),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      if (!(await subjectService.subjectExists(id))) {
+        return error(c, 'Subject not found', 404);
+      }
+      return success(c, await subjectService.getSubjectTeachers(id));
+    }
+  )
+
+  /**
+   * SET SUBJECT TEACHERS (V3 §6.7)
+   * PUT /subjects/:id/teachers
+   *
+   * Admin only. Replaces the linked-teacher set.
+   */
+  .put('/:id/teachers',
+    requireAdmin(),
+    zValidator('param', SubjectId),
+    zValidator('json', SetSubjectTeachers),
+    async (c) => {
+      const user = c.get('user')!;
+      const { id } = c.req.valid('param');
+      const { teacherIds } = c.req.valid('json');
+
+      if (!(await subjectService.subjectExists(id))) {
+        return error(c, 'Subject not found', 404);
+      }
+
+      try {
+        const teachersList = await subjectService.setSubjectTeachers(id, teacherIds);
+        logAction(user.id, 'SUBJECT_UPDATED', 'subject', id, null, { teacherIds }, extractAuditContext(c))
+          .catch((err) => console.error('[audit] SUBJECT_UPDATED (teachers) failed:', err));
+        return success(c, teachersList);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to set teachers';
+        return error(c, message, 400);
+      }
     }
   );
 

@@ -13,9 +13,17 @@ type Session = {
   id: string;
   name: string;
   sessionType: string;
+  qualificationLevel: string;
   startDate: string;
   endDate: string;
   status: string;
+};
+
+type SubjectPricing = {
+  courseFee: number;
+  registrationFee: number;
+  total: number;
+  isOutsideSchool: boolean;
 };
 
 type Subject = {
@@ -23,11 +31,31 @@ type Subject = {
   name: string;
   code: string;
   council: string;
-  priceInSchool: number;
+  qualificationLevel: string;
+  courseFee: number;
+  registrationFee: number;
   isOfferedAtSchool: boolean;
-  customPrice: number | null;
   isCore: boolean;
   isActive: boolean;
+  teachers: { id: string; name: string }[];
+  isRetake: boolean;
+  pricing: SubjectPricing;
+  outsidePricing: SubjectPricing | null;
+};
+
+type SubjectChoice = {
+  teacherId?: string;
+  takeOutsideSchool?: boolean;
+};
+
+type SchoolFeeStatus = {
+  academicYear: string;
+  student: { id: string; name: string; grade: number | null };
+  amount: number | null;
+  dueAt: string | null;
+  required: boolean;
+  paid: boolean;
+  pendingPayment: { id: string; externalReference: string | null } | null;
 };
 
 const fetchChildren = () => apiResponse(api.v1.links.children.$get());
@@ -39,8 +67,16 @@ const COUNCIL_COLORS: Record<string, string> = {
   oxford: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700',
 };
 
-function getSubjectPrice(subject: Subject): number {
-  return subject.isOfferedAtSchool ? subject.priceInSchool : (subject.customPrice ?? subject.priceInSchool);
+const LEVEL_LABELS: Record<string, string> = {
+  igcse: 'IGCSE',
+  as_level: 'AS Level',
+  a_level: 'A Level',
+};
+
+/** Effective pricing given the student's outside-school choice */
+function getEffectivePricing(subject: Subject, choice: SubjectChoice | undefined): SubjectPricing {
+  if (choice?.takeOutsideSchool && subject.outsidePricing) return subject.outsidePricing;
+  return subject.pricing;
 }
 
 // ─── Countdown Hook ──────────────────────────────────────────────────────────
@@ -106,6 +142,7 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
   const [selectedChild, setSelectedChild] = useState<Child | null>(null);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [selectedSubjectIds, setSelectedSubjectIds] = useState<Set<string>>(new Set());
+  const [subjectChoices, setSubjectChoices] = useState<Record<string, SubjectChoice>>({});
   const [successMessage, setSuccessMessage] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [councilFilter, setCouncilFilter] = useState('all');
@@ -131,6 +168,20 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
     queryFn: fetchChildren,
     enabled: isParent,
   });
+
+  // School-fee gate status (D-H): banner + block when the annual fee is unpaid
+  const { data: feeStatus } = useQuery<SchoolFeeStatus>({
+    queryKey: ['school-fees', 'status', effectiveStudentId],
+    queryFn: async () =>
+      (await apiResponse(
+        api.v1['school-fees'].status.$get({
+          query: { studentId: isParent ? effectiveStudentId! : undefined },
+        })
+      )) as SchoolFeeStatus,
+    enabled: !!effectiveStudentId,
+    retry: false,
+  });
+  const schoolFeeBlocked = !!feeStatus && feeStatus.required && !feeStatus.paid;
 
   // Load available subjects when both session and student are selected
   const { data: availableSubjects = [], isFetching: loadingSubjects, error: subjectsError } = useQuery<Subject[]>({
@@ -161,8 +212,8 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
   );
 
   const totalCost = useMemo(
-    () => selectedSubjects.reduce((sum, s) => sum + getSubjectPrice(s), 0),
-    [selectedSubjects]
+    () => selectedSubjects.reduce((sum, s) => sum + getEffectivePricing(s, subjectChoices[s.id]).total, 0),
+    [selectedSubjects, subjectChoices]
   );
 
   const coreSubjects = useMemo(
@@ -183,6 +234,18 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
 
   // ─── Mutations ─────────────────────────────────────────────────────────────
 
+  // Only include options for selected subjects, and only meaningful keys
+  const buildSubjectOptions = () => {
+    const options: Record<string, SubjectChoice> = {};
+    for (const id of selectedSubjectIds) {
+      const choice = subjectChoices[id];
+      if (choice && (choice.teacherId || choice.takeOutsideSchool)) {
+        options[id] = choice;
+      }
+    }
+    return Object.keys(options).length > 0 ? options : undefined;
+  };
+
   const requestMutation = useMutation({
     mutationFn: () =>
       apiResponse(
@@ -190,6 +253,7 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
           json: {
             sessionId: selectedSession!.id,
             subjectIds: Array.from(selectedSubjectIds),
+            subjectOptions: buildSubjectOptions(),
           },
         })
       ),
@@ -198,6 +262,7 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
         'Registration request submitted! Awaiting parent approval.'
       );
       setSelectedSubjectIds(new Set());
+      setSubjectChoices({});
       queryClient.invalidateQueries({ queryKey: ['registrations'] });
     },
     onError: (err: Error) => setSubmitError(err.message),
@@ -211,6 +276,7 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
             sessionId: selectedSession!.id,
             subjectIds: Array.from(selectedSubjectIds),
             studentId: selectedChild!.student.id,
+            subjectOptions: buildSubjectOptions(),
           },
         })
       ),
@@ -219,6 +285,7 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
         'Subjects registered successfully! Proceed to payment to confirm.'
       );
       setSelectedSubjectIds(new Set());
+      setSubjectChoices({});
       queryClient.invalidateQueries({ queryKey: ['registrations'] });
     },
     onError: (err: Error) => setSubmitError(err.message),
@@ -312,6 +379,29 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
         </div>
       )}
 
+      {/* School-fee gate banner (D-H) */}
+      {schoolFeeBlocked && (
+        <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-4">
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+            The {feeStatus?.academicYear} school fee
+            {feeStatus?.amount != null && <> ({formatPrice(feeStatus.amount)})</>} must be paid before
+            registering subjects{isParent && selectedChild ? ` for ${selectedChild.student.name}` : ''}.
+          </p>
+          {isParent ? (
+            <a
+              href={`/school-fee${effectiveStudentId ? `?studentId=${effectiveStudentId}` : ''}`}
+              className="inline-block mt-2 text-sm font-semibold text-amber-800 dark:text-amber-300 underline"
+            >
+              Pay the school fee now →
+            </a>
+          ) : (
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+              Ask your parent to pay it from their account.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Step 1: Select Child (Parent only) */}
       {isParent && (
         <div className="bg-card rounded-xl border border-border shadow-sm p-5">
@@ -374,7 +464,12 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
                       : 'border-border hover:border-primary/40'
                   }`}
                 >
-                  <div className="font-medium text-foreground text-sm">{sess.name}</div>
+                  <div className="font-medium text-foreground text-sm flex items-center gap-2">
+                    {sess.name}
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                      {LEVEL_LABELS[sess.qualificationLevel] ?? sess.qualificationLevel}
+                    </span>
+                  </div>
                   <div className="text-xs text-muted-foreground mt-1">
                     Closes {end.toLocaleDateString()}
                   </div>
@@ -430,67 +525,141 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
                   Core subjects (Grade 10 June) are pre-selected and mandatory.
                 </div>
               )}
-              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
                 {filteredSubjects.map((subject) => {
-                  const price = getSubjectPrice(subject);
+                  const choice = subjectChoices[subject.id];
+                  const pricing = getEffectivePricing(subject, choice);
                   const isSelected = selectedSubjectIds.has(subject.id);
                   const isCore = subject.isCore;
                   const isCoreLocked = isCore && isCoreEnforced;
+                  const canChooseOutside = subject.isRetake && subject.isOfferedAtSchool;
+                  const showTeacherPicker =
+                    isSelected && !pricing.isOutsideSchool && subject.teachers.length > 0;
 
                   return (
-                    <button
+                    <div
                       key={subject.id}
-                      onClick={() => toggleSubject(subject.id, isCore)}
-                      disabled={isCoreLocked}
-                      className={`w-full text-left rounded-lg border px-4 py-3 transition-colors flex items-center gap-3 ${
+                      className={`rounded-lg border transition-colors ${
                         isSelected || isCoreLocked
                           ? 'border-primary bg-primary/5'
                           : 'border-border hover:border-primary/40'
-                      } ${isCoreLocked ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                      }`}
                     >
-                      {/* Checkbox */}
                       <div
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${
-                          isSelected || isCoreLocked
-                            ? 'border-primary bg-primary'
-                            : 'border-muted-foreground/30'
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => toggleSubject(subject.id, isCore)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleSubject(subject.id, isCore); }}
+                        className={`w-full text-left px-4 py-3 flex items-center gap-3 ${
+                          isCoreLocked ? 'cursor-not-allowed' : 'cursor-pointer'
                         }`}
                       >
-                        {(isSelected || isCoreLocked) && (
-                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-
-                      {/* Subject info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-foreground text-sm">
-                            {subject.name}
-                          </span>
-                          <span className={`text-xs px-2 py-0.5 rounded border ${COUNCIL_COLORS[subject.council] ?? ''}`}>
-                            {COUNCIL_LABELS[subject.council as keyof typeof COUNCIL_LABELS] ?? subject.council}
-                          </span>
-                          {isCore && (
-                            <span className="text-xs px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-700">
-                              Core
-                            </span>
-                          )}
-                          {!subject.isOfferedAtSchool && (
-                            <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
-                              External
-                            </span>
+                        {/* Checkbox */}
+                        <div
+                          className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${
+                            isSelected || isCoreLocked
+                              ? 'border-primary bg-primary'
+                              : 'border-muted-foreground/30'
+                          }`}
+                        >
+                          {(isSelected || isCoreLocked) && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
                           )}
                         </div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{subject.code}</div>
+
+                        {/* Subject info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-foreground text-sm">
+                              {subject.name}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded border ${COUNCIL_COLORS[subject.council] ?? ''}`}>
+                              {COUNCIL_LABELS[subject.council as keyof typeof COUNCIL_LABELS] ?? subject.council}
+                            </span>
+                            {isCore && (
+                              <span className="text-xs px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-700">
+                                Core
+                              </span>
+                            )}
+                            {subject.isRetake && (
+                              <span className="text-xs px-2 py-0.5 rounded bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-700">
+                                Retake
+                              </span>
+                            )}
+                            {!subject.isOfferedAtSchool && (
+                              <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                                Outside school · 50%
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {subject.code} · Course {formatPrice(pricing.courseFee)} + Registration {formatPrice(pricing.registrationFee)}
+                          </div>
+                        </div>
+
+                        {/* Price */}
+                        <div className="text-sm font-semibold text-foreground shrink-0">
+                          {formatPrice(pricing.total)}
+                        </div>
                       </div>
 
-                      {/* Price */}
-                      <div className="text-sm font-semibold text-foreground shrink-0">
-                        {formatPrice(price)}
-                      </div>
-                    </button>
+                      {/* Per-subject choices — teacher + outside-school (V3) */}
+                      {isSelected && (canChooseOutside || showTeacherPicker) && (
+                        <div className="px-4 pb-3 pt-0 ml-8 space-y-2">
+                          {canChooseOutside && (
+                            <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={choice?.takeOutsideSchool ?? false}
+                                onChange={(e) =>
+                                  setSubjectChoices((prev) => ({
+                                    ...prev,
+                                    [subject.id]: {
+                                      ...prev[subject.id],
+                                      takeOutsideSchool: e.target.checked,
+                                      // teacher is irrelevant outside school
+                                      teacherId: e.target.checked ? undefined : prev[subject.id]?.teacherId,
+                                    },
+                                  }))
+                                }
+                                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                              />
+                              Take outside school (retake) — 50% fee
+                              {subject.outsidePricing && (
+                                <span className="text-muted-foreground">
+                                  ({formatPrice(subject.outsidePricing.total)})
+                                </span>
+                              )}
+                            </label>
+                          )}
+                          {showTeacherPicker && (
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-muted-foreground">Preferred teacher (optional):</span>
+                              <select
+                                value={choice?.teacherId ?? ''}
+                                onChange={(e) =>
+                                  setSubjectChoices((prev) => ({
+                                    ...prev,
+                                    [subject.id]: {
+                                      ...prev[subject.id],
+                                      teacherId: e.target.value || undefined,
+                                    },
+                                  }))
+                                }
+                                className="rounded-lg border border-border bg-card text-foreground px-2 py-1 text-xs"
+                              >
+                                <option value="">No preference</option>
+                                {subject.teachers.map((t) => (
+                                  <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -507,14 +676,26 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
           </h2>
 
           <div className="space-y-2 mb-4">
-            {selectedSubjects.map((s) => (
-              <div key={s.id} className="flex justify-between text-sm">
-                <span className="text-foreground">{s.name}</span>
-                <span className="text-foreground font-medium">
-                  {formatPrice(getSubjectPrice(s))}
-                </span>
-              </div>
-            ))}
+            {selectedSubjects.map((s) => {
+              const pricing = getEffectivePricing(s, subjectChoices[s.id]);
+              const teacherName = s.teachers.find((t) => t.id === subjectChoices[s.id]?.teacherId)?.name;
+              return (
+                <div key={s.id} className="flex justify-between text-sm gap-3">
+                  <span className="text-foreground min-w-0">
+                    {s.name}
+                    {pricing.isOutsideSchool && (
+                      <span className="text-xs text-muted-foreground ml-1">(outside school, 50%)</span>
+                    )}
+                    {teacherName && (
+                      <span className="text-xs text-muted-foreground ml-1">· {teacherName}</span>
+                    )}
+                  </span>
+                  <span className="text-foreground font-medium shrink-0">
+                    {formatPrice(pricing.total)}
+                  </span>
+                </div>
+              );
+            })}
             <div className="border-t border-border pt-2 flex justify-between font-semibold">
               <span className="text-foreground">Total</span>
               <span className="text-foreground">{formatPrice(totalCost)}</span>
@@ -535,9 +716,10 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
 
           <Button
             onClick={handleSubmit}
-            disabled={isMutating}
+            disabled={isMutating || schoolFeeBlocked}
             className="w-full"
             size="lg"
+            title={schoolFeeBlocked ? 'Pay the school fee first' : undefined}
           >
             {isMutating
               ? 'Submitting...'

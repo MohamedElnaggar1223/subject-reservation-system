@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSuspenseQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import { apiResponse } from '@repo/validations';
-import { COUNCIL_LABELS, type CreateSubjectType, type UpdateSubjectType } from '@repo/validations';
+import { COUNCIL_LABELS, QUALIFICATION_LEVEL_LABELS, type CreateSubjectType, type UpdateSubjectType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 type Subject = {
@@ -12,14 +12,22 @@ type Subject = {
   name: string;
   code: string;
   council: string;
+  qualificationLevel: string;
+  courseFee: number;
+  registrationFee: number;
   priceInSchool: number;
   isOfferedAtSchool: boolean;
-  customPrice: number | null;
   isActive: boolean;
   isCore: boolean;
   createdAt: string;
   updatedAt: string;
 };
+
+const LEVEL_OPTIONS = [
+  { value: 'igcse', label: 'IGCSE' },
+  { value: 'as_level', label: 'AS Level' },
+  { value: 'a_level', label: 'A Level' },
+];
 
 const COUNCIL_OPTIONS = [
   { value: 'pearson_edexcel', label: 'Pearson Edexcel' },
@@ -31,9 +39,10 @@ const emptyForm = {
   name: '',
   code: '',
   council: 'cambridge' as const,
-  priceInSchool: '',
+  qualificationLevel: 'igcse' as const,
+  courseFee: '',
+  registrationFee: '',
   isOfferedAtSchool: true,
-  customPrice: '',
   isCore: false,
 };
 
@@ -50,6 +59,13 @@ export default function SubjectsAdminClient(): React.JSX.Element {
 
   // Form state
   const [form, setForm] = useState(emptyForm);
+
+  // Teacher-linking modal state (V3 §6.7)
+  type TeacherRow = { id: string; name: string; isActive: boolean };
+  const [teacherTarget, setTeacherTarget] = useState<Subject | null>(null);
+  const [linkedTeacherIds, setLinkedTeacherIds] = useState<Set<string>>(new Set());
+  const [newTeacherName, setNewTeacherName] = useState('');
+  const [teacherError, setTeacherError] = useState('');
 
   const { data: subjects } = useSuspenseQuery({
     queryKey: ['subjects', 'admin'],
@@ -94,6 +110,57 @@ export default function SubjectsAdminClient(): React.JSX.Element {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['subjects'] }),
   });
 
+  // ── Teachers (V3 §6.7) ──────────────────────────────────────────────────────
+
+  const { data: allTeachers = [] } = useQuery<TeacherRow[]>({
+    queryKey: ['teachers', 'admin'],
+    queryFn: async () => (await apiResponse(api.v1.teachers.$get({ query: {} }))) as TeacherRow[],
+    enabled: !!teacherTarget,
+  });
+
+  const { isFetching: loadingLinked } = useQuery({
+    queryKey: ['subjects', 'teachers', teacherTarget?.id],
+    queryFn: async () => {
+      // Explicit cast: this endpoint's RPC inference degrades to never in
+      // the web compile (pre-existing quirk shared by e.g. checkout-summary)
+      const linked = (await apiResponse(
+        api.v1.subjects[':id'].teachers.$get({ param: { id: teacherTarget!.id } })
+      )) as TeacherRow[];
+      setLinkedTeacherIds(new Set(linked.map((t) => t.id)));
+      return linked;
+    },
+    enabled: !!teacherTarget,
+  });
+
+  const saveTeachersMutation = useMutation({
+    mutationFn: () =>
+      apiResponse(
+        api.v1.subjects[':id'].teachers.$put({
+          param: { id: teacherTarget!.id },
+          json: { teacherIds: Array.from(linkedTeacherIds) },
+        })
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      setTeacherTarget(null);
+      setTeacherError('');
+    },
+    onError: (err: Error) => setTeacherError(err.message),
+  });
+
+  const createTeacherMutation = useMutation({
+    mutationFn: (name: string) =>
+      apiResponse(api.v1.teachers.$post({ json: { name } })),
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      setLinkedTeacherIds((prev) => new Set(prev).add((created as unknown as { id: string }).id));
+      setNewTeacherName('');
+      setTeacherError('');
+    },
+    onError: (err: Error) => setTeacherError(err.message),
+  });
+
   function openCreateForm() {
     setEditingSubject(null);
     setForm(emptyForm);
@@ -107,9 +174,10 @@ export default function SubjectsAdminClient(): React.JSX.Element {
       name: s.name,
       code: s.code,
       council: s.council as typeof emptyForm['council'],
-      priceInSchool: String(s.priceInSchool),
+      qualificationLevel: s.qualificationLevel as typeof emptyForm['qualificationLevel'],
+      courseFee: String(s.courseFee),
+      registrationFee: String(s.registrationFee),
       isOfferedAtSchool: s.isOfferedAtSchool,
-      customPrice: s.customPrice !== null ? String(s.customPrice) : '',
       isCore: s.isCore,
     });
     setFormError('');
@@ -127,19 +195,14 @@ export default function SubjectsAdminClient(): React.JSX.Element {
     e.preventDefault();
     setFormError('');
 
-    const priceInSchool = parseFloat(form.priceInSchool);
-    if (isNaN(priceInSchool) || priceInSchool <= 0) {
-      setFormError('Please enter a valid price in school.');
+    const courseFee = parseFloat(form.courseFee);
+    const registrationFee = parseFloat(form.registrationFee);
+    if (isNaN(courseFee) || courseFee < 0) {
+      setFormError('Please enter a valid course fee (0 or more).');
       return;
     }
-
-    const customPrice =
-      !form.isOfferedAtSchool && form.customPrice
-        ? parseFloat(form.customPrice)
-        : null;
-
-    if (!form.isOfferedAtSchool && (customPrice === null || isNaN(customPrice!) || customPrice! <= 0)) {
-      setFormError('Custom price is required when subject is not offered at school.');
+    if (isNaN(registrationFee) || registrationFee < 0) {
+      setFormError('Please enter a valid registration fee (0 or more).');
       return;
     }
 
@@ -147,9 +210,10 @@ export default function SubjectsAdminClient(): React.JSX.Element {
       name: form.name.trim(),
       code: form.code.trim().toUpperCase(),
       council: form.council,
-      priceInSchool,
+      qualificationLevel: form.qualificationLevel,
+      courseFee,
+      registrationFee,
       isOfferedAtSchool: form.isOfferedAtSchool,
-      customPrice: customPrice ?? undefined,
       isCore: form.isCore,
     };
 
@@ -271,7 +335,22 @@ export default function SubjectsAdminClient(): React.JSX.Element {
 
                 <div>
                   <label className="mb-1 block text-sm font-medium text-foreground">
-                    Price (In-School) <span className="text-destructive">*</span>
+                    Qualification Level <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    value={form.qualificationLevel}
+                    onChange={(e) => setForm({ ...form, qualificationLevel: e.target.value as typeof form.qualificationLevel })}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    {LEVEL_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-foreground">
+                    Course Fee <span className="text-destructive">*</span>
                   </label>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">EGP</span>
@@ -279,12 +358,32 @@ export default function SubjectsAdminClient(): React.JSX.Element {
                       type="number"
                       min="0"
                       step="0.01"
-                      value={form.priceInSchool}
-                      onChange={(e) => setForm({ ...form, priceInSchool: e.target.value })}
+                      value={form.courseFee}
+                      onChange={(e) => setForm({ ...form, courseFee: e.target.value })}
                       required
                       className="w-full rounded-lg border border-border bg-background py-2 pl-12 pr-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
+                  <p className="mt-1 text-xs text-muted-foreground">Teaching fee.</p>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-foreground">
+                    Registration Fee <span className="text-destructive">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">EGP</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.registrationFee}
+                      onChange={(e) => setForm({ ...form, registrationFee: e.target.value })}
+                      required
+                      className="w-full rounded-lg border border-border bg-background py-2 pl-12 pr-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">Exam board entry fee.</p>
                 </div>
 
                 <div className="flex items-center gap-3 pt-5">
@@ -307,7 +406,7 @@ export default function SubjectsAdminClient(): React.JSX.Element {
                     id="isOfferedAtSchool"
                     type="checkbox"
                     checked={form.isOfferedAtSchool}
-                    onChange={(e) => setForm({ ...form, isOfferedAtSchool: e.target.checked, customPrice: '' })}
+                    onChange={(e) => setForm({ ...form, isOfferedAtSchool: e.target.checked })}
                     className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                   />
                   <label htmlFor="isOfferedAtSchool" className="text-sm font-medium text-foreground">
@@ -316,26 +415,10 @@ export default function SubjectsAdminClient(): React.JSX.Element {
                 </div>
 
                 {!form.isOfferedAtSchool && (
-                  <div className="mt-3">
-                    <label className="mb-1 block text-sm font-medium text-foreground">
-                      Custom Price (External) <span className="text-destructive">*</span>
-                    </label>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground">EGP</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={form.customPrice}
-                        onChange={(e) => setForm({ ...form, customPrice: e.target.value })}
-                        required={!form.isOfferedAtSchool}
-                        className="w-full rounded-lg border border-border bg-background py-2 pl-12 pr-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Applies when the school does not teach this subject.
-                    </p>
-                  </div>
+                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                    Not offered at school — students automatically pay 50% of the
+                    combined course + registration fee.
+                  </p>
                 )}
               </div>
 
@@ -403,7 +486,8 @@ export default function SubjectsAdminClient(): React.JSX.Element {
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Subject</th>
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Council</th>
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Price</th>
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Level</th>
+                <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Fees</th>
                 <th className="px-4 py-3 text-center font-semibold text-muted-foreground">Core</th>
                 <th className="px-4 py-3 text-center font-semibold text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Actions</th>
@@ -422,12 +506,16 @@ export default function SubjectsAdminClient(): React.JSX.Element {
                   <td className="px-4 py-3 text-card-foreground">
                     {COUNCIL_LABELS[s.council as keyof typeof COUNCIL_LABELS] ?? s.council}
                   </td>
+                  <td className="px-4 py-3 text-card-foreground">
+                    {QUALIFICATION_LEVEL_LABELS[s.qualificationLevel as keyof typeof QUALIFICATION_LEVEL_LABELS] ?? s.qualificationLevel}
+                  </td>
                   <td className="px-4 py-3 text-right text-foreground">
-                    <div>EGP {s.priceInSchool.toLocaleString()}</div>
-                    {!s.isOfferedAtSchool && s.customPrice !== null && (
-                      <div className="text-xs text-amber-600 dark:text-amber-400">
-                        External: EGP {s.customPrice.toLocaleString()}
-                      </div>
+                    <div>EGP {(s.courseFee + s.registrationFee).toLocaleString()}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {s.courseFee.toLocaleString()} + {s.registrationFee.toLocaleString()} reg
+                    </div>
+                    {!s.isOfferedAtSchool && (
+                      <div className="text-xs text-amber-600 dark:text-amber-400">Outside school · 50%</div>
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">
@@ -473,6 +561,14 @@ export default function SubjectsAdminClient(): React.JSX.Element {
                       >
                         Edit
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => { setTeacherTarget(s); setTeacherError(''); }}
+                        className="text-primary"
+                      >
+                        Teachers
+                      </Button>
                       {s.isActive ? (
                         <Button
                           variant="ghost"
@@ -504,6 +600,84 @@ export default function SubjectsAdminClient(): React.JSX.Element {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Teachers modal (V3 §6.7) */}
+      {teacherTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-card rounded-xl shadow-xl border border-border max-w-md w-full p-6">
+            <h2 className="text-lg font-bold text-foreground font-display mb-1">
+              Teachers — {teacherTarget.name}
+            </h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Students pick from these teachers (optionally) when registering this subject.
+            </p>
+
+            {loadingLinked ? (
+              <div className="flex justify-center py-6">
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent" />
+              </div>
+            ) : (
+              <div className="max-h-64 overflow-y-auto space-y-1 mb-4">
+                {allTeachers.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-2">No teachers yet — add one below.</p>
+                )}
+                {allTeachers.map((t) => (
+                  <label key={t.id} className="flex items-center gap-2 text-sm text-foreground py-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={linkedTeacherIds.has(t.id)}
+                      onChange={(e) =>
+                        setLinkedTeacherIds((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.add(t.id);
+                          else next.delete(t.id);
+                          return next;
+                        })
+                      }
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                    />
+                    {t.name}
+                    {!t.isActive && <span className="text-xs text-muted-foreground">(inactive)</span>}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={newTeacherName}
+                onChange={(e) => setNewTeacherName(e.target.value)}
+                placeholder="New teacher name"
+                className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={createTeacherMutation.isPending || newTeacherName.trim().length === 0}
+                onClick={() => createTeacherMutation.mutate(newTeacherName.trim())}
+              >
+                {createTeacherMutation.isPending ? 'Adding…' : 'Add'}
+              </Button>
+            </div>
+
+            {teacherError && <p className="mb-4 text-sm text-destructive">{teacherError}</p>}
+
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={() => setTeacherTarget(null)}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={saveTeachersMutation.isPending}
+                onClick={() => saveTeachersMutation.mutate()}
+              >
+                {saveTeachersMutation.isPending ? 'Saving…' : 'Save Teachers'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

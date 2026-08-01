@@ -47,12 +47,28 @@ export type RegistrationIdType = z.infer<typeof RegistrationId>;
  * All registrations are created in 'pending_approval' status and
  * require parent approval before proceeding to payment.
  */
+/**
+ * Per-subject registration options (V3):
+ * - teacherId: preferred teacher, optional (§6.7 / D-F)
+ * - takeOutsideSchool: retaking students may opt to sit the subject
+ *   outside school at 50% of the combined fee (§6.9). Validated
+ *   server-side — only allowed for retakes or subjects not offered
+ *   at school.
+ */
+export const SubjectRegistrationOptions = z.object({
+  teacherId: z.string().min(1).optional(),
+  takeOutsideSchool: z.boolean().optional(),
+});
+export type SubjectRegistrationOptionsType = z.infer<typeof SubjectRegistrationOptions>;
+
 export const RequestRegistration = z.object({
   sessionId: z.string().min(1, 'Invalid session ID'),
   subjectIds: z
     .array(z.string().min(1, 'Invalid subject ID'))
     .min(1, 'Select at least one subject')
     .max(20, 'Cannot register more than 20 subjects at once'),
+  // Keyed by subjectId; absent key = defaults (in school, no teacher)
+  subjectOptions: z.record(z.string(), SubjectRegistrationOptions).optional(),
 });
 export type RequestRegistrationType = z.infer<typeof RequestRegistration>;
 
@@ -70,6 +86,7 @@ export const DirectRegistration = z.object({
     .min(1, 'Select at least one subject')
     .max(20, 'Cannot register more than 20 subjects at once'),
   studentId: z.string().min(1, 'Invalid student ID'),
+  subjectOptions: z.record(z.string(), SubjectRegistrationOptions).optional(),
 });
 export type DirectRegistrationType = z.infer<typeof DirectRegistration>;
 

@@ -105,11 +105,16 @@ export async function getActiveSession(sessionType: string) {
  */
 export async function hasActiveSessionOfType(
   sessionType: string,
+  qualificationLevel: string,
   excludeId?: string
 ): Promise<boolean> {
   const found = await db.query.registrationSession.findFirst({
     where: (s, { eq, and, ne }) => {
-      const base = and(eq(s.status, 'active'), eq(s.sessionType, sessionType));
+      const base = and(
+        eq(s.status, 'active'),
+        eq(s.sessionType, sessionType),
+        eq(s.qualificationLevel, qualificationLevel),
+      );
       return excludeId ? and(base, ne(s.id, excludeId)) : base;
     },
     columns: { id: true },
@@ -132,11 +137,13 @@ export async function hasActiveSessionOfType(
 export async function createSession(data: CreateSessionType) {
   const initialStatus = resolveInitialStatus(data.startDate);
 
+  const qualificationLevel = data.qualificationLevel ?? 'igcse';
+
   if (initialStatus === 'active') {
-    const conflict = await hasActiveSessionOfType(data.sessionType);
+    const conflict = await hasActiveSessionOfType(data.sessionType, qualificationLevel);
     if (conflict) {
       throw new Error(
-        `An active ${data.sessionType} session already exists. Close it before opening a new one.`
+        `An active ${qualificationLevel} ${data.sessionType} session already exists. Close it before opening a new one.`
       );
     }
   }
@@ -149,6 +156,7 @@ export async function createSession(data: CreateSessionType) {
       id,
       name: data.name,
       sessionType: data.sessionType,
+      qualificationLevel,
       startDate: data.startDate,
       endDate: data.endDate,
       status: initialStatus,
@@ -189,6 +197,18 @@ export async function updateDraftSession(
   id: string,
   data: UpdateDraftSessionType
 ) {
+  // V3 §5.5: validate the MERGED state never yields a January IGCSE
+  // session (no January IGCSE series exists in Egypt).
+  if (data.sessionType !== undefined || data.qualificationLevel !== undefined) {
+    const current = await getSessionById(id);
+    if (!current) return undefined;
+    const mergedType = data.sessionType ?? current.sessionType;
+    const mergedLevel = data.qualificationLevel ?? current.qualificationLevel;
+    if (mergedType === 'january' && mergedLevel === 'igcse') {
+      throw new Error('January series are A-Level only — no January IGCSE exists in Egypt');
+    }
+  }
+
   const [updated] = await db
     .update(registrationSession)
     .set({ ...data, updatedAt: new Date() })
@@ -274,10 +294,10 @@ export async function activateSession(id: string) {
   const session = await getSessionById(id);
   if (!session || session.status !== 'draft') return undefined;
 
-  const conflict = await hasActiveSessionOfType(session.sessionType, id);
+  const conflict = await hasActiveSessionOfType(session.sessionType, session.qualificationLevel, id);
   if (conflict) {
     throw new Error(
-      `An active ${session.sessionType} session already exists. Close it before activating this one.`
+      `An active ${session.qualificationLevel} ${session.sessionType} session already exists. Close it before activating this one.`
     );
   }
 
@@ -542,7 +562,7 @@ export async function autoManageSessions(): Promise<{
     where: (s, { eq, lte, and }) =>
       and(eq(s.status, 'draft'), lte(s.startDate, now)),
     // name + endDate included so the scheduler can use them for NOT-001 notifications
-    columns: { id: true, sessionType: true, name: true, endDate: true },
+    columns: { id: true, sessionType: true, qualificationLevel: true, name: true, endDate: true },
     orderBy: (s, { asc }) => [asc(s.startDate)],
   });
 
@@ -550,7 +570,7 @@ export async function autoManageSessions(): Promise<{
   const activatedSessions: { id: string; name: string; sessionType: string; endDate: Date }[] = [];
 
   for (const draft of draftsDue) {
-    const conflict = await hasActiveSessionOfType(draft.sessionType);
+    const conflict = await hasActiveSessionOfType(draft.sessionType, draft.qualificationLevel);
     if (!conflict) {
       await db
         .update(registrationSession)

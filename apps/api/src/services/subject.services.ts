@@ -9,7 +9,7 @@
  * All database imports come from @repo/db — never from drizzle-orm directly.
  */
 
-import { db, subject, eq, and, or, ilike } from '@repo/db';
+import { db, subject, subjectTeacher, eq, and, or, ilike } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { CreateSubjectType, UpdateSubjectType } from '@repo/validations';
 
@@ -56,9 +56,12 @@ export async function createSubject(data: CreateSubjectType) {
       name: data.name,
       code: data.code,
       council: data.council,
-      priceInSchool: data.priceInSchool,
+      qualificationLevel: data.qualificationLevel ?? 'igcse',
+      courseFee: data.courseFee,
+      registrationFee: data.registrationFee,
+      // Legacy column kept in sync so pre-V3 readers stay coherent
+      priceInSchool: data.courseFee + data.registrationFee,
       isOfferedAtSchool: data.isOfferedAtSchool ?? true,
-      customPrice: data.customPrice ?? null,
       isCore: data.isCore ?? false,
       isActive: true,
     })
@@ -75,6 +78,7 @@ export async function createSubject(data: CreateSubjectType) {
  */
 export async function getSubjects(filters?: {
   council?: string;
+  qualificationLevel?: string;
   search?: string;
   isActive?: boolean;
   isCore?: boolean;
@@ -85,6 +89,10 @@ export async function getSubjects(filters?: {
 
       if (filters?.council) {
         conditions.push(eq(s.council, filters.council));
+      }
+
+      if (filters?.qualificationLevel) {
+        conditions.push(eq(s.qualificationLevel, filters.qualificationLevel));
       }
 
       if (filters?.isActive !== undefined) {
@@ -126,35 +134,84 @@ export async function getSubjectById(id: string) {
  * Returns the updated subject or undefined if not found.
  */
 export async function updateSubject(id: string, data: UpdateSubjectType) {
-  // Read current state to validate merged result
   const current = await db.query.subject.findFirst({
     where: (s, { eq }) => eq(s.id, id),
   });
 
   if (!current) return undefined;
 
-  // Merge current state with partial update
-  const merged = {
-    isOfferedAtSchool: data.isOfferedAtSchool ?? current.isOfferedAtSchool,
-    customPrice: data.customPrice !== undefined ? data.customPrice : current.customPrice,
-  };
-
-  // Post-merge validation: if the merged subject is not offered at school,
-  // it must have a non-null customPrice
-  if (!merged.isOfferedAtSchool && (merged.customPrice === null || merged.customPrice === undefined)) {
-    throw new Error('Custom price is required when subject is not offered at school');
-  }
+  // Keep the legacy single-price column in sync with the fee split
+  const mergedCourseFee = data.courseFee ?? current.courseFee;
+  const mergedRegistrationFee = data.registrationFee ?? current.registrationFee;
 
   const [updated] = await db
     .update(subject)
     .set({
       ...data,
+      priceInSchool: mergedCourseFee + mergedRegistrationFee,
       updatedAt: new Date(),
     })
     .where(eq(subject.id, id))
     .returning();
 
   return updated;
+}
+
+/**
+ * Replace the set of teachers linked to a subject (V3 §6.7).
+ * Delete-then-insert inside a transaction; an empty list unlinks all.
+ */
+export async function setSubjectTeachers(subjectId: string, teacherIds: string[]) {
+  if (teacherIds.length > 0) {
+    const teachers = await db.query.teacher.findMany({
+      where: (t, { inArray }) => inArray(t.id, teacherIds),
+      columns: { id: true },
+    });
+    if (teachers.length !== new Set(teacherIds).size) {
+      throw new Error('One or more teacher IDs are invalid');
+    }
+  }
+
+  await db.transaction(async (tx) => {
+    await tx.delete(subjectTeacher).where(eq(subjectTeacher.subjectId, subjectId));
+    if (teacherIds.length > 0) {
+      await tx.insert(subjectTeacher).values(
+        [...new Set(teacherIds)].map((teacherId) => ({
+          id: randomUUID(),
+          subjectId,
+          teacherId,
+        }))
+      );
+    }
+  });
+
+  return getSubjectTeachers(subjectId);
+}
+
+/**
+ * List the active teachers linked to a subject.
+ *
+ * Explicit return type: the drizzle relational inference chained through
+ * Hono RPC + JSONParsed exceeds TS instantiation depth in the web
+ * compile and silently degrades the client type — a concrete type here
+ * short-circuits that.
+ */
+export type SubjectTeacherRow = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export async function getSubjectTeachers(subjectId: string): Promise<SubjectTeacherRow[]> {
+  const links = await db.query.subjectTeacher.findMany({
+    where: (st, { eq }) => eq(st.subjectId, subjectId),
+    with: { teacher: true },
+  });
+  return links.map((l) => l.teacher);
 }
 
 /**

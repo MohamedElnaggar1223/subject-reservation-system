@@ -34,6 +34,8 @@ export const AUDIT_ENTITY_TYPES = [
   'escrow',
   'change_request',
   'notification',
+  'teacher',
+  'school_fee_schedule',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -48,6 +50,8 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   escrow:         'Escrow',
   change_request: 'Change Request',
   notification:   'Notification',
+  teacher:        'Teacher',
+  school_fee_schedule: 'School Fee Schedule',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -79,6 +83,13 @@ export const AUDIT_ACTIONS = [
   'PAYMENT_CONFIRMED',
   'PAYMENT_FAILED',
   'PAYMENT_REFERENCE_SUBMITTED',
+  'TEACHER_CREATED',
+  'TEACHER_UPDATED',
+  'TEACHER_DEACTIVATED',
+  'SCHOOL_FEE_SCHEDULE_CREATED',
+  'SCHOOL_FEE_SCHEDULE_UPDATED',
+  'SCHOOL_FEE_SCHEDULE_DELETED',
+  'SCHOOL_FEE_PAYMENT_INITIATED',
   // Change requests
   'CHANGE_REQUEST_CREATED',
   'CHANGE_REQUEST_APPROVED',
@@ -124,6 +135,13 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   PAYMENT_CONFIRMED:          'Payment Confirmed',
   PAYMENT_FAILED:             'Payment Failed',
   PAYMENT_REFERENCE_SUBMITTED:'InstaPay Reference Submitted',
+  TEACHER_CREATED:            'Teacher Created',
+  TEACHER_UPDATED:            'Teacher Updated',
+  TEACHER_DEACTIVATED:        'Teacher Deactivated',
+  SCHOOL_FEE_SCHEDULE_CREATED:'School Fee Schedule Created',
+  SCHOOL_FEE_SCHEDULE_UPDATED:'School Fee Schedule Updated',
+  SCHOOL_FEE_SCHEDULE_DELETED:'School Fee Schedule Deleted',
+  SCHOOL_FEE_PAYMENT_INITIATED:'School Fee Payment Initiated',
   CHANGE_REQUEST_CREATED:     'Drop/Swap Request Created',
   CHANGE_REQUEST_APPROVED:    'Drop/Swap Request Approved',
   CHANGE_REQUEST_REJECTED:    'Drop/Swap Request Rejected',

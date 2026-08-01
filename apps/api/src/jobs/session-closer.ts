@@ -13,7 +13,8 @@
  * when moving to a multi-instance deployment.
  */
 
-import { db, payment, registrationSession, eq, and, lte, gte, isNull, inArray } from '@repo/db';
+import { db, payment, registrationSession, gradeProgressionRun, eq, and, lte, gte, isNull, inArray } from '@repo/db';
+import { randomUUID } from 'crypto';
 import { autoManageSessions, finalizePendingRecords } from '../services/session.services';
 import { failPayment } from '../services/payment.services';
 import { notifySessionOpened, notifySessionClosingSoon, notifySessionClosed, processScheduledAnnouncements, getStudentAndParentBroadcastIds } from '../services/notification.services';
@@ -26,19 +27,60 @@ import { logger } from '../lib/logger';
  * sessionType). On success, stamps gradeProgressionCompletedAt on those
  * rows so subsequent ticks skip them. On failure, the column stays null
  * and the next tick retries — M-10 durability.
+ *
+ * V3 (§5.5): progression must fire once per (sessionType, seriesYear),
+ * not once per session row — with qualification levels, an IGCSE
+ * November and an A-Level November session can close in the same year,
+ * and running progressGrades twice would double-advance students. The
+ * grade_progression_run unique index is the claim: the first closer to
+ * insert the row runs progression; later closers stamp their sessions
+ * and skip. A failed run deletes its claim so the next tick retries.
  */
 async function runGradeProgressionForSessions(
   sessionType: 'june' | 'november' | 'january',
   sessionIds: string[],
 ): Promise<number> {
-  const progressions = await progressGrades(sessionType);
-  if (sessionIds.length > 0) {
-    await db
-      .update(registrationSession)
-      .set({ gradeProgressionCompletedAt: new Date() })
-      .where(inArray(registrationSession.id, sessionIds));
+  if (sessionIds.length === 0) return 0;
+
+  const rows = await db.query.registrationSession.findMany({
+    where: (s, { inArray: inArr }) => inArr(s.id, sessionIds),
+    columns: { id: true, endDate: true },
+  });
+  const seriesYears = [...new Set(rows.map((r) => String(r.endDate.getFullYear())))];
+
+  let progressed = 0;
+  for (const seriesYear of seriesYears) {
+    const claimed = await db
+      .insert(gradeProgressionRun)
+      .values({ id: randomUUID(), sessionType, seriesYear })
+      .onConflictDoNothing()
+      .returning({ id: gradeProgressionRun.id });
+
+    if (claimed.length === 0) continue; // another session of this series already ran it
+
+    try {
+      const progressions = await progressGrades(sessionType);
+      progressed += progressions.length;
+    } catch (err) {
+      // Release the claim so the next tick retries progression
+      await db
+        .delete(gradeProgressionRun)
+        .where(
+          and(
+            eq(gradeProgressionRun.sessionType, sessionType),
+            eq(gradeProgressionRun.seriesYear, seriesYear),
+          )
+        );
+      throw err;
+    }
   }
-  return progressions.length;
+
+  await db
+    .update(registrationSession)
+    .set({ gradeProgressionCompletedAt: new Date() })
+    .where(inArray(registrationSession.id, sessionIds));
+
+  return progressed;
 }
 
 const INTERVAL_MS = 60_000; // 1 minute

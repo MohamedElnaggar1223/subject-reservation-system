@@ -148,6 +148,13 @@
       "when": 1785546902627,
       "tag": "0020_payment_v3_pipeline",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1785549932718,
+      "tag": "0021_v3_phase2_fees_levels_teachers",
+      "breakpoints": true
     }
   ]
 }

@@ -32,6 +32,8 @@ import { notificationRoutes } from './routes/notification.routes';
 import { audit } from './routes/audit.routes';
 import { grade } from './routes/grade.routes';
 import { reports } from './routes/report.routes';
+import { teachers } from './routes/teacher.routes';
+import { schoolFees } from './routes/school-fee.routes';
 import { startSessionScheduler } from './jobs/session-closer';
 
 /**
@@ -306,7 +308,9 @@ const v1 = new Hono<HonoEnv>()
   .route('/notifications', notificationRoutes)
   .route('/audit', audit)
   .route('/grade', grade)
-  .route('/reports', reports);
+  .route('/reports', reports)
+  .route('/teachers', teachers)
+  .route('/school-fees', schoolFees);
 
 // Mount v1 under /v1 (keep chaining for proper RPC typing)
 const appWithRoutes = app

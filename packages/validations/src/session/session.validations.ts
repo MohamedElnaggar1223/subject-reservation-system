@@ -8,10 +8,15 @@
  */
 
 import { z } from 'zod';
+import { QualificationLevelSchema } from '../subject/subject.validations';
 
 /**
  * IGCSE exam session types.
  * Each represents a distinct exam sitting period in the school year.
+ *
+ * V3 (§5.5): sessions also carry a qualificationLevel. January series
+ * are A-Level-only in Egypt — no January IGCSE exists (Edexcel
+ * discontinued it in 2023; Cambridge/OxfordAQA never ran one).
  */
 export const SESSION_TYPES = {
   JUNE: 'june',
@@ -72,13 +77,21 @@ export const CreateSession = z
       .min(1, 'Session name is required')
       .max(100, 'Session name too long'),
     sessionType: SessionTypeSchema,
+    qualificationLevel: QualificationLevelSchema.default('igcse'),
     startDate: z.coerce.date(),
     endDate: z.coerce.date(),
   })
   .refine((data) => data.endDate > data.startDate, {
     message: 'End date must be after start date',
     path: ['endDate'],
-  });
+  })
+  .refine(
+    (data) => !(data.sessionType === 'january' && data.qualificationLevel === 'igcse'),
+    {
+      message: 'January series are A-Level only — no January IGCSE exists in Egypt',
+      path: ['qualificationLevel'],
+    }
+  );
 
 export type CreateSessionType = z.infer<typeof CreateSession>;
 
@@ -98,6 +111,7 @@ export const UpdateDraftSession = z
       .max(100, 'Session name too long')
       .optional(),
     sessionType: SessionTypeSchema.optional(),
+    qualificationLevel: QualificationLevelSchema.optional(),
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
     reason: z.string().max(500, 'Reason too long').optional(),

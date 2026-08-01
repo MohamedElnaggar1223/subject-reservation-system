@@ -19,6 +19,7 @@ type Session = {
   id: string;
   name: string;
   sessionType: string;
+  qualificationLevel: string;
   startDate: string;
   endDate: string;
   status: string;
@@ -35,6 +36,18 @@ const SESSION_TYPE_OPTIONS = [
   { value: 'january', label: 'January' },
 ];
 
+const LEVEL_OPTIONS = [
+  { value: 'igcse', label: 'IGCSE' },
+  { value: 'as_level', label: 'AS Level' },
+  { value: 'a_level', label: 'A Level' },
+];
+
+const LEVEL_LABELS: Record<string, string> = {
+  igcse: 'IGCSE',
+  as_level: 'AS Level',
+  a_level: 'A Level',
+};
+
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground',
   active: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
@@ -43,7 +56,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 const emptyCreateForm = {
   name: '',
-  sessionType: 'june' as const,
+  sessionType: 'june' as 'june' | 'november' | 'january',
+  qualificationLevel: 'igcse' as 'igcse' | 'as_level' | 'a_level',
   startDate: '',
   endDate: '',
 };
@@ -136,9 +150,15 @@ export default function SessionsAdminClient(): React.JSX.Element {
       return;
     }
 
+    if (createForm.sessionType === 'january' && createForm.qualificationLevel === 'igcse') {
+      setCreateError('January series are A-Level only — no January IGCSE exists in Egypt.');
+      return;
+    }
+
     createMutation.mutate({
       name: createForm.name.trim(),
       sessionType: createForm.sessionType,
+      qualificationLevel: createForm.qualificationLevel,
       startDate: start,
       endDate: end,
     });
@@ -293,7 +313,25 @@ export default function SessionsAdminClient(): React.JSX.Element {
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Only one active session of each type is allowed at a time.
+                  Only one active session per type and level is allowed at a time.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-foreground">
+                  Qualification Level <span className="text-destructive">*</span>
+                </label>
+                <select
+                  value={createForm.qualificationLevel}
+                  onChange={(e) => setCreateForm({ ...createForm, qualificationLevel: e.target.value as typeof createForm.qualificationLevel })}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {LEVEL_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  January series are A-Level only (no January IGCSE exists in Egypt).
                 </p>
               </div>
 
@@ -559,6 +597,9 @@ export default function SessionsAdminClient(): React.JSX.Element {
                       </span>
                       <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                         {SESSION_TYPE_LABELS[s.sessionType as keyof typeof SESSION_TYPE_LABELS] ?? s.sessionType}
+                        <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground align-middle">
+                          {LEVEL_LABELS[s.qualificationLevel] ?? s.qualificationLevel}
+                        </span>
                       </span>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">

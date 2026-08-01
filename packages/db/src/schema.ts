@@ -358,8 +358,18 @@ export const subject = pgTable(
     name: text("name").notNull(),
     code: text("code").notNull().unique(),
     council: text("council").notNull(), // 'pearson_edexcel' | 'cambridge' | 'oxford'
+    // V3 fee split (§6.2): teaching fee + board entry fee. The old single
+    // priceInSchool is retained read-only for pre-V3 rows; new pricing
+    // always derives from courseFee + registrationFee.
+    courseFee: numeric("course_fee", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
+    registrationFee: numeric("registration_fee", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
+    // 'igcse' | 'as_level' | 'a_level' — IGCSE Biology and AS Biology are
+    // separate rows with their own codes and fees (V3_PLAN §5.5).
+    qualificationLevel: text("qualification_level").notNull().default("igcse"),
+    // Legacy single price — superseded by the fee split above.
     priceInSchool: numeric("price_in_school", { precision: 12, scale: 2, mode: "number" }).notNull(),
     isOfferedAtSchool: boolean("is_offered_at_school").notNull().default(true),
+    // Deprecated (V3 §6.9): replaced by the automatic 50% outside-school rule.
     customPrice: numeric("custom_price", { precision: 12, scale: 2, mode: "number" }),
     isActive: boolean("is_active").notNull().default(true),
     isCore: boolean("is_core").notNull().default(false),
@@ -374,6 +384,9 @@ export const subject = pgTable(
     index("subject_council_idx").on(table.council),
     index("subject_isActive_idx").on(table.isActive),
     index("subject_isCore_idx").on(table.isCore),
+    index("subject_qualificationLevel_idx").on(table.qualificationLevel),
+    check("subject_course_fee_nonneg", sql`${table.courseFee} >= 0`),
+    check("subject_registration_fee_nonneg", sql`${table.registrationFee} >= 0`),
     // L-8: Defense-in-depth — block negative prices at the DB layer.
     // Zod already enforces .positive() on input, but raw SQL or a future
     // code path bypassing Zod would still be caught here.
@@ -418,6 +431,9 @@ export const registrationSession = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     sessionType: text("session_type").notNull(), // 'june' | 'november' | 'january'
+    // 'igcse' | 'as_level' | 'a_level'. January series are A-Level-only in
+    // Egypt (no January IGCSE exists — V3_PLAN §2.1); enforced in the service.
+    qualificationLevel: text("qualification_level").notNull().default("igcse"),
     startDate: timestamp("start_date", { withTimezone: true }).notNull(),
     endDate: timestamp("end_date", { withTimezone: true }).notNull(),
     status: text("status").notNull().default("draft"), // 'draft' | 'active' | 'closed'
@@ -444,9 +460,10 @@ export const registrationSession = pgTable(
   (table) => [
     index("reg_session_status_idx").on(table.status),
     index("reg_session_type_idx").on(table.sessionType),
-    // Enforces: only one active window per sessionType at a time
+    // Enforces: only one active window per (sessionType, qualificationLevel).
+    // An IGCSE June window and an A-Level June window may be open together.
     uniqueIndex("one_active_per_session_type_idx")
-      .on(table.sessionType)
+      .on(table.sessionType, table.qualificationLevel)
       .where(sql`status = 'active'`),
   ]
 );
@@ -466,6 +483,119 @@ export const parentStudentLinkRelations = relations(parentStudentLink, ({ one })
     relationName: "studentLinks",
   }),
 }));
+
+/**
+ * ============================================
+ * TEACHER TABLE (V3 §6.7)
+ * ============================================
+ *
+ * Teachers are data-only profiles — no login, no portal. They exist so
+ * subjects can be linked to teachers and students can pick a preferred
+ * teacher (optionally) when registering.
+ */
+export const teacher = pgTable(
+  "teacher",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    phone: text("phone"),
+    email: text("email"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("teacher_isActive_idx").on(table.isActive)]
+);
+
+/**
+ * Subject ↔ Teacher many-to-many link.
+ */
+export const subjectTeacher = pgTable(
+  "subject_teacher",
+  {
+    id: text("id").primaryKey(),
+    subjectId: text("subject_id")
+      .notNull()
+      .references(() => subject.id, { onDelete: "cascade" }),
+    teacherId: text("teacher_id")
+      .notNull()
+      .references(() => teacher.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("subjectTeacher_subjectId_idx").on(table.subjectId),
+    index("subjectTeacher_teacherId_idx").on(table.teacherId),
+    uniqueIndex("subjectTeacher_unique_idx").on(table.subjectId, table.teacherId),
+  ]
+);
+
+/**
+ * ============================================
+ * SCHOOL FEE SCHEDULE TABLE (V3 §6.2, D-A/D-H)
+ * ============================================
+ *
+ * Annual school-year access fee. grade=null means the amount applies
+ * uniformly to all grades; per-grade rows override for their grade.
+ * Paying the school fee gates subject registration for sessions inside
+ * that academic year (waivable via a fee_waiver exception). If no
+ * schedule exists for a year, the gate is simply off.
+ */
+export const schoolFeeSchedule = pgTable(
+  "school_fee_schedule",
+  {
+    id: text("id").primaryKey(),
+    // e.g. '2026-2027'
+    academicYear: text("academic_year").notNull(),
+    // null = uniform for all grades; 10/11/12 = per-grade amount
+    grade: integer("grade"),
+    amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
+    opensAt: timestamp("opens_at", { withTimezone: true }).notNull(),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("schoolFee_academicYear_idx").on(table.academicYear),
+    uniqueIndex("schoolFee_year_grade_idx")
+      .on(table.academicYear, table.grade)
+      .where(sql`grade IS NOT NULL`),
+    uniqueIndex("schoolFee_year_uniform_idx")
+      .on(table.academicYear)
+      .where(sql`grade IS NULL`),
+    check("schoolFee_amount_nonneg", sql`${table.amount} >= 0`),
+  ]
+);
+
+/**
+ * ============================================
+ * GRADE PROGRESSION RUN TABLE (V3 §5.5)
+ * ============================================
+ *
+ * Series-level guard for GRADE-001. With qualification levels, two
+ * sessions of the same series (e.g. IGCSE November + A-Level November)
+ * can close in the same year; progression must fire exactly once per
+ * (sessionType, academicYearLabel). The unique index makes the second
+ * trigger a no-op; a failed run leaves no row so the scheduler retries.
+ */
+export const gradeProgressionRun = pgTable(
+  "grade_progression_run",
+  {
+    id: text("id").primaryKey(),
+    sessionType: text("session_type").notNull(),
+    // Calendar year the series belongs to, e.g. '2026'
+    seriesYear: text("series_year").notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("gradeProgressionRun_unique_idx").on(table.sessionType, table.seriesYear),
+  ]
+);
 
 /**
  * ============================================
@@ -504,8 +634,22 @@ export const registration = pgTable(
     subjectId: text("subject_id")
       .notNull()
       .references(() => subject.id, { onDelete: "restrict" }),
-    // Price snapshot — frozen at time of registration
+    // Price snapshot — frozen at time of registration. Remains the
+    // authoritative TOTAL (courseFee + registrationFee after any 50%
+    // rule) — payments, escrow credits, and reports read this.
     priceAtRegistration: numeric("price_at_registration", { precision: 12, scale: 2, mode: "number" }).notNull(),
+    // V3 fee-split breakdown of priceAtRegistration (§6.2). Backfilled
+    // as courseFee=total, registrationFee=0 for pre-V3 rows.
+    courseFeeAtRegistration: numeric("course_fee_at_registration", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
+    registrationFeeAtRegistration: numeric("registration_fee_at_registration", { precision: 12, scale: 2, mode: "number" }).notNull().default(0),
+    // V3 retake/outside-school pricing inputs (§6.9): a retake is a prior
+    // registration for the same subject in an earlier session (or staff-set);
+    // takenOutsideSchool triggers the 50% combined-fee rule and is only
+    // valid for retakes or subjects not offered at school.
+    isRetake: boolean("is_retake").notNull().default(false),
+    takenOutsideSchool: boolean("taken_outside_school").notNull().default(false),
+    // Student's preferred teacher (optional — V3 §6.7). Data-only profile.
+    teacherId: text("teacher_id").references(() => teacher.id, { onDelete: "set null" }),
     // Core-subject snapshot — frozen at time of registration (URD CORE-002).
     // Enables the drop/swap core-lock rule to remain stable for existing
     // registrations even if an admin later clears subject.isCore for future
@@ -567,6 +711,7 @@ export const registrationSessionRelations = relations(registrationSession, ({ ma
  */
 export const subjectRelations = relations(subject, ({ many }) => ({
   registrations: many(registration),
+  subjectTeachers: many(subjectTeacher),
 }));
 
 /**
@@ -608,6 +753,8 @@ export const payment = pgTable(
     // What the money is for — one pipeline for all money-in (V3_PLAN §5.2).
     // 'registration' | 'school_fee' | 'preregistration' | 'remark'
     purpose: text("purpose").notNull().default("registration"),
+    // For school_fee payments: which academic year was paid (e.g. '2026-2027')
+    academicYear: text("academic_year"),
     // Lifecycle status. 'pending_verification' = InstaPay reference submitted,
     // awaiting finance verification against the bank statement.
     status: text("status").notNull().default("pending"), // 'pending' | 'pending_verification' | 'completed' | 'failed' | 'refunded'
@@ -1022,6 +1169,29 @@ export const registrationWithPaymentRelations = relations(registration, ({ one, 
   }),
   paymentRegistrations: many(paymentRegistration),
   changeRequests: many(changeRequest),
+  teacher: one(teacher, {
+    fields: [registration.teacherId],
+    references: [teacher.id],
+  }),
+}));
+
+/**
+ * TEACHER RELATIONS
+ */
+export const teacherRelations = relations(teacher, ({ many }) => ({
+  subjectTeachers: many(subjectTeacher),
+  registrations: many(registration),
+}));
+
+export const subjectTeacherRelations = relations(subjectTeacher, ({ one }) => ({
+  subject: one(subject, {
+    fields: [subjectTeacher.subjectId],
+    references: [subject.id],
+  }),
+  teacher: one(teacher, {
+    fields: [subjectTeacher.teacherId],
+    references: [teacher.id],
+  }),
 }));
 
 /**
