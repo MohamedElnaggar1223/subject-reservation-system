@@ -46,9 +46,14 @@ export const financeOfficerRole = ac.newRole({
     finance: ["create", "read", "update"],
     student: ["read"],
     parent: ["read"],
-    // Desk onboarding (G5): staff create parent/student accounts for
-    // walk-in families through better-auth's admin createUser.
-    user: ["create", "list"],
+    // SECURITY: finance roles must NEVER hold better-auth's `user`
+    // resource. Those permissions are checked by better-auth's own
+    // /api/auth/admin/* endpoints, which apply a client-supplied `role`
+    // verbatim on create-user and allow set-user-password against ANY
+    // target — so granting them here would let desk staff mint admin
+    // accounts and take over existing ones. Desk onboarding instead
+    // creates accounts through the public sign-up API with the role
+    // hard-coded server-side (see desk.services.ts findOrCreatePerson).
 })
 
 /**
@@ -60,7 +65,7 @@ export const financeAdminRole = ac.newRole({
     finance: ["create", "read", "update", "delete", "approve"],
     student: ["read"],
     parent: ["read"],
-    user: ["create", "list", "set-password"],
+    // See the security note on financeOfficerRole — no `user` resource.
 })
 
 /**

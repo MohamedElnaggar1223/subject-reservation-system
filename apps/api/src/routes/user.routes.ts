@@ -23,10 +23,12 @@ import {
   UserId,
   UserQueryFilters,
   StudentRegistrationData,
+  ROLES,
 } from '@repo/validations';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import { auth } from '../lib/auth';
 import { getStudentSummary } from '../services/desk.services';
+import { getHomeSummary } from '../services/home.services';
 import { requireAuth, requireAdmin, requireFinance } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import { logAction, extractAuditContext } from '../services/audit.services';
@@ -308,7 +310,7 @@ export const users = new Hono<HonoEnv>()
 
         return success(c, result.user, 201);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to create user';
+        const message = clientMessage(err, 'Failed to create user');
         const status = /exists|taken|duplicate/i.test(message) ? 409 : 400;
         return error(c, message, status);
       }
@@ -334,6 +336,26 @@ export const users = new Hono<HonoEnv>()
    * Returns a specific user's profile.
    */
   /**
+   * HOME SUMMARY (UX_AUDIT — app-first destination)
+   * GET /users/me/home-summary
+   *
+   * "What do we owe, and what needs us next?" in one call, for the
+   * parent/student dashboard. Parents get every linked child; students
+   * get themselves.
+   */
+  .get('/me/home-summary', async (c) => {
+    const user = c.get('user')!;
+    if (user.role !== ROLES.PARENT && user.role !== ROLES.STUDENT) {
+      return error(c, 'Only parents and students have a home summary', 403);
+    }
+    try {
+      return success(c, await getHomeSummary(user.id, user.role as 'parent' | 'student'));
+    } catch (err) {
+      return error(c, clientMessage(err, 'Failed to load your summary'), 400);
+    }
+  })
+
+  /**
    * STUDENT 360 (UX_AUDIT G2)
    * GET /users/:id/summary
    *
@@ -350,7 +372,7 @@ export const users = new Hono<HonoEnv>()
       try {
         return success(c, await getStudentSummary(id));
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load summary';
+        const message = clientMessage(err, 'Failed to load summary');
         return error(c, message, message.includes('not found') ? 404 : 400);
       }
     }

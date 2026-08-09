@@ -23,7 +23,7 @@ import {
   ROLES,
 } from '@repo/validations';
 import { db } from '@repo/db';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import {
   requireAuth,
   requireParent,
@@ -119,7 +119,7 @@ export const schoolFees = new Hono<HonoEnv>()
     try {
       return success(c, await schoolFeeService.getSchoolFeeStatus(targetStudentId));
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load status';
+      const message = clientMessage(err, 'Failed to load status');
       return error(c, message, message.includes('not found') ? 404 : 400);
     }
   })
@@ -140,7 +140,7 @@ export const schoolFees = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] DESK_SCHOOL_FEE_COLLECTED failed:', err));
       return success(c, result, 201);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to collect school fee';
+      const message = clientMessage(err, 'Failed to collect school fee');
       const status = message.includes('already paid') ? 409 : 400;
       return error(c, message, status);
     }

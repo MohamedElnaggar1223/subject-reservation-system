@@ -22,6 +22,23 @@ export function error(c: Context, message: string, statusCode: ContentfulStatusC
 }
 
 /**
+ * Message safe to return to a client.
+ *
+ * Domain errors thrown by our services are plain `new Error('human
+ * message')` and are meant to be read by users. Driver errors (pg /
+ * Drizzle) carry a SQLSTATE `code` and their messages leak table,
+ * column, and constraint names — those are replaced with a generic
+ * fallback and left for the server log.
+ */
+export function clientMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error) {
+    if (typeof (err as { code?: unknown }).code === 'string') return fallback;
+    return err.message;
+  }
+  return fallback;
+}
+
+/**
  * Lightweight try-catch wrapper for common async operations
  * OPTIONAL - only use if it makes your code simpler
  * You can always use try-catch manually if you need custom logic

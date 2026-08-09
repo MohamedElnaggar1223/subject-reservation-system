@@ -6,6 +6,7 @@ import { api } from '~/lib/hono';
 import { apiResponse } from '@repo/validations';
 import { COUNCIL_LABELS, QUALIFICATION_LEVEL_LABELS, type CreateSubjectType, type UpdateSubjectType } from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { toCsv, downloadCsv } from '~/lib/csv';
 
 type Subject = {
   id: string;
@@ -213,18 +214,20 @@ export default function SubjectsAdminClient(): React.JSX.Element {
   }
 
   function exportCsv() {
-    const rows = [
-      'name,code,council,level,courseFee,registrationFee,core',
-      ...(subjects as Subject[]).map((x) =>
-        [x.name, x.code, x.council, x.qualificationLevel, x.courseFee, x.registrationFee, x.isCore ? 'yes' : 'no'].join(',')
-      ),
-    ];
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'subjects.csv';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    // Escaped + formula-guarded (subject names/codes are user-authored)
+    const csv = toCsv(
+      ['name', 'code', 'council', 'level', 'courseFee', 'registrationFee', 'core'],
+      (subjects as Subject[]).map((x) => [
+        x.name,
+        x.code,
+        x.council,
+        x.qualificationLevel,
+        x.courseFee,
+        x.registrationFee,
+        x.isCore ? 'yes' : 'no',
+      ])
+    );
+    downloadCsv('subjects.csv', csv);
   }
 
   function openCreateForm() {

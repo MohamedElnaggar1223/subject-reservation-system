@@ -26,7 +26,7 @@ import {
   LinkId, 
   ROLES 
 } from '@repo/validations';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import { logAction, extractAuditContext } from '../services/audit.services';
 import { onboardFamily } from '../services/desk.services';
 import { DeskOnboardFamily } from '@repo/validations';
@@ -206,14 +206,14 @@ export const links = new Hono<HonoEnv>()
       const user = c.get('user')!;
       const data = c.req.valid('json');
       try {
-        const result = await onboardFamily(c.req.raw.headers, data);
+        const result = await onboardFamily(data);
         logAction(user.id, 'DESK_FAMILY_ONBOARDED', 'user', result.student.id, null, {
           parent: result.parent.email, student: result.student.email, linkStatus: result.linkStatus,
         }, extractAuditContext(c))
           .catch((err) => console.error('[audit] DESK_FAMILY_ONBOARDED failed:', err));
         return success(c, result, 201);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to onboard family';
+        const message = clientMessage(err, 'Failed to onboard family');
         const status = /already exists with the role/.test(message) ? 409 : 400;
         return error(c, message, status);
       }

@@ -15,6 +15,7 @@ import { requireAuthenticated } from "~/lib/auth/session";
 import { getServerApi } from "~/lib/hono-server";
 import { apiResponse } from "@repo/validations";
 import SessionBanner from "./session-banner.client";
+import HomeSummaryCard from "./home-summary.client";
 
 type ActiveSessionRow = {
   id: string;
@@ -195,6 +196,9 @@ export default async function Home(): Promise<JSX.Element> {
 
       {/* SES-005: Active session status + countdown (hidden for graduated students) */}
       {!isGraduated && <SessionBanner sessions={activeSessions} />}
+
+      {/* "What do we owe / what's next" — actions before links */}
+      <HomeSummaryCard />
 
       {/* Graduated Banner */}
       {isGraduated && (

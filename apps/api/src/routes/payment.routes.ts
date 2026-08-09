@@ -33,7 +33,7 @@ import {
   FINANCE_ROLES,
   hasRole,
 } from '@repo/validations';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import {
   requireAuth,
   requireParent,
@@ -193,7 +193,7 @@ export const payments = new Hono<HonoEnv>()
           .catch((err) => console.error('[audit] PAYMENT_INITIATED failed:', err));
         return success(c, result, 201);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to initiate payment';
+        const message = clientMessage(err, 'Failed to initiate payment');
         const status =
           message.includes('not linked') ? 403 :
           message.includes('insufficient') ||
@@ -367,7 +367,7 @@ export const payments = new Hono<HonoEnv>()
 
         return success(c, confirmed);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to confirm payment';
+        const message = clientMessage(err, 'Failed to confirm payment');
         return error(c, message, 400);
       }
     }
@@ -395,7 +395,7 @@ export const payments = new Hono<HonoEnv>()
           .catch((err) => console.error('[audit] PAYMENT_REVERSED failed:', err));
         return success(c, result);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to reverse payment';
+        const message = clientMessage(err, 'Failed to reverse payment');
         const status =
           message.includes('handed out') || message.includes('concurrently') ? 409 :
           message.includes('not found') ? 404 : 400;

@@ -11,6 +11,7 @@ import { env, corsOrigins } from './env';
 import { pingDb } from '@repo/db';
 import { logger } from './lib/logger';
 import { randomUUID } from 'crypto';
+import { ROLES } from '@repo/validations';
 
 /**
  * Route Imports
@@ -76,7 +77,8 @@ const apiRateLimit = rateLimiter({
   windowMs: env.API_RATE_LIMIT_WINDOW_MS,
   limit: env.API_RATE_LIMIT_MAX,
   standardHeaders: 'draft-6',
-  skip: (c) => c.req.method === 'OPTIONS',
+  // Never throttle preflights or health probes (uptime monitors poll these)
+  skip: (c) => c.req.method === 'OPTIONS' || c.req.path.includes('/health'),
   keyGenerator: (c) => {
     const user = c.get?.('user' as never) as { id: string } | null;
     return user?.id ?? getClientIp(c);
@@ -121,7 +123,10 @@ const app = new Hono<HonoEnv>()
 		credentials: true,
 	})
 )
-// .use("/api/auth/*", authRateLimit)
+// Throttle every auth endpoint (sign-in, sign-up, password reset).
+// Mounted BEFORE session extraction so unauthenticated floods are
+// rejected without a DB round-trip.
+.use("/api/auth/*", authRateLimit)
 .use("*", async (c, next) => {
 	const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
@@ -135,6 +140,19 @@ const app = new Hono<HonoEnv>()
   	c.set("user", session.user);
   	c.set("session", session.session);
   	await next();
+})
+// SECURITY (defense-in-depth): better-auth's own admin endpoints
+// (/api/auth/admin/create-user, set-user-password, list-users, …) check
+// only their better-auth permission — create-user even honours a
+// client-supplied role. Application roles must never reach them, so the
+// whole surface is admin-only regardless of what the access-control
+// config grants. Desk onboarding does not use these endpoints.
+.use("/api/auth/admin/*", async (c, next) => {
+	const user = c.get("user");
+	if (!user || user.role !== ROLES.ADMIN) {
+		return c.json({ error: "Forbidden" }, 403);
+	}
+	await next();
 })
 .on(["POST", "GET"], "/api/auth/*", async (c) => {
   return auth.handler(c.req.raw);
@@ -293,16 +311,16 @@ const v1 = new Hono<HonoEnv>()
    * - GET    /v1/reports/pending-approvals        - All pending approvals with age (REP-009)
    * All report routes support ?format=csv for CSV download.
    */
+  // Throttle every v1 route (health probes are skipped in the limiter).
+  // Previously only four groups were covered, leaving account creation,
+  // desk onboarding, and the expensive report endpoints unlimited.
+  .use('/*', apiRateLimit)
   .route('/todos', todos)
   .route('/files', files)
   .route('/links', links)
   .route('/users', users)
   .route('/subjects', subjects)
   .route('/sessions', sessions)
-  .use('/registrations/*', apiRateLimit)
-  .use('/payments/*', apiRateLimit)
-  .use('/escrow/*', apiRateLimit)
-  .use('/change-requests/*', apiRateLimit)
   .route('/registrations', registrations)
   .route('/registrations', registrationSwapRoutes)
   .route('/payments', payments)

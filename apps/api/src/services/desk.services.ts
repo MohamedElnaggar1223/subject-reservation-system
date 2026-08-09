@@ -38,7 +38,6 @@ import { isGraduated } from './grade.services';
 // ─── Desk onboarding (G5) ────────────────────────────────────────────────────
 
 async function findOrCreatePerson(
-  headers: Headers,
   person: { email: string; name?: string; password?: string; phone?: string | null },
   role: 'parent' | 'student',
   grade?: number
@@ -66,24 +65,36 @@ async function findOrCreatePerson(
     throw new Error('New student accounts need a grade');
   }
 
-  // better-auth admin createUser — authorization comes from the calling
-  // staff member's session (finance roles hold user:create).
-  const result = await auth.api.createUser({
+  // SECURITY: create through the PUBLIC sign-up API, not better-auth's
+  // admin createUser. The admin endpoint would require staff to hold the
+  // better-auth `user` resource, which also unlocks /api/auth/admin/*
+  // (create-user honours a client-supplied role; set-user-password
+  // targets anyone) — i.e. desk staff could mint or seize admin
+  // accounts. Sign-up needs no elevated permission, and the role below
+  // is a hard-coded server value that can never come from the request.
+  const result = await auth.api.signUpEmail({
     body: {
       email: person.email,
       password: person.password,
       name: person.name,
-      role: role as 'admin',
     },
-    headers,
   });
 
   const userId = result.user.id;
+
+  // Staff vouched for this family in person, so the account is usable
+  // immediately — no verification email round-trip at the desk.
+  await db
+    .update(userTable)
+    .set({
+      role,
+      emailVerified: true,
+      ...(person.phone ? { phone: person.phone } : {}),
+    })
+    .where(eq(userTable.id, userId));
+
   if (role === 'student') {
     await setStudentFields(userId, grade!);
-  }
-  if (person.phone) {
-    await db.update(userTable).set({ phone: person.phone }).where(eq(userTable.id, userId));
   }
 
   return { id: userId, name: result.user.name, email: result.user.email, created: true };
@@ -93,10 +104,9 @@ async function findOrCreatePerson(
  * One desk action: parent + student accounts exist (created if needed)
  * and are linked APPROVED. Idempotent for existing links.
  */
-export async function onboardFamily(headers: Headers, data: DeskOnboardFamilyType) {
-  const parent = await findOrCreatePerson(headers, data.parent, 'parent');
+export async function onboardFamily(data: DeskOnboardFamilyType) {
+  const parent = await findOrCreatePerson(data.parent, 'parent');
   const student = await findOrCreatePerson(
-    headers,
     data.student,
     'student',
     data.student.grade
@@ -348,10 +358,14 @@ export async function getStudentSummary(studentId: string) {
     where: (u, { eq }) => eq(u.id, studentId),
     columns: {
       id: true, name: true, email: true, phone: true,
-      grade: true, studentId: true, createdAt: true,
+      grade: true, studentId: true, createdAt: true, role: true,
     },
   });
   if (!student) throw new Error('Student not found');
+  // Scope strictly to students: without this the Student-360 endpoint
+  // would profile staff and admin accounts (name, phone, family graph)
+  // for any finance user who guessed an id.
+  if (student.role !== 'student') throw new Error('Student not found');
 
   const [links, escrowAccount, registrations, payments, exceptions, remarks] =
     await Promise.all([
