@@ -353,3 +353,64 @@
   background: oklch(0.65 0.13 178 / 25%);
   color: oklch(0.95 0.01 178);
 }
+
+/* ─── Print ─────────────────────────────────────────────────────────────────
+ *
+ * Printable artifacts (subject receipts, daily takings) live inside the
+ * authenticated app shell, which is a full-height flex layout with
+ * `overflow-hidden`. Without these rules the browser prints the sidebar
+ * and clips everything past the first viewport — receipts came out
+ * truncated and takings silently lost rows.
+ */
+@media print {
+  /* Drop chrome: sidebar, top bar, and anything explicitly marked */
+  aside,
+  nav[data-app-nav],
+  header,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Let the document flow onto as many pages as it needs */
+  html,
+  body,
+  #__next,
+  main,
+  [data-app-shell],
+  .h-screen {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Tables must not be cut mid-row, and rows should not split */
+  table {
+    width: 100% !important;
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Cards shouldn't be split across a page break */
+  .print-block {
+    page-break-inside: avoid;
+  }
+
+  a[href]::after {
+    content: '';
+  }
+
+  @page {
+    margin: 12mm;
+  }
+}

@@ -182,7 +182,8 @@ export const receipts = new Hono<HonoEnv>()
    * Full receipt detail for the printable view — the paper the parent
    * actually holds. Finance roles + admin.
    */
-  .get('/:id', requireFinance(), zValidator('param', ReceiptId), async (c) => {
+  .get('/:id', zValidator('param', ReceiptId), async (c) => {
+    const user = c.get('user')!;
     const { id } = c.req.valid('param');
     const found = await db.query.receipt.findFirst({
       where: (r, { eq }) => eq(r.id, id),
@@ -197,6 +198,22 @@ export const receipts = new Hono<HonoEnv>()
       },
     });
     if (!found) return error(c, 'Receipt not found', 404);
+
+    // The family's refund depends on this paper, so they must be able
+    // to see and print it — scoped to their own receipts.
+    const isStaff = hasRole(user.role, ...FINANCE_ROLES);
+    const ownerStudentId = found.registration.studentId;
+    let allowed = isStaff || (user.role === ROLES.STUDENT && ownerStudentId === user.id);
+    if (!allowed && user.role === ROLES.PARENT) {
+      const link = await db.query.parentStudentLink.findFirst({
+        where: (l, { eq, and }) =>
+          and(eq(l.parentId, user.id), eq(l.studentId, ownerStudentId), eq(l.status, 'approved')),
+        columns: { id: true },
+      });
+      allowed = !!link;
+    }
+    if (!allowed) return error(c, 'Forbidden', 403);
+
     return success(c, found);
   });
 

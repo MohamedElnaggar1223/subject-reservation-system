@@ -90,7 +90,14 @@ function getNavSections(role: string | null | undefined): NavSection[] {
         items: [
           { labelKey: 'nav.reports', href: '/admin/reports', icon: 'reports' },
           { labelKey: 'nav.auditLog', href: '/admin/audit', icon: 'audit' },
-          { labelKey: 'nav.notifications', href: '/admin/notifications', icon: 'notifications' },
+          { labelKey: 'nav.announcements', href: '/admin/notifications', icon: 'notifications' },
+        ],
+      },
+      {
+        titleKey: 'nav.account',
+        items: [
+          { labelKey: 'nav.notifications', href: '/notifications', icon: 'notifications' },
+          { labelKey: 'nav.profile', href: '/profile', icon: 'profile' },
         ],
       },
     ];
@@ -148,8 +155,8 @@ function getNavSections(role: string | null | undefined): NavSection[] {
       {
         titleKey: 'nav.financial',
         items: [
+          { labelKey: 'nav.schoolFee', href: '/school-fee', icon: 'payments' },
           { labelKey: 'nav.escrowBalance', href: '/escrow', icon: 'escrow' },
-          { labelKey: 'nav.checkout', href: '/checkout', icon: 'checkout' },
         ],
       },
       {
@@ -383,7 +390,7 @@ export default function NavShell({
   );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div data-app-shell className="flex h-screen overflow-hidden bg-background">
       {/* Desktop sidebar */}
       <aside
         className={cn(
@@ -396,7 +403,7 @@ export default function NavShell({
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="absolute bottom-20 -right-3 z-10 hidden lg:flex size-6 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground/50 shadow-sm hover:text-sidebar-foreground transition-colors"
-          style={{ left: collapsed ? '56px' : '248px' }}
+          style={{ insetInlineStart: collapsed ? '56px' : '248px' }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className={cn('size-3 transition-transform', collapsed && 'rotate-180')}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />

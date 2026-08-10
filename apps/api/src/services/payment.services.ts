@@ -863,7 +863,8 @@ export async function getDailyTakings(dateStr: string) {
   const start = new Date(`${dateStr}T00:00:00`);
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
 
-  const rows = await db.query.payment.findMany({
+  // Money IN: confirmed today
+  const confirmed = await db.query.payment.findMany({
     where: (p, { eq, and, gte, lt }) =>
       and(eq(p.status, 'completed'), gte(p.confirmedAt, start), lt(p.confirmedAt, end)),
     columns: {
@@ -877,17 +878,76 @@ export async function getDailyTakings(dateStr: string) {
     orderBy: (p, { asc }) => [asc(p.confirmedAt)],
   });
 
+  // Money OUT #1: payments confirmed today and then REVERSED. Without
+  // these the row simply vanished from the report (status flips to
+  // 'refunded'), so the printed total silently disagreed with the
+  // drawer and nothing explained the gap.
+  const reversed = await db.query.payment.findMany({
+    where: (p, { eq, and, gte, lt }) =>
+      and(eq(p.status, 'refunded'), gte(p.confirmedAt, start), lt(p.confirmedAt, end)),
+    columns: {
+      id: true, amount: true, escrowAmountApplied: true, paymentMethod: true,
+      purpose: true, instrumentUsed: true, externalReference: true, confirmedAt: true,
+    },
+    with: {
+      student: { columns: { id: true, name: true } },
+      confirmedByUser: { columns: { id: true, name: true } },
+    },
+    orderBy: (p, { asc }) => [asc(p.confirmedAt)],
+  });
+
+  // Money OUT #2: cash refunds handed over at the same desk today.
+  // These live in withdrawal_request, so they never appeared at all.
+  const withdrawals = await db.query.withdrawalRequest.findMany({
+    where: (w, { and, gte, lt, inArray, isNotNull }) =>
+      and(
+        inArray(w.status, ['fulfilled', 'partially_fulfilled']),
+        isNotNull(w.resolvedAt),
+        gte(w.resolvedAt, start),
+        lt(w.resolvedAt, end)
+      ),
+    columns: { id: true, releasedAmount: true, resolvedAt: true },
+    with: {
+      escrow: { with: { student: { columns: { id: true, name: true } } } },
+      resolvedByUser: { columns: { id: true, name: true } },
+    },
+  });
+
   const byInstrument: Record<string, number> = {};
   let cashIn = 0;
   let escrowApplied = 0;
-  for (const r of rows) {
+  for (const r of confirmed) {
     const key = r.instrumentUsed ?? r.paymentMethod;
     byInstrument[key] = (byInstrument[key] ?? 0) + r.amount;
     cashIn += r.amount;
     escrowApplied += r.escrowAmountApplied;
   }
 
-  return { date: dateStr, rows, totals: { cashIn, escrowApplied, byInstrument } };
+  const reversedTotal = reversed.reduce((sum, r) => sum + r.amount, 0);
+  const cashRefunded = withdrawals.reduce((sum, w) => sum + (w.releasedAmount ?? 0), 0);
+  const cashOut = reversedTotal + cashRefunded;
+
+  return {
+    date: dateStr,
+    rows: confirmed,
+    reversed,
+    withdrawals: withdrawals.map((w) => ({
+      id: w.id,
+      releasedAmount: w.releasedAmount ?? 0,
+      resolvedAt: w.resolvedAt,
+      student: w.escrow?.student ?? null,
+      resolvedByUser: w.resolvedByUser ?? null,
+    })),
+    totals: {
+      cashIn,
+      escrowApplied,
+      byInstrument,
+      reversedTotal,
+      cashRefunded,
+      cashOut,
+      net: cashIn - cashOut,
+    },
+  };
 }
 
 /**

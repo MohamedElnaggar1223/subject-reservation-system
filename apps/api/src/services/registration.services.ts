@@ -1066,7 +1066,9 @@ export async function getRegistrations(filters: ListRegistrationsQueryType & {
   // index already prevents a second pending change request from being
   // inserted, but the UI previously let users click through and hit an
   // error — this flag lets us grey out the buttons instead.
-  if (rows.length === 0) return rows.map((r) => ({ ...r, hasPendingChangeRequest: false }));
+  if (rows.length === 0) {
+    return rows.map((r) => ({ ...r, hasPendingChangeRequest: false, receipt: null as ReceiptBrief }));
+  }
 
   const regIds = rows.map((r) => r.id);
   const pendingCRs = await db.query.changeRequest.findMany({
@@ -1076,11 +1078,32 @@ export async function getRegistrations(filters: ListRegistrationsQueryType & {
   });
   const pendingSet = new Set(pendingCRs.map((c) => c.registrationId));
 
+  // The family's refund is gated on physically returning the paper
+  // receipt, so they need to see its number and state — previously the
+  // UI could only show an unexplained "return receipt" status.
+  const receipts = await db.query.receipt.findMany({
+    where: (rc, { inArray: inArr }) => inArr(rc.registrationId, regIds),
+    columns: {
+      id: true, registrationId: true, receiptNumber: true,
+      status: true, refundAmountOnReturn: true,
+    },
+  });
+  const receiptByReg = new Map(receipts.map((rc) => [rc.registrationId, rc]));
+
   return rows.map((r) => ({
     ...r,
     hasPendingChangeRequest: pendingSet.has(r.id),
+    receipt: (receiptByReg.get(r.id) ?? null) as ReceiptBrief,
   }));
 }
+
+type ReceiptBrief = {
+  id: string;
+  registrationId: string;
+  receiptNumber: string;
+  status: string;
+  refundAmountOnReturn: number | null;
+} | null;
 
 /**
  * Get all pending approval requests from all students linked to a parent.

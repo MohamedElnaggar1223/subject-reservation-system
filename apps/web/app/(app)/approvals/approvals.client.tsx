@@ -264,12 +264,17 @@ export default function ApprovalsClient(): React.JSX.Element {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-foreground font-display mb-2">
-            All Caught Up
+            No subject requests
           </h2>
           <p className="text-muted-foreground text-sm">
-            No pending registration requests from your children at this time.
+            None of your children are waiting on a subject-registration approval.
           </p>
         </div>
+
+        {/* Drop/swap requests live on this page too — omitting them here
+            made a child's drop request invisible to the parent forever,
+            under a banner claiming there was nothing to do. */}
+        <ChangeRequestsSection />
       </div>
     );
   }

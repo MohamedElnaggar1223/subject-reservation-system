@@ -135,7 +135,7 @@ export const schoolFees = new Hono<HonoEnv>()
     const user = c.get('user')!;
     const data = c.req.valid('json');
     try {
-      const result = await collectSchoolFeeAtDesk(user.id, data.studentId, data.instrumentUsed, data.notes);
+      const result = await collectSchoolFeeAtDesk(user.id, data.studentId, data.instrumentUsed, data.notes, data.academicYear);
       logAction(user.id, 'DESK_SCHOOL_FEE_COLLECTED', 'payment', result.paymentId, null, result as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] DESK_SCHOOL_FEE_COLLECTED failed:', err));
       return success(c, result, 201);

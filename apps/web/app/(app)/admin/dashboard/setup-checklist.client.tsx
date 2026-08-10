@@ -15,6 +15,7 @@ type Checklist = {
   academicYear: string;
   hasOpenOrUpcomingSession: boolean;
   activeSessionCount: number;
+  draftOnly: boolean;
   subjectCount: number;
   zeroFeeSubjects: number;
   subjectsWithoutTeachers: number;
@@ -35,6 +36,12 @@ export default function SetupChecklist(): React.JSX.Element | null {
   const warnings: { text: string; href: string }[] = [];
   if (!data.hasOpenOrUpcomingSession) {
     warnings.push({ text: 'No open or upcoming registration session', href: '/admin/sessions' });
+  }
+  if (data.draftOnly) {
+    warnings.push({
+      text: 'Your session is still a draft — activate it or nobody can register',
+      href: '/admin/sessions',
+    });
   }
   if (data.subjectCount === 0) {
     warnings.push({ text: 'No subjects created yet', href: '/admin/subjects' });

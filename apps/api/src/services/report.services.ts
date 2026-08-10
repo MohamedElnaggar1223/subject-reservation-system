@@ -1395,10 +1395,15 @@ export async function getSetupChecklist() {
     (c) => !remarkFees.some((f) => f.council === c && f.serviceType === 'review_of_marking')
   );
 
+  const activeCount = sessions.filter((s) => s.status === 'active').length;
   return {
     academicYear: year,
     hasOpenOrUpcomingSession: sessions.length > 0,
-    activeSessionCount: sessions.filter((s) => s.status === 'active').length,
+    activeSessionCount: activeCount,
+    // A draft session satisfies "a session exists" but nobody can
+    // register against it — the checklist looked clean while
+    // registration was closed for everyone.
+    draftOnly: sessions.length > 0 && activeCount === 0,
     subjectCount: subjects.length,
     zeroFeeSubjects: subjects.filter((s) => s.courseFee + s.registrationFee <= 0).length,
     subjectsWithoutTeachers: subjects.filter((s) => !linkedSubjectIds.has(s.id)).length,

@@ -193,7 +193,7 @@ export default function ResultsEntryClient(): React.JSX.Element {
       ) : (
         <>
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden mb-4">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="border-b border-border bg-muted">
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Student</th>

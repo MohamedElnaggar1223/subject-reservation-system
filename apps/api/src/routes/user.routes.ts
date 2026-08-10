@@ -336,6 +336,27 @@ export const users = new Hono<HonoEnv>()
    * Returns a specific user's profile.
    */
   /**
+   * PEOPLE SEARCH (UX_AUDIT staff-C1)
+   * GET /users/search?search=&role=
+   *
+   * Finance staff need to find the family at the desk. GET /users is
+   * admin-only, so without this the Desk's search returned 403 and an
+   * empty dropdown — every downstream desk action needs a studentId.
+   * Field-limited, and students/parents only.
+   */
+  .get('/search',
+    requireFinance(),
+    zValidator('query', z.object({
+      search: z.string().max(100).optional(),
+      role: z.enum(['student', 'parent']).optional(),
+    })),
+    async (c) => {
+      const { search, role } = c.req.valid('query');
+      return success(c, await userService.searchPeople({ search, role }));
+    }
+  )
+
+  /**
    * HOME SUMMARY (UX_AUDIT — app-first destination)
    * GET /users/me/home-summary
    *

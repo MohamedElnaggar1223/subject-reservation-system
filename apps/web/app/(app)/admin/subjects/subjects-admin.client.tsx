@@ -580,8 +580,8 @@ export default function SubjectsAdminClient(): React.JSX.Element {
           <p className="text-muted-foreground">No subjects found.</p>
         </div>
       ) : (
-        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
             <thead className="border-b border-border bg-muted">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Subject</th>

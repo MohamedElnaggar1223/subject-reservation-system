@@ -5,7 +5,7 @@
  * clean print layout, auto-opens the print dialog.
  */
 
-import { requireFinance } from '~/lib/auth/session';
+import { requireAuth } from '~/lib/auth/session';
 import { getServerApi } from '~/lib/hono-server';
 import { apiResponse } from '@repo/validations';
 import PrintButton from './print-button.client';
@@ -41,7 +41,9 @@ export default async function ReceiptPrintPage({
 }: {
   params: Promise<{ id: string }>;
 }): Promise<React.JSX.Element> {
-  await requireFinance();
+  // Any signed-in user may open this; the API scopes the receipt to
+  // staff or the owning family and 403s everyone else.
+  await requireAuth();
   const { id } = await params;
   const api = await getServerApi();
 

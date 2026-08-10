@@ -22,6 +22,7 @@ import {
 } from '@repo/validations';
 import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
+import { ReasonModal } from '~/components/ui/reason-modal';
 
 // ─── Types (explicit — RPC inference quirk, see checkout-summary note) ────────
 
@@ -71,15 +72,17 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
   const [showRegister, setShowRegister] = useState(false);
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [reverseTarget, setReverseTarget] = useState<{ id: string; label: string } | null>(null);
 
   // ── Search ────────────────────────────────────────────────────────────────
-  const { data: hits = [] } = useQuery<StudentHit[]>({
-    queryKey: ['users', 'students', 'desk', search],
+  const { data: hits = [], isError: searchFailed, isFetching: searching } = useQuery<StudentHit[]>({
+    queryKey: ['users', 'search', 'desk', search],
     queryFn: async () =>
       (await apiResponse(
-        api.v1.users.$get({ query: { role: 'student', search: search || undefined } })
+        api.v1.users.search.$get({ query: { role: 'student', search: search || undefined } })
       )) as StudentHit[],
     enabled: search.trim().length >= 2 && !studentId,
+    retry: false,
   });
 
   // ── Summary ───────────────────────────────────────────────────────────────
@@ -126,7 +129,10 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
   const reverseMutation = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       apiResponse(api.v1.payments[':id'].reverse.$post({ param: { id }, json: { reason } })),
-    onSuccess: () => done('Payment reversed — registrations back to pending payment, receipts voided.'),
+    onSuccess: () => {
+      setReverseTarget(null);
+      done('Payment reversed — registrations back to pending payment, receipts voided.');
+    },
     onError: fail,
   });
 
@@ -169,6 +175,24 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
           className="w-full max-w-xl px-4 py-2.5 text-sm border border-border bg-background rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           autoFocus
         />
+        {!studentId && search.trim().length >= 2 && searchFailed && (
+          <p className="mt-2 max-w-xl text-sm text-destructive">
+            Could not search right now. Check your connection and try again.
+          </p>
+        )}
+        {!studentId && search.trim().length >= 2 && !searching && !searchFailed && hits.length === 0 && (
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+            No student matches &ldquo;{search}&rdquo;. If they are new, use{' '}
+            <button
+              type="button"
+              className="underline hover:no-underline"
+              onClick={() => setShowOnboard(true)}
+            >
+              New Family (Onboard)
+            </button>{' '}
+            to create their accounts.
+          </p>
+        )}
         {!studentId && hits.length > 0 && (
           <div className="mt-2 max-w-xl bg-card border border-border rounded-xl shadow-sm divide-y divide-border overflow-hidden">
             {hits.slice(0, 8).map((h) => (
@@ -287,7 +311,8 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
             {summary.registrations.length === 0 ? (
               <p className="px-5 py-6 text-sm text-muted-foreground">No registrations yet.</p>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-sm">
                 <tbody className="divide-y divide-border">
                   {summary.registrations.map((r) => (
                     <tr key={r.id} className="hover:bg-muted/50 transition-colors">
@@ -343,6 +368,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
 
@@ -354,7 +380,8 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
             {summary.payments.length === 0 ? (
               <p className="px-5 py-6 text-sm text-muted-foreground">No payments yet.</p>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-sm">
                 <tbody className="divide-y divide-border">
                   {summary.payments.slice(0, 10).map((p) => (
                     <tr key={p.id} className="hover:bg-muted/50 transition-colors">
@@ -378,10 +405,12 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                             variant="ghost"
                             className="text-red-600 hover:text-red-800 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                             disabled={reverseMutation.isPending}
-                            onClick={() => {
-                              const reason = window.prompt('Reverse this payment? Enter the reason (audited):');
-                              if (reason?.trim()) reverseMutation.mutate({ id: p.id, reason: reason.trim() });
-                            }}
+                            onClick={() =>
+                              setReverseTarget({
+                                id: p.id,
+                                label: `${formatPrice(p.amount + p.escrowAmountApplied)} · ${p.purpose.replace('_', ' ')}`,
+                              })
+                            }
                           >
                             Reverse
                           </Button>
@@ -391,9 +420,24 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>
+      )}
+
+      {reverseTarget && (
+        <ReasonModal
+          title="Reverse this payment?"
+          description={`${reverseTarget.label}. The registrations go back to pending payment and their receipts are voided — only possible while the paper has not left the desk. This is recorded in the audit trail.`}
+          label="Reason for the reversal"
+          placeholder="e.g. Wrong student — money returned to the parent"
+          confirmLabel="Reverse Payment"
+          destructive
+          isPending={reverseMutation.isPending}
+          onConfirm={(reason) => reverseMutation.mutate({ id: reverseTarget.id, reason })}
+          onClose={() => setReverseTarget(null)}
+        />
       )}
     </div>
   );
@@ -506,6 +550,11 @@ function DeskRegisterCard({
 }) {
   const [sessionId, setSessionId] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Per-subject options — without these the desk charged FULL price for
+  // outside-school retakes (the 50% rule lives behind subjectOptions)
+  // and never recorded a teacher, making it strictly weaker than the
+  // parent's own self-serve flow.
+  const [choices, setChoices] = useState<Record<string, { teacherId?: string; takeOutsideSchool?: boolean }>>({});
   const [collect, setCollect] = useState(true);
   const [instrument, setInstrument] = useState<'cash' | 'card' | 'instapay' | 'other'>('cash');
   const [escrowApply, setEscrowApply] = useState('');
@@ -526,9 +575,14 @@ function DeskRegisterCard({
     retry: false,
   });
 
+  const priceFor = (sub: AvailableSubject) =>
+    choices[sub.id]?.takeOutsideSchool && sub.outsidePricing
+      ? sub.outsidePricing.total
+      : sub.pricing.total;
+
   const total = available
     .filter((s) => selected.has(s.id))
-    .reduce((sum, s) => sum + s.pricing.total, 0);
+    .reduce((sum, s) => sum + priceFor(s), 0);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -538,6 +592,13 @@ function DeskRegisterCard({
             studentId,
             sessionId,
             subjectIds: Array.from(selected),
+            subjectOptions: Array.from(selected).reduce<
+              Record<string, { teacherId?: string; takeOutsideSchool?: boolean }>
+            >((acc, id) => {
+              const choice = choices[id];
+              if (choice && (choice.teacherId || choice.takeOutsideSchool)) acc[id] = choice;
+              return acc;
+            }, {}),
             collectNow: collect
               ? {
                   instrumentUsed: instrument,
@@ -565,7 +626,7 @@ function DeskRegisterCard({
       <div className="flex gap-3 flex-wrap mb-3">
         <select
           value={sessionId}
-          onChange={(e) => { setSessionId(e.target.value); setSelected(new Set()); }}
+          onChange={(e) => { setSessionId(e.target.value); setSelected(new Set()); setChoices({}); }}
           className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
         >
           <option value="">Pick an open session…</option>
@@ -582,27 +643,71 @@ function DeskRegisterCard({
       ) : (
         <div className="space-y-1 max-h-64 overflow-y-auto mb-3">
           {available.map((s) => (
-            <label key={s.id} className="flex items-center gap-2 text-sm text-foreground py-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={selected.has(s.id)}
-                onChange={(e) =>
-                  setSelected((prev) => {
-                    const next = new Set(prev);
-                    if (e.target.checked) next.add(s.id);
-                    else next.delete(s.id);
-                    return next;
-                  })
-                }
-                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-              />
-              <span className="flex-1">
-                {s.name} <span className="text-xs text-muted-foreground font-mono">{s.code}</span>
-                {s.isCore && <span className="text-xs text-amber-700 dark:text-amber-400 ml-1">core</span>}
-                {s.isRetake && <span className="text-xs text-violet-700 dark:text-violet-400 ml-1">retake</span>}
-              </span>
-              <span className="font-medium">{formatPrice(s.pricing.total)}</span>
-            </label>
+            <div key={s.id} className="py-1">
+              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selected.has(s.id)}
+                  onChange={(e) =>
+                    setSelected((prev) => {
+                      const next = new Set(prev);
+                      if (e.target.checked) next.add(s.id);
+                      else next.delete(s.id);
+                      return next;
+                    })
+                  }
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                />
+                <span className="flex-1">
+                  {s.name} <span className="text-xs text-muted-foreground font-mono">{s.code}</span>
+                  {s.isCore && <span className="text-xs text-amber-700 dark:text-amber-400 ml-1">core</span>}
+                  {s.isRetake && <span className="text-xs text-violet-700 dark:text-violet-400 ml-1">retake</span>}
+                </span>
+                <span className="font-medium">{formatPrice(priceFor(s))}</span>
+              </label>
+
+              {selected.has(s.id) && (s.outsidePricing || s.teachers.length > 0) && (
+                <div className="ml-6 mt-1 flex flex-wrap items-center gap-3">
+                  {s.outsidePricing && (
+                    <label className="flex items-center gap-1.5 text-xs text-foreground cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={choices[s.id]?.takeOutsideSchool ?? false}
+                        onChange={(e) =>
+                          setChoices((prev) => ({
+                            ...prev,
+                            [s.id]: {
+                              ...prev[s.id],
+                              takeOutsideSchool: e.target.checked,
+                              teacherId: e.target.checked ? undefined : prev[s.id]?.teacherId,
+                            },
+                          }))
+                        }
+                        className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary"
+                      />
+                      Outside school ({formatPrice(s.outsidePricing.total)})
+                    </label>
+                  )}
+                  {s.teachers.length > 0 && !choices[s.id]?.takeOutsideSchool && (
+                    <select
+                      value={choices[s.id]?.teacherId ?? ''}
+                      onChange={(e) =>
+                        setChoices((prev) => ({
+                          ...prev,
+                          [s.id]: { ...prev[s.id], teacherId: e.target.value || undefined },
+                        }))
+                      }
+                      className="rounded-lg border border-border bg-card px-2 py-1 text-xs text-foreground"
+                    >
+                      <option value="">Teacher: no preference</option>
+                      {s.teachers.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       ))}

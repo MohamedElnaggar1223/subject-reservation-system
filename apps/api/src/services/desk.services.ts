@@ -312,7 +312,8 @@ export async function collectSchoolFeeAtDesk(
   staffId: string,
   studentId: string,
   instrumentUsed: string,
-  notes?: string
+  notes?: string,
+  requestedAcademicYear?: string
 ) {
   const student = await db.query.user.findFirst({
     where: (u, { eq }) => eq(u.id, studentId),
@@ -320,7 +321,11 @@ export async function collectSchoolFeeAtDesk(
   });
   if (!student) throw new Error('Student not found');
 
-  const academicYear = academicYearForDate(new Date());
+  // The caller may name the year explicitly — around the 1 July
+  // rollover the year the registration gate demands is not the year
+  // today falls in, which left officers unable to pay the year that was
+  // actually blocking the registration in front of them.
+  const academicYear = requestedAcademicYear ?? academicYearForDate(new Date());
   const fee = await getApplicableFee(academicYear, student.grade ?? null);
   if (!fee) throw new Error('No school fee is currently open for this student');
   if (await hasCompletedSchoolFeePayment(studentId, academicYear)) {
@@ -419,8 +424,27 @@ export async function getStudentSummary(studentId: string) {
   });
   const receiptByReg = new Map(receipts.map((r) => [r.registrationId, r]));
 
-  // School-fee status for the current year
+  // School-fee status. Check the year containing today AND the year of
+  // every open session — near the 1 July rollover these differ, and
+  // reporting only "today's" year told officers the fee was paid while
+  // registration kept refusing for the session's year.
   const academicYear = academicYearForDate(new Date());
+  const openSessionRows = await db.query.registrationSession.findMany({
+    where: (sn, { eq }) => eq(sn.status, 'active'),
+    columns: { startDate: true },
+  });
+  const candidateYears = [
+    ...new Set([academicYear, ...openSessionRows.map((sn) => academicYearForDate(sn.startDate))]),
+  ];
+
+  const schoolFeesDue: { academicYear: string; amount: number }[] = [];
+  for (const year of candidateYears) {
+    const applicable = await getApplicableFee(year, student.grade ?? null);
+    if (!applicable) continue;
+    if (await hasCompletedSchoolFeePayment(studentId, year)) continue;
+    schoolFeesDue.push({ academicYear: year, amount: applicable.amount });
+  }
+
   const fee = await getApplicableFee(academicYear, student.grade ?? null);
   const schoolFeePaid = fee ? await hasCompletedSchoolFeePayment(studentId, academicYear) : true;
 
@@ -442,6 +466,9 @@ export async function getStudentSummary(studentId: string) {
       amount: fee?.amount ?? null,
       paid: schoolFeePaid,
     },
+    // Every year still owed — may include a session year that is not
+    // the year containing today
+    schoolFeesDue,
     owing,
     registrations: registrations.map((r) => ({
       ...r,

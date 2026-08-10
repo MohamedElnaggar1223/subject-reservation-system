@@ -54,12 +54,16 @@ export default function ExceptionsAdminClient(): React.JSX.Element {
     queryFn: async () => (await apiResponse(api.v1.exceptions.$get({ query: {} }))) as ExceptionRow[],
   });
 
-  const { data: students = [] } = useQuery<StudentRow[]>({
-    queryKey: ['users', 'students', studentSearch],
+  // Uses the finance-scoped search: this page is reachable by
+  // finance_admin, for whom GET /users (admin-only) returns 403 and an
+  // empty picker — i.e. no exception could be granted at all.
+  const { data: students = [], isError: studentsFailed } = useQuery<StudentRow[]>({
+    queryKey: ['users', 'search', 'exceptions', studentSearch],
     queryFn: async () =>
       (await apiResponse(
-        api.v1.users.$get({ query: { role: 'student', search: studentSearch || undefined } })
+        api.v1.users.search.$get({ query: { role: 'student', search: studentSearch || undefined } })
       )) as StudentRow[],
+    retry: false,
   });
 
   const { data: sessions = [] } = useQuery<SessionRow[]>({
@@ -154,7 +158,7 @@ export default function ExceptionsAdminClient(): React.JSX.Element {
               onChange={(e) => setForm({ ...form, studentId: e.target.value })}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
             >
-              <option value="">Pick a student…</option>
+              <option value="">{studentsFailed ? 'Could not load students' : 'Pick a student…'}</option>
               {students.map((st) => (
                 <option key={st.id} value={st.id}>
                   {st.name}{st.grade ? ` (G${st.grade})` : ''}
@@ -248,8 +252,8 @@ export default function ExceptionsAdminClient(): React.JSX.Element {
           <p className="text-muted-foreground">No exceptions granted.</p>
         </div>
       ) : (
-        <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-card rounded-xl border border-border shadow-sm overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
             <thead className="border-b border-border bg-muted">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Student</th>

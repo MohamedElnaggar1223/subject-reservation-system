@@ -35,6 +35,12 @@ type Student = {
 };
 
 type Registration = {
+  receipt?: {
+    id: string;
+    receiptNumber: string;
+    status: string;
+    refundAmountOnReturn: number | null;
+  } | null;
   id: string;
   studentId: string;
   sessionId: string;
@@ -275,6 +281,39 @@ function RegistrationCard({
             </div>
           )}
         </>
+      )}
+
+      {/* Physical receipt — the paper the refund depends on */}
+      {reg.receipt && ['issued', 'return_required', 'pending_issue'].includes(reg.receipt.status) && (
+        <div className={`mt-3 rounded-lg border p-2.5 text-xs ${
+          reg.receipt.status === 'return_required'
+            ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
+            : 'border-border bg-muted text-muted-foreground'
+        }`}>
+          {reg.receipt.status === 'return_required' ? (
+            <>
+              Bring paper receipt <span className="font-mono font-semibold">{reg.receipt.receiptNumber}</span>{' '}
+              back to the school finance desk
+              {reg.receipt.refundAmountOnReturn != null && (
+                <> to release your {formatPrice(reg.receipt.refundAmountOnReturn)} refund</>
+              )}
+              . The drop only completes once the school has it.
+            </>
+          ) : reg.receipt.status === 'pending_issue' ? (
+            <>
+              Receipt <span className="font-mono font-semibold">{reg.receipt.receiptNumber}</span> is ready to
+              collect from the finance desk.
+            </>
+          ) : (
+            <>
+              Receipt <span className="font-mono font-semibold">{reg.receipt.receiptNumber}</span> — keep it
+              safe, it must be returned if you drop or swap this subject.{' '}
+              <a href={`/receipt-print/${reg.receipt.id}`} target="_blank" rel="noopener noreferrer" className="underline">
+                View
+              </a>
+            </>
+          )}
+        </div>
       )}
 
       {/* Core subject protection notice */}
@@ -1015,9 +1054,11 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
 
         {!isParent && registrations.some((r) => r.status === 'pending_approval') && (
           <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-4 text-sm text-amber-800 dark:text-amber-300">
-            You have pending requests awaiting parent approval. Share the{' '}
-            <Link href={"/approvals" as never} className="underline font-medium">approvals link</Link>{' '}
-            with your parent.
+            {/* This used to link to /approvals, which requireParent()
+                bounces a student to /unauthorized — telling them to
+                click a page they cannot open. */}
+            Waiting on your parent to approve these. They will find them under
+            &ldquo;Pending Approvals&rdquo; when they sign in — we have already notified them.
           </div>
         )}
       </div>

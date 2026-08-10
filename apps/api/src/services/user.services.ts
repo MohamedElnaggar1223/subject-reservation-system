@@ -301,3 +301,43 @@ export async function userExists(userId: string): Promise<boolean> {
   
   return !!existing;
 }
+
+
+/**
+ * People search for staff desks (UX_AUDIT staff-C1).
+ *
+ * The Desk and the exceptions picker need to find a family, but
+ * GET /users is admin-only — finance staff were getting a silent 403
+ * and an empty dropdown, which made the whole Desk inoperable. This is
+ * a narrow, field-limited alternative: students and parents only, never
+ * staff or admin accounts.
+ */
+export async function searchPeople(params: { search?: string; role?: 'student' | 'parent' }) {
+  const term = params.search?.trim();
+  return db.query.user.findMany({
+    where: (u, { and, or, ilike, inArray, eq }) => {
+      const scope = params.role
+        ? eq(u.role, params.role)
+        : inArray(u.role, ['student', 'parent']);
+      if (!term) return scope;
+      return and(
+        scope,
+        or(
+          ilike(u.name, `%${term}%`),
+          ilike(u.email, `%${term}%`),
+          ilike(u.studentId, `%${term}%`)
+        )
+      );
+    },
+    columns: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      grade: true,
+      studentId: true,
+    },
+    orderBy: (u, { asc }) => [asc(u.name)],
+    limit: 25,
+  });
+}

@@ -329,7 +329,7 @@ export default function AdminNotificationsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[640px] text-sm">
                 <thead className="bg-muted text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2 text-left font-medium">Title</th>

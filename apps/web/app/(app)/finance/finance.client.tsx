@@ -26,6 +26,7 @@ import {
   PAYMENT_METHOD_LABELS,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { ReasonModal } from '~/components/ui/reason-modal';
 
 const fetchPendingManual = () => apiResponse(api.v1.payments['pending-manual'].$get());
 type PendingPayment = Awaited<ReturnType<typeof fetchPendingManual>>[number];
@@ -76,6 +77,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
   const [actionError, setActionError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  const [lostTarget, setLostTarget] = useState<ReceiptRow | null>(null);
   const [fulfillTarget, setFulfillTarget] = useState<WithdrawalRequest | null>(null);
   const [rejectTarget, setRejectTarget] = useState<WithdrawalRequest | null>(null);
   const [amountInput, setAmountInput] = useState('');
@@ -226,7 +228,10 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
   const lostReceiptMutation = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       apiResponse(api.v1.receipts[':id'].lost.$post({ param: { id }, json: { reason } })),
-    onSuccess: () => afterAction('Receipt written off as lost — pending drop completed.'),
+    onSuccess: () => {
+      setLostTarget(null);
+      afterAction('Receipt written off as lost — pending drop completed.');
+    },
     onError: (err: Error) => setActionError(err.message),
   });
 
@@ -421,10 +426,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                         size="sm"
                         variant="outline"
                         disabled={lostReceiptMutation.isPending}
-                        onClick={() => {
-                          const reason = window.prompt('Reason for writing this receipt off as lost?');
-                          if (reason?.trim()) lostReceiptMutation.mutate({ id: r.id, reason: reason.trim() });
-                        }}
+                        onClick={() => setLostTarget(r)}
                       >
                         Lost
                       </Button>
@@ -525,6 +527,20 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
             );
           })}
         </div>
+      )}
+
+      {lostTarget && (
+        <ReasonModal
+          title="Write this receipt off as lost?"
+          description={`Receipt ${lostTarget.receiptNumber} — ${lostTarget.registration.subject.name} for ${lostTarget.registration.student.name}. The family cannot produce the paper, so the school accepts the loss: any pending drop completes and its refund is released${lostTarget.refundAmountOnReturn != null ? ` (${lostTarget.refundAmountOnReturn.toFixed(2)} EGP)` : ''}. Recorded in the audit trail.`}
+          label="Reason"
+          placeholder="e.g. Parent confirms the receipt was lost in a move"
+          confirmLabel="Mark Lost"
+          destructive
+          isPending={lostReceiptMutation.isPending}
+          onConfirm={(reason) => lostReceiptMutation.mutate({ id: lostTarget.id, reason })}
+          onClose={() => setLostTarget(null)}
+        />
       )}
 
       {/* ── Confirm payment modal ──────────────────────────────────────── */}

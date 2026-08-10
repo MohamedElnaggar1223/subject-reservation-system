@@ -10,6 +10,7 @@ import { api } from '~/lib/hono';
 import { apiResponse, IN_SCHOOL_INSTRUMENT_LABELS, PAYMENT_METHOD_LABELS } from '@repo/validations';
 import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
+import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
 
 type Takings = {
   date: string;
@@ -25,7 +26,20 @@ type Takings = {
     student: { id: string; name: string } | null;
     confirmedByUser: { id: string; name: string } | null;
   }[];
-  totals: { cashIn: number; escrowApplied: number; byInstrument: Record<string, number> };
+  reversed: {
+    id: string; amount: number; purpose: string; confirmedAt: string | null;
+    student: { id: string; name: string } | null;
+    confirmedByUser: { id: string; name: string } | null;
+  }[];
+  withdrawals: {
+    id: string; releasedAmount: number; resolvedAt: string | null;
+    student: { id: string; name: string } | null;
+    resolvedByUser: { id: string; name: string } | null;
+  }[];
+  totals: {
+    cashIn: number; escrowApplied: number; byInstrument: Record<string, number>;
+    reversedTotal: number; cashRefunded: number; cashOut: number; net: number;
+  };
 };
 
 function todayStr(): string {
@@ -44,7 +58,7 @@ function instrumentLabel(key: string): string {
 export default function TakingsClient(): React.JSX.Element {
   const [date, setDate] = useState(todayStr());
 
-  const { data, isFetching } = useQuery<Takings>({
+  const { data, isFetching, isError, refetch } = useQuery<Takings>({
     queryKey: ['finance', 'takings', date],
     queryFn: async () =>
       (await apiResponse(api.v1.payments['daily-takings'].$get({ query: { date } }))) as Takings,
@@ -73,24 +87,36 @@ export default function TakingsClient(): React.JSX.Element {
       <h2 className="hidden print:block text-lg font-bold mb-4">Daily takings — {date}</h2>
 
       {isFetching ? (
-        <div className="flex justify-center py-10 print:hidden">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
-        </div>
-      ) : !data || data.rows.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card p-10 text-center shadow-sm">
-          <p className="text-muted-foreground text-sm">No confirmed payments on {date}.</p>
-        </div>
+        <div className="print:hidden"><LoadingState label="Loading the day's takings…" /></div>
+      ) : isError ? (
+        <ErrorState
+          title="Takings did not load"
+          message="Do not reconcile from this screen until it loads — this is a connection problem, not an empty day."
+          onRetry={() => refetch()}
+        />
+      ) : !data || (data.rows.length === 0 && data.reversed.length === 0 && data.withdrawals.length === 0) ? (
+        <EmptyState title={`No money moved on ${date}.`} />
       ) : (
         <>
           {/* Totals */}
-          <div className="grid gap-3 sm:grid-cols-3 mb-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
             <div className="bg-card rounded-xl border border-border shadow-sm p-4">
               <p className="text-xs text-muted-foreground">Money in</p>
               <p className="text-2xl font-bold text-foreground">{formatPrice(data.totals.cashIn)}</p>
             </div>
             <div className="bg-card rounded-xl border border-border shadow-sm p-4">
-              <p className="text-xs text-muted-foreground">Escrow applied</p>
-              <p className="text-2xl font-bold text-foreground">{formatPrice(data.totals.escrowApplied)}</p>
+              <p className="text-xs text-muted-foreground">Money out</p>
+              <p className="text-2xl font-bold text-foreground">{formatPrice(data.totals.cashOut)}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {formatPrice(data.totals.cashRefunded)} refunds · {formatPrice(data.totals.reversedTotal)} reversed
+              </p>
+            </div>
+            <div className="bg-card rounded-xl border border-border shadow-sm p-4">
+              <p className="text-xs text-muted-foreground">Net in drawer</p>
+              <p className="text-2xl font-bold text-foreground">{formatPrice(data.totals.net)}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                incl. {formatPrice(data.totals.escrowApplied)} paid from escrow
+              </p>
             </div>
             <div className="bg-card rounded-xl border border-border shadow-sm p-4">
               <p className="text-xs text-muted-foreground">By instrument</p>
@@ -104,8 +130,8 @@ export default function TakingsClient(): React.JSX.Element {
           </div>
 
           {/* Rows */}
-          <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="bg-card rounded-xl border border-border shadow-sm overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="border-b border-border bg-muted">
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Time</th>
@@ -132,6 +158,44 @@ export default function TakingsClient(): React.JSX.Element {
               </tbody>
             </table>
           </div>
+
+          {(data.reversed.length > 0 || data.withdrawals.length > 0) && (
+            <div className="mt-6 bg-card rounded-xl border border-border shadow-sm overflow-x-auto">
+              <div className="px-4 py-3 border-b border-border">
+                <h2 className="text-sm font-semibold text-foreground">Money out</h2>
+              </div>
+              <table className="w-full min-w-[640px] text-sm">
+                <tbody className="divide-y divide-border">
+                  {data.withdrawals.map((w) => (
+                    <tr key={w.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                        {w.resolvedAt ? new Date(w.resolvedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-foreground">{w.student?.name ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-card-foreground">Cash refund</td>
+                      <td className="px-4 py-2.5 text-card-foreground">{w.resolvedByUser?.name ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-destructive whitespace-nowrap">
+                        − {formatPrice(w.releasedAmount)}
+                      </td>
+                    </tr>
+                  ))}
+                  {data.reversed.map((r) => (
+                    <tr key={r.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                        {r.confirmedAt ? new Date(r.confirmedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                      </td>
+                      <td className="px-4 py-2.5 text-foreground">{r.student?.name ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-card-foreground">Reversed ({r.purpose.replace('_', ' ')})</td>
+                      <td className="px-4 py-2.5 text-card-foreground">{r.confirmedByUser?.name ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-destructive whitespace-nowrap">
+                        − {formatPrice(r.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </>
       )}
     </div>

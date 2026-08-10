@@ -86,5 +86,14 @@ export const DeskSchoolFeePayment = z.object({
   studentId: z.string().min(1, 'Pick a student'),
   instrumentUsed: z.enum(['cash', 'card', 'instapay', 'other']),
   notes: z.string().max(500).optional(),
+  /**
+   * Which year is being paid. Omitted = the year containing today.
+   * Needed near the 1 July rollover, when the year the registration
+   * gate demands differs from the year today falls in.
+   */
+  academicYear: z
+    .string()
+    .regex(/^\d{4}-\d{4}$/, 'Academic year must look like 2026-2027')
+    .optional(),
 });
 export type DeskSchoolFeePaymentType = z.infer<typeof DeskSchoolFeePayment>;
