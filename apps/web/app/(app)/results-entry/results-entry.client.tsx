@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import { apiResponse } from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { toCsv, downloadCsv } from '~/lib/csv';
 
 type SessionRow = { id: string; name: string; status: string };
 type PendingRow = {
@@ -86,12 +87,23 @@ export default function ResultsEntryClient(): React.JSX.Element {
     for (const line of lines) {
       const cells = line.split(/[,;\t]/).map((c) => c.trim());
       if (cells.length < 3) { misses.push(line); continue; }
-      const [sid, code, grade] = cells;
-      const row = rows.find(
-        (r) =>
-          (r.student.studentId ?? '').toLowerCase() === sid!.toLowerCase() &&
-          r.subject.code.toLowerCase() === code!.toLowerCase()
-      );
+      const [who, code, grade] = cells;
+      const key = (who ?? '').trim().toLowerCase();
+      // The school's own spreadsheet has NAMES, not system-generated
+      // student IDs, so matching on studentId alone only worked for a
+      // sheet exported from this system. Match on ID, then name.
+      const matches = rows.filter((r) => {
+        if (r.subject.code.toLowerCase() !== (code ?? '').toLowerCase()) return false;
+        return (
+          (r.student.studentId ?? '').toLowerCase() === key ||
+          r.student.name.trim().toLowerCase() === key
+        );
+      });
+      if (matches.length > 1) {
+        misses.push(`${line}  (matches ${matches.length} students — use the student ID)`);
+        continue;
+      }
+      const row = matches[0];
       if (row && grade) {
         next[row.id] = grade.toUpperCase();
         matched++;
@@ -140,6 +152,27 @@ export default function ResultsEntryClient(): React.JSX.Element {
             {showPaste ? 'Close Paste' : 'Paste from Excel'}
           </Button>
         )}
+        {sessionId && rows.length > 0 && (
+          <Button
+            variant="outline"
+            onClick={() =>
+              downloadCsv(
+                'results-template.csv',
+                toCsv(
+                  ['studentId', 'studentName', 'subjectCode', 'grade'],
+                  rows.map((r) => [
+                    r.student.studentId ?? '',
+                    r.student.name,
+                    r.subject.code,
+                    r.gradeReceived ?? '',
+                  ])
+                )
+              )
+            }
+          >
+            Export Grid
+          </Button>
+        )}
         {sessionId && (
           <input
             type="search"
@@ -154,15 +187,15 @@ export default function ResultsEntryClient(): React.JSX.Element {
       {showPaste && sessionId && (
         <div className="mb-4 bg-card rounded-xl border border-border shadow-sm p-4">
           <p className="text-xs text-muted-foreground mb-2">
-            Paste rows as <span className="font-mono">studentId, subjectCode, grade</span> (tab or comma
-            separated — straight from the results spreadsheet). Rows fill the grid below; nothing saves
-            until you click Save.
+            Paste rows as <span className="font-mono">student name (or ID), subjectCode, grade</span>{' '}
+            — tab or comma separated, straight from the results spreadsheet. Rows fill the grid
+            below; nothing saves until you click Save. Use the student ID if two students share a name.
           </p>
           <textarea
             rows={5}
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
-            placeholder={'STU-20260901-A7B3C\t4MB1\tA*\nSTU-20260901-9K2LM\t0610\t7'}
+            placeholder={'Ahmed Hassan\t4MB1\tA*\nSTU-20260901-9K2LM\t0610\t7'}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground font-mono"
           />
           <div className="mt-2 flex justify-end">

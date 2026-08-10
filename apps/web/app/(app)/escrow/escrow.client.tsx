@@ -59,6 +59,7 @@ type Transaction = {
 
 type ChildBalance = {
   id: string;
+  heldBalance?: number;
   name: string;
   grade: number | null;
   escrowBalance: number;
@@ -191,6 +192,11 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
                     {child.escrowBalance.toFixed(2)}
                   </p>
                   <p className="text-xs text-muted-foreground">EGP</p>
+                  {(child.heldBalance ?? 0) > 0 && (
+                    <p className="text-xs text-violet-700 dark:text-violet-400 mt-0.5">
+                      + {(child.heldBalance ?? 0).toFixed(2)} held
+                    </p>
+                  )}
                 </div>
               </div>
             </button>

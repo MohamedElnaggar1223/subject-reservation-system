@@ -172,16 +172,35 @@ export default function SubjectsAdminClient(): React.JSX.Element {
     const lines = importText.split('\n').map((l) => l.trim()).filter(Boolean);
     let ok = 0;
     const errors: string[] = [];
+
+    // Excel's clipboard is TAB-separated but keeps display formatting, so
+    // a price of 15,000 arrives as literal "15,000". Splitting on comma
+    // as well shattered that into two cells, shifted every later column,
+    // and imported the subject at 15 EGP with no error — the first
+    // symptom was a parent paying 15 EGP. Prefer tabs when present, and
+    // strip thousands separators from numbers.
+    const splitCells = (line: string) =>
+      (line.includes('\t') ? line.split('\t') : line.split(/[,;]/)).map((c) => c.trim());
+    const parseMoney = (raw: string | undefined) =>
+      parseFloat((raw ?? '').replace(/[,\s]/g, '').replace(/[^\d.\-]/g, ''));
+
     for (const [i, line] of lines.entries()) {
-      const cells = line.split(/[,;\t]/).map((c) => c.trim());
-      if (i === 0 && /name/i.test(cells[0] ?? '') && /code/i.test(cells[1] ?? '')) continue; // header row
+      const cells = splitCells(line);
+      // Header row: tolerate "Subject"/"Name" and any casing
+      if (i === 0 && /^(name|subject)$/i.test(cells[0] ?? '') ) continue;
+      if (cells.length < 5 || cells.length > 7) {
+        errors.push(
+          `Line ${i + 1}: found ${cells.length} columns, expected 5-7 (name, code, council, level, courseFee, registrationFee, core). If you pasted from Excel, paste the cells directly rather than a comma-formatted copy.`
+        );
+        continue;
+      }
       const [name, code, councilRaw, levelRaw, courseFeeRaw, regFeeRaw, coreRaw] = cells;
       const council = (councilRaw ?? '').toLowerCase().replace(/\s+/g, '_');
       const level = (levelRaw ?? 'igcse').toLowerCase().replace(/\s+/g, '_');
-      const courseFee = parseFloat(courseFeeRaw ?? '');
-      const registrationFee = parseFloat(regFeeRaw ?? '0');
+      const courseFee = parseMoney(courseFeeRaw);
+      const registrationFee = regFeeRaw ? parseMoney(regFeeRaw) : 0;
       if (!name || !code || isNaN(courseFee)) {
-        errors.push(`Line ${i + 1}: needs name, code, and a course fee`);
+        errors.push(`Line ${i + 1}: needs a name, a code, and a numeric course fee`);
         continue;
       }
       if (!['pearson_edexcel', 'cambridge', 'oxford'].includes(council)) {
@@ -345,8 +364,9 @@ export default function SubjectsAdminClient(): React.JSX.Element {
           <h2 className="text-sm font-semibold text-foreground font-display mb-1">Import subjects from Excel</h2>
           <p className="text-xs text-muted-foreground mb-3">
             Paste rows as: <span className="font-mono">name, code, council, level, courseFee, registrationFee, core</span>{' '}
-            (comma / semicolon / tab separated — copy-paste from Excel works). Council: Pearson Edexcel, Cambridge, or
-            Oxford. Level: IGCSE, AS Level, or A Level. Core: yes/no.
+            Paste cells straight from Excel (tab separated), or use commas. Prices may include
+            thousands separators. Council: Pearson Edexcel, Cambridge, or Oxford. Level: IGCSE,
+            AS Level, or A Level. Core: yes/no. Every row is reported back — nothing imports silently.
           </p>
           <textarea
             rows={6}

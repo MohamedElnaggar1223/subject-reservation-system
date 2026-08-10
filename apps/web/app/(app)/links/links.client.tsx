@@ -1,5 +1,22 @@
 "use client";
 
+/** API errors may be a string or a structured object; never render "[object Object]". */
+function errText(data: unknown): string {
+  if (typeof data === 'string') return data;
+  if (data && typeof data === 'object') {
+    const e = (data as { error?: unknown }).error;
+    if (typeof e === 'string') return e;
+    if (e && typeof e === 'object') {
+      const m = (e as { message?: unknown }).message;
+      if (typeof m === 'string') return m;
+    }
+    const m = (data as { message?: unknown }).message;
+    if (typeof m === 'string') return m;
+  }
+  return '';
+}
+
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -113,7 +130,7 @@ export default function LinksClient(): React.JSX.Element {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || "Failed to create link request");
+        throw new Error(errText(data) || "Failed to create link request");
       }
 
       setSuccess("Link request sent successfully!");
@@ -144,7 +161,7 @@ export default function LinksClient(): React.JSX.Element {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || `Failed to ${status} link request`);
+        throw new Error(errText(data) || `Failed to ${status} link request`);
       }
 
       setSuccess(`Link request ${status}!`);

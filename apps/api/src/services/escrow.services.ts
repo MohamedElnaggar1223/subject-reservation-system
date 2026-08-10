@@ -320,16 +320,19 @@ export async function getChildrenEscrowBalances(parentId: string) {
   const escrowAccounts = await db.query.escrow.findMany({
     where: (e, { inArray }) =>
       inArray(e.studentId, children.map((c) => c.id)),
-    columns: { studentId: true, balance: true, id: true },
+    columns: { studentId: true, balance: true, heldBalance: true, id: true },
   });
 
-  const balanceByStudentId = Object.fromEntries(
-    escrowAccounts.map((e) => [e.studentId, e.balance])
+  const byStudentId = Object.fromEntries(
+    escrowAccounts.map((e) => [e.studentId, e])
   );
 
   return children.map((child) => ({
     ...child,
-    escrowBalance: balanceByStudentId[child.id] ?? 0,
+    escrowBalance: byStudentId[child.id]?.balance ?? 0,
+    // Without this a parent who preregistered saw 0.00 next to their
+    // child and reasonably concluded the money had disappeared.
+    heldBalance: byStudentId[child.id]?.heldBalance ?? 0,
   }));
 }
 
