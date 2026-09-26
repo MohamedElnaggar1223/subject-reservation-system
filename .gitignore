@@ -38,3 +38,5 @@ yarn-error.log*
 *.pem
 
 AI_CONTEXT.md
+# Decision logs (show-me-your-work), working artifacts
+.audit/
