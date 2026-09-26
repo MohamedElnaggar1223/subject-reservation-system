@@ -1,0 +1,51 @@
+# CLAUDE.md — subject-reservation-system
+
+Project rules that hold for every agent session in this repo. The general working
+agreements live in the user's global CLAUDE.md; this file only adds what is specific here.
+
+## Read first
+
+`FOUNDATION_AUDIT.md` (what has been proven and what is still open, with finding ids
+RF-nn / RH-nn), `DISCOVERY.md` (assumptions about the school, parked questions, artefacts
+still to obtain — check it before designing any feature), `PATTERNS.md` (the three golden
+rules of the codebase), `V3_PLAN.md` and `UX_AUDIT.md` (why the system is shaped the way it is).
+
+## Models
+
+**Opus 5.5 (`claude-opus-5-5`) is the only model other than the main session that may be
+used in this project.** `.claude/settings.json` forces every subagent onto it; the reviewer
+definition is `.claude/agents/opus-55-reviewer.md`. Never pass `model: "sonnet"`,
+`"haiku"`, or the `"opus"` alias to the Agent tool here (the alias has resolved to Opus 5 and
+Opus 4.6 in the past). A reviewer's last line names its model; a review that does not say
+Opus 5.5 does not count.
+
+## Hono RPC everywhere
+
+Every request to the backend — web, mobile, and tests — goes through the Hono RPC client
+(`hc<AppType>`), so the project is typed end to end. Never hand-type an API response or add a
+generic to `useQuery`; derive row types from the fetcher
+(`Awaited<ReturnType<typeof fetchX>>[number]`). The only raw requests allowed are the two
+better-auth endpoints (sign-up, sign-in), which the apps call through better-auth's own client.
+Response envelopes are typed by `success()` / `error()` in `apps/api/src/lib/response.ts`; do
+not build `{ success, data }` by hand in a route.
+
+## Tests are the proof
+
+`pnpm --filter @repo/api test` runs the integration suite against a real Postgres
+(`apps/api/test/README.md`). Every money path has a scenario there; a change to a money path
+adds or updates one. `pnpm --filter @repo/api check-types` covers the tests too. Both must be
+green, with `pnpm --filter web check-types`, before anything reaches main.
+
+## Git
+
+Work on a branch in a worktree; when the three gates above are green, merge to `main` and
+push it directly — the owner does not want to wait for a merge. Never force-push. Decision
+trails for audits and multi-phase work live in `.audit/*.tsv` (force-added; the directory is
+otherwise ignored so cookies and test accounts never land in git).
+
+## The desk comes first
+
+Staff act on families' behalf at a desk and compare every flow to their spreadsheet. Before
+shipping anything staff-facing, describe the Excel version of the task and beat it on steps
+and memory load (`UX_AUDIT.md` §4). The destination is app-first for families; the desk is
+how the school gets there.
