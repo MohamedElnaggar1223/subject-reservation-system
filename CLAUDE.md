@@ -19,6 +19,18 @@ definition is `.claude/agents/opus-55-reviewer.md`. Never pass `model: "sonnet"`
 Opus 4.6 in the past). A reviewer's last line names its model; a review that does not say
 Opus 5.5 does not count.
 
+If the session started before those files existed, the Agent tool cannot reach the pinned
+model. Use the CLI from Bash instead, which accepts a full model ID and runs as its own
+process:
+
+```bash
+env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT claude -p --model claude-opus-5-5 --output-format text \
+  --allowedTools "Read" "Glob" "Grep" "Bash(git log:*)" "Bash(git show:*)" "Bash(git diff:*)" "Bash(grep:*)" "Bash(cat:*)" "Bash(sed:*)" "Bash(ls:*)" \
+  < review-prompt.md > review.out
+```
+
+Probe first with a one-line "state your model" prompt; it must answer Opus 5.5.
+
 ## Hono RPC everywhere
 
 Every request to the backend — web, mobile, and tests — goes through the Hono RPC client
