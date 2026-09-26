@@ -5,6 +5,7 @@ agreements live in the user's global CLAUDE.md; this file only adds what is spec
 
 ## Read first
 
+`STRATEGY.md` (the plan of record: goal, decisions and why, phases, open questions),
 `FOUNDATION_AUDIT.md` (what has been proven and what is still open, with finding ids
 RF-nn / RH-nn), `DISCOVERY.md` (assumptions about the school, parked questions, artefacts
 still to obtain — check it before designing any feature), `PATTERNS.md` (the three golden
