@@ -952,14 +952,6 @@ const autoArabicText: Record<string, string> = {
   'Please select an image file': 'يرجى اختيار ملف صورة',
   'Image must be 5MB or less': 'يجب ألا تتجاوز الصورة 5 ميجابايت',
   'Failed to upload avatar. Please try again.': 'تعذر رفع الصورة الشخصية. حاول مرة أخرى.',
-  'Add New Todo': 'إضافة مهمة جديدة',
-  'Todo title...': 'عنوان المهمة...',
-  'Description (optional)...': 'الوصف (اختياري)...',
-  'Add Todo': 'إضافة مهمة',
-  'Adding...': 'جار الإضافة...',
-  'Failed to create todo. Please try again.': 'تعذر إنشاء المهمة. حاول مرة أخرى.',
-  'Failed to update todo. Please try again.': 'تعذر تحديث المهمة. حاول مرة أخرى.',
-  'Failed to delete todo. Please try again.': 'تعذر حذف المهمة. حاول مرة أخرى.',
   'Notifications will appear here when there is activity on your account.': 'ستظهر الإشعارات هنا عند حدوث نشاط على حسابك.',
   'No notifications yet': 'لا توجد إشعارات بعد',
   'No unread notifications': 'لا توجد إشعارات غير مقروءة',
@@ -1101,7 +1093,6 @@ const autoArabicText: Record<string, string> = {
   'Oxford': 'أكسفورد',
   'EGP': 'جنيه',
   'IP:': 'عنوان IP:',
-  'Are you sure you want to delete this todo?': 'هل أنت متأكد أنك تريد حذف هذه المهمة؟',
   'Explain why you': 'اشرح سبب',
   'Explain why you want to drop this subject...': 'اشرح سبب رغبتك في حذف هذه المادة...',
   'Explain why you want to swap this subject...': 'اشرح سبب رغبتك في تبديل هذه المادة...',
@@ -1286,7 +1277,6 @@ const autoArabicText: Record<string, string> = {
   'View': 'عرض',
   'PNG, JPG, GIF up to 5MB. Thumbnails will be generated automatically.': 'PNG وJPG وGIF حتى 5 ميجابايت. سيتم إنشاء الصور المصغرة تلقائيًا.',
   'Created': 'تم الإنشاء',
-  'Your Todos (': 'مهامك (',
   'Switch to "All" to see past notifications.': 'انتقل إلى "الكل" لرؤية الإشعارات السابقة.',
   'Awaiting Approval (': 'بانتظار الموافقة (',
   'Processed (': 'تمت المعالجة (',
@@ -1355,7 +1345,6 @@ const autoArabicText: Record<string, string> = {
   'No pending withdrawal requests.': 'لا توجد طلبات سحب معلقة.',
   'No scheduled announcements.': 'لا توجد إعلانات مجدولة.',
   'No subjects have been registered for your children yet.': 'لم يتم تسجيل أي مواد لأبنائك بعد.',
-  'No todos yet. Create one above!': 'لا توجد مهام بعد. أنشئ واحدة أعلاه!',
   'No transactions yet.': 'لا توجد معاملات بعد.',
   'No withdrawal requests yet.': 'لا توجد طلبات سحب بعد.',
   'Old price (': 'السعر القديم (',
@@ -1377,11 +1366,6 @@ const autoArabicText: Record<string, string> = {
   'Manage connections with your children&apos;s accounts': 'إدارة الروابط مع حسابات أبنائك',
   "Manage connections with your children's accounts": 'إدارة الروابط مع حسابات أبنائك',
   'Avatar uploaded successfully:': 'تم رفع الصورة الشخصية بنجاح:',
-  'Failed to create todo:': 'تعذر إنشاء المهمة:',
-  'Failed to update todo:': 'تعذر تحديث المهمة:',
-  'Failed to delete todo:': 'تعذر حذف المهمة:',
-  'Failed to upload file:': 'تعذر رفع الملف:',
-  'Failed to delete file:': 'تعذر حذف الملف:',
   'Failed to upload avatar:': 'تعذر رفع الصورة الشخصية:',
   'CSV download failed:': 'فشل تنزيل CSV:',
   'CSV download error:': 'خطأ في تنزيل CSV:',
@@ -1568,12 +1552,6 @@ function translateDynamicText(text: string): string | null {
 
   const uploadFileMatch = /^Upload (.+)$/.exec(text);
   if (uploadFileMatch) return `رفع ${uploadFileMatch[1]}`;
-
-  const deleteFileMatch = /^Are you sure you want to delete "(.+)"\?$/.exec(text);
-  if (deleteFileMatch) return `هل أنت متأكد أنك تريد حذف "${deleteFileMatch[1]}"؟`;
-
-  const deleteTodoMatch = /^Are you sure you want to delete this todo\?$/.exec(text);
-  if (deleteTodoMatch) return 'هل أنت متأكد أنك تريد حذف هذه المهمة؟';
 
   const deactivateSubjectMatch = /^Deactivate "(.+)"\? It will no longer appear in registration\.$/.exec(text);
   if (deactivateSubjectMatch) return `هل تريد إلغاء تفعيل "${deactivateSubjectMatch[1]}"؟ لن تظهر بعد الآن في التسجيل.`;

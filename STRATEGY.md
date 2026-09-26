@@ -69,6 +69,9 @@ around February. That gives release 1 until roughly January 2027 for setup and i
 | **Teachers become users.** | The pivot makes the V3 "data only" decision irrelevant; the school's own sheet shows teachers signing registrations. The owner asked that past decisions not be treated as constraints. |
 | **Timetabling starts with data plus manual entry and clash detection; generation only after discovery, and then via an existing solver.** | Automated timetabling is NP-hard and a research field of its own; IGCSE option blocks change the problem shape. A generator built first would consume the roadmap. |
 | **Leave true product questions open rather than guess.** | Where the post-remark grade lives, whether a fee waiver is per year, whether a second parent is notified, whether the headline owing includes the school fee — each changes behaviour the school will feel; they are the owner's calls. |
+| **Keep the Expo app as the future mobile client, untouched for now** (owner, 27 Sep 2026). | Mobile parity is future work. The app stays in the workspace as the template it is, outside the gates, until the plan brings it in. |
+| **CI runs the three gates on every pushed branch; merge on green** (27 Sep 2026). | The gates were enforced by discipline only, and a "green" claimed in one checkout had never run in another. The first run on `main` caught a test race no laptop had shown. |
+| **Archive stale documents rather than delete them; the root holds only what is current** (27 Sep 2026). | Agents are told to read context files at the repo root, and stale plans there misled them. The history stays in `docs/archive/` with an index of what each file was and what replaced it. |
 
 ---
 
@@ -181,9 +184,14 @@ before it ships.
    the running environment and the test accounts that exist.
 2. **Money-correctness audit** (Phase 1.2), then **state and time** (Phase 1.3).
 3. **Discovery research pack** in parallel with 1 and 2.
-4. **Housekeeping the audits already named:** decide or delete the untouched Expo app; replace
-   `render.yaml`, which provisions another project; restore the ESLint config; remove the 38
-   remaining manual query generics; close RF-04 and RF-05.
+4. **Housekeeping the audits already named.** Done on 27 Sep 2026: the suite is kept off third
+   parties, CI runs the gates, `render.yaml` (another project's blueprint) and the template
+   setup script are deleted, the template todo and documents screens are removed, stale
+   documents are archived, and the Expo app is kept for future work. Still open: restore the
+   ESLint config; remove the 36 remaining manual query generics (FOUNDATION_AUDIT.md counted
+   38; `grep -rn 'useQuery<' apps/web/app` finds 36 at c0f246e); close RF-04 and RF-05. The
+   security audit also inherits the unused `/v1/files` upload endpoints (see
+   `.audit/housekeeping.tsv`).
 5. **The gate**, once 1–3 are done.
 
 ---
@@ -195,7 +203,8 @@ before it ships.
 - With **several linked parents**, is the earliest link the payer of record, and are the others
   notified of payments?
 - Should the family's **headline "outstanding"** include a required unpaid school fee?
-- **Keep or delete the Expo app**; if kept, when does mobile parity enter the plan?
+- **Keep or delete the Expo app** — decided 27 Sep 2026: keep it for future work (§3). Still
+  open: when mobile parity enters the plan.
 - Which **qualification labels** the school sees: their O.L./A.S./A.2./A.L. or ours?
 - The **day-one import source**: the school's sheet, an SCL export at the grade 9→10 boundary,
   or both?
@@ -213,6 +222,7 @@ before it ships.
 - **Teachers as users** pulls attendance, timetables and gradebooks into scope; the gate must
   bound it.
 - **Operations.** One process runs the scheduler; there is no production deployment, no
-  backups plan, no local file storage; the deployment blueprint belongs to another project.
+  backups plan, no local file storage, and no deployment blueprint for this project (the one
+  in the repo belonged to another project and was deleted on 27 Sep 2026).
 - **Time.** June 2027 registration is the first realistic live cycle; release 1 must be in the
   school's hands by January for setup and import.

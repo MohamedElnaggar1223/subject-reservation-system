@@ -2,6 +2,10 @@
 
 This document explains the key architectural decisions and patterns used in this template.
 
+> The examples use a generic `Todo` resource for illustration. The template's todo feature
+> itself was removed from this repository on 27 Sep 2026; the patterns apply to every
+> feature here.
+
 ## ⚠️ CRITICAL: Hono RPC Type Inference
 
 ### The Golden Rule: NEVER Manually Type API Responses
@@ -200,8 +204,8 @@ export default async function DashboardPage() {
 ### API Routes: Use Middleware
 
 ```typescript
-// apps/api/src/routes/todos.routes.ts
-export const todos = new Hono()
+// apps/api/src/routes/registration.routes.ts
+export const registrations = new Hono()
   .use('*', requireAuth())  // All routes require auth
   .get('/', handler)        // This route is protected
   .post('/', handler)       // This route is protected
@@ -269,10 +273,10 @@ export async function getUserTodos(req: Request) {
 ```
 apps/api/src/
 ├── routes/
-│   ├── todo.routes.ts       # Feature-based routing
+│   ├── registration.routes.ts   # Feature-based routing
 │   └── user.routes.ts
 ├── services/
-│   ├── todo.services.ts     # Business logic
+│   ├── registration.services.ts # Business logic
 │   └── user.services.ts
 ├── middleware/
 │   └── access-control.middleware.ts
@@ -294,8 +298,8 @@ packages/
 │   └── drizzle/             # Migrations
 └── validations/
     ├── src/
-    │   ├── todo/
-    │   │   └── todo.validations.ts  # Feature-based
+    │   ├── registration/
+    │   │   └── registration.validations.ts  # Feature-based
     │   ├── common.validations.ts    # Shared validators
     │   ├── roles.ts                 # Role definitions
     │   └── api-response.ts          # Response unwrapper

@@ -15,11 +15,7 @@ export * from './api-response'
 
 /**
  * Domain-Specific Validations
- *
- * EXAMPLE: Todo validations (demonstrates the pattern)
- * Add your own feature validations below.
  */
-export * from './todo/todo.validations'
 export * from './file/file.validations'
 
 /**

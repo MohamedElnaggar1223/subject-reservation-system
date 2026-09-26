@@ -16,11 +16,7 @@ import { ROLES } from '@repo/validations';
 
 /**
  * Route Imports
- *
- * EXAMPLE: Todo routes (demonstrates the pattern)
- * Add your own route modules below.
  */
-import { todos } from './routes/todo.routes';
 import { files } from './routes/file.routes';
 import { links } from './routes/link.routes';
 import { users } from './routes/user.routes';
@@ -206,19 +202,13 @@ const v1 = new Hono<HonoEnv>()
   /**
    * Feature Routes
    *
-   * EXAMPLE: Todo routes mounted at /v1/todos
-   * - GET    /v1/todos       - List user's todos
-   * - POST   /v1/todos       - Create todo
-   * - GET    /v1/todos/:id   - Get specific todo
-   * - PUT    /v1/todos/:id   - Update todo
-   * - DELETE /v1/todos/:id   - Delete todo (admin only)
-   *
    * File upload routes mounted at /v1/files
    * - POST   /v1/files/avatar   - Upload avatar with thumbnails
    * - POST   /v1/files/document - Upload document
    * - POST   /v1/files          - Upload general file
    * - GET    /v1/files          - List user's files (paginated)
-   * - GET    /v1/files/:id      - Get specific file
+   * - GET    /v1/files/:id      - Get specific file (owner only)
+   * - GET    /v1/files/:id/download - Download a file (owner only)
    * - DELETE /v1/files/:id      - Delete file
    *
    * Parent-Student Link routes mounted at /v1/links
@@ -329,7 +319,6 @@ const v1 = new Hono<HonoEnv>()
   // Previously only four groups were covered, leaving account creation,
   // desk onboarding, and the expensive report endpoints unlimited.
   .use('/*', apiRateLimit)
-  .route('/todos', todos)
   .route('/files', files)
   .route('/links', links)
   .route('/users', users)

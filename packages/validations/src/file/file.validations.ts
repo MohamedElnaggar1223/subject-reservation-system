@@ -4,7 +4,7 @@
  * Validates file upload requests for different use cases.
  * Uses Zod v4 native file() support for File objects.
  *
- * Pattern: Follows todo.validations.ts structure
+ * Pattern: input schemas and their inferred types only (PATTERNS.md rule 3)
  * - Separate schemas for different operations
  * - Only export INPUT types (never response types)
  * - Let Hono RPC infer response types automatically

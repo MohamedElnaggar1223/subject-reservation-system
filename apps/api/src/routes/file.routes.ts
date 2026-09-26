@@ -14,10 +14,11 @@
  * - POST /files/document   - Upload document (PDF, DOCX, etc.)
  * - POST /files            - Upload general file
  * - GET /files             - List user's files (paginated)
- * - GET /files/:id         - Get specific file
+ * - GET /files/:id         - Get specific file (owner only)
+ * - GET /files/:id/download - Download a file (owner only)
  * - DELETE /files/:id      - Delete file (admin or owner)
  *
- * Pattern: Follows todo.routes.ts structure exactly
+ * Pattern: the standard route shape (auth middleware, zValidator, service call, success/error)
  */
 
 import { Hono } from 'hono'

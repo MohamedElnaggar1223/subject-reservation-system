@@ -101,6 +101,7 @@ family's total outstanding and wallet (free + held) in one place.
 - **Divergent status colours**: 8 separate `STATUS_STYLES` maps; `approved` is blue on one
   page and green on the adjacent one.
 - **Orphan routes**: `/documents` and `/todos` are reachable by URL but in no nav — ship or delete.
+  ✅ Done 27 Sep 2026: both pages removed, and the template todo feature with them.
 - Remaining `window.confirm` sites (13 files) are translated by the i18n layer but still
   blocked in kiosk browsers.
 - The rest of the original audit fleet (money-path correctness, state machines, data layer,

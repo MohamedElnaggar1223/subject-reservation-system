@@ -125,60 +125,12 @@ export const accountRelations = relations(account, ({ one }) => ({
  */
 
 /**
- * TODO TABLE
- *
- * EXAMPLE: Demonstrates a typical application table with:
- * - Primary key (id)
- * - User relationship (userId with cascade delete)
- * - Timestamps (createdAt, updatedAt with auto-update)
- * - Index on foreign key for query performance
- * - Nullable text field (description)
- * - Boolean field with default (completed)
- *
- * This is a reference implementation - feel free to modify or remove.
- */
-export const todo = pgTable(
-  "todo",
-  {
-    id: text("id").primaryKey(),
-    title: text("title").notNull(),
-    description: text("description"),
-    completed: boolean("completed").default(false).notNull(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .defaultNow()
-      .$onUpdate(() => new Date())
-      .notNull(),
-  },
-  (table) => [
-    index("todo_userId_idx").on(table.userId),
-  ],
-);
-
-/**
- * TODO RELATIONS
- *
- * Defines relationships for type-safe joins:
- * - Each todo belongs to one user
- * - Each user can have many todos
- */
-export const todoRelations = relations(todo, ({ one }) => ({
-  user: one(user, {
-    fields: [todo.userId],
-    references: [user.id],
-  }),
-}));
-
-/**
  * FILE TABLE
  *
  * Stores metadata for uploaded files with support for variants.
  * Tracks ownership, type, and storage location.
  *
- * Pattern: Similar to todo table with user relationship
+ * Pattern: a user-owned table
  * - Cascade delete removes files when user is deleted
  * - Indexes on userId and fileType for efficient queries
  * - Auto-updating timestamp on modifications
@@ -275,7 +227,6 @@ export const fileVariantRelations = relations(fileVariant, ({ one }) => ({
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
-  todos: many(todo),
   files: many(file),
   linkRequestsAsParent: many(parentStudentLink, { relationName: "parentLinks" }),
   linkRequestsAsStudent: many(parentStudentLink, { relationName: "studentLinks" }),

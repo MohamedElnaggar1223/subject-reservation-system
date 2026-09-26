@@ -4,7 +4,7 @@
  * Handles business logic for file uploads and management.
  * Coordinates between storage (R2) and database.
  *
- * Pattern: Follows todo.services.ts structure
+ * Pattern: the standard service shape (data access only, no HTTP concerns)
  * - Import everything from @repo/db (NEVER from drizzle-orm directly)
  * - Pure business logic (no HTTP concerns)
  * - Return data or throw errors

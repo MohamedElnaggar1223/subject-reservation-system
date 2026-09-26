@@ -35,7 +35,8 @@ Source: `Nov 1 2026.xlsx` (a Google Form export; two session tabs — "June 2023
 - **Homeroom sections**: 11A–11E (~20–23 students each), 12A–12D.
 - **No Grade 10 rows** in either session tab (→ A-01, Q-01).
 - A **teacher is named per registration row** (8 teachers) and a **"Signature" column** is
-  filled by a teacher/coordinator (Manar Madkour, Ihab Samir, Hamdy Elshal) (→ Q-03).
+  filled by a teacher/coordinator (three named staff members; real names are kept out of
+  this repository) (→ Q-03).
 - **"(Carry forward on June 2022)"** and "(Carry forward on November 2022)" appear in the
   Signature column on some rows (→ Q-02).
 - The November 2026 tab contains **18 rows dated January 2027**, all A-Level Biology papers
