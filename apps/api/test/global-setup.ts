@@ -21,8 +21,10 @@ export default async function globalSetup() {
   process.env.DATABASE_URL = TEST_PG_ADMIN_URL;
   const { db, sql } = await import('@repo/db');
 
-  if (!/^[a-z_][a-z0-9_]*$/.test(TEST_DB_NAME)) {
-    throw new Error(`Refusing to use test database name '${TEST_DB_NAME}'`);
+  // env.ts already refuses a name without the _test suffix and a URL that
+  // names a different database; this is the last check before the drop.
+  if (!/^[a-z_][a-z0-9_]*_test$/.test(TEST_DB_NAME)) {
+    throw new Error(`Refusing to drop '${TEST_DB_NAME}': test databases end in _test`);
   }
   await db.execute(sql.raw(`DROP DATABASE IF EXISTS ${TEST_DB_NAME}`));
   await db.execute(sql.raw(`CREATE DATABASE ${TEST_DB_NAME}`));

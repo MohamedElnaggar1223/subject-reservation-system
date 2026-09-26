@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
   admin, staff, onboard, loneStudent, subject, session, refused, one, sql, waitFor, notificationsFor, money,
-  takings, takingsDelta, type Client, type Takings,
+  takings, takingsDelta, openWindow, type Client, type Takings,
 } from './helpers';
 
 /**
@@ -23,11 +23,7 @@ describe('the desk', () => {
     takingsBefore = await takings(officer);
     physics = await subject(adm, 'T0625', 'Physics', { course: 1200, registration: 300 });
     chemistry = await subject(adm, 'T0620', 'Chemistry', { course: 1200, registration: 300 });
-    sessionId = await session(adm, 'November (desk)', 'november', 'igcse', {
-      startDate: '2026-07-01T00:00:00.000Z',
-      endDate: '2027-06-30T23:59:59.000Z',
-      activate: true,
-    });
+    sessionId = await session(adm, 'November (desk)', 'november', 'igcse', { ...openWindow(), activate: true });
   });
 
   it('onboards a walk-in family: parent, grade-11 student, link approved on the spot', async () => {
@@ -98,6 +94,13 @@ describe('the desk', () => {
     expect(toParent[0]?.title).toBe('Payment confirmed — November (desk)');
     expect((await notificationsFor(student.email, 'PAYMENT_CONFIRMED')).length).toBe(1);
     expect((await notificationsFor(officer.email)).length).toBe(0);
+
+    // The payer of record decides whose payment history carries the desk
+    // payment: the parent's own history lists it. (Finance roles see every
+    // payment through the same endpoint, so the officer's list is not a
+    // personal history and proves nothing here.)
+    const parentHistory = await apiResponse(parent.api.v1.payments.$get({ query: {} }));
+    expect(parentHistory.map((p) => p.id)).toContain(paymentId);
   });
 
   it('refuses to take money for a student with no linked parent, but still registers them', async () => {

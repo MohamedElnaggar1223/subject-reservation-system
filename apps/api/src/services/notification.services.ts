@@ -55,6 +55,7 @@ import {
   sendLinkRequestEmail,
   sendLinkDecisionEmail,
 } from '../integrations/email';
+import { clientMessage } from '../lib/response';
 
 // ─── Core Primitives ──────────────────────────────────────────────────────────
 
@@ -1355,8 +1356,11 @@ export async function processScheduledAnnouncements(): Promise<number> {
 
       dispatched++;
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[notification] Failed to dispatch scheduled announcement ${ann.id}:`, errorMsg);
+      // The stored text can reach an admin screen, so it gets the same guard
+      // as a client response (RF-07): a driver error is logged in full here
+      // and stored as a generic sentence.
+      console.error(`[notification] Failed to dispatch scheduled announcement ${ann.id}:`, err);
+      const errorMsg = clientMessage(err, 'Announcement could not be sent');
 
       await db
         .update(scheduledAnnouncement)

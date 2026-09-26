@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, waitFor, notificationsFor, money, type Client,
+  admin, staff, onboard, subject, session, refused, one, sql, waitFor, notificationsFor, money,
+  openWindow, futureWindow, type Client,
 } from './helpers';
 
 /**
@@ -15,6 +16,7 @@ describe('V3 flows', () => {
   let business: string, economics: string, physicsA: string, juneA: string, januaryA: string;
   let preregId: string;
   let scheduleId: string | null = null;
+  let academicYear: string;
 
   afterAll(async () => {
     // Safety net if the gate test failed midway: never leave a schedule
@@ -38,11 +40,9 @@ describe('V3 flows', () => {
     business = await subject(adm, 'T9609', 'Business (AS)', { course: 1100, registration: 300 }, { qualificationLevel: 'a_level' });
     economics = await subject(adm, 'T9708', 'Economics (AS)', { course: 1100, registration: 300 }, { qualificationLevel: 'a_level' });
     physicsA = await subject(adm, 'T9702', 'Physics (A2)', { course: 1200, registration: 300 }, { qualificationLevel: 'a_level' });
-    juneA = await session(adm, 'June (A-Level)', 'june', 'a_level', {
-      startDate: '2026-08-01T00:00:00.000Z',
-      endDate: '2027-05-31T23:59:59.000Z',
-      activate: true,
-    });
+    const window = openWindow();
+    academicYear = window.academicYear;
+    juneA = await session(adm, 'June (A-Level)', 'june', 'a_level', { ...window, activate: true });
     ({ parent, student, studentId } = await onboard(officer, 'v3'));
   });
 
@@ -63,21 +63,22 @@ describe('V3 flows', () => {
   });
 
   it('school-fee gate blocks with a sentence, a waiver unblocks, and all three views agree both ways (RF-10)', async () => {
+    const opensAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const schedule = await apiResponse(
-      finadmin.api.v1['school-fees'].schedules.$post({ json: { academicYear: '2026-2027', amount: 5000, opensAt: '2026-09-01T00:00:00.000Z' } })
+      finadmin.api.v1['school-fees'].schedules.$post({ json: { academicYear, amount: 5000, opensAt } })
     );
     scheduleId = schedule.id;
 
     const twice = await refused(
-      finadmin.api.v1['school-fees'].schedules.$post({ json: { academicYear: '2026-2027', amount: 4000, opensAt: '2026-09-01T00:00:00.000Z' } })
+      finadmin.api.v1['school-fees'].schedules.$post({ json: { academicYear, amount: 4000, opensAt } })
     );
     expect(twice).toEqual({ status: 409, error: 'A schedule for that academic year and grade already exists' });
 
     const blocked = await refused(student.api.v1.registrations.request.$post({ json: { sessionId: juneA, subjectIds: [economics] } }));
-    expect(blocked).toEqual({ status: 400, error: 'The 2026-2027 school fee (5000.00 EGP) must be paid before registering subjects' });
+    expect(blocked).toEqual({ status: 400, error: `The ${academicYear} school fee (5000.00 EGP) must be paid before registering subjects` });
 
     const due = { required: true, waived: false, paid: false, amount: 5000 };
-    expect(await feeViews()).toEqual({ desk: due, due: [{ academicYear: '2026-2027', amount: 5000 }], home: due, status: due });
+    expect(await feeViews()).toEqual({ desk: due, due: [{ academicYear, amount: 5000 }], home: due, status: due });
 
     expect((await refused(officer.api.v1.exceptions.$post({ json: { type: 'fee_waiver', studentId, reason: 'officer may not' } }))).status).toBe(403);
     await apiResponse(finadmin.api.v1.exceptions.$post({ json: { type: 'fee_waiver', studentId, reason: 'scholarship' } }));
@@ -88,7 +89,7 @@ describe('V3 flows', () => {
     // The desk must refuse to take a waived fee, not only hide the button.
     const collect = await refused(officer.api.v1['school-fees']['desk-pay'].$post({ json: { studentId, instrumentUsed: 'cash' } }));
     expect(collect.status).toBe(400);
-    expect(collect.error).toBe('The 2026-2027 school fee is waived for this student — nothing to collect');
+    expect(collect.error).toBe(`The ${academicYear} school fee is waived for this student — nothing to collect`);
     expect(await sql(`select 1 from payment where student_id = $1 and purpose = 'school_fee'`, [studentId])).toEqual([]);
 
     await apiResponse(student.api.v1.registrations.request.$post({ json: { sessionId: juneA, subjectIds: [economics] } }));
@@ -100,17 +101,13 @@ describe('V3 flows', () => {
   });
 
   it('held wallet: preregister for a draft session, pay at the desk into held, capture on activation', async () => {
+    const draft = futureWindow();
     const wrongLevel = await refused(
-      adm.api.v1.sessions.$post({
-        json: { name: 'January IGCSE?', sessionType: 'january', qualificationLevel: 'igcse', startDate: '2027-01-01T00:00:00.000Z', endDate: '2027-03-31T23:59:59.000Z' },
-      })
+      adm.api.v1.sessions.$post({ json: { name: 'January IGCSE?', sessionType: 'january', qualificationLevel: 'igcse', ...draft } })
     );
     expect(wrongLevel.status).toBe(400);
 
-    januaryA = await session(adm, 'January (A-Level)', 'january', 'a_level', {
-      startDate: '2027-01-01T00:00:00.000Z',
-      endDate: '2027-03-31T23:59:59.000Z',
-    });
+    januaryA = await session(adm, 'January (A-Level)', 'january', 'a_level', draft);
     const pre = await apiResponse(parent.api.v1.registrations.preregister.$post({ json: { sessionId: januaryA, subjectIds: [physicsA], studentId } }));
     preregId = pre[0]!.id;
     expect(pre[0]).toMatchObject({ status: 'preregistered', priceAtRegistration: 1500 });
@@ -159,7 +156,8 @@ describe('V3 flows', () => {
     expect(second.error).toContain('Cambridge accepts only ONE enquiry');
 
     const payEarly = await refused(parent.api.v1.remarks[':id'].pay.$post({ param: { id: remark.id }, json: { paymentMethod: 'in_school' } }));
-    expect(payEarly.status).toBeGreaterThanOrEqual(400);
+    expect(payEarly.error).toBe('Request is not awaiting payment');
+    expect(payEarly.status).toBeLessThan(500);
 
     await apiResponse(parent.api.v1.remarks[':id'].consent.$post({ param: { id: remark.id }, json: { attest: true } }));
     expect((await one<{ status: string }>(`select status from remark_request where id = $1`, [remark.id])).status).toBe('pending_payment');

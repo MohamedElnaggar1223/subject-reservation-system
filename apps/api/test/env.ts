@@ -13,6 +13,18 @@ export const TEST_PG_ADMIN_URL =
 export const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ?? TEST_PG_ADMIN_URL.replace(/\/[^/?]+(\?.*)?$/, `/${TEST_DB_NAME}$1`);
 
+// The run drops TEST_DB_NAME. Refuse anything that is not obviously a test
+// database, and refuse a DATABASE_URL that names a different database than
+// the one being dropped and migrated — both mistakes would otherwise only
+// show up after the drop.
+if (!/^[a-z_][a-z0-9_]*_test$/.test(TEST_DB_NAME)) {
+  throw new Error(`TEST_DB_NAME must end in _test (got '${TEST_DB_NAME}')`);
+}
+const urlDb = /\/([^/?]+)(\?.*)?$/.exec(TEST_DATABASE_URL)?.[1];
+if (urlDb !== TEST_DB_NAME) {
+  throw new Error(`TEST_DATABASE_URL names database '${urlDb}' but TEST_DB_NAME is '${TEST_DB_NAME}'`);
+}
+
 const defaults: Record<string, string> = {
   NODE_ENV: 'test',
   PORT: '3999', // never listened on; env.ts requires >= 1

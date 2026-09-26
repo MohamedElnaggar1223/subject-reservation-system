@@ -207,10 +207,18 @@ export function money(v: unknown): number {
   return Math.round(Number(v) * 100) / 100;
 }
 
-export type Takings = {
-  cashIn: number; escrowApplied: number; byInstrument: Record<string, number>;
-  reversedTotal: number; cashRefunded: number; cashOut: number; net: number;
-};
+/**
+ * Today's date as the server sees it. getDailyTakings reads `${date}T00:00:00`
+ * as local midnight, so the date must be the local one, not the UTC one —
+ * otherwise the first hours of each Cairo day query yesterday.
+ */
+export function localToday(): string {
+  return new Date().toLocaleDateString('en-CA');
+}
+
+const fetchTakings = (officer: Client, date: string) =>
+  apiResponse(officer.api.v1.payments['daily-takings'].$get({ query: { date } }));
+export type Takings = Awaited<ReturnType<typeof fetchTakings>>['totals'];
 
 /**
  * Today's takings totals. The report is global for the day and the suites
@@ -218,15 +226,48 @@ export type Takings = {
  * absolute figures.
  */
 export async function takings(officer: Client): Promise<Takings> {
-  const date = new Date().toISOString().slice(0, 10);
-  const r = await apiResponse(officer.api.v1.payments['daily-takings'].$get({ query: { date } }));
-  return r.totals as Takings;
+  return (await fetchTakings(officer, localToday())).totals;
+}
+
+// ─── Dates that never expire ─────────────────────────────────────────────────
+// The suite must pass on any day, so no test hard-codes a year. Sessions are
+// placed relative to today; academic years follow the API's own rule
+// (1 July rollover, see school-fee.services.ts academicYearForDate).
+
+export function academicYearOf(d: Date): string {
+  const y = d.getFullYear();
+  return d.getMonth() >= 6 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+}
+
+const days = (n: number) => n * 24 * 60 * 60 * 1000;
+
+/** A window that is already open today and lies inside today's academic year. */
+export function openWindow(): { startDate: string; endDate: string; academicYear: string } {
+  const now = new Date();
+  const ayStart = new Date(now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1, 6, 1);
+  const start = new Date(Math.max(ayStart.getTime(), now.getTime() - days(1)));
+  return {
+    startDate: start.toISOString(),
+    endDate: new Date(now.getTime() + days(300)).toISOString(),
+    academicYear: academicYearOf(start),
+  };
+}
+
+/** A window that has not opened yet (a draft session). */
+export function futureWindow(): { startDate: string; endDate: string } {
+  const now = new Date();
+  return {
+    startDate: new Date(now.getTime() + days(90)).toISOString(),
+    endDate: new Date(now.getTime() + days(180)).toISOString(),
+  };
 }
 
 export function takingsDelta(before: Takings, after: Takings) {
   const inst: Record<string, number> = {};
-  for (const k of new Set([...Object.keys(before.byInstrument), ...Object.keys(after.byInstrument)])) {
-    inst[k] = money((after.byInstrument[k] ?? 0) - (before.byInstrument[k] ?? 0));
+  const b = before.byInstrument as Record<string, number>;
+  const a = after.byInstrument as Record<string, number>;
+  for (const k of new Set([...Object.keys(b), ...Object.keys(a)])) {
+    inst[k] = money((a[k] ?? 0) - (b[k] ?? 0));
   }
   return {
     cashIn: money(after.cashIn - before.cashIn),

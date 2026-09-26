@@ -17,7 +17,7 @@ config();
 config({ path: "../../apps/api/.env" });
 
 // Dynamic import so the Pool is created AFTER DATABASE_URL is set
-const { db, subject, registrationSession, user, eq, sql } = await import("./src/index");
+const { db, subject, registrationSession, user, eq } = await import("./src/index");
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -299,27 +299,16 @@ async function seed() {
       courseFee: s.priceInSchool - SEED_REGISTRATION_FEE,
       registrationFee: SEED_REGISTRATION_FEE,
     };
+    // Subjects belong to the admins once they exist (the same rule RF-02
+    // applies to sessions): every column here — fees, custom price, core flag,
+    // active flag — is editable in the app, so a re-run must not touch an
+    // existing row. It only creates the ones that are missing. A subject an
+    // old seed left priced at zero is repaired in the admin UI, not by re-running.
     await db
       .insert(subject)
       .values({ ...s, ...fees })
-      .onConflictDoUpdate({
-        target: subject.code,
-        set: {
-          name: s.name,
-          council: s.council,
-          priceInSchool: s.priceInSchool,
-          // Fees are admin-edited once a subject exists (the same rule RF-02
-          // applies to sessions): a re-run only repairs rows still priced at
-          // zero and never overwrites a fee someone set in the app.
-          courseFee: sql`case when ${subject.courseFee} + ${subject.registrationFee} = 0 then excluded.course_fee else ${subject.courseFee} end`,
-          registrationFee: sql`case when ${subject.courseFee} + ${subject.registrationFee} = 0 then excluded.registration_fee else ${subject.registrationFee} end`,
-          isOfferedAtSchool: s.isOfferedAtSchool,
-          customPrice: s.customPrice,
-          isCore: s.isCore,
-          isActive: s.isActive,
-        },
-      });
-    console.log(`  [subject] ${s.code} - ${s.name}`);
+      .onConflictDoNothing({ target: subject.code });
+    console.log(`  [subject] ${s.code} - ${s.name} (created if missing)`);
   }
   console.log("");
 

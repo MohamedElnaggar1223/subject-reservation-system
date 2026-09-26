@@ -72,17 +72,17 @@ To tear down: `docker rm -f igcse-audit-db` and stop the two preview servers.
 | 16 | Held wallet: draft session → preregister (price locked) → in-school payment → held +1500, receipt born → parent sees held → activate → captured to confirmed, held 0 | green, **first ever run** | 33 |
 | 17 | Results → remark (2 papers, fee per paper) → Cambridge one-shot rule refuses a second request → consent → pay → confirm → submit to board → outcome → fee refunded to escrow on grade change | green, **first ever run**; the consent-before-payment gate itself was not tested (consent was given before pay was tried, row 51); refund flag confirmed in DB in row 47 | 34, 47, 51 |
 | 18 | Desk search finds the student by name in the UI | green | 36 |
-| 19 | Student 360 renders parents, owed total, escrow, school fee, exceptions, every registration with receipt state and Hand Over / Print actions, recent payments — one screen | green (but see RF-10); opened by an in-page click, see UI note | 37 |
-| 20 | Parent signs in via the UI and is sent straight to Pending Approvals because a child request is waiting | green | 40 |
+| 19 | Student 360 renders parents, owed total, escrow, school fee, exceptions, every registration with receipt state and Hand Over / Print actions, recent payments — one screen | renders and routes correctly (but see RF-10); opened by a scripted in-page click, so this proves rendering, not that a person can operate it (row 63) | 37, 63 |
+| 20 | Parent signs in and is sent straight to Pending Approvals because a child request is waiting | renders and routes correctly; the sign-in was scripted (form_input + requestSubmit), see row 63 | 40, 63 |
 | 21 | Parent dashboard leads with actions: total outstanding, pay, approve, wallet, both open windows with countdowns | green | 41 |
 
-UI note: screenshots worked until about 16:18 (the sign-in page and the officer's Desk were
-seen rendered); after that the browser pane was hidden, screenshots timed out, and harness mouse
-clicks stopped reaching React handlers. Pages were then read as text and DOM, and the desk result
-row and Sign Out were clicked from inside the page (rows 36, 38). The most likely cause is the
-hidden pane, but a real pointer-events or overlay defect on the desk result rows is **not
-excluded** (row 55): the button was found enabled at a valid position and two trusted clicks did
-nothing. The UX audit must verify real-mouse click-through with a visible pane.
+UI note: harness clicks, typing and screenshots worked until 16:16:47, when the run set a
+1280×800 viewport emulation; the first screenshot timeout came one second later and every failed
+harness click afterwards happened under that emulation, which was only cleared at 16:30:46 (row
+58). Pages were read as text and DOM instead, and the desk result row and Sign Out were clicked
+from inside the page (rows 36, 38). So the likely cause is the emulation, not the app, but a
+pointer-events or overlay defect on the desk result rows is still not excluded (row 55). The UX
+audit should rerun with a visible pane and no emulation before drawing any conclusion.
 
 ---
 
@@ -95,12 +95,12 @@ carries the exact evidence.
 |---|---|---|---|---|---|
 | **RF-03** | **High** | A desk payment records the **finance officer** as `payment.parentId`, so the payment-confirmed notification goes to the officer and the real parent gets nothing. Same on desk school-fee collection. | The desk is the primary channel. A family pays 3000 EGP at the desk and their app shows no notification; the officer's inbox fills with other families' confirmations. | `apps/api/src/services/desk.services.ts:254`, `:339`; recipients read from that field in `notification.services.ts:612-628` | 11, 13, 16 |
 | **RF-08** | **High** | A payment reversal notifies **nobody**. The registration silently drops to pending payment and the paper receipt the family holds is voided in the system without their knowledge. | Every other money movement notifies parent and student. This one invalidates a physical document and says nothing. | `reversePayment` at `apps/api/src/services/payment.services.ts:785` contains no notification call (verified, row 48); receipt voided | 30, 48 |
-| **RF-10** | **High** | With an active `fee_waiver`, the desk Student 360 and the parent's school-fee page report the fee as **required and unpaid**, while the parent's home summary reports it as **paid** (`paid: true` for a fee that was never paid). Only the registration gate is simply correct. | The officer sees "school fee due — EGP 5,000" with three collect buttons for a family the finance admin waived; the parent's fee page tells them to pay; their dashboard tells them they already paid 5,000 EGP. Three screens, three answers, and the desk one takes money. | waiver ignored in `desk.services.ts` `getStudentSummary` and `school-fee.services.ts:137` `getSchoolFeeStatus`; waiver mapped to `paid = true` in `home.services.ts:83`; only the gate at `school-fee.services.ts:127` is right | 39, 44 |
+| **RF-10** | **High** | With an active `fee_waiver`, the desk Student 360 (observed) and the school-fee status API (observed) report the fee as **required and unpaid**; only the home summary and the registration gate consult the waiver. The desk fee-collection endpoint took the same view and would have charged the waived family (confirmed by test after the fix). | The officer sees "school fee due — EGP 5,000" with three collect buttons for a family the finance admin waived, and the collect endpoint would accept the money. An earlier version of this row also claimed the parent's dashboard said the fee was paid; that was wrong — the home summary's `paid: true` was its "nothing required" default and the dashboard hides a fee that is not required (row 57). | waiver ignored in `desk.services.ts` `getStudentSummary` and `collectSchoolFeeAtDesk`, and in `school-fee.services.ts:137` `getSchoolFeeStatus`; the gate at `school-fee.services.ts:127` and `home.services.ts` were right | 39, 44, 57 |
 | RF-07 | Medium | **Repo-wide:** 51 route handlers in 14 files return `err.message` to the client unguarded; the `clientMessage` guard that swallows driver errors is used at only 10 call sites in 5 files. Reproduced on the duplicate-InstaPay-reference path, where the parent receives the full `UPDATE payment SET …` statement with column names. | Information disclosure (schema) wherever a database error reaches one of those handlers, plus parents reading "Failed query" instead of a sentence. PROJECT_AUDIT.md's claim that driver errors were stopped is broadly false, not false on one route. | reproduced at `apps/api/src/routes/payment.routes.ts:299`; guard at `apps/api/src/lib/response.ts:33`; scope by grep in row 45 | 27, 45 |
-| RF-09 | Medium | A remark outcome with `gradeChanged: true` and a per-paper `gradeAfter` leaves `registration.gradeReceived` at the **old grade**. | The grade of record that retake detection and any future graduation plan read is stale after a successful remark. The schema has no field for the new syllabus grade. | `packages/validations/src/remark/remark.validations.ts:112-124`; remark service outcome handler | 35 |
+| RF-09 | Medium | A remark outcome with `gradeChanged: true` and a per-paper `gradeAfter` leaves `registration.gradeReceived` at the **old grade**. This is a schema gap, not a code bug: the outcome contract has no field for the new syllabus grade, so the fix is a product decision on where that grade lives (row 62). | The grade of record that retake detection and any future graduation plan read is stale after a successful remark. | `packages/validations/src/remark/remark.validations.ts:112-124`; remark service outcome handler | 35, 62 |
 | RF-01 | Medium | The seed writes only the legacy `priceInSchool`; `courseFee` and `registrationFee` stay 0, so **every seeded subject prices at 0 EGP** under the V3 engine. | GETTING_STARTED and TESTING_GUIDE both send people through the seed. A fresh install or demo shows free subjects. | `packages/db/seed.ts:44-53` | 5 |
 | RF-02 | Medium | Re-running the seed **resets `registration_session.status`** to the seeded values (June back to active, November back to draft). | The seed's own instructions say to re-run it after creating the admin. On a live DB that reopens a closed window; the scheduler then has to close it again. | `packages/db/seed.ts` session upsert `set: { status }` | 7 |
-| RF-05 | Low | A parent **direct** registration sends the student a `REGISTRATION_REQUEST_RECEIVED` notification — the type meant for a parent receiving a child's request. | Student sees "request received" for something already approved. Wrong type, wrong copy. | registration direct path in `registration.services.ts` | 23 |
+| RF-05 | Low (naming nit) | A parent **direct** registration stores the student's notification under the `REGISTRATION_REQUEST_RECEIVED` type. The title the student actually sees is "X registered subjects for you", so only the type enum is misused; an earlier version of this row claimed wrong copy that was never observed (row 60). | Filters and icons keyed on the type mislabel the notification; nothing the student reads is wrong. | `notification.services.ts:514-519` | 23, 60 |
 | RF-04 | Low | The desk registration response returns registrations with `status: pending_payment` although the rows are already `confirmed`. | A client trusting the response shows "pending payment" right after cash was taken. | `desk.services.ts` returns the pre-confirmation snapshot | 12 |
 
 RF-06 was reserved for the withdrawal approval stamp, which turned out correct (log row 22); the
@@ -134,12 +134,16 @@ id is unused.
   needs live dates.
 - **Receipt numbers are id-derived** (`RCP-3E10CFA0BD`), not the sequential `RCP-2026-000123`
   V3_PLAN §6.5 describes. Cosmetic; matters only if the school wants a counter.
-- **UI screenshots stopped working about 16:18** (the browser pane was hidden, so the page did
-  not composite). Page text and DOM were read instead; the UX audit should rerun the visual
-  checks and the print preview with a visible pane.
-- **Another app on this machine is pointed at port 3001.** The API log carried requests for
-  `/v1/citywide/*` and `/v1/talent-dashboard/summary`, routes that do not exist in this repo.
-  Harmless here, but any absence-of-request claim taken from that stream is weak (row 53).
+- **UI screenshots stopped working at 16:16:47**, when the run set a viewport emulation (see the
+  UI note under §3). Page text and DOM were read instead; the UX audit should rerun the visual
+  checks and the print preview with a visible pane and no emulation.
+- **This audit's API answered another project's traffic.** Another app on this machine targets
+  port 3001; its requests for `/v1/citywide/*` and `/v1/talent-dashboard/summary` reached the
+  audit API, so §2's "nothing shared was touched" is not quite true: that app got this API's
+  answers while the audit ran. Extra traffic cannot hide a missing log line, so the row-36
+  negative is weak only for lacking a positive control (rows 53, 59).
+- **Row 8 proves less than it says:** the grade-progression guard ran with zero students, so it
+  shows only that the run row was not inserted twice (row 64).
 
 ---
 
@@ -221,7 +225,38 @@ Two more findings came out of building the test harness (§ Tests below):
 | RH-01 | Medium | The API carried better-auth's `nextCookies()` plugin, a Next.js-only integration. Every server-side `auth.api.*` call (desk onboarding creates accounts that way) tried to import `next/headers`, which does not exist in the API; under plain Node the failure was swallowed, under vitest it surfaced. | Plugin removed from `apps/api/src/lib/auth.ts`. |
 | RH-02 | Medium | The repo's long-standing "several RPC endpoints infer `never`" quirk had one cause: `success()` typed its body through `c.json<ApiResponse<T>>`, and Hono's `JSONParsed` mapped type dropped the `data` key while `T` was a deferred generic. Every route using the helper typed as `{ success: true }` on the client, and call sites in the apps cast by hand. | Explicit `SuccessResponse`/`ErrorResponse` return types in `apps/api/src/lib/response.ts`; eight manual query generics removed and four screens' types derived from their fetchers in the web app; 38 harmless manual generics remain for the engineering-health audit. |
 
-Still open: RF-09 (grade of record after a remark), RF-05, RF-04, and the observations in §5.
+**Third pass, from the Opus 5.5 reviews of the fixes and the harness** (rows 10–16 of
+`.audit/spine-fixes.tsv`, 17–26 of `.audit/test-harness.tsv`):
+
+- The reversal's receipt check and void now run inside the transaction under a row lock, and
+  the voided numbers come from the update itself; before, a receipt handed over between the
+  check and the void was neither blocked nor voided yet named as void in the family's notice.
+- `onError` passes Hono's own `HTTPException` through; the first version turned every
+  malformed-request or body-limit 4xx into a 500.
+- The seed no longer touches an existing subject at all (every column is admin-editable; a
+  re-run would have reactivated a deactivated subject). Verified: fresh database 17 of 17
+  priced; an admin-edited row survives a re-run unchanged.
+- The text stored for a failed scheduled announcement goes through the same guard as client
+  responses, closing the last path a driver error could take to a screen.
+- The student's change-request listing now matches the parent's fully (`requestedByUser`
+  included), so the claim of one response type is true.
+- The web auth client carried the same Next-only `nextCookies()` plugin as the API; removed.
+  The RH-01 story is also narrower than first written: desk onboarding did work under plain
+  Node, and browser clients were never affected because the plugin returns early for HTTP.
+- Checkout derives its summary and payment types from the RPC fetchers; the hand-written ones
+  had drifted (grade as a string). The 38 remaining manual `useQuery` generics are a named
+  risk, not "harmless": a hand type looser than the API compiles and hides drift.
+- The suite no longer has an expiry date: sessions are placed relative to today and the
+  academic year follows the API's 1 July rule; takings use the local date the server reads.
+  The database-drop guard requires a `_test` suffix and a matching URL. Assertions tightened
+  where a review found them loose.
+- Recorded caveats on the response helpers: pass the status explicitly when it is not 200
+  (an unpassed status with an explicit generic types 201 but sends 200), and the envelopes
+  drop the unused `message?`/`details?` fields.
+
+Still open: RF-09 (grade of record after a remark), RF-05, RF-04, and the observations in §5,
+plus one product question the reviews sharpened: a fee waiver carries no academic year, so an
+open-ended waiver settles every year until it expires.
 
 ### Tests
 
@@ -232,15 +267,25 @@ in-process app, so the tests are typed end to end; outcomes are asserted by read
 database back. 19 scenarios cover checkpoints 3–17 of §3 plus RF-03, RF-07, RF-08 and RF-10,
 and one `todo` marks RF-09.
 
-## 10. What the cross-model review changed
+## 10. What the cross-model reviews changed
 
-A reviewer on Claude Opus 5 read the log and the transcript after the run and raised 15 flags
-(log rows 42–56 answer each). The ones that changed this document: five log-row pointers were
-off by one (fixed); RF-10 gained the home summary's `paid: true` for a fee never paid; RF-07
-grew from one route to 51 handlers in 14 files; checkpoints 8 and 17 were reworded because the
-registration-fee component and the consent gate were never exercised; three claims that rested
-on API responses or inference (approved link, remark refund flag, RF-08's cause) were verified
-in the database and code; the screenshot statement was corrected; and four observations were
-added for the money, state, and product audits. Two flags were judged accurate but not
-actionable here: the transcript self-check was circular (only the `file:line` check was real),
-and the `.gitignore` edit that hides `.audit/` was made without a log row at the time.
+**First review (Claude Opus 5; superseded).** It was launched at 16:28 before rows 37–41
+existed and, under the repo's model rule, does not count; it is kept here because its flags
+were acted on. It raised 15 flags (rows 42–56 answer each). The ones that changed this
+document: five log-row pointers were off by one (fixed); RF-07 grew from one route to 51
+handlers in 14 files; checkpoints 8 and 17 were reworded because the registration-fee
+component and the consent gate were never exercised; three claims that rested on API responses
+or inference (approved link, remark refund flag, RF-08's cause) were verified in the database
+and code; and four observations were added for the money, state, and product audits. One of
+its flags was accepted wrongly: the claim that the parent dashboard reported a waived fee as
+paid (see RF-10 and row 57).
+
+**Second review (Claude Opus 5.5, `claude-opus-5-5`, run as its own process with read-only
+tools).** Nine flags, answered in rows 57–65. It reversed the wrong RF-10 extension; named the
+viewport emulation, not a hidden pane, as the likely cause of the failed harness clicks and
+corrected the onset time; drew the right lesson from the foreign traffic on port 3001; downgraded
+RF-05 to a naming nit; split RF-03 into notification and payer-of-record, the second of which is
+now asserted by the desk test through the parent's payment history; reclassified RF-09 as a
+schema gap needing a product decision; and reworded checkpoints 19–20 as scripted rather than
+operated. Three report claims that had no trail row (phones keep their leading zero, stale seed
+dates, id-derived receipt numbers) now have one (row 65).

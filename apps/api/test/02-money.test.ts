@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, waitFor, notificationsFor, money,
-  takings, takingsDelta, type Client, type Takings,
+  takings, takingsDelta, openWindow, type Client, type Takings,
 } from './helpers';
 
 /**
@@ -25,11 +25,7 @@ describe('money paths', () => {
     history = await subject(adm, 'T0470', 'History', { course: 1100, registration: 400 });
     biology = await subject(adm, 'T0610', 'Biology', { course: 1200, registration: 300 });
     ict = await subject(adm, 'T0417', 'ICT', { course: 1200, registration: 300 });
-    sessionId = await session(adm, 'June (money)', 'june', 'igcse', {
-      startDate: '2026-08-01T00:00:00.000Z',
-      endDate: '2027-04-30T23:59:59.000Z',
-      activate: true,
-    });
+    sessionId = await session(adm, 'June (money)', 'june', 'igcse', { ...openWindow(), activate: true });
     ({ parent, student, studentId } = await onboard(officer, 'money'));
 
     // Give the family 1500 EGP of free escrow the way it really happens:

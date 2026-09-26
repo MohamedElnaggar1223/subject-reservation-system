@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { getConnInfo } from '@hono/node-server/conninfo'
 import { Hono } from 'hono'
+import { HTTPException } from 'hono/http-exception'
 import { cors } from 'hono/cors'
 import { auth } from './lib/auth'
 import { HonoEnv } from './lib/types';
@@ -99,7 +100,14 @@ const app = new Hono<HonoEnv>()
 // is logged with the request id and answered generically — never with the
 // error text (RF-07).
 .onError((err, c) => {
-  logger.error(`[${c.get('requestId') ?? '-'}] unhandled ${c.req.method} ${c.req.path}: ${err.message}`);
+  // Hono's own HTTP exceptions (body limits, malformed requests, auth
+  // helpers) carry the right status and a safe message — pass them through.
+  if (err instanceof HTTPException) return err.getResponse();
+  const cause = (err as { cause?: unknown }).cause;
+  logger.error(
+    `[${c.get('requestId') ?? '-'}] unhandled ${c.req.method} ${c.req.path}: ${err.message}` +
+      (cause instanceof Error ? ` | cause: ${cause.message}` : '')
+  );
   return c.json({ success: false, error: 'Internal server error' }, 500);
 })
 .use('*', async (c, next) => {

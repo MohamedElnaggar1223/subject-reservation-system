@@ -799,23 +799,11 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
   }
 
   const regIds = pay.paymentRegistrations.map((l) => l.registrationId);
-  // Receipts still at the desk get voided below; the family is told which
-  // numbers stop being valid (RF-08).
+  // Receipts still at the desk get voided inside the transaction below, under
+  // a row lock, and the family is told which numbers stop being valid (RF-08).
+  // Checking them here, before the transaction, left a window in which an
+  // officer could hand a receipt over between the check and the void.
   let voidedReceiptNumbers: string[] = [];
-
-  if (regIds.length > 0) {
-    const receipts = await db.query.receipt.findMany({
-      where: (r, { inArray }) => inArray(r.registrationId, regIds),
-      columns: { id: true, status: true, receiptNumber: true },
-    });
-    const outOfDesk = receipts.filter((r) => r.status !== 'pending_issue' && r.status !== 'void');
-    if (outOfDesk.length > 0) {
-      throw new Error(
-        `Receipts already handed out (${outOfDesk.map((r) => r.receiptNumber).join(', ')}) — take them back before reversing`
-      );
-    }
-    voidedReceiptNumbers = receipts.filter((r) => r.status === 'pending_issue').map((r) => r.receiptNumber);
-  }
 
   const { receipt } = await import('@repo/db');
   let registrationsReverted = 0;
@@ -836,6 +824,20 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
     if (!updated) throw new Error('Payment was concurrently processed');
 
     if (regIds.length > 0) {
+      // Lock the receipts for the duration of the transaction so a concurrent
+      // hand-over cannot slip between the check and the void.
+      const receipts = await tx
+        .select({ status: receipt.status, receiptNumber: receipt.receiptNumber })
+        .from(receipt)
+        .where(inArray(receipt.registrationId, regIds))
+        .for('update');
+      const outOfDesk = receipts.filter((r) => r.status !== 'pending_issue' && r.status !== 'void');
+      if (outOfDesk.length > 0) {
+        throw new Error(
+          `Receipts already handed out (${outOfDesk.map((r) => r.receiptNumber).join(', ')}) — take them back before reversing`
+        );
+      }
+
       // Only confirmed rows revert; count those, not every linked row.
       const reverted = await tx
         .update(registration)
@@ -844,10 +846,12 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
         .returning({ id: registration.id });
       registrationsReverted = reverted.length;
 
-      await tx
+      const voided = await tx
         .update(receipt)
         .set({ status: 'void', notes: `Voided — payment reversed: ${reason}`, updatedAt: new Date() })
-        .where(and(inArray(receipt.registrationId, regIds), eq(receipt.status, 'pending_issue')));
+        .where(and(inArray(receipt.registrationId, regIds), eq(receipt.status, 'pending_issue')))
+        .returning({ receiptNumber: receipt.receiptNumber });
+      voidedReceiptNumbers = voided.map((v) => v.receiptNumber);
     }
 
     if (pay.escrowAmountApplied > 0) {

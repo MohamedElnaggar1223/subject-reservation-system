@@ -50,14 +50,6 @@ type Transaction = {
   createdAt: string;
 };
 
-type ChildBalance = {
-  id: string;
-  heldBalance?: number;
-  name: string;
-  grade: number | null;
-  escrowBalance: number;
-};
-
 interface EscrowClientProps {
   userRole: string | null;
   userId: string;
@@ -80,9 +72,10 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
       ),
     enabled: !isParent || !!selectedChildId,
   });
-  // The balance endpoint answers with a bare balance for a student who has
-  // no escrow row yet and with the full account otherwise; only the latter
-  // carries a held balance.
+  // The balance endpoint answers with a bare `{ balance: 0, message }` when a
+  // parent has not selected a child yet, and with the full account otherwise
+  // (a student without an escrow row still gets heldBalance: 0). Only the
+  // full shape carries a held balance.
   const heldBalance = balance && 'heldBalance' in balance ? balance.heldBalance : 0;
 
   // Transaction history (auto-updates when child changes)

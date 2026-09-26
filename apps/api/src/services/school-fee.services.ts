@@ -148,8 +148,12 @@ export async function schoolFeeGateReason(
  * home summary reported a waived fee as paid.
  *
  * - required: an open schedule applies and the student is not waived
- * - waived:   an active fee_waiver exception exists
- * - paid:     a completed school_fee payment exists — never inferred
+ * - waived:   an active fee_waiver exception exists. A waiver is per student,
+ *             bounded only by validUntil — it carries no academic year, so an
+ *             open-ended waiver settles every year until it is revoked or
+ *             expires. Whether a waiver should be per year is a product
+ *             decision (see the money audit's open items).
+ * - paid:     a completed school_fee payment exists for `academicYear` — never inferred
  * - settled:  nothing is owed (no fee, waived, or paid)
  */
 export async function getSchoolFeeStanding(

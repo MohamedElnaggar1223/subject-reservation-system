@@ -836,6 +836,7 @@ export async function getPendingChangeRequests(
         },
       },
       newSubject: { columns: { id: true, name: true, code: true } },
+      requestedByUser: { columns: { id: true, name: true } },
     },
     orderBy: (cr, { desc }) => [desc(cr.createdAt)],
   });

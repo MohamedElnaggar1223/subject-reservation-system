@@ -370,8 +370,10 @@ export async function collectSchoolFeeAtDesk(
  * The family member of record for money taken at the desk (RF-03). Desk
  * money belongs to the family, not to the officer taking it: the earliest
  * approved linked parent becomes payment.parentId so payment confirmations
- * reach them. With several linked parents the first one linked is the payer
- * of record; the others still hear about it through their link.
+ * reach them. With several linked parents the earliest link wins, which is
+ * an arbitrary tie-break; the other parents are NOT notified today (NOT-010,
+ * "every linked parent hears about their child", is deferred to the
+ * notification audit).
  *
  * A student with no approved parent link cannot pay at the desk: there would
  * be nobody to notify and nobody accountable for the money. The officer

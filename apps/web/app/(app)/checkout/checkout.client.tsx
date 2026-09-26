@@ -20,6 +20,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
+import type { InferRequestType } from 'hono/client';
 import { apiResponse } from '@repo/validations';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import {
@@ -33,29 +34,16 @@ interface CheckoutClientProps {
   registrationIds: string[];
 }
 
-type CheckoutSummary = {
-  registrations: Array<{
-    id: string;
-    priceAtRegistration: number;
-    status: string;
-    subject: { name: string; code: string };
-    session: { name: string; sessionType: string };
-    student: { id: string; name: string; grade: string | null };
-  }>;
-  totalCost: number;
-  escrowBalance: number;
-  student: { id: string; name: string; grade: string | null };
-};
+// Typed by the API, never by hand (PATTERNS.md): both shapes are extracted
+// from the RPC fetchers. The hand-written versions this replaces had drifted
+// (grade typed as a string while the column is an integer).
+const fetchCheckoutSummary = (registrationIds: string) =>
+  apiResponse(api.v1.payments['checkout-summary'].$get({ query: { registrationIds } }));
+type CheckoutSummary = Awaited<ReturnType<typeof fetchCheckoutSummary>>;
 
-type PaymentResult = {
-  id: string;
-  paymentMethod: string;
-  amount: number;
-  escrowAmountApplied: number;
-  externalReference: string | null;
-  metadata: Record<string, unknown>;
-  status?: string;
-};
+const initiatePayment = (json: InferRequestType<typeof api.v1.payments.initiate.$post>['json']) =>
+  apiResponse(api.v1.payments.initiate.$post({ json }));
+type PaymentResult = Awaited<ReturnType<typeof initiatePayment>>;
 
 export default function CheckoutClient({ registrationIds }: CheckoutClientProps) {
   const router = useRouter();
@@ -74,30 +62,20 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
 
   const { data: summary, isLoading, isError } = useQuery({
     queryKey: ['payments', 'checkout-summary', summaryKey],
-    queryFn: () =>
-      apiResponse(
-        api.v1.payments['checkout-summary'].$get({
-          query: { registrationIds: summaryKey },
-        })
-      ),
+    queryFn: () => fetchCheckoutSummary(summaryKey),
   });
 
   const initiateMutation = useMutation({
     mutationFn: async () => {
       const escrowToApply = applyEscrow ? Math.min(escrowAmount, summary?.escrowBalance ?? 0, summary?.totalCost ?? 0) : 0;
 
-      return apiResponse(
-        api.v1.payments.initiate.$post({
-          json: {
-            registrationIds,
-            paymentMethod: selectedMethod,
-            escrowAmountToApply: escrowToApply,
-          },
-        })
-      );
+      return initiatePayment({
+        registrationIds,
+        paymentMethod: selectedMethod,
+        escrowAmountToApply: escrowToApply,
+      });
     },
-    onSuccess: (data) => {
-      const payment = data as PaymentResult;
+    onSuccess: (payment) => {
       setResult(payment);
       setSubmitError('');
 
@@ -231,7 +209,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                   Paid from escrow
                 </p>
                 <p className="text-2xl font-bold text-emerald-900 dark:text-emerald-200">
-                  {result.escrowAmountApplied.toFixed(2)} EGP
+                  {(result.escrowAmountApplied ?? 0).toFixed(2)} EGP
                 </p>
                 <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-2">
                   A receipt has been emailed to you. Your subjects are confirmed.
@@ -270,7 +248,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                       ['Account Name', instapay?.account.accountName],
                       ['Account Number', instapay?.account.accountNumber],
                       ...(instapay?.account.iban ? [['IBAN', instapay.account.iban]] : []),
-                      ['Exact Amount', `${(instapay?.amountDue ?? result.amount).toFixed(2)} EGP`],
+                      ['Exact Amount', `${(instapay?.amountDue ?? result.amount ?? 0).toFixed(2)} EGP`],
                     ].map(([label, value]) => (
                       <div key={label as string} className="flex justify-between gap-4">
                         <dt className="text-violet-700 dark:text-violet-400">{label}</dt>
@@ -300,9 +278,9 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
                       <Button
                         size="sm"
                         className="mt-3 w-full bg-violet-600 hover:bg-violet-700 text-white"
-                        disabled={submitRefMutation.isPending || instapayRef.trim().length < 4}
+                        disabled={submitRefMutation.isPending || instapayRef.trim().length < 4 || !result.id}
                         onClick={() =>
-                          submitRefMutation.mutate({ paymentId: result.id, reference: instapayRef.trim() })
+                          submitRefMutation.mutate({ paymentId: result.id ?? '', reference: instapayRef.trim() })
                         }
                       >
                         {submitRefMutation.isPending ? 'Submitting…' : 'Submit Reference'}
