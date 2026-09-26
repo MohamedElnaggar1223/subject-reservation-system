@@ -203,6 +203,43 @@ export async function notificationsFor(email: string, type?: string) {
   );
 }
 
+/**
+ * The notifications of one type a user has received, once there are `count`
+ * of them. Notifications are written after the response, fire-and-forget,
+ * and each recipient is a separate insert: reading a second recipient right
+ * after the first one's row appeared raced on the CI runner (main run
+ * 36276996869, 26 Sep 2026). Always wait per recipient.
+ */
+export async function notified(email: string, type: string, count: number) {
+  return waitFor(async () => {
+    const rows = await notificationsFor(email, type);
+    return rows.length === count ? rows : null;
+  });
+}
+
+/**
+ * Audit actions recorded against the given entities, once `expected` are all
+ * present. Route handlers log audit rows fire-and-forget after the service
+ * call, so the row can land after the response (same CI run as above).
+ */
+export async function audited(entityIds: string[], expected: string[]) {
+  const placeholders = entityIds.map((_, i) => `$${i + 1}`).join(', ');
+  return waitFor(async () => {
+    const rows = await sql<{ action: string }>(
+      `select action from audit_log where entity_id in (${placeholders}) order by created_at`, entityIds
+    );
+    const actions = rows.map((r) => r.action);
+    const remaining = [...actions];
+    const allPresent = expected.every((e) => {
+      const i = remaining.indexOf(e);
+      if (i === -1) return false;
+      remaining.splice(i, 1);
+      return true;
+    });
+    return allPresent ? actions : null;
+  });
+}
+
 export function money(v: unknown): number {
   return Math.round(Number(v) * 100) / 100;
 }

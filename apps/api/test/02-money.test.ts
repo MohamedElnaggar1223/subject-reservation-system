@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, waitFor, notificationsFor, money,
+  admin, staff, onboard, subject, session, refused, one, sql, notified, money,
   takings, takingsDelta, openWindow, type Client, type Takings,
 } from './helpers';
 
@@ -75,13 +75,10 @@ describe('money paths', () => {
     expect(money((await one<{ balance: string }>(`select balance from escrow where student_id = $1`, [studentId])).balance)).toBe(1000);
 
     // Second PAYMENT_CONFIRMED for this family (the first was the History desk payment in setup).
-    const toParent = await waitFor(async () => {
-      const n = await notificationsFor(parent.email, 'PAYMENT_CONFIRMED');
-      return n.length === 2 ? n : null;
-    });
+    const toParent = await notified(parent.email, 'PAYMENT_CONFIRMED', 2);
     // The confirmation names the full 1500 the payment settled (1000 transferred + 500 escrow), not the transfer alone.
     expect(toParent[1]?.body).toContain('Payment of EGP 1500.00 via instapay has been confirmed');
-    expect((await notificationsFor(student.email, 'PAYMENT_CONFIRMED')).length).toBe(2);
+    await notified(student.email, 'PAYMENT_CONFIRMED', 2);
   });
 
   it('refuses a reference already used by another payment with a sentence, not SQL (RF-07)', async () => {
@@ -132,14 +129,11 @@ describe('money paths', () => {
     );
     expect(refund.map((x) => [money(x.amount), x.reason])).toEqual([[500, 'payment_refund']]);
 
-    const toParent = await waitFor(async () => {
-      const n = await notificationsFor(parent.email, 'PAYMENT_REVERSED');
-      return n.length === 1 ? n : null;
-    });
+    const toParent = await notified(parent.email, 'PAYMENT_REVERSED', 1);
     expect(toParent[0]?.body).toContain(`Receipt ${biologyReceiptNumber} is no longer valid`);
     expect(toParent[0]?.body).toContain('EGP 1500.00');
     expect(toParent[0]?.body).toContain('1 registration is back to pending payment');
-    expect((await notificationsFor(student.email, 'PAYMENT_REVERSED')).length).toBe(1);
+    await notified(student.email, 'PAYMENT_REVERSED', 1);
 
     // The reversed InstaPay payment drops out of cashIn and shows as reversed.
     expect(takingsDelta(takingsBefore, await takings(officer))).toMatchObject({

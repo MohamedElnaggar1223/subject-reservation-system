@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
-  admin, staff, onboard, loneStudent, subject, session, refused, one, sql, waitFor, notificationsFor, money,
+  admin, staff, onboard, loneStudent, subject, session, refused, one, sql, notified, audited, notificationsFor, money,
   takings, takingsDelta, openWindow, type Client, type Takings,
 } from './helpers';
 
@@ -73,10 +73,13 @@ describe('the desk', () => {
     expect(receipts.map((x) => x.status)).toEqual(['pending_issue', 'pending_issue']);
     for (const x of receipts) expect(x.receipt_number).toMatch(/^RCP-[0-9A-F]{10}$/);
 
-    const actions = await sql<{ action: string }>(
-      `select action from audit_log where entity_id in ($1, $2, $3) order by created_at`, [physicsReg, chemistryReg, studentId]
+    // DESK_REGISTRATION is logged after the response; wait for it rather
+    // than read the table the instant the request returns.
+    const actions = await audited(
+      [physicsReg, chemistryReg, studentId],
+      ['DESK_FAMILY_ONBOARDED', 'REGISTRATION_CONFIRMED', 'REGISTRATION_CONFIRMED', 'DESK_REGISTRATION']
     );
-    expect(actions.map((a) => a.action)).toEqual(
+    expect(actions).toEqual(
       expect.arrayContaining(['DESK_FAMILY_ONBOARDED', 'REGISTRATION_CONFIRMED', 'REGISTRATION_CONFIRMED', 'DESK_REGISTRATION'])
     );
   });
@@ -87,12 +90,9 @@ describe('the desk', () => {
     );
     expect(payer).toMatchObject({ email: parent.email, role: 'parent', confirmed_by: officer.id });
 
-    const toParent = await waitFor(async () => {
-      const n = await notificationsFor(parent.email, 'PAYMENT_CONFIRMED');
-      return n.length === 1 ? n : null;
-    });
+    const toParent = await notified(parent.email, 'PAYMENT_CONFIRMED', 1);
     expect(toParent[0]?.title).toBe('Payment confirmed — November (desk)');
-    expect((await notificationsFor(student.email, 'PAYMENT_CONFIRMED')).length).toBe(1);
+    await notified(student.email, 'PAYMENT_CONFIRMED', 1);
     expect((await notificationsFor(officer.email)).length).toBe(0);
 
     // The payer of record decides whose payment history carries the desk
@@ -160,8 +160,8 @@ describe('the desk', () => {
     );
     expect(ledger.map((l) => [money(l.amount), l.type, l.reason, l.balance_type])).toEqual([[1500, 'credit', 'drop', 'free']]);
 
-    await waitFor(async () => (await notificationsFor(parent.email, 'ESCROW_BALANCE_CHANGED')).length === 1 || null);
-    expect((await notificationsFor(student.email, 'DROP_SWAP_PROCESSED')).length).toBe(1);
+    await notified(parent.email, 'ESCROW_BALANCE_CHANGED', 1);
+    await notified(student.email, 'DROP_SWAP_PROCESSED', 1);
   });
 
   it('reconciles the day: this family added 3000 cash in and nothing out', async () => {
