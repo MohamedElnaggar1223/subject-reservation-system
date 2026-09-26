@@ -72,7 +72,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
 
   const summaryKey = registrationIds.join(',');
 
-  const { data: summary, isLoading, isError } = useQuery<CheckoutSummary>({
+  const { data: summary, isLoading, isError } = useQuery({
     queryKey: ['payments', 'checkout-summary', summaryKey],
     queryFn: () =>
       apiResponse(

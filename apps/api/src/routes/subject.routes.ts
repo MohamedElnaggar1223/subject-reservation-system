@@ -149,7 +149,7 @@ export const subjects = new Hono<HonoEnv>()
       } catch (err) {
         // Post-merge validation errors (e.g. removing customPrice from a non-school subject)
         if (err instanceof Error) {
-          return error(c, err.message, 400);
+          return error(c, clientMessage(err, 'Failed to update subject'), 400);
         }
         throw err;
       }

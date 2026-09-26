@@ -818,6 +818,7 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
   }
 
   const { receipt } = await import('@repo/db');
+  let registrationsReverted = 0;
 
   await db.transaction(async (tx) => {
     const [updated] = await tx
@@ -835,10 +836,13 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
     if (!updated) throw new Error('Payment was concurrently processed');
 
     if (regIds.length > 0) {
-      await tx
+      // Only confirmed rows revert; count those, not every linked row.
+      const reverted = await tx
         .update(registration)
         .set({ status: 'pending_payment', updatedAt: new Date() })
-        .where(and(inArray(registration.id, regIds), eq(registration.status, 'confirmed')));
+        .where(and(inArray(registration.id, regIds), eq(registration.status, 'confirmed')))
+        .returning({ id: registration.id });
+      registrationsReverted = reverted.length;
 
       await tx
         .update(receipt)
@@ -868,10 +872,10 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
     amount: pay.amount + pay.escrowAmountApplied,
     reason,
     voidedReceiptNumbers,
-    registrationsReverted: regIds.length,
+    registrationsReverted,
   }).catch((err) => console.error('[notification] PAYMENT_REVERSED failed:', err));
 
-  return { reversed: true, registrationsReverted: regIds.length };
+  return { reversed: true, registrationsReverted };
 }
 
 /**

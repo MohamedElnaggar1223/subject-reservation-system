@@ -5,10 +5,13 @@ import { createAuthMiddleware } from "better-auth/api";
 import { db } from "@repo/db";
 import { expo } from "@better-auth/expo";
 import { admin } from "better-auth/plugins";
+// NOTE: no nextCookies() here. That plugin is for better-auth running inside a
+// Next.js server; this is a standalone Hono API. With it present, every
+// server-side auth.api.* call (desk onboarding creates accounts that way)
+// tried to import next/headers, which does not exist in this process.
 import { ac, studentRole, adminRole, parentRole, financeOfficerRole, financeAdminRole } from './permissions'
 import { ROLES, CommonSchemas } from '@repo/validations';
 import { corsOrigins, env } from '../env';
-import { nextCookies } from 'better-auth/next-js';
 import { sendPasswordResetEmail, sendEmailVerificationEmail } from '../integrations/email';
 
 /**
@@ -41,7 +44,6 @@ export const auth = betterAuth({
         [ROLES.FINANCE_ADMIN]: financeAdminRole,
       }
     }),
-    nextCookies()
   ],
 
   emailAndPassword: {

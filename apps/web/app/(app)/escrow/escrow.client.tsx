@@ -42,13 +42,6 @@ const TRANSACTION_STYLES: Record<string, string> = {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type EscrowBalance = {
-  studentId: string;
-  balance: number;
-  heldBalance?: number;
-  escrowId: string | null;
-};
-
 type Transaction = {
   id: string;
   type: string;
@@ -77,7 +70,7 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
   const activeStudentId = isParent ? (selectedChildId ?? null) : userId;
 
   // Fetch own balance (student) or current child's balance (parent)
-  const { data: balance } = useQuery<EscrowBalance>({
+  const { data: balance } = useQuery({
     queryKey: ['escrow', 'balance', activeStudentId ?? userId],
     queryFn: () =>
       apiResponse(
@@ -87,9 +80,13 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
       ),
     enabled: !isParent || !!selectedChildId,
   });
+  // The balance endpoint answers with a bare balance for a student who has
+  // no escrow row yet and with the full account otherwise; only the latter
+  // carries a held balance.
+  const heldBalance = balance && 'heldBalance' in balance ? balance.heldBalance : 0;
 
   // Transaction history (auto-updates when child changes)
-  const { data: transactions = [], isLoading: txLoading } = useQuery<Transaction[]>({
+  const { data: transactions = [], isLoading: txLoading } = useQuery({
     queryKey: ['escrow', 'transactions', activeStudentId ?? userId],
     queryFn: () =>
       apiResponse(
@@ -101,7 +98,7 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
   });
 
   // Parent: all children's balances
-  const { data: children = [] } = useQuery<ChildBalance[]>({
+  const { data: children = [] } = useQuery({
     queryKey: ['escrow', 'children'],
     queryFn: () => apiResponse(api.v1.escrow.children.$get()),
     enabled: isParent,
@@ -126,9 +123,9 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
             {(balance?.balance ?? 0).toFixed(2)}{' '}
             <span className="text-lg text-muted-foreground font-normal font-sans">EGP</span>
           </p>
-          {(balance?.heldBalance ?? 0) > 0 && (
+          {heldBalance > 0 && (
             <p className="text-sm text-violet-700 dark:text-violet-400 mt-2">
-              + {(balance?.heldBalance ?? 0).toFixed(2)} EGP held for preregistered subjects
+              + {heldBalance.toFixed(2)} EGP held for preregistered subjects
               (auto-applied when their session opens)
             </p>
           )}
@@ -213,8 +210,8 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
             </h2>
             <div className="text-sm font-bold text-foreground">
               Balance: {(balance?.balance ?? 0).toFixed(2)} EGP
-              {(balance?.heldBalance ?? 0) > 0 && (
-                <span className="text-violet-700 dark:text-violet-400"> · Held: {(balance?.heldBalance ?? 0).toFixed(2)} EGP</span>
+              {heldBalance > 0 && (
+                <span className="text-violet-700 dark:text-violet-400"> · Held: {heldBalance.toFixed(2)} EGP</span>
               )}
             </div>
           </div>

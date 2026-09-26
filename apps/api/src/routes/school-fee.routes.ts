@@ -62,13 +62,9 @@ export const schoolFees = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] SCHOOL_FEE_SCHEDULE_CREATED failed:', err));
       return success(c, created, 201);
     } catch (err) {
+      // The service maps the unique violation to an 'already exists' sentence.
       const message = clientMessage(err, 'Failed to create schedule');
-      const status = /unique|duplicate/i.test(message)
-        ? 409
-        : 400;
-      return error(c, /unique|duplicate/i.test(message)
-        ? 'A schedule for that academic year and grade already exists'
-        : message, status);
+      return error(c, message, /already exists/i.test(message) ? 409 : 400);
     }
   })
 

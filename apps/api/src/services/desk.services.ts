@@ -246,7 +246,9 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
   }
 
   const paymentId = randomUUID();
-  const payerParentId = await resolvePayerParent(data.studentId, staffId);
+  // Only money needs a payer of record; register-only desk actions (family
+  // pays later) can proceed for a student who is not linked yet.
+  const payerParentId = data.collectNow ? await resolvePayerParent(data.studentId) : staffId;
 
   const created = await db.transaction(async (tx) => {
     const inserted = await tx.insert(registration).values(records).returning();
@@ -331,14 +333,20 @@ export async function collectSchoolFeeAtDesk(
   // today falls in, which left officers unable to pay the year that was
   // actually blocking the registration in front of them.
   const academicYear = requestedAcademicYear ?? academicYearForDate(new Date());
-  const fee = await getApplicableFee(academicYear, student.grade ?? null);
+  // Same source of truth as every screen (RF-10): a waived family must not
+  // be charged at the desk any more than shown a "due" badge.
+  const standing = await getSchoolFeeStanding(studentId, student.grade ?? null, academicYear);
+  const fee = standing.fee;
   if (!fee) throw new Error('No school fee is currently open for this student');
-  if (await hasCompletedSchoolFeePayment(studentId, academicYear)) {
+  if (standing.waived) {
+    throw new Error(`The ${academicYear} school fee is waived for this student — nothing to collect`);
+  }
+  if (standing.paid) {
     throw new Error(`The ${academicYear} school fee is already paid`);
   }
 
   const paymentId = randomUUID();
-  const payerParentId = await resolvePayerParent(studentId, staffId);
+  const payerParentId = await resolvePayerParent(studentId);
   await db.insert(payment).values({
     id: paymentId,
     studentId,
@@ -362,16 +370,25 @@ export async function collectSchoolFeeAtDesk(
  * The family member of record for money taken at the desk (RF-03). Desk
  * money belongs to the family, not to the officer taking it: the earliest
  * approved linked parent becomes payment.parentId so payment confirmations
- * reach them. Falls back to the staff id only when the student has no
- * approved parent link at all.
+ * reach them. With several linked parents the first one linked is the payer
+ * of record; the others still hear about it through their link.
+ *
+ * A student with no approved parent link cannot pay at the desk: there would
+ * be nobody to notify and nobody accountable for the money. The officer
+ * onboards the parent first (one form, see onboardFamily) and tries again.
  */
-async function resolvePayerParent(studentId: string, staffId: string): Promise<string> {
+async function resolvePayerParent(studentId: string): Promise<string> {
   const link = await db.query.parentStudentLink.findFirst({
     where: (l, { eq, and }) => and(eq(l.studentId, studentId), eq(l.status, 'approved')),
     orderBy: (l, { asc }) => [asc(l.createdAt)],
     columns: { parentId: true },
   });
-  return link?.parentId ?? staffId;
+  if (!link) {
+    throw new Error(
+      'This student has no linked parent — use New Family (Onboard) to add the parent before taking money'
+    );
+  }
+  return link.parentId;
 }
 
 // ─── Student 360 (G2) ────────────────────────────────────────────────────────

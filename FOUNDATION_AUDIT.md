@@ -190,7 +190,7 @@ the seed once to promote it (RF-02 applies), and create staff through `POST /v1/
 
 ---
 
-## 10. Fixed on this branch (26 September 2026, same day)
+## 9. Fixed on this branch (26 September 2026, same day)
 
 Six of the nine findings were fixed before the remaining audits, because three are desk money
 communications and the seed ones break every fresh environment. Each was verified at runtime the
@@ -205,9 +205,34 @@ same way it was found; the trail is `.audit/spine-fixes.tsv`.
 | RF-01 | Seed writes `courseFee` + `registrationFee` (placeholder 300 EGP board fee, see DISCOVERY F-02) | brand-new database: 17 of 17 subjects priced, split sums to the legacy price |
 | RF-02 | Session seed never touches an existing session | seed re-run on the live database left every status unchanged |
 
+A second cross-model review of these fixes (log `.audit/spine-fixes.tsv` and the trail in
+`.audit/test-harness.tsv`) found four gaps, all closed the same day: the desk fee-collection
+endpoint still charged a waived family (now refused with a sentence); the seed re-run
+overwrote admin-edited fees (now repairs zero-priced rows only); the sweep had turned the
+duplicate-schedule 409 into a generic 400 (the service now maps the unique violation) and
+missed one non-ternary handler; and an unlinked student silently made the officer the payer
+again (money at the desk now requires a linked parent, register-only still works). A global
+`onError` handler also answers anything thrown outside a handler with a generic 500.
+
+Two more findings came out of building the test harness (§ Tests below):
+
+| ID | Sev | Finding | Fix |
+|---|---|---|---|
+| RH-01 | Medium | The API carried better-auth's `nextCookies()` plugin, a Next.js-only integration. Every server-side `auth.api.*` call (desk onboarding creates accounts that way) tried to import `next/headers`, which does not exist in the API; under plain Node the failure was swallowed, under vitest it surfaced. | Plugin removed from `apps/api/src/lib/auth.ts`. |
+| RH-02 | Medium | The repo's long-standing "several RPC endpoints infer `never`" quirk had one cause: `success()` typed its body through `c.json<ApiResponse<T>>`, and Hono's `JSONParsed` mapped type dropped the `data` key while `T` was a deferred generic. Every route using the helper typed as `{ success: true }` on the client, and call sites in the apps cast by hand. | Explicit `SuccessResponse`/`ErrorResponse` return types in `apps/api/src/lib/response.ts`; eight manual query generics removed and four screens' types derived from their fetchers in the web app; 38 harmless manual generics remain for the engineering-health audit. |
+
 Still open: RF-09 (grade of record after a remark), RF-05, RF-04, and the observations in §5.
 
-## 9. What the cross-model review changed
+### Tests
+
+The foundation run is now the repo's first automated suite: `apps/api/test/`, run with
+`pnpm --filter @repo/api test` against a Postgres it may create databases in (see
+`apps/api/test/README.md`). Every request goes through the Hono RPC client bound to the
+in-process app, so the tests are typed end to end; outcomes are asserted by reading the
+database back. 19 scenarios cover checkpoints 3–17 of §3 plus RF-03, RF-07, RF-08 and RF-10,
+and one `todo` marks RF-09.
+
+## 10. What the cross-model review changed
 
 A reviewer on Claude Opus 5 read the log and the transcript after the run and raised 15 flags
 (log rows 42–56 answer each). The ones that changed this document: five log-row pointers were

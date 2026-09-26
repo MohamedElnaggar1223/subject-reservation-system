@@ -36,49 +36,12 @@ import { Button } from '~/components/ui/button';
 
 type AuditUser = { id: string; name: string; role: string | null } | null;
 
-type ChangeRequestAudit = {
-  id: string;
-  type: 'drop' | 'swap';
-  status: string;
-  reason: string;
-  priceAtRequest: number;
-  priceDifference: number;
-  comments: string | null;
-  createdAt: string;
-  processedAt: string | null;
-  newSubject: { id: string; name: string; code: string | null } | null;
-  requestedByUser: { id: string; name: string } | null;
-  approvedByUser:  { id: string; name: string } | null;
-};
+type ChangeRequestAudit = HistoryRegistration['changeRequests'][number];
 
-type HistoryRegistration = {
-  id: string;
-  studentId: string;
-  priceAtRegistration: number;
-  status: string;
-  approvalComments: string | null;
-  droppedAt: string | null;
-  approvedAt: string | null;
-  createdAt: string;
-  subject: {
-    id: string;
-    name: string;
-    code: string | null;
-    council: string;
-    isCore: boolean | null;
-  };
-  session: {
-    id: string;
-    name: string;
-    sessionType: string;
-    status: string;
-    startDate: string;
-    endDate: string;
-  };
-  requestedByUser: AuditUser;
-  approvedByUser:  AuditUser;
-  changeRequests:  ChangeRequestAudit[];
-};
+// Typed by the API, never by hand (PATTERNS.md): extract the row type from the fetcher.
+const fetchHistory = (studentId?: string) =>
+  apiResponse(api.v1.registrations.history.$get({ query: studentId ? { studentId } : {} }));
+type HistoryRegistration = Awaited<ReturnType<typeof fetchHistory>>[number];
 
 const fetchChildren = () => apiResponse(api.v1.links.children.$get());
 type LinkedChild = Awaited<ReturnType<typeof fetchChildren>>[number];
@@ -278,14 +241,9 @@ export default function HistoryClient({ userRole, userId, initialStudentId }: Hi
   });
 
   // History data
-  const { data: history = [], isLoading } = useQuery<HistoryRegistration[]>({
+  const { data: history = [], isLoading } = useQuery({
     queryKey: ['registrations', 'history', targetStudentId],
-    queryFn: () =>
-      apiResponse(
-        api.v1.registrations.history.$get({
-          query: isParent && targetStudentId ? { studentId: targetStudentId } : {},
-        })
-      ),
+    queryFn: () => fetchHistory(isParent && targetStudentId ? targetStudentId : undefined),
     enabled: !!targetStudentId,
   });
 

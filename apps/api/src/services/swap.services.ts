@@ -831,6 +831,8 @@ export async function getPendingChangeRequests(
         with: {
           subject: { columns: { id: true, name: true, code: true } },
           session: { columns: { id: true, name: true, sessionType: true } },
+          // Same shape as the parent listing so the route has one response type
+          student: { columns: { id: true, name: true, grade: true } },
         },
       },
       newSubject: { columns: { id: true, name: true, code: true } },

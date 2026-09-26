@@ -1,24 +1,45 @@
-import type { Context } from 'hono';
-import type { ApiResponse } from '@repo/validations';
-import { ContentfulStatusCode } from 'hono/utils/http-status';
+import type { Context, TypedResponse } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import type { JSONParsed } from 'hono/utils/types';
+
+/**
+ * Response envelopes as the RPC client sees them.
+ *
+ * The return types are spelled out on purpose. Letting `c.json<ApiResponse<T>>`
+ * infer them ran Hono's JSONParsed mapped type over an object whose `data`
+ * was still the deferred generic `T`, and that mapping dropped the `data`
+ * key entirely — every route using success() typed as `{ success: true }`
+ * on the client, the shared unwrapper inferred `never`, and call sites in
+ * the apps cast responses by hand. Keeping JSONParsed on the `data` value
+ * alone resolves correctly once T is known.
+ */
+export type SuccessResponse<T, U extends ContentfulStatusCode = 200> =
+  Response & TypedResponse<{ success: true; data: JSONParsed<T> }, U, 'json'>;
+export type ErrorResponse<U extends ContentfulStatusCode = 500> =
+  Response & TypedResponse<{ success: false; error: string }, U, 'json'>;
 
 /**
  * Simple wrapper for successful responses
  * Use when you just want to return data with success: true
  */
-export function success<T>(c: Context, data: T, statusCode: ContentfulStatusCode = 200) {
-  return c.json<ApiResponse<T>>({ success: true, data }, statusCode);
+export function success<T, U extends ContentfulStatusCode = 200>(
+  c: Context,
+  data: T,
+  statusCode?: U
+): SuccessResponse<T, U> {
+  return c.json({ success: true as const, data }, (statusCode ?? 200) as U) as unknown as SuccessResponse<T, U>;
 }
 
 /**
  * Simple wrapper for error responses
  * Use when you want to return an error with success: false
  */
-export function error(c: Context, message: string, statusCode: ContentfulStatusCode = 500) {
-  return c.json<ApiResponse<never>>({ 
-    success: false, 
-    error: message 
-  }, statusCode);
+export function error<U extends ContentfulStatusCode = 500>(
+  c: Context,
+  message: string,
+  statusCode?: U
+): ErrorResponse<U> {
+  return c.json({ success: false as const, error: message }, (statusCode ?? 500) as U) as unknown as ErrorResponse<U>;
 }
 
 /**
@@ -37,8 +58,13 @@ export function clientMessage(err: unknown, fallback: string): string {
   // `cause` is the pg error — so check both, and never echo query text
   // (RF-07: 51 handlers were passing this straight to parents).
   const hasCode = (e: unknown) => typeof (e as { code?: unknown } | null)?.code === 'string';
-  if (hasCode(err) || hasCode((err as { cause?: unknown }).cause)) return fallback;
-  if (/^Failed query/i.test(err.message)) return fallback;
+  const hidden = hasCode(err) || hasCode((err as { cause?: unknown }).cause) || /^Failed query/i.test(err.message);
+  if (hidden) {
+    // The client gets the fallback; the operator must still see the cause.
+    const cause = (err as { cause?: unknown }).cause;
+    console.error(`[api] hidden from client ("${fallback}"):`, err.message, cause instanceof Error ? `| cause: ${cause.message}` : '');
+    return fallback;
+  }
   return err.message;
 }
 

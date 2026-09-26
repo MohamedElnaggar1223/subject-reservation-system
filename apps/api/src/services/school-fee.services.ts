@@ -32,18 +32,28 @@ export function academicYearForDate(date: Date): string {
 // ─── Schedule management ─────────────────────────────────────────────────────
 
 export async function createSchedule(data: CreateSchoolFeeScheduleType) {
-  const [created] = await db
-    .insert(schoolFeeSchedule)
-    .values({
-      id: randomUUID(),
-      academicYear: data.academicYear,
-      grade: data.grade ?? null,
-      amount: data.amount,
-      opensAt: data.opensAt,
-      dueAt: data.dueAt ?? null,
-    })
-    .returning();
-  return created;
+  try {
+    const [created] = await db
+      .insert(schoolFeeSchedule)
+      .values({
+        id: randomUUID(),
+        academicYear: data.academicYear,
+        grade: data.grade ?? null,
+        amount: data.amount,
+        opensAt: data.opensAt,
+        dueAt: data.dueAt ?? null,
+      })
+      .returning();
+    return created;
+  } catch (err) {
+    // One schedule per (year, grade). Drizzle wraps the pg unique violation;
+    // the code sits on `cause` (same shape as the InstaPay reference path).
+    const cause = (err as { cause?: { code?: string } } | null)?.cause;
+    if (cause?.code === '23505' || (err as { code?: string } | null)?.code === '23505') {
+      throw new Error('A schedule for that academic year and grade already exists');
+    }
+    throw err;
+  }
 }
 
 export async function updateSchedule(id: string, data: UpdateSchoolFeeScheduleType) {

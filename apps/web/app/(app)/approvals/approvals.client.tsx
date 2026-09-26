@@ -76,7 +76,7 @@ export default function ApprovalsClient(): React.JSX.Element {
 
   // ─── Query ─────────────────────────────────────────────────────────────────
 
-  const { data: pending = [] } = useSuspenseQuery<PendingRegistration[]>({
+  const { data: pending = [] } = useSuspenseQuery({
     queryKey: ['registrations', 'pending'],
     queryFn: () => apiResponse(api.v1.registrations.pending.$get()),
   });
@@ -628,22 +628,9 @@ export default function ApprovalsClient(): React.JSX.Element {
 
 // ─── Change Requests Section ─────────────────────────────────────────────────
 
-type ChangeRequestEntry = {
-  id: string;
-  type: 'drop' | 'swap';
-  status: string;
-  reason: string;
-  priceAtRequest: number;
-  priceDifference: number;
-  createdAt: string;
-  registration: {
-    priceAtRegistration: number;
-    subject: { name: string; code: string | null };
-    session: { name: string };
-    student: { id: string; name: string; grade: number | null };
-  };
-  newSubject: { name: string; code: string | null } | null;
-};
+// Typed by the API, never by hand (PATTERNS.md): extract the row type from the fetcher.
+const fetchParentChangeRequests = () => apiResponse(api.v1['change-requests'].$get({ query: {} }));
+type ChangeRequestEntry = Awaited<ReturnType<typeof fetchParentChangeRequests>>[number];
 
 function ChangeRequestsSection() {
   const qc = useQueryClient();
@@ -655,9 +642,9 @@ function ChangeRequestsSection() {
   const [rejectComment, setRejectComment]   = useState('');
   const [crError, setCrError] = useState('');
 
-  const { data: changeRequests = [] } = useQuery<ChangeRequestEntry[]>({
+  const { data: changeRequests = [] } = useQuery({
     queryKey: ['change-requests', 'pending-for-parent'],
-    queryFn: () => apiResponse(api.v1['change-requests'].$get({ query: {} })),
+    queryFn: fetchParentChangeRequests,
   });
 
   const invalidate = (target?: ChangeRequestEntry | null, escrowDelta?: number) => {

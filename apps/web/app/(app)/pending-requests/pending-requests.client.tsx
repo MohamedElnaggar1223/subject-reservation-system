@@ -19,23 +19,9 @@ import { Button } from '~/components/ui/button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ChangeRequest = {
-  id: string;
-  type: 'drop' | 'swap';
-  status: string;
-  reason: string;
-  priceAtRequest: number;
-  priceDifference: number;
-  comments: string | null;
-  createdAt: string;
-  processedAt: string | null;
-  registration: {
-    priceAtRegistration: number;
-    subject: { id: string; name: string; code: string | null };
-    session: { id: string; name: string; sessionType: string };
-  };
-  newSubject: { id: string; name: string; code: string | null } | null;
-};
+// Typed by the API, never by hand (PATTERNS.md): extract the row type from the fetcher.
+const fetchMyChangeRequests = () => apiResponse(api.v1['change-requests'].$get({ query: {} }));
+type ChangeRequest = Awaited<ReturnType<typeof fetchMyChangeRequests>>[number];
 
 // ─── Style Maps ───────────────────────────────────────────────────────────────
 
@@ -53,9 +39,9 @@ const TYPE_STYLES: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PendingRequestsClient() {
-  const { data: requests = [], isLoading } = useQuery<ChangeRequest[]>({
+  const { data: requests = [], isLoading } = useQuery({
     queryKey: ['change-requests', 'mine'],
-    queryFn: () => apiResponse(api.v1['change-requests'].$get({ query: {} })),
+    queryFn: fetchMyChangeRequests,
   });
 
   if (isLoading) {

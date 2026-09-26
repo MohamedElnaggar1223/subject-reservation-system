@@ -17,7 +17,7 @@ config();
 config({ path: "../../apps/api/.env" });
 
 // Dynamic import so the Pool is created AFTER DATABASE_URL is set
-const { db, subject, registrationSession, user, eq } = await import("./src/index");
+const { db, subject, registrationSession, user, eq, sql } = await import("./src/index");
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -308,7 +308,11 @@ async function seed() {
           name: s.name,
           council: s.council,
           priceInSchool: s.priceInSchool,
-          ...fees,
+          // Fees are admin-edited once a subject exists (the same rule RF-02
+          // applies to sessions): a re-run only repairs rows still priced at
+          // zero and never overwrites a fee someone set in the app.
+          courseFee: sql`case when ${subject.courseFee} + ${subject.registrationFee} = 0 then excluded.course_fee else ${subject.courseFee} end`,
+          registrationFee: sql`case when ${subject.courseFee} + ${subject.registrationFee} = 0 then excluded.registration_fee else ${subject.registrationFee} end`,
           isOfferedAtSchool: s.isOfferedAtSchool,
           customPrice: s.customPrice,
           isCore: s.isCore,
