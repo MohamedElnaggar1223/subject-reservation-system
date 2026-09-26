@@ -30,6 +30,20 @@ describe('harness', () => {
     expect(journal.entries.length).toBeGreaterThanOrEqual(26);
   });
 
+  it('never sends real email: the email module the app uses is in stub mode', async () => {
+    // Load the app first, exactly as every other test does, and only then
+    // take the email module: that is the instance the notifications call,
+    // evaluated after anything the app might have pulled into the
+    // environment. A static import at the top of this file would evaluate
+    // the module before the app and prove nothing. If env.ts stopped
+    // blanking the key, or the app started loading .env again, this fails
+    // before any suite below can reach Resend with a real key.
+    await clientFor();
+    const { sendEmail } = await import('../src/integrations/email');
+    const result = await sendEmail({ to: 'nobody@test.invalid', subject: 'harness', html: '<p>harness</p>' });
+    expect(result).toMatchObject({ success: true, stubbed: true });
+  });
+
   it('provisions admin and finance accounts and refuses a finance officer at an admin route', async () => {
     const adm = await admin('h');
     expect((await apiResponse(adm.api.v1.session.$get())).user).toMatchObject({ role: 'admin' });

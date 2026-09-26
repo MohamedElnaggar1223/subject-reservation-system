@@ -1,4 +1,5 @@
-import 'dotenv/config';
+// No `dotenv/config` here: index.ts loads .env for the server; tests import
+// this module directly and must not see a developer's .env.
 import { getConnInfo } from '@hono/node-server/conninfo'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'

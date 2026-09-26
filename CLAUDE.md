@@ -47,7 +47,11 @@ not build `{ success, data }` by hand in a route.
 `pnpm --filter @repo/api test` runs the integration suite against a real Postgres
 (`apps/api/test/README.md`). Every money path has a scenario there; a change to a money path
 adds or updates one. `pnpm --filter @repo/api check-types` covers the tests too. Both must be
-green, with `pnpm --filter web check-types`, before anything reaches main.
+green, with `pnpm --filter web check-types`, before anything reaches main. The same three
+gates run in GitHub Actions (`.github/workflows/ci.yml`) on every pushed branch and pull
+request; push the worktree branch first and merge only on a green run, and a red run on
+`main` is fixed before anything else lands. A claim of "green" names the checkout it ran
+in — the main checkout's `node_modules` can be stale while a worktree's are current.
 
 ## Git
 

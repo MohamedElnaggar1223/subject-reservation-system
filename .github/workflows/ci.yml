@@ -1,0 +1,74 @@
+# The three gates from CLAUDE.md, run on every pushed branch and every pull request:
+#   1. pnpm --filter @repo/api check-types   (API source and the integration tests)
+#   2. pnpm --filter web check-types
+#   3. pnpm --filter @repo/api test          (integration suite against a real Postgres)
+# Push the worktree branch first and merge only on a green run. A red run on
+# main is fixed before anything else lands.
+name: gates
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request supersedes the run in
+# progress. Every push to main keeps its own run so nothing on main goes
+# unchecked.
+concurrency:
+  group: ${{ github.ref == 'refs/heads/main' && format('gates-main-{0}', github.run_id) || format('gates-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        # Same image, user and password as the local container the test README
+        # describes, so the suite's defaults work unchanged.
+        image: postgres:17.5
+        env:
+          POSTGRES_USER: audit
+          POSTGRES_PASSWORD: auditpass
+          POSTGRES_DB: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U audit"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      # Maintenance connection; the suite creates and drops its own igcse_test database.
+      TEST_PG_ADMIN_URL: postgresql://audit:auditpass@127.0.0.1:5433/postgres
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # pnpm version comes from the packageManager field in package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared packages
+        run: pnpm build --filter=@repo/db --filter=@repo/validations --filter=@repo/storage
+
+      - name: Gate 1 - API type-check (source and tests)
+        run: pnpm --filter @repo/api check-types
+
+      - name: Gate 2 - web type-check
+        run: pnpm --filter web check-types
+
+      - name: Gate 3 - integration suite
+        run: pnpm --filter @repo/api test

@@ -18,7 +18,7 @@ class ByNameSequencer extends BaseSequencer {
  *   run in order because each scenario is a chain of real money movements.
  *
  * Prerequisite: a Postgres reachable at TEST_PG_ADMIN_URL (default: the
- * foundation-audit container on 127.0.0.1:5433). See test/README.md.
+ * local dev container on 127.0.0.1:5433, or the CI service). See test/README.md.
  */
 export default defineConfig({
   test: {

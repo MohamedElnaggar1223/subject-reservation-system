@@ -14,15 +14,21 @@ breaks one of them fails a test instead of a family.
 
 ## Prerequisite
 
-A Postgres the tests may create databases in. Default: the foundation-audit container.
+A Postgres the tests may create databases in. Default: the local dev container below (the
+same user, password and port the CI workflow's Postgres service uses).
 
 ```bash
-docker run -d --name igcse-audit-db -e POSTGRES_USER=audit -e POSTGRES_PASSWORD=auditpass \
+docker run -d --name igcse-dev-db -e POSTGRES_USER=audit -e POSTGRES_PASSWORD=auditpass \
   -e POSTGRES_DB=igcse_audit -p 127.0.0.1:5433:5432 postgres:17.5
 ```
 
 Override with `TEST_PG_ADMIN_URL` (maintenance connection, must be allowed to `CREATE DATABASE`)
 and optionally `TEST_DB_NAME` (default `igcse_test`).
+
+The suite never talks to a third party. The app does not load `apps/api/.env` (only the
+server entry `src/index.ts` does), and `env.ts` blanks every Resend, R2 and payment key the
+shell might hold before the app is imported; the harness test asserts the email module the
+app uses is in stub mode.
 
 ## Run
 
@@ -33,6 +39,10 @@ pnpm --filter @repo/api test
 `global-setup.ts` drops and recreates the test database and runs `pnpm db:migrate` against
 it, so the schema under test is exactly what production gets. The shared packages must be
 built first (`pnpm build --filter=@repo/db --filter=@repo/validations --filter=@repo/storage`).
+
+The same three gates run in GitHub Actions on every pushed branch and every pull request
+(`.github/workflows/ci.yml`), so a worktree branch can be pushed to get a verdict before it is
+merged; a red run on `main` is fixed before anything else lands.
 
 ## Layout
 

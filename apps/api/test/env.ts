@@ -1,8 +1,9 @@
 /**
  * Test environment. Runs before any test file (vitest setupFiles), so every
  * value is in place before src/env.ts, @repo/db, or better-auth are imported.
- * `dotenv/config` (pulled in by src/lib/auth.ts) never overrides an existing
- * variable, so apps/api/.env cannot redirect tests at a real database.
+ * The app never loads apps/api/.env itself (only src/index.ts, the server
+ * entry, imports `dotenv/config`), so that file cannot reach a test run at
+ * all; what the shell holds is handled below.
  */
 export const TEST_DB_NAME = process.env.TEST_DB_NAME ?? 'igcse_test';
 
@@ -46,4 +47,30 @@ for (const [key, value] of Object.entries(defaults)) {
   if (process.env[key] === undefined || key === 'DATABASE_URL' || key === 'NODE_ENV') {
     process.env[key] = value;
   }
+}
+
+// The suite must never talk to a third party. The .env file is kept out by
+// index.ts being the only dotenv loader; a key exported in the developer's
+// shell would still reach the process, so every third-party credential is
+// blanked here unconditionally and each integration stays in stub mode. On
+// 26 Sep 2026, when app.ts still loaded .env, a run tried to send real mail
+// through Resend for every notification the tests triggered.
+// PAYMOB_REDIRECT_URL is deliberately absent: src/env.ts validates it with
+// .url(), which an empty string fails, and it is not a credential.
+const THIRD_PARTY_KEYS = [
+  'RESEND_API_KEY',
+  'R2_ACCOUNT_ID',
+  'R2_ACCESS_KEY_ID',
+  'R2_SECRET_ACCESS_KEY',
+  'R2_BUCKET_NAME',
+  'PAYMOB_API_KEY',
+  'PAYMOB_HMAC_SECRET',
+  'PAYMOB_SECRET_KEY',
+  'PAYMOB_PUBLIC_KEY',
+  'PAYMOB_INTEGRATION_ID',
+  'FAWRY_MERCHANT_CODE',
+  'FAWRY_SECURE_KEY',
+];
+for (const key of THIRD_PARTY_KEYS) {
+  process.env[key] = '';
 }

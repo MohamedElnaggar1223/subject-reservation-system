@@ -1,4 +1,4 @@
-import 'dotenv/config';
+// No `dotenv/config` here: index.ts loads .env for the server (see app.ts).
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createAuthMiddleware } from "better-auth/api";
