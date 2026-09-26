@@ -9,19 +9,14 @@
  */
 
 import { db } from '@repo/db';
-import {
-  academicYearForDate,
-  getApplicableFee,
-  hasCompletedSchoolFeePayment,
-} from './school-fee.services';
-import { hasFeeWaiver } from './exception.services';
+import { academicYearForDate, getSchoolFeeStanding } from './school-fee.services';
 
 export type ChildSummary = {
   student: { id: string; name: string; grade: number | null };
   owing: number;
   owingRegistrationIds: string[];
   escrow: { freeBalance: number; heldBalance: number };
-  schoolFee: { academicYear: string; required: boolean; paid: boolean; amount: number | null };
+  schoolFee: { academicYear: string; required: boolean; waived: boolean; paid: boolean; amount: number | null };
   pendingApprovalCount: number;
   pendingChangeRequestCount: number;
   receiptsToReturn: number;
@@ -78,9 +73,10 @@ async function summariseStudent(studentId: string): Promise<ChildSummary> {
   const receiptsToReturn = gatedRegIds.length;
 
   const academicYear = academicYearForDate(new Date());
-  const fee = await getApplicableFee(academicYear, student.grade ?? null);
-  const waived = fee ? await hasFeeWaiver(studentId) : false;
-  const paid = fee && !waived ? await hasCompletedSchoolFeePayment(studentId, academicYear) : true;
+  // One source of truth for the fee (RF-10) — this used to report a
+  // waived, never-paid fee as paid:true.
+  const standing = await getSchoolFeeStanding(studentId, student.grade ?? null, academicYear);
+  const fee = standing.fee;
 
   return {
     student,
@@ -92,8 +88,9 @@ async function summariseStudent(studentId: string): Promise<ChildSummary> {
     },
     schoolFee: {
       academicYear,
-      required: !!fee && !waived,
-      paid,
+      required: standing.required,
+      waived: standing.waived,
+      paid: standing.paid,
       amount: fee?.amount ?? null,
     },
     pendingApprovalCount: registrations.filter((r) => r.status === 'pending_approval').length,

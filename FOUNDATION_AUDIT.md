@@ -190,6 +190,23 @@ the seed once to promote it (RF-02 applies), and create staff through `POST /v1/
 
 ---
 
+## 10. Fixed on this branch (26 September 2026, same day)
+
+Six of the nine findings were fixed before the remaining audits, because three are desk money
+communications and the seed ones break every fresh environment. Each was verified at runtime the
+same way it was found; the trail is `.audit/spine-fixes.tsv`.
+
+| ID | Fix | Verified by |
+|---|---|---|
+| RF-03 | Desk payments record the earliest approved linked parent as payer of record; staff stays in `confirmedBy` and metadata | new desk cash payment: payer is the parent, confirmations to parent and student, none to the officer |
+| RF-08 | New `PAYMENT_REVERSED` notification and email to every linked parent and the student, naming the voided receipt numbers | reversal produced two notifications whose body names the voided receipt |
+| RF-10 | One `getSchoolFeeStanding` (required / waived / paid / settled) used by the desk summary, the fee status endpoint, and the home summary; Waived badge on the desk and the fee page | all three views agree with the waiver active and again after revoking it; fee page reads "Waived — nothing to pay" |
+| RF-07 | All 51 unguarded handlers now use `clientMessage`; the guard refuses driver errors on `err.cause` and any "Failed query" text; the InstaPay path detects the unique violation by code | duplicate reference → 409 with a plain sentence |
+| RF-01 | Seed writes `courseFee` + `registrationFee` (placeholder 300 EGP board fee, see DISCOVERY F-02) | brand-new database: 17 of 17 subjects priced, split sums to the legacy price |
+| RF-02 | Session seed never touches an existing session | seed re-run on the live database left every status unchanged |
+
+Still open: RF-09 (grade of record after a remark), RF-05, RF-04, and the observations in §5.
+
 ## 9. What the cross-model review changed
 
 A reviewer on Claude Opus 5 read the log and the transcript after the run and raised 15 flags

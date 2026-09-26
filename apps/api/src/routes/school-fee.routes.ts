@@ -62,7 +62,7 @@ export const schoolFees = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] SCHOOL_FEE_SCHEDULE_CREATED failed:', err));
       return success(c, created, 201);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create schedule';
+      const message = clientMessage(err, 'Failed to create schedule');
       const status = /unique|duplicate/i.test(message)
         ? 409
         : 400;
@@ -165,7 +165,7 @@ export const schoolFees = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] SCHOOL_FEE_PAYMENT_INITIATED failed:', err));
       return success(c, created, 201);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to initiate payment';
+      const message = clientMessage(err, 'Failed to initiate payment');
       const status =
         message.includes('not linked') ? 403 :
         message.includes('already') ? 409 : 400;

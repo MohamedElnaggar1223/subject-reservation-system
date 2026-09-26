@@ -38,7 +38,7 @@ import {
   WithdrawalsQuery,
   ROLES,
 } from '@repo/validations';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import {
   requireAuth,
   requireFinanceAdmin,
@@ -175,7 +175,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
         );
         return success(c, requests);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to fetch withdrawals';
+        const message = clientMessage(err, 'Failed to fetch withdrawals');
         return error(c, message, message.includes('not linked') ? 403 : 400);
       }
     }
@@ -200,7 +200,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
           .catch(err => console.error('[audit] ESCROW_TRANSFER failed:', err));
         return success(c, result);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Transfer failed';
+        const message = clientMessage(err, 'Transfer failed');
         const status = message.includes('not linked') ? 403 :
                        message.includes('Insufficient') ? 422 : 400;
         return error(c, message, status);
@@ -227,7 +227,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
           .catch(err => console.error('[audit] WITHDRAWAL_REQUESTED failed:', err));
         return success(c, result, 201);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to create withdrawal request';
+        const message = clientMessage(err, 'Failed to create withdrawal request');
         const status = message.includes('not linked') ? 403 :
                        message.includes('exceeds') ? 422 : 400;
         return error(c, message, status);
@@ -273,7 +273,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
           .catch(err => console.error('[audit] WITHDRAWAL_FULFILLED failed:', err));
         return success(c, result);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to fulfill withdrawal';
+        const message = clientMessage(err, 'Failed to fulfill withdrawal');
         const status = message.includes('not found') ? 404 :
                        message.includes('Insufficient') || message.includes('Cannot release') ? 422 : 400;
         return error(c, message, status);
@@ -302,7 +302,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
           .catch(err => console.error('[audit] WITHDRAWAL_REJECTED failed:', err));
         return success(c, result);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to reject withdrawal';
+        const message = clientMessage(err, 'Failed to reject withdrawal');
         const status = message.includes('not found') ? 404 : 400;
         return error(c, message, status);
       }
@@ -328,7 +328,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
           .catch(err => console.error('[audit] WITHDRAWAL_APPROVED failed:', err));
         return success(c, result);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to approve withdrawal';
+        const message = clientMessage(err, 'Failed to approve withdrawal');
         return error(c, message, message.includes('not awaiting') ? 409 : 400);
       }
     }

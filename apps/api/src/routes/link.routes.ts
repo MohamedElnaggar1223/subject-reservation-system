@@ -67,7 +67,7 @@ export const links = new Hono<HonoEnv>()
 
         return success(c, link, 201);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to create link request';
+        const message = clientMessage(err, 'Failed to create link request');
         return error(c, message, 400);
       }
     }
@@ -155,7 +155,7 @@ export const links = new Hono<HonoEnv>()
         const updated = await linkService.respondToLinkRequest(id, user.id, response);
         return success(c, updated);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to respond to link request';
+        const message = clientMessage(err, 'Failed to respond to link request');
         return error(c, message, 400);
       }
     }

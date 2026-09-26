@@ -31,6 +31,7 @@ import { confirmPayment } from './payment.services';
 import {
   academicYearForDate,
   getApplicableFee,
+  getSchoolFeeStanding,
   hasCompletedSchoolFeePayment,
 } from './school-fee.services';
 import { isGraduated } from './grade.services';
@@ -245,13 +246,17 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
   }
 
   const paymentId = randomUUID();
+  const payerParentId = await resolvePayerParent(data.studentId, staffId);
+
   const created = await db.transaction(async (tx) => {
     const inserted = await tx.insert(registration).values(records).returning();
 
     await tx.insert(payment).values({
       id: paymentId,
       studentId: data.studentId,
-      parentId: staffId, // payer of record: the staff member processing the desk
+      // Payer of record is the family, not the officer (RF-03): confirmations
+      // go to whoever is here; the staff member stays in confirmedBy/metadata.
+      parentId: payerParentId,
       amount: Math.max(0, totalCost - escrowToApply),
       escrowAmountApplied: escrowToApply,
       paymentMethod: 'in_school',
@@ -333,10 +338,11 @@ export async function collectSchoolFeeAtDesk(
   }
 
   const paymentId = randomUUID();
+  const payerParentId = await resolvePayerParent(studentId, staffId);
   await db.insert(payment).values({
     id: paymentId,
     studentId,
-    parentId: staffId,
+    parentId: payerParentId, // the family, not the officer (RF-03)
     amount: fee.amount,
     escrowAmountApplied: 0,
     paymentMethod: 'in_school',
@@ -350,6 +356,22 @@ export async function collectSchoolFeeAtDesk(
   await confirmPayment(paymentId, staffId, undefined, notes ?? 'School fee collected at desk', instrumentUsed);
 
   return { paymentId, academicYear, amount: fee.amount };
+}
+
+/**
+ * The family member of record for money taken at the desk (RF-03). Desk
+ * money belongs to the family, not to the officer taking it: the earliest
+ * approved linked parent becomes payment.parentId so payment confirmations
+ * reach them. Falls back to the staff id only when the student has no
+ * approved parent link at all.
+ */
+async function resolvePayerParent(studentId: string, staffId: string): Promise<string> {
+  const link = await db.query.parentStudentLink.findFirst({
+    where: (l, { eq, and }) => and(eq(l.studentId, studentId), eq(l.status, 'approved')),
+    orderBy: (l, { asc }) => [asc(l.createdAt)],
+    columns: { parentId: true },
+  });
+  return link?.parentId ?? staffId;
 }
 
 // ─── Student 360 (G2) ────────────────────────────────────────────────────────
@@ -437,16 +459,17 @@ export async function getStudentSummary(studentId: string) {
     ...new Set([academicYear, ...openSessionRows.map((sn) => academicYearForDate(sn.startDate))]),
   ];
 
+  // One source of truth for the fee (RF-10): this screen used to tell the
+  // officer to collect a fee the finance admin had waived.
   const schoolFeesDue: { academicYear: string; amount: number }[] = [];
   for (const year of candidateYears) {
-    const applicable = await getApplicableFee(year, student.grade ?? null);
-    if (!applicable) continue;
-    if (await hasCompletedSchoolFeePayment(studentId, year)) continue;
-    schoolFeesDue.push({ academicYear: year, amount: applicable.amount });
+    const standing = await getSchoolFeeStanding(studentId, student.grade ?? null, year);
+    if (!standing.fee || standing.settled) continue;
+    schoolFeesDue.push({ academicYear: year, amount: standing.fee.amount });
   }
 
-  const fee = await getApplicableFee(academicYear, student.grade ?? null);
-  const schoolFeePaid = fee ? await hasCompletedSchoolFeePayment(studentId, academicYear) : true;
+  const currentStanding = await getSchoolFeeStanding(studentId, student.grade ?? null, academicYear);
+  const fee = currentStanding.fee;
 
   // What does the family owe right now?
   const owing = registrations
@@ -462,9 +485,10 @@ export async function getStudentSummary(studentId: string) {
     },
     schoolFee: {
       academicYear,
-      required: !!fee,
+      required: currentStanding.required,
+      waived: currentStanding.waived,
       amount: fee?.amount ?? null,
-      paid: schoolFeePaid,
+      paid: currentStanding.paid,
     },
     // Every year still owed — may include a session year that is not
     // the year containing today

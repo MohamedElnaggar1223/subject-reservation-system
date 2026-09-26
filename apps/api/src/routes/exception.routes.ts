@@ -9,7 +9,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { CreateException, ExceptionId, ListExceptionsQuery } from '@repo/validations';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import { requireAuth, requireFinanceAdmin } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as exceptionService from '../services/exception.services';
@@ -33,7 +33,7 @@ export const exceptions = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] EXCEPTION_GRANTED failed:', err));
       return success(c, created, 201);
     } catch (err) {
-      return error(c, err instanceof Error ? err.message : 'Failed to grant exception', 400);
+      return error(c, clientMessage(err, 'Failed to grant exception'), 400);
     }
   })
 
@@ -46,7 +46,7 @@ export const exceptions = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] EXCEPTION_REVOKED failed:', err));
       return success(c, updated);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to revoke exception';
+      const message = clientMessage(err, 'Failed to revoke exception');
       return error(c, message, message.includes('not found') ? 404 : 400);
     }
   });

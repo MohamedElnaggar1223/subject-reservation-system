@@ -21,7 +21,7 @@ type ChildSummary = {
   owing: number;
   owingRegistrationIds: string[];
   escrow: { freeBalance: number; heldBalance: number };
-  schoolFee: { academicYear: string; required: boolean; paid: boolean; amount: number | null };
+  schoolFee: { academicYear: string; required: boolean; waived: boolean; paid: boolean; amount: number | null };
   pendingApprovalCount: number;
   pendingChangeRequestCount: number;
   receiptsToReturn: number;

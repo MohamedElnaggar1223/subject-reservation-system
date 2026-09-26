@@ -132,6 +132,31 @@ export async function schoolFeeGateReason(
 }
 
 /**
+ * The one answer to "does this student owe the school fee for this year?"
+ * (RF-10). Every screen reads this; none recomputes it. Three screens used
+ * to disagree: the desk and the fee page ignored an active waiver, and the
+ * home summary reported a waived fee as paid.
+ *
+ * - required: an open schedule applies and the student is not waived
+ * - waived:   an active fee_waiver exception exists
+ * - paid:     a completed school_fee payment exists — never inferred
+ * - settled:  nothing is owed (no fee, waived, or paid)
+ */
+export async function getSchoolFeeStanding(
+  studentId: string,
+  grade: number | null,
+  academicYear: string
+) {
+  const fee = await getApplicableFee(academicYear, grade);
+  if (!fee) return { fee: null, required: false, waived: false, paid: false, settled: true };
+  const [waived, paid] = await Promise.all([
+    hasFeeWaiver(studentId),
+    hasCompletedSchoolFeePayment(studentId, academicYear),
+  ]);
+  return { fee, required: !waived, waived, paid, settled: waived || paid };
+}
+
+/**
  * Status payload for the parent/student UI.
  */
 export async function getSchoolFeeStatus(studentId: string) {
@@ -142,8 +167,9 @@ export async function getSchoolFeeStatus(studentId: string) {
   if (!student) throw new Error('Student not found');
 
   const academicYear = academicYearForDate(new Date());
-  const fee = await getApplicableFee(academicYear, student.grade ?? null);
-  const paid = await hasCompletedSchoolFeePayment(studentId, academicYear);
+  const standing = await getSchoolFeeStanding(studentId, student.grade ?? null, academicYear);
+  const fee = standing.fee;
+  const paid = standing.paid;
 
   const openPayment = await db.query.payment.findFirst({
     where: (p, { eq, and, inArray }) =>
@@ -160,7 +186,8 @@ export async function getSchoolFeeStatus(studentId: string) {
     student: { id: student.id, name: student.name, grade: student.grade },
     amount: fee?.amount ?? null,
     dueAt: fee?.dueAt ?? null,
-    required: !!fee,
+    required: standing.required,
+    waived: standing.waived,
     paid,
     pendingPayment: openPayment ?? null,
   };

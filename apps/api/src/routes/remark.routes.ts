@@ -36,7 +36,7 @@ import {
   hasRole,
 } from '@repo/validations';
 import { db } from '@repo/db';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import {
   requireAuth,
   requireParent,
@@ -132,7 +132,7 @@ export const remarks = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] REMARK_REQUESTED failed:', err));
       return success(c, created, 201);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create remark request';
+      const message = clientMessage(err, 'Failed to create remark request');
       return error(c, message, friendlyStatus(message));
     }
   })
@@ -147,7 +147,7 @@ export const remarks = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] REMARK_APPROVED failed:', err));
       return success(c, updated);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to approve';
+      const message = clientMessage(err, 'Failed to approve');
       return error(c, message, friendlyStatus(message));
     }
   })
@@ -162,7 +162,7 @@ export const remarks = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] REMARK_REJECTED failed:', err));
       return success(c, updated);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to reject';
+      const message = clientMessage(err, 'Failed to reject');
       return error(c, message, friendlyStatus(message));
     }
   })
@@ -177,7 +177,7 @@ export const remarks = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] REMARK_CONSENT_CONFIRMED failed:', err));
       return success(c, updated);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to confirm consent';
+      const message = clientMessage(err, 'Failed to confirm consent');
       return error(c, message, friendlyStatus(message));
     }
   })
@@ -190,7 +190,7 @@ export const remarks = new Hono<HonoEnv>()
       const created = await remarkService.initiateRemarkPayment(id, user.id, paymentMethod, schoolAccountDetails());
       return success(c, created, 201);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to initiate payment';
+      const message = clientMessage(err, 'Failed to initiate payment');
       return error(c, message, friendlyStatus(message));
     }
   })
@@ -205,7 +205,7 @@ export const remarks = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] REMARK_SUBMITTED_TO_BOARD failed:', err));
       return success(c, updated);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to record submission';
+      const message = clientMessage(err, 'Failed to record submission');
       return error(c, message, friendlyStatus(message));
     }
   })
@@ -220,7 +220,7 @@ export const remarks = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] REMARK_OUTCOME_RECORDED failed:', err));
       return success(c, result);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to record outcome';
+      const message = clientMessage(err, 'Failed to record outcome');
       return error(c, message, friendlyStatus(message));
     }
   })
@@ -234,7 +234,7 @@ export const remarks = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] REMARK_CANCELLED failed:', err));
       return success(c, updated);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to cancel';
+      const message = clientMessage(err, 'Failed to cancel');
       return error(c, message, friendlyStatus(message));
     }
   });

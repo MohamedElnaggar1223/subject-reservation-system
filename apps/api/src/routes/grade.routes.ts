@@ -18,7 +18,7 @@ import {
   UserId,
   ManualGradeAdjustment,
 } from '@repo/validations';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import { requireAuth, requireAdmin } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import {
@@ -67,7 +67,7 @@ export const grade = new Hono<HonoEnv>()
 
         return success(c, updated);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to update grade';
+        const message = clientMessage(err, 'Failed to update grade');
         const status =
           message.includes('not found') ? 404 :
           message.includes('not a student') ? 400 :

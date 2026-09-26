@@ -31,11 +31,15 @@ export function error(c: Context, message: string, statusCode: ContentfulStatusC
  * fallback and left for the server log.
  */
 export function clientMessage(err: unknown, fallback: string): string {
-  if (err instanceof Error) {
-    if (typeof (err as { code?: unknown }).code === 'string') return fallback;
-    return err.message;
-  }
-  return fallback;
+  if (!(err instanceof Error)) return fallback;
+  // Driver errors carry a string `code` (pg: '23505' etc.). Drizzle wraps
+  // them in a DrizzleQueryError whose message is the SQL text and whose
+  // `cause` is the pg error — so check both, and never echo query text
+  // (RF-07: 51 handlers were passing this straight to parents).
+  const hasCode = (e: unknown) => typeof (e as { code?: unknown } | null)?.code === 'string';
+  if (hasCode(err) || hasCode((err as { cause?: unknown }).cause)) return fallback;
+  if (/^Failed query/i.test(err.message)) return fallback;
+  return err.message;
 }
 
 /**

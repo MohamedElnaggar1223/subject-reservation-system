@@ -32,7 +32,7 @@ type Summary = {
   student: { id: string; name: string; email: string; phone: string | null; grade: number | null; studentId: string | null };
   parents: { id: string; name: string; email: string; phone: string | null; linkStatus: string }[];
   escrow: { freeBalance: number; heldBalance: number };
-  schoolFee: { academicYear: string; required: boolean; amount: number | null; paid: boolean };
+  schoolFee: { academicYear: string; required: boolean; waived: boolean; amount: number | null; paid: boolean };
   owing: number;
   registrations: {
     id: string;
@@ -278,6 +278,10 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
               ) : summary.schoolFee.required ? (
                 <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                   {summary.schoolFee.academicYear} school fee paid
+                </span>
+              ) : summary.schoolFee.waived ? (
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                  {summary.schoolFee.academicYear} school fee waived — nothing to collect
                 </span>
               ) : null}
               <Button size="sm" onClick={() => setShowRegister((v) => !v)}>

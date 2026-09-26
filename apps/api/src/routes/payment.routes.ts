@@ -251,7 +251,7 @@ export const payments = new Hono<HonoEnv>()
           },
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to generate receipt';
+        const message = clientMessage(err, 'Failed to generate receipt');
         logger.error('[receipt] PDF generation failed:', err);
         return error(c, message, 500);
       }
@@ -312,7 +312,7 @@ export const payments = new Hono<HonoEnv>()
           .catch((err) => console.error('[audit] PAYMENT_REFERENCE_SUBMITTED failed:', err));
         return success(c, updated);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to submit reference';
+        const message = clientMessage(err, 'Failed to submit reference');
         const status =
           message.includes('not authorized') ? 403 :
           message.includes('already been submitted') ? 409 :

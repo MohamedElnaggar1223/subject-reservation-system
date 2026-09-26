@@ -44,6 +44,7 @@ import {
   sendDirectRegistrationEmail,
   sendRegistrationDecisionEmail,
   sendPaymentReceiptEmail,
+  sendPaymentReversedEmail,
   sendDropSwapRequestEmail,
   sendDropSwapProcessedEmail,
   sendDirectDropSwapEmail,
@@ -663,6 +664,64 @@ export async function notifyPaymentConfirmed(data: {
       }),
       parentNotif ? [parentNotif.id] : undefined
     );
+  }
+}
+
+/**
+ * RF-08: a reversal re-opens the registration and voids any receipt still at
+ * the desk, so the family must hear about it. Every approved linked parent
+ * and the student are notified; parents also get an email.
+ * Called from payment.services.ts → reversePayment().
+ */
+export async function notifyPaymentReversed(data: {
+  studentId: string;
+  paymentId: string;
+  amount: number;
+  reason: string;
+  voidedReceiptNumbers: string[];
+  registrationsReverted: number;
+}) {
+  const [studentUser, parents] = await Promise.all([
+    getUserDetails(data.studentId),
+    getLinkedParents(data.studentId),
+  ]);
+  const studentName = studentUser?.name ?? 'your child';
+  const n = data.voidedReceiptNumbers.length;
+  const receiptNote = n > 0
+    ? ` Receipt${n === 1 ? '' : 's'} ${data.voidedReceiptNumbers.join(', ')} ${n === 1 ? 'is' : 'are'} no longer valid.`
+    : '';
+  const title = 'Payment reversed';
+  const body =
+    `The finance office reversed a payment of EGP ${data.amount.toFixed(2)} for ${studentName} (${data.reason}). ` +
+    `${data.registrationsReverted} registration${data.registrationsReverted === 1 ? ' is' : 's are'} back to pending payment.${receiptNote} ` +
+    `Please settle again at the finance desk.`;
+  const notifData = {
+    paymentId: data.paymentId,
+    studentId: data.studentId,
+    amount: data.amount,
+    voidedReceiptNumbers: data.voidedReceiptNumbers,
+  };
+
+  for (const { parentId } of parents) {
+    const parentUser = await getUserDetails(parentId);
+    const created = await createNotification(parentId, 'PAYMENT_REVERSED', title, body, notifData);
+    if (parentUser?.email) {
+      fireEmail('RF-08 reversal to parent', () =>
+        sendPaymentReversedEmail(parentUser.email!, {
+          parentName: parentUser.name,
+          studentName,
+          amount: data.amount,
+          reason: data.reason,
+          voidedReceiptNumbers: data.voidedReceiptNumbers,
+          registrationsReverted: data.registrationsReverted,
+        }),
+        created ? [created.id] : undefined
+      );
+    }
+  }
+
+  if (studentUser) {
+    await createNotification(data.studentId, 'PAYMENT_REVERSED', title, body, notifData);
   }
 }
 

@@ -23,7 +23,7 @@ import {
   SubjectId,
   ListSubjectsQuery,
 } from '@repo/validations';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import { requireAuth, requireAdmin } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as subjectService from '../services/subject.services';
@@ -315,7 +315,7 @@ export const subjects = new Hono<HonoEnv>()
           .catch((err) => console.error('[audit] SUBJECT_UPDATED (teachers) failed:', err));
         return success(c, teachersList);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to set teachers';
+        const message = clientMessage(err, 'Failed to set teachers');
         return error(c, message, 400);
       }
     }

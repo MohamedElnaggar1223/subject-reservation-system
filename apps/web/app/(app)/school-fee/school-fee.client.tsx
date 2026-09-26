@@ -33,6 +33,7 @@ type SchoolFeeStatus = {
   amount: number | null;
   dueAt: string | null;
   required: boolean;
+  waived: boolean;
   paid: boolean;
   pendingPayment: { id: string; externalReference: string | null } | null;
 };
@@ -170,6 +171,10 @@ export default function SchoolFeeClient({ initialStudentId }: { initialStudentId
             ) : status.required ? (
               <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                 Due{status.amount != null && ` — ${formatPrice(status.amount)}`}
+              </span>
+            ) : status.waived ? (
+              <span className="px-3 py-1 rounded-full text-xs font-medium bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+                Waived — nothing to pay
               </span>
             ) : (
               <span className="px-3 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">

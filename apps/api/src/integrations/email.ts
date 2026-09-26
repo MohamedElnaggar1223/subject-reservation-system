@@ -714,3 +714,38 @@ export async function sendEmailVerificationEmail(to: string, data: {
 
   return sendEmail({ to, subject: 'Verify your email — IGCSE System', html });
 }
+
+/**
+ * RF-08: a finance admin reversed a completed payment. The registration is
+ * back to pending payment and any receipt still at the desk is void, so the
+ * family must hear about it.
+ */
+export async function sendPaymentReversedEmail(to: string, data: {
+  parentName: string;
+  studentName: string;
+  amount: number;
+  reason: string;
+  voidedReceiptNumbers: string[];
+  registrationsReverted: number;
+}): Promise<EmailResult> {
+  const receipts = data.voidedReceiptNumbers.length
+    ? `<tr><td>Receipts now void</td><td>${data.voidedReceiptNumbers.map(esc).join(', ')}</td></tr>`
+    : '';
+  const html = emailLayout('Payment Reversed', `
+    <h2>Payment reversed</h2>
+    <p>Hello ${esc(data.parentName)},</p>
+    <p>The finance office has reversed a payment made for <strong>${esc(data.studentName)}</strong>. The subjects it covered are back to <strong>pending payment</strong> and are not registered until the amount is settled again.</p>
+    <div class="info-box">
+      <table>
+        <tr><td>Student</td><td>${esc(data.studentName)}</td></tr>
+        <tr><td>Amount reversed</td><td><strong>EGP ${data.amount.toFixed(2)}</strong></td></tr>
+        <tr><td>Registrations affected</td><td>${data.registrationsReverted}</td></tr>
+        ${receipts}
+        <tr><td>Reason</td><td>${esc(data.reason)}</td></tr>
+      </table>
+    </div>
+    <p>If you hold a paper receipt listed above, it is no longer valid. Please contact the finance desk to settle the registration again.</p>
+  `);
+
+  return sendEmail({ to, subject: `Payment reversed — ${data.studentName}`, html });
+}

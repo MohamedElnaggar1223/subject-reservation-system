@@ -35,7 +35,7 @@ import {
   ChangeRequestsQuery,
   ROLES,
 } from '@repo/validations';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import {
   requireAuth,
   requireStudent,
@@ -75,7 +75,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
           .catch((err) => console.error('[audit] CHANGE_REQUEST_CREATED failed:', err));
         return success(c, result, 201);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to create drop request';
+        const message = clientMessage(err, 'Failed to create drop request');
         const status = message.includes('not found') ? 404 :
                        message.includes('Core subjects') ? 422 :
                        message.includes('closed') ? 422 :
@@ -107,7 +107,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
           .catch((err) => console.error('[audit] CHANGE_REQUEST_CREATED failed:', err));
         return success(c, result, 201);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to create swap request';
+        const message = clientMessage(err, 'Failed to create swap request');
         const status = message.includes('not found') ? 404 :
                        message.includes('Core subjects') ? 422 :
                        message.includes('already') ? 409 : 400;
@@ -137,7 +137,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
           .catch((err) => console.error('[audit] DIRECT_DROP_EXECUTED failed:', err));
         return success(c, result);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to drop registration';
+        const message = clientMessage(err, 'Failed to drop registration');
         const status = message.includes('not found') ? 404 :
                        message.includes('not linked') ? 403 :
                        message.includes('Core subjects') || message.includes('closed') ? 422 : 400;
@@ -167,7 +167,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
           .catch((err) => console.error('[audit] DIRECT_SWAP_EXECUTED failed:', err));
         return success(c, result);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to swap registration';
+        const message = clientMessage(err, 'Failed to swap registration');
         const status = message.includes('not found') ? 404 :
                        message.includes('not linked') ? 403 :
                        message.includes('Core subjects') || message.includes('closed') ? 422 :
@@ -264,7 +264,7 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
 
         return success(c, result);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to approve change request';
+        const message = clientMessage(err, 'Failed to approve change request');
         const status = message.includes('not found') ? 404 :
                        message.includes('not linked') ? 403 :
                        message.includes('closed') ||
@@ -298,7 +298,7 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
 
         return success(c, result);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to reject change request';
+        const message = clientMessage(err, 'Failed to reject change request');
         const status = message.includes('not found') ? 404 :
                        message.includes('not linked') ? 403 : 400;
         return error(c, message, status);
@@ -327,7 +327,7 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
 
         return success(c, result);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to cancel change request';
+        const message = clientMessage(err, 'Failed to cancel change request');
         const status = message.includes('not found') ? 404 :
                        message.includes('only cancel your own') ? 403 : 400;
         return error(c, message, status);

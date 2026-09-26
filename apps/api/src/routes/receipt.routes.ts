@@ -29,7 +29,7 @@ import {
   FINANCE_ROLES,
   hasRole,
 } from '@repo/validations';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import {
   requireAuth,
   requireFinance,
@@ -114,7 +114,7 @@ export const receipts = new Hono<HonoEnv>()
     try {
       return success(c, await refundService.previewRefund(registrationId));
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to preview refund';
+      const message = clientMessage(err, 'Failed to preview refund');
       return error(c, message, message.includes('not found') ? 404 : 400);
     }
   })
@@ -130,7 +130,7 @@ export const receipts = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] RECEIPT_ISSUED failed:', err));
       return success(c, updated);
     } catch (err) {
-      return error(c, err instanceof Error ? err.message : 'Failed to issue receipt', 409);
+      return error(c, clientMessage(err, 'Failed to issue receipt'), 409);
     }
   })
 
@@ -144,7 +144,7 @@ export const receipts = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] RECEIPT_RETURNED failed:', err));
       return success(c, updated);
     } catch (err) {
-      return error(c, err instanceof Error ? err.message : 'Failed to mark returned', 409);
+      return error(c, clientMessage(err, 'Failed to mark returned'), 409);
     }
   })
 
@@ -158,7 +158,7 @@ export const receipts = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] RECEIPT_LOST failed:', err));
       return success(c, updated);
     } catch (err) {
-      return error(c, err instanceof Error ? err.message : 'Failed to mark lost', 409);
+      return error(c, clientMessage(err, 'Failed to mark lost'), 409);
     }
   })
 
@@ -172,7 +172,7 @@ export const receipts = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] RECEIPT_VOIDED failed:', err));
       return success(c, updated);
     } catch (err) {
-      return error(c, err instanceof Error ? err.message : 'Failed to void receipt', 409);
+      return error(c, clientMessage(err, 'Failed to void receipt'), 409);
     }
   })
 

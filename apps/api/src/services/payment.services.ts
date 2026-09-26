@@ -52,7 +52,7 @@ import {
   debitEscrow,
 } from './escrow.services';
 import { logAction } from './audit.services';
-import { notifyPaymentConfirmed, notifyEscrowBalanceChanged } from './notification.services';
+import { notifyPaymentConfirmed, notifyPaymentReversed, notifyEscrowBalanceChanged } from './notification.services';
 import { createReceiptsForRegistrations } from './receipt.services';
 import { creditHeld } from './escrow.services';
 import { onRemarkPaymentCompleted } from './remark.services';
@@ -735,7 +735,12 @@ export async function submitInstapayReference(
     }
     return updated;
   } catch (err) {
-    if (err instanceof Error && /unique|duplicate/i.test(err.message)) {
+    // Drizzle wraps the pg error: the outer message is the SQL text, the
+    // unique-violation code and detail live on `cause` (RF-07).
+    const cause = (err as { cause?: { code?: string; message?: string } } | null)?.cause;
+    const code = cause?.code ?? (err as { code?: string } | null)?.code;
+    const text = `${cause?.message ?? ''} ${err instanceof Error ? err.message : ''}`;
+    if (code === '23505' || /unique|duplicate/i.test(text)) {
       throw new Error(
         'This transaction reference has already been submitted for another payment. Double-check your InstaPay receipt.'
       );
@@ -794,6 +799,9 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
   }
 
   const regIds = pay.paymentRegistrations.map((l) => l.registrationId);
+  // Receipts still at the desk get voided below; the family is told which
+  // numbers stop being valid (RF-08).
+  let voidedReceiptNumbers: string[] = [];
 
   if (regIds.length > 0) {
     const receipts = await db.query.receipt.findMany({
@@ -806,6 +814,7 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
         `Receipts already handed out (${outOfDesk.map((r) => r.receiptNumber).join(', ')}) — take them back before reversing`
       );
     }
+    voidedReceiptNumbers = receipts.filter((r) => r.status === 'pending_issue').map((r) => r.receiptNumber);
   }
 
   const { receipt } = await import('@repo/db');
@@ -850,6 +859,17 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
       );
     }
   });
+
+  // RF-08: every other money movement tells the family; this one used to
+  // void their paper receipt in silence. Fire-and-forget like the rest.
+  notifyPaymentReversed({
+    studentId: pay.studentId,
+    paymentId,
+    amount: pay.amount + pay.escrowAmountApplied,
+    reason,
+    voidedReceiptNumbers,
+    registrationsReverted: regIds.length,
+  }).catch((err) => console.error('[notification] PAYMENT_REVERSED failed:', err));
 
   return { reversed: true, registrationsReverted: regIds.length };
 }

@@ -23,7 +23,7 @@ import {
   SessionId,
   ListSessionsQuery,
 } from '@repo/validations';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import { requireAuth, requireAdmin } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as sessionService from '../services/session.services';
@@ -123,7 +123,7 @@ export const sessions = new Hono<HonoEnv>()
 
         return success(c, created, 201);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to create session';
+        const msg = clientMessage(err, 'Failed to create session');
         return error(c, msg, 409);
       }
     }
@@ -262,7 +262,7 @@ export const sessions = new Hono<HonoEnv>()
 
         return success(c, updated);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to activate session';
+        const msg = clientMessage(err, 'Failed to activate session');
         return error(c, msg, 409);
       }
     }

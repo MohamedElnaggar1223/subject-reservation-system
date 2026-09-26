@@ -23,6 +23,13 @@ const { db, subject, registrationSession, user, eq } = await import("./src/index
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Placeholder board entry fee per subject (EGP) used to split each seeded
+ * price into courseFee + registrationFee. Real values come from the
+ * school's fee list (DISCOVERY.md F-02).
+ */
+const SEED_REGISTRATION_FEE = 300;
+
 /** Generate a deterministic text ID from a prefix + code for idempotency. */
 function subjectId(code: string): string {
   return `subj_${code}`;
@@ -283,15 +290,25 @@ async function seed() {
   // ── 1. Upsert subjects ───────────────────────────────────────────
   console.log(`Seeding ${subjects.length} subjects...`);
   for (const s of subjects) {
+    // V3 fee split (RF-01): the pricing engine reads courseFee +
+    // registrationFee, never priceInSchool. Without these two columns every
+    // seeded subject prices at 0 EGP. priceInSchool stays as the legacy
+    // total; the split below is a placeholder until the school's real fee
+    // list arrives (DISCOVERY.md F-02).
+    const fees = {
+      courseFee: s.priceInSchool - SEED_REGISTRATION_FEE,
+      registrationFee: SEED_REGISTRATION_FEE,
+    };
     await db
       .insert(subject)
-      .values(s)
+      .values({ ...s, ...fees })
       .onConflictDoUpdate({
         target: subject.code,
         set: {
           name: s.name,
           council: s.council,
           priceInSchool: s.priceInSchool,
+          ...fees,
           isOfferedAtSchool: s.isOfferedAtSchool,
           customPrice: s.customPrice,
           isCore: s.isCore,
@@ -311,17 +328,12 @@ async function seed() {
         ...sess,
         editHistory: [],
       })
-      .onConflictDoUpdate({
-        target: registrationSession.id,
-        set: {
-          name: sess.name,
-          sessionType: sess.sessionType,
-          startDate: sess.startDate,
-          endDate: sess.endDate,
-          status: sess.status,
-        },
-      });
-    console.log(`  [session] ${sess.name} (${sess.sessionType}) - ${sess.status}`);
+      // Sessions belong to the admins once they exist (RF-02): the seed
+      // creates missing ones and never touches a live one. Re-running the
+      // seed used to reset a closed window back to 'active' and an
+      // activated one back to 'draft'.
+      .onConflictDoNothing({ target: registrationSession.id });
+    console.log(`  [session] ${sess.name} (${sess.sessionType}) - ${sess.status} (created if missing)`);
   }
   console.log("");
 

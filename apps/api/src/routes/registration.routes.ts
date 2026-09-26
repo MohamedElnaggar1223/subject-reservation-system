@@ -251,7 +251,7 @@ export const registrations = new Hono<HonoEnv>()
           .catch((err) => console.error('[audit] REGISTRATION_REQUESTED failed:', err));
         return success(c, created, 201);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to create registration request';
+        const message = clientMessage(err, 'Failed to create registration request');
         // 409 — precondition not yet met (missing parent link)
         // 422 — semantic violation (closed window, duplicates, core rule)
         // 400 — generic bad request
@@ -286,7 +286,7 @@ export const registrations = new Hono<HonoEnv>()
           .catch((err) => console.error('[audit] REGISTRATION_DIRECT failed:', err));
         return success(c, created, 201);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to create registration';
+        const message = clientMessage(err, 'Failed to create registration');
         const status = message.includes('not linked') ? 403 :
                        message.includes('window is not open') ||
                        message.includes('already registered') ||
@@ -321,7 +321,7 @@ export const registrations = new Hono<HonoEnv>()
         }
         return success(c, updated);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to approve registrations';
+        const message = clientMessage(err, 'Failed to approve registrations');
         const status = message.includes('not authorized') ? 403 : 400;
         return error(c, message, status);
       }
@@ -382,7 +382,7 @@ export const registrations = new Hono<HonoEnv>()
         }
         return success(c, created, 201);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to preregister';
+        const message = clientMessage(err, 'Failed to preregister');
         const status =
           message.includes('not linked') ? 403 :
           message.includes('already') ? 409 : 400;
@@ -411,7 +411,7 @@ export const registrations = new Hono<HonoEnv>()
           .catch((err) => console.error('[audit] PREREG_CANCELLED failed:', err));
         return success(c, result);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to cancel preregistration';
+        const message = clientMessage(err, 'Failed to cancel preregistration');
         const status =
           message.includes('not linked') ? 403 :
           message.includes('already opened') || message.includes('Only preregistered') ? 409 :
@@ -445,7 +445,7 @@ export const registrations = new Hono<HonoEnv>()
         }
         return success(c, updated);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to revert approval';
+        const message = clientMessage(err, 'Failed to revert approval');
         const status = message.includes('not authorized') ? 403 :
                        message.includes('payment in progress') ||
                        message.includes('cannot be reverted') ? 409 : 400;
@@ -480,7 +480,7 @@ export const registrations = new Hono<HonoEnv>()
         }
         return success(c, updated);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to reject registrations';
+        const message = clientMessage(err, 'Failed to reject registrations');
         const status = message.includes('not authorized') ? 403 : 400;
         return error(c, message, status);
       }
@@ -516,7 +516,7 @@ export const registrations = new Hono<HonoEnv>()
 
         return success(c, created, 201);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to override approval';
+        const message = clientMessage(err, 'Failed to override approval');
         const status = message.includes('window is not open') ||
                        message.includes('already registered') ? 422 : 400;
         return error(c, message, status);

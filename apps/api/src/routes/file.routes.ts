@@ -30,7 +30,7 @@ import {
   ListFilesQuery,
   ROLES,
 } from '@repo/validations'
-import { success, error } from '../lib/response.js'
+import { success, error, clientMessage } from '../lib/response.js'
 import { requireAuth } from '../middleware/access-control.middleware.js'
 import type { HonoEnv } from '../lib/types.js'
 import * as fileService from '../services/file.services.js'
@@ -78,7 +78,7 @@ export const files = new Hono<HonoEnv>()
         const uploaded = await fileService.updateUserAvatar(file, user.id)
         return success(c, uploaded, 201)
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Upload failed'
+        const message = clientMessage(err, 'Upload failed')
         return error(c, message, 400)
       }
     }
@@ -106,7 +106,7 @@ export const files = new Hono<HonoEnv>()
         const uploaded = await fileService.uploadFile(file, 'document', user.id)
         return success(c, uploaded, 201)
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Upload failed'
+        const message = clientMessage(err, 'Upload failed')
         return error(c, message, 400)
       }
     }
@@ -130,7 +130,7 @@ export const files = new Hono<HonoEnv>()
         const uploaded = await fileService.uploadFile(file, 'general', user.id)
         return success(c, uploaded, 201)
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Upload failed'
+        const message = clientMessage(err, 'Upload failed')
         return error(c, message, 400)
       }
     }
@@ -257,7 +257,7 @@ export const files = new Hono<HonoEnv>()
         await fileService.deleteFile(id, user.id)
         return success(c, { deleted: true })
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Delete failed'
+        const message = clientMessage(err, 'Delete failed')
         return error(c, message, 400)
       }
     }

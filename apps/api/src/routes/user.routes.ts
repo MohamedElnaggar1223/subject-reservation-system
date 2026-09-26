@@ -134,7 +134,7 @@ export const users = new Hono<HonoEnv>()
           newEmail,
         });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to initiate email change';
+        const message = clientMessage(err, 'Failed to initiate email change');
         return error(c, message, 400);
       }
     }
