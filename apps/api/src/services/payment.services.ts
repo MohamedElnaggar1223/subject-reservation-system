@@ -65,11 +65,13 @@ import {
   notifyPaymentExpired,
   notifyPaymentClosedAtEntryDeadline,
   notifyRegistrationsExpiredAtEntryDeadline,
+  notifyPreregistrationsRefundedAtDeadline,
   notifyEscrowBalanceChanged,
 } from './notification.services';
 import { createReceiptsForRegistrations } from './receipt.services';
 import { creditHeld } from './escrow.services';
 import { onRemarkPaymentCompleted } from './remark.services';
+import { refundPreregistrationsAtDeadline } from './prereg.services';
 import { isOwnDocument } from './file.services';
 
 // ─── School Receiving Account (InstaPay destination) ─────────────────────────
@@ -903,7 +905,8 @@ export async function recordLateTransfer(
         verificationReference: reference,
         metadata: {
           ...((p.metadata as Record<string, unknown>) ?? {}),
-          lateTransfer: { by: financeAdminId, at: now.toISOString(), notes: data.notes, amount: data.amount, amountDue: p.amount, familyReference },
+          // previousReference: what an undo puts back (MO-24).
+          lateTransfer: { by: financeAdminId, at: now.toISOString(), notes: data.notes, amount: data.amount, amountDue: p.amount, familyReference, previousReference: p.verificationReference },
         },
         updatedAt: now,
       })
@@ -938,6 +941,67 @@ export async function recordLateTransfer(
 }
 
 /**
+ * A finance admin undoes a "Transfer found" recorded by mistake (owner
+ * decision MO-24): only on the day it was recorded, so no day already
+ * reconciled changes (that day's takings simply no longer list it), and only
+ * while the escrow it added is unspent. After that it is escrow like any
+ * other. The payment goes back to failed with no transfer recorded — and its
+ * reference back to what it was — so it can be recorded again correctly.
+ */
+export async function undoLateTransfer(paymentId: string, financeAdminId: string, reason: string, auditCtx?: AuditContext) {
+  const pay = await db.transaction(async (tx) => {
+    const [p] = await tx.select().from(payment).where(eq(payment.id, paymentId)).for('update');
+    if (!p) throw new Error('Payment not found');
+    if (!p.lateTransferAt || !p.lateTransferAmount) throw new Error('No transfer found later is recorded on this payment');
+    // The takings day: the server's local day (MO-3).
+    if (p.lateTransferAt.toDateString() !== new Date().toDateString()) {
+      throw new Error('A transfer found later can only be undone on the day it was recorded — that day may already be reconciled');
+    }
+    const meta = (p.metadata as Record<string, unknown>) ?? {};
+    const recorded = (meta.lateTransfer as Record<string, unknown> | undefined) ?? {};
+    await debitEscrow(
+      { studentId: p.studentId, amount: p.lateTransferAmount, reason: 'late_transfer_undone', initiatedBy: financeAdminId, relatedPaymentId: paymentId },
+      tx
+    ).catch((err) => {
+      if (err instanceof Error && err.message.startsWith('Insufficient escrow balance')) {
+        throw new Error('The escrow this transfer added has already been used, so it can no longer be undone');
+      }
+      throw err;
+    });
+    const { lateTransfer: _recorded, ...rest } = meta;
+    await tx
+      .update(payment)
+      .set({
+        lateTransferAt: null,
+        lateTransferBy: null,
+        lateTransferAmount: null,
+        verificationReference: (recorded.previousReference as string | null | undefined) ?? null,
+        metadata: { ...rest, lateTransferUndone: [...((meta.lateTransferUndone as unknown[]) ?? []), { ...recorded, undoneBy: financeAdminId, undoneAt: new Date().toISOString(), reason }] },
+        updatedAt: new Date(),
+      })
+      .where(eq(payment.id, paymentId));
+    await logAction(financeAdminId, 'PAYMENT_LATE_TRANSFER_UNDONE', 'payment', paymentId,
+      { lateTransferAmount: p.lateTransferAmount, verificationReference: p.verificationReference },
+      { debitedFromEscrow: p.lateTransferAmount, reason }, auditCtx, tx);
+    return p;
+  });
+
+  // The family was told of the credit, so they are told it was taken back.
+  const newBalance = await getEscrowBalance(pay.studentId);
+  const studentUser = await db.query.user.findFirst({ where: (u, { eq: eqOp }) => eqOp(u.id, pay.studentId), columns: { name: true } });
+  notifyEscrowBalanceChanged({
+    studentId: pay.studentId,
+    studentName: studentUser?.name ?? 'Student',
+    previousBalance: newBalance + pay.lateTransferAmount!,
+    newBalance,
+    changeAmount: -pay.lateTransferAmount!,
+    reason: `The transfer (${pay.verificationReference}) added to the escrow balance earlier today was recorded by mistake and has been removed`,
+  }).catch((err) => console.error('[notification] late transfer undo failed:', err));
+
+  return { id: pay.id, debitedFromEscrow: pay.lateTransferAmount! };
+}
+
+/**
  * The two payment deadlines that follow a close (owner decision MO-10). Run
  * by the scheduler on every tick; idempotent, so a missed tick costs nothing.
  *
@@ -947,12 +1011,15 @@ export async function recordLateTransfer(
  * 2. A series whose exam-board entry deadline has passed: every payment still
  *    open on it is closed (a transfer finance never verified included; the
  *    board accepts no more entries), escrow back, family told; and every
- *    registration still waiting on it expires.
+ *    registration still waiting on it expires. If the series is still in
+ *    draft it will never open, so its preregistrations are refunded in full
+ *    (MO-21).
  */
 export async function enforcePaymentDeadlines(now: Date = new Date()) {
   let referencesLapsed = 0;
   let paymentsClosedAtDeadline = 0;
   let registrationsExpiredAtDeadline = 0;
+  let preregistrationsRefundedAtDeadline = 0;
 
   const lapsed = await db
     .select({ id: payment.id })
@@ -977,7 +1044,7 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
   }
 
   const pastDeadline = await db
-    .select({ id: registrationSession.id, entryDeadline: registrationSession.entryDeadline })
+    .select({ id: registrationSession.id, status: registrationSession.status, entryDeadline: registrationSession.entryDeadline })
     .from(registrationSession)
     .where(and(isNotNull(registrationSession.entryDeadline), lte(registrationSession.entryDeadline, now)));
   for (const s of pastDeadline) {
@@ -1020,9 +1087,20 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
       await notifyRegistrationsExpiredAtEntryDeadline(s.id, s.entryDeadline!, expired)
         .catch((err) => console.error(`[deadlines] Expiry notices for session ${s.id} failed:`, err));
     }
+
+    // A series still in draft never opens now: its preregistrations are
+    // refunded in full (owner decision MO-21).
+    if (s.status === 'draft') {
+      const refunded = await refundPreregistrationsAtDeadline(s.id);
+      preregistrationsRefundedAtDeadline += refunded.length;
+      if (refunded.length > 0) {
+        await notifyPreregistrationsRefundedAtDeadline(s.id, s.entryDeadline!, refunded)
+          .catch((err) => console.error(`[deadlines] Prereg refund notices for session ${s.id} failed:`, err));
+      }
+    }
   }
 
-  return { referencesLapsed, paymentsClosedAtDeadline, registrationsExpiredAtDeadline };
+  return { referencesLapsed, paymentsClosedAtDeadline, registrationsExpiredAtDeadline, preregistrationsRefundedAtDeadline };
 }
 
 /**
@@ -1383,6 +1461,14 @@ export async function getDailyTakings(dateStr: string) {
   } as const;
   const neverReceived = (r: { status: string; reversalMoneyReturned: boolean | null }) =>
     r.status === 'refunded' && r.reversalMoneyReturned === false;
+  // A "never received" reversal corrects the day it was confirmed only while
+  // that day is in the reversal's own month. A month already closed with the
+  // bank stays as printed, and the correction is posted on the day of the
+  // reversal instead (owner decision on MO-11, 28 Sep; DISCOVERY.md A-09).
+  // Months are the server's local months, like the takings days (MO-3).
+  const monthOf = (d: Date) => d.getFullYear() * 12 + d.getMonth();
+  const correctsItsDay = (r: { status: string; reversalMoneyReturned: boolean | null; confirmedAt: Date | null; reversedAt: Date | null }) =>
+    neverReceived(r) && !!r.confirmedAt && !!r.reversedAt && monthOf(r.reversedAt) === monthOf(r.confirmedAt);
 
   const confirmedThatDay = await db.query.payment.findMany({
     where: (p, { and, inArray, gte, lt }) =>
@@ -1391,8 +1477,8 @@ export async function getDailyTakings(dateStr: string) {
     with: people,
     orderBy: (p, { asc }) => [asc(p.confirmedAt)],
   });
-  const confirmed = confirmedThatDay.filter((r) => !neverReceived(r));
-  const corrected = confirmedThatDay.filter(neverReceived);
+  const confirmed = confirmedThatDay.filter((r) => !correctsItsDay(r));
+  const corrected = confirmedThatDay.filter(correctsItsDay);
 
   const reversedThatDay = await db.query.payment.findMany({
     where: (p, { and, eq, gte, lt }) =>
@@ -1403,6 +1489,8 @@ export async function getDailyTakings(dateStr: string) {
   });
   const reversed = reversedThatDay.filter((r) => !neverReceived(r));
   const correctionsRecorded = reversedThatDay.filter(neverReceived);
+  // Corrections of a closed month: posted on this day, since their own day stays as printed.
+  const closedMonthCorrections = correctionsRecorded.filter((r) => !correctsItsDay(r));
 
   // Transfers found on the statement after their payment had failed, recorded
   // that day and credited to escrow (recordLateTransfer): money into the bank.
@@ -1443,13 +1531,15 @@ export async function getDailyTakings(dateStr: string) {
   const correctedTotal = sum(corrected, (r) => r.amount);
   const correctedEscrow = sum(corrected, (r) => r.escrowAmountApplied);
   const drawerCorrected = sum(corrected.filter((r) => instrumentOf(r) === 'cash'), (r) => r.amount);
+  const closedMonthCorrectionTotal = sum(closedMonthCorrections, (r) => r.amount);
+  const closedMonthCorrectionEscrow = sum(closedMonthCorrections, (r) => r.escrowAmountApplied);
 
   return {
     date: dateStr,
     rows: confirmed,
     reversed,
     corrected,
-    correctionsRecorded,
+    correctionsRecorded: correctionsRecorded.map((r) => ({ ...r, postedHere: !correctsItsDay(r) })),
     lateTransfers,
     cashRefunds: handOvers.map((d) => ({
       id: d.id,
@@ -1466,11 +1556,16 @@ export async function getDailyTakings(dateStr: string) {
       reversedTotal,
       cashRefunded,
       moneyOut,
-      net: round2(moneyIn - moneyOut),
+      // Less corrections posted here for a closed month's confirmations.
+      net: round2(moneyIn - moneyOut - closedMonthCorrectionTotal),
       // Money this day's confirmations claimed but never received (MO-11);
       // already left out of moneyIn above, and their escrow out of escrowApplied.
       correctedTotal,
       correctedEscrow,
+      // Money a closed month's confirmations claimed but never received,
+      // corrected on this day (their own day stays as printed); not money out.
+      closedMonthCorrectionTotal,
+      closedMonthCorrectionEscrow,
       // Transfers found later and credited to escrow; part of moneyIn.
       lateTransferTotal,
       drawer: { cashIn: drawerIn, cashOut: drawerOut, net: round2(drawerIn - drawerOut), corrected: drawerCorrected },

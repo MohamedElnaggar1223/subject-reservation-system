@@ -871,6 +871,47 @@ export async function notifyPaymentClosedAtEntryDeadline(paymentId: string, entr
   );
 }
 
+/**
+ * At the board's entry deadline of a series that never opened (MO-21): its
+ * preregistrations will not be entered, and what was paid for them is back
+ * in escrow in full — or, for a paper receipt the family holds, once the
+ * receipt comes back to the desk.
+ */
+export async function notifyPreregistrationsRefundedAtDeadline(
+  sessionId: string,
+  entryDeadline: Date,
+  rows: { studentId: string; subjectId: string; refunded: number; gated: boolean }[]
+) {
+  const [sessionRow, subjects] = await Promise.all([
+    db.query.registrationSession.findFirst({ where: (s, { eq: eqOp }) => eqOp(s.id, sessionId), columns: { name: true } }),
+    db.query.subject.findMany({
+      where: (s, { inArray: inArr }) => inArr(s.id, [...new Set(rows.map((r) => r.subjectId))]),
+      columns: { id: true, name: true },
+    }),
+  ]);
+  const nameOf = new Map(subjects.map((s) => [s.id, s.name]));
+  const sessionName = sessionRow?.name ?? 'the series';
+  const byStudent = new Map<string, typeof rows>();
+  for (const r of rows) byStudent.set(r.studentId, [...(byStudent.get(r.studentId) ?? []), r]);
+  for (const [studentId, mine] of byStudent) {
+    const names = (list: typeof rows) => list.map((r) => nameOf.get(r.subjectId) ?? 'a subject').join(', ');
+    const now = mine.filter((r) => r.refunded > 0 && !r.gated);
+    const onReturn = mine.filter((r) => r.refunded > 0 && r.gated);
+    const total = (list: typeof rows) => list.reduce((s, r) => s + r.refunded, 0).toFixed(2);
+    const title = `Refunded: ${sessionName} did not open`;
+    const body =
+      `The exam board's entry deadline for ${sessionName} (${schoolDate(entryDeadline)}) passed before the school opened registration, ` +
+      `so these preregistered subjects will not be entered: ${names(mine)}.` +
+      (now.length ? ` EGP ${total(now)} paid for ${names(now)} has been returned to your escrow balance in full.` : '') +
+      (onReturn.length ? ` EGP ${total(onReturn)} for ${names(onReturn)} is returned in full once the paper receipt is brought back to the finance desk.` : '');
+    const meta = { sessionId, subjectNames: mine.map((r) => nameOf.get(r.subjectId)), reason: 'entry_deadline_unopened' };
+    await createNotification(studentId, 'SESSION_CLOSED', title, body, meta);
+    for (const { parentId } of await getLinkedParents(studentId)) {
+      await createNotification(parentId, 'SESSION_CLOSED', title, body, { ...meta, studentId });
+    }
+  }
+}
+
 /** At the board's entry deadline: registrations still waiting on the series expired. */
 export async function notifyRegistrationsExpiredAtEntryDeadline(
   sessionId: string,

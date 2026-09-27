@@ -70,6 +70,7 @@ Source: `Nov 1 2026.xlsx` (a Google Form export; two session tabs — "June 2023
 | A-06 | Each **registration window is specific to one exam series**; a family may deposit against a future series from within the current window (A-03). | User, 26 Sep | medium | If windows span series, the `registrationSession` model and the one-active-per-(type, level) index change. | assumed |
 | A-07 | Grade 10 is **"treated the same as the others"** in the sense of using the same registration form and pricing; the core-subject rule is the one thing unique to them. | User, 26 Sep (resolved Q-01) | high | — | confirmed |
 | A-08 | The **exam board's entry deadline** for each series is known from the board's published calendar and is entered by the admin per session; the school does not accept entries (or money for them) after it, and late entries with board late fees are not handled by this system. | Owner decision MO-10, 27 Sep (MONEY_AUDIT.md §6) | medium | If the school takes late entries with the board's late fee, the cut-off becomes a fee step instead of a hard stop. | assumed |
+| A-09 | The school **closes its books with the bank monthly**: a correction to a day in the current month may change that day's report, but a month already closed stays as printed and its corrections are posted on the day they are made. | Owner decision on MO-11, 28 Sep (MONEY_AUDIT.md §6b) | medium | If finance reconciles weekly or quarterly, the boundary moves (a one-line change in the takings). Confirm with the school's finance person. | assumed |
 
 ---
 

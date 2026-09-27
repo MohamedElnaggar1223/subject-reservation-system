@@ -34,6 +34,7 @@ const REASON_LABELS: Record<string, string> = {
   payment:        'Payment Applied',
   payment_refund: 'Payment Refund',
   late_transfer:  'Transfer Found After Closing',
+  late_transfer_undone: 'Transfer Recorded by Mistake — Removed',
   withdrawal_hold:     'Cash Refund Requested',
   withdrawal_rejected: 'Refund Request Declined — Returned',
   prereg_hold:    'Held for a Preregistered Subject',

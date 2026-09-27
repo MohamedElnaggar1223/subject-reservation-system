@@ -26,6 +26,7 @@ import { refundPercentage } from './refund.services';
 import { isGraduated } from './grade.services';
 import { logger } from '../lib/logger';
 import { entryDeadlineMessage } from './window.services';
+import { logAction } from './audit.services';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -202,6 +203,64 @@ export async function cancelPreregistration(registrationId: string, parentId: st
   });
 
   return result;
+}
+
+/**
+ * A series still in draft when its exam-board entry deadline passes never
+ * opens (the scheduler will not open it, nor an admin), so its
+ * preregistrations can never be entered. Owner decision MO-21: the family
+ * gets the full price back — the refund windows are for a family's own drop,
+ * and here the school never ran the window. Run by the deadline sweep for
+ * such a series; idempotent (only rows still preregistered move).
+ *
+ * A paid row releases its held money and is dropped with a 100% refund on
+ * the same receipt-gated path as a cancellation, so paper already handed to
+ * the family must come back first (MA-16). An unpaid row expires. Each
+ * money move writes its audit row in its transaction.
+ */
+export async function refundPreregistrationsAtDeadline(sessionId: string) {
+  const preregs = await db.query.registration.findMany({
+    where: (r, { eq: eqOp, and: andOp }) => andOp(eqOp(r.sessionId, sessionId), eqOp(r.status, 'preregistered')),
+    columns: { id: true, studentId: true, subjectId: true, priceAtRegistration: true },
+  });
+
+  const outcomes: { studentId: string; subjectId: string; refunded: number; gated: boolean }[] = [];
+  for (const reg of preregs) {
+    try {
+      const outcome = await db.transaction(async (tx) => {
+        const [row] = await tx.select({ status: registration.status }).from(registration).where(eq(registration.id, reg.id)).for('update');
+        if (row?.status !== 'preregistered') return undefined;
+        const { funded, open } = await preregPaymentState(reg.id, tx);
+        // The sweep closes open payments first; one still open waits for the next tick.
+        if (open) return undefined;
+
+        if (!funded) {
+          await tx.update(registration).set({ status: 'expired', updatedAt: new Date() })
+            .where(and(eq(registration.id, reg.id), eq(registration.status, 'preregistered')));
+          return { refunded: 0, gated: false };
+        }
+        await debitHeld(
+          { studentId: reg.studentId, amount: reg.priceAtRegistration, reason: 'prereg_release', initiatedBy: reg.studentId, relatedRegistrationId: reg.id },
+          tx
+        );
+        const drop = await executeReceiptGatedDrop(tx, {
+          registrationId: reg.id,
+          studentId: reg.studentId,
+          refundAmount: reg.priceAtRegistration,
+          refundReason: 'drop',
+          initiatedBy: reg.studentId,
+          fromStatus: 'preregistered',
+        });
+        await logAction(null, 'PREREG_REFUNDED_AT_DEADLINE', 'registration', reg.id, { status: 'preregistered' },
+          { status: drop.gated ? 'dropped_pending_receipt' : 'dropped', refundAmount: drop.refundAmount, refundPercentage: 100, gated: drop.gated }, undefined, tx);
+        return { refunded: drop.refundAmount, gated: drop.gated };
+      });
+      if (outcome) outcomes.push({ studentId: reg.studentId, subjectId: reg.subjectId, ...outcome });
+    } catch (err) {
+      logger.error(`[prereg] Deadline refund failed for registration ${reg.id}:`, err);
+    }
+  }
+  return outcomes;
 }
 
 /**

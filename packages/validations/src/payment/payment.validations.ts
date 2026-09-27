@@ -243,6 +243,11 @@ export const RecordLateTransfer = z.object({
 });
 export type RecordLateTransferType = z.infer<typeof RecordLateTransfer>;
 
+/** A finance admin undoes a "Transfer found" recorded by mistake, the same day (MO-24). */
+export const UndoLateTransfer = z.object({
+  reason: z.string().trim().min(5, 'Say why it was recorded by mistake (min 5 characters)').max(500),
+});
+
 // ─── Admin: Confirm Bank Transfer ─────────────────────────────────────────────
 
 /**

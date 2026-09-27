@@ -1039,6 +1039,7 @@ const autoArabicText: Record<string, string> = {
   'Payment Applied': 'تم استخدام الدفع',
   'Payment Refund': 'استرداد دفع',
   'Transfer Found After Closing': 'تحويل وُجد بعد الإغلاق',
+  'Transfer Recorded by Mistake — Removed': 'تحويل سُجّل بالخطأ — أُزيل',
   'Cash Refund Requested': 'طلب استرداد نقدي',
   'Refund Request Declined — Returned': 'رُفض طلب الاسترداد — أُعيد المبلغ',
   'Held for a Preregistered Subject': 'محجوز لمادة مسجلة مسبقًا',

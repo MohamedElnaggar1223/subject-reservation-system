@@ -893,7 +893,7 @@ export const escrowTransaction = pgTable(
     balanceType: text("balance_type").notNull().default("free"),
     amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
     // Reason categories for reporting and audit
-    reason: text("reason").notNull(), // 'drop' | 'swap_refund' | 'transfer_in' | 'transfer_out' | 'withdrawal' | 'payment' | 'payment_refund' | 'prereg_hold' | 'prereg_capture' | 'prereg_release' | 'late_transfer'
+    reason: text("reason").notNull(), // 'drop' | 'swap_refund' | 'transfer_in' | 'transfer_out' | 'withdrawal' | 'payment' | 'payment_refund' | 'prereg_hold' | 'prereg_capture' | 'prereg_release' | 'late_transfer' | 'late_transfer_undone'
     // Optional audit links
     relatedRegistrationId: text("related_registration_id").references(
       () => registration.id,

@@ -252,7 +252,7 @@ The fourth review, of that response (fc1a101), again said "don't merge yet", on 
 | MO-8 | ESCROW_TRANSFER audit rows have an empty entity id. | Engineering health |
 | MO-9 | A subject priced at 0 by a full discount still needs a 0 EGP payment to confirm (one click at the desk), and expires at the close if nobody confirms it. | Feature work |
 | MO-10 | **InstaPay at the close.** A family who transfers just before the close but submits the reference just after loses the subject (the checkout is `pending` at the close and fails). In the other direction, a submitted reference — not proof of payment — holds its registration past the close until finance acts, with no cut-off. Recommendation: a grace period (for example 24 hours) during which an unreferenced InstaPay checkout survives the close, and a hard cut-off (the board's entry deadline) after which anything unconfirmed is rejected automatically. | **Decided 27 Sep: as recommended — §6a** |
-| MO-11 | **What a cash reversal means.** Takings count a reversal as money out on its day, the bookkeeper's correcting entry: right if cash was handed back, and right over the pair of days if the confirmation was a mistake and no cash came (the confirmation day showed cash that was never there). Recommendation: the reversal asks "was cash handed back?"; if not, it is shown as a correction to its original date and the day's drawer does not move. | **Decided 27 Sep: as recommended — §6a.** Still open: a "never received" reversal corrects its confirmation day however long ago it was reconciled (the dialog warns); the owner may want a limit |
+| MO-11 | **What a cash reversal means.** Takings count a reversal as money out on its day, the bookkeeper's correcting entry: right if cash was handed back, and right over the pair of days if the confirmation was a mistake and no cash came (the confirmation day showed cash that was never there). Recommendation: the reversal asks "was cash handed back?"; if not, it is shown as a correction to its original date and the day's drawer does not move. | **Decided 27 Sep: as recommended — §6a.** The limit, decided 28 Sep: a correction reaches back only within its own month; a month already closed stays as printed and the correction posts on the day of the reversal (§6b) |
 | MO-12 | A deadline extension with no session applies to every session (the exception model's rule). Checkouts and registrations made under an extension after the close are now swept at the series' board entry deadline (§6a) — but only once the admin has set one. | Owner decision |
 | MO-13 | A swap does not record retake status on the new registration (price is unaffected: retake matters only for outside-school pricing, which swaps do not offer). | Engineering health |
 | MO-14 | The desk's collection bar applies no escrow; the endpoint accepts it. | Feature work |
@@ -262,10 +262,10 @@ The fourth review, of that response (fc1a101), again said "don't merge yet", on 
 | MO-18 | Cancelling a preregistration at the very instant capture runs for it can deadlock; Postgres aborts one of the two and no money moves. | Accepted, low |
 | MO-19 | Dev data only: the dev database has one registration confirmed with a void receipt, made before MA-20 was fixed. No production data exists. | Accepted |
 | MO-20 | Approving or rejecting a registration request, and swaps, check the session's status only: they ignore deadline extensions (a student with one cannot have a request approved after the close) and the board deadline (safe while a window must close before its deadline). | State-and-time audit |
-| MO-21 | A series still in draft when its window ends is no longer opened by the scheduler, nor by hand once its board deadline has passed (so no held money is captured for entries the board refuses). Its paid preregistrations stay in the held wallet until each is cancelled, and cancelling refunds at the refund window's percentage. The school never ran the window, so the owner may want these refunded in full. | Owner decision |
+| MO-21 | A series still in draft when its window ends is no longer opened by the scheduler, nor by hand once its board deadline has passed (so no held money is captured for entries the board refuses). Its preregistrations could only be cancelled, at the refund window's percentage, although the school never ran the window. | **Decided 28 Sep: refunded in full at the deadline — §6b** |
 | MO-22 | The checkout card, the workbench and the takings times are shown in the browser's local time; the API's sentences use Cairo time. Identical while staff and families are in Egypt. | Accepted |
 | MO-23 | The escrow page's transaction rows and the desk's student summary are hand-typed instead of derived from their fetchers (CLAUDE.md, Hono RPC); this work added fields to the desk's. | Engineering health |
-| MO-24 | A "Transfer found" has no undo. It is the finance admin's alone, asks for the statement's reference and an amount typed from the statement (never more than the payment was for), and a family reference it sets aside cannot be submitted again. A record whose money never arrived has no correction inside the system: the system has no manual escrow debit, and a cash refund would pay out money that never came, so it needs a database fix. An undo mirroring MO-11 is feature work if the owner wants it. | Owner decision |
+| MO-24 | A "Transfer found" had no undo. It is the finance admin's alone, asks for the statement's reference and an amount typed from the statement (never more than the payment was for), and a family reference it sets aside cannot be submitted again; a record whose money never arrived had no correction inside the system. | **Decided 28 Sep: a same-day undo while its escrow is unspent — §6b.** Later than that it still needs a database fix |
 
 ---
 
@@ -333,6 +333,43 @@ reversal to record the answer, and a transfer found later to be credited exactly
 amount found, with its audit row. Undone, each fix failed its test (trail), with two exceptions
 named in §4: desk collection is refused twice over, and checkout shares the registration's
 window check.
+
+## 6b. The owner's decisions of 28 September 2026
+
+**MO-21 — a series that never opened refunds in full.** When the board's entry deadline
+passes on a series still in draft, the deadline sweep drops each paid preregistration with a
+100% refund to the family's escrow (the held money is released, not captured), on the same
+receipt-gated path as a cancellation: a paper receipt already handed over must come back
+first. Unpaid preregistrations expire. Each refund writes `PREREG_REFUNDED_AT_DEADLINE` in its
+transaction, and each family is told which subjects will not be entered and what came back.
+The refund windows do not apply: they are for a family's own drop.
+
+**MO-24 — undoing a "Transfer found".** A finance admin can undo one on the day it was
+recorded (the server's day, as the takings), while the escrow it added is unspent; the reason
+is audited (`PAYMENT_LATE_TRANSFER_UNDONE`, in the transaction) and the family told. The escrow
+is debited back (ledger reason `late_transfer_undone`), the payment returns to failed with
+the reference it had before, it leaves that day's takings — so no reconciled day changes — and
+it can be recorded again correctly. After that day, or once the escrow is spent, it is escrow
+like any other, and a record whose money never arrived needs a database fix.
+
+**MO-11 — how far back a "never received" reversal reaches.** Only within its own calendar
+month. Reversed in the month of its confirmation, it corrects the confirmation's day as
+before. Reversed in a later month, the confirmation's month stays as printed (the payment is
+still money in on its day) and the correction is posted on the day of the reversal: listed
+under Corrections, it reduces that day's net by the amount (`closedMonthCorrectionTotal`),
+is not money out, and does not move that day's drawer. The reversal dialog says which will
+happen. The month boundary assumes the school closes its books with the bank monthly
+(DISCOVERY.md A-09).
+
+**Tests** (`08`): June's deadline passing unopened refunds its paid preregistration in full
+(1500 back, held released), expires the unpaid ones, notifies, runs once, and leaves a
+November series whose deadline is ahead untouched; an undo is the finance admin's, refused
+while the escrow is spent and on a later day, takes the escrow back, leaves the day's takings,
+and lets the payment be recorded again; a same-month "never received" reversal corrects its
+confirmation day and not its own, and a closed-month one leaves its month as printed and posts
+on the reversal's day. These use fixed days in last month, so they do not depend on today's
+date. `09` checks that credits less undo debits equal what is recorded now, and counts the
+refunds and undos. Undone, each failed its test (trail).
 
 ## 7. Not covered
 

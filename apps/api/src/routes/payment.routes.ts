@@ -32,6 +32,7 @@ import {
   RejectManualPayment,
   ReversePayment,
   RecordLateTransfer,
+  UndoLateTransfer,
   ListPaymentsQuery,
   CheckoutSummaryQuery,
   PaymentId,
@@ -434,6 +435,32 @@ export const payments = new Hono<HonoEnv>()
         const status =
           message.includes('not found') ? 404 :
           message.includes('already') ? 409 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * POST /payments/:id/undo-transfer  (owner decision MO-24)
+   *
+   * A finance admin undoes a "Transfer found" recorded by mistake: only on
+   * the day it was recorded and while the escrow it added is unspent. The
+   * escrow is debited back and the payment can be recorded again.
+   */
+  .post('/:id/undo-transfer',
+    requireAuth(),
+    requireFinanceAdmin(),
+    zValidator('param', PaymentId),
+    zValidator('json', UndoLateTransfer),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      try {
+        return success(c, await paymentService.undoLateTransfer(id, c.get('user')!.id, c.req.valid('json').reason, extractAuditContext(c)));
+      } catch (err) {
+        const message = clientMessage(err, 'Failed to undo the transfer');
+        const status =
+          message.includes('not found') ? 404 :
+          message.includes('No transfer') || message.includes('only be undone') || message.includes('already been used') ? 409 : 400;
         return error(c, message, status);
       }
     }

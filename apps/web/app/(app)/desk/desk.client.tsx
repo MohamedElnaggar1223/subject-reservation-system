@@ -63,6 +63,11 @@ type AvailableSubject = {
   outsidePricing: { total: number } | null;
 };
 
+/** True when `a` falls in a calendar month before `b`'s (the takings' month rule, MO-11). */
+function isEarlierMonth(a: Date, b: Date): boolean {
+  return a.getFullYear() * 12 + a.getMonth() < b.getFullYear() * 12 + b.getMonth();
+}
+
 export default function DeskClient({ userRole }: { userRole: string }): React.JSX.Element {
   const isFinanceAdmin = userRole === 'finance_admin' || userRole === 'admin';
   const qc = useQueryClient();
@@ -74,6 +79,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [reverseTarget, setReverseTarget] = useState<{ id: string; label: string; confirmedAt: string | null } | null>(null);
+  const [undoTransferTarget, setUndoTransferTarget] = useState<{ id: string; label: string } | null>(null);
   const [transferTarget, setTransferTarget] = useState<{ id: string; label: string; amount: number; reference: string | null } | null>(null);
 
   // ── Search ────────────────────────────────────────────────────────────────
@@ -145,6 +151,17 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
     onSuccess: (d) => {
       setTransferTarget(null);
       done(`Transfer ${d.reference} recorded — ${formatPrice(d.creditedToEscrow)} added to the student's escrow. The family has been told.`);
+    },
+    onError: fail,
+  });
+
+  // Same day only, while the escrow it added is unspent (MO-24).
+  const undoTransferMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      apiResponse(api.v1.payments[':id']['undo-transfer'].$post({ param: { id }, json: { reason } })),
+    onSuccess: (d) => {
+      setUndoTransferTarget(null);
+      done(`Transfer undone — ${formatPrice(d.debitedFromEscrow)} taken back from the student's escrow. The payment can be recorded again.`);
     },
     onError: fail,
   });
@@ -500,6 +517,16 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                         {p.lateTransferAt && (
                           <span className="text-xs text-muted-foreground">Transfer found — credited to escrow</span>
                         )}
+                        {isFinanceAdmin && p.lateTransferAt && new Date(p.lateTransferAt).toDateString() === new Date().toDateString() && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={undoTransferMutation.isPending}
+                            onClick={() => setUndoTransferTarget({ id: p.id, label: `The transfer recorded today against ${formatPrice(p.amount)} by InstaPay` })}
+                          >
+                            Undo
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -528,12 +555,30 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
               {
                 value: 'never',
                 label: 'No — it was never received',
-                hint: `The confirmation was a mistake. It corrects the takings of the day it was confirmed${reverseTarget.confirmedAt ? ` (${new Date(reverseTarget.confirmedAt).toLocaleDateString()})` : ''}, even if that day was already reconciled; today’s drawer does not move.`,
+                // A closed month stays as printed; its correction is posted today (MO-11, 28 Sep).
+                hint: reverseTarget.confirmedAt && isEarlierMonth(new Date(reverseTarget.confirmedAt), new Date())
+                  ? `The confirmation was a mistake. It was confirmed in ${new Date(reverseTarget.confirmedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}, a month already closed: that month stays as printed and the correction appears on today’s report. Today’s drawer does not move.`
+                  : `The confirmation was a mistake. It corrects the takings of the day it was confirmed${reverseTarget.confirmedAt ? ` (${new Date(reverseTarget.confirmedAt).toLocaleDateString()})` : ''}, even if that day was already reconciled; today’s drawer does not move.`,
               },
             ],
           }}
           onConfirm={(reason, choice) => reverseMutation.mutate({ id: reverseTarget.id, reason, moneyReturned: choice === 'returned' })}
           onClose={() => setReverseTarget(null)}
+        />
+      )}
+
+      {undoTransferTarget && (
+        <ReasonModal
+          title="Undo this transfer found later?"
+          description={`${undoTransferTarget.label}. Its amount is taken back from the student's escrow and it leaves today's takings; the payment can then be recorded again. Possible only today, and only while that escrow is unspent.`}
+          label="Why it was recorded by mistake"
+          placeholder="e.g. Wrong family — the transfer belongs to another student"
+          confirmLabel="Undo Transfer"
+          destructive
+          minLength={5}
+          isPending={undoTransferMutation.isPending}
+          onConfirm={(reason) => undoTransferMutation.mutate({ id: undoTransferTarget.id, reason })}
+          onClose={() => setUndoTransferTarget(null)}
         />
       )}
 

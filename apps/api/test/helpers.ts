@@ -328,6 +328,8 @@ export function takingsDelta(before: Takings, after: Takings) {
     correctedTotal: money(after.correctedTotal - before.correctedTotal),
     correctedEscrow: money(after.correctedEscrow - before.correctedEscrow),
     lateTransferTotal: money(after.lateTransferTotal - before.lateTransferTotal),
+    closedMonthCorrectionTotal: money(after.closedMonthCorrectionTotal - before.closedMonthCorrectionTotal),
+    closedMonthCorrectionEscrow: money(after.closedMonthCorrectionEscrow - before.closedMonthCorrectionEscrow),
     drawer: {
       cashIn: money(after.drawer.cashIn - before.drawer.cashIn),
       cashOut: money(after.drawer.cashOut - before.drawer.cashOut),

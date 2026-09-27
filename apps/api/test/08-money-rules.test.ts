@@ -373,25 +373,58 @@ describe('money rules', () => {
       });
     });
 
-    it('a payment confirmed yesterday by mistake corrects yesterday, and today\'s figures do not move (MO-11)', async () => {
+    // Days in last month, so the month rule below never depends on today's date.
+    const lastMonthDay = (d: number) => {
+      const t = new Date();
+      const x = new Date(t.getFullYear(), t.getMonth() - 1, d, 12, 0, 0);
+      const ymd = `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+      return { at: x, ymd };
+    };
+
+    it('a payment confirmed by mistake corrects the day it was confirmed when reversed later in the same month, and the reversal\'s day does not move (MO-11)', async () => {
       const desk = await deskCash(f, [subj.MUS!]);
       const pay = desk.payment!.id;
-      await sql(`update payment set confirmed_at = confirmed_at - interval '1 day' where id = $1`, [pay]);
-      const yesterdayBefore = await takingsOn(officer, localYesterday());
-      const todayBefore = await takings(officer);
+      const [confirmedOn, reversedOn] = [lastMonthDay(10), lastMonthDay(11)];
+      await sql(`update payment set confirmed_at = $1 where id = $2`, [confirmedOn.at.toISOString(), pay]);
+      const confirmedBefore = await takingsOn(officer, confirmedOn.ymd);
+      const reversedBefore = await takingsOn(officer, reversedOn.ymd);
 
       await apiResponse(finadmin.api.v1.payments[':id'].reverse.$post({
         param: { id: pay }, json: { reason: 'confirmed against the wrong family, no cash was taken', moneyReturned: false },
       }));
+      await sql(`update payment set reversed_at = $1 where id = $2`, [reversedOn.at.toISOString(), pay]);
 
-      expect(takingsDelta(yesterdayBefore, await takingsOn(officer, localYesterday()))).toMatchObject({
-        moneyIn: -1500, net: -1500, correctedTotal: 1500, drawer: { cashIn: -1500, net: -1500, corrected: 1500 },
+      expect(takingsDelta(confirmedBefore, await takingsOn(officer, confirmedOn.ymd))).toMatchObject({
+        moneyIn: -1500, net: -1500, correctedTotal: 1500, closedMonthCorrectionTotal: 0, drawer: { cashIn: -1500, net: -1500, corrected: 1500 },
       });
-      expect(await takings(officer)).toEqual(todayBefore);
-      const yesterday = await apiResponse(officer.api.v1.payments['daily-takings'].$get({ query: { date: localYesterday() } }));
-      expect(yesterday.corrected.find((r) => r.id === pay)).toMatchObject({ reversalMoneyReturned: false, reversedByUser: { id: finadmin.id } });
+      expect(await takingsOn(officer, reversedOn.ymd)).toEqual(reversedBefore);
+      const confirmedDay = await apiResponse(officer.api.v1.payments['daily-takings'].$get({ query: { date: confirmedOn.ymd } }));
+      expect(confirmedDay.corrected.find((r) => r.id === pay)).toMatchObject({ reversalMoneyReturned: false, reversedByUser: { id: finadmin.id } });
+      const reversedDay = await apiResponse(officer.api.v1.payments['daily-takings'].$get({ query: { date: reversedOn.ymd } }));
+      expect(reversedDay.correctionsRecorded.find((r) => r.id === pay)).toMatchObject({ postedHere: false });
+    });
+
+    it('a payment confirmed by mistake in a month already closed is corrected on the day of the reversal, and that month stays as printed (MO-11)', async () => {
+      const desk = await deskCash(f, [subj.GER!]);
+      const pay = desk.payment!.id;
+      const confirmedOn = lastMonthDay(20);
+      await sql(`update payment set confirmed_at = $1 where id = $2`, [confirmedOn.at.toISOString(), pay]);
+      const confirmedBefore = await takingsOn(officer, confirmedOn.ymd);
+      const todayBefore = await takings(officer);
+
+      await apiResponse(finadmin.api.v1.payments[':id'].reverse.$post({
+        param: { id: pay }, json: { reason: 'found on the monthly bank reconciliation, never received', moneyReturned: false },
+      }));
+
+      expect(await takingsOn(officer, confirmedOn.ymd)).toEqual(confirmedBefore);
+      expect(takingsDelta(todayBefore, await takings(officer))).toMatchObject({
+        moneyIn: 0, moneyOut: 0, reversedTotal: 0, correctedTotal: 0, closedMonthCorrectionTotal: 1500, net: -1500,
+        drawer: { cashIn: 0, cashOut: 0, net: 0, corrected: 0 },
+      });
       const today = await apiResponse(officer.api.v1.payments['daily-takings'].$get({ query: { date: localToday() } }));
-      expect(today.correctionsRecorded.map((r) => r.id)).toContain(pay);
+      expect(today.correctionsRecorded.find((r) => r.id === pay)).toMatchObject({ postedHere: true });
+      const confirmedDay = await apiResponse(officer.api.v1.payments['daily-takings'].$get({ query: { date: confirmedOn.ymd } }));
+      expect(confirmedDay.rows.map((r) => r.id)).toContain(pay);
     });
   });
 
@@ -969,6 +1002,40 @@ describe('money rules', () => {
       // Only a closed InstaPay payment qualifies.
       expect((await refused(record(finadmin, okPay, { notes: 'already confirmed one', reference: 'FT-MR-DEADLINE-3', amount: 1300 }))).status).toBe(409);
     });
+
+    it('a transfer found later can be undone by a finance admin the same day, while its escrow is unspent (MO-24)', async () => {
+      const undo = (by: Client, id: string) =>
+        by.api.v1.payments[':id']['undo-transfer'].$post({ param: { id }, json: { reason: 'recorded against the wrong family' } });
+      const before = await takings(officer);
+      expect((await refused(undo(officer, musPay))).status).toBe(403);
+
+      // Not while the escrow it added is spent: a refund request holds most of the balance.
+      const w = await apiResponse(f.parent.api.v1.escrow.withdraw.$post({ json: { studentId: f.studentId, amount: 3000 } }));
+      expect(await escrowOf(f.studentId)).toBe(800);
+      expect(await refused(undo(finadmin, musPay))).toEqual({ status: 409, error: 'The escrow this transfer added has already been used, so it can no longer be undone' });
+      await apiResponse(officer.api.v1.escrow.admin.withdrawals[':id'].reject.$post({ param: { id: w.id }, json: { notes: 'the family keeps it as credit' } }));
+      expect(await escrowOf(f.studentId)).toBe(3800);
+
+      // Undone: the escrow is taken back, today's takings no longer list it, and the payment can be recorded again.
+      expect(await apiResponse(undo(finadmin, musPay))).toEqual({ id: musPay, debitedFromEscrow: 1500 });
+      expect(await escrowOf(f.studentId)).toBe(2300);
+      expect(takingsDelta(before, await takings(officer))).toMatchObject({ moneyIn: -1500, lateTransferTotal: -1500, byInstrument: { instapay: -1500 }, net: -1500 });
+      expect(await one(`select late_transfer_at, late_transfer_amount, verification_reference from payment where id = $1`, [musPay]))
+        .toEqual({ late_transfer_at: null, late_transfer_amount: null, verification_reference: null });
+      await audited([musPay], ['PAYMENT_LATE_TRANSFER_UNDONE']);
+      expect((await refused(undo(finadmin, musPay))).status).toBe(409);
+      await apiResponse(finadmin.api.v1.payments[':id']['record-transfer'].$post({
+        param: { id: musPay }, json: { notes: 'the right family after all', reference: 'FT-MR-DEADLINE-2', amount: 1500 },
+      }));
+      expect(await escrowOf(f.studentId)).toBe(3800);
+
+      // Not on a later day: that day may already be reconciled.
+      await sql(`update payment set late_transfer_at = late_transfer_at - interval '1 day' where id = $1`, [musPay]);
+      expect(await refused(undo(finadmin, musPay))).toEqual({
+        status: 409, error: 'A transfer found later can only be undone on the day it was recorded — that day may already be reconciled',
+      });
+      await sql(`update payment set late_transfer_at = now() where id = $1`, [musPay]);
+    });
   });
 
   // ─── Preregistration paid late ─────────────────────────────────────────────
@@ -1039,7 +1106,7 @@ describe('money rules', () => {
       }
     });
 
-    it("past a later series' board deadline a preregistration can no longer be made, paid or confirmed (MO-10)", async () => {
+    it("past a later series' board deadline a preregistration can no longer be made, paid or confirmed, and what was paid comes back in full (MO-10, MO-21)", async () => {
       const prereg = async (subjectId: string) => apiResponse(f.parent.api.v1.registrations.preregister.$post({
         json: { sessionId: june, subjectIds: [subjectId], studentId: f.studentId },
       })).then((r) => r[0]!.id);
@@ -1047,8 +1114,22 @@ describe('money rules', () => {
       const his = await prereg(subj.HIS!);
       const hisPay = (await apiResponse(checkout(his))).id!;
       await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: hisPay }, json: { reference: 'FT-MR-PRE-2' } }));
-      const ecoPay = (await apiResponse(checkout(await prereg(subj.ECO!)))).id!;
+      const eco = await prereg(subj.ECO!);
+      const ecoPay = (await apiResponse(checkout(eco))).id!;
       const ger = await prereg(subj.GER!);
+
+      // A November series with its deadline still ahead holds a paid preregistration too.
+      const november = await session(adm, 'November (AS, money rules, prereg)', 'november', 'as_level', futureWindow());
+      const nov = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({
+        json: { sessionId: november, subjectIds: [subj.PHY!], studentId: f.studentId },
+      })))[0]!.id;
+      const novPay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [nov], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
+      await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: novPay }, json: { instrumentUsed: 'cash' } }));
+      const wallet = async () => {
+        const w = await one<{ balance: string; held: string }>(`select balance, held_balance as held from escrow where student_id = $1`, [f.studentId]);
+        return { free: money(w.balance), held: money(w.held) };
+      };
+      expect(await wallet()).toEqual({ free: 0, held: 3000 });
 
       // June never opens, and the board's deadline for it passes.
       await sql(
@@ -1066,21 +1147,31 @@ describe('money rules', () => {
       const confirm = await refused(officer.api.v1.payments[':id'].confirm.$post({ param: { id: hisPay }, json: {} }));
       expect(confirm.error).toMatch(sentence);
 
-      // The sweep closes both checkouts.
-      await runPaymentDeadlines();
+      // The sweep closes both checkouts, and since June never opened, gives
+      // back what was paid for it in full (MO-21) — not at the refund window's rate.
+      const swept = await runPaymentDeadlines();
+      expect(swept.preregistrationsRefundedAtDeadline).toBe(4);
       expect([await statusOf('payment', hisPay), await statusOf('payment', ecoPay)]).toEqual(['failed', 'failed']);
-      expect(await statusOf('registration', his)).toBe('preregistered');
+      expect(await statusOf('registration', late)).toBe('dropped');
+      for (const reg of [his, eco, ger]) expect(await statusOf('registration', reg)).toBe('expired');
+      expect(await wallet()).toEqual({ free: 1500, held: 1500 });
+      await audited([late], ['PREREG_REFUNDED_AT_DEADLINE']);
+      const refundNotice = await waitFor(async () => (await notificationsFor(f.parent.email, 'SESSION_CLOSED'))
+        .find((n) => n.title === 'Refunded: June (AS, money rules, prereg) did not open') ?? null);
+      expect(refundNotice.body).toContain('EGP 1500.00 paid for Geography (AS, money rules) has been returned to your escrow balance in full');
+      expect(refundNotice.body).toContain('History (AS, money rules)');
+      // Running it again changes nothing; November's preregistration is untouched.
+      expect((await runPaymentDeadlines()).preregistrationsRefundedAtDeadline).toBe(0);
+      expect(await statusOf('registration', nov)).toBe('preregistered');
 
-      // June never opens now — not by hand, not by the scheduler — so the money
-      // already held for it is never captured for entries the board refuses (MO-21).
+      // June never opens now — not by hand, not by the scheduler — so nothing is
+      // captured for entries the board refuses.
       const open = await refused(adm.api.v1.sessions[':id'].activate.$post({ param: { id: june } }));
       expect(open.status).toBe(409);
       expect(open.error).toMatch(/^This series cannot be opened: the exam board's entry deadline \(.+\) has passed$/);
       await runSessionScheduler();
       expect((await one<{ status: string }>(`select status from registration_session where id = $1`, [june])).status).toBe('draft');
-      expect(await statusOf('registration', late)).toBe('preregistered');
-      const w = await one<{ held: string }>(`select held_balance as held from escrow where student_id = $1`, [f.studentId]);
-      expect(money(w.held)).toBe(1500);
+      expect(await wallet()).toEqual({ free: 1500, held: 1500 });
     });
 
     it('a family reference set aside by a transfer found later cannot be submitted again', async () => {

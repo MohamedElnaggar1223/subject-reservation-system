@@ -112,7 +112,9 @@ export default function TakingsClient(): React.JSX.Element {
               <p className="text-xs text-muted-foreground">Money out</p>
               <p className="text-2xl font-bold text-foreground">{formatPrice(data.totals.moneyOut)}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                {formatPrice(data.totals.cashRefunded)} refunds · {formatPrice(data.totals.reversedTotal)} reversed · net {formatPrice(data.totals.net)}
+                {formatPrice(data.totals.cashRefunded)} refunds · {formatPrice(data.totals.reversedTotal)} reversed
+                {data.totals.closedMonthCorrectionTotal > 0 && <> · less {formatPrice(data.totals.closedMonthCorrectionTotal)} corrections to closed months</>}
+                {' '}· net {formatPrice(data.totals.net)}
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border shadow-sm p-4">
@@ -237,7 +239,8 @@ export default function TakingsClient(): React.JSX.Element {
               <div className="px-4 py-3 border-b border-border">
                 <h2 className="text-sm font-semibold text-foreground">Corrections</h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Payments confirmed by mistake and reversed, with no money ever received. The figures above already leave them out.
+                  Payments confirmed by mistake and reversed, with no money ever received. The figures above already leave them out; one
+                  confirmed in a month already closed is corrected here instead, and that month stays as printed.
                 </p>
               </div>
               <table className="w-full min-w-[640px] text-sm">
@@ -262,8 +265,18 @@ export default function TakingsClient(): React.JSX.Element {
                         <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{time(r.reversedAt)}</td>
                         <td className="px-4 py-2.5 text-foreground">{r.student?.name ?? '—'}</td>
                         <td className="px-4 py-2.5 text-card-foreground">
-                          Reversed this day by {r.reversedByUser?.name ?? '—'}: corrects{' '}
-                          {r.confirmedAt ? new Date(r.confirmedAt).toLocaleDateString() : 'the day it was confirmed'}, not this day
+                          {r.postedHere ? (
+                            <>
+                              Reversed this day by {r.reversedByUser?.name ?? '—'}: confirmed{' '}
+                              {r.confirmedAt ? new Date(r.confirmedAt).toLocaleDateString() : ''}, a month already closed, so corrected on this day
+                              {r.escrowAmountApplied > 0 ? ` (${formatPrice(r.escrowAmountApplied)} from escrow, returned)` : ''}
+                            </>
+                          ) : (
+                            <>
+                              Reversed this day by {r.reversedByUser?.name ?? '—'}: corrects{' '}
+                              {r.confirmedAt ? new Date(r.confirmedAt).toLocaleDateString() : 'the day it was confirmed'}, not this day
+                            </>
+                          )}
                         </td>
                         <td className="px-4 py-2.5 text-right font-medium text-muted-foreground whitespace-nowrap">{formatPrice(r.amount)}</td>
                       </tr>

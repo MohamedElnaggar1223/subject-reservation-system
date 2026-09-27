@@ -197,10 +197,12 @@ before it ships.
    (`MONEY_AUDIT.md` §6a): 24 hours after the close for an InstaPay reference, the board's
    entry deadline as a hard cut-off (entered per session, DISCOVERY.md A-08), and a reversal
    that asks whether the money went back. A transfer found on the statement after the
-   cut-off is credited to the family's escrow by a finance admin ("Transfer found"). Still
-   open: MO-2, MO-5, MO-6, MO-12, MO-21 (a draft series that passes its deadline unopened),
-   MO-24 (no undo for a "Transfer found"), and how far back a "never received" reversal may
-   correct a reconciled day (MO-11). Handed on:
+   cut-off is credited to the family's escrow by a finance admin ("Transfer found"). Decided
+   28 Sep (§6b): a series that never opened refunds its preregistrations in full (MO-21); a
+   "Transfer found" can be undone the same day while its escrow is unspent (MO-24); a "never
+   received" reversal corrects only within its own month, a closed month staying as printed
+   (MO-11, assumes a monthly close: DISCOVERY.md A-09). Still open: MO-2, MO-5, MO-6, MO-12.
+   Handed on:
    MO-1 (the rest of O-7) to state and time; MO-3 (`TZ=Africa/Cairo`) is in the production
    checklist.
    Next: **state and time** (Phase 1.3).
