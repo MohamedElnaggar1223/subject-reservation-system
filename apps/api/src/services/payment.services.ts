@@ -33,6 +33,8 @@ import {
   eq,
   and,
   inArray,
+  lte,
+  isNotNull,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type {
@@ -54,11 +56,13 @@ import {
   debitEscrow,
 } from './escrow.services';
 import { logAction, type AuditContext } from './audit.services';
-import { hasDeadlineExtension } from './exception.services';
+import { sessionOpenFor, sessionWindow, entryDeadlineMessage, schoolDateTime } from './window.services';
 import {
   notifyPaymentConfirmed,
   notifyPaymentReversed,
   notifyPaymentRejected,
+  notifyPaymentExpired,
+  notifyPaymentClosedAtEntryDeadline,
   notifyEscrowBalanceChanged,
 } from './notification.services';
 import { createReceiptsForRegistrations } from './receipt.services';
@@ -92,20 +96,6 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/**
- * Whether a session's window is open for this student: the session is active,
- * or finance granted the student a deadline extension for it. Registration
- * already honoured extensions; payment did not, so a student with an extension
- * could register and then nobody could pay (money audit MA-13).
- */
-export async function sessionOpenFor(studentId: string, sessionId: string, executor: typeof db | Tx = db): Promise<boolean> {
-  const [sess] = await executor
-    .select({ status: registrationSession.status })
-    .from(registrationSession)
-    .where(eq(registrationSession.id, sessionId));
-  if (sess?.status === 'active') return true;
-  return hasDeadlineExtension(studentId, sessionId, executor);
-}
 
 /**
  * Verify that a parent has an approved link to a specific student.
@@ -470,17 +460,19 @@ export async function confirmPayment(
     // preregistered (or pending_payment if the session opened first). Anything
     // else needs a window that is open for this student — or a transfer
     // awaiting verification: a registration it held past the close stays
-    // confirmable after it (money audit MA-01).
+    // confirmable after it (money audit MA-01), until the exam board's entry
+    // deadline, after which nothing more can be entered (MO-10).
     for (const r of regs) {
-      const payable = isPreregPayment
-        ? r.status === 'preregistered' || r.status === 'pending_payment'
-        : r.status === 'pending_payment' &&
-          (current.status === 'pending_verification' || (await sessionOpenFor(pay.studentId, r.sessionId, tx)));
-      if (!payable) {
-        throw new Error(
-          'Payment cannot be confirmed — at least one registration is no longer payable (session closed or already expired).'
-        );
+      if (isPreregPayment) {
+        if (r.status === 'preregistered' || r.status === 'pending_payment') continue;
+      } else if (r.status === 'pending_payment') {
+        const w = await sessionWindow(pay.studentId, r.sessionId, tx);
+        if (w.open || (current.status === 'pending_verification' && !w.entryDeadlinePassed)) continue;
+        if (w.entryDeadlinePassed) throw new Error(entryDeadlineMessage(w.entryDeadline!));
       }
+      throw new Error(
+        'Payment cannot be confirmed — at least one registration is no longer payable (session closed or already expired).'
+      );
     }
 
     const [paymentUpdate] = await tx
@@ -848,6 +840,86 @@ export async function rejectPayment(paymentId: string, staffId: string, reason: 
 }
 
 /**
+ * The two payment deadlines that follow a close (owner decision MO-10). Run
+ * by the scheduler on every tick; idempotent, so a missed tick costs nothing.
+ *
+ * 1. An InstaPay checkout the close kept open for its reference, whose
+ *    referenceDueAt has passed with no reference: it lapses — escrow back,
+ *    its subjects released — and the family is told.
+ * 2. A series whose exam-board entry deadline has passed: every payment still
+ *    open on it is closed (a transfer finance never verified included; the
+ *    board accepts no more entries), escrow back, family told; and every
+ *    registration still waiting on it expires.
+ */
+export async function enforcePaymentDeadlines(now: Date = new Date()) {
+  let referencesLapsed = 0;
+  let paymentsClosedAtDeadline = 0;
+  let registrationsExpiredAtDeadline = 0;
+
+  const lapsed = await db
+    .select({ id: payment.id })
+    .from(payment)
+    .where(and(eq(payment.status, 'pending'), lte(payment.referenceDueAt, now)));
+  for (const { id } of lapsed) {
+    try {
+      const r = await failOpenPayment(id, {
+        from: ['pending'],
+        actorId: null,
+        action: 'PAYMENT_FAILED',
+        reason: 'No transfer reference was submitted in the time allowed after the registration window closed',
+        expireIfClosed: true,
+      });
+      if (!r) continue;
+      referencesLapsed++;
+      await notifyPaymentExpired(id, r.pay.escrowAmountApplied)
+        .catch((err) => console.error(`[deadlines] Lapse notice for ${id} failed:`, err));
+    } catch (err) {
+      console.error(`[deadlines] Could not lapse payment ${id}:`, err);
+    }
+  }
+
+  const pastDeadline = await db
+    .select({ id: registrationSession.id, entryDeadline: registrationSession.entryDeadline })
+    .from(registrationSession)
+    .where(and(isNotNull(registrationSession.entryDeadline), lte(registrationSession.entryDeadline, now)));
+  for (const s of pastDeadline) {
+    const open = await db
+      .selectDistinct({ id: payment.id })
+      .from(payment)
+      .innerJoin(paymentRegistration, eq(paymentRegistration.paymentId, payment.id))
+      .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
+      .where(and(eq(registration.sessionId, s.id), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])));
+    for (const { id } of open) {
+      try {
+        const r = await failOpenPayment(id, {
+          from: OPEN_PAYMENT_STATUSES,
+          actorId: null,
+          action: 'PAYMENT_REJECTED',
+          reason: "The exam board's entry deadline passed before this payment was confirmed",
+          expireIfClosed: true,
+        });
+        if (!r) continue;
+        paymentsClosedAtDeadline++;
+        await notifyPaymentClosedAtEntryDeadline(id, s.entryDeadline!, r.pay.escrowAmountApplied)
+          .catch((err) => console.error(`[deadlines] Deadline notice for ${id} failed:`, err));
+      } catch (err) {
+        console.error(`[deadlines] Could not close payment ${id} at the entry deadline:`, err);
+      }
+    }
+
+    // Anything else still waiting on this series can never be entered now.
+    const expired = await db
+      .update(registration)
+      .set({ status: 'expired', updatedAt: now })
+      .where(and(eq(registration.sessionId, s.id), inArray(registration.status, ['pending_approval', 'pending_payment'])))
+      .returning({ id: registration.id });
+    registrationsExpiredAtDeadline += expired.length;
+  }
+
+  return { referencesLapsed, paymentsClosedAtDeadline, registrationsExpiredAtDeadline };
+}
+
+/**
  * Get a payment by ID with its linked registrations.
  */
 export async function getPaymentById(id: string) {
@@ -936,14 +1008,23 @@ export async function submitInstapayReference(
   }
   // A checkout whose registrations already expired with the window can take
   // no reference: nothing could ever be confirmed against it.
+  // A checkout the close left waiting for its reference has until
+  // referenceDueAt to get one (owner decision MO-10).
+  if (pay.referenceDueAt && pay.referenceDueAt <= new Date()) {
+    throw new Error(
+      `The time to submit a transfer reference after the registration window closed ended on ${schoolDateTime(pay.referenceDueAt)}. If you did transfer, contact the finance desk with your bank receipt.`
+    );
+  }
   if (pay.purpose === 'registration') {
     const links = await db.query.paymentRegistration.findMany({
       where: (pr, { eq }) => eq(pr.paymentId, paymentId),
-      with: { registration: { columns: { status: true } } },
+      with: { registration: { columns: { status: true }, with: { session: { columns: { entryDeadline: true } } } } },
     });
     if (links.some((l) => l.registration.status !== 'pending_payment')) {
       throw new Error('The registration window has closed for this payment; it can no longer take a transfer reference.');
     }
+    const passed = links.find((l) => l.registration.session.entryDeadline && l.registration.session.entryDeadline <= new Date());
+    if (passed) throw new Error(entryDeadlineMessage(passed.registration.session.entryDeadline!));
   }
 
   try {
@@ -994,7 +1075,11 @@ export async function getPendingManualPayments() {
       paymentRegistrations: {
         with: {
           registration: {
-            with: { subject: { columns: { id: true, name: true, code: true } } },
+            with: {
+              subject: { columns: { id: true, name: true, code: true } },
+              // The workbench shows what is due: the board deadline of a closed series (MO-10).
+              session: { columns: { id: true, name: true, status: true, entryDeadline: true } },
+            },
           },
         },
       },
@@ -1015,7 +1100,16 @@ export async function getPendingManualPayments() {
  * pending_payment, receipts voided. School-fee reversals re-lock the
  * registration gate automatically (the gate checks completed payments).
  */
-export async function reversePayment(paymentId: string, financeAdminId: string, reason: string, auditCtx?: AuditContext) {
+export async function reversePayment(
+  paymentId: string,
+  financeAdminId: string,
+  reason: string,
+  // Was the money given back to the family? (owner decision MO-11) Yes: money
+  // out on today's takings. No — confirmed by mistake, nothing was received:
+  // the confirmation day's money in is corrected, and today does not move.
+  moneyReturned: boolean,
+  auditCtx?: AuditContext
+) {
   const pay = await db.query.payment.findFirst({
     where: (p, { eq }) => eq(p.id, paymentId),
     with: { paymentRegistrations: { columns: { registrationId: true } } },
@@ -1043,9 +1137,10 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
         // The day's takings count the reversal on this date (MA-05).
         reversedAt,
         reversedBy: financeAdminId,
+        reversalMoneyReturned: moneyReturned,
         metadata: {
           ...((pay.metadata as Record<string, unknown>) ?? {}),
-          reversal: { by: financeAdminId, reason, at: reversedAt.toISOString() },
+          reversal: { by: financeAdminId, reason, at: reversedAt.toISOString(), moneyReturned },
         },
         updatedAt: reversedAt,
       })
@@ -1112,7 +1207,7 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
     }
 
     await logAction(financeAdminId, 'PAYMENT_REVERSED', 'payment', paymentId, { status: 'completed' },
-      { status: 'refunded', reason, registrationsReverted, voidedReceiptNumbers }, auditCtx, tx);
+      { status: 'refunded', reason, moneyReturned, registrationsReverted, voidedReceiptNumbers }, auditCtx, tx);
   });
 
   // RF-08: every other money movement tells the family; this one used to
@@ -1122,6 +1217,7 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
     paymentId,
     amount: pay.amount + pay.escrowAmountApplied,
     reason,
+    moneyReturned,
     voidedReceiptNumbers,
     registrationsReverted,
   }).catch((err) => console.error('[notification] PAYMENT_REVERSED failed:', err));
@@ -1134,11 +1230,16 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
  * the officer reconciles the drawer against it at closing time, and a
  * printed day must stay true afterwards (money audit MA-04, MA-05, MA-09).
  *
- * - Money in: every payment confirmed that day, including one reversed
- *   later. A reversal is money out on the day it is made; it never
- *   rewrites the day of the confirmation.
- * - Money out: reversals made that day, plus each hand-over of refund
- *   cash made that day (withdrawal_disbursement, one row per hand-over).
+ * - Money in: every payment confirmed that day — including one reversed
+ *   later with the money handed back, since that money did come in.
+ * - Money out: reversals made that day that handed money back, plus each
+ *   hand-over of refund cash made that day (withdrawal_disbursement, one
+ *   row per hand-over).
+ * - Corrections (owner decision MO-11): a reversal that says no money had
+ *   come in — a confirmation made by mistake — is not money out on its day.
+ *   It corrects the day of the confirmation: that day's money in leaves it
+ *   out and lists it under `corrected`, and the reversal's own day lists it
+ *   under `correctionsRecorded` without moving any total.
  * - Drawer: the cash instrument only. InstaPay lands in the bank and card
  *   in the terminal, so neither belongs in the drawer count.
  */
@@ -1146,31 +1247,36 @@ export async function getDailyTakings(dateStr: string) {
   const start = new Date(`${dateStr}T00:00:00`);
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   const columns = {
-    id: true, amount: true, escrowAmountApplied: true, paymentMethod: true, purpose: true,
-    instrumentUsed: true, externalReference: true, confirmedAt: true, reversedAt: true,
+    id: true, amount: true, escrowAmountApplied: true, paymentMethod: true, purpose: true, status: true,
+    instrumentUsed: true, externalReference: true, confirmedAt: true, reversedAt: true, reversalMoneyReturned: true,
   } as const;
+  const people = {
+    student: { columns: { id: true, name: true } },
+    confirmedByUser: { columns: { id: true, name: true } },
+    reversedByUser: { columns: { id: true, name: true } },
+  } as const;
+  const neverReceived = (r: { status: string; reversalMoneyReturned: boolean | null }) =>
+    r.status === 'refunded' && r.reversalMoneyReturned === false;
 
-  const confirmed = await db.query.payment.findMany({
+  const confirmedThatDay = await db.query.payment.findMany({
     where: (p, { and, inArray, gte, lt }) =>
       and(inArray(p.status, ['completed', 'refunded']), gte(p.confirmedAt, start), lt(p.confirmedAt, end)),
     columns,
-    with: {
-      student: { columns: { id: true, name: true } },
-      confirmedByUser: { columns: { id: true, name: true } },
-    },
+    with: people,
     orderBy: (p, { asc }) => [asc(p.confirmedAt)],
   });
+  const confirmed = confirmedThatDay.filter((r) => !neverReceived(r));
+  const corrected = confirmedThatDay.filter(neverReceived);
 
-  const reversed = await db.query.payment.findMany({
+  const reversedThatDay = await db.query.payment.findMany({
     where: (p, { and, eq, gte, lt }) =>
       and(eq(p.status, 'refunded'), gte(p.reversedAt, start), lt(p.reversedAt, end)),
     columns,
-    with: {
-      student: { columns: { id: true, name: true } },
-      reversedByUser: { columns: { id: true, name: true } },
-    },
+    with: people,
     orderBy: (p, { asc }) => [asc(p.reversedAt)],
   });
+  const reversed = reversedThatDay.filter((r) => !neverReceived(r));
+  const correctionsRecorded = reversedThatDay.filter(neverReceived);
 
   const handOvers = await db.query.withdrawalDisbursement.findMany({
     where: (d, { and, gte, lt }) => and(gte(d.disbursedAt, start), lt(d.disbursedAt, end)),
@@ -1194,11 +1300,15 @@ export async function getDailyTakings(dateStr: string) {
   const moneyOut = round2(reversedTotal + cashRefunded);
   const drawerIn = sum(confirmed.filter((r) => instrumentOf(r) === 'cash'), (r) => r.amount);
   const drawerOut = round2(sum(reversed.filter((r) => instrumentOf(r) === 'cash'), (r) => r.amount) + cashRefunded);
+  const correctedTotal = sum(corrected, (r) => r.amount);
+  const drawerCorrected = sum(corrected.filter((r) => instrumentOf(r) === 'cash'), (r) => r.amount);
 
   return {
     date: dateStr,
     rows: confirmed,
     reversed,
+    corrected,
+    correctionsRecorded,
     cashRefunds: handOvers.map((d) => ({
       id: d.id,
       withdrawalRequestId: d.withdrawalRequestId,
@@ -1215,7 +1325,10 @@ export async function getDailyTakings(dateStr: string) {
       cashRefunded,
       moneyOut,
       net: round2(moneyIn - moneyOut),
-      drawer: { cashIn: drawerIn, cashOut: drawerOut, net: round2(drawerIn - drawerOut) },
+      // Money this day's confirmations claimed but never received (MO-11);
+      // already left out of moneyIn above.
+      correctedTotal,
+      drawer: { cashIn: drawerIn, cashOut: drawerOut, net: round2(drawerIn - drawerOut), corrected: drawerCorrected },
     },
   };
 }
@@ -1531,6 +1644,7 @@ export async function getCheckoutSummary(
         columns: {
           id: true, status: true, paymentMethod: true, amount: true, escrowAmountApplied: true,
           externalReference: true, verificationReference: true, metadata: true, createdAt: true,
+          referenceDueAt: true,
         },
         with: {
           paymentRegistrations: {

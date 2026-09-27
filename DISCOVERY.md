@@ -69,6 +69,7 @@ Source: `Nov 1 2026.xlsx` (a Google Form export; two session tabs — "June 2023
 | A-05 | The **Grade-10 core-subject mandate** (URD CORE-001..004: core subjects pre-selected, locked, cannot be dropped/swapped) still holds. | URD v2; **confirmed by user 26 Sep: "the core-subject is the unique thing to grade 10"** | high | — | confirmed |
 | A-06 | Each **registration window is specific to one exam series**; a family may deposit against a future series from within the current window (A-03). | User, 26 Sep | medium | If windows span series, the `registrationSession` model and the one-active-per-(type, level) index change. | assumed |
 | A-07 | Grade 10 is **"treated the same as the others"** in the sense of using the same registration form and pricing; the core-subject rule is the one thing unique to them. | User, 26 Sep (resolved Q-01) | high | — | confirmed |
+| A-08 | The **exam board's entry deadline** for each series is known from the board's published calendar and is entered by the admin per session; the school does not accept entries (or money for them) after it, and late entries with board late fees are not handled by this system. | Owner decision MO-10, 27 Sep (MONEY_AUDIT.md §6) | medium | If the school takes late entries with the board's late fee, the cut-off becomes a fee step instead of a hard stop. | assumed |
 
 ---
 
@@ -126,6 +127,11 @@ unless a fact in §1 changes.
 - **Preregistration for an upcoming series stays** (A-03 validates the held wallet).
 - **The Grade-10 June-only pattern stays** (A-01), and **the core-subject mandate stays**
   as the one grade-10-specific rule (A-05, A-07, Q-01 confirmed).
+- **Money after the close** (owner, 27 Sep, MONEY_AUDIT.md MO-10): an InstaPay checkout with
+  no reference yet gets 24 hours after the window closes; a series' board entry deadline
+  (A-08) closes everything still unconfirmed on it.
+- **A reversal says whether the money went back** (owner, 27 Sep, MO-11): if it did, it is
+  money out that day; if the confirmation was a mistake, it corrects the confirmation's day.
 
 ---
 

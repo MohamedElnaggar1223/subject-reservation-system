@@ -46,6 +46,7 @@ import {
   sendPaymentReceiptEmail,
   sendPaymentReversedEmail,
   sendPaymentRejectedEmail,
+  sendPaymentNoticeEmail,
   sendDropSwapRequestEmail,
   sendDropSwapProcessedEmail,
   sendDirectDropSwapEmail,
@@ -57,6 +58,7 @@ import {
   sendLinkDecisionEmail,
 } from '../integrations/email';
 import { clientMessage } from '../lib/response';
+import { schoolDate, schoolDateTime } from './window.services';
 
 // ─── Core Primitives ──────────────────────────────────────────────────────────
 
@@ -680,6 +682,8 @@ export async function notifyPaymentReversed(data: {
   paymentId: string;
   amount: number;
   reason: string;
+  /** MO-11: the money was handed back, or the confirmation was a mistake and none had been received. */
+  moneyReturned: boolean;
   voidedReceiptNumbers: string[];
   registrationsReverted: number;
 }) {
@@ -692,9 +696,12 @@ export async function notifyPaymentReversed(data: {
   const receiptNote = n > 0
     ? ` Receipt${n === 1 ? '' : 's'} ${data.voidedReceiptNumbers.join(', ')} ${n === 1 ? 'is' : 'are'} no longer valid.`
     : '';
+  const moneyNote = data.moneyReturned
+    ? ' The money was returned to you.'
+    : ' It had been recorded by mistake: no money was received for it.';
   const title = 'Payment reversed';
   const body =
-    `The finance office reversed a payment of EGP ${data.amount.toFixed(2)} for ${studentName} (${data.reason}). ` +
+    `The finance office reversed a payment of EGP ${data.amount.toFixed(2)} for ${studentName} (${data.reason}).${moneyNote} ` +
     `${data.registrationsReverted} registration${data.registrationsReverted === 1 ? ' is' : 's are'} back to pending payment.${receiptNote} ` +
     `Please settle again at the finance desk.`;
   const notifData = {
@@ -779,6 +786,79 @@ export async function notifyPaymentRejected(data: {
   if (studentUser) {
     await createNotification(data.studentId, 'PAYMENT_REJECTED', title, body, notifData);
   }
+}
+
+/**
+ * Owner decision MO-10: payment notices about the time left, or run out,
+ * after a window closes. Parents get the notification and an email; the
+ * student gets the notification.
+ */
+async function notifyFamilyOfPayment(
+  paymentId: string,
+  type: 'PAYMENT_REFERENCE_DUE' | 'PAYMENT_EXPIRED' | 'PAYMENT_REJECTED',
+  title: string,
+  body: (ctx: { studentName: string; amount: string; subjects: string; sessionName: string }) => string
+) {
+  const pay = await db.query.payment.findFirst({
+    where: (p, { eq: eqOp }) => eqOp(p.id, paymentId),
+    columns: { id: true, studentId: true, amount: true, escrowAmountApplied: true, referenceDueAt: true },
+    with: {
+      paymentRegistrations: {
+        with: { registration: { with: { subject: { columns: { name: true } }, session: { columns: { name: true } } } } },
+      },
+    },
+  });
+  if (!pay) return;
+  const [studentUser, parents] = await Promise.all([getUserDetails(pay.studentId), getLinkedParents(pay.studentId)]);
+  const studentName = studentUser?.name ?? 'your child';
+  const text = body({
+    studentName,
+    amount: `EGP ${(pay.amount + pay.escrowAmountApplied).toFixed(2)}`,
+    subjects: pay.paymentRegistrations.map((pr) => pr.registration.subject.name).join(', '),
+    sessionName: pay.paymentRegistrations[0]?.registration.session.name ?? 'the session',
+  });
+  const notifData = { paymentId, studentId: pay.studentId, referenceDueAt: pay.referenceDueAt?.toISOString() ?? null };
+
+  for (const { parentId } of parents) {
+    const parentUser = await getUserDetails(parentId);
+    const created = await createNotification(parentId, type, title, text, notifData);
+    if (parentUser?.email) {
+      fireEmail(`MO-10 ${type} to parent`, () =>
+        sendPaymentNoticeEmail(parentUser.email!, { parentName: parentUser.name, studentName, title, body: text }),
+        created ? [created.id] : undefined
+      );
+    }
+  }
+  if (studentUser) await createNotification(pay.studentId, type, title, text, notifData);
+}
+
+/** At the close: an InstaPay checkout was kept open for its reference until referenceDueAt. */
+export async function notifyPaymentReferenceDue(paymentId: string) {
+  const pay = await db.query.payment.findFirst({ where: (p, { eq: eqOp }) => eqOp(p.id, paymentId), columns: { referenceDueAt: true } });
+  const due = pay?.referenceDueAt ? schoolDateTime(pay.referenceDueAt) : 'the time allowed';
+  await notifyFamilyOfPayment(paymentId, 'PAYMENT_REFERENCE_DUE', 'Submit your InstaPay reference', (c) =>
+    `The registration window for ${c.sessionName} has closed. You started an InstaPay payment of ${c.amount} for ${c.studentName} (${c.subjects}). ` +
+    `If you have transferred the money, submit the transaction reference by ${due}; the subjects stay reserved until then. ` +
+    `If no reference arrives by then, the payment is cancelled and the subjects are released.`
+  );
+}
+
+/** After the grace period: no reference came, so the checkout lapsed. */
+export async function notifyPaymentExpired(paymentId: string, escrowReturned: number) {
+  const escrowNote = escrowReturned > 0 ? ` EGP ${escrowReturned.toFixed(2)} applied from escrow has been returned.` : '';
+  await notifyFamilyOfPayment(paymentId, 'PAYMENT_EXPIRED', 'InstaPay payment not completed', (c) =>
+    `No transfer reference was submitted for the InstaPay payment of ${c.amount} for ${c.studentName} (${c.subjects}) in the time allowed after the ${c.sessionName} window closed, ` +
+    `so the payment was cancelled and the subjects were released.${escrowNote} If you did transfer, contact the finance desk with your bank receipt.`
+  );
+}
+
+/** At the board's entry deadline: an unconfirmed payment was closed automatically. */
+export async function notifyPaymentClosedAtEntryDeadline(paymentId: string, entryDeadline: Date, escrowReturned: number) {
+  const escrowNote = escrowReturned > 0 ? ` EGP ${escrowReturned.toFixed(2)} applied from escrow has been returned.` : '';
+  await notifyFamilyOfPayment(paymentId, 'PAYMENT_REJECTED', 'Payment closed at the exam board deadline', (c) =>
+    `The exam board's entry deadline for ${c.sessionName} (${schoolDate(entryDeadline)}) passed before the payment of ${c.amount} for ${c.studentName} (${c.subjects}) was confirmed, ` +
+    `so it was closed and the subjects were not entered.${escrowNote} If you did transfer, contact the finance desk with your bank receipt.`
+  );
 }
 
 /**

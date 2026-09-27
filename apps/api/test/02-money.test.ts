@@ -116,10 +116,11 @@ describe('money paths', () => {
   });
 
   it('finance-admin reversal restores every row and tells the family which receipt is void (RF-08)', async () => {
-    expect((await refused(officer.api.v1.payments[':id'].reverse.$post({ param: { id: biologyPayment }, json: { reason: 'should be refused' } }))).status).toBe(403);
+    expect((await refused(officer.api.v1.payments[':id'].reverse.$post({ param: { id: biologyPayment }, json: { reason: 'should be refused', moneyReturned: false } }))).status).toBe(403);
 
+    // The transfer never reached the bank: nothing is returned, the confirmation was a mistake (MO-11).
     const r = await apiResponse(
-      finadmin.api.v1.payments[':id'].reverse.$post({ param: { id: biologyPayment }, json: { reason: 'bank statement did not match after all' } })
+      finadmin.api.v1.payments[':id'].reverse.$post({ param: { id: biologyPayment }, json: { reason: 'bank statement did not match after all', moneyReturned: false } })
     );
     expect(r).toEqual({ reversed: true, registrationsReverted: 1 });
     expect((await one<{ status: string }>(`select status from payment where id = $1`, [biologyPayment])).status).toBe('refunded');
@@ -135,16 +136,17 @@ describe('money paths', () => {
     expect(toParent[0]?.body).toContain(`Receipt ${biologyReceiptNumber} is no longer valid`);
     expect(toParent[0]?.body).toContain('EGP 1500.00');
     expect(toParent[0]?.body).toContain('1 registration is back to pending payment');
+    expect(toParent[0]?.body).toContain('no money was received for it');
     await notified(student.email, 'PAYMENT_REVERSED', 1);
 
-    // The InstaPay payment stays in money in (it was confirmed today) and its
-    // reversal is money out today: they net to zero, not to minus 1000 (MA-04).
-    // Before the money audit the reversed payment left money in AND was
-    // subtracted again, and this test never read the net, which came to -500.
+    // No money had come in, so this is a correction, not money out (MO-11):
+    // the InstaPay payment leaves today's money in and is listed as corrected,
+    // and nothing is subtracted. (Before the money audit it left money in AND
+    // was subtracted again, and this test never read the net, which came to -500.)
     expect(takingsDelta(takingsBefore, await takings(officer))).toMatchObject({
-      moneyIn: 2500, escrowApplied: 500, byInstrument: { cash: 1500, instapay: 1000 },
-      reversedTotal: 1000, cashRefunded: 1000, moneyOut: 2000, net: 500,
-      drawer: { cashIn: 1500, cashOut: 1000, net: 500 },
+      moneyIn: 1500, escrowApplied: 0, byInstrument: { cash: 1500 },
+      reversedTotal: 0, cashRefunded: 1000, moneyOut: 1000, net: 500, correctedTotal: 1000,
+      drawer: { cashIn: 1500, cashOut: 1000, net: 500, corrected: 0 },
     });
   });
 });

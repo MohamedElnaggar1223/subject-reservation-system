@@ -134,6 +134,8 @@ Set these before the first deployment; each one is a control this audit relies o
 - The API served over HTTPS only (HSTS is sent).
 - `TZ=Africa/Cairo` for the API process: the daily takings report cuts days at the server's
   local midnight (MONEY_AUDIT.md MO-3).
+- Before each series opens, the admin enters its exam-board entry deadline on the Sessions
+  page; without one, unconfirmed payments are never closed automatically (MONEY_AUDIT.md §6a).
 
 ---
 

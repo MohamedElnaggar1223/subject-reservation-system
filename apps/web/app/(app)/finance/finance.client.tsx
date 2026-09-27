@@ -370,6 +370,22 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                         .map((pr) => `${pr.registration.subject.name} (${pr.registration.subject.code})`)
                         .join(' · ')}
                     </p>
+                    {/* MO-10: what is due once the window has closed */}
+                    {pay.status === 'pending' && pay.referenceDueAt && (
+                      <p className="text-xs mt-1 text-amber-600 dark:text-amber-400">
+                        Window closed — the family has until {new Date(pay.referenceDueAt).toLocaleString()} to submit the reference; then it lapses on its own.
+                      </p>
+                    )}
+                    {(() => {
+                      const closed = pay.paymentRegistrations.find(
+                        (pr) => pr.registration.session.status === 'closed' && pr.registration.session.entryDeadline
+                      );
+                      return closed ? (
+                        <p className="text-xs mt-1 text-amber-600 dark:text-amber-400">
+                          Confirm or reject before the board deadline, {new Date(closed.registration.session.entryDeadline!).toLocaleDateString()} — after it this payment is closed automatically.
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
                   <div className="text-right shrink-0 flex flex-col items-end gap-2">
                     <div>

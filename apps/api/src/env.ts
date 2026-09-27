@@ -31,6 +31,10 @@ const envSchema = z.object({
   SCHOOL_ACCOUNT_NAME: z.string().optional(),
   SCHOOL_ACCOUNT_NUMBER: z.string().optional(),
   SCHOOL_IBAN: z.string().optional(),
+  // Hours after a window closes during which an InstaPay checkout still
+  // waiting for its transfer reference survives the close (owner decision
+  // MO-10): a family who transferred just before the close can still submit it.
+  INSTAPAY_REFERENCE_GRACE_HOURS: z.coerce.number().min(0).max(24 * 14).default(24),
 
   // Legacy provider credentials — integrations disabled in V3 (kept for the
   // future PSP InstaPay path; see V3_PLAN §2.3).

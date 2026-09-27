@@ -30,6 +30,7 @@ import {
   SubmitInstapayReference,
   ConfirmManualPayment,
   RejectManualPayment,
+  ReversePayment,
   ListPaymentsQuery,
   CheckoutSummaryQuery,
   PaymentId,
@@ -389,14 +390,14 @@ export const payments = new Hono<HonoEnv>()
     requireAuth(),
     requireFinanceAdmin(),
     zValidator('param', PaymentId),
-    zValidator('json', z.object({ reason: z.string().min(3, 'A reason is required').max(500) })),
+    zValidator('json', ReversePayment),
     async (c) => {
       const user = c.get('user')!;
       const { id } = c.req.valid('param');
-      const { reason } = c.req.valid('json');
+      const { reason, moneyReturned } = c.req.valid('json');
       try {
         // PAYMENT_REVERSED is written inside the reversal's transaction (O-7).
-        const result = await paymentService.reversePayment(id, user.id, reason, extractAuditContext(c));
+        const result = await paymentService.reversePayment(id, user.id, reason, moneyReturned, extractAuditContext(c));
         return success(c, result);
       } catch (err) {
         const message = clientMessage(err, 'Failed to reverse payment');

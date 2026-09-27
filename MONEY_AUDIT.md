@@ -43,9 +43,9 @@ take money for a subject already registered; and a subject paid again after a re
 with only its voided receipt. All twenty are fixed. Eighteen have a test that fails without the
 fix; MA-12, and the deadlock half of MA-16, rest on reasoning.
 
-Two questions are the owner's (§5, MO-10 and MO-11): how long a family has to submit an
+Two questions were the owner's (§6, MO-10 and MO-11): how long a family has to submit an
 InstaPay reference after the close, and whether reversing a cash payment means cash was handed
-back.
+back. The owner took both recommendations on 27 September; they are built and tested (§6a).
 
 ---
 
@@ -176,9 +176,9 @@ review also corrected these claims:
 | MO-7 | Two refund windows created at the same instant could both pass the overlap check. One finance admin maintains them. | Accepted |
 | MO-8 | ESCROW_TRANSFER audit rows have an empty entity id. | Engineering health |
 | MO-9 | A subject priced at 0 by a full discount still needs a 0 EGP payment to confirm (one click at the desk), and expires at the close if nobody confirms it. | Feature work |
-| **MO-10** | **InstaPay at the close.** A family who transfers just before the close but submits the reference just after loses the subject (the checkout is `pending` at the close and fails). In the other direction, a submitted reference — not proof of payment — holds its registration past the close until finance acts, with no cut-off. Recommendation: a grace period (for example 24 hours) during which an unreferenced InstaPay checkout survives the close, and a hard cut-off (the board's entry deadline) after which anything unconfirmed is rejected automatically. | **Owner decision** |
-| **MO-11** | **What a cash reversal means.** Takings count a reversal as money out on its day, the bookkeeper's correcting entry: right if cash was handed back, and right over the pair of days if the confirmation was a mistake and no cash came (the confirmation day showed cash that was never there). Recommendation: the reversal asks "was cash handed back?"; if not, it is shown as a correction to its original date and the day's drawer does not move. | **Owner decision** |
-| MO-12 | A deadline extension with no session applies to every session (the exception model's rule), and checkouts made under an extension after the close are never swept. | Owner decision |
+| MO-10 | **InstaPay at the close.** A family who transfers just before the close but submits the reference just after loses the subject (the checkout is `pending` at the close and fails). In the other direction, a submitted reference — not proof of payment — holds its registration past the close until finance acts, with no cut-off. Recommendation: a grace period (for example 24 hours) during which an unreferenced InstaPay checkout survives the close, and a hard cut-off (the board's entry deadline) after which anything unconfirmed is rejected automatically. | **Decided 27 Sep: as recommended — §6a** |
+| MO-11 | **What a cash reversal means.** Takings count a reversal as money out on its day, the bookkeeper's correcting entry: right if cash was handed back, and right over the pair of days if the confirmation was a mistake and no cash came (the confirmation day showed cash that was never there). Recommendation: the reversal asks "was cash handed back?"; if not, it is shown as a correction to its original date and the day's drawer does not move. | **Decided 27 Sep: as recommended — §6a** |
+| MO-12 | A deadline extension with no session applies to every session (the exception model's rule). Checkouts and registrations made under an extension after the close are now swept at the series' board entry deadline (§6a) — but only once the admin has set one. | Owner decision |
 | MO-13 | A swap does not record retake status on the new registration (price is unaffected: retake matters only for outside-school pricing, which swaps do not offer). | Engineering health |
 | MO-14 | The desk's collection bar applies no escrow; the endpoint accepts it. | Feature work |
 | MO-15 | A parent can cancel a pay-at-school checkout after handing cash over; the officer's confirm then says so and points to desk collection. | Accepted |
@@ -188,6 +188,45 @@ review also corrected these claims:
 | MO-19 | Dev data only: the dev database has one registration confirmed with a void receipt, made before MA-20 was fixed. No production data exists. | Accepted |
 
 ---
+
+## 6a. The owner's decisions, as built (27 September 2026)
+
+**MO-10 — money after the close.**
+- At the close, an InstaPay checkout still waiting for its transfer reference is kept, with
+  its subjects, until `referenceDueAt` = the close plus `INSTAPAY_REFERENCE_GRACE_HOURS`
+  (default 24), never later than the series' board entry deadline. The family gets a notice
+  and an email with the time; the checkout page and the finance workbench show it. A
+  reference sent in time is verified and confirmed like any other; after the time it is
+  refused. A pay-at-school checkout still fails at the close: no money is in flight.
+- When the time passes with no reference, the scheduler's sweep (every minute) cancels the
+  checkout, returns any escrow, releases the subjects and tells the family.
+- Each series can carry the **exam board's entry deadline** (admin, from the board's
+  calendar; after the window's close and in the future; any status; audited with a reason).
+  When it passes, the sweep closes every payment still open on the series — a transfer
+  finance never verified included — returns escrow, tells the family, and expires every
+  registration still waiting on it. From then on nothing new can be registered, paid,
+  confirmed, referenced or collected on the series, deadline extension or not; each refusal
+  names the deadline. The workbench shows the deadline on every payment from a closed series.
+- The admin must enter each series' deadline: with none set there is no automatic cut-off
+  (DISCOVERY.md A-08).
+
+**MO-11 — a reversal says whether the money went back.** The reversal dialog asks "Was the
+money returned to the family?" and will not confirm without an answer.
+- **Yes:** the reversal is money out on its own day, as before.
+- **No — never received:** the confirmation was a mistake. The confirmation's day leaves the
+  payment out of money in and lists it under Corrections (who confirmed it, who reversed it
+  and when); the day of the reversal lists it too, and none of its figures move. The family's
+  notice says which it was.
+- Reversals made before the question existed are read as "money returned" (migration 0029),
+  which is how they were reported.
+
+**Tests** (`08`): the grace survives the close and notifies; a reference sent inside it is
+confirmed; without one it lapses, returns escrow and notifies, and a late reference is
+refused; setting the deadline is validated and audited; at the deadline a transfer awaiting
+verification and an unpaid subject are closed and a late registration is refused; the four
+reversal cases (same day and next day, money returned or never received); `02` now reverses
+as "never received". `09` requires every reversal to record the answer. Each of these was
+shown to fail with its code undone (trail).
 
 ## 7. Not covered
 

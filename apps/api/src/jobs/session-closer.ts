@@ -16,7 +16,7 @@
 import { db, payment, registrationSession, gradeProgressionRun, eq, and, lte, gte, isNull, inArray } from '@repo/db';
 import { randomUUID } from 'crypto';
 import { autoManageSessions, finalizePendingRecords } from '../services/session.services';
-import { failPayment } from '../services/payment.services';
+import { failPayment, enforcePaymentDeadlines } from '../services/payment.services';
 import { notifySessionOpened, notifySessionClosingSoon, notifySessionClosed, processScheduledAnnouncements, getStudentAndParentBroadcastIds } from '../services/notification.services';
 import { progressGrades } from '../services/grade.services';
 import { capturePreregistrationsForSession } from '../services/prereg.services';
@@ -332,6 +332,20 @@ export function startSessionScheduler(): void {
         }
       } catch (err) {
         logger.error('[session-closer] Scheduled announcement processing failed:', err);
+      }
+
+      // Owner decision MO-10: InstaPay checkouts whose reference never came in
+      // the grace period after a close lapse; at a series' exam-board entry
+      // deadline, everything still unconfirmed on it is closed.
+      try {
+        const d = await enforcePaymentDeadlines();
+        if (d.referencesLapsed + d.paymentsClosedAtDeadline + d.registrationsExpiredAtDeadline > 0) {
+          logger.info(
+            `[session-closer] Deadlines: ${d.referencesLapsed} InstaPay checkout(s) lapsed, ${d.paymentsClosedAtDeadline} payment(s) and ${d.registrationsExpiredAtDeadline} registration(s) closed at entry deadlines.`
+          );
+        }
+      } catch (err) {
+        logger.error('[session-closer] Payment deadline enforcement failed:', err);
       }
 
       // Expire stale Fawry payments whose codes have passed their deadline.

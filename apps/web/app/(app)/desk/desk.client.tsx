@@ -137,11 +137,15 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
   });
 
   const reverseMutation = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
-      apiResponse(api.v1.payments[':id'].reverse.$post({ param: { id }, json: { reason } })),
-    onSuccess: () => {
+    mutationFn: ({ id, reason, moneyReturned }: { id: string; reason: string; moneyReturned: boolean }) =>
+      apiResponse(api.v1.payments[':id'].reverse.$post({ param: { id }, json: { reason, moneyReturned } })),
+    onSuccess: (_d, v) => {
       setReverseTarget(null);
-      done('Payment reversed — registrations back to pending payment, receipts voided.');
+      done(
+        v.moneyReturned
+          ? 'Payment reversed — registrations back to pending payment, receipts voided. The money returned counts as money out today.'
+          : 'Payment reversed — registrations back to pending payment, receipts voided. Recorded as a correction to the day it was confirmed; today’s drawer is unchanged.'
+      );
     },
     onError: fail,
   });
@@ -481,7 +485,15 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
           confirmLabel="Reverse Payment"
           destructive
           isPending={reverseMutation.isPending}
-          onConfirm={(reason) => reverseMutation.mutate({ id: reverseTarget.id, reason })}
+          // Owner decision MO-11: the day's takings depend on the answer.
+          choice={{
+            legend: 'Was the money returned to the family?',
+            options: [
+              { value: 'returned', label: 'Yes — the money was given back', hint: 'Cash handed back, card refunded or transfer returned. Counts as money out today.' },
+              { value: 'never', label: 'No — it was never received', hint: 'The confirmation was a mistake. It corrects the day it was confirmed; today’s drawer does not move.' },
+            ],
+          }}
+          onConfirm={(reason, choice) => reverseMutation.mutate({ id: reverseTarget.id, reason, moneyReturned: choice === 'returned' })}
           onClose={() => setReverseTarget(null)}
         />
       )}

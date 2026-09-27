@@ -751,6 +751,26 @@ export async function sendPaymentReversedEmail(to: string, data: {
 }
 
 /**
+ * A payment notice a parent must act on or know about, sent with its in-app
+ * notification: the transfer reference due after a close, a checkout that
+ * lapsed without one, a payment closed at the board's entry deadline
+ * (owner decision MO-10). One sentence-led body, no table.
+ */
+export async function sendPaymentNoticeEmail(to: string, data: {
+  parentName: string;
+  studentName: string;
+  title: string;
+  body: string;
+}): Promise<EmailResult> {
+  const html = emailLayout(data.title, `
+    <h2>${esc(data.title)}</h2>
+    <p>Hello ${esc(data.parentName)},</p>
+    <p>${esc(data.body)}</p>
+  `);
+  return sendEmail({ to, subject: `${data.title} — ${data.studentName}`, html });
+}
+
+/**
  * Money audit MA-03: finance rejected an open payment — usually an InstaPay
  * reference that is not on the bank statement. The family must learn why and
  * what to do, since they may believe they have paid.

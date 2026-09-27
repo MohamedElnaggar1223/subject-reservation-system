@@ -50,10 +50,18 @@ import {
 import { isGraduated } from './grade.services';
 import { computeRegistrationPricing } from './pricing.services';
 import { schoolFeeGateReason } from './school-fee.services';
-import { applyPricingExceptions, hasDeadlineExtension } from './exception.services';
+import { applyPricingExceptions } from './exception.services';
+import { sessionWindow, entryDeadlineMessage } from './window.services';
 import type { SubjectRegistrationOptionsType } from '@repo/validations';
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
+
+/** Refuse unless the series is open for this student (window.services.ts). */
+async function assertWindowOpen(studentId: string, sessionId: string) {
+  const w = await sessionWindow(studentId, sessionId);
+  if (w.open) return;
+  throw new Error(w.entryDeadlinePassed ? entryDeadlineMessage(w.entryDeadline!) : 'Registration window is not open');
+}
 
 /**
  * Subject IDs the student has previously sat (confirmed) or dropped in
@@ -426,10 +434,8 @@ export async function createRegistrationRequest(
   });
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
-  // as open for this student
-  if (sess.status !== 'active' && !(await hasDeadlineExtension(studentId, sess.id))) {
-    throw new Error('Registration window is not open');
-  }
+  // as open for this student — never past the board's entry deadline (MO-10)
+  await assertWindowOpen(studentId, sess.id);
 
   const subjects = await db.query.subject.findMany({
     where: (s, { eq, and, inArray }) =>
@@ -537,10 +543,8 @@ export async function createDirectRegistration(
   });
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
-  // as open for this student
-  if (sess.status !== 'active' && !(await hasDeadlineExtension(data.studentId, sess.id))) {
-    throw new Error('Registration window is not open');
-  }
+  // as open for this student — never past the board's entry deadline (MO-10)
+  await assertWindowOpen(data.studentId, sess.id);
 
   const subjects = await db.query.subject.findMany({
     where: (s, { eq, and, inArray }) =>
@@ -944,10 +948,8 @@ export async function adminOverrideApproval(
   });
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
-  // as open for this student
-  if (sess.status !== 'active' && !(await hasDeadlineExtension(data.studentId, sess.id))) {
-    throw new Error('Registration window is not open');
-  }
+  // as open for this student — never past the board's entry deadline (MO-10)
+  await assertWindowOpen(data.studentId, sess.id);
 
   const subjects = await db.query.subject.findMany({
     where: (s, { eq, and, inArray }) =>

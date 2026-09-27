@@ -21,6 +21,7 @@ import {
   UpdateActiveSession,
   CloseSession,
   SessionId,
+  SetEntryDeadline,
   ListSessionsQuery,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
@@ -218,6 +219,30 @@ export const sessions = new Hono<HonoEnv>()
         .catch((err) => console.error('[audit] SESSION_UPDATED (active) failed:', err));
 
       return success(c, updated);
+    }
+  )
+
+  /**
+   * SET THE EXAM BOARD'S ENTRY DEADLINE  (owner decision MO-10)
+   * PUT /sessions/:id/entry-deadline
+   *
+   * Admin only, in any status. After the deadline, open payments on the
+   * series are closed automatically and waiting registrations expire. Null
+   * removes the cut-off. Audited with the reason.
+   */
+  .put('/:id/entry-deadline',
+    requireAdmin(),
+    zValidator('param', SessionId),
+    zValidator('json', SetEntryDeadline),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      const data = c.req.valid('json');
+      try {
+        return success(c, await sessionService.setEntryDeadline(id, data, c.get('user')!.id, extractAuditContext(c)));
+      } catch (err) {
+        const message = clientMessage(err, 'Failed to set the entry deadline');
+        return error(c, message, message.includes('not found') ? 404 : 400);
+      }
     }
   )
 

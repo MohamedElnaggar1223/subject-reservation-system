@@ -24,7 +24,9 @@ export type ReasonModalProps = {
   isPending?: boolean;
   error?: string;
   minLength?: number;
-  onConfirm: (reason: string) => void;
+  /** A question the action must also answer; confirm stays disabled until one option is picked. */
+  choice?: { legend: string; options: { value: string; label: string; hint?: string }[] };
+  onConfirm: (reason: string, choice?: string) => void;
   onClose: () => void;
 };
 
@@ -38,11 +40,13 @@ export function ReasonModal({
   isPending = false,
   error,
   minLength = 3,
+  choice,
   onConfirm,
   onClose,
 }: ReasonModalProps) {
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
+  const [picked, setPicked] = useState<string | undefined>(undefined);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Focus the input on open; Escape closes (parity with a native dialog)
@@ -69,6 +73,35 @@ export function ReasonModal({
           {title}
         </h2>
         <p className="mb-4 text-sm text-muted-foreground">{description}</p>
+
+        {choice && (
+          <fieldset className="mb-4">
+            <legend className="mb-2 text-sm font-medium text-foreground">{choice.legend}</legend>
+            <div className="space-y-2">
+              {choice.options.map((o) => (
+                <label
+                  key={o.value}
+                  className={`flex cursor-pointer gap-3 rounded-lg border px-3 py-2 text-sm ${
+                    picked === o.value ? 'border-primary bg-primary/5' : 'border-border'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="reason-modal-choice"
+                    value={o.value}
+                    checked={picked === o.value}
+                    onChange={() => setPicked(o.value)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="font-medium text-foreground">{o.label}</span>
+                    {o.hint && <span className="block text-xs text-muted-foreground">{o.hint}</span>}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
 
         <label className="mb-1 block text-sm font-medium text-foreground" htmlFor="reason-modal-input">
           {label}
@@ -97,8 +130,8 @@ export function ReasonModal({
           <Button
             variant={destructive ? 'destructive' : 'default'}
             className="flex-1"
-            disabled={isPending || tooShort}
-            onClick={() => onConfirm(reason.trim())}
+            disabled={isPending || tooShort || (!!choice && !picked)}
+            onClick={() => onConfirm(reason.trim(), picked)}
           >
             {isPending ? 'Working…' : confirmLabel}
           </Button>

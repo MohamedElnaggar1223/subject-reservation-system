@@ -193,10 +193,12 @@ before it ships.
    thirteen money invariants now run over the whole database after every suite; takings count
    reversals and refunds on their own day and show the drawer as cash only; the desk can take
    money for subjects already registered; O-7 done for payments and cash refunds.
-   **Owner decisions:** MO-10 (a grace period for InstaPay references after the close, and a
-   cut-off) and MO-11 (whether reversing a cash payment means cash was handed back); also
-   MO-2, MO-5, MO-6, MO-12. Handed on: MO-1 (the rest of O-7) to state and time; MO-3
-   (`TZ=Africa/Cairo`) is in the production checklist.
+   **Owner decisions:** MO-10 and MO-11 decided on 27 Sep as recommended and built
+   (`MONEY_AUDIT.md` §6a): 24 hours after the close for an InstaPay reference, the board's
+   entry deadline as a hard cut-off (entered per session, DISCOVERY.md A-08), and a reversal
+   that asks whether the money went back. Still open: MO-2, MO-5, MO-6, MO-12. Handed on:
+   MO-1 (the rest of O-7) to state and time; MO-3 (`TZ=Africa/Cairo`) is in the production
+   checklist.
    Next: **state and time** (Phase 1.3).
 3. **Discovery research pack** in parallel with 1 and 2.
 4. **Housekeeping the audits already named.** Done on 27 Sep 2026: the suite is kept off third

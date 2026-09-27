@@ -3,12 +3,15 @@
 /**
  * Daily Takings Client (UX_AUDIT G4)
  *
- * What the day's report means (money audit MA-04, MA-05, MA-09):
+ * What the day's report means (money audit MA-04, MA-05, MA-09, MO-11):
  * - Money in is every payment confirmed that day. A payment reversed later
- *   stays here, marked; its reversal is money out on the day it was made,
- *   so a day printed and reconciled never changes afterwards.
- * - Money out is the reversals made that day and each hand-over of refund
- *   cash made that day.
+ *   with the money handed back stays here, marked; the hand-back is money
+ *   out on the day it was made.
+ * - Money out is the reversals made that day that handed money back, and
+ *   each hand-over of refund cash made that day.
+ * - Corrections: a payment confirmed by mistake (reversed later, no money
+ *   ever received) leaves this day's money in and is listed here with who
+ *   reversed it and when; the day it was reversed does not move.
  * - The drawer counts cash only: InstaPay lands in the bank, card in the
  *   terminal.
  */
@@ -78,7 +81,7 @@ export default function TakingsClient(): React.JSX.Element {
           message="Do not reconcile from this screen until it loads — this is a connection problem, not an empty day."
           onRetry={() => refetch()}
         />
-      ) : !data || (data.rows.length === 0 && data.reversed.length === 0 && data.cashRefunds.length === 0) ? (
+      ) : !data || (data.rows.length === 0 && data.reversed.length === 0 && data.cashRefunds.length === 0 && data.corrected.length === 0 && data.correctionsRecorded.length === 0) ? (
         <EmptyState title={`No money moved on ${date}.`} />
       ) : (
         <>
@@ -96,6 +99,7 @@ export default function TakingsClient(): React.JSX.Element {
               <p className="text-2xl font-bold text-foreground">{formatPrice(data.totals.moneyIn)}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 all instruments · plus {formatPrice(data.totals.escrowApplied)} paid from escrow
+                {data.totals.correctedTotal > 0 && <> · {formatPrice(data.totals.correctedTotal)} corrected out</>}
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border shadow-sm p-4">
@@ -188,6 +192,47 @@ export default function TakingsClient(): React.JSX.Element {
                       <td className="px-4 py-2.5 text-right font-medium text-destructive whitespace-nowrap">− {formatPrice(r.amount)}</td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Corrections (MO-11): confirmed by mistake, no money ever received */}
+          {(data.corrected.length > 0 || data.correctionsRecorded.length > 0) && (
+            <div className="mt-6 bg-card rounded-xl border border-border shadow-sm overflow-x-auto">
+              <div className="px-4 py-3 border-b border-border">
+                <h2 className="text-sm font-semibold text-foreground">Corrections</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Payments confirmed by mistake and reversed, with no money ever received. The figures above already leave them out.
+                </p>
+              </div>
+              <table className="w-full min-w-[640px] text-sm">
+                <tbody className="divide-y divide-border">
+                  {data.corrected.map((r) => (
+                    <tr key={`c-${r.id}`} className="hover:bg-muted/50 transition-colors">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{time(r.confirmedAt)}</td>
+                      <td className="px-4 py-2.5 text-foreground">{r.student?.name ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-card-foreground">
+                        Confirmed this day by {r.confirmedByUser?.name ?? '—'}; reversed{' '}
+                        {r.reversedAt ? new Date(r.reversedAt).toLocaleDateString() : ''} by {r.reversedByUser?.name ?? '—'}
+                        {' '}({instrumentLabel(r.instrumentUsed ?? r.paymentMethod)})
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-medium text-muted-foreground line-through whitespace-nowrap">{formatPrice(r.amount)}</td>
+                    </tr>
+                  ))}
+                  {data.correctionsRecorded
+                    .filter((r) => !data.corrected.some((c) => c.id === r.id))
+                    .map((r) => (
+                      <tr key={`r-${r.id}`} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{time(r.reversedAt)}</td>
+                        <td className="px-4 py-2.5 text-foreground">{r.student?.name ?? '—'}</td>
+                        <td className="px-4 py-2.5 text-card-foreground">
+                          Reversed today by {r.reversedByUser?.name ?? '—'}: corrects{' '}
+                          {r.confirmedAt ? new Date(r.confirmedAt).toLocaleDateString() : 'its day'}, not today
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-medium text-muted-foreground whitespace-nowrap">{formatPrice(r.amount)}</td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>

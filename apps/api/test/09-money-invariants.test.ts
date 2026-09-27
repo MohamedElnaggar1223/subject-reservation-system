@@ -34,6 +34,9 @@ describe('money invariants over the whole database', () => {
            select 1 from payment_registration pr join payment p on p.id = pr.payment_id
            where pr.registration_id = r.id and p.status = 'completed'))                  as paid_waiting_preregistrations,
         (select count(*) from receipt where receipt_number like '%-R%')                  as reissued_receipts,
+        (select count(*) from payment where reversal_money_returned = true)              as reversals_money_returned,
+        (select count(*) from payment where reversal_money_returned = false)             as reversals_never_received,
+        (select count(*) from payment where reference_due_at is not null)                as checkouts_held_after_close,
         (select count(*) from registration where status = 'dropped_pending_receipt' or status = 'dropped') as drops
     `);
     for (const [kind, n] of Object.entries(counts!)) expect(Number(n), kind).toBeGreaterThan(0);
@@ -165,9 +168,13 @@ describe('money invariants over the whole database', () => {
     expect(broken).toEqual([]);
   });
 
-  it('every reversal records its day, so the takings know when the money went out', async () => {
+  it('every reversal records its day and whether the money went back, so the takings know where it belongs (MO-11)', async () => {
     // reversed_by may legitimately be empty: it is set null if that user is later deleted.
-    const broken = await sql(`select id from payment where status = 'refunded' and reversed_at is null`);
+    const broken = await sql(`
+      select id from payment
+      where (status = 'refunded' and (reversed_at is null or reversal_money_returned is null))
+         or (status <> 'refunded' and reversal_money_returned is not null)
+    `);
     expect(broken).toEqual([]);
   });
 

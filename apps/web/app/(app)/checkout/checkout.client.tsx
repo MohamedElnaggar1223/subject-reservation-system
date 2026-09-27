@@ -378,6 +378,14 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             ))}
           </ul>
 
+          {/* MO-10: the window closed while this checkout waited for its reference */}
+          {open.status === 'pending' && open.referenceDueAt && (
+            <div className="mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-sm text-amber-800 dark:text-amber-300">
+              The registration window has closed. Submit your transfer reference by{' '}
+              <strong>{new Date(open.referenceDueAt).toLocaleString()}</strong>; after that the payment is cancelled and the subjects are released.
+            </div>
+          )}
+
           {open.status === 'pending_verification' ? (
             <div className="mt-5 p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl text-sm text-violet-800 dark:text-violet-300">
               Your transfer reference <span className="font-mono font-semibold">{open.verificationReference}</span> is with

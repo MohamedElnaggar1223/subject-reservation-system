@@ -198,6 +198,21 @@ export const ConfirmManualPayment = z.object({
 });
 export type ConfirmManualPaymentType = z.infer<typeof ConfirmManualPayment>;
 
+// ─── Finance Admin: Reverse a Confirmation ───────────────────────────────────
+
+/**
+ * Reverse a completed payment. `moneyReturned` answers the question the
+ * reversal must ask (owner decision MO-11): was the money given back to the
+ * family? Yes: it is money out on today's takings. No — the confirmation
+ * was a mistake and nothing had been received: the confirmation day's money
+ * in is corrected instead, and today's drawer does not move.
+ */
+export const ReversePayment = z.object({
+  reason: z.string().min(3, 'A reason is required').max(500),
+  moneyReturned: z.boolean({ error: 'Say whether the money was returned to the family' }),
+});
+export type ReversePaymentType = z.infer<typeof ReversePayment>;
+
 // ─── Finance: Reject Manual Payment ───────────────────────────────────────────
 
 /**

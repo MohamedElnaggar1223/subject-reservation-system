@@ -130,6 +130,7 @@ GET	/v1/school-fees/status	D	A	A	A	A	A
 GET	/v1/session	D	A	A	A	A	A
 POST	/v1/sessions/:id/activate	D	D	D	D	D	A
 POST	/v1/sessions/:id/close	D	D	D	D	D	A
+PUT	/v1/sessions/:id/entry-deadline	D	D	D	D	D	A
 GET	/v1/sessions/:id	D	D	D	D	D	A
 PUT	/v1/sessions/:id	D	D	D	D	D	A
 GET	/v1/sessions/active	D	A	A	A	A	A

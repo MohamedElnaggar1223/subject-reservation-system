@@ -325,10 +325,24 @@ export function takingsDelta(before: Takings, after: Takings) {
     cashRefunded: money(after.cashRefunded - before.cashRefunded),
     moneyOut: money(after.moneyOut - before.moneyOut),
     net: money(after.net - before.net),
+    correctedTotal: money(after.correctedTotal - before.correctedTotal),
     drawer: {
       cashIn: money(after.drawer.cashIn - before.drawer.cashIn),
       cashOut: money(after.drawer.cashOut - before.drawer.cashOut),
       net: money(after.drawer.net - before.drawer.net),
+      corrected: money(after.drawer.corrected - before.drawer.corrected),
     },
   };
+}
+
+/**
+ * Run the payment deadlines the scheduler enforces every minute (grace after
+ * a close, exam-board entry deadlines; MONEY_AUDIT.md MO-10). The scheduler is
+ * this code's only caller and does not run in tests, so the suite calls it
+ * the same way the scheduler does, at a chosen time. The one place the suite
+ * reaches past the API: there is no request that triggers it.
+ */
+export async function runPaymentDeadlines(now: Date = new Date()) {
+  const { enforcePaymentDeadlines } = await import('../src/services/payment.services');
+  return enforcePaymentDeadlines(now);
 }

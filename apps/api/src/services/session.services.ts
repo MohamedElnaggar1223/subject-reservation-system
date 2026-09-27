@@ -18,13 +18,16 @@
 
 import { db, registrationSession, registration, changeRequest, paymentRegistration, payment, user, eq, and, lte, inArray, sql } from '@repo/db';
 import { capturePreregistrationsForSession } from './prereg.services';
-import { notifySessionOpened, createNotification } from './notification.services';
+import { notifySessionOpened, createNotification, notifyPaymentReferenceDue } from './notification.services';
 import { failPayment } from './payment.services';
+import { logAction, type AuditContext } from './audit.services';
+import { env } from '../env';
 import { randomUUID } from 'crypto';
 import type {
   CreateSessionType,
   UpdateDraftSessionType,
   UpdateActiveSessionType,
+  SetEntryDeadlineType,
 } from '@repo/validations';
 
 /**
@@ -160,6 +163,7 @@ export async function createSession(data: CreateSessionType) {
       qualificationLevel,
       startDate: data.startDate,
       endDate: data.endDate,
+      entryDeadline: data.entryDeadline ?? null,
       status: initialStatus,
       editHistory: [],
     })
@@ -345,17 +349,60 @@ export async function activateSession(id: string) {
 }
 
 /**
+ * Set or clear a series' exam-board entry deadline (owner decision MO-10), in
+ * any status: boards publish their calendars on their own timetable. It must
+ * fall after the window closes and in the future — a date already past would
+ * close every unconfirmed payment on the next scheduler tick, which a typo
+ * must not be able to do. Audited in the same transaction.
+ */
+export async function setEntryDeadline(
+  sessionId: string,
+  data: SetEntryDeadlineType,
+  adminId: string,
+  auditCtx?: AuditContext
+) {
+  return db.transaction(async (tx) => {
+    const [sess] = await tx.select().from(registrationSession).where(eq(registrationSession.id, sessionId)).for('update');
+    if (!sess) throw new Error('Session not found');
+    if (data.entryDeadline) {
+      if (data.entryDeadline <= sess.endDate) {
+        throw new Error("The board's entry deadline must be after the registration window closes");
+      }
+      if (data.entryDeadline <= new Date()) {
+        throw new Error("The board's entry deadline must be in the future");
+      }
+    }
+    const [updated] = await tx
+      .update(registrationSession)
+      .set({ entryDeadline: data.entryDeadline, updatedAt: new Date() })
+      .where(eq(registrationSession.id, sessionId))
+      .returning();
+    await logAction(adminId, 'SESSION_ENTRY_DEADLINE_SET', 'session', sessionId,
+      { entryDeadline: sess.entryDeadline?.toISOString() ?? null },
+      { entryDeadline: data.entryDeadline?.toISOString() ?? null, reason: data.reason }, auditCtx, tx);
+    return updated!;
+  });
+}
+
+/**
  * Finalize all pending records when a session closes.
  *
  * Called from both manual close and auto-close paths.
- * 1. unpaid checkouts ('pending' payments) on this session → failed, escrow back
+ * 1. unpaid checkouts ('pending' payments) on this session → failed, escrow
+ *    back — except InstaPay checkouts, which get INSTAPAY_REFERENCE_GRACE_HOURS
+ *    (never past the board's entry deadline) to submit their reference: the
+ *    family may have transferred just before the close (owner decision MO-10)
  * 2. pending_approval and pending_payment registrations → expired, except those
- *    held by a transfer awaiting verification ('pending_verification'): the
- *    family may already have sent that money, so finance confirms or rejects
- *    it after the close (money audit MA-01)
+ *    held by a transfer awaiting verification ('pending_verification') or by an
+ *    InstaPay checkout still in its grace period: the family may already have
+ *    sent that money, so finance confirms or rejects it after the close
+ *    (money audit MA-01)
  * 3. pending_approval change requests for registrations in this session → rejected with system comment
  * 4. any 'pending' payment left on an expired registration (a checkout started
  *    while the close ran) → failed, escrow back
+ *
+ * A grace period that ends with no reference, and the board's entry deadline,
+ * are enforced afterwards by enforcePaymentDeadlines (payment.services.ts).
  *
  * Returns counts of affected records.
  */
@@ -364,26 +411,45 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   rejectedChangeRequests: number;
 }> {
   const now = new Date();
+  const sessionForGrace = await db.query.registrationSession.findFirst({
+    where: (s, { eq: eqOp }) => eqOp(s.id, sessionId),
+    columns: { entryDeadline: true },
+  });
+  const graceEnds = now.getTime() + env.INSTAPAY_REFERENCE_GRACE_HOURS * 60 * 60 * 1000;
+  const referenceDueAt = new Date(Math.min(graceEnds, sessionForGrace?.entryDeadline?.getTime() ?? Infinity));
 
-  // 1. Fail unpaid checkouts first. failPayment is told to move only
-  //    'pending' payments: one whose reference arrives in the meantime is left
-  //    alone, and step 2 then sees it and keeps its registrations.
+  // 1. Unpaid checkouts first. An InstaPay one keeps its registrations until
+  //    referenceDueAt (kept even if it already had a due date from another
+  //    session's close). Anything else fails; failPayment moves only 'pending'
+  //    payments, so one whose reference arrives in the meantime is left alone,
+  //    and step 2 then sees it and keeps its registrations.
   const unpaid = await db
-    .selectDistinct({ id: payment.id })
+    .selectDistinct({ id: payment.id, method: payment.paymentMethod })
     .from(payment)
     .innerJoin(paymentRegistration, eq(paymentRegistration.paymentId, payment.id))
     .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
     .where(and(eq(registration.sessionId, sessionId), eq(registration.status, 'pending_payment'), eq(payment.status, 'pending')));
-  for (const { id } of unpaid) {
+  const heldForReference: string[] = [];
+  for (const p of unpaid) {
     try {
-      await failPayment(id, { from: ['pending'], reason: 'Registration window closed before payment' });
+      if (p.method === 'instapay' && referenceDueAt > now) {
+        const [kept] = await db
+          .update(payment)
+          .set({ referenceDueAt: sql`coalesce(${payment.referenceDueAt}, ${referenceDueAt})`, updatedAt: now })
+          .where(and(eq(payment.id, p.id), eq(payment.status, 'pending')))
+          .returning({ id: payment.id });
+        if (kept) heldForReference.push(kept.id);
+        continue;
+      }
+      await failPayment(p.id, { from: ['pending'], reason: 'Registration window closed before payment' });
     } catch (err) {
-      console.error(`[session:finalize] Failed to fail payment ${id}:`, err);
+      console.error(`[session:finalize] Failed to settle payment ${p.id} at close:`, err);
     }
   }
 
   // 2. Expire pending_approval and pending_payment registrations for this session,
-  // except those held by a transfer awaiting verification.
+  // except those held by a transfer awaiting verification or by an InstaPay
+  // checkout still inside its grace period.
   // Return enough data to notify each affected student individually afterward
   // (SES-004: "Students/parents notified of early closure" and H-16:
   // students whose swap-generated pending_payment expires must know their
@@ -401,7 +467,8 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
         inArray(registration.status, ['pending_approval', 'pending_payment']),
         sql`not exists (
           select 1 from ${paymentRegistration} pr join ${payment} p on p.id = pr.payment_id
-          where pr.registration_id = ${registration.id} and p.status = 'pending_verification'
+          where pr.registration_id = ${registration.id}
+            and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
         )`,
       )
     )
@@ -460,6 +527,13 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
         console.error(`[session:finalize] Failed to fail payment ${pid}:`, err);
       }
     }
+  }
+
+  // MO-10: a family whose InstaPay checkout survived the close is told how
+  // long they have to submit the transfer reference.
+  for (const paymentId of heldForReference) {
+    await notifyPaymentReferenceDue(paymentId)
+      .catch((err) => console.error(`[session:finalize] Reference-due notice for ${paymentId} failed:`, err));
   }
 
   // SES-004 / H-16: Per-student notification for each expired registration.

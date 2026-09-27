@@ -80,6 +80,7 @@ export const AUDIT_ACTIONS = [
   // Session lifecycle
   'SESSION_CREATED',
   'SESSION_UPDATED',
+  'SESSION_ENTRY_DEADLINE_SET',
   'SESSION_ACTIVATED',
   'SESSION_CLOSED',
   'SESSION_AUTO_CLOSED',
@@ -172,6 +173,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   SUBJECT_CORE_UPDATED:       'Core Subject Flag Updated',
   SESSION_CREATED:            'Session Created',
   SESSION_UPDATED:            'Session Updated',
+  SESSION_ENTRY_DEADLINE_SET: 'Board Entry Deadline Set',
   SESSION_ACTIVATED:          'Session Activated',
   SESSION_CLOSED:             'Session Closed',
   SESSION_AUTO_CLOSED:        'Session Auto-Closed',

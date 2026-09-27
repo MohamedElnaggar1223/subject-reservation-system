@@ -388,6 +388,11 @@ export const registrationSession = pgTable(
     qualificationLevel: text("qualification_level").notNull().default("igcse"),
     startDate: timestamp("start_date", { withTimezone: true }).notNull(),
     endDate: timestamp("end_date", { withTimezone: true }).notNull(),
+    // The exam board's entry deadline for this series, entered by the admin
+    // from the board's calendar. After it, nothing unconfirmed can be paid:
+    // open payments are rejected automatically and waiting registrations
+    // expire (money audit, owner decision MO-10). Null: no automatic cut-off.
+    entryDeadline: timestamp("entry_deadline", { withTimezone: true }),
     status: text("status").notNull().default("draft"), // 'draft' | 'active' | 'closed'
     closedAt: timestamp("closed_at", { withTimezone: true }),
     closedBy: text("closed_by").references(() => user.id, { onDelete: "set null" }),
@@ -739,6 +744,16 @@ export const payment = pgTable(
     // day the payment was confirmed (money audit MA-05).
     reversedAt: timestamp("reversed_at", { withTimezone: true }),
     reversedBy: text("reversed_by").references(() => user.id, { onDelete: "set null" }),
+    // Whether a reversal gave the money back to the family (true: money out
+    // on the day of the reversal) or corrected a confirmation made by mistake
+    // when no money had come in (false: the confirmation day's money in is
+    // corrected instead). Null unless reversed (owner decision MO-11).
+    reversalMoneyReturned: boolean("reversal_money_returned"),
+    // An InstaPay checkout still waiting for its transfer reference when the
+    // window closed survives the close until this time (the close plus the
+    // grace period); after it, it lapses and its subjects are released
+    // (owner decision MO-10). Null otherwise.
+    referenceDueAt: timestamp("reference_due_at", { withTimezone: true }),
     // Provider-specific data (payment URL, Fawry expiry, bank details)
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

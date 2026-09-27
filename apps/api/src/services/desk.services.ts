@@ -25,10 +25,10 @@ import {
   prepareRegistrationInputs,
   validateCoreSubjectRequirements,
 } from './registration.services';
-import { hasDeadlineExtension } from './exception.services';
+import { sessionWindow, entryDeadlineMessage } from './window.services';
 import { setStudentFields } from './user.services';
 import { getEscrowBalance, debitEscrow } from './escrow.services';
-import { confirmPayment, failPayment, sessionOpenFor } from './payment.services';
+import { confirmPayment, failPayment } from './payment.services';
 import {
   academicYearForDate,
   getApplicableFee,
@@ -155,9 +155,12 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     where: (s, { eq }) => eq(s.id, data.sessionId),
   });
   if (!sess) throw new Error('Session not found');
-  if (sess.status !== 'active' && !(await hasDeadlineExtension(data.studentId, sess.id))) {
+  const w = await sessionWindow(data.studentId, sess.id);
+  if (!w.open) {
     throw new Error(
-      'Registration window is not open — a finance admin can grant this student a deadline extension'
+      w.entryDeadlinePassed
+        ? entryDeadlineMessage(w.entryDeadline!)
+        : 'Registration window is not open — a finance admin can grant this student a deadline extension'
     );
   }
 
@@ -363,9 +366,12 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
     throw new Error('One or more subjects are not waiting for payment');
   }
   for (const sessionId of new Set(regs.map((r) => r.sessionId))) {
-    if (!(await sessionOpenFor(data.studentId, sessionId))) {
+    const w = await sessionWindow(data.studentId, sessionId);
+    if (!w.open) {
       throw new Error(
-        'Registration window is not open — a finance admin can grant this student a deadline extension'
+        w.entryDeadlinePassed
+          ? entryDeadlineMessage(w.entryDeadline!)
+          : 'Registration window is not open — a finance admin can grant this student a deadline extension'
       );
     }
   }
