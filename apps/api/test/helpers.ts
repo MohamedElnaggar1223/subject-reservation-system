@@ -219,8 +219,9 @@ export async function notified(email: string, type: string, count: number) {
 
 /**
  * Audit actions recorded against the given entities, once `expected` are all
- * present. Route handlers log audit rows fire-and-forget after the service
- * call, so the row can land after the response (same CI run as above).
+ * present. Since the security audit (RF-15) route handlers await their audit
+ * row before answering, so this returns on the first read; the polling stays
+ * because some service-level writes still happen after the response.
  */
 export async function audited(entityIds: string[], expected: string[]) {
   const placeholders = entityIds.map((_, i) => `$${i + 1}`).join(', ');

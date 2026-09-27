@@ -1,9 +1,12 @@
 // No `dotenv/config` here: index.ts loads .env for the server; tests import
 // this module directly and must not see a developer's .env.
-import { getConnInfo } from '@hono/node-server/conninfo'
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { cors } from 'hono/cors'
+import { bodyLimit } from 'hono/body-limit'
+import { secureHeaders } from 'hono/secure-headers'
+import { clientIp } from './lib/client-ip'
+import { isBanned } from './lib/auth-policy'
 import { auth } from './lib/auth'
 import { HonoEnv } from './lib/types';
 import { success, error } from './lib/response';
@@ -37,35 +40,30 @@ import { exceptions } from './routes/exception.routes';
 import { remarks } from './routes/remark.routes';
 
 /**
- * Rate Limiter for Auth Routes
+ * Rate limiters (auth: brute force; v1: abuse).
  *
- * Protects authentication endpoints from brute force attacks.
- * - Defaults to 50 requests per 15 minute window
- * - Keyed by IP address (handles proxies and Cloudflare)
+ * Keyed by clientIp(): a proxy header counts only when CLIENT_IP_HEADER
+ * names it (RF-11). The auth limiter used to trust cf-connecting-ip from
+ * anyone, so a client rotating that header was never throttled.
  */
-function getClientIp(c: { req: { header: (name: string) => string | undefined; raw: Request }; env?: any }): string {
-  // Prefer Cloudflare-set header (cannot be spoofed by the client).
-  // Fall back to the socket remote address from @hono/node-server.
-  // Do NOT trust x-forwarded-for — it is trivially spoofable without a
-  // trusted proxy chain.
-  const cfIp = c.req.header('cf-connecting-ip');
-  if (cfIp) return cfIp;
+const getClientIp = (c: Parameters<typeof clientIp>[0]) => clientIp(c, env.CLIENT_IP_HEADER);
 
-  try {
-    const info = getConnInfo(c as any);
-    if (info.remote.address) return info.remote.address;
-  } catch {
-    // getConnInfo may throw if the adapter doesn't support it
-  }
-
-  return 'unknown';
-}
+// RF-16: no body is read without a bound. Uploads get room for the largest
+// file the validators allow (documents, 10 MB); everything else is JSON.
+const MB = 1024 * 1024;
+const tooLarge = { onError: (c: { json: (b: unknown, s: 413) => Response }) => c.json({ success: false, error: 'Request body too large' }, 413) };
+const uploadBodyLimit = bodyLimit({ maxSize: 11 * MB, ...tooLarge });
+const jsonBodyLimit = bodyLimit({ maxSize: 1 * MB, ...tooLarge });
 
 const authRateLimit = rateLimiter({
   windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
   limit: env.AUTH_RATE_LIMIT_MAX,
   standardHeaders: 'draft-6',
-  skip: (c) => c.req.method === 'OPTIONS',
+  // Reading the current session is not a guessing target, and the web app
+  // calls it on every page; counting it let ordinary browsing exhaust the
+  // sign-in budget, which behind a shared proxy address meant nobody could
+  // sign in.
+  skip: (c) => c.req.method === 'OPTIONS' || (c.req.method === 'GET' && c.req.path === '/api/auth/get-session'),
   keyGenerator: (c) => getClientIp(c),
 });
 
@@ -133,6 +131,11 @@ const app = new Hono<HonoEnv>()
 		credentials: true,
 	})
 )
+// Baseline response headers (RF-21): nosniff, frame and referrer policy.
+// Same-site resource policy so the web app on a sibling host can still load
+// anything the API serves.
+.use('*', secureHeaders({ crossOriginResourcePolicy: 'same-site' }))
+.use('*', (c, next) => (c.req.path.startsWith('/v1/files') ? uploadBodyLimit(c, next) : jsonBodyLimit(c, next)))
 // Throttle every auth endpoint (sign-in, sign-up, password reset).
 // Mounted BEFORE session extraction so unauthenticated floods are
 // rejected without a DB round-trip.
@@ -140,7 +143,10 @@ const app = new Hono<HonoEnv>()
 .use("*", async (c, next) => {
 	const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
-  	if (!session) {
+	// RF-23: better-auth refuses a banned account only when it signs in, so a
+	// session opened before the ban kept working. A banned user is treated as
+	// signed out on every request.
+  	if (!session || isBanned(session.user)) {
     	c.set("user", null);
     	c.set("session", null);
     	await next();
@@ -164,6 +170,23 @@ const app = new Hono<HonoEnv>()
 	}
 	await next();
 })
+// Cross-site request forgery, defence in depth (RF-19): a state-changing
+// /v1 request that carries a session cookie must come from a trusted
+// origin — the rule better-auth already applies to /api/auth/*. SameSite=Lax
+// stops other sites; this also stops a sibling subdomain once the session
+// cookie is shared across subdomains in production.
+.use("/v1/*", async (c, next) => {
+	const method = c.req.method;
+	if (method === "GET" || method === "HEAD" || method === "OPTIONS" || !c.req.header("cookie")) {
+		return next();
+	}
+	const origin = c.req.header("origin") ?? c.req.header("referer");
+	const ctx = await auth.$context;
+	if (!origin || origin === "null" || !ctx.isTrustedOrigin(origin, { allowRelativePaths: false })) {
+		return c.json({ success: false, error: "Request origin is not allowed" }, 403);
+	}
+	return next();
+})
 .on(["POST", "GET"], "/api/auth/*", async (c) => {
   return auth.handler(c.req.raw);
 });
@@ -186,17 +209,17 @@ const v1 = new Hono<HonoEnv>()
     return c.json({ ready: false, error: 'db unreachable' }, 503);
   })
 
-  // Session endpoint - returns current authenticated user
+  // Session endpoint - returns current authenticated user. Never the session
+  // token (RF-12): it lives in an HttpOnly cookie so page scripts cannot read
+  // it, and repeating it here would undo that.
   .get("/session", (c) => {
-    const session = c.get("session");
+    const current = c.get("session");
     const user = c.get("user");
 
-    if (!user) return error(c, 'Unauthorized', 401);
+    if (!user || !current) return error(c, 'Unauthorized', 401);
 
-    return c.json({
-      success: true,
-      data: { session, user }
-    });
+    const { token: _token, ...session } = current;
+    return success(c, { session, user });
   })
 
   /**
@@ -205,7 +228,6 @@ const v1 = new Hono<HonoEnv>()
    * File upload routes mounted at /v1/files
    * - POST   /v1/files/avatar   - Upload avatar with thumbnails
    * - POST   /v1/files/document - Upload document
-   * - POST   /v1/files          - Upload general file
    * - GET    /v1/files          - List user's files (paginated)
    * - GET    /v1/files/:id      - Get specific file (owner only)
    * - GET    /v1/files/:id/download - Download a file (owner only)

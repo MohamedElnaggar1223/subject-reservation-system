@@ -180,8 +180,11 @@ before it ships.
 
 ## 6. Immediate next steps
 
-1. **Security audit** (Phase 1.1). Start with the scripted authorization matrix; it needs only
-   the running environment and the test accounts that exist.
+1. **Security audit** (Phase 1.1). Done on 27 Sep 2026, merged on a green CI run:
+   `SECURITY_AUDIT.md`, trail `.audit/security-audit.tsv`. Thirteen findings (RF-11 to RF-23;
+   one high, three medium) fixed with tests; the authorization matrix is now an enforced policy.
+   Handed on: a second factor for finance roles (owner decision), audit rows inside the money
+   transaction (money audit), and the production checklist in §6 of that report.
 2. **Money-correctness audit** (Phase 1.2), then **state and time** (Phase 1.3).
 3. **Discovery research pack** in parallel with 1 and 2.
 4. **Housekeeping the audits already named.** Done on 27 Sep 2026: the suite is kept off third

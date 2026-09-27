@@ -52,6 +52,14 @@ merged; a red run on `main` is fixed before anything else lands.
 | `01-desk.test.ts` | desk onboarding, desk registration with cash, receipts, printable receipt data, receipt-gated drop and refund, daily takings, RF-03 |
 | `02-money.test.ts` | InstaPay with partial escrow, duplicate reference (RF-07), withdrawal maker-checker, finance-admin reversal (RF-08) |
 | `03-v3-flows.test.ts` | student request → parent approve, school-fee gate + waiver and the three views (RF-10), held-wallet preregistration, results → remark → outcome |
+| `04-authz-matrix.test.ts` | every /v1 endpoint called as each of six principals; the result must match `authz-policy.tsv` (security audit) |
+| `05-object-access.test.ts` | one family's parent and student against another family's records of every kind; each attempt refused, nothing changed |
+| `06-auth-surface.test.ts` | privilege escalation through better-auth, session token exposure, cookie flags, cross-site writes, body limit, rate-limit keying, security headers, teacher contact details |
+| `07-audit-trail.test.ts` | the actions that move money, grant access to a child or change fees leave an audit row before the response |
+
+**Adding an endpoint?** Add its row to `authz-policy.tsv` (A = may get past the role gate,
+D = refused, one column per principal). The matrix test fails on an endpoint without a row, so
+someone always decides who may call it.
 
 Files run one at a time and share the database; each file creates its own sessions with a
 distinct (type, level) pair because only one session per pair may be active. Tests inside a

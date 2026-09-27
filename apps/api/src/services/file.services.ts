@@ -229,6 +229,24 @@ export async function deleteFile(fileId: string, userId: string) {
     throw new Error('File not found')
   }
 
+  // A file attached to a payment (InstaPay screenshot) or a remark (signed
+  // consent) is evidence finance relies on; the foreign keys are ON DELETE
+  // SET NULL, so deleting it would silently erase that evidence (security
+  // audit, RF-13). Checked before anything is removed from storage.
+  const attachedToPayment = await db.query.payment.findFirst({
+    where: (p, { eq: eqOp }) => eqOp(p.verificationFileId, fileId),
+    columns: { id: true },
+  })
+  const attachedToRemark = attachedToPayment
+    ? null
+    : await db.query.remarkRequest.findFirst({
+        where: (r, { eq: eqOp }) => eqOp(r.consentFileId, fileId),
+        columns: { id: true },
+      })
+  if (attachedToPayment || attachedToRemark) {
+    throw new Error('This file is attached to a payment or a remark request and cannot be deleted')
+  }
+
   // Delete from R2
   if (fileRecord.variants && fileRecord.variants.length > 0) {
     // Delete all variants

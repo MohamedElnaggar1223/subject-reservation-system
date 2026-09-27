@@ -21,6 +21,9 @@ import { requireAuth, requireAdmin } from '../middleware/access-control.middlewa
 import type { HonoEnv } from '../lib/types';
 import * as teacherService from '../services/teacher.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
+import { teacherForViewer } from '../lib/teacher-view';
+
+const forViewer = teacherForViewer;
 
 export const teachers = new Hono<HonoEnv>()
   .use('*', requireAuth())
@@ -30,14 +33,15 @@ export const teachers = new Hono<HonoEnv>()
     const filters = c.req.valid('query');
     // Non-admins only ever see active teachers (for registration pickers)
     if (user.role !== 'admin') filters.isActive = true;
-    return success(c, await teacherService.getTeachers(filters));
+    const rows = await teacherService.getTeachers(filters);
+    return success(c, rows.map((t) => forViewer(t, user.role)));
   })
 
   .post('/', requireAdmin(), zValidator('json', CreateTeacher), async (c) => {
     const user = c.get('user')!;
     const data = c.req.valid('json');
     const created = await teacherService.createTeacher(data);
-    logAction(user.id, 'TEACHER_CREATED', 'teacher', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
+    await logAction(user.id, 'TEACHER_CREATED', 'teacher', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
       .catch((err) => console.error('[audit] TEACHER_CREATED failed:', err));
     return success(c, created, 201);
   })
@@ -46,7 +50,7 @@ export const teachers = new Hono<HonoEnv>()
     const { id } = c.req.valid('param');
     const found = await teacherService.getTeacherById(id);
     if (!found) return error(c, 'Teacher not found', 404);
-    return success(c, found);
+    return success(c, forViewer(found, c.get('user')!.role));
   })
 
   .put('/:id', requireAdmin(), zValidator('param', TeacherId), zValidator('json', UpdateTeacher), async (c) => {
@@ -55,7 +59,7 @@ export const teachers = new Hono<HonoEnv>()
     const data = c.req.valid('json');
     const updated = await teacherService.updateTeacher(id, data);
     if (!updated) return error(c, 'Teacher not found', 404);
-    logAction(user.id, 'TEACHER_UPDATED', 'teacher', id, null, data as Record<string, unknown>, extractAuditContext(c))
+    await logAction(user.id, 'TEACHER_UPDATED', 'teacher', id, null, data as Record<string, unknown>, extractAuditContext(c))
       .catch((err) => console.error('[audit] TEACHER_UPDATED failed:', err));
     return success(c, updated);
   })
@@ -65,7 +69,7 @@ export const teachers = new Hono<HonoEnv>()
     const { id } = c.req.valid('param');
     const updated = await teacherService.deactivateTeacher(id);
     if (!updated) return error(c, 'Teacher not found', 404);
-    logAction(user.id, 'TEACHER_DEACTIVATED', 'teacher', id, null, null, extractAuditContext(c))
+    await logAction(user.id, 'TEACHER_DEACTIVATED', 'teacher', id, null, null, extractAuditContext(c))
       .catch((err) => console.error('[audit] TEACHER_DEACTIVATED failed:', err));
     return success(c, updated);
   });

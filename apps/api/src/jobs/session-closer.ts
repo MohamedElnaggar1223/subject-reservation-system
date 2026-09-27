@@ -137,7 +137,7 @@ export function startSessionScheduler(): void {
 
         // Audit: log each auto-closed session
         for (const sess of closedSessions) {
-          logAction(null, 'SESSION_AUTO_CLOSED', 'session', sess.id, { status: 'active' }, { status: 'closed', name: sess.name, sessionType: sess.sessionType })
+          await logAction(null, 'SESSION_AUTO_CLOSED', 'session', sess.id, { status: 'active' }, { status: 'closed', name: sess.name, sessionType: sess.sessionType })
             .catch((err) => logger.error(`[session-closer] Audit SESSION_AUTO_CLOSED failed for ${sess.id}:`, err));
         }
 
@@ -278,7 +278,7 @@ export function startSessionScheduler(): void {
 
         // Audit: log each auto-activated session
         for (const sess of activatedSessions) {
-          logAction(null, 'SESSION_AUTO_ACTIVATED', 'session', sess.id, { status: 'draft' }, { status: 'active', name: sess.name, sessionType: sess.sessionType })
+          await logAction(null, 'SESSION_AUTO_ACTIVATED', 'session', sess.id, { status: 'draft' }, { status: 'active', name: sess.name, sessionType: sess.sessionType })
             .catch((err) => logger.error(`[session-closer] Audit SESSION_AUTO_ACTIVATED failed for ${sess.id}:`, err));
         }
 

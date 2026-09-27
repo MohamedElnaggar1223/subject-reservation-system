@@ -176,7 +176,7 @@ export async function progressGrades(sessionType: string): Promise<Array<{
       ? `Automatic graduation after ${sessionType} session.`
       : `Automatic grade progression after ${sessionType} session.`;
 
-    logAction(null, 'USER_GRADE_CHANGED', 'user', p.studentId, { grade: p.previousGrade }, { grade: p.newGrade })
+    await logAction(null, 'USER_GRADE_CHANGED', 'user', p.studentId, { grade: p.previousGrade }, { grade: p.newGrade })
       .catch((err) => console.error(`[grade] Audit log failed for ${p.studentId}:`, err));
 
     notifyGradeChanged({

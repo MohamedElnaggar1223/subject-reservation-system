@@ -73,14 +73,21 @@ export const remarks = new Hono<HonoEnv>()
 
   .put('/fees', requireFinanceAdmin(), zValidator('json', UpsertRemarkFee), async (c) => {
     const data = c.req.valid('json');
-    return success(c, await remarkService.upsertRemarkFee(data));
+    const saved = await remarkService.upsertRemarkFee(data);
+    // RF-14: what families are charged for a remark changed with no record.
+    await logAction(c.get('user')!.id, 'REMARK_FEE_SET', 'remark_fee', `${data.council}:${data.serviceType}`, null, data as Record<string, unknown>, extractAuditContext(c))
+      .catch((err) => console.error('[audit] REMARK_FEE_SET failed:', err));
+    return success(c, saved);
   })
 
   .get('/deadlines', async (c) => success(c, await remarkService.getRemarkDeadlines()))
 
   .put('/deadlines', requireFinanceAdmin(), zValidator('json', UpsertRemarkDeadline), async (c) => {
     const data = c.req.valid('json');
-    return success(c, await remarkService.upsertRemarkDeadline(data));
+    const saved = await remarkService.upsertRemarkDeadline(data);
+    await logAction(c.get('user')!.id, 'REMARK_DEADLINE_SET', 'remark_deadline', `${data.council}:${data.sessionId}:${data.serviceType}`, null, data as Record<string, unknown>, extractAuditContext(c))
+      .catch((err) => console.error('[audit] REMARK_DEADLINE_SET failed:', err));
+    return success(c, saved);
   })
 
   // ─── Results entry (V3 §5.4) ──────────────────────────────────────────────
@@ -94,7 +101,7 @@ export const remarks = new Hono<HonoEnv>()
     const user = c.get('user')!;
     const { results } = c.req.valid('json');
     const outcome = await remarkService.recordResults(user.id, results);
-    logAction(user.id, 'RESULTS_RECORDED', 'registration', 'bulk', null, { count: outcome.recorded }, extractAuditContext(c))
+    await logAction(user.id, 'RESULTS_RECORDED', 'registration', 'bulk', null, { count: outcome.recorded }, extractAuditContext(c))
       .catch((err) => console.error('[audit] RESULTS_RECORDED failed:', err));
     return success(c, outcome);
   })
@@ -128,7 +135,7 @@ export const remarks = new Hono<HonoEnv>()
     const data = c.req.valid('json');
     try {
       const created = await remarkService.createRemarkRequest(user.id, user.role ?? '', data);
-      logAction(user.id, 'REMARK_REQUESTED', 'remark_request', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'REMARK_REQUESTED', 'remark_request', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] REMARK_REQUESTED failed:', err));
       return success(c, created, 201);
     } catch (err) {
@@ -143,7 +150,7 @@ export const remarks = new Hono<HonoEnv>()
     const { comments } = c.req.valid('json');
     try {
       const updated = await remarkService.decideRemarkRequest(id, user.id, true, comments);
-      logAction(user.id, 'REMARK_APPROVED', 'remark_request', id, null, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'REMARK_APPROVED', 'remark_request', id, null, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] REMARK_APPROVED failed:', err));
       return success(c, updated);
     } catch (err) {
@@ -158,7 +165,7 @@ export const remarks = new Hono<HonoEnv>()
     const { comments } = c.req.valid('json');
     try {
       const updated = await remarkService.decideRemarkRequest(id, user.id, false, comments);
-      logAction(user.id, 'REMARK_REJECTED', 'remark_request', id, null, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'REMARK_REJECTED', 'remark_request', id, null, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] REMARK_REJECTED failed:', err));
       return success(c, updated);
     } catch (err) {
@@ -173,7 +180,7 @@ export const remarks = new Hono<HonoEnv>()
     const data = c.req.valid('json');
     try {
       const updated = await remarkService.confirmConsent(id, user.id, data);
-      logAction(user.id, 'REMARK_CONSENT_CONFIRMED', 'remark_request', id, null, { consentFileId: data.consentFileId ?? null }, extractAuditContext(c))
+      await logAction(user.id, 'REMARK_CONSENT_CONFIRMED', 'remark_request', id, null, { consentFileId: data.consentFileId ?? null }, extractAuditContext(c))
         .catch((err) => console.error('[audit] REMARK_CONSENT_CONFIRMED failed:', err));
       return success(c, updated);
     } catch (err) {
@@ -188,6 +195,8 @@ export const remarks = new Hono<HonoEnv>()
     const { paymentMethod } = c.req.valid('json');
     try {
       const created = await remarkService.initiateRemarkPayment(id, user.id, paymentMethod, schoolAccountDetails());
+      await logAction(user.id, 'REMARK_PAYMENT_INITIATED', 'remark_request', id, null, { paymentMethod }, extractAuditContext(c))
+        .catch((err) => console.error('[audit] REMARK_PAYMENT_INITIATED failed:', err));
       return success(c, created, 201);
     } catch (err) {
       const message = clientMessage(err, 'Failed to initiate payment');
@@ -201,7 +210,7 @@ export const remarks = new Hono<HonoEnv>()
     const { boardReference } = c.req.valid('json');
     try {
       const updated = await remarkService.markSubmittedToBoard(id, boardReference);
-      logAction(user.id, 'REMARK_SUBMITTED_TO_BOARD', 'remark_request', id, null, { boardReference }, extractAuditContext(c))
+      await logAction(user.id, 'REMARK_SUBMITTED_TO_BOARD', 'remark_request', id, null, { boardReference }, extractAuditContext(c))
         .catch((err) => console.error('[audit] REMARK_SUBMITTED_TO_BOARD failed:', err));
       return success(c, updated);
     } catch (err) {
@@ -216,7 +225,7 @@ export const remarks = new Hono<HonoEnv>()
     const data = c.req.valid('json');
     try {
       const result = await remarkService.recordOutcome(id, user.id, data);
-      logAction(user.id, 'REMARK_OUTCOME_RECORDED', 'remark_request', id, null, { ...data, refunded: result.refunded } as unknown as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'REMARK_OUTCOME_RECORDED', 'remark_request', id, null, { ...data, refunded: result.refunded } as unknown as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] REMARK_OUTCOME_RECORDED failed:', err));
       return success(c, result);
     } catch (err) {
@@ -230,7 +239,7 @@ export const remarks = new Hono<HonoEnv>()
     const { id } = c.req.valid('param');
     try {
       const updated = await remarkService.cancelRemarkRequest(id, user.id, user.role ?? '');
-      logAction(user.id, 'REMARK_CANCELLED', 'remark_request', id, null, null, extractAuditContext(c))
+      await logAction(user.id, 'REMARK_CANCELLED', 'remark_request', id, null, null, extractAuditContext(c))
         .catch((err) => console.error('[audit] REMARK_CANCELLED failed:', err));
       return success(c, updated);
     } catch (err) {

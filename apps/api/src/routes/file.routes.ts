@@ -12,8 +12,12 @@
  * Route Structure:
  * - POST /files/avatar     - Upload avatar with thumbnails
  * - POST /files/document   - Upload document (PDF, DOCX, etc.)
- * - POST /files            - Upload general file
  * - GET /files             - List user's files (paginated)
+ *
+ * There is no general "upload anything" route: it accepted any type up to
+ * 50 MB from any signed-in account and nothing used it (security audit,
+ * RF-13). A file attached to a payment or remark must belong to the parent
+ * attaching it (payment.services / remark.services use isFileOwner).
  * - GET /files/:id         - Get specific file (owner only)
  * - GET /files/:id/download - Download a file (owner only)
  * - DELETE /files/:id      - Delete file (admin or owner)
@@ -26,7 +30,6 @@ import { zValidator } from '@hono/zod-validator'
 import {
   UploadAvatar,
   UploadDocument,
-  UploadFile,
   FileId,
   ListFilesQuery,
   ROLES,
@@ -105,30 +108,6 @@ export const files = new Hono<HonoEnv>()
 
       try {
         const uploaded = await fileService.uploadFile(file, 'document', user.id)
-        return success(c, uploaded, 201)
-      } catch (err) {
-        const message = clientMessage(err, 'Upload failed')
-        return error(c, message, 400)
-      }
-    }
-  )
-
-  /**
-   * UPLOAD GENERAL FILE
-   * POST /files
-   * Form data: { file: File }
-   *
-   * Uploads any allowed file type (50MB limit).
-   * More permissive validation.
-   */
-  .post('/',
-    zValidator('form', UploadFile),
-    async (c) => {
-      const user = c.get('user')!
-      const { file } = c.req.valid('form')
-
-      try {
-        const uploaded = await fileService.uploadFile(file, 'general', user.id)
         return success(c, uploaded, 201)
       } catch (err) {
         const message = clientMessage(err, 'Upload failed')

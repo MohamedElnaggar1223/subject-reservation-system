@@ -70,20 +70,6 @@ export const UploadDocument = z.object({
 })
 
 /**
- * GENERAL FILE UPLOAD SCHEMA
- *
- * Validates general file uploads (50MB limit).
- * More permissive for various file types.
- */
-export const UploadFile = z.object({
-  file: fileBase
-    .refine(
-      (file) => file.size <= 50 * 1024 * 1024,
-      'File must be 50MB or less'
-    ),
-})
-
-/**
  * FILE ID SCHEMA
  *
  * Validates file ID in URL parameters.
@@ -117,7 +103,6 @@ export const ListFilesQuery = z.object({
  */
 export type UploadAvatarType = z.infer<typeof UploadAvatar>
 export type UploadDocumentType = z.infer<typeof UploadDocument>
-export type UploadFileType = z.infer<typeof UploadFile>
 export type FileIdType = z.infer<typeof FileId>
 export type ListFilesQueryType = z.infer<typeof ListFilesQuery>
 

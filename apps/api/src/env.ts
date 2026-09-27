@@ -10,6 +10,15 @@ const envSchema = z.object({
   AUTH_RATE_LIMIT_MAX: z.coerce.number().min(1).default(50),
   API_RATE_LIMIT_WINDOW_MS: z.coerce.number().min(1).default(15 * 60 * 1000),
   API_RATE_LIMIT_MAX: z.coerce.number().min(1).default(600),
+  // The one request header a proxy in front of the API sets to the real
+  // client address (cf-connecting-ip behind Cloudflare, x-real-ip behind a
+  // load balancer). Unset: rate limits key on the socket address and every
+  // client-supplied header is ignored (RF-11). A proxied deployment must set
+  // it, or every user shares the proxy's bucket. Prefer a header the proxy
+  // overwrites; x-forwarded-for works only with exactly one proxy (the
+  // rightmost entry is used), and cf-connecting-ip only if the origin refuses
+  // traffic that did not come through Cloudflare. See lib/client-ip.ts.
+  CLIENT_IP_HEADER: z.string().trim().toLowerCase().optional(),
 
   BETTER_AUTH_SECRET: z.string().min(32, 'BETTER_AUTH_SECRET must be at least 32 characters'),
 

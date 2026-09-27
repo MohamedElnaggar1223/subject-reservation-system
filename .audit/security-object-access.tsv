@@ -1,0 +1,59 @@
+attempt	status	error
+parentB GET registration A	403	Access denied
+studentB GET registration A	403	Access denied
+parentB GET history A	403	You are not linked to this student
+parentB GET available subjects for A	403	You are not linked to this student
+parentB drop A	403	You are not linked to this student
+parentB swap A	403	You are not linked to this student
+studentB request-drop A	400	You do not own this registration
+studentB request-swap A	400	You do not own this registration
+parentB approve A request	403	You are not authorized to approve registrations for one or more students
+parentB reject A request	403	You are not authorized to reject registrations for one or more students
+parentB revert A approval	403	You are not authorized to revert approvals for one or more students
+parentB direct-register A	403	You are not linked to this student
+parentB preregister A	403	You are not linked to this student
+parentB cancel A prereg	403	You are not linked to this student
+parentB GET payment A	403	Access denied
+parentB GET payment receipt PDF A	403	Access denied
+studentA GET own family payment	403	Forbidden — payments are managed by parents
+studentA GET own family payment receipt PDF	403	Forbidden — payments are managed by parents
+parentB instapay-reference A	403	You are not authorized to update this payment
+parentB initiate for A	403	You are not linked to this student
+parentB checkout-summary A	400	Could not load checkout summary. Verify registrations belong to a linked child.
+parentB GET receipt A	403	Forbidden
+studentB GET receipt A	403	Forbidden
+parentB refund-preview A	403	Forbidden
+parentB school-fee status A	403	You are not linked to this student
+parentB school-fee pay A	403	You are not linked to this student
+parentB GET escrow A	403	You are not linked to this student
+parentB GET escrow transactions A	403	You are not linked to this student
+parentB transfer A to B	403	You are not linked to the source student
+parentB withdraw A	403	You are not linked to this student
+parentB GET change request A	403	Access denied
+studentB GET change request A	403	Access denied
+parentB approve change request A	403	You are not linked to this student
+parentB reject change request A	403	You are not linked to this student
+studentB cancel change request A	403	You can only cancel your own change requests
+parentB create remark on A	403	You are not linked to this student
+studentB create remark on A	403	You can only request remarks for your own subjects
+officer create remark on A	400	Only students and parents can request remarks
+admin create remark on A	400	Only students and parents can request remarks
+parentB approve remark A	403	You are not linked to this student
+parentB reject remark A	403	You are not linked to this student
+parentB cancel remark A	403	You are not authorized to cancel this request
+studentB cancel remark A	403	You are not authorized to cancel this request
+parentB consent remark A	403	You are not linked to this student
+parentB pay remark A	403	You are not linked to this student
+parentB GET link A	403	Access denied
+studentB GET link A	403	Access denied
+studentB answer link A	400	Link request not found or already processed
+studentB approve link addressed to A	400	Link request not found or already processed
+parentB with pending link GET escrow A	403	You are not linked to this student
+parentB with pending link GET history A	403	You are not linked to this student
+parentB mark notification A read	404	Notification not found or already read
+parentB GET file A	404	File not found
+parentB download file A	404	File not found
+parentB delete file A	404	File not found or access denied
+parentB attach file A as InstaPay screenshot	403	You are not authorized to attach that file
+parentB attach file A as remark consent	403	You are not authorized to attach that file
+parentB delete own file attached as evidence	400	This file is attached to a payment or a remark request and cannot be deleted

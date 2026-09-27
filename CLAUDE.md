@@ -7,7 +7,8 @@ agreements live in the user's global CLAUDE.md; this file only adds what is spec
 
 `STRATEGY.md` (the plan of record: goal, decisions and why, phases, open questions),
 `FOUNDATION_AUDIT.md` (what has been proven and what is still open, with finding ids
-RF-nn / RH-nn), `DISCOVERY.md` (assumptions about the school, parked questions, artefacts
+RF-nn / RH-nn), `SECURITY_AUDIT.md` (authorization, cross-family access, the auth surface,
+and the production checklist), `DISCOVERY.md` (assumptions about the school, parked questions, artefacts
 still to obtain — check it before designing any feature), `PATTERNS.md` (the three golden
 rules of the codebase), `V3_PLAN.md` and `UX_AUDIT.md` (why the system is shaped the way it is).
 
@@ -52,6 +53,10 @@ gates run in GitHub Actions (`.github/workflows/ci.yml`) on every pushed branch 
 request; push the worktree branch first and merge only on a green run, and a red run on
 `main` is fixed before anything else lands. A claim of "green" names the checkout it ran
 in — the main checkout's `node_modules` can be stale while a worktree's are current.
+
+A new endpoint needs a row in `apps/api/test/authz-policy.tsv` saying which principals may
+call it; the matrix test fails without one. An endpoint that takes an id belonging to a family
+gets a cross-family case in `05-object-access.test.ts`.
 
 ## Git
 

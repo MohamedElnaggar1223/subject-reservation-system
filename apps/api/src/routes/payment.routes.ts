@@ -189,7 +189,7 @@ export const payments = new Hono<HonoEnv>()
 
       try {
         const result = await paymentService.initiatePayment(user.id, data);
-        logAction(user.id, 'PAYMENT_INITIATED', 'payment', result.id ?? '', null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'PAYMENT_INITIATED', 'payment', result.id ?? '', null, result as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] PAYMENT_INITIATED failed:', err));
         return success(c, result, 201);
       } catch (err) {
@@ -308,7 +308,7 @@ export const payments = new Hono<HonoEnv>()
 
       try {
         const updated = await paymentService.submitInstapayReference(id, user.id, data);
-        logAction(user.id, 'PAYMENT_REFERENCE_SUBMITTED', 'payment', id, null, { reference: data.reference }, extractAuditContext(c))
+        await logAction(user.id, 'PAYMENT_REFERENCE_SUBMITTED', 'payment', id, null, { reference: data.reference }, extractAuditContext(c))
           .catch((err) => console.error('[audit] PAYMENT_REFERENCE_SUBMITTED failed:', err));
         return success(c, updated);
       } catch (err) {
@@ -362,7 +362,7 @@ export const payments = new Hono<HonoEnv>()
       try {
         const confirmed = await paymentService.confirmPayment(id, user.id, undefined, notes, instrument);
 
-        logAction(user.id, 'PAYMENT_CONFIRMED', 'payment', id, pay as Record<string, unknown>, confirmed as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'PAYMENT_CONFIRMED', 'payment', id, pay as Record<string, unknown>, confirmed as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] PAYMENT_CONFIRMED (finance) failed:', err));
 
         return success(c, confirmed);
@@ -391,7 +391,7 @@ export const payments = new Hono<HonoEnv>()
       const { reason } = c.req.valid('json');
       try {
         const result = await paymentService.reversePayment(id, user.id, reason);
-        logAction(user.id, 'PAYMENT_REVERSED', 'payment', id, null, { reason, ...result }, extractAuditContext(c))
+        await logAction(user.id, 'PAYMENT_REVERSED', 'payment', id, null, { reason, ...result }, extractAuditContext(c))
           .catch((err) => console.error('[audit] PAYMENT_REVERSED failed:', err));
         return success(c, result);
       } catch (err) {

@@ -56,6 +56,7 @@ import { notifyPaymentConfirmed, notifyPaymentReversed, notifyEscrowBalanceChang
 import { createReceiptsForRegistrations } from './receipt.services';
 import { creditHeld } from './escrow.services';
 import { onRemarkPaymentCompleted } from './remark.services';
+import { isFileOwner } from './file.services';
 
 // ─── School Receiving Account (InstaPay destination) ─────────────────────────
 //
@@ -495,8 +496,9 @@ export async function confirmPayment(
     }
   }
 
+  // Awaited so the rows exist before the caller answers (RF-15); still non-fatal.
   for (const regId of registrationIds) {
-    logAction(null, 'REGISTRATION_CONFIRMED', 'registration', regId, null, { paymentId })
+    await logAction(null, 'REGISTRATION_CONFIRMED', 'registration', regId, null, { paymentId })
       .catch((err) => console.error('[audit] REGISTRATION_CONFIRMED failed:', err));
   }
 
@@ -716,6 +718,11 @@ export async function submitInstapayReference(
   }
   if (!(OPEN_PAYMENT_STATUSES as readonly string[]).includes(pay.status)) {
     throw new Error(`Payment is already in '${pay.status}' status`);
+  }
+  // RF-13: a screenshot must be one this parent uploaded. The id used to be
+  // stored as given, so any family could attach another family's document.
+  if (data.screenshotFileId && !(await isFileOwner(data.screenshotFileId, parentId))) {
+    throw new Error('You are not authorized to attach that file');
   }
 
   try {

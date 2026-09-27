@@ -8,7 +8,7 @@
  * - Admin user management
  */
 
-import { db, user, eq, ilike, or, and } from '@repo/db';
+import { db, user, session, eq, ilike, or, and } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { UpdateProfileType, AdminUpdateUserType, UserQueryFiltersType } from '@repo/validations';
 
@@ -143,6 +143,26 @@ export async function adminUpdateUser(userId: string, data: AdminUpdateUserType)
     });
 
   return updated;
+}
+
+/**
+ * An account created by staff (the admin's team form) is vouched for in
+ * person, like one created at the desk, so it can sign in at once. Without
+ * this, the production default of required email verification (RF-22)
+ * would lock every staff-created account out: nothing sends them a
+ * verification email.
+ */
+export async function markEmailVerified(userId: string) {
+  await db.update(user).set({ emailVerified: true, updatedAt: new Date() }).where(eq(user.id, userId));
+}
+
+/**
+ * End every session a user has (RF-23). Banning an account used to leave
+ * its sessions alive, so a banned finance officer kept confirm and reverse
+ * authority until the session expired.
+ */
+export async function revokeAllSessions(userId: string) {
+  await db.delete(session).where(eq(session.userId, userId));
 }
 
 /**

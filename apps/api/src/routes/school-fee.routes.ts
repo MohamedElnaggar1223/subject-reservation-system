@@ -58,7 +58,7 @@ export const schoolFees = new Hono<HonoEnv>()
     const data = c.req.valid('json');
     try {
       const created = await schoolFeeService.createSchedule(data);
-      logAction(user.id, 'SCHOOL_FEE_SCHEDULE_CREATED', 'school_fee_schedule', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'SCHOOL_FEE_SCHEDULE_CREATED', 'school_fee_schedule', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] SCHOOL_FEE_SCHEDULE_CREATED failed:', err));
       return success(c, created, 201);
     } catch (err) {
@@ -74,7 +74,7 @@ export const schoolFees = new Hono<HonoEnv>()
     const data = c.req.valid('json');
     const updated = await schoolFeeService.updateSchedule(id, data);
     if (!updated) return error(c, 'Schedule not found', 404);
-    logAction(user.id, 'SCHOOL_FEE_SCHEDULE_UPDATED', 'school_fee_schedule', id, null, data as Record<string, unknown>, extractAuditContext(c))
+    await logAction(user.id, 'SCHOOL_FEE_SCHEDULE_UPDATED', 'school_fee_schedule', id, null, data as Record<string, unknown>, extractAuditContext(c))
       .catch((err) => console.error('[audit] SCHOOL_FEE_SCHEDULE_UPDATED failed:', err));
     return success(c, updated);
   })
@@ -84,7 +84,7 @@ export const schoolFees = new Hono<HonoEnv>()
     const { id } = c.req.valid('param');
     const deleted = await schoolFeeService.deleteSchedule(id);
     if (!deleted) return error(c, 'Schedule not found', 404);
-    logAction(user.id, 'SCHOOL_FEE_SCHEDULE_DELETED', 'school_fee_schedule', id, deleted as Record<string, unknown>, null, extractAuditContext(c))
+    await logAction(user.id, 'SCHOOL_FEE_SCHEDULE_DELETED', 'school_fee_schedule', id, deleted as Record<string, unknown>, null, extractAuditContext(c))
       .catch((err) => console.error('[audit] SCHOOL_FEE_SCHEDULE_DELETED failed:', err));
     return success(c, deleted);
   })
@@ -132,7 +132,7 @@ export const schoolFees = new Hono<HonoEnv>()
     const data = c.req.valid('json');
     try {
       const result = await collectSchoolFeeAtDesk(user.id, data.studentId, data.instrumentUsed, data.notes, data.academicYear);
-      logAction(user.id, 'DESK_SCHOOL_FEE_COLLECTED', 'payment', result.paymentId, null, result as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'DESK_SCHOOL_FEE_COLLECTED', 'payment', result.paymentId, null, result as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] DESK_SCHOOL_FEE_COLLECTED failed:', err));
       return success(c, result, 201);
     } catch (err) {
@@ -157,7 +157,7 @@ export const schoolFees = new Hono<HonoEnv>()
         data.paymentMethod,
         schoolAccountDetails()
       );
-      logAction(user.id, 'SCHOOL_FEE_PAYMENT_INITIATED', 'payment', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'SCHOOL_FEE_PAYMENT_INITIATED', 'payment', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] SCHOOL_FEE_PAYMENT_INITIATED failed:', err));
       return success(c, created, 201);
     } catch (err) {

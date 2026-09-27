@@ -89,7 +89,7 @@ export const notificationRoutes = new Hono<HonoEnv>()
       const result = await notificationService.sendAdminAnnouncement(payload, user.id);
 
       if (result.scheduled) {
-        logAction(user.id, 'ADMIN_ANNOUNCEMENT', 'notification', '', null, {
+        await logAction(user.id, 'ADMIN_ANNOUNCEMENT', 'notification', '', null, {
           recipients: payload.recipients,
           scheduled: true,
           scheduledAt: result.scheduledAt?.toISOString(),
@@ -106,7 +106,7 @@ export const notificationRoutes = new Hono<HonoEnv>()
         });
       }
 
-      logAction(user.id, 'ADMIN_ANNOUNCEMENT', 'notification', '', null, { recipients: payload.recipients, notificationCount: result.notificationCount }, extractAuditContext(c))
+      await logAction(user.id, 'ADMIN_ANNOUNCEMENT', 'notification', '', null, { recipients: payload.recipients, notificationCount: result.notificationCount }, extractAuditContext(c))
         .catch(err => console.error('[audit] ADMIN_ANNOUNCEMENT failed:', err));
       return success(c, {
         message: `Announcement sent to ${result.notificationCount} user(s)`,
@@ -145,7 +145,7 @@ export const notificationRoutes = new Hono<HonoEnv>()
       if (!cancelled) {
         return error(c, 'Scheduled announcement not found or already dispatched', 404);
       }
-      logAction(
+      await logAction(
         user.id,
         'ADMIN_ANNOUNCEMENT',
         'notification',

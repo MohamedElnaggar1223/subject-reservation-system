@@ -71,7 +71,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
 
       try {
         const result = await swapService.createDropRequest(id, data, user.id);
-        logAction(user.id, 'CHANGE_REQUEST_CREATED', 'change_request', result.id ?? '', null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'CHANGE_REQUEST_CREATED', 'change_request', result.id ?? '', null, result as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] CHANGE_REQUEST_CREATED failed:', err));
         return success(c, result, 201);
       } catch (err) {
@@ -103,7 +103,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
 
       try {
         const result = await swapService.createSwapRequest(id, data, user.id);
-        logAction(user.id, 'CHANGE_REQUEST_CREATED', 'change_request', result.id ?? '', null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'CHANGE_REQUEST_CREATED', 'change_request', result.id ?? '', null, result as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] CHANGE_REQUEST_CREATED failed:', err));
         return success(c, result, 201);
       } catch (err) {
@@ -133,7 +133,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
 
       try {
         const result = await swapService.executeDirectDrop(id, data, user.id);
-        logAction(user.id, 'DIRECT_DROP_EXECUTED', 'registration', id, null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'DIRECT_DROP_EXECUTED', 'registration', id, null, result as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] DIRECT_DROP_EXECUTED failed:', err));
         return success(c, result);
       } catch (err) {
@@ -163,7 +163,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
 
       try {
         const result = await swapService.executeDirectSwap(id, data, user.id);
-        logAction(user.id, 'DIRECT_SWAP_EXECUTED', 'registration', id, null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'DIRECT_SWAP_EXECUTED', 'registration', id, null, result as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] DIRECT_SWAP_EXECUTED failed:', err));
         return success(c, result);
       } catch (err) {
@@ -259,7 +259,7 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
       try {
         const result = await swapService.approveChangeRequest(id, data, user.id);
 
-        logAction(user.id, 'CHANGE_REQUEST_APPROVED', 'change_request', id, null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'CHANGE_REQUEST_APPROVED', 'change_request', id, null, result as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] CHANGE_REQUEST_APPROVED failed:', err));
 
         return success(c, result);
@@ -293,7 +293,7 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
       try {
         const result = await swapService.rejectChangeRequest(id, data, user.id);
 
-        logAction(user.id, 'CHANGE_REQUEST_REJECTED', 'change_request', id, null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'CHANGE_REQUEST_REJECTED', 'change_request', id, null, result as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] CHANGE_REQUEST_REJECTED failed:', err));
 
         return success(c, result);
@@ -322,7 +322,7 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
       try {
         const result = await swapService.cancelChangeRequest(id, user.id);
 
-        logAction(user.id, 'CHANGE_REQUEST_CANCELLED', 'change_request', id, null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'CHANGE_REQUEST_CANCELLED', 'change_request', id, null, result as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] CHANGE_REQUEST_CANCELLED failed:', err));
 
         return success(c, result);

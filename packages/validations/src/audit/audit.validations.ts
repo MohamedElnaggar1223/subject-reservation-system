@@ -40,6 +40,9 @@ export const AUDIT_ENTITY_TYPES = [
   'refund_window',
   'exception',
   'remark_request',
+  'link',
+  'remark_fee',
+  'remark_deadline',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -60,6 +63,9 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   refund_window:  'Refund Window',
   exception:      'Exception',
   remark_request: 'Remark Request',
+  link:           'Parent-Student Link',
+  remark_fee:     'Remark Fee',
+  remark_deadline:'Remark Deadline',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -137,7 +143,18 @@ export const AUDIT_ACTIONS = [
   'WITHDRAWAL_REJECTED',
   // User / grade
   'USER_UPDATED',
+  'USER_UPDATED_BY_ADMIN',
   'USER_GRADE_CHANGED',
+  // Parent-student links (security audit RF-14: access to a child's money
+  // and records hangs on these, so every change is recorded)
+  'LINK_REQUESTED',
+  'LINK_APPROVED',
+  'LINK_REJECTED',
+  'LINK_REMOVED',
+  // Remark configuration and payment
+  'REMARK_FEE_SET',
+  'REMARK_DEADLINE_SET',
+  'REMARK_PAYMENT_INITIATED',
   // Admin
   'ADMIN_ANNOUNCEMENT',
 ] as const;
@@ -211,7 +228,15 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   WITHDRAWAL_FULFILLED:       'Withdrawal Fulfilled',
   WITHDRAWAL_REJECTED:        'Withdrawal Rejected',
   USER_UPDATED:               'User Profile Updated',
+  USER_UPDATED_BY_ADMIN:      'User Updated by Admin',
   USER_GRADE_CHANGED:         'Student Grade Changed',
+  LINK_REQUESTED:             'Link Requested by Parent',
+  LINK_APPROVED:              'Link Approved by Student',
+  LINK_REJECTED:              'Link Rejected by Student',
+  LINK_REMOVED:               'Link Removed by Admin',
+  REMARK_FEE_SET:             'Remark Fee Set',
+  REMARK_DEADLINE_SET:        'Remark Deadline Set',
+  REMARK_PAYMENT_INITIATED:   'Remark Payment Initiated',
   ADMIN_ANNOUNCEMENT:         'Admin Announcement Sent',
 };
 

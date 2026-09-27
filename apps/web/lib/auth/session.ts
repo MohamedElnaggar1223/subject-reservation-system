@@ -4,39 +4,17 @@ import { apiResponse } from '@repo/validations'
 import { ROLES, type Role } from '@repo/validations'
 import { redirect } from 'next/navigation'
 
-// Shape inferred from API response; keeps RPC typing
-export type SessionData = {
-  user: {
-    id: string;
-    createdAt: Date | string;
-    updatedAt: Date | string;
-    email: string;
-    emailVerified: boolean;
-    name: string;
-    image?: string | null | undefined;
-    banned: boolean | null | undefined;
-    role?: string | null | undefined;
-    banReason?: string | null | undefined;
-    banExpires?: Date | string | null | undefined;
-  };
-  session: {
-    id: string;
-    createdAt: Date | string;
-    updatedAt: Date | string;
-    userId: string;
-    expiresAt: Date | string;
-    token: string;
-    ipAddress?: string | null | undefined;
-    userAgent?: string | null | undefined;
-    impersonatedBy?: string | null | undefined;
-  } | null;
-};
+const fetchSession = async () => apiResponse((await getServerApi()).v1.session.$get())
+
+// Derived from the RPC fetcher, never hand-written: the hand-written copy
+// that used to live here still promised a session token after the API
+// stopped sending one (security audit RF-12).
+export type SessionData = Awaited<ReturnType<typeof fetchSession>>
 
 // Cached per-request session fetch
 export const getSession = cache(async (): Promise<SessionData | null> => {
-  const api = await getServerApi()
   try {
-    return await apiResponse(api.v1.session.$get())
+    return await fetchSession()
   } catch (err) {
     console.error('[session] getSession failed:', err instanceof Error ? err.message : err)
     return null

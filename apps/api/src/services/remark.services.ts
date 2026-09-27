@@ -35,6 +35,7 @@ import type {
 } from '@repo/validations';
 import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { notifyEscrowBalanceChanged } from './notification.services';
+import { isFileOwner } from './file.services';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -291,6 +292,10 @@ export async function confirmConsent(
   if (!rr) throw new Error('Remark request not found');
   if (!(await validateParentStudentLink(parentId, rr.studentId))) {
     throw new Error('You are not linked to this student');
+  }
+  // RF-13: the signed consent form must be one this parent uploaded.
+  if (data.consentFileId && !(await isFileOwner(data.consentFileId, parentId))) {
+    throw new Error('You are not authorized to attach that file');
   }
 
   const nextStatus = rr.feeCharged > 0 ? 'pending_payment' : 'awaiting_submission';

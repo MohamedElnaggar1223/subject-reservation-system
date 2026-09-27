@@ -29,7 +29,7 @@ export const exceptions = new Hono<HonoEnv>()
     const data = c.req.valid('json');
     try {
       const created = await exceptionService.grantException(data, user.id);
-      logAction(user.id, 'EXCEPTION_GRANTED', 'exception', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'EXCEPTION_GRANTED', 'exception', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] EXCEPTION_GRANTED failed:', err));
       return success(c, created, 201);
     } catch (err) {
@@ -42,7 +42,7 @@ export const exceptions = new Hono<HonoEnv>()
     const { id } = c.req.valid('param');
     try {
       const updated = await exceptionService.revokeException(id, user.id);
-      logAction(user.id, 'EXCEPTION_REVOKED', 'exception', id, null, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'EXCEPTION_REVOKED', 'exception', id, null, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] EXCEPTION_REVOKED failed:', err));
       return success(c, updated);
     } catch (err) {

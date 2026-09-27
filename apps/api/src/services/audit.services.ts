@@ -29,8 +29,9 @@ import {
   lte,
   count,
 } from '@repo/db';
-import { getConnInfo } from '@hono/node-server/conninfo';
 import { randomUUID } from 'crypto';
+import { clientIp } from '../lib/client-ip';
+import { env } from '../env';
 import type { AuditAction, AuditEntityType, AuditLogsQueryType } from '@repo/validations';
 
 // ─── Log Context (from HTTP request) ─────────────────────────────────────────
@@ -155,29 +156,16 @@ export async function getEntityHistory(
 
 /**
  * Extract Hono request context for audit logging.
- * Uses the same trusted IP logic as the rate limiter:
- * - Prefer `cf-connecting-ip` (set by Cloudflare, cannot be spoofed by client)
- * - Fall back to socket remote address via `getConnInfo`
- * - Do NOT trust `x-forwarded-for` — it is trivially spoofable without a trusted proxy chain
+ *
+ * The address comes from clientIp(), the same function that keys the rate
+ * limiters: a proxy header counts only when CLIENT_IP_HEADER names it. This
+ * used to trust `cf-connecting-ip` from any client (RF-11), so the address in
+ * an audit row was whatever the caller chose to write there.
  */
-export function extractAuditContext(c: {
-  req: { header: (name: string) => string | undefined; raw: Request };
-  env?: unknown;
-}): AuditContext {
-  const cfIp = c.req.header('cf-connecting-ip');
-  let ipAddress: string | undefined = cfIp ?? undefined;
-
-  if (!ipAddress) {
-    try {
-      const info = getConnInfo(c as Parameters<typeof getConnInfo>[0]);
-      ipAddress = info.remote.address ?? undefined;
-    } catch {
-      // getConnInfo may throw if the adapter doesn't support it
-    }
-  }
-
+export function extractAuditContext(c: Parameters<typeof clientIp>[0]): AuditContext {
+  const ip = clientIp(c, env.CLIENT_IP_HEADER);
   return {
-    ipAddress,
+    ipAddress: ip === 'unknown' ? undefined : ip,
     userAgent: c.req.header('user-agent'),
   };
 }

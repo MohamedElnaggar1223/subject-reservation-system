@@ -118,7 +118,7 @@ export const sessions = new Hono<HonoEnv>()
       try {
         const created = await sessionService.createSession(data);
 
-        logAction(user.id, 'SESSION_CREATED', 'session', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'SESSION_CREATED', 'session', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] SESSION_CREATED failed:', err));
 
         return success(c, created, 201);
@@ -170,7 +170,7 @@ export const sessions = new Hono<HonoEnv>()
 
         // Including _updateReason in the audit newData preserves the
         // rationale alongside the before/after field snapshots.
-        logAction(
+        await logAction(
           currentUser.id,
           'SESSION_UPDATED',
           'session',
@@ -214,7 +214,7 @@ export const sessions = new Hono<HonoEnv>()
         return error(c, 'Failed to update session', 500);
       }
 
-      logAction(currentUser.id, 'SESSION_UPDATED', 'session', id, session as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(currentUser.id, 'SESSION_UPDATED', 'session', id, session as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] SESSION_UPDATED (active) failed:', err));
 
       return success(c, updated);
@@ -244,7 +244,7 @@ export const sessions = new Hono<HonoEnv>()
           return error(c, 'Session not found or is not in draft status', 400);
         }
 
-        logAction(user.id, 'SESSION_ACTIVATED', 'session', id, previous as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'SESSION_ACTIVATED', 'session', id, previous as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] SESSION_ACTIVATED failed:', err));
 
         // NOT-001: Notify all active students and parents when session is manually activated
@@ -299,7 +299,7 @@ export const sessions = new Hono<HonoEnv>()
         return error(c, 'Failed to close session', 500);
       }
 
-      logAction(currentUser.id, 'SESSION_CLOSED', 'session', id, session as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(currentUser.id, 'SESSION_CLOSED', 'session', id, session as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] SESSION_CLOSED failed:', err));
 
       // GRADE-001 + M-10: Await so admins see failures. On success, stamp

@@ -18,6 +18,15 @@ import { startSessionScheduler } from './jobs/session-closer';
 
 export type { AppType } from './app';
 
+// A production API with no CLIENT_IP_HEADER keys rate limits on the socket
+// address. Behind a proxy that is the proxy's address, so the whole school
+// would share one sign-in budget (security audit, O-4).
+if (env.NODE_ENV === 'production' && !env.CLIENT_IP_HEADER) {
+  console.warn(
+    '[security] CLIENT_IP_HEADER is not set. If this API runs behind a proxy or CDN, every user shares one rate-limit bucket; set it to the header that proxy writes.'
+  );
+}
+
 // Start background jobs
 startSessionScheduler();
 

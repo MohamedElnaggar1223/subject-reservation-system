@@ -75,7 +75,7 @@ export const users = new Hono<HonoEnv>()
         return error(c, 'Failed to update profile', 500);
       }
       
-      logAction(currentUser.id, 'USER_UPDATED', 'user', currentUser.id, null, result as Record<string, unknown>, extractAuditContext(c))
+      await logAction(currentUser.id, 'USER_UPDATED', 'user', currentUser.id, null, result as Record<string, unknown>, extractAuditContext(c))
         .catch(err => console.error('[audit] USER_UPDATED failed:', err));
       return success(c, result);
     }
@@ -119,7 +119,7 @@ export const users = new Hono<HonoEnv>()
           headers: c.req.raw.headers,
         });
 
-        logAction(
+        await logAction(
           currentUser.id,
           'USER_UPDATED',
           'user',
@@ -304,8 +304,10 @@ export const users = new Hono<HonoEnv>()
         if (data.role === 'student' && data.grade !== undefined) {
           await userService.setStudentFields(result.user.id, data.grade);
         }
+        // Staff vouch for the person in front of them, as at the desk (RF-22).
+        await userService.markEmailVerified(result.user.id);
 
-        logAction(user.id, 'STAFF_USER_CREATED', 'user', result.user.id, null, { email: data.email, role: data.role }, extractAuditContext(c))
+        await logAction(user.id, 'STAFF_USER_CREATED', 'user', result.user.id, null, { email: data.email, role: data.role }, extractAuditContext(c))
           .catch((err) => console.error('[audit] STAFF_USER_CREATED failed:', err));
 
         return success(c, result.user, 201);
@@ -429,19 +431,31 @@ export const users = new Hono<HonoEnv>()
     async (c) => {
       const { id } = c.req.valid('param');
       const data = c.req.valid('json');
-      
-      // Verify user exists
-      const exists = await userService.userExists(id);
-      if (!exists) {
+
+      // Verify user exists, keeping the before-values for the audit row
+      const before = await userService.getUserProfile(id);
+      if (!before) {
         return error(c, 'User not found', 404);
       }
-      
+
       const updated = await userService.adminUpdateUser(id, data);
-      
+
       if (!updated) {
         return error(c, 'Failed to update user', 500);
       }
-      
+
+      // RF-23: a ban takes effect now, not when the account's sessions expire.
+      if (data.banned === true) {
+        await userService.revokeAllSessions(id);
+      }
+
+      // RF-14: an admin changing someone's account (role, ban, grade) left no
+      // audit row. Record exactly the fields the request changed.
+      const previous = Object.fromEntries(
+        Object.keys(data).map((k) => [k, (before as Record<string, unknown>)[k] ?? null])
+      );
+      await logAction(c.get('user')!.id, 'USER_UPDATED_BY_ADMIN', 'user', id, previous, data as Record<string, unknown>, extractAuditContext(c))
+        .catch((err) => console.error('[audit] USER_UPDATED_BY_ADMIN failed:', err));
       return success(c, updated);
     }
   );

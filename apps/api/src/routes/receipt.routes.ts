@@ -64,7 +64,7 @@ export const receipts = new Hono<HonoEnv>()
     const user = c.get('user')!;
     const data = c.req.valid('json');
     const created = await refundService.createWindow(data);
-    logAction(user.id, 'REFUND_WINDOW_CREATED', 'refund_window', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
+    await logAction(user.id, 'REFUND_WINDOW_CREATED', 'refund_window', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
       .catch((err) => console.error('[audit] REFUND_WINDOW_CREATED failed:', err));
     return success(c, created, 201);
   })
@@ -74,7 +74,7 @@ export const receipts = new Hono<HonoEnv>()
     const { id } = c.req.valid('param');
     const deleted = await refundService.deleteWindow(id);
     if (!deleted) return error(c, 'Refund window not found', 404);
-    logAction(user.id, 'REFUND_WINDOW_DELETED', 'refund_window', id, deleted as Record<string, unknown>, null, extractAuditContext(c))
+    await logAction(user.id, 'REFUND_WINDOW_DELETED', 'refund_window', id, deleted as Record<string, unknown>, null, extractAuditContext(c))
       .catch((err) => console.error('[audit] REFUND_WINDOW_DELETED failed:', err));
     return success(c, deleted);
   })
@@ -126,7 +126,7 @@ export const receipts = new Hono<HonoEnv>()
     const { id } = c.req.valid('param');
     try {
       const updated = await receiptService.markIssued(id, user.id);
-      logAction(user.id, 'RECEIPT_ISSUED', 'receipt', id, null, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'RECEIPT_ISSUED', 'receipt', id, null, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] RECEIPT_ISSUED failed:', err));
       return success(c, updated);
     } catch (err) {
@@ -140,7 +140,7 @@ export const receipts = new Hono<HonoEnv>()
     const { notes } = c.req.valid('json');
     try {
       const updated = await receiptService.markReturned(id, user.id, notes);
-      logAction(user.id, 'RECEIPT_RETURNED', 'receipt', id, null, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'RECEIPT_RETURNED', 'receipt', id, null, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] RECEIPT_RETURNED failed:', err));
       return success(c, updated);
     } catch (err) {
@@ -154,7 +154,7 @@ export const receipts = new Hono<HonoEnv>()
     const { reason } = c.req.valid('json');
     try {
       const updated = await receiptService.markLostOrVoid(id, user.id, 'lost', reason);
-      logAction(user.id, 'RECEIPT_LOST', 'receipt', id, null, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'RECEIPT_LOST', 'receipt', id, null, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] RECEIPT_LOST failed:', err));
       return success(c, updated);
     } catch (err) {
@@ -168,7 +168,7 @@ export const receipts = new Hono<HonoEnv>()
     const { reason } = c.req.valid('json');
     try {
       const updated = await receiptService.markLostOrVoid(id, user.id, 'void', reason);
-      logAction(user.id, 'RECEIPT_VOIDED', 'receipt', id, null, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'RECEIPT_VOIDED', 'receipt', id, null, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] RECEIPT_VOIDED failed:', err));
       return success(c, updated);
     } catch (err) {

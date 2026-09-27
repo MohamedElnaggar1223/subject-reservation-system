@@ -28,6 +28,7 @@ import { requireAuth, requireAdmin } from '../middleware/access-control.middlewa
 import type { HonoEnv } from '../lib/types';
 import * as subjectService from '../services/subject.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
+import { teacherForViewer } from '../lib/teacher-view';
 
 export const subjects = new Hono<HonoEnv>()
   .use('*', requireAuth())
@@ -107,7 +108,7 @@ export const subjects = new Hono<HonoEnv>()
 
       const created = await subjectService.createSubject(data);
 
-      logAction(user.id, 'SUBJECT_CREATED', 'subject', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'SUBJECT_CREATED', 'subject', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] SUBJECT_CREATED failed:', err));
 
       return success(c, created, 201);
@@ -158,7 +159,7 @@ export const subjects = new Hono<HonoEnv>()
         return error(c, 'Failed to update subject', 500);
       }
 
-      logAction(user.id, 'SUBJECT_UPDATED', 'subject', id, previous as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'SUBJECT_UPDATED', 'subject', id, previous as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] SUBJECT_UPDATED failed:', err));
 
       return success(c, updated);
@@ -192,7 +193,7 @@ export const subjects = new Hono<HonoEnv>()
         return error(c, 'Failed to update subject', 500);
       }
 
-      logAction(user.id, 'SUBJECT_CORE_UPDATED', 'subject', id, previous as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'SUBJECT_CORE_UPDATED', 'subject', id, previous as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] SUBJECT_CORE_UPDATED failed:', err));
 
       return success(c, updated);
@@ -233,7 +234,7 @@ export const subjects = new Hono<HonoEnv>()
         return error(c, 'Failed to deactivate subject', 500);
       }
 
-      logAction(user.id, 'SUBJECT_DEACTIVATED', 'subject', id, existing as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'SUBJECT_DEACTIVATED', 'subject', id, existing as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] SUBJECT_DEACTIVATED failed:', err));
 
       return success(c, updated);
@@ -268,7 +269,7 @@ export const subjects = new Hono<HonoEnv>()
         return error(c, 'Failed to activate subject', 500);
       }
 
-      logAction(user.id, 'SUBJECT_ACTIVATED', 'subject', id, existing as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
+      await logAction(user.id, 'SUBJECT_ACTIVATED', 'subject', id, existing as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] SUBJECT_ACTIVATED failed:', err));
 
       return success(c, updated);
@@ -286,7 +287,9 @@ export const subjects = new Hono<HonoEnv>()
       if (!(await subjectService.subjectExists(id))) {
         return error(c, 'Subject not found', 404);
       }
-      return success(c, await subjectService.getSubjectTeachers(id));
+      // RF-20: the same rule as /v1/teachers — names for everyone, contact details for the admin.
+      const role = c.get('user')!.role;
+      return success(c, (await subjectService.getSubjectTeachers(id)).map((t) => teacherForViewer(t, role)));
     }
   )
 
@@ -311,7 +314,7 @@ export const subjects = new Hono<HonoEnv>()
 
       try {
         const teachersList = await subjectService.setSubjectTeachers(id, teacherIds);
-        logAction(user.id, 'SUBJECT_UPDATED', 'subject', id, null, { teacherIds }, extractAuditContext(c))
+        await logAction(user.id, 'SUBJECT_UPDATED', 'subject', id, null, { teacherIds }, extractAuditContext(c))
           .catch((err) => console.error('[audit] SUBJECT_UPDATED (teachers) failed:', err));
         return success(c, teachersList);
       } catch (err) {

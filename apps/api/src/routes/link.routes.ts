@@ -65,6 +65,10 @@ export const links = new Hono<HonoEnv>()
           studentIdentifier: data.studentIdentifier,
         });
 
+        if (link) {
+          await logAction(user.id, 'LINK_REQUESTED', 'link', link.id, null, { parentId: user.id, studentId: link.studentId }, extractAuditContext(c))
+            .catch((err) => console.error('[audit] LINK_REQUESTED failed:', err));
+        }
         return success(c, link, 201);
       } catch (err) {
         const message = clientMessage(err, 'Failed to create link request');
@@ -153,6 +157,10 @@ export const links = new Hono<HonoEnv>()
 
       try {
         const updated = await linkService.respondToLinkRequest(id, user.id, response);
+        await logAction(
+          user.id, response.status === 'approved' ? 'LINK_APPROVED' : 'LINK_REJECTED', 'link', id,
+          { status: 'pending' }, { status: response.status }, extractAuditContext(c)
+        ).catch((err) => console.error('[audit] LINK decision failed:', err));
         return success(c, updated);
       } catch (err) {
         const message = clientMessage(err, 'Failed to respond to link request');
@@ -180,6 +188,10 @@ export const links = new Hono<HonoEnv>()
       }
 
       await linkService.deleteLink(id);
+      await logAction(
+        c.get('user')!.id, 'LINK_REMOVED', 'link', id,
+        { parentId: link.parentId, studentId: link.studentId, status: link.status }, null, extractAuditContext(c)
+      ).catch((err) => console.error('[audit] LINK_REMOVED failed:', err));
       return success(c, { deleted: true });
     }
   )
@@ -207,7 +219,7 @@ export const links = new Hono<HonoEnv>()
       const data = c.req.valid('json');
       try {
         const result = await onboardFamily(data);
-        logAction(user.id, 'DESK_FAMILY_ONBOARDED', 'user', result.student.id, null, {
+        await logAction(user.id, 'DESK_FAMILY_ONBOARDED', 'user', result.student.id, null, {
           parent: result.parent.email, student: result.student.email, linkStatus: result.linkStatus,
         }, extractAuditContext(c))
           .catch((err) => console.error('[audit] DESK_FAMILY_ONBOARDED failed:', err));

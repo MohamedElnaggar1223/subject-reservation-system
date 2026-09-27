@@ -80,6 +80,7 @@ every pushed branch and pull request ([`.github/workflows/ci.yml`](./.github/wor
 | [`STRATEGY.md`](./STRATEGY.md) | The plan of record: goal, decisions and why, phases, open questions. |
 | [`DISCOVERY.md`](./DISCOVERY.md) | What we know and assume about the school; check it before designing a feature. |
 | [`FOUNDATION_AUDIT.md`](./FOUNDATION_AUDIT.md) | What has been proven at runtime, and the findings (RF-nn, RH-nn). |
+| [`SECURITY_AUDIT.md`](./SECURITY_AUDIT.md) | The security audit: what was proven, findings RF-11 to RF-23, and the production checklist. |
 | [`PATTERNS.md`](./PATTERNS.md) | The three golden rules of the codebase. |
 | [`V3_PLAN.md`](./V3_PLAN.md), [`UX_AUDIT.md`](./UX_AUDIT.md), [`PROJECT_AUDIT.md`](./PROJECT_AUDIT.md) | Why the money rails, the desk and the current screens are shaped as they are. |
 | [`urd-doc.md`](./urd-doc.md) | The original requirements (URD v2); code cites its story ids, such as CORE-001. |

@@ -247,7 +247,7 @@ export const registrations = new Hono<HonoEnv>()
           data,
           user.id
         );
-        logAction(user.id, 'REGISTRATION_REQUESTED', 'registration', created[0]?.id ?? '', null, { registrations: created } as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'REGISTRATION_REQUESTED', 'registration', created[0]?.id ?? '', null, { registrations: created } as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] REGISTRATION_REQUESTED failed:', err));
         return success(c, created, 201);
       } catch (err) {
@@ -282,7 +282,7 @@ export const registrations = new Hono<HonoEnv>()
           user.id,
           data
         );
-        logAction(user.id, 'REGISTRATION_DIRECT', 'registration', created[0]?.id ?? '', null, { registrations: created } as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'REGISTRATION_DIRECT', 'registration', created[0]?.id ?? '', null, { registrations: created } as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] REGISTRATION_DIRECT failed:', err));
         return success(c, created, 201);
       } catch (err) {
@@ -316,7 +316,7 @@ export const registrations = new Hono<HonoEnv>()
         );
         const auditCtx = extractAuditContext(c);
         for (const regId of data.registrationIds) {
-          logAction(user.id, 'REGISTRATION_APPROVED', 'registration', regId, { status: 'pending_approval' }, { status: 'pending_payment' }, auditCtx)
+          await logAction(user.id, 'REGISTRATION_APPROVED', 'registration', regId, { status: 'pending_approval' }, { status: 'pending_payment' }, auditCtx)
             .catch((err) => console.error('[audit] REGISTRATION_APPROVED failed:', err));
         }
         return success(c, updated);
@@ -344,7 +344,7 @@ export const registrations = new Hono<HonoEnv>()
       const data = c.req.valid('json');
       try {
         const result = await deskService.executeDeskRegistration(user.id, data);
-        logAction(user.id, 'DESK_REGISTRATION', 'registration', data.studentId, null, {
+        await logAction(user.id, 'DESK_REGISTRATION', 'registration', data.studentId, null, {
           subjects: data.subjectIds.length, collected: result.collected,
         }, extractAuditContext(c))
           .catch((err) => console.error('[audit] DESK_REGISTRATION failed:', err));
@@ -377,7 +377,7 @@ export const registrations = new Hono<HonoEnv>()
         const created = await preregService.createPreregistration(user.id, data);
         const auditCtx = extractAuditContext(c);
         for (const reg of created) {
-          logAction(user.id, 'PREREG_CREATED', 'registration', reg.id, null, reg as Record<string, unknown>, auditCtx)
+          await logAction(user.id, 'PREREG_CREATED', 'registration', reg.id, null, reg as Record<string, unknown>, auditCtx)
             .catch((err) => console.error('[audit] PREREG_CREATED failed:', err));
         }
         return success(c, created, 201);
@@ -407,7 +407,7 @@ export const registrations = new Hono<HonoEnv>()
 
       try {
         const result = await preregService.cancelPreregistration(id, user.id);
-        logAction(user.id, 'PREREG_CANCELLED', 'registration', id, null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'PREREG_CANCELLED', 'registration', id, null, result as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] PREREG_CANCELLED failed:', err));
         return success(c, result);
       } catch (err) {
@@ -440,7 +440,7 @@ export const registrations = new Hono<HonoEnv>()
         );
         const auditCtx = extractAuditContext(c);
         for (const regId of data.registrationIds) {
-          logAction(user.id, 'REGISTRATION_APPROVAL_REVERTED', 'registration', regId, { status: 'pending_payment' }, { status: 'pending_approval' }, auditCtx)
+          await logAction(user.id, 'REGISTRATION_APPROVAL_REVERTED', 'registration', regId, { status: 'pending_payment' }, { status: 'pending_approval' }, auditCtx)
             .catch((err) => console.error('[audit] REGISTRATION_APPROVAL_REVERTED failed:', err));
         }
         return success(c, updated);
@@ -475,7 +475,7 @@ export const registrations = new Hono<HonoEnv>()
         );
         const auditCtx = extractAuditContext(c);
         for (const regId of data.registrationIds) {
-          logAction(user.id, 'REGISTRATION_REJECTED', 'registration', regId, { status: 'pending_approval' }, { status: 'rejected', comments: data.comments }, auditCtx)
+          await logAction(user.id, 'REGISTRATION_REJECTED', 'registration', regId, { status: 'pending_approval' }, { status: 'rejected', comments: data.comments }, auditCtx)
             .catch((err) => console.error('[audit] REGISTRATION_REJECTED failed:', err));
         }
         return success(c, updated);
@@ -510,7 +510,7 @@ export const registrations = new Hono<HonoEnv>()
         // Audit each registration created by the override
         const ctx = extractAuditContext(c);
         for (const reg of created) {
-          logAction(user.id, 'REGISTRATION_ADMIN_OVERRIDE', 'registration', reg.id, null, reg as Record<string, unknown>, ctx)
+          await logAction(user.id, 'REGISTRATION_ADMIN_OVERRIDE', 'registration', reg.id, null, reg as Record<string, unknown>, ctx)
             .catch((err) => console.error('[audit] REGISTRATION_ADMIN_OVERRIDE failed:', err));
         }
 

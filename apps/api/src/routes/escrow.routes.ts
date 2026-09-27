@@ -196,7 +196,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
 
       try {
         const result = await escrowService.transferEscrow(data, user.id);
-        logAction(user.id, 'ESCROW_TRANSFER', 'escrow', '', null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'ESCROW_TRANSFER', 'escrow', '', null, result as Record<string, unknown>, extractAuditContext(c))
           .catch(err => console.error('[audit] ESCROW_TRANSFER failed:', err));
         return success(c, result);
       } catch (err) {
@@ -223,7 +223,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
 
       try {
         const result = await escrowService.createWithdrawalRequest(data, user.id);
-        logAction(user.id, 'WITHDRAWAL_REQUESTED', 'escrow', result.id, null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'WITHDRAWAL_REQUESTED', 'escrow', result.id, null, result as Record<string, unknown>, extractAuditContext(c))
           .catch(err => console.error('[audit] WITHDRAWAL_REQUESTED failed:', err));
         return success(c, result, 201);
       } catch (err) {
@@ -269,7 +269,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
 
       try {
         const result = await escrowService.fulfillWithdrawalRequest(id, data, user.id);
-        logAction(user.id, 'WITHDRAWAL_FULFILLED', 'escrow', id, null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'WITHDRAWAL_FULFILLED', 'escrow', id, null, result as Record<string, unknown>, extractAuditContext(c))
           .catch(err => console.error('[audit] WITHDRAWAL_FULFILLED failed:', err));
         return success(c, result);
       } catch (err) {
@@ -298,7 +298,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
 
       try {
         const result = await escrowService.rejectWithdrawalRequest(id, data, user.id);
-        logAction(user.id, 'WITHDRAWAL_REJECTED', 'escrow', id, null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'WITHDRAWAL_REJECTED', 'escrow', id, null, result as Record<string, unknown>, extractAuditContext(c))
           .catch(err => console.error('[audit] WITHDRAWAL_REJECTED failed:', err));
         return success(c, result);
       } catch (err) {
@@ -324,7 +324,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
 
       try {
         const result = await escrowService.approveWithdrawalRequest(id, user.id);
-        logAction(user.id, 'WITHDRAWAL_APPROVED', 'escrow', id, null, result as Record<string, unknown>, extractAuditContext(c))
+        await logAction(user.id, 'WITHDRAWAL_APPROVED', 'escrow', id, null, result as Record<string, unknown>, extractAuditContext(c))
           .catch(err => console.error('[audit] WITHDRAWAL_APPROVED failed:', err));
         return success(c, result);
       } catch (err) {
