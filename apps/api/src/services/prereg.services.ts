@@ -25,6 +25,7 @@ import { executeReceiptGatedDrop } from './receipt.services';
 import { refundPercentage } from './refund.services';
 import { isGraduated } from './grade.services';
 import { logger } from '../lib/logger';
+import { entryDeadlineMessage } from './window.services';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -57,6 +58,8 @@ export async function createPreregistration(parentId: string, data: PreregisterR
   if (sess.status !== 'draft') {
     throw new Error('Preregistration is only available for upcoming (not-yet-open) sessions');
   }
+  // Past the series' board deadline nothing more can be entered (MO-10).
+  if (sess.entryDeadline && sess.entryDeadline <= new Date()) throw new Error(entryDeadlineMessage(sess.entryDeadline));
 
   const subjects = await db.query.subject.findMany({
     where: (s, { eq, and, inArray }) =>

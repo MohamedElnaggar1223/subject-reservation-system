@@ -433,15 +433,25 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   for (const p of unpaid) {
     try {
       if (p.method === 'instapay' && referenceDueAt > now) {
+        // Kept only while the time it is kept until lies ahead: a due time an
+        // earlier close already set (a checkout spanning two sessions) stays,
+        // and one that has already passed means it fails here instead of
+        // telling the family to submit by a time already gone.
         const [kept] = await db
           .update(payment)
           .set({ referenceDueAt: sql`coalesce(${payment.referenceDueAt}, ${referenceDueAt})`, updatedAt: now })
-          .where(and(eq(payment.id, p.id), eq(payment.status, 'pending')))
+          .where(and(
+            eq(payment.id, p.id),
+            eq(payment.status, 'pending'),
+            sql`(${payment.referenceDueAt} is null or ${payment.referenceDueAt} > ${now})`,
+          ))
           .returning({ id: payment.id });
-        if (kept) heldForReference.push(kept.id);
-        continue;
+        if (kept) {
+          heldForReference.push(kept.id);
+          continue;
+        }
       }
-      await failPayment(p.id, { from: ['pending'], reason: 'Registration window closed before payment' });
+      await failPayment(p.id, { from: ['pending'], reason: 'Registration window closed before payment', expireIfClosed: true });
     } catch (err) {
       console.error(`[session:finalize] Failed to settle payment ${p.id} at close:`, err);
     }
@@ -522,7 +532,7 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
 
     for (const pid of pendingPaymentIds) {
       try {
-        await failPayment(pid, { from: ['pending'], reason: 'Registration window closed before payment' });
+        await failPayment(pid, { from: ['pending'], reason: 'Registration window closed before payment', expireIfClosed: true });
       } catch (err) {
         console.error(`[session:finalize] Failed to fail payment ${pid}:`, err);
       }

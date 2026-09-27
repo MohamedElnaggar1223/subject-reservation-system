@@ -37,6 +37,7 @@ describe('money invariants over the whole database', () => {
         (select count(*) from payment where reversal_money_returned = true)              as reversals_money_returned,
         (select count(*) from payment where reversal_money_returned = false)             as reversals_never_received,
         (select count(*) from payment where reference_due_at is not null)                as checkouts_held_after_close,
+        (select count(*) from payment where late_transfer_at is not null)                as late_transfers_recorded,
         (select count(*) from registration where status = 'dropped_pending_receipt' or status = 'dropped') as drops
     `);
     for (const [kind, n] of Object.entries(counts!)) expect(Number(n), kind).toBeGreaterThan(0);
@@ -176,6 +177,23 @@ describe('money invariants over the whole database', () => {
          or (status <> 'refunded' and reversal_money_returned is not null)
     `);
     expect(broken).toEqual([]);
+  });
+
+  it('a transfer found after its payment closed is credited to escrow once, for exactly its amount (MO-10)', async () => {
+    const broken = await sql(`
+      select p.id, p.status, p.payment_method, p.amount, p.verification_reference, c.total as credited, c.n as credits, a.n as audits
+      from payment p
+      left join (select related_payment_id, sum(amount) as total, count(*) as n from escrow_transaction
+                 where reason = 'late_transfer' and type = 'credit' and balance_type = 'free' group by related_payment_id) c on c.related_payment_id = p.id
+      left join (select entity_id, count(*) as n from audit_log where action = 'PAYMENT_LATE_TRANSFER_RECORDED' group by entity_id) a on a.entity_id = p.id
+      where (p.late_transfer_at is not null and (
+               p.status <> 'failed' or p.payment_method <> 'instapay' or p.verification_reference is null
+               or c.n is distinct from 1 or ${cents('c.total')} <> ${cents('p.amount')} or a.n is distinct from 1))
+         or (p.late_transfer_at is null and (c.n is not null or a.n is not null))
+    `);
+    expect(broken).toEqual([]);
+    const stray = await sql(`select id from escrow_transaction where reason = 'late_transfer' and (related_payment_id is null or type <> 'credit')`);
+    expect(stray).toEqual([]);
   });
 
   it('the held wallet holds exactly the price of paid preregistrations still waiting for their session (MA-15)', async () => {

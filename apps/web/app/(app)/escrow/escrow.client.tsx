@@ -33,6 +33,12 @@ const REASON_LABELS: Record<string, string> = {
   withdrawal:     'Cash Withdrawal',
   payment:        'Payment Applied',
   payment_refund: 'Payment Refund',
+  late_transfer:  'Transfer Found After Closing',
+  withdrawal_hold:     'Cash Refund Requested',
+  withdrawal_rejected: 'Refund Request Declined — Returned',
+  prereg_hold:    'Held for a Preregistered Subject',
+  prereg_capture: 'Held Money Applied to Subject',
+  prereg_release: 'Preregistration Cancelled — Hold Released',
 };
 
 const TRANSACTION_STYLES: Record<string, string> = {

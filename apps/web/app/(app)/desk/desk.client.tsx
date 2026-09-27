@@ -49,6 +49,7 @@ type Summary = {
     id: string; amount: number; escrowAmountApplied: number; paymentMethod: string;
     purpose: string; status: string; instrumentUsed: string | null;
     externalReference: string | null; createdAt: string; confirmedAt: string | null;
+    verificationReference: string | null; lateTransferAt: string | null;
   }[];
   exceptions: { id: string; type: string; value: number | null; reason: string; validUntil: string | null }[];
   remarks: { id: string; serviceType: string; status: string; feeCharged: number; registration: { subject: { name: string; code: string } } }[];
@@ -72,7 +73,8 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
   const [showRegister, setShowRegister] = useState(false);
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [reverseTarget, setReverseTarget] = useState<{ id: string; label: string } | null>(null);
+  const [reverseTarget, setReverseTarget] = useState<{ id: string; label: string; confirmedAt: string | null } | null>(null);
+  const [transferTarget, setTransferTarget] = useState<{ id: string; label: string; reference: string | null } | null>(null);
 
   // ── Search ────────────────────────────────────────────────────────────────
   const { data: hits = [], isError: searchFailed, isFetching: searching } = useQuery<StudentHit[]>({
@@ -133,6 +135,17 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
   const returnReceiptMutation = useMutation({
     mutationFn: (id: string) => apiResponse(api.v1.receipts[':id'].return.$post({ param: { id }, json: {} })),
     onSuccess: () => done('Receipt returned — any pending drop refund is released.'),
+    onError: fail,
+  });
+
+  // A transfer found on the bank statement after its payment had closed goes to escrow.
+  const transferMutation = useMutation({
+    mutationFn: ({ id, notes, reference }: { id: string; notes: string; reference?: string }) =>
+      apiResponse(api.v1.payments[':id']['record-transfer'].$post({ param: { id }, json: { notes, reference } })),
+    onSuccess: (d) => {
+      setTransferTarget(null);
+      done(`Transfer ${d.reference} recorded — ${formatPrice(d.creditedToEscrow)} added to the student's escrow. The family has been told.`);
+    },
     onError: fail,
   });
 
@@ -459,11 +472,32 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                               setReverseTarget({
                                 id: p.id,
                                 label: `${formatPrice(p.amount + p.escrowAmountApplied)} · ${p.purpose.replace('_', ' ')}`,
+                                confirmedAt: p.confirmedAt,
                               })
                             }
                           >
                             Reverse
                           </Button>
+                        )}
+                        {/* A closed InstaPay payment whose transfer turns up on the statement later */}
+                        {p.status === 'failed' && p.paymentMethod === 'instapay' && p.amount > 0 && !p.lateTransferAt && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={transferMutation.isPending}
+                            onClick={() =>
+                              setTransferTarget({
+                                id: p.id,
+                                label: `${formatPrice(p.amount)} by InstaPay`,
+                                reference: p.verificationReference,
+                              })
+                            }
+                          >
+                            Transfer found
+                          </Button>
+                        )}
+                        {p.lateTransferAt && (
+                          <span className="text-xs text-muted-foreground">Transfer found — credited to escrow</span>
                         )}
                       </td>
                     </tr>
@@ -490,11 +524,30 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
             legend: 'Was the money returned to the family?',
             options: [
               { value: 'returned', label: 'Yes — the money was given back', hint: 'Cash handed back, card refunded or transfer returned. Counts as money out today.' },
-              { value: 'never', label: 'No — it was never received', hint: 'The confirmation was a mistake. It corrects the day it was confirmed; today’s drawer does not move.' },
+              {
+                value: 'never',
+                label: 'No — it was never received',
+                hint: `The confirmation was a mistake. It corrects the takings of the day it was confirmed${reverseTarget.confirmedAt ? ` (${new Date(reverseTarget.confirmedAt).toLocaleDateString()})` : ''}, even if that day was already reconciled; today’s drawer does not move.`,
+              },
             ],
           }}
           onConfirm={(reason, choice) => reverseMutation.mutate({ id: reverseTarget.id, reason, moneyReturned: choice === 'returned' })}
           onClose={() => setReverseTarget(null)}
+        />
+      )}
+
+      {transferTarget && (
+        <ReasonModal
+          title="Record a transfer found later?"
+          description={`${transferTarget.label}. The payment had already closed, so its subjects stay as they are; the amount is added to the student's escrow, to use on a later payment or take back as cash. Recorded in the audit trail and in today's takings.`}
+          label="Where it was found"
+          placeholder="e.g. On the 28 Sep bank statement, sent 27 Sep"
+          confirmLabel="Add to Escrow"
+          minLength={5}
+          isPending={transferMutation.isPending}
+          field={transferTarget.reference ? undefined : { label: 'Transfer reference from the bank statement', placeholder: 'e.g. FT-2026-000123', minLength: 4 }}
+          onConfirm={(notes, _choice, reference) => transferMutation.mutate({ id: transferTarget.id, notes, reference })}
+          onClose={() => setTransferTarget(null)}
         />
       )}
     </div>

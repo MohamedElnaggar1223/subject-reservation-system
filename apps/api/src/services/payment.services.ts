@@ -63,6 +63,7 @@ import {
   notifyPaymentRejected,
   notifyPaymentExpired,
   notifyPaymentClosedAtEntryDeadline,
+  notifyRegistrationsExpiredAtEntryDeadline,
   notifyEscrowBalanceChanged,
 } from './notification.services';
 import { createReceiptsForRegistrations } from './receipt.services';
@@ -173,10 +174,12 @@ export async function initiatePayment(
   const sessionIds = [...new Set(regs.map((r) => r.sessionId))];
   const sessions = await db.query.registrationSession.findMany({
     where: (s, { inArray }) => inArray(s.id, sessionIds),
-    columns: { id: true, status: true, name: true },
+    columns: { id: true, status: true, name: true, entryDeadline: true },
   });
   const wrongState: typeof sessions = [];
   for (const s of sessions) {
+    // A preregistration past its series' board deadline can never be entered (MO-10).
+    if (isPrereg && s.entryDeadline && s.entryDeadline <= new Date()) throw new Error(entryDeadlineMessage(s.entryDeadline));
     const ok = isPrereg ? s.status === 'draft' : await sessionOpenFor(studentId, s.id);
     if (!ok) wrongState.push(s);
   }
@@ -464,7 +467,13 @@ export async function confirmPayment(
     // deadline, after which nothing more can be entered (MO-10).
     for (const r of regs) {
       if (isPreregPayment) {
-        if (r.status === 'preregistered' || r.status === 'pending_payment') continue;
+        if (r.status === 'preregistered' || r.status === 'pending_payment') {
+          // A preregistration is for a later series; past that series' board
+          // deadline it cannot be entered either (MO-10).
+          const w = await sessionWindow(pay.studentId, r.sessionId, tx);
+          if (w.entryDeadlinePassed) throw new Error(entryDeadlineMessage(w.entryDeadline!));
+          continue;
+        }
       } else if (r.status === 'pending_payment') {
         const w = await sessionWindow(pay.studentId, r.sessionId, tx);
         if (w.open || (current.status === 'pending_verification' && !w.entryDeadlinePassed)) continue;
@@ -737,13 +746,17 @@ async function failOpenPayment(
  */
 export async function failPayment(
   paymentId: string,
-  opts: { from?: readonly OpenStatus[]; reason?: string } = {}
+  // expireIfClosed: a payment spanning two sessions also releases its
+  // registrations in any other session whose window is already closed, so
+  // none is left pending_payment with nothing to pay it.
+  opts: { from?: readonly OpenStatus[]; reason?: string; expireIfClosed?: boolean } = {}
 ) {
   const result = await failOpenPayment(paymentId, {
     from: opts.from ?? OPEN_PAYMENT_STATUSES,
     actorId: null,
     action: 'PAYMENT_FAILED',
     reason: opts.reason ?? 'Payment failed',
+    expireIfClosed: opts.expireIfClosed,
   });
   return result?.failed;
 }
@@ -840,6 +853,79 @@ export async function rejectPayment(paymentId: string, staffId: string, reason: 
 }
 
 /**
+ * Finance records an InstaPay transfer found on the bank statement after its
+ * payment had failed — it lapsed after the close, was closed at the board's
+ * entry deadline, or was rejected before the transfer showed up. Without this
+ * the money sat in the school's bank with no record and no way back to the
+ * family (money audit review of MO-10). The transferred amount is credited to
+ * the family's escrow, to spend on a later payment or take back as cash; the
+ * registrations stay as they are. Money in on the day it is recorded.
+ *
+ * A checkout that lapsed without a reference takes the one finance found;
+ * the unique reference index stops one transfer being recorded twice.
+ */
+export async function recordLateTransfer(
+  paymentId: string,
+  staffId: string,
+  data: { notes: string; reference?: string },
+  auditCtx?: AuditContext
+) {
+  const pay = await db.transaction(async (tx) => {
+    const [p] = await tx.select().from(payment).where(eq(payment.id, paymentId)).for('update');
+    if (!p) throw new Error('Payment not found');
+    if (p.paymentMethod !== 'instapay') throw new Error('Only an InstaPay payment can be recorded as a transfer found later');
+    if (p.status !== 'failed') {
+      throw new Error(`Payment is already in '${p.status}' status — an open transfer is confirmed from the Finance Workbench instead`);
+    }
+    if (p.lateTransferAt) throw new Error('This transfer has already been recorded');
+    if (p.amount <= 0) throw new Error('Nothing was transferred for this payment');
+    const reference = p.verificationReference ?? data.reference?.trim();
+    if (!reference) throw new Error('Enter the transfer reference from the bank statement');
+
+    const now = new Date();
+    await tx
+      .update(payment)
+      .set({
+        lateTransferAt: now,
+        lateTransferBy: staffId,
+        verificationReference: reference,
+        metadata: {
+          ...((p.metadata as Record<string, unknown>) ?? {}),
+          lateTransfer: { by: staffId, at: now.toISOString(), notes: data.notes },
+        },
+        updatedAt: now,
+      })
+      .where(eq(payment.id, paymentId));
+    await creditEscrow(
+      { studentId: p.studentId, amount: p.amount, reason: 'late_transfer', initiatedBy: staffId, relatedPaymentId: paymentId },
+      tx
+    );
+    await logAction(staffId, 'PAYMENT_LATE_TRANSFER_RECORDED', 'payment', paymentId, { status: 'failed' },
+      { creditedToEscrow: p.amount, reference, notes: data.notes }, auditCtx, tx);
+    return { ...p, verificationReference: reference };
+  }).catch((err) => {
+    const cause = (err as { cause?: { code?: string } } | null)?.cause;
+    if (cause?.code === '23505') {
+      throw new Error('This transfer reference is already recorded against another payment');
+    }
+    throw err;
+  });
+
+  const newBalance = await getEscrowBalance(pay.studentId);
+  const studentUser = await db.query.user.findFirst({ where: (u, { eq: eqOp }) => eqOp(u.id, pay.studentId), columns: { name: true } });
+  notifyEscrowBalanceChanged({
+    studentId: pay.studentId,
+    studentName: studentUser?.name ?? 'Student',
+    previousBalance: newBalance - pay.amount,
+    newBalance,
+    changeAmount: pay.amount,
+    reason: `Your InstaPay transfer (${pay.verificationReference}) was found on the bank statement after the payment had closed, so it was added to the escrow balance — use it for a later payment or ask for it back at the finance desk`,
+  }).catch((err) => console.error('[notification] late transfer credit failed:', err));
+
+  return { id: pay.id, creditedToEscrow: pay.amount, reference: pay.verificationReference };
+}
+
+/**
  * The two payment deadlines that follow a close (owner decision MO-10). Run
  * by the scheduler on every tick; idempotent, so a missed tick costs nothing.
  *
@@ -891,10 +977,13 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
       .where(and(eq(registration.sessionId, s.id), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])));
     for (const { id } of open) {
       try {
+        // Failed by the system, not rejected: nobody judged the transfer. If it
+        // turns up on the statement later, finance records it and the money
+        // goes to escrow (recordLateTransfer).
         const r = await failOpenPayment(id, {
           from: OPEN_PAYMENT_STATUSES,
           actorId: null,
-          action: 'PAYMENT_REJECTED',
+          action: 'PAYMENT_FAILED',
           reason: "The exam board's entry deadline passed before this payment was confirmed",
           expireIfClosed: true,
         });
@@ -907,13 +996,18 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
       }
     }
 
-    // Anything else still waiting on this series can never be entered now.
+    // Anything else still waiting on this series can never be entered now;
+    // each student is told which subjects, as at the close.
     const expired = await db
       .update(registration)
       .set({ status: 'expired', updatedAt: now })
       .where(and(eq(registration.sessionId, s.id), inArray(registration.status, ['pending_approval', 'pending_payment'])))
-      .returning({ id: registration.id });
+      .returning({ id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId });
     registrationsExpiredAtDeadline += expired.length;
+    if (expired.length > 0) {
+      await notifyRegistrationsExpiredAtEntryDeadline(s.id, s.entryDeadline!, expired)
+        .catch((err) => console.error(`[deadlines] Expiry notices for session ${s.id} failed:`, err));
+    }
   }
 
   return { referencesLapsed, paymentsClosedAtDeadline, registrationsExpiredAtDeadline };
@@ -1015,17 +1109,17 @@ export async function submitInstapayReference(
       `The time to submit a transfer reference after the registration window closed ended on ${schoolDateTime(pay.referenceDueAt)}. If you did transfer, contact the finance desk with your bank receipt.`
     );
   }
-  if (pay.purpose === 'registration') {
-    const links = await db.query.paymentRegistration.findMany({
-      where: (pr, { eq }) => eq(pr.paymentId, paymentId),
-      with: { registration: { columns: { status: true }, with: { session: { columns: { entryDeadline: true } } } } },
-    });
-    if (links.some((l) => l.registration.status !== 'pending_payment')) {
-      throw new Error('The registration window has closed for this payment; it can no longer take a transfer reference.');
-    }
-    const passed = links.find((l) => l.registration.session.entryDeadline && l.registration.session.entryDeadline <= new Date());
-    if (passed) throw new Error(entryDeadlineMessage(passed.registration.session.entryDeadline!));
+  const links = await db.query.paymentRegistration.findMany({
+    where: (pr, { eq }) => eq(pr.paymentId, paymentId),
+    with: { registration: { columns: { status: true }, with: { session: { columns: { entryDeadline: true } } } } },
+  });
+  if (pay.purpose === 'registration' && links.some((l) => l.registration.status !== 'pending_payment')) {
+    throw new Error('The registration window has closed for this payment; it can no longer take a transfer reference.');
   }
+  // Registration or preregistration: past the series' board deadline nothing
+  // more can be entered, so no transfer can be taken for it (MO-10).
+  const passed = links.find((l) => l.registration.session.entryDeadline && l.registration.session.entryDeadline <= new Date());
+  if (passed) throw new Error(entryDeadlineMessage(passed.registration.session.entryDeadline!));
 
   try {
     const [updated] = await db
@@ -1210,9 +1304,20 @@ export async function reversePayment(
       { status: 'refunded', reason, moneyReturned, registrationsReverted, voidedReceiptNumbers }, auditCtx, tx);
   });
 
+  // Past the series' board deadline the reverted registrations cannot be paid
+  // again (the next sweep expires them), so the notice must not say "settle again".
+  const pastEntryDeadline = regIds.length > 0 && (
+    await db
+      .select({ entryDeadline: registrationSession.entryDeadline })
+      .from(registration)
+      .innerJoin(registrationSession, eq(registrationSession.id, registration.sessionId))
+      .where(inArray(registration.id, regIds))
+  ).some((r) => r.entryDeadline && r.entryDeadline <= new Date());
+
   // RF-08: every other money movement tells the family; this one used to
   // void their paper receipt in silence. Fire-and-forget like the rest.
   notifyPaymentReversed({
+    pastEntryDeadline,
     studentId: pay.studentId,
     paymentId,
     amount: pay.amount + pay.escrowAmountApplied,
@@ -1278,6 +1383,16 @@ export async function getDailyTakings(dateStr: string) {
   const reversed = reversedThatDay.filter((r) => !neverReceived(r));
   const correctionsRecorded = reversedThatDay.filter(neverReceived);
 
+  // Transfers found on the statement after their payment had failed, recorded
+  // that day and credited to escrow (recordLateTransfer): money into the bank.
+  const lateTransfers = await db.query.payment.findMany({
+    where: (p, { and, eq, gte, lt }) =>
+      and(eq(p.status, 'failed'), gte(p.lateTransferAt, start), lt(p.lateTransferAt, end)),
+    columns: { id: true, amount: true, paymentMethod: true, purpose: true, verificationReference: true, lateTransferAt: true },
+    with: { student: { columns: { id: true, name: true } }, lateTransferByUser: { columns: { id: true, name: true } } },
+    orderBy: (p, { asc }) => [asc(p.lateTransferAt)],
+  });
+
   const handOvers = await db.query.withdrawalDisbursement.findMany({
     where: (d, { and, gte, lt }) => and(gte(d.disbursedAt, start), lt(d.disbursedAt, end)),
     with: {
@@ -1292,8 +1407,10 @@ export async function getDailyTakings(dateStr: string) {
 
   const byInstrument: Record<string, number> = {};
   for (const r of confirmed) byInstrument[instrumentOf(r)] = round2((byInstrument[instrumentOf(r)] ?? 0) + r.amount);
+  for (const r of lateTransfers) byInstrument[r.paymentMethod] = round2((byInstrument[r.paymentMethod] ?? 0) + r.amount);
 
-  const moneyIn = sum(confirmed, (r) => r.amount);
+  const lateTransferTotal = sum(lateTransfers, (r) => r.amount);
+  const moneyIn = round2(sum(confirmed, (r) => r.amount) + lateTransferTotal);
   const escrowApplied = sum(confirmed, (r) => r.escrowAmountApplied);
   const reversedTotal = sum(reversed, (r) => r.amount);
   const cashRefunded = sum(handOvers, (d) => d.amount);
@@ -1301,6 +1418,7 @@ export async function getDailyTakings(dateStr: string) {
   const drawerIn = sum(confirmed.filter((r) => instrumentOf(r) === 'cash'), (r) => r.amount);
   const drawerOut = round2(sum(reversed.filter((r) => instrumentOf(r) === 'cash'), (r) => r.amount) + cashRefunded);
   const correctedTotal = sum(corrected, (r) => r.amount);
+  const correctedEscrow = sum(corrected, (r) => r.escrowAmountApplied);
   const drawerCorrected = sum(corrected.filter((r) => instrumentOf(r) === 'cash'), (r) => r.amount);
 
   return {
@@ -1309,6 +1427,7 @@ export async function getDailyTakings(dateStr: string) {
     reversed,
     corrected,
     correctionsRecorded,
+    lateTransfers,
     cashRefunds: handOvers.map((d) => ({
       id: d.id,
       withdrawalRequestId: d.withdrawalRequestId,
@@ -1326,8 +1445,11 @@ export async function getDailyTakings(dateStr: string) {
       moneyOut,
       net: round2(moneyIn - moneyOut),
       // Money this day's confirmations claimed but never received (MO-11);
-      // already left out of moneyIn above.
+      // already left out of moneyIn above, and their escrow out of escrowApplied.
       correctedTotal,
+      correctedEscrow,
+      // Transfers found later and credited to escrow; part of moneyIn.
+      lateTransferTotal,
       drawer: { cashIn: drawerIn, cashOut: drawerOut, net: round2(drawerIn - drawerOut), corrected: drawerCorrected },
     },
   };

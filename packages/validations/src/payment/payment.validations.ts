@@ -225,6 +225,19 @@ export const RejectManualPayment = z.object({
 });
 export type RejectManualPaymentType = z.infer<typeof RejectManualPayment>;
 
+/**
+ * Finance records a transfer found on the bank statement after its payment
+ * had failed — lapsed after the close, rejected, or closed at the board's
+ * entry deadline. The money is credited to the family's escrow; the
+ * registrations stay as they are (money audit review of MO-10).
+ */
+export const RecordLateTransfer = z.object({
+  notes: z.string().trim().min(5, 'Say where the transfer was found (min 5 characters)').max(500),
+  // Needed only when the family never submitted one (a checkout that lapsed).
+  reference: z.string().trim().min(4, 'Enter the transfer reference from the bank statement').max(100).optional(),
+});
+export type RecordLateTransferType = z.infer<typeof RecordLateTransfer>;
+
 // ─── Admin: Confirm Bank Transfer ─────────────────────────────────────────────
 
 /**

@@ -684,6 +684,8 @@ export async function notifyPaymentReversed(data: {
   reason: string;
   /** MO-11: the money was handed back, or the confirmation was a mistake and none had been received. */
   moneyReturned: boolean;
+  /** The series' board deadline has passed: the subjects cannot be paid for again. */
+  pastEntryDeadline?: boolean;
   voidedReceiptNumbers: string[];
   registrationsReverted: number;
 }) {
@@ -702,8 +704,10 @@ export async function notifyPaymentReversed(data: {
   const title = 'Payment reversed';
   const body =
     `The finance office reversed a payment of EGP ${data.amount.toFixed(2)} for ${studentName} (${data.reason}).${moneyNote} ` +
-    `${data.registrationsReverted} registration${data.registrationsReverted === 1 ? ' is' : 's are'} back to pending payment.${receiptNote} ` +
-    `Please settle again at the finance desk.`;
+    (data.pastEntryDeadline
+      ? `The exam board's entry deadline for this series has passed, so ${data.registrationsReverted === 1 ? 'this subject' : 'these subjects'} can no longer be entered.${receiptNote}`
+      : `${data.registrationsReverted} registration${data.registrationsReverted === 1 ? ' is' : 's are'} back to pending payment.${receiptNote} ` +
+        `Please settle again at the finance desk.`);
   const notifData = {
     paymentId: data.paymentId,
     studentId: data.studentId,
@@ -852,13 +856,46 @@ export async function notifyPaymentExpired(paymentId: string, escrowReturned: nu
   );
 }
 
-/** At the board's entry deadline: an unconfirmed payment was closed automatically. */
+/**
+ * At the board's entry deadline: an unconfirmed payment was closed
+ * automatically. Sent as PAYMENT_EXPIRED ("Payment Not Completed"), not as a
+ * rejection — nobody judged the transfer, and if it did arrive finance
+ * credits it to escrow once it is found.
+ */
 export async function notifyPaymentClosedAtEntryDeadline(paymentId: string, entryDeadline: Date, escrowReturned: number) {
   const escrowNote = escrowReturned > 0 ? ` EGP ${escrowReturned.toFixed(2)} applied from escrow has been returned.` : '';
-  await notifyFamilyOfPayment(paymentId, 'PAYMENT_REJECTED', 'Payment closed at the exam board deadline', (c) =>
-    `The exam board's entry deadline for ${c.sessionName} (${schoolDate(entryDeadline)}) passed before the payment of ${c.amount} for ${c.studentName} (${c.subjects}) was confirmed, ` +
-    `so it was closed and the subjects were not entered.${escrowNote} If you did transfer, contact the finance desk with your bank receipt.`
+  await notifyFamilyOfPayment(paymentId, 'PAYMENT_EXPIRED', 'Payment closed at the exam board deadline', (c) =>
+    `The exam board's entry deadline for ${c.sessionName} (${schoolDate(entryDeadline)}) passed before the payment of ${c.amount} for ${c.studentName} was confirmed, ` +
+    `so the payment was closed and its subjects in that series were not entered.${escrowNote} ` +
+    `If you did transfer the money, contact the finance desk with your bank receipt: once the transfer is found it is added to your escrow balance, to use or to take back.`
   );
+}
+
+/** At the board's entry deadline: registrations still waiting on the series expired. */
+export async function notifyRegistrationsExpiredAtEntryDeadline(
+  sessionId: string,
+  entryDeadline: Date,
+  expired: { studentId: string; subjectId: string }[]
+) {
+  const [sessionRow, subjects] = await Promise.all([
+    db.query.registrationSession.findFirst({ where: (s, { eq: eqOp }) => eqOp(s.id, sessionId), columns: { name: true } }),
+    db.query.subject.findMany({
+      where: (s, { inArray: inArr }) => inArr(s.id, [...new Set(expired.map((r) => r.subjectId))]),
+      columns: { id: true, name: true },
+    }),
+  ]);
+  const nameOf = new Map(subjects.map((s) => [s.id, s.name]));
+  const byStudent = new Map<string, string[]>();
+  for (const r of expired) byStudent.set(r.studentId, [...(byStudent.get(r.studentId) ?? []), nameOf.get(r.subjectId) ?? 'a subject']);
+  const sessionName = sessionRow?.name ?? 'the series';
+  for (const [studentId, names] of byStudent) {
+    const title = `Not entered for ${sessionName}`;
+    const body = `The exam board's entry deadline for ${sessionName} (${schoolDate(entryDeadline)}) has passed, so these subjects were not entered: ${names.join(', ')}.`;
+    await createNotification(studentId, 'SESSION_CLOSED', title, body, { sessionId, subjectNames: names, reason: 'entry_deadline' });
+    for (const { parentId } of await getLinkedParents(studentId)) {
+      await createNotification(parentId, 'SESSION_CLOSED', title, body, { sessionId, studentId, subjectNames: names, reason: 'entry_deadline' });
+    }
+  }
 }
 
 /**

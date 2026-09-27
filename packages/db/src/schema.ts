@@ -237,6 +237,7 @@ export const userRelations = relations(user, ({ many }) => ({
   paymentsAsParent: many(payment, { relationName: "parentPayments" }),
   paymentsConfirmed: many(payment, { relationName: "confirmedPayments" }),
   paymentsReversed: many(payment, { relationName: "reversedPayments" }),
+  paymentsLateTransferRecorded: many(payment, { relationName: "lateTransferPayments" }),
   changeRequestsRequested: many(changeRequest, { relationName: "requestedChangeRequests" }),
   changeRequestsApproved: many(changeRequest, { relationName: "approvedChangeRequests" }),
   notifications: many(notification),
@@ -422,6 +423,13 @@ export const registrationSession = pgTable(
     uniqueIndex("one_active_per_session_type_idx")
       .on(table.sessionType, table.qualificationLevel)
       .where(sql`status = 'active'`),
+    // The board's entry deadline falls after the window closes, so the
+    // deadline sweep never runs inside an open window (MO-10). The routes
+    // refuse it with a sentence; the database refuses whatever gets past them.
+    check(
+      "session_entry_deadline_after_end",
+      sql`${table.entryDeadline} IS NULL OR ${table.entryDeadline} > ${table.endDate}`,
+    ),
   ]
 );
 
@@ -754,6 +762,12 @@ export const payment = pgTable(
     // grace period); after it, it lapses and its subjects are released
     // (owner decision MO-10). Null otherwise.
     referenceDueAt: timestamp("reference_due_at", { withTimezone: true }),
+    // A transfer this payment claimed, found on the bank statement after the
+    // payment had failed (lapsed, rejected, or closed at the board deadline):
+    // finance recorded it and its amount was credited to the family's escrow.
+    // Money in on that day; the registrations stay as they are.
+    lateTransferAt: timestamp("late_transfer_at", { withTimezone: true }),
+    lateTransferBy: text("late_transfer_by").references(() => user.id, { onDelete: "set null" }),
     // Provider-specific data (payment URL, Fawry expiry, bank details)
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -872,7 +886,7 @@ export const escrowTransaction = pgTable(
     balanceType: text("balance_type").notNull().default("free"),
     amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
     // Reason categories for reporting and audit
-    reason: text("reason").notNull(), // 'drop' | 'swap_refund' | 'transfer_in' | 'transfer_out' | 'withdrawal' | 'payment' | 'payment_refund' | 'prereg_hold' | 'prereg_capture' | 'prereg_release'
+    reason: text("reason").notNull(), // 'drop' | 'swap_refund' | 'transfer_in' | 'transfer_out' | 'withdrawal' | 'payment' | 'payment_refund' | 'prereg_hold' | 'prereg_capture' | 'prereg_release' | 'late_transfer'
     // Optional audit links
     relatedRegistrationId: text("related_registration_id").references(
       () => registration.id,
@@ -1284,6 +1298,11 @@ export const paymentRelations = relations(payment, ({ one, many }) => ({
     fields: [payment.reversedBy],
     references: [user.id],
     relationName: "reversedPayments",
+  }),
+  lateTransferByUser: one(user, {
+    fields: [payment.lateTransferBy],
+    references: [user.id],
+    relationName: "lateTransferPayments",
   }),
   paymentRegistrations: many(paymentRegistration),
 }));

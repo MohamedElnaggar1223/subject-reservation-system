@@ -5,8 +5,13 @@
  * A window is open for a student while the session is active, or while the
  * student holds a deadline extension for it (MA-13) — and never once the
  * exam board's entry deadline has passed, since the board then accepts no
- * more entries (owner decision MO-10). Registration, checkout, confirmation,
- * rejection and desk collection all ask here.
+ * more entries (owner decision MO-10). New registrations (request, direct,
+ * admin override, desk), checkout, confirmation, the expiry after a
+ * rejection or cancellation, and desk collection ask here. A parent's
+ * approval or rejection of a request, and drops and swaps, still check only
+ * that the session is active: an active session's window cannot reach past
+ * its deadline (the session routes refuse it), but those paths do not honour
+ * deadline extensions either (MONEY_AUDIT.md MO-20).
  */
 
 import { db, registrationSession, eq } from '@repo/db';

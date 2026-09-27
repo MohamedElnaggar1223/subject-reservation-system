@@ -1,0 +1,4 @@
+ALTER TABLE "payment" ADD COLUMN "late_transfer_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "payment" ADD COLUMN "late_transfer_by" text;--> statement-breakpoint
+ALTER TABLE "payment" ADD CONSTRAINT "payment_late_transfer_by_user_id_fk" FOREIGN KEY ("late_transfer_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "registration_session" ADD CONSTRAINT "session_entry_deadline_after_end" CHECK ("registration_session"."entry_deadline" IS NULL OR "registration_session"."entry_deadline" > "registration_session"."end_date");

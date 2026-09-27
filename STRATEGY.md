@@ -187,16 +187,19 @@ before it ships.
    Handed on: a second factor for finance roles (owner decision), audit rows inside the money
    transaction (money audit), and the production checklist in §6 of that report.
 2. **Money-correctness audit** (Phase 1.2). Done on 27 Sep 2026, reviewed on Opus 5.5:
-   `MONEY_AUDIT.md`, trail `.audit/money-audit.tsv`. Twenty findings (MA-01 to MA-20; one
+   `MONEY_AUDIT.md`, trail `.audit/money-audit.tsv`. Twenty-one findings (MA-01 to MA-21; one
    high: InstaPay transfers already sent were failed at window close), all fixed, eighteen
    with a test that fails without the fix;
-   thirteen money invariants now run over the whole database after every suite; takings count
+   fourteen money invariants now run over the whole database after every suite; takings count
    reversals and refunds on their own day and show the drawer as cash only; the desk can take
    money for subjects already registered; O-7 done for payments and cash refunds.
    **Owner decisions:** MO-10 and MO-11 decided on 27 Sep as recommended and built
    (`MONEY_AUDIT.md` §6a): 24 hours after the close for an InstaPay reference, the board's
    entry deadline as a hard cut-off (entered per session, DISCOVERY.md A-08), and a reversal
-   that asks whether the money went back. Still open: MO-2, MO-5, MO-6, MO-12. Handed on:
+   that asks whether the money went back. A transfer found on the statement after the
+   cut-off is credited to the family's escrow by finance ("Transfer found"). Still open:
+   MO-2, MO-5, MO-6, MO-12, MO-21 (a draft series that passes its deadline unopened), and how
+   far back a "never received" reversal may correct a reconciled day (MO-11). Handed on:
    MO-1 (the rest of O-7) to state and time; MO-3 (`TZ=Africa/Cairo`) is in the production
    checklist.
    Next: **state and time** (Phase 1.3).

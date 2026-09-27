@@ -571,6 +571,8 @@ export async function getStudentSummary(studentId: string) {
           id: true, amount: true, escrowAmountApplied: true, paymentMethod: true,
           purpose: true, status: true, instrumentUsed: true, externalReference: true,
           createdAt: true, confirmedAt: true,
+          // For "Transfer found" on a failed InstaPay payment (recordLateTransfer).
+          verificationReference: true, lateTransferAt: true,
         },
         orderBy: (p, { desc }) => [desc(p.createdAt)],
         limit: 20,

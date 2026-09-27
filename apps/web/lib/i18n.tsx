@@ -1038,6 +1038,12 @@ const autoArabicText: Record<string, string> = {
   'Cash Withdrawal': 'سحب نقدي',
   'Payment Applied': 'تم استخدام الدفع',
   'Payment Refund': 'استرداد دفع',
+  'Transfer Found After Closing': 'تحويل وُجد بعد الإغلاق',
+  'Cash Refund Requested': 'طلب استرداد نقدي',
+  'Refund Request Declined — Returned': 'رُفض طلب الاسترداد — أُعيد المبلغ',
+  'Held for a Preregistered Subject': 'محجوز لمادة مسجلة مسبقًا',
+  'Held Money Applied to Subject': 'استُخدم المبلغ المحجوز للمادة',
+  'Preregistration Cancelled — Hold Released': 'أُلغي التسجيل المسبق — حُرّر المبلغ المحجوز',
   'Transfer Complete': 'اكتمل التحويل',
   'Amount (EGP)': 'المبلغ (جنيه)',
   'Amount exceeds available balance': 'المبلغ يتجاوز الرصيد المتاح',
@@ -1611,10 +1617,6 @@ function translatePreservingWhitespace(value: string): string {
   return `${leading}${translated}${trailing}`;
 }
 
-function isEnglishSourceText(value: string): boolean {
-  return /[A-Za-z]/.test(value) && !/[\u0600-\u06FF]/.test(value);
-}
-
 function localizeDom(language: Language) {
   if (typeof document === 'undefined') return;
 
@@ -1643,10 +1645,11 @@ function localizeDom(language: Language) {
     const current = node.nodeValue ?? '';
     const localizedOriginal = translatePreservingWhitespace(original);
 
-    if (language === 'en' && isEnglishSourceText(current)) {
-      original = current;
-      textNodeOriginals.set(node, original);
-    } else if (current !== localizedOriginal && isEnglishSourceText(current)) {
+    // Text that is neither the recorded source nor this pass's translation of
+    // it was written by React since the last pass, so it is the new source —
+    // whatever it holds. Requiring letters here put every re-rendered number
+    // (a balance that loads after first paint) back to its first value.
+    if (current !== original && current !== localizedOriginal) {
       original = current;
       textNodeOriginals.set(node, original);
     }

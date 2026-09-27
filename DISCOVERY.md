@@ -129,7 +129,9 @@ unless a fact in §1 changes.
   as the one grade-10-specific rule (A-05, A-07, Q-01 confirmed).
 - **Money after the close** (owner, 27 Sep, MONEY_AUDIT.md MO-10): an InstaPay checkout with
   no reference yet gets 24 hours after the window closes; a series' board entry deadline
-  (A-08) closes everything still unconfirmed on it.
+  (A-08) closes everything still unconfirmed on it. A transfer that turns up on the bank
+  statement afterwards is credited to the family's escrow by finance and never re-opens the
+  subject.
 - **A reversal says whether the money went back** (owner, 27 Sep, MO-11): if it did, it is
   money out that day; if the confirmation was a mistake, it corrects the confirmation's day.
 

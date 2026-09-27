@@ -31,6 +31,7 @@ import {
   ConfirmManualPayment,
   RejectManualPayment,
   ReversePayment,
+  RecordLateTransfer,
   ListPaymentsQuery,
   CheckoutSummaryQuery,
   PaymentId,
@@ -203,7 +204,8 @@ export const payments = new Hono<HonoEnv>()
           message.includes('not linked') ? 403 :
           message.includes('insufficient') ||
           message.includes('already have') ||
-          message.includes('window is closed') ? 422 : 400;
+          message.includes('window is closed') ||
+          message.includes('window is not open') ? 422 : 400;
         return error(c, message, status);
       }
     }
@@ -404,6 +406,33 @@ export const payments = new Hono<HonoEnv>()
         const status =
           message.includes('handed out') || message.includes('concurrently') || message.includes('already been dropped') ? 409 :
           message.includes('not found') ? 404 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * POST /payments/:id/record-transfer  (money audit review of MO-10)
+   *
+   * Finance records an InstaPay transfer found on the bank statement after
+   * its payment had failed (lapsed, closed at the board deadline, or
+   * rejected): the amount is credited to the family's escrow. The reference
+   * is required only if the family never submitted one. Finance roles.
+   */
+  .post('/:id/record-transfer',
+    requireAuth(),
+    requireFinance(),
+    zValidator('param', PaymentId),
+    zValidator('json', RecordLateTransfer),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      try {
+        return success(c, await paymentService.recordLateTransfer(id, c.get('user')!.id, c.req.valid('json'), extractAuditContext(c)));
+      } catch (err) {
+        const message = clientMessage(err, 'Failed to record the transfer');
+        const status =
+          message.includes('not found') ? 404 :
+          message.includes('already') ? 409 : 400;
         return error(c, message, status);
       }
     }

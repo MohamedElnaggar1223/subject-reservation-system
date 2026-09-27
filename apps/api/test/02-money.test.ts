@@ -145,7 +145,7 @@ describe('money paths', () => {
     // was subtracted again, and this test never read the net, which came to -500.)
     expect(takingsDelta(takingsBefore, await takings(officer))).toMatchObject({
       moneyIn: 1500, escrowApplied: 0, byInstrument: { cash: 1500 },
-      reversedTotal: 0, cashRefunded: 1000, moneyOut: 1000, net: 500, correctedTotal: 1000,
+      reversedTotal: 0, cashRefunded: 1000, moneyOut: 1000, net: 500, correctedTotal: 1000, correctedEscrow: 500,
       drawer: { cashIn: 1500, cashOut: 1000, net: 500, corrected: 0 },
     });
   });

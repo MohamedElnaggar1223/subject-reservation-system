@@ -32,10 +32,12 @@ function todayStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// The payment method's label first: the 'instapay' line holds transfers the
+// app took as well as ones recorded at the desk, so it is not "(at desk)".
 function instrumentLabel(key: string): string {
   return (
-    IN_SCHOOL_INSTRUMENT_LABELS[key as keyof typeof IN_SCHOOL_INSTRUMENT_LABELS] ??
     PAYMENT_METHOD_LABELS[key as keyof typeof PAYMENT_METHOD_LABELS] ??
+    IN_SCHOOL_INSTRUMENT_LABELS[key as keyof typeof IN_SCHOOL_INSTRUMENT_LABELS] ??
     key
   );
 }
@@ -81,7 +83,7 @@ export default function TakingsClient(): React.JSX.Element {
           message="Do not reconcile from this screen until it loads — this is a connection problem, not an empty day."
           onRetry={() => refetch()}
         />
-      ) : !data || (data.rows.length === 0 && data.reversed.length === 0 && data.cashRefunds.length === 0 && data.corrected.length === 0 && data.correctionsRecorded.length === 0) ? (
+      ) : !data || (data.rows.length === 0 && data.reversed.length === 0 && data.cashRefunds.length === 0 && data.corrected.length === 0 && data.correctionsRecorded.length === 0 && data.lateTransfers.length === 0) ? (
         <EmptyState title={`No money moved on ${date}.`} />
       ) : (
         <>
@@ -99,7 +101,11 @@ export default function TakingsClient(): React.JSX.Element {
               <p className="text-2xl font-bold text-foreground">{formatPrice(data.totals.moneyIn)}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 all instruments · plus {formatPrice(data.totals.escrowApplied)} paid from escrow
-                {data.totals.correctedTotal > 0 && <> · {formatPrice(data.totals.correctedTotal)} corrected out</>}
+                {data.totals.correctedTotal > 0 && (
+                  <> · {formatPrice(data.totals.correctedTotal)} corrected out
+                    {data.totals.correctedEscrow > 0 && <> (and {formatPrice(data.totals.correctedEscrow)} escrow)</>}</>
+                )}
+                {data.totals.lateTransferTotal > 0 && <> · incl. {formatPrice(data.totals.lateTransferTotal)} transfers found later</>}
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border shadow-sm p-4">
@@ -197,6 +203,33 @@ export default function TakingsClient(): React.JSX.Element {
             </div>
           )}
 
+          {/* Transfers found on the statement after their payment had closed, credited to escrow */}
+          {data.lateTransfers.length > 0 && (
+            <div className="mt-6 bg-card rounded-xl border border-border shadow-sm overflow-x-auto">
+              <div className="px-4 py-3 border-b border-border">
+                <h2 className="text-sm font-semibold text-foreground">Transfers found later</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Found on the bank statement after their payment had closed, and added to the family&apos;s escrow. Included in money in.
+                </p>
+              </div>
+              <table className="w-full min-w-[640px] text-sm">
+                <tbody className="divide-y divide-border">
+                  {data.lateTransfers.map((r) => (
+                    <tr key={r.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{time(r.lateTransferAt)}</td>
+                      <td className="px-4 py-2.5 text-foreground">{r.student?.name ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-card-foreground">
+                        InstaPay <span className="font-mono">{r.verificationReference}</span> — credited to escrow
+                      </td>
+                      <td className="px-4 py-2.5 text-card-foreground">{r.lateTransferByUser?.name ?? '—'}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-foreground whitespace-nowrap">{formatPrice(r.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {/* Corrections (MO-11): confirmed by mistake, no money ever received */}
           {(data.corrected.length > 0 || data.correctionsRecorded.length > 0) && (
             <div className="mt-6 bg-card rounded-xl border border-border shadow-sm overflow-x-auto">
@@ -215,7 +248,8 @@ export default function TakingsClient(): React.JSX.Element {
                       <td className="px-4 py-2.5 text-card-foreground">
                         Confirmed this day by {r.confirmedByUser?.name ?? '—'}; reversed{' '}
                         {r.reversedAt ? new Date(r.reversedAt).toLocaleDateString() : ''} by {r.reversedByUser?.name ?? '—'}
-                        {' '}({instrumentLabel(r.instrumentUsed ?? r.paymentMethod)})
+                        {' '}({instrumentLabel(r.instrumentUsed ?? r.paymentMethod)}
+                        {r.escrowAmountApplied > 0 ? `; ${formatPrice(r.escrowAmountApplied)} from escrow, returned` : ''})
                       </td>
                       <td className="px-4 py-2.5 text-right font-medium text-muted-foreground line-through whitespace-nowrap">{formatPrice(r.amount)}</td>
                     </tr>
@@ -227,8 +261,8 @@ export default function TakingsClient(): React.JSX.Element {
                         <td className="px-4 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{time(r.reversedAt)}</td>
                         <td className="px-4 py-2.5 text-foreground">{r.student?.name ?? '—'}</td>
                         <td className="px-4 py-2.5 text-card-foreground">
-                          Reversed today by {r.reversedByUser?.name ?? '—'}: corrects{' '}
-                          {r.confirmedAt ? new Date(r.confirmedAt).toLocaleDateString() : 'its day'}, not today
+                          Reversed this day by {r.reversedByUser?.name ?? '—'}: corrects{' '}
+                          {r.confirmedAt ? new Date(r.confirmedAt).toLocaleDateString() : 'the day it was confirmed'}, not this day
                         </td>
                         <td className="px-4 py-2.5 text-right font-medium text-muted-foreground whitespace-nowrap">{formatPrice(r.amount)}</td>
                       </tr>

@@ -26,7 +26,9 @@ export type ReasonModalProps = {
   minLength?: number;
   /** A question the action must also answer; confirm stays disabled until one option is picked. */
   choice?: { legend: string; options: { value: string; label: string; hint?: string }[] };
-  onConfirm: (reason: string, choice?: string) => void;
+  /** A one-line value the action also needs (e.g. a transfer reference); required when given. */
+  field?: { label: string; placeholder?: string; minLength?: number };
+  onConfirm: (reason: string, choice?: string, fieldValue?: string) => void;
   onClose: () => void;
 };
 
@@ -41,12 +43,15 @@ export function ReasonModal({
   error,
   minLength = 3,
   choice,
+  field,
   onConfirm,
   onClose,
 }: ReasonModalProps) {
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
   const [picked, setPicked] = useState<string | undefined>(undefined);
+  const [fieldValue, setFieldValue] = useState('');
+  const fieldMissing = !!field && fieldValue.trim().length < (field.minLength ?? 1);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Focus the input on open; Escape closes (parity with a native dialog)
@@ -103,6 +108,22 @@ export function ReasonModal({
           </fieldset>
         )}
 
+        {field && (
+          <div className="mb-4">
+            <label className="mb-1 block text-sm font-medium text-foreground" htmlFor="reason-modal-field">
+              {field.label}
+            </label>
+            <input
+              id="reason-modal-field"
+              type="text"
+              value={fieldValue}
+              onChange={(e) => setFieldValue(e.target.value)}
+              placeholder={field.placeholder}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+        )}
+
         <label className="mb-1 block text-sm font-medium text-foreground" htmlFor="reason-modal-input">
           {label}
         </label>
@@ -130,8 +151,8 @@ export function ReasonModal({
           <Button
             variant={destructive ? 'destructive' : 'default'}
             className="flex-1"
-            disabled={isPending || tooShort || (!!choice && !picked)}
-            onClick={() => onConfirm(reason.trim(), picked)}
+            disabled={isPending || tooShort || (!!choice && !picked) || fieldMissing}
+            onClick={() => onConfirm(reason.trim(), picked, field ? fieldValue.trim() : undefined)}
           >
             {isPending ? 'Working…' : confirmLabel}
           </Button>
