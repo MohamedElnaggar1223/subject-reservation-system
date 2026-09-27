@@ -35,6 +35,7 @@ import {
   inArray,
   lte,
   isNotNull,
+  sql,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type {
@@ -886,6 +887,10 @@ export async function recordLateTransfer(
     }
     if (p.lateTransferAt) throw new Error('This transfer has already been recorded');
     if (p.amount <= 0) throw new Error('Nothing was due by transfer on this payment');
+    // Nothing undoes a record, so a slip of the keyboard must not create escrow.
+    if (data.amount > p.amount) {
+      throw new Error(`The amount found is more than this payment was for (EGP ${p.amount.toFixed(2)}) — record at most that`);
+    }
     const familyReference = p.verificationReference && p.verificationReference !== reference ? p.verificationReference : null;
 
     const now = new Date();
@@ -1128,6 +1133,17 @@ export async function submitInstapayReference(
   const passed = links.find((l) => l.registration.session.entryDeadline && l.registration.session.entryDeadline <= new Date());
   if (passed) throw new Error(entryDeadlineMessage(passed.registration.session.entryDeadline!));
 
+  const duplicateReference = 'This transaction reference has already been submitted for another payment. Double-check your InstaPay receipt.';
+  // A family's reference set aside when finance recorded the transfer under
+  // the statement's reference ("Transfer found") left the unique index, but
+  // it is spent all the same (review of 4c65322).
+  const [setAside] = await db
+    .select({ id: payment.id })
+    .from(payment)
+    .where(sql`${payment.metadata}->'lateTransfer'->>'familyReference' = ${data.reference}`)
+    .limit(1);
+  if (setAside) throw new Error(duplicateReference);
+
   try {
     const [updated] = await db
       .update(payment)
@@ -1151,9 +1167,7 @@ export async function submitInstapayReference(
     const code = cause?.code ?? (err as { code?: string } | null)?.code;
     const text = `${cause?.message ?? ''} ${err instanceof Error ? err.message : ''}`;
     if (code === '23505' || /unique|duplicate/i.test(text)) {
-      throw new Error(
-        'This transaction reference has already been submitted for another payment. Double-check your InstaPay receipt.'
-      );
+      throw new Error(duplicateReference);
     }
     throw err;
   }

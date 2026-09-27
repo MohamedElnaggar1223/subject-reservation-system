@@ -237,7 +237,8 @@ export const RecordLateTransfer = z.object({
   // may be the very one finance could not find (review of fc1a101, flag 1).
   reference: z.string().trim().min(4, 'Enter the transfer reference from the bank statement').max(100),
   // What actually arrived, which is what the family's escrow is credited.
-  amount: z.number().positive('Enter the amount on the bank statement').max(1_000_000, 'Amount exceeds maximum allowed')
+  amount: z.number({ error: 'Enter the amount on the bank statement, in EGP' }).positive('Enter the amount on the bank statement')
+    .max(1_000_000, 'Amount exceeds maximum allowed')
     .refine(isWholePiastres, PIASTRES_MESSAGE),
 });
 export type RecordLateTransferType = z.infer<typeof RecordLateTransfer>;

@@ -936,6 +936,11 @@ describe('money rules', () => {
       // A finance admin only: nothing undoes it.
       expect((await refused(record(officer, artPay, { notes: 'found on the statement', reference: 'FT-MR-DEADLINE-1', amount: 1400 }))).status).toBe(403);
 
+      // Nothing undoes it, so no more than the payment was for.
+      expect(await refused(record(finadmin, artPay, { notes: 'found on the statement', reference: 'FT-MR-DEADLINE-1B', amount: 14000 }))).toEqual({
+        status: 400, error: 'The amount found is more than this payment was for (EGP 1400.00) — record at most that',
+      });
+
       // The statement's reference is the one that counts: a transfer already confirmed on
       // another payment is refused, although the family's own reference was never used.
       expect(await refused(record(finadmin, artPay, { notes: 'found on the statement', reference: 'FT-MR-LASTDAY-1', amount: 1400 }))).toEqual(duplicate);
@@ -1076,6 +1081,21 @@ describe('money rules', () => {
       expect(await statusOf('registration', late)).toBe('preregistered');
       const w = await one<{ held: string }>(`select held_balance as held from escrow where student_id = $1`, [f.studentId]);
       expect(money(w.held)).toBe(1500);
+    });
+
+    it('a family reference set aside by a transfer found later cannot be submitted again', async () => {
+      // FT-MR-DEADLINE-1 was the family's reference on the Art payment; finance
+      // recorded that transfer under the statement's FT-MR-DEADLINE-1B above.
+      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({
+        json: { sessionId: january, subjectIds: [subj.BIO!], studentId: f.studentId },
+      })))[0]!.id;
+      const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({
+        json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 },
+      }))).id!;
+      const again = await refused(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: pay }, json: { reference: 'FT-MR-DEADLINE-1' } }));
+      expect(again).toEqual({ status: 409, error: 'This transaction reference has already been submitted for another payment. Double-check your InstaPay receipt.' });
+      expect(await statusOf('payment', pay)).toBe('pending');
+      await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
     });
 
     it('at the close, the time left to send a reference never runs past the board deadline (MO-10)', async () => {

@@ -549,10 +549,11 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
           // Both from the statement: the family's reference may be the one that was not found.
           fields={[
             { label: 'Transfer reference on the bank statement', placeholder: 'e.g. FT-2026-000123', minLength: 4, mono: true },
-            { label: 'Amount on the bank statement (EGP)', initial: String(transferTarget.amount), inputMode: 'decimal', minLength: 1 },
+            // Left empty: read off the statement, never assumed to be the amount due.
+            { label: `Amount on the bank statement (EGP, at most ${formatPrice(transferTarget.amount)})`, placeholder: 'As printed on the statement', inputMode: 'decimal', minLength: 1 },
           ]}
           onConfirm={(notes, _choice, values) =>
-            transferMutation.mutate({ id: transferTarget.id, notes, reference: values?.[0] ?? '', amount: Number(values?.[1]) })
+            transferMutation.mutate({ id: transferTarget.id, notes, reference: values?.[0] ?? '', amount: Number((values?.[1] ?? '').replace(/[,\s]/g, '')) })
           }
           onClose={() => setTransferTarget(null)}
         />

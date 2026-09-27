@@ -209,7 +209,9 @@ The fourth review, of that response (fc1a101), again said "don't merge yet", on 
    (undone: an officer got 200), and credits the amount on the statement, stored in
    `late_transfer_amount` (migration 0031, with a check that a recorded transfer has an amount);
    takings, the `09` rule and the notice use it (undone: escrow 2700 not 2300, and the `09`
-   rule listed the payment). There is still no undo (MO-24).
+   rule listed the payment). There is still no undo (MO-24). Its confirmation added two
+   guards against slips: the amount is typed from the statement and cannot exceed what the
+   payment was for, and the family's set-aside reference cannot be submitted again.
 3. **The close lost its "not completed" notice** for subjects a failed checkout expired itself
    (third review item 6) — a pay-at-school checkout nobody came to pay told the student
    nothing. The failed checkout's registrations now join the notice (undone: no notice).
@@ -263,7 +265,7 @@ The fourth review, of that response (fc1a101), again said "don't merge yet", on 
 | MO-21 | A series still in draft when its window ends is no longer opened by the scheduler, nor by hand once its board deadline has passed (so no held money is captured for entries the board refuses). Its paid preregistrations stay in the held wallet until each is cancelled, and cancelling refunds at the refund window's percentage. The school never ran the window, so the owner may want these refunded in full. | Owner decision |
 | MO-22 | The checkout card, the workbench and the takings times are shown in the browser's local time; the API's sentences use Cairo time. Identical while staff and families are in Egypt. | Accepted |
 | MO-23 | The escrow page's transaction rows and the desk's student summary are hand-typed instead of derived from their fetchers (CLAUDE.md, Hono RPC); this work added fields to the desk's. | Engineering health |
-| MO-24 | A "Transfer found" has no undo. It is the finance admin's alone and asks for the statement's reference and amount; a mistaken one is corrected only by hand (a cash refund of the escrow it created). An undo mirroring MO-11 is feature work if the owner wants it. | Owner decision |
+| MO-24 | A "Transfer found" has no undo. It is the finance admin's alone, asks for the statement's reference and an amount typed from the statement (never more than the payment was for), and a family reference it sets aside cannot be submitted again. A record whose money never arrived has no correction inside the system: the system has no manual escrow debit, and a cash refund would pay out money that never came, so it needs a database fix. An undo mirroring MO-11 is feature work if the owner wants it. | Owner decision |
 
 ---
 
