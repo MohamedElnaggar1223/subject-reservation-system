@@ -16,8 +16,10 @@ corrupting rows, and the screens were driven in a real browser against the dev s
 independent reviews on Opus 5.5 followed: the first found four more defects on paths the first
 pass had read and several claims worded beyond the evidence; the second, of the fixes, found a
 blocker in them (MA-20) and more races on the same paths. A third, of the owner's two
-decisions as built, stopped the merge on how the board-deadline cut-off treats real transfers.
-All are acted on below (§4).
+decisions as built, stopped the merge on how the board-deadline cut-off treats real transfers;
+a fourth, of that response, found a double count in the new "Transfer found", a lost notice at
+the close, and a draft series that could still open past its deadline. All are acted on below
+(§4).
 Every decision and its evidence is in `.audit/money-audit.tsv`; the scripts, screenshots and
 logs it cites are kept locally in `.audit/money-audit-evidence/` (git-ignored: they hold dev
 test accounts).
@@ -73,7 +75,7 @@ cut-off closed its payment is recorded by finance and credited to the family's e
 | Refund windows | `08` | 50% window refunds 750 of 1500; a custom refund exception (90%) overrides it; a gap between configured windows refunds 0; with none configured, 100% |
 | Exception stacking | `08` | 20% and 10% multiply (1500 → 1080, split 720 + 360); a fixed 100 comes off the course fee (980); a fixed discount larger than the price makes it 0, never negative |
 | Concurrency | `08` | Four simultaneous checkouts of one subject: one payment, escrow taken once. Three officers confirming one transfer: one confirmation, one receipt, one audit row, the others 409. Confirm against reject, and cancel against confirm: one wins, escrow matches the winner. Two officers paying out one refund: one recorded. A partial hand-over racing a rejection: no money created. A drop racing its receipt's hand-over, swept across the drop's transaction: never a refund for paper the family holds. A drop racing a reversal: one wins with a clean refusal |
-| Screens | headless Chrome on the dev servers | Parent cancels a checkout and the escrow returns; a returning parent sees the checkout they started, with its subjects; the officer rejects a reference with a reason, warned when none was submitted yet; the family is notified; the desk takes the money for unpaid subjects in one click and is told when a transfer is in progress; the finance admin approves a hand-over again after a later one, and a declined request offers only Approve; takings show drawer, money in and money out; refusals read as sentences; a checkout lapsed after the close offers "Transfer found", which asks for the statement's reference, credits escrow, and appears under "Transfers found later" in the day's takings and in the family's escrow history; the parent's escrow page shows the selected child's balance, in English and Arabic |
+| Screens | headless Chrome on the dev servers | Parent cancels a checkout and the escrow returns; a returning parent sees the checkout they started, with its subjects; the officer rejects a reference with a reason, warned when none was submitted yet; the family is notified; the desk takes the money for unpaid subjects in one click and is told when a transfer is in progress; the finance admin approves a hand-over again after a later one, and a declined request offers only Approve; takings show drawer, money in and money out; refusals read as sentences; a checkout lapsed after the close offers a finance admin (not an officer) "Transfer found", which asks for the statement's reference and amount, names the family's own reference, credits what arrived to escrow, and appears under "Transfers found later" in the day's takings (with the amount that was due) and in the family's escrow history; the parent's escrow page shows the selected child's balance, in English and Arabic |
 
 ---
 
@@ -177,7 +179,9 @@ and raised eleven points. What each changed:
 6. **The close's grace could announce a time already past** for a payment spanning two
    sessions, and step 4 failed payments without expiring their registrations. The keep-or-fail
    test now reads the stored due time, and every failure at the close expires what it held.
-   Fixed by reasoning; the timing is narrow.
+   Fixed by reasoning; the timing is narrow. That change lost the close's per-student
+   "not completed" notice for the subjects a failed checkout expired itself — found by the
+   fourth review, below.
 7. **The window/deadline order was a route check on an unlocked read.** The database now
    enforces it (`session_entry_deadline_after_end`, migration 0030; undone: red).
 8. **Notices.** Registrations expired at the deadline now tell the family which subjects were
@@ -191,6 +195,28 @@ and raised eleven points. What each changed:
     row below).
 11. **Approve, reject and swap check session status only** (MO-20); the comment in
     `window.services.ts` that said every path asks it was corrected.
+
+The fourth review, of that response (fc1a101), again said "don't merge yet", on four points:
+
+1. **"Transfer found" could count one bank transfer twice.** It stored the family's reference
+   when there was one — often the very reference finance had rejected for not being on the
+   statement — so the real reference never met the unique index. Now it always takes the
+   statement's reference and stores that; a different family reference is kept in the
+   payment's metadata. A reference already confirmed on another payment is refused (undone:
+   recorded, 200).
+2. **A mistaken "Transfer found" could not be undone**, officers could make one, and the
+   credit was always the amount due. It is now the finance admin's alone, as a reversal is
+   (undone: an officer got 200), and credits the amount on the statement, stored in
+   `late_transfer_amount` (migration 0031, with a check that a recorded transfer has an amount);
+   takings, the `09` rule and the notice use it (undone: escrow 2700 not 2300, and the `09`
+   rule listed the payment). There is still no undo (MO-24).
+3. **The close lost its "not completed" notice** for subjects a failed checkout expired itself
+   (third review item 6) — a pay-at-school checkout nobody came to pay told the student
+   nothing. The failed checkout's registrations now join the notice (undone: no notice).
+4. **A draft series could still open past its deadline**: the scheduler opened any draft
+   whose start had come, and opening captures paid preregistrations' held money. The scheduler
+   no longer opens a draft whose window has ended (the deadline is always after the end), and
+   opening one by hand past its deadline is refused (each undone: the series opened).
 
 ---
 
@@ -234,9 +260,10 @@ and raised eleven points. What each changed:
 | MO-18 | Cancelling a preregistration at the very instant capture runs for it can deadlock; Postgres aborts one of the two and no money moves. | Accepted, low |
 | MO-19 | Dev data only: the dev database has one registration confirmed with a void receipt, made before MA-20 was fixed. No production data exists. | Accepted |
 | MO-20 | Approving or rejecting a registration request, and swaps, check the session's status only: they ignore deadline extensions (a student with one cannot have a request approved after the close) and the board deadline (safe while a window must close before its deadline). | State-and-time audit |
-| MO-21 | A series still in draft when its board deadline passes never opens: its paid preregistrations stay in the held wallet until each is cancelled, and cancelling refunds at the refund window's percentage. The school never ran the window, so the owner may want these refunded in full. | Owner decision |
+| MO-21 | A series still in draft when its window ends is no longer opened by the scheduler, nor by hand once its board deadline has passed (so no held money is captured for entries the board refuses). Its paid preregistrations stay in the held wallet until each is cancelled, and cancelling refunds at the refund window's percentage. The school never ran the window, so the owner may want these refunded in full. | Owner decision |
 | MO-22 | The checkout card, the workbench and the takings times are shown in the browser's local time; the API's sentences use Cairo time. Identical while staff and families are in Egypt. | Accepted |
-| MO-23 | The escrow page hand-types its transaction row type instead of deriving it from the fetcher (CLAUDE.md, Hono RPC). | Engineering health |
+| MO-23 | The escrow page's transaction rows and the desk's student summary are hand-typed instead of derived from their fetchers (CLAUDE.md, Hono RPC); this work added fields to the desk's. | Engineering health |
+| MO-24 | A "Transfer found" has no undo. It is the finance admin's alone and asks for the statement's reference and amount; a mistaken one is corrected only by hand (a cash refund of the escrow it created). An undo mirroring MO-11 is feature work if the owner wants it. | Owner decision |
 
 ---
 
@@ -262,14 +289,15 @@ and raised eleven points. What each changed:
   the series, deadline extension or not; each refusal names the deadline. The workbench shows
   the deadline on every payment from a closed series.
 - **A transfer found later.** When a transfer turns up on the bank statement after its
-  payment was closed — it lapsed without a reference, or the deadline closed it — finance uses
-  **Transfer found** on the desk (finance roles). The payment's amount is credited to the
-  student's escrow (ledger reason `late_transfer`), to use on a later payment or take back as
-  a cash refund; the subjects stay as they are, since the window or the board has closed. It
-  is money in on the day it is recorded, listed under "Transfers found later" in the takings.
-  It asks for the statement's reference when the family never sent one, refuses a reference
-  already recorded against another payment, is recorded once per payment and audited in the
-  same transaction, and the family is told the escrow changed.
+  payment was closed — it lapsed without a reference, the deadline closed it, or finance had
+  rejected it — a finance admin uses **Transfer found** on the desk. It asks for the reference
+  and the amount on the statement (the family's reference is shown, never used): the amount
+  that arrived is credited to the student's escrow (ledger reason `late_transfer`), to use on
+  a later payment or take back as a cash refund; the subjects stay as they are, since the
+  window or the board has closed. It is money in on the day it is recorded, listed under
+  "Transfers found later" in the takings with the amount that was due. A reference already
+  recorded against any other payment is refused; it is recorded once per payment, audited in
+  the same transaction, cannot be undone (MO-24), and the family is told the escrow changed.
 - The admin must enter each series' deadline: with none set there is no automatic cut-off
   (DISCOVERY.md A-08). A window cannot be moved to close on or after its deadline (draft
   edit or extension; the database refuses it too), so the sweep never runs inside an open
@@ -289,15 +317,18 @@ money returned to the family?" and will not confirm without an answer.
 confirmed; without one it lapses, returns escrow and notifies, and a late reference is
 refused; at the close the grace never runs past the deadline; setting the deadline is
 validated (after the close, in the future; the database's check too) and audited; past the
-deadline, before the sweep, confirm, reference, checkout and desk collection are refused with
-the deadline's sentence; the sweep closes a transfer awaiting verification and a checkout
-without a reference, expires an unpaid subject, and notifies; a late registration is refused;
-a transfer found later is credited once, is in the day's takings, needs a reference when there
-was none, and refuses one already used; past a draft series' deadline a preregistration can
-be neither made, paid, referenced nor confirmed; the four cash reversal cases plus a returned
+deadline, before the sweep, confirm, reference and desk collection are refused with the
+deadline's sentence and checkout as a closed window; the sweep closes a transfer awaiting
+verification and a checkout without a reference, expires an unpaid subject, and notifies; a
+late registration is refused; at the close the student is told which subjects a failed
+checkout left uncompleted; a transfer found later is the finance admin's, takes the
+statement's reference and amount (keeping the family's), is credited once, is in the day's
+takings, and refuses a reference already counted on another payment; past a draft series'
+deadline a preregistration can be neither made, paid, referenced nor confirmed, and the series
+is opened neither by hand nor by the scheduler; the four cash reversal cases plus a returned
 InstaPay reversal with escrow applied; `02` reverses as "never received". `09` requires every
-reversal to record the answer, and a transfer found later to be credited exactly once, for its
-amount, with its audit row. Undone, each fix failed its test (trail), with two exceptions
+reversal to record the answer, and a transfer found later to be credited exactly once, for the
+amount found, with its audit row. Undone, each fix failed its test (trail), with two exceptions
 named in §4: desk collection is refused twice over, and checkout shares the registration's
 window check.
 

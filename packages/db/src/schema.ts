@@ -764,10 +764,12 @@ export const payment = pgTable(
     referenceDueAt: timestamp("reference_due_at", { withTimezone: true }),
     // A transfer this payment claimed, found on the bank statement after the
     // payment had failed (lapsed, rejected, or closed at the board deadline):
-    // finance recorded it and its amount was credited to the family's escrow.
-    // Money in on that day; the registrations stay as they are.
+    // a finance admin recorded it with the statement's reference, and the
+    // amount that arrived was credited to the family's escrow. Money in on
+    // that day; the registrations stay as they are.
     lateTransferAt: timestamp("late_transfer_at", { withTimezone: true }),
     lateTransferBy: text("late_transfer_by").references(() => user.id, { onDelete: "set null" }),
+    lateTransferAmount: numeric("late_transfer_amount", { precision: 12, scale: 2, mode: "number" }),
     // Provider-specific data (payment URL, Fawry expiry, bank details)
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -791,6 +793,11 @@ export const payment = pgTable(
     check(
       "payment_escrow_applied_nonneg",
       sql`${table.escrowAmountApplied} >= 0`,
+    ),
+    // A transfer found later is recorded with the amount that arrived, or not at all.
+    check(
+      "payment_late_transfer_recorded_whole",
+      sql`(${table.lateTransferAt} IS NULL AND ${table.lateTransferAmount} IS NULL) OR (${table.lateTransferAt} IS NOT NULL AND ${table.lateTransferAmount} > 0)`,
     ),
   ]
 );

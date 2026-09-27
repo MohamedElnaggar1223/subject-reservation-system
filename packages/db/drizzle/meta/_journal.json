@@ -218,6 +218,13 @@
       "when": 1790520993004,
       "tag": "0030_late_transfer_and_deadline_check",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790537049450,
+      "tag": "0031_late_transfer_amount",
+      "breakpoints": true
     }
   ]
 }

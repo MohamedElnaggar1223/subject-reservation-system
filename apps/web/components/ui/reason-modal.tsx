@@ -26,9 +26,9 @@ export type ReasonModalProps = {
   minLength?: number;
   /** A question the action must also answer; confirm stays disabled until one option is picked. */
   choice?: { legend: string; options: { value: string; label: string; hint?: string }[] };
-  /** A one-line value the action also needs (e.g. a transfer reference); required when given. */
-  field?: { label: string; placeholder?: string; minLength?: number };
-  onConfirm: (reason: string, choice?: string, fieldValue?: string) => void;
+  /** One-line values the action also needs (e.g. a transfer reference and amount); each is required. */
+  fields?: { label: string; placeholder?: string; minLength?: number; initial?: string; inputMode?: 'text' | 'decimal'; mono?: boolean }[];
+  onConfirm: (reason: string, choice?: string, fieldValues?: string[]) => void;
   onClose: () => void;
 };
 
@@ -43,15 +43,15 @@ export function ReasonModal({
   error,
   minLength = 3,
   choice,
-  field,
+  fields = [],
   onConfirm,
   onClose,
 }: ReasonModalProps) {
   const [reason, setReason] = useState('');
   const [touched, setTouched] = useState(false);
   const [picked, setPicked] = useState<string | undefined>(undefined);
-  const [fieldValue, setFieldValue] = useState('');
-  const fieldMissing = !!field && fieldValue.trim().length < (field.minLength ?? 1);
+  const [fieldValues, setFieldValues] = useState<string[]>(() => fields.map((f) => f.initial ?? ''));
+  const fieldMissing = fields.some((f, i) => (fieldValues[i] ?? '').trim().length < (f.minLength ?? 1));
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Focus the input on open; Escape closes (parity with a native dialog)
@@ -108,21 +108,22 @@ export function ReasonModal({
           </fieldset>
         )}
 
-        {field && (
-          <div className="mb-4">
-            <label className="mb-1 block text-sm font-medium text-foreground" htmlFor="reason-modal-field">
-              {field.label}
+        {fields.map((f, i) => (
+          <div key={f.label} className="mb-4">
+            <label className="mb-1 block text-sm font-medium text-foreground" htmlFor={`reason-modal-field-${i}`}>
+              {f.label}
             </label>
             <input
-              id="reason-modal-field"
+              id={`reason-modal-field-${i}`}
               type="text"
-              value={fieldValue}
-              onChange={(e) => setFieldValue(e.target.value)}
-              placeholder={field.placeholder}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              inputMode={f.inputMode ?? 'text'}
+              value={fieldValues[i] ?? ''}
+              onChange={(e) => setFieldValues((v) => v.map((x, j) => (j === i ? e.target.value : x)))}
+              placeholder={f.placeholder}
+              className={`w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary ${f.mono ? 'font-mono' : ''}`}
             />
           </div>
-        )}
+        ))}
 
         <label className="mb-1 block text-sm font-medium text-foreground" htmlFor="reason-modal-input">
           {label}
@@ -152,7 +153,7 @@ export function ReasonModal({
             variant={destructive ? 'destructive' : 'default'}
             className="flex-1"
             disabled={isPending || tooShort || (!!choice && !picked) || fieldMissing}
-            onClick={() => onConfirm(reason.trim(), picked, field ? fieldValue.trim() : undefined)}
+            onClick={() => onConfirm(reason.trim(), picked, fields.length ? fieldValues.map((v) => v.trim()) : undefined)}
           >
             {isPending ? 'Working…' : confirmLabel}
           </Button>

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, notified, notificationsFor, money, audited,
-  takings, takingsOn, takingsDelta, openWindow, futureWindow, localToday, localYesterday, waitFor, runPaymentDeadlines,
+  takings, takingsOn, takingsDelta, openWindow, futureWindow, localToday, localYesterday, waitFor, runPaymentDeadlines, runSessionScheduler,
   type Client,
 } from './helpers';
 
@@ -747,10 +747,15 @@ describe('money rules', () => {
       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: sessionId }, json: { reason: 'money rules: window closes' } }));
     });
 
-    it('an unpaid desk checkout fails at close and its escrow comes back', async () => {
+    it('an unpaid desk checkout fails at close, its escrow comes back, and the student is told which subject was not completed', async () => {
       expect(await statusOf('payment', deskPay)).toBe('failed');
       expect(await statusOf('registration', deskReg)).toBe('expired');
       expect(await escrowOf(f.studentId)).toBe(950);
+      // The checkout expired its own subject; the close's notice still names it (review of fc1a101, flag 3).
+      const notice = await waitFor(async () => (await notificationsFor(f.student.email, 'SESSION_CLOSED'))
+        .find((n) => n.title === 'Your pending registrations for January (AS, money rules) were not completed') ?? null);
+      expect(notice.body).toContain('Biology (AS, money rules)');
+      expect(notice.body).not.toContain('Physics');
     });
 
     it('an InstaPay checkout with no reference yet survives the close for 24 hours, and the family is told (MO-10)', async () => {
@@ -922,36 +927,42 @@ describe('money rules', () => {
       expect(late.error).toMatch(deadlineSentence);
     });
 
-    it('a transfer found on the statement after its payment closed is recorded and credited to escrow', async () => {
+    it('a transfer found on the statement after its payment closed is recorded by a finance admin and credited to escrow', async () => {
       const before = await takings(officer);
+      const record = (by: Client, id: string, json: { notes: string; reference: string; amount: number }) =>
+        by.api.v1.payments[':id']['record-transfer'].$post({ param: { id }, json });
+      const duplicate = { status: 409, error: 'This transfer reference is already recorded against another payment' };
 
-      // The transfer referenced FT-MR-DEADLINE-1 turns up: its 1400 goes to escrow.
-      const r = await apiResponse(officer.api.v1.payments[':id']['record-transfer'].$post({
-        param: { id: artPay }, json: { notes: 'On the statement, sent the day before the deadline' },
-      }));
-      expect(r).toEqual({ id: artPay, creditedToEscrow: 1400, reference: 'FT-MR-DEADLINE-1' });
-      expect(await escrowOf(f.studentId)).toBe(2700);
+      // A finance admin only: nothing undoes it.
+      expect((await refused(record(officer, artPay, { notes: 'found on the statement', reference: 'FT-MR-DEADLINE-1', amount: 1400 }))).status).toBe(403);
+
+      // The statement's reference is the one that counts: a transfer already confirmed on
+      // another payment is refused, although the family's own reference was never used.
+      expect(await refused(record(finadmin, artPay, { notes: 'found on the statement', reference: 'FT-MR-LASTDAY-1', amount: 1400 }))).toEqual(duplicate);
+      expect(await escrowOf(f.studentId)).toBe(1300);
+
+      // The transfer turns up under another reference than the family gave, for 1000 of the 1400 due.
+      const r = await apiResponse(record(finadmin, artPay, { notes: 'On the statement, sent the day before the deadline', reference: 'FT-MR-DEADLINE-1B', amount: 1000 }));
+      expect(r).toEqual({ id: artPay, creditedToEscrow: 1000, reference: 'FT-MR-DEADLINE-1B' });
+      expect(await escrowOf(f.studentId)).toBe(2300);
+      const row = await one<{ ref: string; family: string; found: string }>(
+        `select verification_reference as ref, metadata->'lateTransfer'->>'familyReference' as family, late_transfer_amount as found from payment where id = $1`, [artPay]
+      );
+      expect({ ...row, found: money(row.found) }).toEqual({ ref: 'FT-MR-DEADLINE-1B', family: 'FT-MR-DEADLINE-1', found: 1000 });
       expect(await statusOf('registration', (await one<{ id: string }>(`select registration_id as id from payment_registration where payment_id = $1`, [artPay])).id)).toBe('expired');
       await audited([artPay], ['PAYMENT_LATE_TRANSFER_RECORDED']);
       expect(takingsDelta(before, await takings(officer))).toMatchObject({
-        moneyIn: 1400, lateTransferTotal: 1400, byInstrument: { instapay: 1400 }, net: 1400, drawer: { cashIn: 0, net: 0 },
+        moneyIn: 1000, lateTransferTotal: 1000, byInstrument: { instapay: 1000 }, net: 1000, drawer: { cashIn: 0, net: 0 },
       });
-      expect((await refused(officer.api.v1.payments[':id']['record-transfer'].$post({ param: { id: artPay }, json: { notes: 'second time around' } }))).status).toBe(409);
+      expect((await refused(record(finadmin, artPay, { notes: 'second time around', reference: 'FT-MR-DEADLINE-1C', amount: 1000 }))).status).toBe(409);
 
-      // A checkout that never had a reference needs the one from the statement, and it must be new.
-      const none = await refused(officer.api.v1.payments[':id']['record-transfer'].$post({ param: { id: musPay }, json: { notes: 'found on the statement' } }));
-      expect(none).toEqual({ status: 400, error: 'Enter the transfer reference from the bank statement' });
-      const reused = await refused(officer.api.v1.payments[':id']['record-transfer'].$post({
-        param: { id: musPay }, json: { notes: 'found on the statement', reference: 'FT-MR-DEADLINE-1' },
-      }));
-      expect(reused).toEqual({ status: 409, error: 'This transfer reference is already recorded against another payment' });
-      await apiResponse(officer.api.v1.payments[':id']['record-transfer'].$post({
-        param: { id: musPay }, json: { notes: 'found on the statement', reference: 'FT-MR-DEADLINE-2' },
-      }));
-      expect(await escrowOf(f.studentId)).toBe(4200);
+      // A checkout that never had a reference takes the statement's, and it must be new.
+      expect(await refused(record(finadmin, musPay, { notes: 'found on the statement', reference: 'FT-MR-DEADLINE-1B', amount: 1500 }))).toEqual(duplicate);
+      await apiResponse(record(finadmin, musPay, { notes: 'found on the statement', reference: 'FT-MR-DEADLINE-2', amount: 1500 }));
+      expect(await escrowOf(f.studentId)).toBe(3800);
 
       // Only a closed InstaPay payment qualifies.
-      expect((await refused(officer.api.v1.payments[':id']['record-transfer'].$post({ param: { id: okPay }, json: { notes: 'already confirmed one' } }))).status).toBe(409);
+      expect((await refused(record(finadmin, okPay, { notes: 'already confirmed one', reference: 'FT-MR-DEADLINE-3', amount: 1300 }))).status).toBe(409);
     });
   });
 
@@ -1050,10 +1061,19 @@ describe('money rules', () => {
       const confirm = await refused(officer.api.v1.payments[':id'].confirm.$post({ param: { id: hisPay }, json: {} }));
       expect(confirm.error).toMatch(sentence);
 
-      // The sweep closes both checkouts; the money already held for June stays held.
+      // The sweep closes both checkouts.
       await runPaymentDeadlines();
       expect([await statusOf('payment', hisPay), await statusOf('payment', ecoPay)]).toEqual(['failed', 'failed']);
       expect(await statusOf('registration', his)).toBe('preregistered');
+
+      // June never opens now — not by hand, not by the scheduler — so the money
+      // already held for it is never captured for entries the board refuses (MO-21).
+      const open = await refused(adm.api.v1.sessions[':id'].activate.$post({ param: { id: june } }));
+      expect(open.status).toBe(409);
+      expect(open.error).toMatch(/^This series cannot be opened: the exam board's entry deadline \(.+\) has passed$/);
+      await runSessionScheduler();
+      expect((await one<{ status: string }>(`select status from registration_session where id = $1`, [june])).status).toBe('draft');
+      expect(await statusOf('registration', late)).toBe('preregistered');
       const w = await one<{ held: string }>(`select held_balance as held from escrow where student_id = $1`, [f.studentId]);
       expect(money(w.held)).toBe(1500);
     });

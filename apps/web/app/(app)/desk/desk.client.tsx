@@ -74,7 +74,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
   const [message, setMessage] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [reverseTarget, setReverseTarget] = useState<{ id: string; label: string; confirmedAt: string | null } | null>(null);
-  const [transferTarget, setTransferTarget] = useState<{ id: string; label: string; reference: string | null } | null>(null);
+  const [transferTarget, setTransferTarget] = useState<{ id: string; label: string; amount: number; reference: string | null } | null>(null);
 
   // ── Search ────────────────────────────────────────────────────────────────
   const { data: hits = [], isError: searchFailed, isFetching: searching } = useQuery<StudentHit[]>({
@@ -140,8 +140,8 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
 
   // A transfer found on the bank statement after its payment had closed goes to escrow.
   const transferMutation = useMutation({
-    mutationFn: ({ id, notes, reference }: { id: string; notes: string; reference?: string }) =>
-      apiResponse(api.v1.payments[':id']['record-transfer'].$post({ param: { id }, json: { notes, reference } })),
+    mutationFn: ({ id, notes, reference, amount }: { id: string; notes: string; reference: string; amount: number }) =>
+      apiResponse(api.v1.payments[':id']['record-transfer'].$post({ param: { id }, json: { notes, reference, amount } })),
     onSuccess: (d) => {
       setTransferTarget(null);
       done(`Transfer ${d.reference} recorded — ${formatPrice(d.creditedToEscrow)} added to the student's escrow. The family has been told.`);
@@ -479,8 +479,8 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                             Reverse
                           </Button>
                         )}
-                        {/* A closed InstaPay payment whose transfer turns up on the statement later */}
-                        {p.status === 'failed' && p.paymentMethod === 'instapay' && p.amount > 0 && !p.lateTransferAt && (
+                        {/* A closed InstaPay payment whose transfer turns up on the statement later (finance admin: nothing undoes it) */}
+                        {isFinanceAdmin && p.status === 'failed' && p.paymentMethod === 'instapay' && p.amount > 0 && !p.lateTransferAt && (
                           <Button
                             size="sm"
                             variant="ghost"
@@ -489,6 +489,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                               setTransferTarget({
                                 id: p.id,
                                 label: `${formatPrice(p.amount)} by InstaPay`,
+                                amount: p.amount,
                                 reference: p.verificationReference,
                               })
                             }
@@ -539,14 +540,20 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
       {transferTarget && (
         <ReasonModal
           title="Record a transfer found later?"
-          description={`${transferTarget.label}. The payment had already closed, so its subjects stay as they are; the amount is added to the student's escrow, to use on a later payment or take back as cash. Recorded in the audit trail and in today's takings.`}
+          description={`${transferTarget.label}${transferTarget.reference ? ` (the family gave reference ${transferTarget.reference})` : ''}. The payment had already closed, so its subjects stay as they are; the amount that arrived is added to the student's escrow, to use on a later payment or take back as cash. This cannot be undone. Recorded in the audit trail and in today's takings.`}
           label="Where it was found"
           placeholder="e.g. On the 28 Sep bank statement, sent 27 Sep"
           confirmLabel="Add to Escrow"
           minLength={5}
           isPending={transferMutation.isPending}
-          field={transferTarget.reference ? undefined : { label: 'Transfer reference from the bank statement', placeholder: 'e.g. FT-2026-000123', minLength: 4 }}
-          onConfirm={(notes, _choice, reference) => transferMutation.mutate({ id: transferTarget.id, notes, reference })}
+          // Both from the statement: the family's reference may be the one that was not found.
+          fields={[
+            { label: 'Transfer reference on the bank statement', placeholder: 'e.g. FT-2026-000123', minLength: 4, mono: true },
+            { label: 'Amount on the bank statement (EGP)', initial: String(transferTarget.amount), inputMode: 'decimal', minLength: 1 },
+          ]}
+          onConfirm={(notes, _choice, values) =>
+            transferMutation.mutate({ id: transferTarget.id, notes, reference: values?.[0] ?? '', amount: Number(values?.[1]) })
+          }
           onClose={() => setTransferTarget(null)}
         />
       )}

@@ -414,14 +414,15 @@ export const payments = new Hono<HonoEnv>()
   /**
    * POST /payments/:id/record-transfer  (money audit review of MO-10)
    *
-   * Finance records an InstaPay transfer found on the bank statement after
-   * its payment had failed (lapsed, closed at the board deadline, or
-   * rejected): the amount is credited to the family's escrow. The reference
-   * is required only if the family never submitted one. Finance roles.
+   * A finance admin records an InstaPay transfer found on the bank statement
+   * after its payment had failed (lapsed, closed at the board deadline, or
+   * rejected): the amount that arrived is credited to the family's escrow,
+   * under the statement's reference. Finance admin only, like a reversal:
+   * nothing undoes it and the escrow can be spent at once.
    */
   .post('/:id/record-transfer',
     requireAuth(),
-    requireFinance(),
+    requireFinanceAdmin(),
     zValidator('param', PaymentId),
     zValidator('json', RecordLateTransfer),
     async (c) => {

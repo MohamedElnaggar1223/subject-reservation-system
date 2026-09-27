@@ -20,6 +20,7 @@ import { db, registrationSession, registration, changeRequest, paymentRegistrati
 import { capturePreregistrationsForSession } from './prereg.services';
 import { notifySessionOpened, createNotification, notifyPaymentReferenceDue } from './notification.services';
 import { failPayment } from './payment.services';
+import { schoolDate } from './window.services';
 import { logAction, type AuditContext } from './audit.services';
 import { env } from '../env';
 import { randomUUID } from 'crypto';
@@ -298,6 +299,11 @@ export async function extendActiveSessionDeadline(
 export async function activateSession(id: string) {
   const session = await getSessionById(id);
   if (!session || session.status !== 'draft') return undefined;
+  // Past the board's deadline no entry can be made, and opening would capture
+  // the held money of paid preregistrations for entries the board refuses.
+  if (session.entryDeadline && session.entryDeadline <= new Date()) {
+    throw new Error(`This series cannot be opened: the exam board's entry deadline (${schoolDate(session.entryDeadline)}) has passed`);
+  }
 
   const conflict = await hasActiveSessionOfType(session.sessionType, session.qualificationLevel, id);
   if (conflict) {
@@ -430,6 +436,9 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
     .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
     .where(and(eq(registration.sessionId, sessionId), eq(registration.status, 'pending_payment'), eq(payment.status, 'pending')));
   const heldForReference: string[] = [];
+  // Registrations a failed checkout expired itself (the window is closed), so
+  // the per-student notice below still names them.
+  const expiredWithPayment: { id: string; studentId: string; subjectId: string; sessionId: string }[] = [];
   for (const p of unpaid) {
     try {
       if (p.method === 'instapay' && referenceDueAt > now) {
@@ -451,7 +460,8 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
           continue;
         }
       }
-      await failPayment(p.id, { from: ['pending'], reason: 'Registration window closed before payment', expireIfClosed: true });
+      const r = await failPayment(p.id, { from: ['pending'], reason: 'Registration window closed before payment', expireIfClosed: true });
+      expiredWithPayment.push(...(r?.expired ?? []));
     } catch (err) {
       console.error(`[session:finalize] Failed to settle payment ${p.id} at close:`, err);
     }
@@ -532,7 +542,8 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
 
     for (const pid of pendingPaymentIds) {
       try {
-        await failPayment(pid, { from: ['pending'], reason: 'Registration window closed before payment', expireIfClosed: true });
+        const r = await failPayment(pid, { from: ['pending'], reason: 'Registration window closed before payment', expireIfClosed: true });
+        expiredWithPayment.push(...(r?.expired ?? []));
       } catch (err) {
         console.error(`[session:finalize] Failed to fail payment ${pid}:`, err);
       }
@@ -552,9 +563,12 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   // THEIR registrations didn't go through, so a student who swapped then
   // never paid understands why the new subject is gone (the escrow credit
   // from the original drop remains on their account).
-  if (expiredRegs.length > 0) {
+  // This session's only: another session's registration a two-session
+  // checkout released is not "pending for" this one.
+  const notifyExpired = [...expiredRegs, ...expiredWithPayment.filter((r) => r.sessionId === sessionId)];
+  if (notifyExpired.length > 0) {
     try {
-      const subjectIds = [...new Set(expiredRegs.map((r) => r.subjectId))];
+      const subjectIds = [...new Set(notifyExpired.map((r) => r.subjectId))];
       const subjects = await db.query.subject.findMany({
         where: (s, { inArray: inArr }) => inArr(s.id, subjectIds),
         columns: { id: true, name: true },
@@ -570,7 +584,7 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
       // Group expired registrations per student so each student gets a
       // single notification rather than one per subject.
       const byStudent = new Map<string, string[]>();
-      for (const r of expiredRegs) {
+      for (const r of notifyExpired) {
         const name = subjectNameById.get(r.subjectId) ?? 'a subject';
         const arr = byStudent.get(r.studentId) ?? [];
         arr.push(name);
@@ -592,7 +606,7 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   }
 
   return {
-    expiredRegistrations: expiredRegs.length,
+    expiredRegistrations: notifyExpired.length,
     rejectedChangeRequests: rejectedCRs.length,
   };
 }
@@ -668,11 +682,16 @@ export async function autoManageSessions(): Promise<{
     )
     .returning({ id: registrationSession.id, name: registrationSession.name, sessionType: registrationSession.sessionType });
 
-  // Activate draft sessions whose startDate has arrived
+  // Activate draft sessions whose startDate has arrived — never one whose
+  // window has already ended: opening it would close it on the next tick,
+  // after capturing paid preregistrations' held money, possibly for entries
+  // the board no longer takes (the database keeps the board's deadline after
+  // the window's end, so a draft past its deadline is past its end too;
+  // review of fc1a101, flag 4; MO-21).
   // We do this one at a time to respect the unique constraint per sessionType
   const draftsDue = await db.query.registrationSession.findMany({
-    where: (s, { eq, lte, and }) =>
-      and(eq(s.status, 'draft'), lte(s.startDate, now)),
+    where: (s, { eq, lte, gt, and }) =>
+      and(eq(s.status, 'draft'), lte(s.startDate, now), gt(s.endDate, now)),
     // name + endDate included so the scheduler can use them for NOT-001 notifications
     columns: { id: true, sessionType: true, qualificationLevel: true, name: true, endDate: true },
     orderBy: (s, { asc }) => [asc(s.startDate)],

@@ -683,7 +683,7 @@ async function failOpenPayment(
       }, tx);
     }
 
-    let registrationsExpired = 0;
+    const expired: { id: string; studentId: string; subjectId: string; sessionId: string }[] = [];
     if (opts.expireIfClosed) {
       const regs = await tx
         .select({ id: registration.id, sessionId: registration.sessionId })
@@ -692,19 +692,19 @@ async function failOpenPayment(
         .where(and(eq(paymentRegistration.paymentId, paymentId), eq(registration.status, 'pending_payment')));
       for (const r of regs) {
         if (await sessionOpenFor(pay.studentId, r.sessionId, tx)) continue;
-        const expired = await tx
+        expired.push(...await tx
           .update(registration)
           .set({ status: 'expired', updatedAt: new Date() })
           .where(and(eq(registration.id, r.id), eq(registration.status, 'pending_payment')))
-          .returning({ id: registration.id });
-        registrationsExpired += expired.length;
+          .returning({ id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId, sessionId: registration.sessionId }));
       }
     }
+    const registrationsExpired = expired.length;
 
     await logAction(opts.actorId, opts.action, 'payment', paymentId, { status: pay.status },
       { status: 'failed', reason: opts.reason, escrowReturned: pay.escrowAmountApplied, registrationsExpired }, opts.auditCtx, tx);
 
-    return { pay, failed: failed!, registrationsExpired };
+    return { pay, failed: failed!, registrationsExpired, expired };
   });
 
   if (!result) return undefined;
@@ -758,7 +758,9 @@ export async function failPayment(
     reason: opts.reason ?? 'Payment failed',
     expireIfClosed: opts.expireIfClosed,
   });
-  return result?.failed;
+  // The registrations it expired, so a caller that tells families which
+  // subjects did not go through can include them (the close does).
+  return result && { failed: result.failed, expired: result.expired };
 }
 
 /**
@@ -861,15 +863,20 @@ export async function rejectPayment(paymentId: string, staffId: string, reason: 
  * the family's escrow, to spend on a later payment or take back as cash; the
  * registrations stay as they are. Money in on the day it is recorded.
  *
- * A checkout that lapsed without a reference takes the one finance found;
- * the unique reference index stops one transfer being recorded twice.
+ * Finance admin only: nothing undoes it, and the escrow it creates can be
+ * spent at once. It takes the reference and the amount from the statement.
+ * The statement's reference is the one stored — the family's may be the very
+ * one finance could not find — so the unique reference index refuses a
+ * transfer already counted on any other payment (review of fc1a101, flag 1).
+ * A different reference the family gave is kept beside it in the metadata.
  */
 export async function recordLateTransfer(
   paymentId: string,
-  staffId: string,
-  data: { notes: string; reference?: string },
+  financeAdminId: string,
+  data: { notes: string; reference: string; amount: number },
   auditCtx?: AuditContext
 ) {
+  const reference = data.reference.trim();
   const pay = await db.transaction(async (tx) => {
     const [p] = await tx.select().from(payment).where(eq(payment.id, paymentId)).for('update');
     if (!p) throw new Error('Payment not found');
@@ -878,31 +885,31 @@ export async function recordLateTransfer(
       throw new Error(`Payment is already in '${p.status}' status — an open transfer is confirmed from the Finance Workbench instead`);
     }
     if (p.lateTransferAt) throw new Error('This transfer has already been recorded');
-    if (p.amount <= 0) throw new Error('Nothing was transferred for this payment');
-    const reference = p.verificationReference ?? data.reference?.trim();
-    if (!reference) throw new Error('Enter the transfer reference from the bank statement');
+    if (p.amount <= 0) throw new Error('Nothing was due by transfer on this payment');
+    const familyReference = p.verificationReference && p.verificationReference !== reference ? p.verificationReference : null;
 
     const now = new Date();
     await tx
       .update(payment)
       .set({
         lateTransferAt: now,
-        lateTransferBy: staffId,
+        lateTransferBy: financeAdminId,
+        lateTransferAmount: data.amount,
         verificationReference: reference,
         metadata: {
           ...((p.metadata as Record<string, unknown>) ?? {}),
-          lateTransfer: { by: staffId, at: now.toISOString(), notes: data.notes },
+          lateTransfer: { by: financeAdminId, at: now.toISOString(), notes: data.notes, amount: data.amount, amountDue: p.amount, familyReference },
         },
         updatedAt: now,
       })
       .where(eq(payment.id, paymentId));
     await creditEscrow(
-      { studentId: p.studentId, amount: p.amount, reason: 'late_transfer', initiatedBy: staffId, relatedPaymentId: paymentId },
+      { studentId: p.studentId, amount: data.amount, reason: 'late_transfer', initiatedBy: financeAdminId, relatedPaymentId: paymentId },
       tx
     );
-    await logAction(staffId, 'PAYMENT_LATE_TRANSFER_RECORDED', 'payment', paymentId, { status: 'failed' },
-      { creditedToEscrow: p.amount, reference, notes: data.notes }, auditCtx, tx);
-    return { ...p, verificationReference: reference };
+    await logAction(financeAdminId, 'PAYMENT_LATE_TRANSFER_RECORDED', 'payment', paymentId, { status: 'failed', verificationReference: p.verificationReference },
+      { creditedToEscrow: data.amount, amountDue: p.amount, reference, familyReference, notes: data.notes }, auditCtx, tx);
+    return { ...p, verificationReference: reference, lateTransferAmount: data.amount };
   }).catch((err) => {
     const cause = (err as { cause?: { code?: string } } | null)?.cause;
     if (cause?.code === '23505') {
@@ -916,13 +923,13 @@ export async function recordLateTransfer(
   notifyEscrowBalanceChanged({
     studentId: pay.studentId,
     studentName: studentUser?.name ?? 'Student',
-    previousBalance: newBalance - pay.amount,
+    previousBalance: newBalance - pay.lateTransferAmount,
     newBalance,
-    changeAmount: pay.amount,
+    changeAmount: pay.lateTransferAmount,
     reason: `Your InstaPay transfer (${pay.verificationReference}) was found on the bank statement after the payment had closed, so it was added to the escrow balance — use it for a later payment or ask for it back at the finance desk`,
   }).catch((err) => console.error('[notification] late transfer credit failed:', err));
 
-  return { id: pay.id, creditedToEscrow: pay.amount, reference: pay.verificationReference };
+  return { id: pay.id, creditedToEscrow: pay.lateTransferAmount, reference: pay.verificationReference };
 }
 
 /**
@@ -1388,7 +1395,7 @@ export async function getDailyTakings(dateStr: string) {
   const lateTransfers = await db.query.payment.findMany({
     where: (p, { and, eq, gte, lt }) =>
       and(eq(p.status, 'failed'), gte(p.lateTransferAt, start), lt(p.lateTransferAt, end)),
-    columns: { id: true, amount: true, paymentMethod: true, purpose: true, verificationReference: true, lateTransferAt: true },
+    columns: { id: true, amount: true, paymentMethod: true, purpose: true, verificationReference: true, lateTransferAt: true, lateTransferAmount: true },
     with: { student: { columns: { id: true, name: true } }, lateTransferByUser: { columns: { id: true, name: true } } },
     orderBy: (p, { asc }) => [asc(p.lateTransferAt)],
   });
@@ -1407,9 +1414,11 @@ export async function getDailyTakings(dateStr: string) {
 
   const byInstrument: Record<string, number> = {};
   for (const r of confirmed) byInstrument[instrumentOf(r)] = round2((byInstrument[instrumentOf(r)] ?? 0) + r.amount);
-  for (const r of lateTransfers) byInstrument[r.paymentMethod] = round2((byInstrument[r.paymentMethod] ?? 0) + r.amount);
+  // What arrived, not what was due (the check constraint keeps it set on every recorded transfer).
+  const foundOf = (r: { lateTransferAmount: number | null }) => r.lateTransferAmount ?? 0;
+  for (const r of lateTransfers) byInstrument[r.paymentMethod] = round2((byInstrument[r.paymentMethod] ?? 0) + foundOf(r));
 
-  const lateTransferTotal = sum(lateTransfers, (r) => r.amount);
+  const lateTransferTotal = sum(lateTransfers, foundOf);
   const moneyIn = round2(sum(confirmed, (r) => r.amount) + lateTransferTotal);
   const escrowApplied = sum(confirmed, (r) => r.escrowAmountApplied);
   const reversedTotal = sum(reversed, (r) => r.amount);

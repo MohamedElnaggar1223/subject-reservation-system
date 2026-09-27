@@ -348,3 +348,15 @@ export async function runPaymentDeadlines(now: Date = new Date()) {
   const { enforcePaymentDeadlines } = await import('../src/services/payment.services');
   return enforcePaymentDeadlines(now);
 }
+
+/**
+ * Run the scheduler's session step (close windows that ended, open drafts
+ * whose start has come), as the scheduler does every minute. Like
+ * runPaymentDeadlines, the scheduler is its only caller. It touches every
+ * session in the database, so a suite calls it only where no other suite's
+ * session is due to open or close.
+ */
+export async function runSessionScheduler() {
+  const { autoManageSessions } = await import('../src/services/session.services');
+  return autoManageSessions();
+}

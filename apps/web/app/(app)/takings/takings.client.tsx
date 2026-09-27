@@ -220,9 +220,10 @@ export default function TakingsClient(): React.JSX.Element {
                       <td className="px-4 py-2.5 text-foreground">{r.student?.name ?? '—'}</td>
                       <td className="px-4 py-2.5 text-card-foreground">
                         InstaPay <span className="font-mono">{r.verificationReference}</span> — credited to escrow
+                        {r.lateTransferAmount !== r.amount && <> (the payment was for {formatPrice(r.amount)})</>}
                       </td>
                       <td className="px-4 py-2.5 text-card-foreground">{r.lateTransferByUser?.name ?? '—'}</td>
-                      <td className="px-4 py-2.5 text-right font-medium text-foreground whitespace-nowrap">{formatPrice(r.amount)}</td>
+                      <td className="px-4 py-2.5 text-right font-medium text-foreground whitespace-nowrap">{formatPrice(r.lateTransferAmount ?? 0)}</td>
                     </tr>
                   ))}
                 </tbody>
