@@ -879,13 +879,13 @@ describe('money rules', () => {
   // Runs after the close above, which frees the january / as_level slot.
 
   describe('a preregistration paid after its session opened', () => {
-    let f: Family, early: string, late: string, pay: string;
+    let f: Family, early: string, late: string, pay: string, january: string, june: string;
 
     beforeAll(async () => {
       f = await family('pre');
       // Two draft sessions; only the January one opens in this test.
-      const january = await session(adm, 'January (AS, money rules, prereg)', 'january', 'as_level', futureWindow());
-      const june = await session(adm, 'June (AS, money rules, prereg)', 'june', 'as_level', futureWindow());
+      january = await session(adm, 'January (AS, money rules, prereg)', 'january', 'as_level', futureWindow());
+      june = await session(adm, 'June (AS, money rules, prereg)', 'june', 'as_level', futureWindow());
       early = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({
         json: { sessionId: january, subjectIds: [subj.PHY!], studentId: f.studentId },
       })))[0]!.id;
@@ -926,6 +926,21 @@ describe('money rules', () => {
       expect(r.error).toBe('One or more of these subjects is already paid for.');
       const w = await one<{ held: string }>(`select held_balance as held from escrow where student_id = $1`, [f.studentId]);
       expect(money(w.held)).toBe(1500);
+    });
+
+    it("a window cannot be moved to close on or after its board entry deadline (MO-10)", async () => {
+      for (const id of [january, june]) {
+        const end = new Date((await one<{ end: string }>(`select end_date as end from registration_session where id = $1`, [id])).end);
+        const deadline = new Date(end.getTime() + 24 * 60 * 60 * 1000);
+        await apiResponse(adm.api.v1.sessions[':id']['entry-deadline'].$put({ param: { id }, json: { entryDeadline: deadline, reason: 'board calendar published' } }));
+        const moved = await refused(adm.api.v1.sessions[':id'].$put({
+          param: { id },
+          // @ts-expect-error — the route reads its body by session status, without zValidator (as the web does)
+          json: { endDate: new Date(deadline.getTime() + 60 * 60 * 1000), reason: 'extend past the board deadline' },
+        }));
+        expect(moved.status).toBe(400);
+        expect(moved.error).toMatch(/^The window cannot close on or after the exam board's entry deadline \(.+\) — move the board deadline first$/);
+      }
     });
   });
 });

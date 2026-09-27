@@ -208,7 +208,8 @@ review also corrected these claims:
   confirmed, referenced or collected on the series, deadline extension or not; each refusal
   names the deadline. The workbench shows the deadline on every payment from a closed series.
 - The admin must enter each series' deadline: with none set there is no automatic cut-off
-  (DISCOVERY.md A-08).
+  (DISCOVERY.md A-08). A window cannot be moved to close on or after its deadline (draft
+  edit or extension), so the sweep never runs inside an open window.
 
 **MO-11 — a reversal says whether the money went back.** The reversal dialog asks "Was the
 money returned to the family?" and will not confirm without an answer.

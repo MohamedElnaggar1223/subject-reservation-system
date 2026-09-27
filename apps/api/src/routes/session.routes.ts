@@ -32,6 +32,17 @@ import { notifySessionOpened, notifySessionClosed, getStudentAndParentBroadcastI
 import { progressGrades } from '../services/grade.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 import { db, registrationSession as registrationSessionTable, eq } from '@repo/db';
+import { schoolDate } from '../services/window.services';
+
+/**
+ * A window may not close on or after its series' exam-board entry deadline:
+ * the deadline sweep would close payments in a window that is still open
+ * (owner decision MO-10). Returns the refusal, or null.
+ */
+function windowAfterEntryDeadline(endDate: Date, entryDeadline: Date | null): string | null {
+  if (!entryDeadline || endDate < entryDeadline) return null;
+  return `The window cannot close on or after the exam board's entry deadline (${schoolDate(entryDeadline)}) — move the board deadline first`;
+}
 
 export const sessions = new Hono<HonoEnv>()
   .use('*', requireAuth())
@@ -164,6 +175,8 @@ export const sessions = new Hono<HonoEnv>()
         // Extract reason before passing the remaining fields to the service.
         // It isn't a column on registrationSession — it lives in the audit log.
         const { reason, ...updateFields } = parsed.data;
+        const deadlineClash = windowAfterEntryDeadline(updateFields.endDate ?? session.endDate, session.entryDeadline);
+        if (deadlineClash) return error(c, deadlineClash, 400);
         const updated = await sessionService.updateDraftSession(id, updateFields);
         if (!updated) {
           return error(c, 'Session is no longer in draft status', 409);
@@ -204,6 +217,9 @@ export const sessions = new Hono<HonoEnv>()
       if (parsed.data.endDate.getTime() === session.endDate.getTime()) {
         return error(c, 'New end date is identical to the current end date', 400);
       }
+
+      const deadlineClash = windowAfterEntryDeadline(parsed.data.endDate, session.entryDeadline);
+      if (deadlineClash) return error(c, deadlineClash, 400);
 
       const updated = await sessionService.extendActiveSessionDeadline(
         id,
