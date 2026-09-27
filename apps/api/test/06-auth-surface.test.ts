@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import { app, admin, staff, onboard, signUp, signIn, subject, session, openWindow, one, sql, PASSWORD, type Client } from './helpers';
-import { clientIp } from '../src/lib/client-ip';
+import { clientIp, rateLimitKey } from '../src/lib/client-ip';
 import { emailVerificationRequired } from '../src/lib/auth-policy';
 
 /**
@@ -141,6 +141,26 @@ describe('auth surface', () => {
     const fresh = await raw('/api/auth/sign-up/email', { json: { name: 'Fresh Parent', email: 'fresh.parent.as@test.local', password: PASSWORD } });
     expect(fresh.status).toBe(200);
     expect((await fresh.json()) as Record<string, unknown>).not.toHaveProperty('token');
+
+    // The admin plugin handed every session token of any user to the admin's page.
+    const userSessions = await raw('/api/auth/admin/list-user-sessions', { cookie: adm.cookie, json: { userId: parent.id } });
+    expect(userSessions.status).toBe(200);
+    const us = (await userSessions.json()) as { sessions: Record<string, unknown>[] };
+    expect(us.sessions.length).toBeGreaterThan(0);
+    for (const s of us.sessions) expect(s).not.toHaveProperty('token');
+    const imp = await raw('/api/auth/admin/impersonate-user', { cookie: adm.cookie, json: { userId: parent.id } });
+    expect(imp.status).toBe(200);
+    expect(((await imp.json()) as { session: Record<string, unknown> }).session).not.toHaveProperty('token');
+
+    // A password change that signs other devices out returned the new token.
+    const email = 'pw.change.as@test.local';
+    await signUp('Password Changer', email);
+    const changer = await signIn(email);
+    const pw = await raw('/api/auth/change-password', {
+      cookie: changer.cookie, json: { currentPassword: PASSWORD, newPassword: 'NewPass123', revokeOtherSessions: true },
+    });
+    expect(pw.status).toBe(200);
+    expect((await pw.json()) as Record<string, unknown>).not.toHaveProperty('token');
   });
 
   it('a ban signs the account out at once and keeps it out (RF-23)', async () => {
@@ -155,14 +175,27 @@ describe('auth surface', () => {
     await signIn(victim.email);
 
     // A ban applied some other way (better-auth's own admin endpoint, or the
-    // database) leaves the session row in place; the request is still refused.
+    // database) leaves the session row in place. The first request deletes it,
+    // so better-auth's own endpoints refuse the account too.
     const other = await staff(adm, 'finance_officer', 'as-ban2');
     await sql(`update "user" set banned = true where id = $1`, [other.id]);
     expect(await sql(`select 1 from session where user_id = $1`, [other.id])).toHaveLength(1);
     expect((await other.api.v1.users.me.$get()).status).toBe(401);
+    expect(await sql(`select 1 from session where user_id = $1`, [other.id])).toEqual([]);
+    expect(await (await raw('/api/auth/get-session', { cookie: other.cookie })).json()).toBeNull();
+    expect((await raw('/api/auth/update-user', { cookie: other.cookie, json: { name: 'Still here' } })).status).toBe(401);
+
+    // An expiry left from an earlier timed ban must not void a new ban.
+    const third = await staff(adm, 'finance_officer', 'as-ban3');
+    await sql(`update "user" set banned = false, ban_expires = now() - interval '1 day' where id = $1`, [third.id]);
+    await apiResponse(adm.api.v1.users[':id'].$put({ param: { id: third.id }, json: { banned: true } }));
+    expect(await one(`select banned, ban_expires from "user" where id = $1`, [third.id])).toEqual({ banned: true, ban_expires: null });
+    expect((await raw('/api/auth/sign-in/email', { json: { email: third.email, password: PASSWORD } })).status).toBe(403);
   });
 
-  it('accounts staff create in person can sign in when verification is required; self-registered ones cannot skip it (RF-22)', async () => {
+  // The suite runs with verification off, so this asserts the column
+  // better-auth's sign-in check reads, not a refused sign-in.
+  it('accounts staff create in person are stored verified; self-registered ones are not (RF-22)', async () => {
     const created = await apiResponse(adm.api.v1.users.$post({
       json: { name: 'Staff Made', email: 'staff.made.as@test.local', password: PASSWORD, role: 'student', grade: 11 },
     }));
@@ -244,9 +277,22 @@ describe('auth surface', () => {
     expect(clientIp(ctx({}), 'cf-connecting-ip')).toBe('unknown');
   });
 
+  it('IPv6 addresses share a rate-limit bucket per /64; IPv4 counts per address (RF-11)', () => {
+    expect(rateLimitKey('2001:db8:abcd:12:1::7')).toBe('2001:db8:abcd:12::/64');
+    expect(rateLimitKey('2001:db8:abcd:12:ffff:ffff:ffff:ffff')).toBe('2001:db8:abcd:12::/64');
+    expect(rateLimitKey('2001:0db8:0000:0012::1')).toBe('2001:db8:0:12::/64');
+    expect(rateLimitKey('fe80::1%eth0')).toBe('fe80:0:0:0::/64');
+    expect(rateLimitKey('::1')).toBe('0:0:0:0::/64');
+    expect(rateLimitKey('::ffff:203.0.113.9')).toBe('203.0.113.9');
+    expect(rateLimitKey('203.0.113.9')).toBe('203.0.113.9');
+    expect(rateLimitKey('unknown')).toBe('unknown');
+  });
+
   it('the sign-in limiter counts two different client-sent IP headers as one caller, and ignores session reads (RF-11)', async () => {
     // Observed through the limiter's own headers: before the fix each header
-    // value opened a fresh bucket; now both land in the same one.
+    // value opened a fresh bucket; now both land in the same one. (In-process
+    // there is no socket, so the bucket is 'unknown'; keying on the socket
+    // address itself was proven on the dev server.)
     const attempt = (ip: string) =>
       raw('/api/auth/sign-in/email', { json: { email: parent.email, password: 'WrongPass1' }, headers: { 'cf-connecting-ip': ip } });
     const first = Number((await attempt('203.0.113.1')).headers.get('ratelimit-remaining'));

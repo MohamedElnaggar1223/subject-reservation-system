@@ -29,26 +29,36 @@ function validatePasswordComplexity(password: string): string | null {
 }
 
 /**
- * The same body without session tokens, or the body itself when it carries
- * none (RF-12). Only the better-auth responses known to carry one are touched.
+ * The same body without session tokens, or the very same object when it
+ * carries none (RF-12). Applied to every better-auth response, because the
+ * token turned up in more of them than anyone listed: get-session,
+ * list-sessions, sign-in, sign-up, change-password (revokeOtherSessions),
+ * and the admin plugin's list-user-sessions and impersonate-user.
+ *
+ * Removed: a top-level `token`, and `token` on any session-shaped object
+ * (one with userId and expiresAt) nested in the body or in an array.
+ * Anything else, Dates included, comes back untouched.
  */
-function withoutSessionTokens(path: string, body: object): object {
-  const drop = (o: unknown) => {
-    if (!o || typeof o !== 'object' || !('token' in o)) return o;
-    const { token: _token, ...rest } = o as Record<string, unknown>;
-    return rest;
-  };
-  if (path === '/get-session') {
-    const b = body as { session?: unknown };
-    return b.session && typeof b.session === 'object' && 'token' in b.session ? { ...b, session: drop(b.session) } : body;
+function withoutSessionTokens(body: unknown, depth = 0): unknown {
+  if (depth > 4 || !body || typeof body !== 'object' || body instanceof Response || body instanceof Date) return body;
+  if (Array.isArray(body)) {
+    const out = body.map((item) => withoutSessionTokens(item, depth + 1));
+    return out.some((item, i) => item !== body[i]) ? out : body;
   }
-  if (path === '/list-sessions' && Array.isArray(body)) {
-    return body.some((s) => s && typeof s === 'object' && 'token' in s) ? body.map(drop) : body;
+  const record = body as Record<string, unknown>;
+  const sessionShaped = 'userId' in record && 'expiresAt' in record;
+  let changed = false;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (key === 'token' && (depth === 0 || sessionShaped)) {
+      changed = true;
+      continue;
+    }
+    const next = withoutSessionTokens(value, depth + 1);
+    if (next !== value) changed = true;
+    out[key] = next;
   }
-  if (path === '/sign-in/email' || path === '/sign-up/email') {
-    return 'token' in body ? (drop(body) as object) : body;
-  }
-  return body;
+  return changed ? out : body;
 }
 
 export const auth = betterAuth({
@@ -112,17 +122,17 @@ export const auth = betterAuth({
       }
     }),
     // RF-12: the session token lives in an HttpOnly cookie so page scripts
-    // cannot read it, but several better-auth responses repeated it in the
-    // JSON body — get-session, list-sessions (every active session's token),
-    // sign-in and sign-up — which let any injected script steal a working
-    // session. The bodies lose the token; the cookie still carries it.
-    // Nothing in the API, the web app or the Expo client reads it from a body.
+    // cannot read it, but better-auth repeated it in several JSON bodies,
+    // which let any injected script steal a working session (from the admin's
+    // pages: every officer's session). Every body loses it; the cookie still
+    // carries it. Nothing in the API, the web app or the Expo client reads it
+    // from a body.
     after: createAuthMiddleware(async (ctx) => {
-      const path = (ctx as unknown as { path: string }).path;
       const returned = ctx.context.returned as unknown;
       if (!returned || typeof returned !== 'object' || returned instanceof Response) return;
-      const stripped = withoutSessionTokens(path, returned);
-      if (stripped !== returned) return ctx.json(stripped);
+      const stripped = withoutSessionTokens(returned);
+      // An object or an array, both serialised as JSON.
+      if (stripped !== returned) return ctx.json(stripped as Record<string, unknown>);
     }),
   },
 

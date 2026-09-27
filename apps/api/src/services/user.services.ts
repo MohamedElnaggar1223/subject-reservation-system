@@ -166,6 +166,19 @@ export async function revokeAllSessions(userId: string) {
 }
 
 /**
+ * Make a ban set through the admin form mean what it says (RF-23). A ban is
+ * open-ended, so any expiry left from an earlier timed ban is cleared — an
+ * expired date would otherwise make the new ban void, and better-auth would
+ * lift it at the next sign-in. Lifting a ban clears its reason and expiry.
+ */
+export async function settleBan(userId: string, banned: boolean) {
+  await db
+    .update(user)
+    .set(banned ? { banExpires: null, updatedAt: new Date() } : { banReason: null, banExpires: null, updatedAt: new Date() })
+    .where(eq(user.id, userId));
+}
+
+/**
  * Generate a unique student ID
  * 
  * Format: STU-YYYYMMDD-XXXXX (where X is random alphanumeric)

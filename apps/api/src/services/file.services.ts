@@ -340,6 +340,19 @@ export async function isFileOwner(fileId: string, userId: string): Promise<boole
 }
 
 /**
+ * Whether a file can be attached as evidence by this user (RF-13): it must
+ * be a document they uploaded. Avatars are excluded — replacing an avatar
+ * deletes the old one, which would fail or erase evidence once attached.
+ */
+export async function isOwnDocument(fileId: string, userId: string): Promise<boolean> {
+  const fileRecord = await db.query.file.findFirst({
+    where: (files, { and, eq }) => and(eq(files.id, fileId), eq(files.userId, userId), eq(files.fileType, 'document')),
+    columns: { id: true },
+  })
+  return !!fileRecord
+}
+
+/**
  * Update user's avatar
  *
  * Deletes old avatar if present, uploads new one.

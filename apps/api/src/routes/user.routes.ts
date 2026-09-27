@@ -444,7 +444,11 @@ export const users = new Hono<HonoEnv>()
         return error(c, 'Failed to update user', 500);
       }
 
-      // RF-23: a ban takes effect now, not when the account's sessions expire.
+      // RF-23: a ban takes effect now, not when the account's sessions expire,
+      // and no leftover expiry can quietly void it.
+      if (data.banned !== undefined) {
+        await userService.settleBan(id, data.banned);
+      }
       if (data.banned === true) {
         await userService.revokeAllSessions(id);
       }

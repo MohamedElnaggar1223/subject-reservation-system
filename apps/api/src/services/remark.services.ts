@@ -35,7 +35,7 @@ import type {
 } from '@repo/validations';
 import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { notifyEscrowBalanceChanged } from './notification.services';
-import { isFileOwner } from './file.services';
+import { isOwnDocument } from './file.services';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -294,7 +294,7 @@ export async function confirmConsent(
     throw new Error('You are not linked to this student');
   }
   // RF-13: the signed consent form must be one this parent uploaded.
-  if (data.consentFileId && !(await isFileOwner(data.consentFileId, parentId))) {
+  if (data.consentFileId && !(await isOwnDocument(data.consentFileId, parentId))) {
     throw new Error('You are not authorized to attach that file');
   }
 

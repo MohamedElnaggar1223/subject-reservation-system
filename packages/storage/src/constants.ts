@@ -27,12 +27,18 @@ export const ALLOWED_MIME_TYPES = {
     MIME_TYPES.PNG,
     MIME_TYPES.WEBP,
   ],
+  // Documents include images: an InstaPay screenshot or a photographed
+  // signed consent form is evidence a parent uploads as a document, not as
+  // an avatar (security audit, RF-13).
   document: [
     MIME_TYPES.PDF,
     MIME_TYPES.DOCX,
     MIME_TYPES.XLSX,
     MIME_TYPES.TXT,
     MIME_TYPES.CSV,
+    MIME_TYPES.JPEG,
+    MIME_TYPES.PNG,
+    MIME_TYPES.WEBP,
   ],
   general: [
     ...Object.values(MIME_TYPES),

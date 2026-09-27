@@ -44,7 +44,7 @@ describe('object-level access between families', () => {
   let physA: string, chemA: string, geoA: string, deskPaymentA: string, physReceiptA: string;
   let bioA: string, instaPaymentA: string, econA: string, preregA: string;
   let crA: string, remarkStudentA: string, remarkParentA: string, linkA: string, notificationA: string;
-  let withdrawalA: string, fileA: string, fileB: string;
+  let withdrawalA: string, fileA: string, fileB: string, avatarB: string;
   // Family B's own records, used to test attaching A's file
   let physB: string, bioB: string, instaPaymentB: string, remarkB: string;
 
@@ -131,9 +131,10 @@ describe('object-level access between families', () => {
     )).id;
 
     // Files cannot be uploaded without R2, so the rows are written directly.
-    fileA = randomUUID(); fileB = randomUUID();
+    fileA = randomUUID(); fileB = randomUUID(); avatarB = randomUUID();
     await sql(`insert into file (id, name, mime_type, size, storage_key, file_type, user_id) values ($1, 'a.pdf', 'application/pdf', 10, 'test/a.pdf', 'document', $2)`, [fileA, parentA.id]);
     await sql(`insert into file (id, name, mime_type, size, storage_key, file_type, user_id) values ($1, 'b.pdf', 'application/pdf', 10, 'test/b.pdf', 'document', $2)`, [fileB, parentB.id]);
+    await sql(`insert into file (id, name, mime_type, size, storage_key, file_type, user_id) values ($1, 'b.webp', 'image/webp', 10, 'test/b.webp', 'avatar', $2)`, [avatarB, parentB.id]);
 
     // B: a confirmed, resulted subject with a remark awaiting consent, and a pending InstaPay payment.
     const deskB = await apiResponse(officer.api.v1.registrations.desk.$post({
@@ -306,7 +307,14 @@ describe('object-level access between families', () => {
     }));
     expect(await statusOf('remark_request', remarkB)).toBe('pending_consent');
 
-    // B's own file is accepted in both places.
+    // Evidence must be a document: B's own avatar is refused, because
+    // replacing an avatar deletes the old one.
+    await refusedAs('parentB attach own avatar as InstaPay screenshot', parentB.api.v1.payments[':id']['instapay-reference'].$post({
+      param: { id: instaPaymentB }, json: { reference: 'FT-B-0003', screenshotFileId: avatarB },
+    }));
+    expect(await one(`select verification_file_id from payment where id = $1`, [instaPaymentB])).toEqual({ verification_file_id: null });
+
+    // B's own document is accepted in both places.
     await apiResponse(parentB.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: instaPaymentB }, json: { reference: 'FT-B-0002', screenshotFileId: fileB } }));
     expect(await one(`select verification_file_id from payment where id = $1`, [instaPaymentB])).toEqual({ verification_file_id: fileB });
     await apiResponse(parentB.api.v1.remarks[':id'].consent.$post({ param: { id: remarkB }, json: { attest: true, consentFileId: fileB } }));
@@ -319,6 +327,10 @@ describe('object-level access between families', () => {
     attempts.push(['parentB delete own file attached as evidence', String(del.status), delBody.error ?? ''].join('\t'));
     expect(del.status).toBe(400);
     expect(delBody.error).toBe('This file is attached to a payment or a remark request and cannot be deleted');
+    expect(await sql(`select 1 from file where id = $1`, [fileB])).toHaveLength(1);
+    // The database refuses it too, so no race between attach and delete can
+    // erase the evidence (foreign keys are ON DELETE RESTRICT since 0027).
+    await expect(sql(`delete from file where id = $1`, [fileB])).rejects.toThrow();
     expect(await sql(`select 1 from file where id = $1`, [fileB])).toHaveLength(1);
   });
 });

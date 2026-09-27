@@ -180,9 +180,10 @@ before it ships.
 
 ## 6. Immediate next steps
 
-1. **Security audit** (Phase 1.1). Done on 27 Sep 2026, merged on a green CI run:
-   `SECURITY_AUDIT.md`, trail `.audit/security-audit.tsv`. Thirteen findings (RF-11 to RF-23;
-   one high, three medium) fixed with tests; the authorization matrix is now an enforced policy.
+1. **Security audit** (Phase 1.1). Done on 27 Sep 2026, reviewed twice on Opus 5.5:
+   `SECURITY_AUDIT.md`, trail `.audit/security-audit.tsv` (which records the CI runs and the
+   merge). Thirteen findings (RF-11 to RF-23; one high, three medium) fixed with tests; the
+   authorization matrix is now an enforced policy.
    Handed on: a second factor for finance roles (owner decision), audit rows inside the money
    transaction (money audit), and the production checklist in §6 of that report.
 2. **Money-correctness audit** (Phase 1.2), then **state and time** (Phase 1.3).

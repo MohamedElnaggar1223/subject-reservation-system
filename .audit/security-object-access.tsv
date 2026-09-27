@@ -56,4 +56,5 @@ parentB download file A	404	File not found
 parentB delete file A	404	File not found or access denied
 parentB attach file A as InstaPay screenshot	403	You are not authorized to attach that file
 parentB attach file A as remark consent	403	You are not authorized to attach that file
+parentB attach own avatar as InstaPay screenshot	403	You are not authorized to attach that file
 parentB delete own file attached as evidence	400	This file is attached to a payment or a remark request and cannot be deleted

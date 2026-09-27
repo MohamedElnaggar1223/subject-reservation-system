@@ -9,8 +9,9 @@ the response.
 **Method:** everything was driven through the running app, never inferred from code alone.
 Four new test files do the probing and now guard the result permanently; runtime-only
 properties (rate limiting, body limits, headers, the browser path) were proven against the
-real dev servers. An independent review on Opus 5.5 raised 19 flags against the first version;
-every flag that was a fact was fixed, including one finding the audit had missed (RF-23).
+real dev servers. Two independent reviews on Opus 5.5 raised 19 and then 9 flags; every flag
+that was a fact was fixed, including one finding the audit had missed (RF-23). Nine negative
+controls confirmed that each key fix's test fails when the fix is undone.
 Every decision and its evidence is in `.audit/security-audit.tsv`; every cross-family attempt
 and its answer is in `.audit/security-object-access.tsv`.
 
@@ -27,7 +28,8 @@ files, every attempt was refused and nothing changed, with one exception (RF-13)
 **Thirteen findings: one high, three medium.** The high one: the sign-in rate limiter trusted a
 header any client can send, so password guessing against staff accounts, which confirm and
 reverse money, was unlimited. The medium ones: the session token was readable by page scripts
-through four auth responses; banning an account left its sessions working, so a banned officer
+through several auth responses, including one that gave the admin's pages every officer's
+token; banning an account left its sessions working, so a banned officer
 kept money authority; and the actions that grant access to a child or change what families pay
 left no audit row. All thirteen are fixed, each with a test that fails when its fix is undone,
 and the fixes were re-proven on the real servers.
@@ -44,12 +46,12 @@ and the fixes were re-proven on the real servers.
 | One family reaching another | `05` | Every attempt refused, no state changed (after RF-13) |
 | Links | `05` | A pending link grants nothing; another family's student cannot approve a link addressed to someone else |
 | Privilege escalation | `06-auth-surface.test.ts` | Sign-up refuses injected role and student fields; update-user and profile update ignore them; better-auth's admin endpoints refuse everyone but an admin; account setup cannot switch a role |
-| Bans | `06` | A banned account is signed out at once and cannot sign in (after RF-23) |
+| Bans | `06` | A banned account is signed out at once everywhere, better-auth's own endpoints included, and cannot sign in (after RF-23) |
 | Money authority | matrix plus `06` | Only the roles in the V3 capability table confirm, reverse, void, grant exceptions or approve withdrawals. No request sets a price or a fee; the amounts a client does send (escrow to apply, transfer, withdrawal) are bounded by the server against the balance |
-| Session token | `06` | HttpOnly, SameSite=Lax cookie; the token is in no response body (after RF-12) |
+| Session token | `06` | HttpOnly, SameSite=Lax cookie; the token is in no response body, including the admin plugin's session list, impersonation and password change (after RF-12) |
 | Cross-site requests | `06` and dev server | Cookie-bearing writes from another origin are refused on both /api/auth and /v1 |
 | SQL and HTML injection | code read | Every SQL fragment is a Drizzle tagged template (values bound); no raw HTML rendering in the web app; email templates escape their inputs |
-| Rate limiting | `06` and dev server | Rotating a client IP header no longer escapes the limit; session reads no longer spend the sign-in budget |
+| Rate limiting | `06` and dev server | Rotating a client IP header, or IPv6 addresses within one /64, no longer escapes the limit; session reads no longer spend the sign-in budget |
 | Browser path | preview browser and scripted sign-in | Sign-in, sign-out and a profile save work through the new origin rule; the save is audited |
 
 ---
@@ -57,16 +59,16 @@ and the fixes were re-proven on the real servers.
 ## 3. Findings
 
 Severity is by impact on the school if exploited. Each fix has a test that fails when the fix is
-undone; the four most important were checked by undoing them (trail, "control" row).
+undone; nine were checked by undoing them (trail, "control" rows).
 
 | ID | Sev | Finding | Fix | Test |
 |---|---|---|---|---|
-| **RF-11** | **High** | The sign-in rate limiter keyed on `cf-connecting-ip` from any client. With a rotating header, 0 of 60 wrong-password attempts were throttled. Audit rows recorded the same forgeable address. | `lib/client-ip.ts` trusts only the header named in `CLIENT_IP_HEADER` (rightmost entry), else the socket address; audit rows use the same function; session reads no longer count against the sign-in budget; the API warns at boot in production without the setting. Dev server afterwards: 10 of 60 throttled. | `06`, in-process through the limiter's own headers |
-| RF-12 | Medium | The session token was returned in the JSON of `get-session`, `list-sessions` (every active session), sign-in, sign-up and `/v1/session`, so an injected script could steal a working session despite the HttpOnly cookie. | One better-auth after-hook strips it from all four; `/v1/session` strips it; the web's hand-written session type is now derived from its fetcher. | `06` |
+| **RF-11** | **High** | The sign-in rate limiter keyed on `cf-connecting-ip` from any client. With a rotating header, 0 of 60 wrong-password attempts were throttled. Audit rows recorded the same forgeable address. | `lib/client-ip.ts` trusts only the header named in `CLIENT_IP_HEADER` (rightmost entry), else the socket address; IPv6 is bucketed per /64; audit rows use the same address; session reads no longer count against the sign-in budget; the API warns at boot in production without the setting. Dev server afterwards: 10 of 60 throttled. | `06`, in-process through the limiter's own headers; `07` for the audit address |
+| RF-12 | Medium | The session token was returned in the JSON of `get-session`, `list-sessions`, sign-in, sign-up, change-password, the admin plugin's `list-user-sessions` (every session of any user) and `impersonate-user`, and `/v1/session`, so an injected script could steal working sessions despite the HttpOnly cookie. | One better-auth after-hook strips the token from every auth response (top level and any session object); `/v1/session` strips it and its type no longer has one; the web's hand-written session type is now derived from its fetcher. | `06` |
 | RF-14 | Medium | No audit row for an admin changing a user (role, ban, grade), for a parent-student link being requested, answered or removed, for remark fee or deadline changes, or for a remark payment. | Seven new audit actions; the admin update records before and after. | `07` |
-| RF-23 | Medium | Banning a user left their sessions working until they expired: better-auth checks a ban only at sign-in, and the admin's ban wrote the database directly. A banned finance officer kept confirm and reverse authority. | A banned user is treated as signed out on every request; banning through the admin form also deletes the user's sessions. | `06` |
-| RF-13 | Low | Any parent who knew another family's file id could attach it as their InstaPay screenshot or remark consent form. A parent could delete a file after attaching it, erasing the evidence (the foreign keys are ON DELETE SET NULL). `POST /v1/files` accepted any type up to 50 MB from any account and had no caller. | Both services require `isFileOwner`; an attached file cannot be deleted; the general upload route is removed. | `05` |
-| RF-15 | Low | Of 73 audit-write call sites on main, only 2 were awaited, so a money action could answer before its audit row existed. This race failed the first CI run on main. | All 80 call sites are awaited (still non-fatal); a source-scan test fails on any new unawaited write. | `07` |
+| RF-23 | Medium | Banning a user left their sessions working until they expired: better-auth checks a ban only at sign-in, and the admin's ban wrote the database directly. A banned finance officer kept confirm and reverse authority. A leftover expiry from an earlier timed ban could also void a new ban. | A banned user's sessions are deleted the first time one is seen, before better-auth's own handler runs, so every endpoint treats them as signed out; banning through the admin form deletes the sessions at once and clears any leftover expiry. | `06` |
+| RF-13 | Low | Any parent who knew another family's file id could attach it as their InstaPay screenshot or remark consent form. A parent could delete a file after attaching it, erasing the evidence (the foreign keys were ON DELETE SET NULL). `POST /v1/files` accepted any type up to 50 MB from any account and had no caller. | Evidence must be the parent's own document, and documents now accept JPEG, PNG and WebP so a screenshot has a proper route; the evidence foreign keys are ON DELETE RESTRICT (migration 0027), so the database refuses to delete attached evidence; the general upload route is removed. | `05` |
+| RF-15 | Low | Of 73 audit-write call sites on main, only 2 were awaited, so a money action could answer before its audit row existed. This race failed the first CI run on main. | All 80 call sites are awaited (still non-fatal); a source-scan test fails on any new unawaited write or any alias of the audit function. | `07` |
 | RF-16 | Low | No request body limit anywhere. | 1 MB for JSON, 11 MB for uploads. Dev server: a 2 MB body answers 413. | `06` |
 | RF-17 | Low | Sign-up with a weak password answered 500. | The password hook throws a 400 with the rule. | `06` |
 | RF-18 | Low | better-auth turns its origin check off whenever `NODE_ENV=test`, so the suite never exercised it and a deploy started with that value would run without it. | `disableOriginCheck: false`, always on. | `06` |
@@ -86,6 +88,8 @@ undone; the four most important were checked by undoing them (trail, "control" r
   (CLAUDE.md).
 - **Every audit write is awaited**, enforced by a source scan in `07`; it found two scheduler
   writes the first pass missed.
+- **The database holds the evidence rule**: a file attached to a payment or remark cannot be
+  deleted, whatever the application does (migration 0027).
 - **The web may not hand-type API responses** (CLAUDE.md); the one that had drifted, the
   session type, is now derived from its fetcher.
 - All of it runs in CI on every pushed branch.
@@ -105,6 +109,11 @@ undone; the four most important were checked by undoing them (trail, "control" r
 | O-7 | Audit rows are written after the money movement commits, in a separate statement. Writing them inside the same transaction would make "no money without its audit row" absolute. | Money-correctness audit |
 | O-8 | better-auth does not origin-check sign-in itself, since no cookie exists yet: a minor login-CSRF. | Accepted |
 | O-9 | `CORS_ORIGINS` feeds the /v1 origin rule; when the Expo app ships, its origins (`app://`, `exp://…`) must be added or its writes will be refused. | Mobile work |
+| O-10 | Rate limits are per address, so an attacker with many addresses can still guess slowly at one account. A per-account slowdown after repeated failures is the next control; the URD deliberately removed account lockout, so how far to go is a product call. | Owner decision |
+| O-11 | Session reads (`GET /api/auth/get-session`) are no longer rate limited, so a signed-in client can call them freely; each costs two session lookups. Tokens cannot be guessed through it (the cookie signature is checked first). | Accepted, low |
+| O-12 | By reading the guard (not run): better-auth's own impersonation cannot be stopped through `/api/auth/admin/stop-impersonating`, because the admin-only guard sees the impersonated user. Signing out ends it; there is no impersonation screen. | Accepted until a screen exists |
+| O-13 | better-auth's built-in limiter (on in production) keys on `x-forwarded-for` by default; this app's own limiter is the one relied on. | Deployment checklist |
+| O-14 | The audit-write scan catches unawaited calls and aliases by name, not a wrapper function called without `await`. None exists today. | Engineering health |
 
 ---
 

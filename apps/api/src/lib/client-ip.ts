@@ -38,3 +38,22 @@ export function clientIp(
   }
   return 'unknown';
 }
+
+/**
+ * The rate-limit bucket for an address. IPv4 counts per address. IPv6 counts
+ * per /64: one subscriber usually holds a whole /64, so keying on the full
+ * address would let a single attacker rotate through billions of addresses
+ * and never be throttled. An IPv4-mapped IPv6 address counts as its IPv4.
+ * Audit rows keep the exact address; only the limiter groups.
+ */
+export function rateLimitKey(address: string): string {
+  const addr = address.split('%')[0]!.trim().toLowerCase();
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(addr);
+  if (mapped) return mapped[1]!;
+  if (!addr.includes(':')) return addr;
+  const [head, tail] = addr.split('::') as [string, string | undefined];
+  const h = head ? head.split(':') : [];
+  const t = tail === undefined ? [] : tail ? tail.split(':') : [];
+  const groups = tail === undefined ? h : [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t];
+  return groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, '') || '0').join(':') + '::/64';
+}

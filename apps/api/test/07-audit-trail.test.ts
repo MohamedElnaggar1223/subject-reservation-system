@@ -36,8 +36,11 @@ describe('audit writes', () => {
     const offenders: string[] = [];
     for (const file of sourceFiles(src)) {
       readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+        const where = `${path.relative(src, file)}:${i + 1}: ${line.trim()}`;
+        // The scan matches the name, so an alias would hide a call from it.
+        if (/logAction\s+as\s+\w+|=\s*logAction\b(?!\()/.test(line)) { offenders.push(`${where} (alias)`); return; }
         if (!line.includes('logAction(') || /function logAction\(|import .*logAction/.test(line) || /^\s*(\/\/|\*)/.test(line)) return;
-        if (!/\b(await|return)\s+logAction\(/.test(line)) offenders.push(`${path.relative(src, file)}:${i + 1}: ${line.trim()}`);
+        if (!/\b(await|return)\s+logAction\(/.test(line)) offenders.push(where);
       });
     }
     expect(offenders).toEqual([]);
@@ -81,6 +84,19 @@ describe('audit trail', () => {
     await apiResponse(adm.api.v1.links[':id'].$delete({ param: { id: link!.id } }));
     const removed = (await rowsFor(link!.id)).at(-1)!;
     expect(removed).toMatchObject({ action: 'LINK_REMOVED', user_id: adm.id, previous_data: { parentId: second.id, studentId, status: 'approved' } });
+  });
+
+  it('an audit row records the connection address, never a header the client chose (RF-11)', async () => {
+    await apiResponse(adm.api.v1.users[':id'].$put(
+      { param: { id: parent.id }, json: { name: 'Spoof Check' } },
+      { headers: { 'cf-connecting-ip': '203.0.113.77', 'x-real-ip': '203.0.113.78' } }
+    ));
+    const row = await one<{ ip_address: string | null }>(
+      `select ip_address from audit_log where entity_id = $1 and action = 'USER_UPDATED_BY_ADMIN' order by created_at desc limit 1`, [parent.id]
+    );
+    expect(row.ip_address).not.toBe('203.0.113.77');
+    expect(row.ip_address).not.toBe('203.0.113.78');
+    await apiResponse(adm.api.v1.users[':id'].$put({ param: { id: parent.id }, json: { name: 'Parent at' } }));
   });
 
   it('an admin changing a user records what changed, before and after', async () => {

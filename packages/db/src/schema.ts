@@ -721,9 +721,11 @@ export const payment = pgTable(
     // (no published format exists); unique so the same transfer can never be
     // claimed against two payments. Presence is NOT proof of payment.
     verificationReference: text("verification_reference"),
-    // Optional screenshot upload backing the InstaPay reference
+    // Optional screenshot upload backing the InstaPay reference. RESTRICT, not
+    // SET NULL: it is evidence finance relies on, so the database refuses to
+    // delete the file while it is attached (security audit RF-13).
     verificationFileId: text("verification_file_id").references(() => file.id, {
-      onDelete: "set null",
+      onDelete: "restrict",
     }),
     // Instrument the parent actually used at the finance desk for in_school
     // payments: 'cash' | 'card' | 'instapay' | 'other'
@@ -1372,7 +1374,8 @@ export const remarkRequest = pgTable(
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     // Blocking consent (grades can go DOWN): parent attests + optionally
     // uploads the signed form; the school retains the paper per board rules.
-    consentFileId: text("consent_file_id").references(() => file.id, { onDelete: "set null" }),
+    // Signed consent form: evidence the board can ask for, so RESTRICT (RF-13).
+    consentFileId: text("consent_file_id").references(() => file.id, { onDelete: "restrict" }),
     consentConfirmedBy: text("consent_confirmed_by").references(() => user.id, { onDelete: "set null" }),
     consentConfirmedAt: timestamp("consent_confirmed_at", { withTimezone: true }),
     boardReference: text("board_reference"),

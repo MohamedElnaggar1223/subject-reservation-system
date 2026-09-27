@@ -46,7 +46,8 @@ export const UploadAvatar = z.object({
  * DOCUMENT UPLOAD SCHEMA
  *
  * Validates document uploads (10MB limit, specific types).
- * Allowed: PDF, DOCX, XLSX, TXT, CSV
+ * Allowed: PDF, DOCX, XLSX, TXT, CSV, and JPEG/PNG/WebP images — an InstaPay
+ * screenshot or a photographed consent form is a document (security audit RF-13).
  */
 export const UploadDocument = z.object({
   file: fileBase
@@ -62,10 +63,13 @@ export const UploadDocument = z.object({
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           'text/plain',
           'text/csv',
+          'image/jpeg',
+          'image/png',
+          'image/webp',
         ]
         return allowedTypes.includes(file.type)
       },
-      'Document must be PDF, DOCX, XLSX, TXT, or CSV'
+      'Document must be PDF, DOCX, XLSX, TXT, CSV, JPEG, PNG or WebP'
     ),
 })
 

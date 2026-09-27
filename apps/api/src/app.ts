@@ -5,8 +5,9 @@ import { HTTPException } from 'hono/http-exception'
 import { cors } from 'hono/cors'
 import { bodyLimit } from 'hono/body-limit'
 import { secureHeaders } from 'hono/secure-headers'
-import { clientIp } from './lib/client-ip'
+import { clientIp, rateLimitKey } from './lib/client-ip'
 import { isBanned } from './lib/auth-policy'
+import { revokeAllSessions } from './services/user.services'
 import { auth } from './lib/auth'
 import { HonoEnv } from './lib/types';
 import { success, error } from './lib/response';
@@ -46,7 +47,7 @@ import { remarks } from './routes/remark.routes';
  * names it (RF-11). The auth limiter used to trust cf-connecting-ip from
  * anyone, so a client rotating that header was never throttled.
  */
-const getClientIp = (c: Parameters<typeof clientIp>[0]) => clientIp(c, env.CLIENT_IP_HEADER);
+const getClientIp = (c: Parameters<typeof clientIp>[0]) => rateLimitKey(clientIp(c, env.CLIENT_IP_HEADER));
 
 // RF-16: no body is read without a bound. Uploads get room for the largest
 // file the validators allow (documents, 10 MB); everything else is JSON.
@@ -144,9 +145,15 @@ const app = new Hono<HonoEnv>()
 	const session = await auth.api.getSession({ headers: c.req.raw.headers });
 
 	// RF-23: better-auth refuses a banned account only when it signs in, so a
-	// session opened before the ban kept working. A banned user is treated as
-	// signed out on every request.
-  	if (!session || isBanned(session.user)) {
+	// session opened before the ban kept working. A banned user's sessions are
+	// deleted the first time one is seen — this middleware runs before
+	// better-auth's own handler, so /api/auth/* sees no session either — and
+	// the request is treated as signed out.
+	const banned = !!session && isBanned(session.user);
+	if (session && banned) {
+		await revokeAllSessions(session.user.id);
+	}
+  	if (!session || banned) {
     	c.set("user", null);
     	c.set("session", null);
     	await next();
@@ -218,7 +225,9 @@ const v1 = new Hono<HonoEnv>()
 
     if (!user || !current) return error(c, 'Unauthorized', 401);
 
-    const { token: _token, ...session } = current;
+    // The type already has no token; strip at run time as well, so the rule
+    // does not rest on the after-hook alone.
+    const { token: _token, ...session } = current as typeof current & { token?: string };
     return success(c, { session, user });
   })
 

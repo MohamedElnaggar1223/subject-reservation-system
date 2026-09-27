@@ -56,7 +56,7 @@ import { notifyPaymentConfirmed, notifyPaymentReversed, notifyEscrowBalanceChang
 import { createReceiptsForRegistrations } from './receipt.services';
 import { creditHeld } from './escrow.services';
 import { onRemarkPaymentCompleted } from './remark.services';
-import { isFileOwner } from './file.services';
+import { isOwnDocument } from './file.services';
 
 // ─── School Receiving Account (InstaPay destination) ─────────────────────────
 //
@@ -721,7 +721,7 @@ export async function submitInstapayReference(
   }
   // RF-13: a screenshot must be one this parent uploaded. The id used to be
   // stored as given, so any family could attach another family's document.
-  if (data.screenshotFileId && !(await isFileOwner(data.screenshotFileId, parentId))) {
+  if (data.screenshotFileId && !(await isOwnDocument(data.screenshotFileId, parentId))) {
     throw new Error('You are not authorized to attach that file');
   }
 
