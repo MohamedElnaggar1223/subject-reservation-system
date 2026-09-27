@@ -250,11 +250,19 @@ describe('money rules', () => {
       expect(takingsDelta(before, await takings(officer))).toMatchObject({ moneyIn: 1000, escrowApplied: 500, drawer: { cashIn: 1000 } });
       await audited([r.paymentId], ['PAYMENT_CONFIRMED']);
 
-      // Another family's subject, or one not waiting for payment, is refused.
+      // A subject no longer waiting for payment is refused, and so is one
+      // that belongs to another student.
       const again = await refused(officer.api.v1.registrations.desk.collect.$post({
         json: { studentId: f.studentId, registrationIds: [physReg], instrumentUsed: 'cash' },
       }));
       expect(again).toEqual({ status: 400, error: 'One or more subjects are not waiting for payment' });
+      const other = await family('cancel-other');
+      const otherReg = await direct(other, subj.BIO!);
+      const notTheirs = await refused(officer.api.v1.registrations.desk.collect.$post({
+        json: { studentId: f.studentId, registrationIds: [otherReg], instrumentUsed: 'cash' },
+      }));
+      expect(notTheirs).toEqual({ status: 400, error: 'One or more subjects do not belong to this student' });
+      expect(await statusOf('registration', otherReg)).toBe('pending_payment');
     });
 
     it('a checkout whose subject expired cannot take a transfer reference', async () => {
@@ -417,6 +425,16 @@ describe('money rules', () => {
       await apiResponse(finadmin.api.v1.escrow.admin.withdrawals[':id'].approve.$post({ param: { id: declined.id } }));
       expect(await queue()).not.toContain(declined.id);
     });
+
+    it('a finance admin cannot approve cash they handed over themselves', async () => {
+      const finadmin2 = await staff(adm, 'finance_admin', 'mr2');
+      const w = await apiResponse(f.parent.api.v1.escrow.withdraw.$post({ json: { studentId: f.studentId, amount: 100 } }));
+      await apiResponse(finadmin.api.v1.escrow.admin.withdrawals[':id'].fulfill.$post({ param: { id: w.id }, json: { releasedAmount: 100 } }));
+      const self = await refused(finadmin.api.v1.escrow.admin.withdrawals[':id'].approve.$post({ param: { id: w.id } }));
+      expect(self).toEqual({ status: 403, error: 'You handed over cash on this request, so another finance admin must approve it' });
+      await apiResponse(finadmin2.api.v1.escrow.admin.withdrawals[':id'].approve.$post({ param: { id: w.id } }));
+      await audited([w.id], ['WITHDRAWAL_APPROVED']);
+    });
   });
 
   // ─── Pricing exceptions and swaps ──────────────────────────────────────────
@@ -553,6 +571,26 @@ describe('money rules', () => {
       expect(await escrowOf(f.studentId)).toBe(1500);
     });
 
+    it('a subject paid again after a reversal gets its receipt back under a new number (MA-20)', async () => {
+      const f = await family('rv3');
+      const desk = await deskCash(f, [subj.PHY!]);
+      const reg = desk.registrations[0]!.id;
+      const first = await one<{ id: string; receipt_number: string }>(`select id, receipt_number from receipt where registration_id = $1`, [reg]);
+      await apiResponse(finadmin.api.v1.payments[':id'].reverse.$post({ param: { id: desk.payment!.id }, json: { reason: 'confirmed against the wrong family' } }));
+      expect(await one(`select status from receipt where id = $1`, [first.id])).toEqual({ status: 'void' });
+
+      const again = await apiResponse(officer.api.v1.registrations.desk.collect.$post({
+        json: { studentId: f.studentId, registrationIds: [reg], instrumentUsed: 'cash' },
+      }));
+      expect(again.receipts.map((r) => r.receiptNumber)).toEqual([`${first.receipt_number}-R2`]);
+      expect(await one(`select status, receipt_number from receipt where id = $1`, [first.id])).toEqual({
+        status: 'pending_issue', receipt_number: `${first.receipt_number}-R2`,
+      });
+      // It is a real receipt: the desk can hand it over.
+      await apiResponse(officer.api.v1.receipts[':id'].issue.$post({ param: { id: first.id } }));
+      expect(await one(`select status from receipt where id = $1`, [first.id])).toEqual({ status: 'issued' });
+    });
+
     it('a drop and a reversal of the same payment at once: one wins cleanly, never a deadlock (MA-16)', async () => {
       // A deadlock also leaves one winner, so the loser must be refused with
       // one of the sentences a clean refusal gives, not a failed query.
@@ -650,6 +688,12 @@ describe('money rules', () => {
       expect(await statusOf('registration', okReg)).toBe('pending_payment');
       const queue = await apiResponse(officer.api.v1.payments['pending-manual'].$get());
       expect(queue.map((p) => p.id)).toEqual(expect.arrayContaining([okPay, badPay]));
+
+      // The desk cannot take money for it: the window is closed for this student.
+      const desk = await refused(officer.api.v1.registrations.desk.collect.$post({
+        json: { studentId: f.studentId, registrationIds: [okReg], instrumentUsed: 'cash' },
+      }));
+      expect(desk).toEqual({ status: 422, error: 'Registration window is not open — a finance admin can grant this student a deadline extension' });
     });
 
     it('finance confirms it after the close: the subject is confirmed and its receipt is born (MA-01)', async () => {
@@ -706,26 +750,53 @@ describe('money rules', () => {
   // Runs after the close above, which frees the january / as_level slot.
 
   describe('a preregistration paid after its session opened', () => {
-    it('confirms the subject and leaves nothing stranded in the held wallet (MA-15)', async () => {
-      const f = await family('pre');
-      const draft = await session(adm, 'January (AS, money rules, prereg)', 'january', 'as_level', futureWindow());
-      const reg = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({
-        json: { sessionId: draft, subjectIds: [subj.PHY!], studentId: f.studentId },
+    let f: Family, early: string, late: string, pay: string;
+
+    beforeAll(async () => {
+      f = await family('pre');
+      // Two draft sessions; only the January one opens in this test.
+      const january = await session(adm, 'January (AS, money rules, prereg)', 'january', 'as_level', futureWindow());
+      const june = await session(adm, 'June (AS, money rules, prereg)', 'june', 'as_level', futureWindow());
+      early = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({
+        json: { sessionId: january, subjectIds: [subj.PHY!], studentId: f.studentId },
       })))[0]!.id;
-      const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({
-        json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 },
+      late = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({
+        json: { sessionId: june, subjectIds: [subj.GEO!], studentId: f.studentId },
+      })))[0]!.id;
+
+      // One InstaPay transfer for both, referenced, not yet checked by finance.
+      pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({
+        json: { registrationIds: [early, late], paymentMethod: 'instapay', escrowAmountToApply: 0 },
       }))).id!;
       await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: pay }, json: { reference: 'FT-MR-PRE-1' } }));
 
-      // The session opens before finance gets to the transfer: capture finds
-      // no confirmed money and moves the subject to pending payment.
-      await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: draft } }));
-      await waitFor(async () => (await statusOf('registration', reg)) === 'pending_payment' || null);
+      // January opens before finance gets to the transfer: capture finds no
+      // confirmed money and moves that subject to pending payment.
+      await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: january } }));
+      await waitFor(async () => (await statusOf('registration', early)) === 'pending_payment' || null);
+    });
 
+    it('cancelling a preregistration while its transfer is being checked is refused', async () => {
+      const r = await refused(f.parent.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: late } }));
+      expect(r.error).toBe('A payment for this subject is in progress — cancel that checkout first, or wait for the finance office to confirm or reject the transfer');
+      expect(await statusOf('registration', late)).toBe('preregistered');
+    });
+
+    it('confirms the opened subject and holds only the one still waiting (MA-15)', async () => {
       await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay }, json: {} }));
-      expect(await statusOf('registration', reg)).toBe('confirmed');
-      const wallet = await sql<{ balance: string; held: string }>(`select balance, held_balance as held from escrow where student_id = $1`, [f.studentId]);
-      expect(wallet.map((w) => [money(w.balance), money(w.held)])).toEqual(wallet.length ? [[0, 0]] : []);
+      expect(await statusOf('registration', early)).toBe('confirmed');
+      expect(await statusOf('registration', late)).toBe('preregistered');
+      const w = await one<{ balance: string; held: string }>(`select balance, held_balance as held from escrow where student_id = $1`, [f.studentId]);
+      expect([money(w.balance), money(w.held)]).toEqual([0, 1500]);
+    });
+
+    it('a preregistration already paid for cannot be paid again', async () => {
+      const r = await refused(f.parent.api.v1.payments.initiate.$post({
+        json: { registrationIds: [late], paymentMethod: 'in_school', escrowAmountToApply: 0 },
+      }));
+      expect(r.error).toBe('One or more of these subjects is already paid for.');
+      const w = await one<{ held: string }>(`select held_balance as held from escrow where student_id = $1`, [f.studentId]);
+      expect(money(w.held)).toBe(1500);
     });
   });
 });

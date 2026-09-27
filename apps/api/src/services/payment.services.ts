@@ -316,6 +316,11 @@ export async function initiatePayment(
         'One or more registrations already have a pending payment. Complete or wait for it to expire first.'
       );
     }
+    // A paid preregistration is still 'preregistered', so its status alone
+    // let it be paid again and its price held twice (money audit review).
+    if (existingPaymentLinksInTx.some((pl) => pl.payment.status === 'completed')) {
+      throw new Error('One or more of these subjects is already paid for.');
+    }
 
     // 1. Create payment record FIRST so the escrow_transaction FK can resolve.
     const [paymentRecord] = await tx

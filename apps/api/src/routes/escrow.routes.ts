@@ -324,13 +324,12 @@ export const escrowRoutes = new Hono<HonoEnv>()
       const { id } = c.req.valid('param');
 
       try {
-        const result = await escrowService.approveWithdrawalRequest(id, user.id);
-        await logAction(user.id, 'WITHDRAWAL_APPROVED', 'escrow', id, null, result as Record<string, unknown>, extractAuditContext(c))
-          .catch(err => console.error('[audit] WITHDRAWAL_APPROVED failed:', err));
+        // WITHDRAWAL_APPROVED is written inside the approval's transaction (O-7).
+        const result = await escrowService.approveWithdrawalRequest(id, user.id, extractAuditContext(c));
         return success(c, result);
       } catch (err) {
         const message = clientMessage(err, 'Failed to approve withdrawal');
-        return error(c, message, message.includes('not awaiting') ? 409 : 400);
+        return error(c, message, message.includes('not awaiting') ? 409 : message.includes('another finance admin') ? 403 : 400);
       }
     }
   );

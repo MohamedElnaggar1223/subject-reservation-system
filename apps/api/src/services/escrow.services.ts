@@ -849,21 +849,41 @@ export async function getWithdrawalRequestsForParent(
  * Qualifies: fulfilled or partially fulfilled, or rejected after a partial
  * hand-over (that cash still went out).
  */
-export async function approveWithdrawalRequest(id: string, financeAdminId: string) {
-  const [updated] = await db
-    .update(withdrawalRequest)
-    .set({ approvedBy: financeAdminId, approvedAt: new Date(), updatedAt: new Date() })
-    .where(
-      and(
-        eq(withdrawalRequest.id, id),
-        or(
-          inArray(withdrawalRequest.status, ['fulfilled', 'partially_fulfilled']),
-          and(eq(withdrawalRequest.status, 'rejected'), gt(withdrawalRequest.releasedAmount, 0)),
-        ),
-        isNull(withdrawalRequest.approvedBy),
+export async function approveWithdrawalRequest(id: string, financeAdminId: string, auditCtx?: AuditContext) {
+  return db.transaction(async (tx) => {
+    // Lock the request so a hand-over cannot land between the check and the approval.
+    await tx.select({ id: withdrawalRequest.id }).from(withdrawalRequest)
+      .where(eq(withdrawalRequest.id, id)).for('update');
+
+    // Maker-checker means two people: a finance admin can hand cash over, but
+    // not approve cash they handed over themselves (money audit review).
+    const own = await tx
+      .select({ id: withdrawalDisbursement.id })
+      .from(withdrawalDisbursement)
+      .where(and(eq(withdrawalDisbursement.withdrawalRequestId, id), eq(withdrawalDisbursement.disbursedBy, financeAdminId)))
+      .limit(1);
+    if (own.length > 0) {
+      throw new Error('You handed over cash on this request, so another finance admin must approve it');
+    }
+
+    const [updated] = await tx
+      .update(withdrawalRequest)
+      .set({ approvedBy: financeAdminId, approvedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(withdrawalRequest.id, id),
+          or(
+            inArray(withdrawalRequest.status, ['fulfilled', 'partially_fulfilled']),
+            and(eq(withdrawalRequest.status, 'rejected'), gt(withdrawalRequest.releasedAmount, 0)),
+          ),
+          isNull(withdrawalRequest.approvedBy),
+        )
       )
-    )
-    .returning();
-  if (!updated) throw new Error('Withdrawal is not awaiting approval');
-  return updated;
+      .returning();
+    if (!updated) throw new Error('Withdrawal is not awaiting approval');
+
+    await logAction(financeAdminId, 'WITHDRAWAL_APPROVED', 'escrow', id, null,
+      { status: updated.status, releasedAmount: updated.releasedAmount }, auditCtx, tx);
+    return updated;
+  });
 }

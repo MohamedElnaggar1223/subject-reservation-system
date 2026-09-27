@@ -40,6 +40,31 @@ export async function createReceiptsForRegistrations(
   executor: DbOrTx = db
 ) {
   if (registrationIds.length === 0) return;
+
+  // A registration paid again after its payment was reversed already has a
+  // receipt, voided by the reversal. Skipping it (the insert below does
+  // nothing on conflict) left the new payment with no receipt to hand over,
+  // and the desk offered the void one (money audit MA-20). Reissue it under a
+  // new number, so the voided paper can never pass for the new one.
+  const existing = await executor
+    .select({ id: receipt.id, registrationId: receipt.registrationId, status: receipt.status, receiptNumber: receipt.receiptNumber })
+    .from(receipt)
+    .where(inArray(receipt.registrationId, registrationIds));
+  for (const rc of existing.filter((r) => r.status === 'void')) {
+    const n = Number(/-R(\d+)$/.exec(rc.receiptNumber)?.[1] ?? '1') + 1;
+    await executor
+      .update(receipt)
+      .set({
+        status: 'pending_issue',
+        receiptNumber: `${receiptNumberFor(rc.registrationId)}-R${n}`,
+        issuedBy: null, issuedAt: null, returnedTo: null, returnedAt: null,
+        refundAmountOnReturn: null, refundReason: null, refundInitiatedBy: null,
+        notes: `Reissued — ${rc.receiptNumber} was voided when an earlier payment was reversed`,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(receipt.id, rc.id), eq(receipt.status, 'void')));
+  }
+
   await executor
     .insert(receipt)
     .values(

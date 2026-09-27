@@ -19,7 +19,7 @@
 import { db, payment, paymentRegistration, registration, parentStudentLink, user as userTable, eq, and, inArray } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { DeskOnboardFamilyType, DeskRegistrationType, DeskCollectType } from '@repo/validations';
-import type { AuditContext } from './audit.services';
+import { logAction, type AuditContext } from './audit.services';
 import { auth } from '../lib/auth';
 import {
   prepareRegistrationInputs,
@@ -28,7 +28,7 @@ import {
 import { hasDeadlineExtension } from './exception.services';
 import { setStudentFields } from './user.services';
 import { getEscrowBalance, debitEscrow } from './escrow.services';
-import { confirmPayment, sessionOpenFor } from './payment.services';
+import { confirmPayment, failPayment, sessionOpenFor } from './payment.services';
 import {
   academicYearForDate,
   getApplicableFee,
@@ -291,10 +291,9 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
 
   // Money is in hand — confirm through the shared path so registrations
   // flip to confirmed, receipts are created, and NOT-005 fires.
-  await confirmPayment(
+  await confirmDeskPayment(
     paymentId,
     staffId,
-    undefined,
     data.collectNow.notes ?? 'Collected at the finance desk',
     data.collectNow.instrumentUsed
   );
@@ -311,6 +310,34 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     collected: Math.max(0, totalCost - escrowToApply),
     receipts,
   };
+}
+
+/**
+ * Confirm a payment the desk has just created. The payment is created in one
+ * transaction and confirmed in the next, so between them the close or a
+ * parent could fail it: confirmPayment then returns undefined, and the desk
+ * must not answer "collected". If confirmation throws, the desk's own
+ * payment is failed so its escrow comes back and a retry is not refused as
+ * "in progress" (money audit review, second round).
+ */
+async function confirmDeskPayment(
+  paymentId: string,
+  staffId: string,
+  notes: string,
+  instrumentUsed: string,
+  auditCtx?: AuditContext
+) {
+  let confirmed;
+  try {
+    confirmed = await confirmPayment(paymentId, staffId, undefined, notes, instrumentUsed, auditCtx);
+  } catch (err) {
+    await failPayment(paymentId, { from: ['pending'], reason: 'Desk collection could not be confirmed' })
+      .catch((e) => console.error(`[desk] could not release payment ${paymentId}:`, e));
+    throw err;
+  }
+  if (!confirmed) {
+    throw new Error('The payment was closed before it could be confirmed — nothing was collected; please try again');
+  }
 }
 
 /**
@@ -392,19 +419,16 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
     await tx.insert(paymentRegistration).values(
       data.registrationIds.map((registrationId) => ({ id: randomUUID(), paymentId, registrationId }))
     );
+    await logAction(staffId, 'PAYMENT_INITIATED', 'payment', paymentId, null,
+      { desk: true, registrationIds: data.registrationIds, amount: totalCost - escrowToApply, escrowApplied: escrowToApply }, auditCtx, tx);
   });
 
-  await confirmPayment(
-    paymentId,
-    staffId,
-    undefined,
-    data.notes ?? 'Collected at the finance desk',
-    data.instrumentUsed,
-    auditCtx
-  );
+  await confirmDeskPayment(paymentId, staffId, data.notes ?? 'Collected at the finance desk', data.instrumentUsed, auditCtx);
 
+  // Only receipts ready to hand over; a void one is never offered (MA-20).
   const receipts = await db.query.receipt.findMany({
-    where: (r, { inArray: inArr }) => inArr(r.registrationId, data.registrationIds),
+    where: (r, { inArray: inArr, and: andOp, eq: eqOp }) =>
+      andOp(inArr(r.registrationId, data.registrationIds), eqOp(r.status, 'pending_issue')),
     columns: { id: true, registrationId: true, receiptNumber: true, status: true },
   });
   return {
@@ -464,7 +488,7 @@ export async function collectSchoolFeeAtDesk(
     metadata: { desk: true, staffId },
   });
 
-  await confirmPayment(paymentId, staffId, undefined, notes ?? 'School fee collected at desk', instrumentUsed);
+  await confirmDeskPayment(paymentId, staffId, notes ?? 'School fee collected at desk', instrumentUsed);
 
   return { paymentId, academicYear, amount: fee.amount };
 }

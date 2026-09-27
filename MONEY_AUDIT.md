@@ -12,9 +12,10 @@ as a failing scenario through the API before it was fixed. Two new test files ho
 `08-money-rules.test.ts` (one scenario per rule, with concurrency fired as simultaneous
 requests on separate connections) and `09-money-invariants.test.ts` (rules that must hold over
 every row the whole suite leaves behind). Fixes were checked by undoing them, invariants by
-corrupting rows, and the screens were driven in a real browser against the dev servers. An
-independent review on Opus 5.5 then found four more defects on paths the first pass had read,
-and several claims worded more strongly than the evidence; all are acted on below (§4).
+corrupting rows, and the screens were driven in a real browser against the dev servers. Two
+independent reviews on Opus 5.5 followed: the first found four more defects on paths the first
+pass had read and several claims worded beyond the evidence; the second, of the fixes, found a
+blocker in them (MA-20) and more races on the same paths. All are acted on below (§4).
 Every decision and its evidence is in `.audit/money-audit.tsv`; the scripts, screenshots and
 logs it cites are kept locally in `.audit/money-audit-evidence/` (git-ignored: they hold dev
 test accounts).
@@ -29,7 +30,7 @@ could make a balance disagree with its ledger or go negative. The defects were i
 flows decided to do with money, in the report the desk reconciles against, and in checks that
 read a row and then wrote it without a lock.
 
-**Nineteen findings: one high, fourteen medium, four low.** The high one: when a registration
+**Twenty findings: one high, fifteen medium, four low.** The high one: when a registration
 window closed, the system failed every open payment, including InstaPay transfers the family
 had already sent and referenced. The registration expired, the escrow came back, and nothing
 could confirm the transfer afterwards. Among the medium ones: a takings report whose "net in
@@ -37,8 +38,10 @@ drawer" counted every reversal twice and included bank transfers; reversals and 
 that rewrote or vanished from days already reconciled; races that recorded less cash than was
 handed out or created refund money; a reversal that paid a family twice; preregistration money
 stranded in the held wallet; a drop that refunded at once while the family held the paper
-receipt; a second-approver check on cash refunds that could be bypassed; and a desk that could
-not take money for a subject already registered. All nineteen are fixed, each with a test.
+receipt; a second-approver check on cash refunds that could be bypassed; a desk that could not
+take money for a subject already registered; and a subject paid again after a reversal left
+with only its voided receipt. All twenty are fixed. Eighteen have a test that fails without the
+fix; MA-12, and the deadlock half of MA-16, rest on reasoning.
 
 Two questions are the owner's (§5, MO-10 and MO-11): how long a family has to submit an
 InstaPay reference after the close, and whether reversing a cash payment means cash was handed
@@ -56,8 +59,8 @@ back.
 | Price = fee split | `09` | Every registration price equals course fee plus registration fee |
 | Paid once | `09` | No registration is covered by two completed payments; every confirmed one by exactly one |
 | No money for nothing | `09` | A completed payment never covers a waiting, expired or rejected registration |
-| Receipts | `09` | Every paid registration has its receipt; a parked drop has a receipt out waiting to return, refunding no more than the price |
-| Held wallet | `09` | Held balance equals the prices of paid preregistrations still waiting for their session |
+| Receipts | `09` | Every paid registration has its receipt, never a void one; a parked drop has a receipt out waiting to return, refunding no more than the price |
+| Held wallet | `09`, with a paid preregistration still waiting at the end of the suite | Held balance equals the prices of paid preregistrations still waiting for their session |
 | Drops | `09` | No drop refunds more than the registration cost |
 | Cash refunds | `09` | Cash handed over adds up to what each request says was released, never more than requested; an approval covers every hand-over made before it |
 | Audit rows | `09` | Every completed, reversed or failed payment carries exactly its transition's audit rows |
@@ -89,16 +92,17 @@ fixes were undone and what failed; exceptions are named in the Test column.
 | MA-12 | Low | `confirmPayment` judged the registrations before its transaction, so a close in between could leave a completed payment on expired registrations. Not reproduced; fixed by reasoning. | Payment and registrations are locked and judged inside the transaction. | None for the race itself. `09` would catch the outcome only if a suite path produced it |
 | MA-13 | Medium | Deadline extensions let a student register after the close, but payment ignored them: the desk created a payment it then could not confirm; the parent could not pay at all. | One check — active session or an extension — used by checkout, confirmation, rejection and desk collection. | `08` "a student with a deadline extension" |
 | MA-14 | Medium | A payment could be reversed after one of its subjects was dropped and refunded: the family kept the refund for money recorded as never received. | A reversal requires every registration to still be confirmed. | `08` "reversing a confirmation … is refused" |
-| MA-15 | Medium | A preregistration paid after its session opened credited the whole payment to the held wallet although capture had already moved the subject on; nothing ever took it out, so the family's money was stranded. | Held is credited only for rows still preregistered. | `08` "a preregistration paid after its session opened"; `09` held rule |
+| MA-15 | Medium | A preregistration paid after its session opened credited the whole payment to the held wallet although capture had already moved the subject on; nothing ever took it out, so the family's money was stranded. The same path had three more ways in: a cancel while a transfer was being checked dropped the row with nothing refunded; capture decided "paid?" without a lock, so a confirmation in between reached the same outcome; and a paid preregistration could be paid again, holding its price twice. | Held is credited only for rows still preregistered; cancel is refused while a payment is open and decides under a row lock; capture locks the row and decides inside its transaction; checkout refuses a subject already paid for. | `08` "a preregistration paid after its session opened" (one payment for two preregistrations, one session opens), "cancelling … while its transfer is being checked", "already paid for cannot be paid again"; `09` held rule. The capture race is fixed by reasoning |
 | MA-16 | Medium | A drop read the receipt without a lock and voided it unguarded: an officer handing the paper over in between left the family with the paper and an immediate refund. A drop also locked registration then receipt, the reverse of a reversal's order. | The drop locks the receipt first (the reversal's order) and voids only a receipt still at the desk. | `08` "a drop racing the hand-over" (swept; failed without the fix). The deadlock was not reproduced (0 of 3 swept runs with the old order); the order change rests on reasoning |
-| MA-17 | Medium | The second approver's check on cash refunds could be bypassed: an approval given after one partial hand-over stayed on the request, so the rest was paid out unapproved; a request rejected after a partial hand-over left the queue unapproved. | A new hand-over clears the approval; a rejected request with cash out stays in the queue until approved; the screen says whether the request is closed. | `08` "every hand-over needs the second signature"; `09` approval rule |
-| MA-18 | Medium | The desk could not take money for a subject already registered and unpaid — the state after a reversal ("settle again at the finance desk"), a rejection, a cancelled checkout or a register-only visit. | `POST /v1/registrations/desk/collect` and a one-click "waiting for payment" bar on the desk, refused with a sentence while a checkout is in progress. | `08` "the desk takes the money for a subject already registered" |
+| MA-17 | Medium | The second approver's check on cash refunds could be bypassed: an approval given after one partial hand-over stayed on the request, so the rest was paid out unapproved; a request rejected after a partial hand-over left the queue unapproved; and a finance admin could approve cash they had handed over themselves. | A new hand-over clears the approval; a rejected request with cash out stays in the queue until approved; approving cash you handed over is refused (403); the approval and its audit row commit together; the screen says whether the request is closed. | `08` "every hand-over needs the second signature", "cannot approve cash they handed over themselves"; `09` approval rule |
+| MA-18 | Medium | The desk could not take money for a subject already registered and unpaid — the state after a reversal ("settle again at the finance desk"), a rejection, a cancelled checkout or a register-only visit. | `POST /v1/registrations/desk/collect` and a one-click "waiting for payment" bar on the desk, refused with a sentence while a checkout is in progress or the window is closed for the student. The desk (here, and for desk registration and school fees) now checks its confirmation happened: if the payment was failed in between it says nothing was collected, and if confirmation throws, its own payment is failed so the escrow comes back. | `08` "the desk takes the money for a subject already registered" (incl. another student's subject, and the closed window). The confirmation guard is fixed by reasoning |
 | MA-19 | Low | Every refusal on every screen was shown as the raw response body (`{"success":false,"error":"…"}`) since the initial commit, the money sentences included. | `apiResponse` throws the API's sentence, or the validation messages. | `08` asserts the thrown sentence for a refusal and a validation failure |
+| MA-20 | Medium | A subject paid again after its payment was reversed kept only the receipt the reversal had voided: receipt creation skips a registration that already has one, so the new payment had no receipt to hand over, and the desk listed the void one as "ready to hand over" and could print it. Handing that paper over re-opened MA-16. Found by the second review, in this audit's own MA-18 screenshot. | Paying again reissues the void receipt under a new number (`…-R2`), so the voided paper can never pass for it; the desk lists only receipts ready to hand over. | `08` "a subject paid again after a reversal gets its receipt back under a new number"; `09` "never a void one" |
 
 **O-7 (handed on by the security audit).** Payment confirmation, reversal, failure,
-cancellation and rejection, desk collection, and cash-refund hand-over and rejection write their
-audit rows inside the money transaction. The other money actions still write after the commit
-(MO-1).
+cancellation and rejection, desk collection (its payment and escrow debit, then its
+confirmation), and cash-refund hand-over, rejection and approval write their audit rows inside
+the money transaction. The other money actions still write after the commit (MO-1).
 
 **Also tightened:** money inputs (escrow applied, transfers, withdrawals, hand-overs) accept at
 most two decimals, and refund totals are rounded to the piastre, so a request's hand-overs
@@ -106,11 +110,18 @@ always add up to its total.
 
 ---
 
-## 4. What the review changed
+## 4. What the reviews changed
 
-The Opus 5.5 review (trail, "review" rows) found no regression in the first commit and four
-defects the first pass missed on paths it had read: MA-15, MA-16, MA-17 and MA-18 above
-(MA-19 was found while driving the screens for MA-18). It also corrected these claims:
+The first Opus 5.5 review (trail, "review" rows) found no regression in the first commit and
+four defects the first pass missed on paths it had read: MA-15, MA-16, MA-17 and MA-18 above
+(MA-19 was found while driving the screens for MA-18). The second review, of those fixes,
+found a blocker in them — MA-20, visible in this audit's own screenshot of the desk collection,
+whose trail row had said "all flows work" — and, on the same paths, the preregistration races
+now under MA-15, self-approval under MA-17, the unchecked desk confirmation under MA-18, a desk
+test comment that claimed an ownership case it did not run, a held-wallet rule that checked
+almost nothing (no paid preregistration was left waiting at the end of the suite), and a claim
+that desk collection wrote all its audit rows inside the transaction. All are fixed. The first
+review also corrected these claims:
 
 - **"Each lock was shown necessary by removing it"** was not true. Now shown by removal:
   the checkout's registration lock (MA-06), the refund hand-over and rejection locks (MA-08),
@@ -171,7 +182,10 @@ defects the first pass missed on paths it had read: MA-15, MA-16, MA-17 and MA-1
 | MO-13 | A swap does not record retake status on the new registration (price is unaffected: retake matters only for outside-school pricing, which swaps do not offer). | Engineering health |
 | MO-14 | The desk's collection bar applies no escrow; the endpoint accepts it. | Feature work |
 | MO-15 | A parent can cancel a pay-at-school checkout after handing cash over; the officer's confirm then says so and points to desk collection. | Accepted |
-| MO-16 | A finance admin approving at the instant an officer hands more cash over approves that hand-over too, unseen. | Accepted, low |
+| MO-16 | A finance admin approving just after an officer hands more cash over approves that hand-over too, before their screen has shown it (the queue refreshes every 30 seconds). | Accepted, low |
+| MO-17 | A validation refusal now reads as its message alone; a generic message (none in the money forms) would not say which field failed. | Engineering health |
+| MO-18 | Cancelling a preregistration at the very instant capture runs for it can deadlock; Postgres aborts one of the two and no money moves. | Accepted, low |
+| MO-19 | Dev data only: the dev database has one registration confirmed with a void receipt, made before MA-20 was fixed. No production data exists. | Accepted |
 
 ---
 

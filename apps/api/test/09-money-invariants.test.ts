@@ -30,7 +30,10 @@ describe('money invariants over the whole database', () => {
         (select count(*) from withdrawal_disbursement)                                    as hand_overs,
         (select count(*) from withdrawal_request where status = 'rejected')              as rejected_withdrawals,
         (select count(*) from withdrawal_request where approved_by is not null)          as approved_withdrawals,
-        (select count(*) from registration where status = 'preregistered')               as waiting_preregistrations,
+        (select count(*) from registration r where r.status = 'preregistered' and exists (
+           select 1 from payment_registration pr join payment p on p.id = pr.payment_id
+           where pr.registration_id = r.id and p.status = 'completed'))                  as paid_waiting_preregistrations,
+        (select count(*) from receipt where receipt_number like '%-R%')                  as reissued_receipts,
         (select count(*) from registration where status = 'dropped_pending_receipt' or status = 'dropped') as drops
     `);
     for (const [kind, n] of Object.entries(counts!)) expect(Number(n), kind).toBeGreaterThan(0);
@@ -125,6 +128,12 @@ describe('money invariants over the whole database', () => {
         and not exists (select 1 from receipt rc where rc.registration_id = r.id)
     `);
     expect(noReceipt).toEqual([]);
+    // A paid subject's receipt is one the desk can hand over or has handed over, never a void one (MA-20).
+    const voidForPaid = await sql(`
+      select r.id, rc.receipt_number from registration r join receipt rc on rc.registration_id = r.id
+      where r.status = 'confirmed' and rc.status = 'void'
+    `);
+    expect(voidForPaid).toEqual([]);
     const parked = await sql(`
       select r.id, rc.status, rc.refund_amount_on_return, r.price_at_registration
       from registration r join receipt rc on rc.registration_id = r.id

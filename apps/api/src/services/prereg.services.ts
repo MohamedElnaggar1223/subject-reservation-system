@@ -117,12 +117,23 @@ export async function createPreregistration(parentId: string, data: PreregisterR
 /**
  * Is this prereg funded? (a completed payment covers it)
  */
-async function isPreregFunded(registrationId: string): Promise<boolean> {
-  const links = await db.query.paymentRegistration.findMany({
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Whether a preregistration is paid for, and whether a payment for it is
+ * still open. Callers ask inside their transaction, after locking the row:
+ * asked before it, a confirmation landing in between went unseen (money
+ * audit review, second round).
+ */
+async function preregPaymentState(registrationId: string, executor: typeof db | Tx) {
+  const links = await executor.query.paymentRegistration.findMany({
     where: (pr, { eq }) => eq(pr.registrationId, registrationId),
     with: { payment: { columns: { status: true } } },
   });
-  return links.some((l) => l.payment.status === 'completed');
+  return {
+    funded: links.some((l) => l.payment.status === 'completed'),
+    open: links.some((l) => l.payment.status === 'pending' || l.payment.status === 'pending_verification'),
+  };
 }
 
 /**
@@ -146,11 +157,19 @@ export async function cancelPreregistration(registrationId: string, parentId: st
   const linked = await validateParentStudentLink(parentId, reg.studentId);
   if (!linked) throw new Error('You are not linked to this student');
 
-  const funded = await isPreregFunded(registrationId);
-  const pct = funded ? await refundPercentage(new Date(), reg.sessionId, reg.studentId) : 0;
-  const refundAmount = funded ? round2((reg.priceAtRegistration * pct) / 100) : 0;
+  const pct = await refundPercentage(new Date(), reg.sessionId, reg.studentId);
 
   const result = await db.transaction(async (tx) => {
+    // Lock the row, then decide. A payment still open for it means money may
+    // be on its way: cancelling now dropped the row with nothing refunded and
+    // left finance unable to confirm the transfer.
+    await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, registrationId)).for('update');
+    const { funded, open } = await preregPaymentState(registrationId, tx);
+    if (open) {
+      throw new Error('A payment for this subject is in progress — cancel that checkout first, or wait for the finance office to confirm or reject the transfer');
+    }
+    const refundAmount = funded ? round2((reg.priceAtRegistration * pct) / 100) : 0;
+
     // Release the full held amount; the refundable portion re-enters the
     // free balance (receipt-gated); the remainder is retained per the
     // refund windows.
@@ -176,7 +195,7 @@ export async function cancelPreregistration(registrationId: string, parentId: st
       fromStatus: 'preregistered',
     });
 
-    return { success: true, funded, refundPercentage: pct, ...dropOutcome };
+    return { success: true, funded, refundPercentage: funded ? pct : 0, ...dropOutcome };
   });
 
   return result;
@@ -206,36 +225,38 @@ export async function capturePreregistrationsForSession(sessionId: string): Prom
 
   for (const reg of preregs) {
     try {
-      const funded = await isPreregFunded(reg.id);
-      if (funded) {
-        await db.transaction(async (tx) => {
-          const [updated] = await tx
-            .update(registration)
-            .set({ status: 'confirmed', updatedAt: new Date() })
-            .where(and(eq(registration.id, reg.id), eq(registration.status, 'preregistered')))
-            .returning({ id: registration.id });
-          if (!updated) return;
+      // Lock the row, then ask whether it is paid for. Asked before the lock,
+      // a confirmation committing in between moved a paid row to
+      // pending_payment and stranded its held money (the MA-15 outcome).
+      const outcome = await db.transaction(async (tx) => {
+        const [row] = await tx
+          .select({ status: registration.status })
+          .from(registration)
+          .where(eq(registration.id, reg.id))
+          .for('update');
+        if (row?.status !== 'preregistered') return 'skipped' as const;
 
-          await debitHeld(
-            {
-              studentId: reg.studentId,
-              amount: reg.priceAtRegistration,
-              reason: 'prereg_capture',
-              initiatedBy: reg.studentId,
-              relatedRegistrationId: reg.id,
-            },
-            tx
-          );
-        });
-        captured++;
-      } else {
-        const [updated] = await db
+        const { funded } = await preregPaymentState(reg.id, tx);
+        await tx
           .update(registration)
-          .set({ status: 'pending_payment', updatedAt: new Date() })
-          .where(and(eq(registration.id, reg.id), eq(registration.status, 'preregistered')))
-          .returning({ id: registration.id });
-        if (updated) movedToPendingPayment++;
-      }
+          .set({ status: funded ? 'confirmed' : 'pending_payment', updatedAt: new Date() })
+          .where(eq(registration.id, reg.id));
+        if (!funded) return 'moved' as const;
+
+        await debitHeld(
+          {
+            studentId: reg.studentId,
+            amount: reg.priceAtRegistration,
+            reason: 'prereg_capture',
+            initiatedBy: reg.studentId,
+            relatedRegistrationId: reg.id,
+          },
+          tx
+        );
+        return 'captured' as const;
+      });
+      if (outcome === 'captured') captured++;
+      if (outcome === 'moved') movedToPendingPayment++;
     } catch (err) {
       // A single failed capture (e.g. insufficient held after manual
       // intervention) must not block the rest; the row stays

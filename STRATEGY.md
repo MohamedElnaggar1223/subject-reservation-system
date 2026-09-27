@@ -187,8 +187,9 @@ before it ships.
    Handed on: a second factor for finance roles (owner decision), audit rows inside the money
    transaction (money audit), and the production checklist in §6 of that report.
 2. **Money-correctness audit** (Phase 1.2). Done on 27 Sep 2026, reviewed on Opus 5.5:
-   `MONEY_AUDIT.md`, trail `.audit/money-audit.tsv`. Nineteen findings (MA-01 to MA-19; one
-   high: InstaPay transfers already sent were failed at window close) fixed with tests;
+   `MONEY_AUDIT.md`, trail `.audit/money-audit.tsv`. Twenty findings (MA-01 to MA-20; one
+   high: InstaPay transfers already sent were failed at window close), all fixed, eighteen
+   with a test that fails without the fix;
    thirteen money invariants now run over the whole database after every suite; takings count
    reversals and refunds on their own day and show the drawer as cash only; the desk can take
    money for subjects already registered; O-7 done for payments and cash refunds.
