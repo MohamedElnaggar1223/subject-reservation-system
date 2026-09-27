@@ -1029,6 +1029,18 @@ describe('money rules', () => {
       }));
       expect(await escrowOf(f.studentId)).toBe(3800);
 
+      // An undo puts back the reference the payment had: the Art payment's family reference returns…
+      expect(await apiResponse(undo(finadmin, artPay))).toEqual({ id: artPay, debitedFromEscrow: 1000 });
+      expect((await one<{ ref: string }>(`select verification_reference as ref from payment where id = $1`, [artPay])).ref).toBe('FT-MR-DEADLINE-1');
+      await apiResponse(finadmin.api.v1.payments[':id']['record-transfer'].$post({
+        param: { id: artPay }, json: { notes: 'recorded again, under the statement reference', reference: 'FT-MR-DEADLINE-1B', amount: 1000 },
+      }));
+      expect(await escrowOf(f.studentId)).toBe(3800);
+      // …and once set aside again, it cannot become another payment's statement reference.
+      expect(await refused(finadmin.api.v1.payments[':id']['record-transfer'].$post({
+        param: { id: lapsePay }, json: { notes: 'found on the statement', reference: 'FT-MR-DEADLINE-1', amount: 1000 },
+      }))).toEqual({ status: 409, error: 'This transfer reference is already recorded against another payment' });
+
       // Not on a later day: that day may already be reconciled.
       await sql(`update payment set late_transfer_at = late_transfer_at - interval '1 day' where id = $1`, [musPay]);
       expect(await refused(undo(finadmin, musPay))).toEqual({
@@ -1129,7 +1141,15 @@ describe('money rules', () => {
         const w = await one<{ balance: string; held: string }>(`select balance, held_balance as held from escrow where student_id = $1`, [f.studentId]);
         return { free: money(w.balance), held: money(w.held) };
       };
-      expect(await wallet()).toEqual({ free: 0, held: 3000 });
+      // A second paid June preregistration, and a 50% refund window on June that must not apply.
+      const che = await prereg(subj.CHE!);
+      const chePay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [che], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
+      await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: chePay }, json: { instrumentUsed: 'cash' } }));
+      const hour = 60 * 60 * 1000;
+      await apiResponse(finadmin.api.v1.receipts['refund-windows'].$post({
+        json: { sessionId: june, startsAt: new Date(Date.now() - hour).toISOString(), endsAt: new Date(Date.now() + 24 * hour).toISOString(), percentage: 50, label: 'June: half back' },
+      }));
+      expect(await wallet()).toEqual({ free: 0, held: 4500 });
 
       // June never opens, and the board's deadline for it passes.
       await sql(
@@ -1147,21 +1167,26 @@ describe('money rules', () => {
       const confirm = await refused(officer.api.v1.payments[':id'].confirm.$post({ param: { id: hisPay }, json: {} }));
       expect(confirm.error).toMatch(sentence);
 
+      // A parent who cancels before the sweep gets the full price too, not the window's 50%.
+      const cancelled = await apiResponse(f.parent.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: che } }));
+      expect(cancelled).toMatchObject({ funded: true, refundPercentage: 100 });
+      expect(await wallet()).toEqual({ free: 1500, held: 3000 });
+
       // The sweep closes both checkouts, and since June never opened, gives
       // back what was paid for it in full (MO-21) — not at the refund window's rate.
       const swept = await runPaymentDeadlines();
-      expect(swept.preregistrationsRefundedAtDeadline).toBe(4);
+      expect(swept).toMatchObject({ preregistrationsRefundedAtDeadline: 1, preregistrationsExpiredUnopened: 3 });
       expect([await statusOf('payment', hisPay), await statusOf('payment', ecoPay)]).toEqual(['failed', 'failed']);
       expect(await statusOf('registration', late)).toBe('dropped');
       for (const reg of [his, eco, ger]) expect(await statusOf('registration', reg)).toBe('expired');
-      expect(await wallet()).toEqual({ free: 1500, held: 1500 });
+      expect(await wallet()).toEqual({ free: 3000, held: 1500 });
       await audited([late], ['PREREG_REFUNDED_AT_DEADLINE']);
       const refundNotice = await waitFor(async () => (await notificationsFor(f.parent.email, 'SESSION_CLOSED'))
         .find((n) => n.title === 'Refunded: June (AS, money rules, prereg) did not open') ?? null);
       expect(refundNotice.body).toContain('EGP 1500.00 paid for Geography (AS, money rules) has been returned to your escrow balance in full');
       expect(refundNotice.body).toContain('History (AS, money rules)');
       // Running it again changes nothing; November's preregistration is untouched.
-      expect((await runPaymentDeadlines()).preregistrationsRefundedAtDeadline).toBe(0);
+      expect(await runPaymentDeadlines()).toMatchObject({ preregistrationsRefundedAtDeadline: 0, preregistrationsExpiredUnopened: 0 });
       expect(await statusOf('registration', nov)).toBe('preregistered');
 
       // June never opens now — not by hand, not by the scheduler — so nothing is
@@ -1171,7 +1196,7 @@ describe('money rules', () => {
       expect(open.error).toMatch(/^This series cannot be opened: the exam board's entry deadline \(.+\) has passed$/);
       await runSessionScheduler();
       expect((await one<{ status: string }>(`select status from registration_session where id = $1`, [june])).status).toBe('draft');
-      expect(await wallet()).toEqual({ free: 1500, held: 1500 });
+      expect(await wallet()).toEqual({ free: 3000, held: 1500 });
     });
 
     it('a family reference set aside by a transfer found later cannot be submitted again', async () => {

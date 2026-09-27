@@ -894,6 +894,15 @@ export async function recordLateTransfer(
       throw new Error(`The amount found is more than this payment was for (EGP ${p.amount.toFixed(2)}) — record at most that`);
     }
     const familyReference = p.verificationReference && p.verificationReference !== reference ? p.verificationReference : null;
+    // A family reference another record set aside is spent as well: recording
+    // it here would also stop that record's undo from restoring it (review of
+    // ae4f88b, flag 3).
+    const [setAside] = await tx
+      .select({ id: payment.id })
+      .from(payment)
+      .where(and(sql`${payment.metadata}->'lateTransfer'->>'familyReference' = ${reference}`, sql`${payment.id} <> ${paymentId}`))
+      .limit(1);
+    if (setAside) throw new Error('This transfer reference is already recorded against another payment');
 
     const now = new Date();
     await tx
@@ -984,6 +993,13 @@ export async function undoLateTransfer(paymentId: string, financeAdminId: string
       { lateTransferAmount: p.lateTransferAmount, verificationReference: p.verificationReference },
       { debitedFromEscrow: p.lateTransferAmount, reason }, auditCtx, tx);
     return p;
+  }).catch((err) => {
+    // The reference it had before is on another payment now (both paths that
+    // could put it there refuse it, so this should not happen); nothing moved.
+    if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') {
+      throw new Error('The reference this payment had before is now on another payment, so the undo cannot restore it — nothing was changed');
+    }
+    throw err;
   });
 
   // The family was told of the credit, so they are told it was taken back.
@@ -1020,6 +1036,7 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
   let paymentsClosedAtDeadline = 0;
   let registrationsExpiredAtDeadline = 0;
   let preregistrationsRefundedAtDeadline = 0;
+  let preregistrationsExpiredUnopened = 0;
 
   const lapsed = await db
     .select({ id: payment.id })
@@ -1092,7 +1109,8 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
     // refunded in full (owner decision MO-21).
     if (s.status === 'draft') {
       const refunded = await refundPreregistrationsAtDeadline(s.id);
-      preregistrationsRefundedAtDeadline += refunded.length;
+      preregistrationsRefundedAtDeadline += refunded.filter((r) => r.refunded > 0).length;
+      preregistrationsExpiredUnopened += refunded.filter((r) => r.refunded === 0).length;
       if (refunded.length > 0) {
         await notifyPreregistrationsRefundedAtDeadline(s.id, s.entryDeadline!, refunded)
           .catch((err) => console.error(`[deadlines] Prereg refund notices for session ${s.id} failed:`, err));
@@ -1100,7 +1118,7 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
     }
   }
 
-  return { referencesLapsed, paymentsClosedAtDeadline, registrationsExpiredAtDeadline, preregistrationsRefundedAtDeadline };
+  return { referencesLapsed, paymentsClosedAtDeadline, registrationsExpiredAtDeadline, preregistrationsRefundedAtDeadline, preregistrationsExpiredUnopened };
 }
 
 /**

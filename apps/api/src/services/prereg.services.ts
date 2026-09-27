@@ -148,7 +148,7 @@ async function preregPaymentState(registrationId: string, executor: typeof db | 
 export async function cancelPreregistration(registrationId: string, parentId: string) {
   const reg = await db.query.registration.findFirst({
     where: (r, { eq }) => eq(r.id, registrationId),
-    with: { session: { columns: { id: true, status: true } } },
+    with: { session: { columns: { id: true, status: true, entryDeadline: true } } },
   });
   if (!reg) throw new Error('Registration not found');
   if (reg.status !== 'preregistered') {
@@ -161,7 +161,11 @@ export async function cancelPreregistration(registrationId: string, parentId: st
   const linked = await validateParentStudentLink(parentId, reg.studentId);
   if (!linked) throw new Error('You are not linked to this student');
 
-  const pct = await refundPercentage(new Date(), reg.sessionId, reg.studentId);
+  // Past the board's deadline the series never opens: the full price back, as
+  // the deadline sweep gives — the refund windows are for a family's own
+  // drop (MO-21; review of ae4f88b, flag 1).
+  const pastDeadline = !!reg.session.entryDeadline && reg.session.entryDeadline <= new Date();
+  const pct = pastDeadline ? 100 : await refundPercentage(new Date(), reg.sessionId, reg.studentId);
 
   const result = await db.transaction(async (tx) => {
     // Lock the row, then decide. A payment still open for it means money may

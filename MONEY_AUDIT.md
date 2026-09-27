@@ -262,7 +262,7 @@ The fourth review, of that response (fc1a101), again said "don't merge yet", on 
 | MO-18 | Cancelling a preregistration at the very instant capture runs for it can deadlock; Postgres aborts one of the two and no money moves. | Accepted, low |
 | MO-19 | Dev data only: the dev database has one registration confirmed with a void receipt, made before MA-20 was fixed. No production data exists. | Accepted |
 | MO-20 | Approving or rejecting a registration request, and swaps, check the session's status only: they ignore deadline extensions (a student with one cannot have a request approved after the close) and the board deadline (safe while a window must close before its deadline). | State-and-time audit |
-| MO-21 | A series still in draft when its window ends is no longer opened by the scheduler, nor by hand once its board deadline has passed (so no held money is captured for entries the board refuses). Its preregistrations could only be cancelled, at the refund window's percentage, although the school never ran the window. | **Decided 28 Sep: refunded in full at the deadline — §6b** |
+| MO-21 | A series still in draft when its window ends is no longer opened by the scheduler, nor by hand once its board deadline has passed (so no held money is captured for entries the board refuses). Its preregistrations could only be cancelled, at the refund window's percentage, although the school never ran the window. | **Decided 28 Sep: refunded in full at the deadline — §6b.** Only once the admin has set the series' deadline (as MO-12): a draft that never opens and has none keeps its preregistrations held |
 | MO-22 | The checkout card, the workbench and the takings times are shown in the browser's local time; the API's sentences use Cairo time. Identical while staff and families are in Egypt. | Accepted |
 | MO-23 | The escrow page's transaction rows and the desk's student summary are hand-typed instead of derived from their fetchers (CLAUDE.md, Hono RPC); this work added fields to the desk's. | Engineering health |
 | MO-24 | A "Transfer found" had no undo. It is the finance admin's alone, asks for the statement's reference and an amount typed from the statement (never more than the payment was for), and a family reference it sets aside cannot be submitted again; a record whose money never arrived had no correction inside the system. | **Decided 28 Sep: a same-day undo while its escrow is unspent — §6b.** Later than that it still needs a database fix |
@@ -342,14 +342,20 @@ passes on a series still in draft, the deadline sweep drops each paid preregistr
 receipt-gated path as a cancellation: a paper receipt already handed over must come back
 first. Unpaid preregistrations expire. Each refund writes `PREREG_REFUNDED_AT_DEADLINE` in its
 transaction, and each family is told which subjects will not be entered and what came back.
-The refund windows do not apply: they are for a family's own drop.
+The refund windows do not apply: they are for a family's own drop — and a parent who cancels
+after the deadline, before the sweep has run, also gets the full price. It happens only for a
+series whose deadline the admin has set (as MO-12): a draft with none keeps its preregistrations
+held until they are cancelled.
 
 **MO-24 — undoing a "Transfer found".** A finance admin can undo one on the day it was
-recorded (the server's day, as the takings), while the escrow it added is unspent; the reason
+recorded (the server's day, as the takings), while the family's free escrow still covers it
+(escrow is one balance, so this is what "unspent" can mean); the reason
 is audited (`PAYMENT_LATE_TRANSFER_UNDONE`, in the transaction) and the family told. The escrow
 is debited back (ledger reason `late_transfer_undone`), the payment returns to failed with
-the reference it had before, it leaves that day's takings — so no reconciled day changes — and
-it can be recorded again correctly. After that day, or once the escrow is spent, it is escrow
+the reference it had before, it leaves that day's takings — so no earlier day changes, though
+that day's own report changes if it was printed earlier the same day — and it can be recorded
+again correctly. A family reference a record set aside cannot be recorded as another
+payment's statement reference, so an undo can always put it back. After that day, or once the escrow is spent, it is escrow
 like any other, and a record whose money never arrived needs a database fix.
 
 **MO-11 — how far back a "never received" reversal reaches.** Only within its own calendar
@@ -362,10 +368,12 @@ happen. The month boundary assumes the school closes its books with the bank mon
 (DISCOVERY.md A-09).
 
 **Tests** (`08`): June's deadline passing unopened refunds its paid preregistration in full
-(1500 back, held released), expires the unpaid ones, notifies, runs once, and leaves a
-November series whose deadline is ahead untouched; an undo is the finance admin's, refused
-while the escrow is spent and on a later day, takes the escrow back, leaves the day's takings,
-and lets the payment be recorded again; a same-month "never received" reversal corrects its
+(1500 back, held released) despite a 50% refund window on June, expires the unpaid ones,
+notifies, runs once, and leaves a November series whose deadline is ahead untouched; a parent
+cancelling after the deadline, before the sweep, gets 100%; an undo is the finance admin's,
+refused while the escrow is spent and on a later day, takes the escrow back, leaves the day's
+takings, restores the reference the payment had, and lets the payment be recorded again; a
+set-aside family reference cannot be recorded on another payment; a same-month "never received" reversal corrects its
 confirmation day and not its own, and a closed-month one leaves its month as printed and posts
 on the reversal's day. These use fixed days in last month, so they do not depend on today's
 date. `09` checks that credits less undo debits equal what is recorded now, and counts the
