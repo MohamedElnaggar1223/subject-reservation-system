@@ -52,9 +52,11 @@ GET	/v1/notifications/admin/scheduled	D	D	D	D	D	A
 PUT	/v1/notifications/read-all	D	A	A	A	A	A
 GET	/v1/notifications/unread-count	D	A	A	A	A	A
 GET	/v1/notifications	D	A	A	A	A	A
+POST	/v1/payments/:id/cancel	D	D	A	D	D	D
 POST	/v1/payments/:id/confirm	D	D	D	A	A	A
 POST	/v1/payments/:id/instapay-reference	D	D	A	D	D	D
 GET	/v1/payments/:id/receipt	D	A	A	A	A	A
+POST	/v1/payments/:id/reject	D	D	D	A	A	A
 POST	/v1/payments/:id/reverse	D	D	D	D	A	A
 GET	/v1/payments/:id	D	A	A	A	A	A
 GET	/v1/payments/checkout-summary	D	D	A	D	D	D

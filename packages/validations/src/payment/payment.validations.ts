@@ -197,6 +197,18 @@ export const ConfirmManualPayment = z.object({
 });
 export type ConfirmManualPaymentType = z.infer<typeof ConfirmManualPayment>;
 
+// ─── Finance: Reject Manual Payment ───────────────────────────────────────────
+
+/**
+ * Finance rejects an open manual payment: an InstaPay reference that is not
+ * on the bank statement, or a checkout the family abandoned. The reason is
+ * shown to the family, so it must say what finance found.
+ */
+export const RejectManualPayment = z.object({
+  reason: z.string().trim().min(5, 'Say why the payment is rejected (min 5 characters)').max(500),
+});
+export type RejectManualPaymentType = z.infer<typeof RejectManualPayment>;
+
 // ─── Admin: Confirm Bank Transfer ─────────────────────────────────────────────
 
 /**

@@ -87,7 +87,24 @@ export async function previewRefund(registrationId: string) {
 
 // ─── Window management (finance admin) ───────────────────────────────────────
 
+/**
+ * Windows in one scope may not overlap: refundPercentage takes the first
+ * window containing the date, so two overlapping windows made the refund
+ * depend on row order (money audit MA-11). Windows are inclusive at both
+ * ends, so one ending exactly when the next starts overlaps too.
+ */
 export async function createWindow(data: CreateRefundWindowType) {
+  const sameScope = await db.query.refundWindow.findMany({
+    where: (w, { eq }) =>
+      data.sessionId ? eq(w.sessionId, data.sessionId) : eq(w.academicYear, data.academicYear!),
+  });
+  const clash = sameScope.find((w) => w.startsAt <= data.endsAt && data.startsAt <= w.endsAt);
+  if (clash) {
+    throw new Error(
+      `This window overlaps "${clash.label ?? 'an existing window'}" (${clash.startsAt.toISOString().slice(0, 10)} to ${clash.endsAt.toISOString().slice(0, 10)}, ${clash.percentage}%) — a date can have only one refund percentage`
+    );
+  }
+
   const [created] = await db
     .insert(refundWindow)
     .values({

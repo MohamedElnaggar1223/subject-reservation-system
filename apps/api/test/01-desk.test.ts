@@ -166,6 +166,9 @@ describe('the desk', () => {
 
   it('reconciles the day: this family added 3000 cash in and nothing out', async () => {
     const delta = takingsDelta(takingsBefore, await takings(officer));
-    expect(delta).toMatchObject({ cashIn: 3000, escrowApplied: 0, byInstrument: { cash: 3000 }, reversedTotal: 0, cashRefunded: 0, cashOut: 0, net: 3000 });
+    expect(delta).toMatchObject({
+      moneyIn: 3000, escrowApplied: 0, byInstrument: { cash: 3000 }, reversedTotal: 0, cashRefunded: 0, moneyOut: 0, net: 3000,
+      drawer: { cashIn: 3000, cashOut: 0, net: 3000 },
+    });
   });
 });

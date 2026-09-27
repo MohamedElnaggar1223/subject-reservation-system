@@ -132,6 +132,8 @@ Set these before the first deployment; each one is a control this audit relies o
   share a parent domain.
 - `REQUIRE_EMAIL_VERIFICATION` left unset or `true`, never `false`.
 - The API served over HTTPS only (HSTS is sent).
+- `TZ=Africa/Cairo` for the API process: the daily takings report cuts days at the server's
+  local midnight (MONEY_AUDIT.md MO-3).
 
 ---
 

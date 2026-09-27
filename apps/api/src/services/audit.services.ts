@@ -53,6 +53,9 @@ export type AuditContext = {
  * @param previousData - State before the mutation (pass null for creates)
  * @param newData      - State after the mutation (pass null for deletes)
  * @param ctx          - Optional HTTP context for IP/UA capture
+ * @param executor     - The money transaction to write inside. A money action
+ *                       passes its transaction so the movement and its audit
+ *                       row commit together or not at all (money audit, O-7).
  */
 export async function logAction(
   userId: string | null,
@@ -61,9 +64,10 @@ export async function logAction(
   entityId: string,
   previousData?: Record<string, unknown> | null,
   newData?: Record<string, unknown> | null,
-  ctx?: AuditContext
+  ctx?: AuditContext,
+  executor: Pick<typeof db, 'insert'> = db
 ) {
-  await db.insert(auditLog).values({
+  await executor.insert(auditLog).values({
     id:           randomUUID(),
     userId:       userId ?? null,
     action,

@@ -9,6 +9,9 @@
  * POST /payments/initiate               - Initiate payment (parent only)
  * POST /payments/:id/instapay-reference - Parent submits InstaPay transfer reference
  * POST /payments/:id/confirm            - Finance confirms a manual payment
+ * POST /payments/:id/reject             - Finance rejects an open manual payment
+ * POST /payments/:id/cancel             - Parent cancels an unpaid checkout
+ * POST /payments/:id/reverse            - Finance admin reverses a confirmation
  *
  * V3: Fawry/Paymob webhooks are commented out along with their provider
  * integrations — active methods are in_school and instapay only, both
@@ -26,6 +29,7 @@ import {
   InitiatePayment,
   SubmitInstapayReference,
   ConfirmManualPayment,
+  RejectManualPayment,
   ListPaymentsQuery,
   CheckoutSummaryQuery,
   PaymentId,
@@ -360,11 +364,10 @@ export const payments = new Hono<HonoEnv>()
       const instrument = pay.paymentMethod === 'instapay' ? 'instapay' : instrumentUsed;
 
       try {
-        const confirmed = await paymentService.confirmPayment(id, user.id, undefined, notes, instrument);
-
-        await logAction(user.id, 'PAYMENT_CONFIRMED', 'payment', id, pay as Record<string, unknown>, confirmed as Record<string, unknown>, extractAuditContext(c))
-          .catch((err) => console.error('[audit] PAYMENT_CONFIRMED (finance) failed:', err));
-
+        // PAYMENT_CONFIRMED is written inside the confirmation's transaction,
+        // and only by the caller that actually confirmed (MA-07).
+        const confirmed = await paymentService.confirmPayment(id, user.id, undefined, notes, instrument, extractAuditContext(c));
+        if (!confirmed) return error(c, 'This payment was already confirmed by someone else', 409);
         return success(c, confirmed);
       } catch (err) {
         const message = clientMessage(err, 'Failed to confirm payment');
@@ -390,15 +393,74 @@ export const payments = new Hono<HonoEnv>()
       const { id } = c.req.valid('param');
       const { reason } = c.req.valid('json');
       try {
-        const result = await paymentService.reversePayment(id, user.id, reason);
-        await logAction(user.id, 'PAYMENT_REVERSED', 'payment', id, null, { reason, ...result }, extractAuditContext(c))
-          .catch((err) => console.error('[audit] PAYMENT_REVERSED failed:', err));
+        // PAYMENT_REVERSED is written inside the reversal's transaction (O-7).
+        const result = await paymentService.reversePayment(id, user.id, reason, extractAuditContext(c));
         return success(c, result);
       } catch (err) {
         const message = clientMessage(err, 'Failed to reverse payment');
         const status =
-          message.includes('handed out') || message.includes('concurrently') ? 409 :
+          message.includes('handed out') || message.includes('concurrently') || message.includes('already been dropped') ? 409 :
           message.includes('not found') ? 404 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * POST /payments/:id/cancel  (money audit MA-02)
+   *
+   * A parent cancels a checkout they have not paid: escrow applied at
+   * checkout comes back and the subjects are payable again by any method.
+   * Refused once a transfer reference is in — finance decides then.
+   *
+   * Parent only — linked to the payment's student.
+   */
+  .post('/:id/cancel',
+    requireAuth(),
+    requireParent(),
+    zValidator('param', PaymentId),
+    async (c) => {
+      const user = c.get('user')!;
+      const { id } = c.req.valid('param');
+      try {
+        return success(c, await paymentService.cancelPayment(id, user.id, extractAuditContext(c)));
+      } catch (err) {
+        const message = clientMessage(err, 'Failed to cancel payment');
+        const status =
+          message.includes('not authorized') ? 403 :
+          message.includes('not found') ? 404 :
+          message.includes('already in') || message.includes('reference has been submitted') ? 409 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * POST /payments/:id/reject  (money audit MA-03)
+   *
+   * Finance rejects an open manual payment with a reason the family reads:
+   * an InstaPay reference not on the bank statement, or an abandoned
+   * checkout. Escrow applied comes back; the subjects are payable again
+   * while the window is open for the student, and expire after it.
+   *
+   * Finance roles (officer / finance-admin / admin), as for confirmation.
+   */
+  .post('/:id/reject',
+    requireAuth(),
+    requireFinance(),
+    zValidator('param', PaymentId),
+    zValidator('json', RejectManualPayment),
+    async (c) => {
+      const user = c.get('user')!;
+      const { id } = c.req.valid('param');
+      const { reason } = c.req.valid('json');
+      try {
+        return success(c, await paymentService.rejectPayment(id, user.id, reason, extractAuditContext(c)));
+      } catch (err) {
+        const message = clientMessage(err, 'Failed to reject payment');
+        const status =
+          message.includes('not found') ? 404 :
+          message.includes('already in') || message.includes('concurrently') ? 409 : 400;
         return error(c, message, status);
       }
     }

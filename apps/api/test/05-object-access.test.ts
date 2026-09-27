@@ -189,6 +189,7 @@ describe('object-level access between families', () => {
     await refusedAs('studentA GET own family payment', studentA.api.v1.payments[':id'].$get({ param: { id: deskPaymentA } }));
     await refusedAs('studentA GET own family payment receipt PDF', studentA.api.v1.payments[':id'].receipt.$get({ param: { id: deskPaymentA } }));
     await refusedAs('parentB instapay-reference A', parentB.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: instaPaymentA }, json: { reference: 'FT-NOT-MINE-1' } }));
+    await refusedAs('parentB cancel payment A', parentB.api.v1.payments[':id'].cancel.$post({ param: { id: instaPaymentA } }));
     await refusedAs('parentB initiate for A', parentB.api.v1.payments.initiate.$post({ json: { registrationIds: [bioA], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
     await refusedAs('parentB checkout-summary A', parentB.api.v1.payments['checkout-summary'].$get({ query: { registrationIds: bioA } }));
     await refusedAs('parentB GET receipt A', parentB.api.v1.receipts[':id'].$get({ param: { id: physReceiptA } }));

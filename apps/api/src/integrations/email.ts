@@ -749,3 +749,40 @@ export async function sendPaymentReversedEmail(to: string, data: {
 
   return sendEmail({ to, subject: `Payment reversed — ${data.studentName}`, html });
 }
+
+/**
+ * Money audit MA-03: finance rejected an open payment — usually an InstaPay
+ * reference that is not on the bank statement. The family must learn why and
+ * what to do, since they may believe they have paid.
+ */
+export async function sendPaymentRejectedEmail(to: string, data: {
+  parentName: string;
+  studentName: string;
+  amount: number;
+  escrowReturned: number;
+  reason: string;
+  registrationsExpired: number;
+}): Promise<EmailResult> {
+  const escrowRow = data.escrowReturned > 0
+    ? `<tr><td>Returned to escrow</td><td>EGP ${data.escrowReturned.toFixed(2)}</td></tr>`
+    : '';
+  const next = data.registrationsExpired > 0
+    ? 'The registration window has closed, so the subjects this payment covered are no longer reserved. If you did send this transfer, contact the finance desk with your bank receipt.'
+    : 'The subjects this payment covered are still waiting for payment. If you did send this transfer, contact the finance desk with your bank receipt; otherwise pay again from the app or at the desk.';
+  const html = emailLayout('Payment Not Received', `
+    <h2>Payment not received</h2>
+    <p>Hello ${esc(data.parentName)},</p>
+    <p>The finance office could not match a payment for <strong>${esc(data.studentName)}</strong> and has marked it as not received.</p>
+    <div class="info-box">
+      <table>
+        <tr><td>Student</td><td>${esc(data.studentName)}</td></tr>
+        <tr><td>Amount</td><td><strong>EGP ${data.amount.toFixed(2)}</strong></td></tr>
+        ${escrowRow}
+        <tr><td>Reason</td><td>${esc(data.reason)}</td></tr>
+      </table>
+    </div>
+    <p>${next}</p>
+  `);
+
+  return sendEmail({ to, subject: `Payment not received — ${data.studentName}`, html });
+}

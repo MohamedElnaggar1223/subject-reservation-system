@@ -45,6 +45,7 @@ import {
   sendRegistrationDecisionEmail,
   sendPaymentReceiptEmail,
   sendPaymentReversedEmail,
+  sendPaymentRejectedEmail,
   sendDropSwapRequestEmail,
   sendDropSwapProcessedEmail,
   sendDirectDropSwapEmail,
@@ -723,6 +724,60 @@ export async function notifyPaymentReversed(data: {
 
   if (studentUser) {
     await createNotification(data.studentId, 'PAYMENT_REVERSED', title, body, notifData);
+  }
+}
+
+/**
+ * Money audit MA-03: finance rejected an open payment (a reference that is
+ * not on the bank statement, or an abandoned checkout). Parents get the
+ * notification and an email; the student gets the notification.
+ * Called from payment.services.ts → rejectPayment().
+ */
+export async function notifyPaymentRejected(data: {
+  studentId: string;
+  paymentId: string;
+  amount: number;
+  escrowReturned: number;
+  reason: string;
+  registrationsExpired: number;
+}) {
+  const [studentUser, parents] = await Promise.all([
+    getUserDetails(data.studentId),
+    getLinkedParents(data.studentId),
+  ]);
+  const studentName = studentUser?.name ?? 'your child';
+  const escrowNote = data.escrowReturned > 0
+    ? ` EGP ${data.escrowReturned.toFixed(2)} applied from escrow has been returned.`
+    : '';
+  const next = data.registrationsExpired > 0
+    ? 'The registration window has closed, so these subjects are no longer reserved; if you did send the transfer, contact the finance desk with your bank receipt.'
+    : 'The subjects are still waiting for payment; if you did send the transfer, contact the finance desk with your bank receipt.';
+  const title = 'Payment not received';
+  const body =
+    `The finance office could not match a payment of EGP ${data.amount.toFixed(2)} for ${studentName} (${data.reason}).` +
+    `${escrowNote} ${next}`;
+  const notifData = { paymentId: data.paymentId, studentId: data.studentId, amount: data.amount, escrowReturned: data.escrowReturned };
+
+  for (const { parentId } of parents) {
+    const parentUser = await getUserDetails(parentId);
+    const created = await createNotification(parentId, 'PAYMENT_REJECTED', title, body, notifData);
+    if (parentUser?.email) {
+      fireEmail('MA-03 rejection to parent', () =>
+        sendPaymentRejectedEmail(parentUser.email!, {
+          parentName: parentUser.name,
+          studentName,
+          amount: data.amount,
+          escrowReturned: data.escrowReturned,
+          reason: data.reason,
+          registrationsExpired: data.registrationsExpired,
+        }),
+        created ? [created.id] : undefined
+      );
+    }
+  }
+
+  if (studentUser) {
+    await createNotification(data.studentId, 'PAYMENT_REJECTED', title, body, notifData);
   }
 }
 

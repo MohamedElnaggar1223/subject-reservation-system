@@ -144,6 +144,40 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
     onError: (err: Error) => setRefError(err.message),
   });
 
+  // Money audit MA-02: an unpaid checkout can be cancelled — escrow applied
+  // to it comes back and the subjects can be paid another way.
+  const [cancelError, setCancelError] = useState('');
+  const cancelMutation = useMutation({
+    mutationFn: (paymentId: string) => apiResponse(api.v1.payments[':id'].cancel.$post({ param: { id: paymentId } })),
+    onSuccess: () => {
+      setResult(null);
+      setRefSubmitted(false);
+      setInstapayRef('');
+      setCancelError('');
+      queryClient.invalidateQueries({ queryKey: ['payments', 'checkout-summary', summaryKey] });
+      invalidateFinancialState(queryClient, { studentId: summary?.student.id });
+      router.refresh();
+    },
+    onError: (err: Error) => setCancelError(err.message),
+  });
+
+  const cancelButton = (paymentId: string) => (
+    <>
+      <Button
+        variant="outline"
+        className="mt-3 w-full"
+        disabled={cancelMutation.isPending}
+        onClick={() => cancelMutation.mutate(paymentId)}
+      >
+        {cancelMutation.isPending ? 'Cancelling…' : 'Cancel this checkout'}
+      </Button>
+      <p className="mt-1 text-xs text-muted-foreground text-center">
+        Only if you have not paid. Escrow applied to it goes back to the balance.
+      </p>
+      {cancelError && <p className="mt-2 text-xs text-destructive text-center">{cancelError}</p>}
+    </>
+  );
+
   if (isLoading) {
     return (
       <div className="px-6 py-8 max-w-5xl mx-auto flex items-center justify-center min-h-[400px]">
@@ -294,6 +328,8 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               );
             })()}
 
+            {!completed && result.status === 'pending' && !refSubmitted && result.id && cancelButton(result.id)}
+
             {/* Summary footer */}
             <div className="mt-6 pt-6 border-t border-border flex justify-between text-sm text-muted-foreground">
               <span>Amount due</span>
@@ -315,6 +351,71 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               Back to Registrations
             </Button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── A checkout already started on these subjects (MA-02) ───────────────
+
+  const open = summary.openPayment;
+  if (open) {
+    const openMeta = (open.metadata ?? {}) as { instapay?: { amountDue?: number } };
+    const methodLabel = PAYMENT_METHOD_LABELS[open.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS] ?? open.paymentMethod;
+    return (
+      <div className="px-6 py-8 max-w-5xl mx-auto animate-fade-up">
+        <div className="max-w-xl mx-auto bg-card rounded-xl border border-border shadow-sm p-8">
+          <h1 className="text-xl font-bold text-foreground font-display">Payment already started</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            A payment of {(open.amount + open.escrowAmountApplied).toFixed(2)} EGP ({methodLabel}) was started for{' '}
+            {summary.student.name}&apos;s subjects on {new Date(open.createdAt).toLocaleDateString()}.
+          </p>
+
+          {open.status === 'pending_verification' ? (
+            <div className="mt-5 p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl text-sm text-violet-800 dark:text-violet-300">
+              Your transfer reference <span className="font-mono font-semibold">{open.verificationReference}</span> is with
+              the finance office. They confirm it against the bank statement, usually within one school day.
+            </div>
+          ) : open.paymentMethod === 'in_school' ? (
+            <div className="mt-5 p-4 bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-700 rounded-xl text-center">
+              <p className="text-sm text-brand-800 dark:text-brand-300">Quote this reference at the finance desk</p>
+              <p className="mt-1 text-2xl font-bold tracking-widest text-brand-900 dark:text-brand-200 font-mono">{open.externalReference}</p>
+            </div>
+          ) : (
+            <div className="mt-5 p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl">
+              <p className="text-sm text-violet-800 dark:text-violet-300">
+                Transfer {(openMeta.instapay?.amountDue ?? open.amount).toFixed(2)} EGP by InstaPay, then submit the reference.
+              </p>
+              {refSubmitted ? (
+                <p className="mt-3 text-sm text-emerald-700 dark:text-emerald-400">Reference submitted. The finance team will verify it.</p>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={instapayRef}
+                    onChange={(e) => setInstapayRef(e.target.value)}
+                    placeholder="Transaction reference from your InstaPay receipt"
+                    className="mt-3 w-full px-3 py-2 text-sm border border-violet-300 dark:border-violet-700 bg-background rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500 font-mono"
+                  />
+                  {refError && <p className="mt-2 text-xs text-destructive">{refError}</p>}
+                  <Button
+                    size="sm"
+                    className="mt-3 w-full bg-violet-600 hover:bg-violet-700 text-white"
+                    disabled={submitRefMutation.isPending || instapayRef.trim().length < 4}
+                    onClick={() => submitRefMutation.mutate({ paymentId: open.id, reference: instapayRef.trim() })}
+                  >
+                    {submitRefMutation.isPending ? 'Submitting…' : 'Submit Reference'}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+
+          {open.status === 'pending' && !refSubmitted && cancelButton(open.id)}
+
+          <Button variant="ghost" onClick={() => router.push('/registrations' as never)} className="mt-6 w-full">
+            Back to Registrations
+          </Button>
         </div>
       </div>
     );

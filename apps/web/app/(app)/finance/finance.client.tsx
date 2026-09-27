@@ -78,6 +78,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
   const [successMsg, setSuccessMsg] = useState('');
 
   const [lostTarget, setLostTarget] = useState<ReceiptRow | null>(null);
+  const [rejectPaymentTarget, setRejectPaymentTarget] = useState<PendingPayment | null>(null);
   const [fulfillTarget, setFulfillTarget] = useState<WithdrawalRequest | null>(null);
   const [rejectTarget, setRejectTarget] = useState<WithdrawalRequest | null>(null);
   const [amountInput, setAmountInput] = useState('');
@@ -172,6 +173,24 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
       setInstrument('');
       setNotes('');
       afterAction(`Payment confirmed for ${student?.name ?? 'student'}. Registrations released.`, student?.id);
+    },
+    onError: (err: Error) => setActionError(err.message),
+  });
+
+  // Money audit MA-03: a reference that is not on the bank statement (or a
+  // checkout the family abandoned) is rejected with a reason the family reads.
+  const rejectPaymentMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      apiResponse(api.v1.payments[':id'].reject.$post({ param: { id }, json: { reason } })),
+    onSuccess: (r) => {
+      const student = rejectPaymentTarget?.student;
+      setRejectPaymentTarget(null);
+      afterAction(
+        `Payment rejected for ${student?.name ?? 'student'}; the family has been told.` +
+          (r.escrowReturned > 0 ? ` ${r.escrowReturned.toFixed(2)} EGP returned to escrow.` : '') +
+          (r.registrationsExpired > 0 ? ' The window has closed, so the subjects are released.' : ''),
+        student?.id
+      );
     },
     onError: (err: Error) => setActionError(err.message),
   });
@@ -279,7 +298,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
           <button onClick={() => setSuccessMsg('')} className="text-xs underline">Dismiss</button>
         </div>
       )}
-      {actionError && !confirmTarget && !fulfillTarget && !rejectTarget && (
+      {actionError && !confirmTarget && !fulfillTarget && !rejectTarget && !rejectPaymentTarget && (
         <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
           {actionError}
         </div>
@@ -352,19 +371,31 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                         </p>
                       )}
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setConfirmTarget(pay);
-                        setInstrument(pay.paymentMethod === 'in_school' ? '' : 'instapay');
-                        setNotes('');
-                        setActionError('');
-                      }}
-                      disabled={awaitingReference}
-                      title={awaitingReference ? 'Waiting for the parent to submit their InstaPay reference' : undefined}
-                    >
-                      Confirm
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setRejectPaymentTarget(pay);
+                          setActionError('');
+                        }}
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setConfirmTarget(pay);
+                          setInstrument(pay.paymentMethod === 'in_school' ? '' : 'instapay');
+                          setNotes('');
+                          setActionError('');
+                        }}
+                        disabled={awaitingReference}
+                        title={awaitingReference ? 'Waiting for the parent to submit their InstaPay reference' : undefined}
+                      >
+                        Confirm
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -540,6 +571,25 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
           isPending={lostReceiptMutation.isPending}
           onConfirm={(reason) => lostReceiptMutation.mutate({ id: lostTarget.id, reason })}
           onClose={() => setLostTarget(null)}
+        />
+      )}
+
+      {rejectPaymentTarget && (
+        <ReasonModal
+          title="Reject this payment?"
+          description={`${rejectPaymentTarget.student.name} — ${(rejectPaymentTarget.amount + rejectPaymentTarget.escrowAmountApplied).toFixed(2)} EGP by ${PAYMENT_METHOD_LABELS[rejectPaymentTarget.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS] ?? rejectPaymentTarget.paymentMethod}${rejectPaymentTarget.verificationReference ? `, reference ${rejectPaymentTarget.verificationReference}` : ''}. The payment is marked not received${rejectPaymentTarget.escrowAmountApplied > 0 ? ` and the ${rejectPaymentTarget.escrowAmountApplied.toFixed(2)} EGP applied from escrow goes back` : ''}. The subjects stay open to pay while the window is open, and are released if it has closed. The family receives your reason.`}
+          label="Reason (sent to the family)"
+          placeholder="e.g. No transfer with this reference on the bank statement"
+          confirmLabel="Reject Payment"
+          destructive
+          minLength={5}
+          isPending={rejectPaymentMutation.isPending}
+          error={actionError}
+          onConfirm={(reason) => rejectPaymentMutation.mutate({ id: rejectPaymentTarget.id, reason })}
+          onClose={() => {
+            setRejectPaymentTarget(null);
+            setActionError('');
+          }}
         />
       )}
 

@@ -28,6 +28,8 @@ import {
   payment,
   paymentRegistration,
   registration,
+  registrationSession,
+  receipt,
   eq,
   and,
   inArray,
@@ -51,8 +53,14 @@ import {
   creditEscrow,
   debitEscrow,
 } from './escrow.services';
-import { logAction } from './audit.services';
-import { notifyPaymentConfirmed, notifyPaymentReversed, notifyEscrowBalanceChanged } from './notification.services';
+import { logAction, type AuditContext } from './audit.services';
+import { hasDeadlineExtension } from './exception.services';
+import {
+  notifyPaymentConfirmed,
+  notifyPaymentReversed,
+  notifyPaymentRejected,
+  notifyEscrowBalanceChanged,
+} from './notification.services';
 import { createReceiptsForRegistrations } from './receipt.services';
 import { creditHeld } from './escrow.services';
 import { onRemarkPaymentCompleted } from './remark.services';
@@ -77,6 +85,27 @@ function getSchoolAccountDetails() {
 }
 
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Whether a session's window is open for this student: the session is active,
+ * or finance granted the student a deadline extension for it. Registration
+ * already honoured extensions; payment did not, so a student with an extension
+ * could register and then nobody could pay (money audit MA-13).
+ */
+async function sessionOpenFor(studentId: string, sessionId: string, executor: typeof db | Tx = db): Promise<boolean> {
+  const [sess] = await executor
+    .select({ status: registrationSession.status })
+    .from(registrationSession)
+    .where(eq(registrationSession.id, sessionId));
+  if (sess?.status === 'active') return true;
+  return hasDeadlineExtension(studentId, sessionId);
+}
 
 /**
  * Verify that a parent has an approved link to a specific student.
@@ -156,8 +185,11 @@ export async function initiatePayment(
     where: (s, { inArray }) => inArray(s.id, sessionIds),
     columns: { id: true, status: true, name: true },
   });
-  const requiredStatus = isPrereg ? 'draft' : 'active';
-  const wrongState = sessions.filter((s) => s.status !== requiredStatus);
+  const wrongState: typeof sessions = [];
+  for (const s of sessions) {
+    const ok = isPrereg ? s.status === 'draft' : await sessionOpenFor(studentId, s.id);
+    if (!ok) wrongState.push(s);
+  }
   if (wrongState.length > 0) {
     const names = wrongState.map((s) => s.name).join(', ');
     throw new Error(
@@ -255,9 +287,21 @@ export async function initiatePayment(
   // three operations in the same transaction still preserves all-or-nothing
   // semantics — if the debit or linking fails, the payment insert rolls back.
   const created = await db.transaction(async (tx) => {
-    // Re-check for existing pending payments INSIDE the transaction to prevent
-    // concurrent double-debit (EDGE-3). Two concurrent requests both passing the
-    // outer check will be serialized here; the second one will see the first's payment.
+    // Lock the registrations first, then re-check for an open payment (EDGE-3).
+    // Without the lock the re-check proved nothing: under READ COMMITTED two
+    // concurrent checkouts each read "no open payment" before either commits,
+    // so both created a payment and both debited escrow (money audit MA-06).
+    // With it, the second checkout waits here and then sees the first's link.
+    const locked = await tx
+      .select({ id: registration.id, status: registration.status })
+      .from(registration)
+      .where(inArray(registration.id, data.registrationIds))
+      .for('update');
+    const expected = isPrereg ? 'preregistered' : 'pending_payment';
+    if (locked.length !== data.registrationIds.length || locked.some((r) => r.status !== expected)) {
+      throw new Error('One or more registrations are not ready for payment');
+    }
+
     const existingPaymentLinksInTx = await tx.query.paymentRegistration.findMany({
       where: (pr, { inArray: inArr }) => inArr(pr.registrationId, data.registrationIds),
       with: {
@@ -352,6 +396,11 @@ export async function initiatePayment(
  * - Admin manually confirming a bank transfer (PAY-007)
  *
  * Moves payment to 'completed' and all linked registrations to 'confirmed'.
+ * Returns undefined when another caller confirmed it first.
+ *
+ * The PAYMENT_CONFIRMED and REGISTRATION_CONFIRMED audit rows are written
+ * inside the same transaction, so a confirmation and its audit rows commit
+ * together, and a caller who lost the race writes none (money audit MA-07, O-7).
  */
 export async function confirmPayment(
   paymentId: string,
@@ -359,6 +408,7 @@ export async function confirmPayment(
   externalRef?: string,
   adminNotes?: string,
   instrumentUsed?: string,
+  auditCtx?: AuditContext,
 ) {
   const pay = await db.query.payment.findFirst({
     where: (p, { eq }) => eq(p.id, paymentId),
@@ -369,44 +419,55 @@ export async function confirmPayment(
     throw new Error(`Payment is already in '${pay.status}' status`);
   }
 
-  // M-12: Reject confirmations whose registrations or sessions have
-  // already been finalized. In normal operation, finalizePendingRecords
-  // fails pending payments as soon as a session closes — but a late
-  // webhook callback (or a slow gateway) could still land here after
-  // the registrations have been expired. We stop the confirmation and
-  // let the scheduler's expiry sweep call failPayment so escrow is
-  // refunded and the student isn't silently confirmed into a closed
-  // session.
-  const linkedRegs = await db.query.paymentRegistration.findMany({
-    where: (pr, { eq }) => eq(pr.paymentId, paymentId),
-    with: {
-      registration: {
-        columns: { id: true, status: true },
-        with: { session: { columns: { status: true } } },
-      },
-    },
-  });
-  const isPreregPayment = pay.purpose === 'preregistration';
-  const stale = linkedRegs.some((l) =>
-    isPreregPayment
-      ? // Prereg: rows must still be preregistered in a draft session.
-        // (If the session opened before the money was confirmed, capture
-        // has already moved rows to pending_payment — confirm normally.)
-        l.registration.status !== 'preregistered' && l.registration.status !== 'pending_payment'
-      : l.registration.status !== 'pending_payment' ||
-        l.registration.session.status !== 'active'
-  );
-  if (stale) {
-    throw new Error(
-      'Payment cannot be confirmed — at least one registration is no longer payable (session closed or already expired).'
-    );
-  }
-
   const now = new Date();
+  const isPreregPayment = pay.purpose === 'preregistration';
 
   // Atomic transaction: update payment status + confirm all linked registrations
-  const { updated, registrationIds } = await db.transaction(async (tx) => {
-    // Update payment status — include status guard to prevent concurrent double-confirm
+  const { updated } = await db.transaction(async (tx) => {
+    // Lock the payment, then its registrations, and judge them under the lock.
+    // This check used to run before the transaction, so a session could close
+    // (expiring the registrations) between the check and the confirmation,
+    // leaving a completed payment on expired registrations (money audit MA-12).
+    const [current] = await tx
+      .select({ status: payment.status })
+      .from(payment)
+      .where(eq(payment.id, paymentId))
+      .for('update');
+    if (!current || !(OPEN_PAYMENT_STATUSES as readonly string[]).includes(current.status)) {
+      return { updated: undefined, registrationIds: [] as string[] };
+    }
+
+    const regIds = (
+      await tx
+        .select({ registrationId: paymentRegistration.registrationId })
+        .from(paymentRegistration)
+        .where(eq(paymentRegistration.paymentId, paymentId))
+    ).map((l) => l.registrationId);
+    const regs = regIds.length
+      ? await tx
+          .select({ id: registration.id, status: registration.status, sessionId: registration.sessionId })
+          .from(registration)
+          .where(inArray(registration.id, regIds))
+          .for('update')
+      : [];
+
+    // M-12: registrations must still be payable. A prereg payment's rows are
+    // preregistered (or pending_payment if the session opened first). Anything
+    // else needs a window that is open for this student — or a transfer the
+    // family already sent: a reference submitted before the close stays
+    // confirmable after it (money audit MA-01).
+    for (const r of regs) {
+      const payable = isPreregPayment
+        ? r.status === 'preregistered' || r.status === 'pending_payment'
+        : r.status === 'pending_payment' &&
+          (current.status === 'pending_verification' || (await sessionOpenFor(pay.studentId, r.sessionId, tx)));
+      if (!payable) {
+        throw new Error(
+          'Payment cannot be confirmed — at least one registration is no longer payable (session closed or already expired).'
+        );
+      }
+    }
+
     const [paymentUpdate] = await tx
       .update(payment)
       .set({
@@ -423,18 +484,10 @@ export async function confirmPayment(
       .where(and(eq(payment.id, paymentId), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])))
       .returning();
 
-    // Idempotent: if 0 rows updated, another webhook already confirmed this payment
-    if (!paymentUpdate) {
-      return { updated: undefined, registrationIds: [] as string[] };
-    }
+    // The row is locked and open, so the guarded update cannot miss.
+    if (!paymentUpdate) throw new Error('Payment was concurrently processed');
 
     // Move all linked registrations to 'confirmed'
-    const links = await db.query.paymentRegistration.findMany({
-      where: (pr, { eq }) => eq(pr.paymentId, paymentId),
-      columns: { registrationId: true },
-    });
-
-    const regIds = links.map((l) => l.registrationId);
     if (regIds.length > 0) {
       if (pay.purpose === 'preregistration') {
         // V3 §6.8: prereg money lands in the HELD wallet; registrations
@@ -477,6 +530,12 @@ export async function confirmPayment(
       await createReceiptsForRegistrations(regIds, tx);
     }
 
+    await logAction(confirmedBy ?? null, 'PAYMENT_CONFIRMED', 'payment', paymentId,
+      { status: current.status }, { status: 'completed', instrumentUsed: instrumentUsed ?? null, notes: adminNotes ?? null }, auditCtx, tx);
+    for (const regId of regIds) {
+      await logAction(confirmedBy ?? null, 'REGISTRATION_CONFIRMED', 'registration', regId, null, { paymentId }, auditCtx, tx);
+    }
+
     return { updated: paymentUpdate, registrationIds: regIds };
   });
 
@@ -494,12 +553,6 @@ export async function confirmPayment(
         console.error('[payment] remark completion hook failed:', err)
       );
     }
-  }
-
-  // Awaited so the rows exist before the caller answers (RF-15); still non-fatal.
-  for (const regId of registrationIds) {
-    await logAction(null, 'REGISTRATION_CONFIRMED', 'registration', regId, null, { paymentId })
-      .catch((err) => console.error('[audit] REGISTRATION_CONFIRMED failed:', err));
   }
 
   // NOT-005: Notify parent of payment receipt (fire-and-forget)
@@ -556,65 +609,84 @@ export async function confirmPayment(
   return updated;
 }
 
+type OpenStatus = (typeof OPEN_PAYMENT_STATUSES)[number];
+
 /**
- * Mark a payment as failed.
+ * Move an open payment to 'failed', exactly once: lock the row, check it is
+ * still in one of `from`, fail it, give back any escrow applied at checkout,
+ * and write the audit row, all in one transaction (O-7). Returns undefined
+ * when the payment was no longer in `from` (another caller got there first).
  *
- * Called when:
- * - Fawry code expires without payment
- * - Card transaction declines
- * - Wallet payment rejected
- * - Session closes with pending payments (finalizePendingRecords)
- *
- * Idempotent: two concurrent callers (e.g. webhook retry + scheduler
- * expiry sweep) will only transition the payment and refund escrow once.
- * A second call on an already-failed payment returns undefined without
- * error and without side effects.
- *
- * If escrow was applied at checkout, the full escrowAmountApplied is
- * credited back to the student exactly once — but only when THIS call
- * is the one that actually flipped the status from 'pending' to 'failed'.
+ * `expireIfClosed`: linked registrations still pending_payment in a window
+ * that is no longer open for the student expire with the payment — a transfer
+ * held them open past the close, and without it nothing can pay them now.
  */
-export async function failPayment(paymentId: string) {
-  const pay = await db.query.payment.findFirst({
-    where: (p, { eq }) => eq(p.id, paymentId),
-  });
+async function failOpenPayment(
+  paymentId: string,
+  opts: {
+    from: readonly OpenStatus[];
+    actorId: string | null;
+    action: 'PAYMENT_FAILED' | 'PAYMENT_CANCELLED' | 'PAYMENT_REJECTED';
+    reason: string;
+    expireIfClosed?: boolean;
+    auditCtx?: AuditContext;
+  }
+) {
+  const result = await db.transaction(async (tx) => {
+    const [pay] = await tx.select().from(payment).where(eq(payment.id, paymentId)).for('update');
+    if (!pay) throw new Error('Payment not found');
+    if (!(opts.from as readonly string[]).includes(pay.status)) return undefined;
 
-  if (!pay) throw new Error('Payment not found');
-
-  // Non-throwing idempotency for non-open states so callers
-  // (finalizePendingRecords, scheduler Fawry sweep, webhook retries)
-  // can call freely without error handling.
-  if (!(OPEN_PAYMENT_STATUSES as readonly string[]).includes(pay.status)) return undefined;
-
-  // Atomic transaction: fail payment + refund escrow if applied.
-  // The UPDATE carries a status='pending' guard so only one concurrent
-  // call transitions the row; the refund branch is inside that guard.
-  const updated = await db.transaction(async (tx) => {
-    const [paymentUpdate] = await tx
+    const key = { PAYMENT_FAILED: 'failure', PAYMENT_CANCELLED: 'cancellation', PAYMENT_REJECTED: 'rejection' }[opts.action];
+    const [failed] = await tx
       .update(payment)
-      .set({ status: 'failed', updatedAt: new Date() })
-      .where(and(eq(payment.id, paymentId), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])))
+      .set({
+        status: 'failed',
+        metadata: {
+          ...((pay.metadata as Record<string, unknown>) ?? {}),
+          [key]: { by: opts.actorId, reason: opts.reason, at: new Date().toISOString() },
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(payment.id, paymentId))
       .returning();
-
-    // Idempotent: if 0 rows updated, another caller already failed this payment.
-    if (!paymentUpdate) {
-      return undefined;
-    }
 
     if (pay.escrowAmountApplied > 0) {
       await creditEscrow({
         studentId: pay.studentId,
         amount: pay.escrowAmountApplied,
         reason: 'payment_refund',
-        initiatedBy: pay.parentId,
+        initiatedBy: opts.actorId ?? pay.parentId,
         relatedPaymentId: paymentId,
       }, tx);
     }
 
-    return paymentUpdate;
+    let registrationsExpired = 0;
+    if (opts.expireIfClosed) {
+      const regs = await tx
+        .select({ id: registration.id, sessionId: registration.sessionId })
+        .from(paymentRegistration)
+        .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
+        .where(and(eq(paymentRegistration.paymentId, paymentId), eq(registration.status, 'pending_payment')));
+      for (const r of regs) {
+        if (await sessionOpenFor(pay.studentId, r.sessionId, tx)) continue;
+        const expired = await tx
+          .update(registration)
+          .set({ status: 'expired', updatedAt: new Date() })
+          .where(and(eq(registration.id, r.id), eq(registration.status, 'pending_payment')))
+          .returning({ id: registration.id });
+        registrationsExpired += expired.length;
+      }
+    }
+
+    await logAction(opts.actorId, opts.action, 'payment', paymentId, { status: pay.status },
+      { status: 'failed', reason: opts.reason, escrowReturned: pay.escrowAmountApplied, registrationsExpired }, opts.auditCtx, tx);
+
+    return { pay, failed: failed!, registrationsExpired };
   });
 
-  if (!updated) return undefined;
+  if (!result) return undefined;
+  const { pay } = result;
 
   // NOT-008: Notify parents of escrow refund from failed payment (fire-and-forget).
   // Only fired on the call that actually transitioned the status.
@@ -630,11 +702,128 @@ export async function failPayment(paymentId: string) {
       previousBalance: newBalance - pay.escrowAmountApplied,
       newBalance,
       changeAmount: pay.escrowAmountApplied,
-      reason: 'Escrow refund — payment failed',
+      reason: `Escrow refund — ${opts.action === 'PAYMENT_CANCELLED' ? 'payment cancelled' : opts.action === 'PAYMENT_REJECTED' ? 'payment not received' : 'payment failed'}`,
     }).catch((err) => console.error('[notification] NOT-008 (payment refund) failed:', err));
   }
 
-  return updated;
+  return result;
+}
+
+/**
+ * Mark a payment as failed (system).
+ *
+ * Called when:
+ * - a legacy Fawry code expires without payment (scheduler sweep)
+ * - the registration window closes on an unpaid checkout
+ *   (finalizePendingRecords, which passes from: ['pending'] so a transfer the
+ *   family already sent is never failed by the clock — money audit MA-01)
+ *
+ * Idempotent: a second call on a payment no longer open returns undefined
+ * without side effects, and escrow is given back only by the call that
+ * actually moved the payment.
+ */
+export async function failPayment(
+  paymentId: string,
+  opts: { from?: readonly OpenStatus[]; reason?: string } = {}
+) {
+  const result = await failOpenPayment(paymentId, {
+    from: opts.from ?? OPEN_PAYMENT_STATUSES,
+    actorId: null,
+    action: 'PAYMENT_FAILED',
+    reason: opts.reason ?? 'Payment failed',
+  });
+  return result?.failed;
+}
+
+/**
+ * A parent cancels a checkout they have not paid ('pending'): escrow applied
+ * at checkout comes back and the registrations are payable again, by any
+ * method (money audit MA-02). Once a transfer reference is in, the money may
+ * have been sent, so only finance can resolve it (rejectPayment).
+ * Any parent linked to the student may cancel, as either may pay.
+ */
+export async function cancelPayment(paymentId: string, parentId: string, auditCtx?: AuditContext) {
+  const pay = await db.query.payment.findFirst({
+    where: (p, { eq }) => eq(p.id, paymentId),
+    columns: { id: true, studentId: true, status: true },
+  });
+  if (!pay) throw new Error('Payment not found');
+  if (!(await validateParentStudentLink(parentId, pay.studentId))) {
+    throw new Error('You are not authorized to cancel this payment');
+  }
+  if (pay.status === 'pending_verification') {
+    throw new Error('The transfer reference has been submitted; the finance office will verify or reject it.');
+  }
+
+  const result = await failOpenPayment(paymentId, {
+    from: ['pending'],
+    actorId: parentId,
+    action: 'PAYMENT_CANCELLED',
+    reason: 'Cancelled by the parent before paying',
+    expireIfClosed: true,
+    auditCtx,
+  });
+  if (!result) {
+    const now = await db.query.payment.findFirst({ where: (p, { eq }) => eq(p.id, paymentId), columns: { status: true } });
+    throw new Error(
+      now?.status === 'pending_verification'
+        ? 'The transfer reference has been submitted; the finance office will verify or reject it.'
+        : `Payment is already in '${now?.status ?? pay.status}' status`
+    );
+  }
+  return {
+    id: result.failed.id,
+    status: result.failed.status,
+    escrowReturned: result.pay.escrowAmountApplied,
+    registrationsExpired: result.registrationsExpired,
+  };
+}
+
+/**
+ * Finance rejects an open manual payment with a reason the family will read:
+ * an InstaPay reference that is not on the bank statement, or a checkout the
+ * family abandoned (money audit MA-03). Escrow applied at checkout comes back.
+ * Registrations return to payable while the window is open for the student;
+ * after the close they expire, since the transfer was all that held them.
+ */
+export async function rejectPayment(paymentId: string, staffId: string, reason: string, auditCtx?: AuditContext) {
+  const pay = await db.query.payment.findFirst({
+    where: (p, { eq }) => eq(p.id, paymentId),
+    columns: { id: true, status: true, paymentMethod: true, studentId: true, amount: true, escrowAmountApplied: true },
+  });
+  if (!pay) throw new Error('Payment not found');
+  if (!['in_school', 'instapay', 'bank_transfer'].includes(pay.paymentMethod)) {
+    throw new Error('Only in-school, InstaPay, and bank transfer payments are rejected manually');
+  }
+  if (!(OPEN_PAYMENT_STATUSES as readonly string[]).includes(pay.status)) {
+    throw new Error(`Payment is already in '${pay.status}' status`);
+  }
+
+  const result = await failOpenPayment(paymentId, {
+    from: OPEN_PAYMENT_STATUSES,
+    actorId: staffId,
+    action: 'PAYMENT_REJECTED',
+    reason,
+    expireIfClosed: true,
+    auditCtx,
+  });
+  if (!result) throw new Error('Payment was concurrently processed');
+
+  notifyPaymentRejected({
+    studentId: pay.studentId,
+    paymentId,
+    amount: pay.amount,
+    escrowReturned: pay.escrowAmountApplied,
+    reason,
+    registrationsExpired: result.registrationsExpired,
+  }).catch((err) => console.error('[notification] PAYMENT_REJECTED failed:', err));
+
+  return {
+    id: result.failed.id,
+    status: result.failed.status,
+    escrowReturned: pay.escrowAmountApplied,
+    registrationsExpired: result.registrationsExpired,
+  };
 }
 
 /**
@@ -724,6 +913,17 @@ export async function submitInstapayReference(
   if (data.screenshotFileId && !(await isOwnDocument(data.screenshotFileId, parentId))) {
     throw new Error('You are not authorized to attach that file');
   }
+  // A checkout whose registrations already expired with the window can take
+  // no reference: nothing could ever be confirmed against it.
+  if (pay.purpose === 'registration') {
+    const links = await db.query.paymentRegistration.findMany({
+      where: (pr, { eq }) => eq(pr.paymentId, paymentId),
+      with: { registration: { columns: { status: true } } },
+    });
+    if (links.some((l) => l.registration.status !== 'pending_payment')) {
+      throw new Error('The registration window has closed for this payment; it can no longer take a transfer reference.');
+    }
+  }
 
   try {
     const [updated] = await db
@@ -794,7 +994,7 @@ export async function getPendingManualPayments() {
  * pending_payment, receipts voided. School-fee reversals re-lock the
  * registration gate automatically (the gate checks completed payments).
  */
-export async function reversePayment(paymentId: string, financeAdminId: string, reason: string) {
+export async function reversePayment(paymentId: string, financeAdminId: string, reason: string, auditCtx?: AuditContext) {
   const pay = await db.query.payment.findFirst({
     where: (p, { eq }) => eq(p.id, paymentId),
     with: { paymentRegistrations: { columns: { registrationId: true } } },
@@ -811,20 +1011,22 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
   // Checking them here, before the transaction, left a window in which an
   // officer could hand a receipt over between the check and the void.
   let voidedReceiptNumbers: string[] = [];
-
-  const { receipt } = await import('@repo/db');
   let registrationsReverted = 0;
+  const reversedAt = new Date();
 
   await db.transaction(async (tx) => {
     const [updated] = await tx
       .update(payment)
       .set({
         status: 'refunded',
+        // The day's takings count the reversal on this date (MA-05).
+        reversedAt,
+        reversedBy: financeAdminId,
         metadata: {
           ...((pay.metadata as Record<string, unknown>) ?? {}),
-          reversal: { by: financeAdminId, reason, at: new Date().toISOString() },
+          reversal: { by: financeAdminId, reason, at: reversedAt.toISOString() },
         },
-        updatedAt: new Date(),
+        updatedAt: reversedAt,
       })
       .where(and(eq(payment.id, paymentId), eq(payment.status, 'completed')))
       .returning();
@@ -845,7 +1047,21 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
         );
       }
 
-      // Only confirmed rows revert; count those, not every linked row.
+      // A reversal undoes a confirmation nothing has built on yet. A dropped or
+      // swapped registration already paid its refund into escrow; reversing its
+      // payment as well handed the family that refund for money now recorded
+      // as never received (money audit MA-14).
+      const regs = await tx
+        .select({ id: registration.id, status: registration.status })
+        .from(registration)
+        .where(inArray(registration.id, regIds))
+        .for('update');
+      if (regs.some((r) => r.status !== 'confirmed')) {
+        throw new Error(
+          'A subject on this payment has already been dropped or changed — undo that first, or settle the difference as a refund'
+        );
+      }
+
       const reverted = await tx
         .update(registration)
         .set({ status: 'pending_payment', updatedAt: new Date() })
@@ -873,6 +1089,9 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
         tx
       );
     }
+
+    await logAction(financeAdminId, 'PAYMENT_REVERSED', 'payment', paymentId, { status: 'completed' },
+      { status: 'refunded', reason, registrationsReverted, voidedReceiptNumbers }, auditCtx, tx);
   });
 
   // RF-08: every other money movement tells the family; this one used to
@@ -890,22 +1109,30 @@ export async function reversePayment(paymentId: string, financeAdminId: string, 
 }
 
 /**
- * Daily takings (UX_AUDIT G4): everything confirmed on one calendar day,
- * with per-instrument totals — the officer reconciles the cash drawer
- * against this at closing time.
+ * Daily takings (UX_AUDIT G4): the money that moved on one calendar day —
+ * the officer reconciles the drawer against it at closing time, and a
+ * printed day must stay true afterwards (money audit MA-04, MA-05, MA-09).
+ *
+ * - Money in: every payment confirmed that day, including one reversed
+ *   later. A reversal is money out on the day it is made; it never
+ *   rewrites the day of the confirmation.
+ * - Money out: reversals made that day, plus each hand-over of refund
+ *   cash made that day (withdrawal_disbursement, one row per hand-over).
+ * - Drawer: the cash instrument only. InstaPay lands in the bank and card
+ *   in the terminal, so neither belongs in the drawer count.
  */
 export async function getDailyTakings(dateStr: string) {
   const start = new Date(`${dateStr}T00:00:00`);
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  const columns = {
+    id: true, amount: true, escrowAmountApplied: true, paymentMethod: true, purpose: true,
+    instrumentUsed: true, externalReference: true, confirmedAt: true, reversedAt: true,
+  } as const;
 
-  // Money IN: confirmed today
   const confirmed = await db.query.payment.findMany({
-    where: (p, { eq, and, gte, lt }) =>
-      and(eq(p.status, 'completed'), gte(p.confirmedAt, start), lt(p.confirmedAt, end)),
-    columns: {
-      id: true, amount: true, escrowAmountApplied: true, paymentMethod: true,
-      purpose: true, instrumentUsed: true, externalReference: true, confirmedAt: true,
-    },
+    where: (p, { and, inArray, gte, lt }) =>
+      and(inArray(p.status, ['completed', 'refunded']), gte(p.confirmedAt, start), lt(p.confirmedAt, end)),
+    columns,
     with: {
       student: { columns: { id: true, name: true } },
       confirmedByUser: { columns: { id: true, name: true } },
@@ -913,74 +1140,61 @@ export async function getDailyTakings(dateStr: string) {
     orderBy: (p, { asc }) => [asc(p.confirmedAt)],
   });
 
-  // Money OUT #1: payments confirmed today and then REVERSED. Without
-  // these the row simply vanished from the report (status flips to
-  // 'refunded'), so the printed total silently disagreed with the
-  // drawer and nothing explained the gap.
   const reversed = await db.query.payment.findMany({
-    where: (p, { eq, and, gte, lt }) =>
-      and(eq(p.status, 'refunded'), gte(p.confirmedAt, start), lt(p.confirmedAt, end)),
-    columns: {
-      id: true, amount: true, escrowAmountApplied: true, paymentMethod: true,
-      purpose: true, instrumentUsed: true, externalReference: true, confirmedAt: true,
-    },
+    where: (p, { and, eq, gte, lt }) =>
+      and(eq(p.status, 'refunded'), gte(p.reversedAt, start), lt(p.reversedAt, end)),
+    columns,
     with: {
       student: { columns: { id: true, name: true } },
-      confirmedByUser: { columns: { id: true, name: true } },
+      reversedByUser: { columns: { id: true, name: true } },
     },
-    orderBy: (p, { asc }) => [asc(p.confirmedAt)],
+    orderBy: (p, { asc }) => [asc(p.reversedAt)],
   });
 
-  // Money OUT #2: cash refunds handed over at the same desk today.
-  // These live in withdrawal_request, so they never appeared at all.
-  const withdrawals = await db.query.withdrawalRequest.findMany({
-    where: (w, { and, gte, lt, inArray, isNotNull }) =>
-      and(
-        inArray(w.status, ['fulfilled', 'partially_fulfilled']),
-        isNotNull(w.resolvedAt),
-        gte(w.resolvedAt, start),
-        lt(w.resolvedAt, end)
-      ),
-    columns: { id: true, releasedAmount: true, resolvedAt: true },
+  const handOvers = await db.query.withdrawalDisbursement.findMany({
+    where: (d, { and, gte, lt }) => and(gte(d.disbursedAt, start), lt(d.disbursedAt, end)),
     with: {
-      escrow: { with: { student: { columns: { id: true, name: true } } } },
-      resolvedByUser: { columns: { id: true, name: true } },
+      withdrawalRequest: { columns: { id: true }, with: { escrow: { with: { student: { columns: { id: true, name: true } } } } } },
+      disbursedByUser: { columns: { id: true, name: true } },
     },
+    orderBy: (d, { asc }) => [asc(d.disbursedAt)],
   });
+
+  const instrumentOf = (r: { instrumentUsed: string | null; paymentMethod: string }) => r.instrumentUsed ?? r.paymentMethod;
+  const sum = <T>(rows: T[], f: (r: T) => number) => round2(rows.reduce((s, r) => s + f(r), 0));
 
   const byInstrument: Record<string, number> = {};
-  let cashIn = 0;
-  let escrowApplied = 0;
-  for (const r of confirmed) {
-    const key = r.instrumentUsed ?? r.paymentMethod;
-    byInstrument[key] = (byInstrument[key] ?? 0) + r.amount;
-    cashIn += r.amount;
-    escrowApplied += r.escrowAmountApplied;
-  }
+  for (const r of confirmed) byInstrument[instrumentOf(r)] = round2((byInstrument[instrumentOf(r)] ?? 0) + r.amount);
 
-  const reversedTotal = reversed.reduce((sum, r) => sum + r.amount, 0);
-  const cashRefunded = withdrawals.reduce((sum, w) => sum + (w.releasedAmount ?? 0), 0);
-  const cashOut = reversedTotal + cashRefunded;
+  const moneyIn = sum(confirmed, (r) => r.amount);
+  const escrowApplied = sum(confirmed, (r) => r.escrowAmountApplied);
+  const reversedTotal = sum(reversed, (r) => r.amount);
+  const cashRefunded = sum(handOvers, (d) => d.amount);
+  const moneyOut = round2(reversedTotal + cashRefunded);
+  const drawerIn = sum(confirmed.filter((r) => instrumentOf(r) === 'cash'), (r) => r.amount);
+  const drawerOut = round2(sum(reversed.filter((r) => instrumentOf(r) === 'cash'), (r) => r.amount) + cashRefunded);
 
   return {
     date: dateStr,
     rows: confirmed,
     reversed,
-    withdrawals: withdrawals.map((w) => ({
-      id: w.id,
-      releasedAmount: w.releasedAmount ?? 0,
-      resolvedAt: w.resolvedAt,
-      student: w.escrow?.student ?? null,
-      resolvedByUser: w.resolvedByUser ?? null,
+    cashRefunds: handOvers.map((d) => ({
+      id: d.id,
+      withdrawalRequestId: d.withdrawalRequestId,
+      amount: d.amount,
+      disbursedAt: d.disbursedAt,
+      student: d.withdrawalRequest.escrow?.student ?? null,
+      disbursedByUser: d.disbursedByUser ?? null,
     })),
     totals: {
-      cashIn,
+      moneyIn,
       escrowApplied,
       byInstrument,
       reversedTotal,
       cashRefunded,
-      cashOut,
-      net: cashIn - cashOut,
+      moneyOut,
+      net: round2(moneyIn - moneyOut),
+      drawer: { cashIn: drawerIn, cashOut: drawerOut, net: round2(drawerIn - drawerOut) },
     },
   };
 }
@@ -1287,10 +1501,27 @@ export async function getCheckoutSummary(
   const totalCost = regs.reduce((sum, r) => sum + r.priceAtRegistration, 0);
   const escrowBalance = await getEscrowBalance(studentId);
 
+  // A checkout already started on these subjects: a parent who comes back
+  // sees it (to finish or cancel it) instead of a refusal to pay again (MA-02).
+  const links = await db.query.paymentRegistration.findMany({
+    where: (pr, { inArray: inArr }) => inArr(pr.registrationId, registrationIds),
+    with: {
+      payment: {
+        columns: {
+          id: true, status: true, paymentMethod: true, amount: true, escrowAmountApplied: true,
+          externalReference: true, verificationReference: true, metadata: true, createdAt: true,
+        },
+      },
+    },
+  });
+  const openPayment =
+    links.map((l) => l.payment).find((p) => (OPEN_PAYMENT_STATUSES as readonly string[]).includes(p.status)) ?? null;
+
   return {
     registrations: regs,
     totalCost,
     escrowBalance,
     student: regs[0]!.student,
+    openPayment,
   };
 }

@@ -108,8 +108,10 @@ describe('money paths', () => {
     expect((await one<{ approved_by: string }>(`select approved_by from withdrawal_request where id = $1`, [w.id])).approved_by).toBe(finadmin.id);
 
     // Since the snapshot: 1500 cash (History) + 1000 InstaPay in, 1000 cash refunded out.
+    // The drawer holds only the cash: 1500 in, 1000 out (MA-04).
     expect(takingsDelta(takingsBefore, await takings(officer))).toMatchObject({
-      cashIn: 2500, escrowApplied: 500, byInstrument: { cash: 1500, instapay: 1000 }, cashRefunded: 1000, cashOut: 1000, net: 1500,
+      moneyIn: 2500, escrowApplied: 500, byInstrument: { cash: 1500, instapay: 1000 }, cashRefunded: 1000, moneyOut: 1000, net: 1500,
+      drawer: { cashIn: 1500, cashOut: 1000, net: 500 },
     });
   });
 
@@ -135,9 +137,14 @@ describe('money paths', () => {
     expect(toParent[0]?.body).toContain('1 registration is back to pending payment');
     await notified(student.email, 'PAYMENT_REVERSED', 1);
 
-    // The reversed InstaPay payment drops out of cashIn and shows as reversed.
+    // The InstaPay payment stays in money in (it was confirmed today) and its
+    // reversal is money out today: they net to zero, not to minus 1000 (MA-04).
+    // Before the money audit the reversed payment left money in AND was
+    // subtracted again, and this test never read the net, which came to -500.
     expect(takingsDelta(takingsBefore, await takings(officer))).toMatchObject({
-      cashIn: 1500, escrowApplied: 0, byInstrument: { cash: 1500 }, reversedTotal: 1000, cashRefunded: 1000, // the reversed instrument drops out of the map entirely
+      moneyIn: 2500, escrowApplied: 500, byInstrument: { cash: 1500, instapay: 1000 },
+      reversedTotal: 1000, cashRefunded: 1000, moneyOut: 2000, net: 500,
+      drawer: { cashIn: 1500, cashOut: 1000, net: 500 },
     });
   });
 });

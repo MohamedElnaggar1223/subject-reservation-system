@@ -268,14 +268,14 @@ export const escrowRoutes = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const result = await escrowService.fulfillWithdrawalRequest(id, data, user.id);
-        await logAction(user.id, 'WITHDRAWAL_FULFILLED', 'escrow', id, null, result as Record<string, unknown>, extractAuditContext(c))
-          .catch(err => console.error('[audit] WITHDRAWAL_FULFILLED failed:', err));
+        // WITHDRAWAL_FULFILLED is written inside the hand-over's transaction (O-7).
+        const result = await escrowService.fulfillWithdrawalRequest(id, data, user.id, extractAuditContext(c));
         return success(c, result);
       } catch (err) {
         const message = clientMessage(err, 'Failed to fulfill withdrawal');
         const status = message.includes('not found') ? 404 :
-                       message.includes('Insufficient') || message.includes('Cannot release') ? 422 : 400;
+                       message.includes('Insufficient') || message.includes('Cannot release') ? 422 :
+                       message.includes('already') || message.includes('has been rejected') ? 409 : 400;
         return error(c, message, status);
       }
     }
@@ -284,8 +284,9 @@ export const escrowRoutes = new Hono<HonoEnv>()
   /**
    * POST /escrow/admin/withdrawals/:id/reject
    *
-   * Finance staff reject a pending withdrawal request. No funds are moved.
-   * A mandatory reason is stored in adminNotes.
+   * Finance staff reject the unpaid remainder of a withdrawal request: the
+   * part not yet handed over goes back to escrow. A mandatory reason is
+   * stored in adminNotes.
    */
   .post('/admin/withdrawals/:id/reject',
     requireFinance(),
@@ -297,13 +298,13 @@ export const escrowRoutes = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const result = await escrowService.rejectWithdrawalRequest(id, data, user.id);
-        await logAction(user.id, 'WITHDRAWAL_REJECTED', 'escrow', id, null, result as Record<string, unknown>, extractAuditContext(c))
-          .catch(err => console.error('[audit] WITHDRAWAL_REJECTED failed:', err));
+        // WITHDRAWAL_REJECTED is written inside the rejection's transaction (O-7).
+        const result = await escrowService.rejectWithdrawalRequest(id, data, user.id, extractAuditContext(c));
         return success(c, result);
       } catch (err) {
         const message = clientMessage(err, 'Failed to reject withdrawal');
-        const status = message.includes('not found') ? 404 : 400;
+        const status = message.includes('not found') ? 404 :
+                       message.includes('Cannot reject') || message.includes('already') ? 409 : 400;
         return error(c, message, status);
       }
     }

@@ -267,6 +267,16 @@ export async function takings(officer: Client): Promise<Takings> {
   return (await fetchTakings(officer, localToday())).totals;
 }
 
+/** Takings totals for another local date (YYYY-MM-DD). */
+export async function takingsOn(officer: Client, date: string): Promise<Takings> {
+  return (await fetchTakings(officer, date)).totals;
+}
+
+/** Yesterday's local date, for scenarios that move a timestamp back a day. */
+export function localYesterday(): string {
+  return new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA');
+}
+
 // ─── Dates that never expire ─────────────────────────────────────────────────
 // The suite must pass on any day, so no test hard-codes a year. Sessions are
 // placed relative to today; academic years follow the API's own rule
@@ -308,12 +318,17 @@ export function takingsDelta(before: Takings, after: Takings) {
     inst[k] = money((a[k] ?? 0) - (b[k] ?? 0));
   }
   return {
-    cashIn: money(after.cashIn - before.cashIn),
+    moneyIn: money(after.moneyIn - before.moneyIn),
     escrowApplied: money(after.escrowApplied - before.escrowApplied),
     byInstrument: inst,
     reversedTotal: money(after.reversedTotal - before.reversedTotal),
     cashRefunded: money(after.cashRefunded - before.cashRefunded),
-    cashOut: money(after.cashOut - before.cashOut),
+    moneyOut: money(after.moneyOut - before.moneyOut),
     net: money(after.net - before.net),
+    drawer: {
+      cashIn: money(after.drawer.cashIn - before.drawer.cashIn),
+      cashOut: money(after.drawer.cashOut - before.drawer.cashOut),
+      net: money(after.drawer.net - before.drawer.net),
+    },
   };
 }

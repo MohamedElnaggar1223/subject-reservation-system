@@ -8,7 +8,8 @@ agreements live in the user's global CLAUDE.md; this file only adds what is spec
 `STRATEGY.md` (the plan of record: goal, decisions and why, phases, open questions),
 `FOUNDATION_AUDIT.md` (what has been proven and what is still open, with finding ids
 RF-nn / RH-nn), `SECURITY_AUDIT.md` (authorization, cross-family access, the auth surface,
-and the production checklist), `DISCOVERY.md` (assumptions about the school, parked questions, artefacts
+and the production checklist), `MONEY_AUDIT.md` (ledger invariants, takings semantics, the
+money findings MA-nn), `DISCOVERY.md` (assumptions about the school, parked questions, artefacts
 still to obtain — check it before designing any feature), `PATTERNS.md` (the three golden
 rules of the codebase), `V3_PLAN.md` and `UX_AUDIT.md` (why the system is shaped the way it is).
 
@@ -57,6 +58,13 @@ in — the main checkout's `node_modules` can be stale while a worktree's are cu
 A new endpoint needs a row in `apps/api/test/authz-policy.tsv` saying which principals may
 call it; the matrix test fails without one. An endpoint that takes an id belonging to a family
 gets a cross-family case in `05-object-access.test.ts`.
+
+`09-money-invariants.test.ts` runs last and checks rules over every row the suite leaves
+behind (ledger equals balance, a payment equals what it covers, cash handed over equals what
+was released). A new money table or movement gets a rule there as well as a scenario. A money
+transition writes its audit row inside its own transaction (`logAction(..., tx)`), and a
+guard that relies on "read, then write" takes a row lock (`.for('update')`): under READ
+COMMITTED a re-read inside a transaction serializes nothing (MONEY_AUDIT.md MA-06, MA-08).
 
 ## Git
 

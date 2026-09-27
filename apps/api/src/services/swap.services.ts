@@ -62,6 +62,7 @@ import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { refundPercentage } from './refund.services';
 import { executeReceiptGatedDrop } from './receipt.services';
 import { computeRegistrationPricing } from './pricing.services';
+import { applyPricingExceptions } from './exception.services';
 import {
   notifyDropSwapRequestReceived,
   notifyDropSwapProcessed,
@@ -87,24 +88,26 @@ async function validateParentStudentLink(
 export const isParentLinkedToStudent = validateParentStudentLink;
 
 /**
- * Resolves the price for a subject following the same logic as
- * registration.services.ts → resolveRegistrationPrice.
+ * Price a subject being swapped in exactly as a fresh registration into it
+ * would be priced: the shared engine (in-school by default; the 50% rule when
+ * the school does not offer it), then the student's pricing exceptions, with
+ * the course / registration fee split kept.
  *
- * Previously this helper fell through to 0 when isOfferedAtSchool=false
- * and customPrice was null, which under-charged the student on a swap
- * into such a subject. Registration-time logic uses priceInSchool as the
- * safety net instead — we mirror that here so a swap into the same
- * subject charges the same price as a fresh registration into it.
+ * This used to stop after the engine and store the whole total as the course
+ * fee, so a family with a discount paid full price for the new subject and
+ * the stored split was wrong (money audit MA-10).
  */
-function resolveSubjectPrice(sub: {
-  isOfferedAtSchool: boolean;
-  courseFee: number;
-  registrationFee: number;
-}): number {
-  // V3 (§5.3): swaps price the new subject through the shared engine —
-  // in-school by default; the 50% rule applies automatically when the
-  // subject isn't offered at school.
-  return computeRegistrationPricing(sub, { isRetake: false, takeOutsideSchool: false }).total;
+async function priceSwappedInSubject(
+  studentId: string,
+  sessionId: string,
+  sub: { id: string; isOfferedAtSchool: boolean; courseFee: number; registrationFee: number }
+) {
+  return applyPricingExceptions(
+    studentId,
+    sessionId,
+    sub.id,
+    computeRegistrationPricing(sub, { isRetake: false, takeOutsideSchool: false })
+  );
 }
 
 function round2(n: number): number {
@@ -327,8 +330,8 @@ export async function createSwapRequest(
     registrationId
   );
 
-  const newSubjectPrice = resolveSubjectPrice(newSub);
-  const priceDifference = newSubjectPrice - reg.priceAtRegistration;
+  const newSubjectPrice = (await priceSwappedInSubject(reg.studentId, reg.sessionId, newSub)).total;
+  const priceDifference = round2(newSubjectPrice - reg.priceAtRegistration);
 
   const [request] = await db
     .insert(changeRequest)
@@ -424,15 +427,19 @@ export async function approveChangeRequest(
   }
 
   let newSubjectIsCore = false;
+  let newPricing: Awaited<ReturnType<typeof priceSwappedInSubject>> | null = null;
   if (cr.type === 'swap' && cr.newSubjectId) {
     const newSubject = await db.query.subject.findFirst({
       where: (s, { eq: eqOp }) => eqOp(s.id, cr.newSubjectId!),
-      columns: { id: true, isActive: true, isCore: true },
+      columns: { id: true, isActive: true, isCore: true, isOfferedAtSchool: true, courseFee: true, registrationFee: true },
     });
     if (!newSubject || !newSubject.isActive) {
       throw new Error('The requested subject is no longer available');
     }
     newSubjectIsCore = newSubject.isCore;
+    // Priced now, the way a fresh registration made now would be; the quote
+    // on the request (priceAtRequest) is what the parent was shown.
+    newPricing = await priceSwappedInSubject(cr.registration.studentId, cr.registration.sessionId, newSubject);
 
     const existingReg = await db.query.registration.findFirst({
       where: (r, { eq: eqOp, and: andOp, notInArray: niArr }) =>
@@ -478,16 +485,16 @@ export async function approveChangeRequest(
       initiatedBy: parentId,
     });
 
-    if (cr.type === 'swap' && cr.newSubjectId) {
-      const newSubjectPrice = cr.priceAtRequest;
-
+    if (cr.type === 'swap' && cr.newSubjectId && newPricing) {
       await tx.insert(registration).values({
         id: randomUUID(),
         studentId: cr.registration.studentId,
         sessionId: cr.registration.sessionId,
         subjectId: cr.newSubjectId,
-        priceAtRegistration: newSubjectPrice,
-        courseFeeAtRegistration: newSubjectPrice,
+        priceAtRegistration: newPricing.total,
+        courseFeeAtRegistration: newPricing.courseFee,
+        registrationFeeAtRegistration: newPricing.registrationFee,
+        takenOutsideSchool: newPricing.isOutsideSchool,
         wasCoreAtRegistration: newSubjectIsCore,
         status: 'pending_payment',
         requestedBy: cr.registration.studentId,
@@ -723,7 +730,8 @@ export async function executeDirectSwap(
     registrationId
   );
 
-  const newSubjectPrice = resolveSubjectPrice(newSub);
+  const newPricing = await priceSwappedInSubject(reg.studentId, reg.sessionId, newSub);
+  const newSubjectPrice = newPricing.total;
   const now = new Date();
 
   // V3 §6.12: refund percentage locks at swap time (drop leg)
@@ -747,8 +755,10 @@ export async function executeDirectSwap(
       studentId: reg.studentId,
       sessionId: reg.sessionId,
       subjectId: data.newSubjectId,
-      priceAtRegistration: newSubjectPrice,
-      courseFeeAtRegistration: newSubjectPrice,
+      priceAtRegistration: newPricing.total,
+      courseFeeAtRegistration: newPricing.courseFee,
+      registrationFeeAtRegistration: newPricing.registrationFee,
+      takenOutsideSchool: newPricing.isOutsideSchool,
       wasCoreAtRegistration: newSub.isCore,
       status: 'pending_payment',
       requestedBy: parentId,

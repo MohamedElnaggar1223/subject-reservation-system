@@ -236,6 +236,7 @@ export const userRelations = relations(user, ({ many }) => ({
   paymentsAsStudent: many(payment, { relationName: "studentPayments" }),
   paymentsAsParent: many(payment, { relationName: "parentPayments" }),
   paymentsConfirmed: many(payment, { relationName: "confirmedPayments" }),
+  paymentsReversed: many(payment, { relationName: "reversedPayments" }),
   changeRequestsRequested: many(changeRequest, { relationName: "requestedChangeRequests" }),
   changeRequestsApproved: many(changeRequest, { relationName: "approvedChangeRequests" }),
   notifications: many(notification),
@@ -733,6 +734,11 @@ export const payment = pgTable(
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     // Staff member (finance/admin) who confirmed a manual payment
     confirmedBy: text("confirmed_by").references(() => user.id, { onDelete: "set null" }),
+    // When and by whom a completed payment was reversed (status 'refunded').
+    // The day's takings count a reversal on this date, never by rewriting the
+    // day the payment was confirmed (money audit MA-05).
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
+    reversedBy: text("reversed_by").references(() => user.id, { onDelete: "set null" }),
     // Provider-specific data (payment URL, Fawry expiry, bank details)
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -747,6 +753,8 @@ export const payment = pgTable(
     index("payment_status_idx").on(table.status),
     index("payment_method_idx").on(table.paymentMethod),
     index("payment_purpose_idx").on(table.purpose),
+    index("payment_confirmedAt_idx").on(table.confirmedAt),
+    index("payment_reversedAt_idx").on(table.reversedAt),
     uniqueIndex("payment_verification_reference_idx").on(table.verificationReference),
     // L-8: Payment amount may be 0 for fully-escrow-funded payments (C-8
     // auto-confirm path) but never negative. Same for the escrow portion.
@@ -922,6 +930,36 @@ export const withdrawalRequest = pgTable(
       "withdrawal_released_le_requested",
       sql`${table.releasedAmount} IS NULL OR ${table.releasedAmount} <= ${table.requestedAmount}`,
     ),
+  ]
+);
+
+/**
+ * ============================================
+ * WITHDRAWAL DISBURSEMENT TABLE
+ * ============================================
+ *
+ * One row per hand-over of cash against a withdrawal request. A request can
+ * be paid in parts, on different days, and then have its remainder rejected;
+ * the request row keeps only the running total and the latest resolution, so
+ * the day's takings read cash out from here (money audit MA-09).
+ * The sum of a request's rows always equals its releasedAmount.
+ */
+export const withdrawalDisbursement = pgTable(
+  "withdrawal_disbursement",
+  {
+    id: text("id").primaryKey(),
+    withdrawalRequestId: text("withdrawal_request_id")
+      .notNull()
+      .references(() => withdrawalRequest.id, { onDelete: "restrict" }),
+    amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
+    disbursedBy: text("disbursed_by").references(() => user.id, { onDelete: "set null" }),
+    disbursedAt: timestamp("disbursed_at", { withTimezone: true }).defaultNow().notNull(),
+    notes: text("notes"),
+  },
+  (table) => [
+    index("withdrawalDisb_requestId_idx").on(table.withdrawalRequestId),
+    index("withdrawalDisb_disbursedAt_idx").on(table.disbursedAt),
+    check("withdrawal_disbursement_amount_positive", sql`${table.amount} > 0`),
   ]
 );
 
@@ -1227,6 +1265,11 @@ export const paymentRelations = relations(payment, ({ one, many }) => ({
     references: [user.id],
     relationName: "confirmedPayments",
   }),
+  reversedByUser: one(user, {
+    fields: [payment.reversedBy],
+    references: [user.id],
+    relationName: "reversedPayments",
+  }),
   paymentRegistrations: many(paymentRegistration),
 }));
 
@@ -1272,13 +1315,25 @@ export const escrowTransactionRelations = relations(escrowTransaction, ({ one })
   }),
 }));
 
-export const withdrawalRequestRelations = relations(withdrawalRequest, ({ one }) => ({
+export const withdrawalRequestRelations = relations(withdrawalRequest, ({ one, many }) => ({
   escrow: one(escrow, {
     fields: [withdrawalRequest.escrowId],
     references: [escrow.id],
   }),
   resolvedByUser: one(user, {
     fields: [withdrawalRequest.resolvedBy],
+    references: [user.id],
+  }),
+  disbursements: many(withdrawalDisbursement),
+}));
+
+export const withdrawalDisbursementRelations = relations(withdrawalDisbursement, ({ one }) => ({
+  withdrawalRequest: one(withdrawalRequest, {
+    fields: [withdrawalDisbursement.withdrawalRequestId],
+    references: [withdrawalRequest.id],
+  }),
+  disbursedByUser: one(user, {
+    fields: [withdrawalDisbursement.disbursedBy],
     references: [user.id],
   }),
 }));

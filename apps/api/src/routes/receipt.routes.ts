@@ -63,7 +63,13 @@ export const receipts = new Hono<HonoEnv>()
   .post('/refund-windows', requireFinanceAdmin(), zValidator('json', CreateRefundWindow), async (c) => {
     const user = c.get('user')!;
     const data = c.req.valid('json');
-    const created = await refundService.createWindow(data);
+    let created;
+    try {
+      created = await refundService.createWindow(data);
+    } catch (err) {
+      const message = clientMessage(err, 'Failed to create refund window');
+      return error(c, message, message.includes('overlaps') ? 409 : 400);
+    }
     await logAction(user.id, 'REFUND_WINDOW_CREATED', 'refund_window', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
       .catch((err) => console.error('[audit] REFUND_WINDOW_CREATED failed:', err));
     return success(c, created, 201);

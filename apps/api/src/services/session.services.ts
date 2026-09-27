@@ -348,9 +348,14 @@ export async function activateSession(id: string) {
  * Finalize all pending records when a session closes.
  *
  * Called from both manual close and auto-close paths.
- * 1. pending_approval registrations → expired
- * 2. pending_payment registrations → expired
+ * 1. unpaid checkouts ('pending' payments) on this session → failed, escrow back
+ * 2. pending_approval and pending_payment registrations → expired, except those
+ *    held by a transfer awaiting verification ('pending_verification'): the
+ *    family may already have sent that money, so finance confirms or rejects
+ *    it after the close (money audit MA-01)
  * 3. pending_approval change requests for registrations in this session → rejected with system comment
+ * 4. any 'pending' payment left on an expired registration (a checkout started
+ *    while the close ran) → failed, escrow back
  *
  * Returns counts of affected records.
  */
@@ -360,7 +365,25 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
 }> {
   const now = new Date();
 
-  // 1 & 2. Expire all pending_approval and pending_payment registrations for this session.
+  // 1. Fail unpaid checkouts first. failPayment is told to move only
+  //    'pending' payments: one whose reference arrives in the meantime is left
+  //    alone, and step 2 then sees it and keeps its registrations.
+  const unpaid = await db
+    .selectDistinct({ id: payment.id })
+    .from(payment)
+    .innerJoin(paymentRegistration, eq(paymentRegistration.paymentId, payment.id))
+    .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
+    .where(and(eq(registration.sessionId, sessionId), eq(registration.status, 'pending_payment'), eq(payment.status, 'pending')));
+  for (const { id } of unpaid) {
+    try {
+      await failPayment(id, { from: ['pending'], reason: 'Registration window closed before payment' });
+    } catch (err) {
+      console.error(`[session:finalize] Failed to fail payment ${id}:`, err);
+    }
+  }
+
+  // 2. Expire pending_approval and pending_payment registrations for this session,
+  // except those held by a transfer awaiting verification.
   // Return enough data to notify each affected student individually afterward
   // (SES-004: "Students/parents notified of early closure" and H-16:
   // students whose swap-generated pending_payment expires must know their
@@ -376,6 +399,10 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
       and(
         eq(registration.sessionId, sessionId),
         inArray(registration.status, ['pending_approval', 'pending_payment']),
+        sql`not exists (
+          select 1 from ${paymentRegistration} pr join ${payment} p on p.id = pr.payment_id
+          where pr.registration_id = ${registration.id} and p.status = 'pending_verification'
+        )`,
       )
     )
     .returning({
@@ -411,10 +438,9 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
       .returning({ id: changeRequest.id });
   }
 
-  // 4. Fail any pending payments linked to the now-expired registrations
-  // This refunds escrow if it was applied at checkout (fire-and-forget with logging)
+  // 4. A checkout started while the close ran can still be 'pending' on a
+  // now-expired registration; fail it so its escrow comes back.
   const expiredRegIds = expiredRegs.map((r) => r.id);
-  let failedPayments = 0;
   if (expiredRegIds.length > 0) {
     const pendingPaymentLinks = await db.query.paymentRegistration.findMany({
       where: (pr, { inArray: inArr }) => inArr(pr.registrationId, expiredRegIds),
@@ -423,19 +449,13 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
       },
     });
 
-    // Deduplicate payment IDs and only target pending payments
     const pendingPaymentIds = [
-      ...new Set(
-        pendingPaymentLinks
-          .filter((pl) => pl.payment.status === 'pending' || pl.payment.status === 'pending_verification')
-          .map((pl) => pl.payment.id)
-      ),
+      ...new Set(pendingPaymentLinks.filter((pl) => pl.payment.status === 'pending').map((pl) => pl.payment.id)),
     ];
 
     for (const pid of pendingPaymentIds) {
       try {
-        await failPayment(pid);
-        failedPayments++;
+        await failPayment(pid, { from: ['pending'], reason: 'Registration window closed before payment' });
       } catch (err) {
         console.error(`[session:finalize] Failed to fail payment ${pid}:`, err);
       }

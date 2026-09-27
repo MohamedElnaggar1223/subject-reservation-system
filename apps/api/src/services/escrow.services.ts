@@ -20,6 +20,7 @@ import {
   escrow,
   escrowTransaction,
   withdrawalRequest,
+  withdrawalDisbursement,
   parentStudentLink,
   user,
   eq,
@@ -42,6 +43,7 @@ import {
   notifyWithdrawalRejected,
   createNotification,
 } from './notification.services';
+import { logAction, type AuditContext } from './audit.services';
 
 // ─── Core Escrow Primitives ───────────────────────────────────────────────────
 // These are also imported by payment.services.ts and (future) swap.services.ts
@@ -548,8 +550,13 @@ export async function getPendingWithdrawalRequests() {
  * Funds were already held (debited from escrow) when the withdrawal was created.
  * Fulfillment only updates the request status — no additional escrow debit needed.
  *
- * The entire operation runs inside a transaction with the request re-read
- * inside the TX to prevent TOCTOU races (two admins processing the same request).
+ * The request row is locked for the whole transaction. Re-reading it inside
+ * the transaction without a lock did not serialize anything: two officers
+ * paying out parts of one request each read the same running total and each
+ * wrote "total + mine", so the record kept one hand-over and lost the other
+ * (money audit MA-08). Each hand-over is also written to
+ * withdrawal_disbursement, which the day's takings read (MA-09), and its audit
+ * row commits with it (O-7).
  *
  * Status progression:
  * - pending → fulfilled (full release)
@@ -559,14 +566,14 @@ export async function getPendingWithdrawalRequests() {
 export async function fulfillWithdrawalRequest(
   requestId: string,
   data: FulfillWithdrawalType,
-  adminId: string
+  adminId: string,
+  auditCtx?: AuditContext
 ) {
   const now = new Date();
 
-  // Atomic transaction with TOCTOU protection: re-read inside TX to prevent
-  // two admins from simultaneously processing the same withdrawal request.
   const { updated, studentId, requestedAmount } = await db.transaction(async (tx) => {
-    // Re-read the request inside the transaction to get a consistent snapshot
+    await tx.select({ id: withdrawalRequest.id }).from(withdrawalRequest)
+      .where(eq(withdrawalRequest.id, requestId)).for('update');
     const req = await tx.query.withdrawalRequest.findFirst({
       where: (wr, { eq: eqOp }) => eqOp(wr.id, requestId),
       with: {
@@ -612,6 +619,19 @@ export async function fulfillWithdrawalRequest(
       .returning();
 
     if (!upd) throw new Error('Withdrawal request already processed by another admin');
+
+    await tx.insert(withdrawalDisbursement).values({
+      id: randomUUID(),
+      withdrawalRequestId: requestId,
+      amount: data.releasedAmount,
+      disbursedBy: adminId,
+      disbursedAt: now,
+      notes: data.notes ?? null,
+    });
+
+    await logAction(adminId, 'WITHDRAWAL_FULFILLED', 'escrow', requestId,
+      { status: req.status, releasedAmount: currentReleased },
+      { status: newStatus, releasedAmount: newTotalReleased, handedOver: data.releasedAmount }, auditCtx, tx);
 
     return {
       updated: upd,
@@ -666,13 +686,17 @@ export async function fulfillWithdrawalRequest(
 export async function rejectWithdrawalRequest(
   requestId: string,
   data: RejectWithdrawalType,
-  adminId: string
+  adminId: string,
+  auditCtx?: AuditContext
 ) {
   const now = new Date();
 
-  // Atomic: read + reject request + restore held funds to escrow
+  // Atomic: lock + read + reject request + restore held funds to escrow.
+  // The lock makes a racing hand-over finish first, so the refund below is
+  // computed from the amount actually released (money audit MA-08).
   const { updated, req, refundedAmount } = await db.transaction(async (tx) => {
-    // Read inside transaction for TOCTOU protection
+    await tx.select({ id: withdrawalRequest.id }).from(withdrawalRequest)
+      .where(eq(withdrawalRequest.id, requestId)).for('update');
     const wr = await tx.query.withdrawalRequest.findFirst({
       where: (w, { eq: eqOp }) => eqOp(w.id, requestId),
       columns: { id: true, status: true, requestedAmount: true, releasedAmount: true },
@@ -717,6 +741,10 @@ export async function rejectWithdrawalRequest(
       .returning();
 
     if (!upd) throw new Error('Withdrawal request already processed by another admin');
+
+    await logAction(adminId, 'WITHDRAWAL_REJECTED', 'escrow', requestId,
+      { status: wr.status, releasedAmount: alreadyReleased },
+      { status: 'rejected', returnedToEscrow: refund, notes: data.notes }, auditCtx, tx);
 
     return { updated: upd, req: wr, refundedAmount: refund };
   });

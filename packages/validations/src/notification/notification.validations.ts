@@ -32,6 +32,7 @@ export const NOTIFICATION_TYPES = [
   // Payment
   'PAYMENT_CONFIRMED',
   'PAYMENT_REVERSED',
+  'PAYMENT_REJECTED',
   // Drop / swap request flow
   'DROP_SWAP_REQUEST_RECEIVED',
   'DROP_SWAP_PROCESSED',
@@ -60,6 +61,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   REGISTRATION_REJECTED:            'Registration Rejected',
   PAYMENT_CONFIRMED:                'Payment Confirmed',
   PAYMENT_REVERSED:                 'Payment Reversed',
+  PAYMENT_REJECTED:                 'Payment Not Received',
   DROP_SWAP_REQUEST_RECEIVED:       'Drop / Swap Request',
   DROP_SWAP_PROCESSED:              'Drop / Swap Processed',
   ESCROW_BALANCE_CHANGED:           'Escrow Balance Updated',
@@ -81,6 +83,7 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   REGISTRATION_REJECTED:            '❌',
   PAYMENT_CONFIRMED:                '💳',
   PAYMENT_REVERSED:                 '↩️',
+  PAYMENT_REJECTED:                 '⚠️',
   DROP_SWAP_REQUEST_RECEIVED:       '🔄',
   DROP_SWAP_PROCESSED:              '📝',
   ESCROW_BALANCE_CHANGED:           '💰',
