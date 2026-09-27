@@ -355,7 +355,9 @@ is debited back (ledger reason `late_transfer_undone`), the payment returns to f
 the reference it had before, it leaves that day's takings — so no earlier day changes, though
 that day's own report changes if it was printed earlier the same day — and it can be recorded
 again correctly. A family reference a record set aside cannot be recorded as another
-payment's statement reference, so an undo can always put it back. After that day, or once the escrow is spent, it is escrow
+payment's statement reference, so an undo can put it back (a record committing at the same
+instant could still slip past that unlocked check; the undo then refuses with a sentence and
+nothing moves). After that day, or once the escrow is spent, it is escrow
 like any other, and a record whose money never arrived needs a database fix.
 
 **MO-11 — how far back a "never received" reversal reaches.** Only within its own calendar
