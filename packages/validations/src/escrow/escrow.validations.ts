@@ -13,6 +13,7 @@
  */
 
 import { z } from 'zod';
+import { isWholePiastres, PIASTRES_MESSAGE } from '../common.validations';
 
 // ─── Withdrawal Request Status ────────────────────────────────────────────────
 
@@ -50,7 +51,7 @@ export type WithdrawalRequestIdType = z.infer<typeof WithdrawalRequestId>;
 export const TransferEscrow = z.object({
   fromStudentId: z.string().min(1, 'Invalid source student ID'),
   toStudentId:   z.string().min(1, 'Invalid destination student ID'),
-  amount:        z.number().positive('Transfer amount must be greater than 0').max(1_000_000, 'Amount exceeds maximum allowed'),
+  amount:        z.number().positive('Transfer amount must be greater than 0').max(1_000_000, 'Amount exceeds maximum allowed').refine(isWholePiastres, PIASTRES_MESSAGE),
 }).refine(
   (data) => data.fromStudentId !== data.toStudentId,
   { message: 'Cannot transfer escrow to the same student', path: ['toStudentId'] }
@@ -66,7 +67,7 @@ export type TransferEscrowType = z.infer<typeof TransferEscrow>;
  */
 export const RequestWithdrawal = z.object({
   studentId: z.string().min(1, 'Invalid student ID'),
-  amount:    z.number().positive('Withdrawal amount must be greater than 0').max(1_000_000, 'Amount exceeds maximum allowed'),
+  amount:    z.number().positive('Withdrawal amount must be greater than 0').max(1_000_000, 'Amount exceeds maximum allowed').refine(isWholePiastres, PIASTRES_MESSAGE),
 });
 export type RequestWithdrawalType = z.infer<typeof RequestWithdrawal>;
 
@@ -80,7 +81,7 @@ export type RequestWithdrawalType = z.infer<typeof RequestWithdrawal>;
  * When cumulative total reaches requestedAmount → status becomes 'fulfilled'.
  */
 export const FulfillWithdrawal = z.object({
-  releasedAmount: z.number().positive('Released amount must be greater than 0').max(1_000_000, 'Amount exceeds maximum allowed'),
+  releasedAmount: z.number().positive('Released amount must be greater than 0').max(1_000_000, 'Amount exceeds maximum allowed').refine(isWholePiastres, PIASTRES_MESSAGE),
   notes:          z.string().max(500).optional(),
 });
 export type FulfillWithdrawalType = z.infer<typeof FulfillWithdrawal>;

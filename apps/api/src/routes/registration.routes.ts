@@ -29,6 +29,7 @@ import {
   DirectRegistration,
   PreregisterRegistration,
   DeskRegistration,
+  DeskCollect,
   ApproveRegistrations,
   RevertApprovedRegistrations,
   RejectRegistrations,
@@ -354,6 +355,32 @@ export const registrations = new Hono<HonoEnv>()
         const status =
           message.includes('already') ? 409 :
           message.includes('not open') || message.includes('insufficient') || message.includes('Insufficient') ? 422 : 400;
+        return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * POST /registrations/desk/collect  (money audit MA-18)
+   *
+   * Take the money at the desk for subjects already registered and waiting
+   * for payment: they confirm and their receipts are born at once. The
+   * PAYMENT_CONFIRMED and REGISTRATION_CONFIRMED audit rows are written
+   * inside the confirmation. Finance roles + admin.
+   */
+  .post('/desk/collect',
+    requireFinance(),
+    zValidator('json', DeskCollect),
+    async (c) => {
+      const user = c.get('user')!;
+      const data = c.req.valid('json');
+      try {
+        return success(c, await deskService.collectAtDesk(user.id, data, extractAuditContext(c)), 201);
+      } catch (err) {
+        const message = clientMessage(err, 'Failed to collect payment');
+        const status =
+          message.includes('in progress') ? 409 :
+          message.includes('not open') || message.includes('nsufficient') ? 422 : 400;
         return error(c, message, status);
       }
     }

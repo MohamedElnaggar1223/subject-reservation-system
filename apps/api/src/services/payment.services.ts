@@ -98,13 +98,13 @@ function round2(n: number): number {
  * already honoured extensions; payment did not, so a student with an extension
  * could register and then nobody could pay (money audit MA-13).
  */
-async function sessionOpenFor(studentId: string, sessionId: string, executor: typeof db | Tx = db): Promise<boolean> {
+export async function sessionOpenFor(studentId: string, sessionId: string, executor: typeof db | Tx = db): Promise<boolean> {
   const [sess] = await executor
     .select({ status: registrationSession.status })
     .from(registrationSession)
     .where(eq(registrationSession.id, sessionId));
   if (sess?.status === 'active') return true;
-  return hasDeadlineExtension(studentId, sessionId);
+  return hasDeadlineExtension(studentId, sessionId, executor);
 }
 
 /**
@@ -416,6 +416,11 @@ export async function confirmPayment(
 
   if (!pay) throw new Error('Payment not found');
   if (!(OPEN_PAYMENT_STATUSES as readonly string[]).includes(pay.status)) {
+    // The desk's likeliest surprise: the family cancelled a pay-at-school
+    // checkout in the app before handing the money over.
+    if ((pay.metadata as Record<string, unknown> | null)?.cancellation) {
+      throw new Error(`Payment is already in 'failed' status — the parent cancelled this checkout in the app. Take the payment through the desk instead.`);
+    }
     throw new Error(`Payment is already in '${pay.status}' status`);
   }
 
@@ -445,7 +450,12 @@ export async function confirmPayment(
     ).map((l) => l.registrationId);
     const regs = regIds.length
       ? await tx
-          .select({ id: registration.id, status: registration.status, sessionId: registration.sessionId })
+          .select({
+            id: registration.id,
+            status: registration.status,
+            sessionId: registration.sessionId,
+            price: registration.priceAtRegistration,
+          })
           .from(registration)
           .where(inArray(registration.id, regIds))
           .for('update')
@@ -453,8 +463,8 @@ export async function confirmPayment(
 
     // M-12: registrations must still be payable. A prereg payment's rows are
     // preregistered (or pending_payment if the session opened first). Anything
-    // else needs a window that is open for this student — or a transfer the
-    // family already sent: a reference submitted before the close stays
+    // else needs a window that is open for this student — or a transfer
+    // awaiting verification: a registration it held past the close stays
     // confirmable after it (money audit MA-01).
     for (const r of regs) {
       const payable = isPreregPayment
@@ -490,20 +500,26 @@ export async function confirmPayment(
     // Move all linked registrations to 'confirmed'
     if (regIds.length > 0) {
       if (pay.purpose === 'preregistration') {
-        // V3 §6.8: prereg money lands in the HELD wallet; registrations
-        // stay preregistered until the session activates and the
-        // scheduler captures them. Rows already moved to pending_payment
-        // (session opened early) confirm normally below.
-        await creditHeld(
-          {
-            studentId: pay.studentId,
-            amount: pay.amount,
-            reason: 'prereg_hold',
-            initiatedBy: pay.parentId,
-            relatedPaymentId: paymentId,
-          },
-          tx
-        );
+        // V3 §6.8: prereg money lands in the HELD wallet for rows still
+        // preregistered; they wait there until the session activates and the
+        // scheduler captures them. Rows capture already moved to
+        // pending_payment (the session opened before this confirmation)
+        // confirm normally below and hold nothing: crediting their price to
+        // held left it there for good, since nothing captures a confirmed row
+        // (money audit MA-15).
+        const heldAmount = round2(regs.filter((r) => r.status === 'preregistered').reduce((s, r) => s + r.price, 0));
+        if (heldAmount > 0) {
+          await creditHeld(
+            {
+              studentId: pay.studentId,
+              amount: heldAmount,
+              reason: 'prereg_hold',
+              initiatedBy: pay.parentId,
+              relatedPaymentId: paymentId,
+            },
+            tx
+          );
+        }
         await tx
           .update(registration)
           .set({ status: 'confirmed', updatedAt: now })
@@ -1510,6 +1526,12 @@ export async function getCheckoutSummary(
         columns: {
           id: true, status: true, paymentMethod: true, amount: true, escrowAmountApplied: true,
           externalReference: true, verificationReference: true, metadata: true, createdAt: true,
+        },
+        with: {
+          paymentRegistrations: {
+            columns: { registrationId: true },
+            with: { registration: { columns: { id: true }, with: { subject: { columns: { name: true, code: true } } } } },
+          },
         },
       },
     },

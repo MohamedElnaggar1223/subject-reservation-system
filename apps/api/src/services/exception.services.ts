@@ -84,10 +84,11 @@ export async function getExceptions(filters?: ListExceptionsQueryType) {
 export async function getActiveExceptions(
   studentId: string,
   types: string[],
-  scope: { sessionId?: string; subjectId?: string } = {}
+  scope: { sessionId?: string; subjectId?: string } = {},
+  executor: Pick<typeof db, 'query'> = db
 ) {
   const now = new Date();
-  const rows = await db.query.exception.findMany({
+  const rows = await executor.query.exception.findMany({
     where: (e, { eq, and, inArray }) =>
       and(eq(e.studentId, studentId), eq(e.status, 'active'), inArray(e.type, types)),
   });
@@ -151,11 +152,18 @@ export async function applyPricingExceptions(
  * Hook 2 — window checks. A closed (or not-yet-open) session is treated
  * as open for this student while an extension is active.
  */
-export async function hasDeadlineExtension(studentId: string, sessionId: string): Promise<boolean> {
+export async function hasDeadlineExtension(
+  studentId: string,
+  sessionId: string,
+  // A caller inside a transaction passes it, so the lookup does not take a
+  // second pool connection while the transaction holds its locks.
+  executor: Pick<typeof db, 'query'> = db
+): Promise<boolean> {
   const rows = await getActiveExceptions(
     studentId,
     ['deadline_extension', 'late_registration'],
-    { sessionId }
+    { sessionId },
+    executor
   );
   return rows.length > 0;
 }

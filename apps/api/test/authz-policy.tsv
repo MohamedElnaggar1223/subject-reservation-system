@@ -86,6 +86,7 @@ POST	/v1/registrations/admin-override	D	D	D	D	D	A
 PUT	/v1/registrations/approve	D	D	A	D	D	D
 GET	/v1/registrations/available	D	A	A	A	A	A
 POST	/v1/registrations/desk	D	D	D	A	A	A
+POST	/v1/registrations/desk/collect	D	D	D	A	A	A
 POST	/v1/registrations/direct	D	D	A	D	D	D
 GET	/v1/registrations/history	D	A	A	D	D	A
 GET	/v1/registrations/pending	D	D	A	D	D	A

@@ -186,13 +186,16 @@ before it ships.
    authorization matrix is now an enforced policy.
    Handed on: a second factor for finance roles (owner decision), audit rows inside the money
    transaction (money audit), and the production checklist in §6 of that report.
-2. **Money-correctness audit** (Phase 1.2). Done on 27 Sep 2026: `MONEY_AUDIT.md`, trail
-   `.audit/money-audit.tsv`. Fourteen findings (MA-01 to MA-14; one high: InstaPay transfers
-   already sent were failed at window close) fixed with tests; eleven ledger invariants now run
-   over the whole database after every suite; takings count reversals and refunds on their own
-   day and show the drawer as cash only; O-7 done for payments and cash refunds.
-   Handed on: MO-1 (the rest of O-7) to state and time; MO-2, MO-5, MO-6 are owner decisions;
-   MO-3 (`TZ=Africa/Cairo`) joins the production checklist.
+2. **Money-correctness audit** (Phase 1.2). Done on 27 Sep 2026, reviewed on Opus 5.5:
+   `MONEY_AUDIT.md`, trail `.audit/money-audit.tsv`. Nineteen findings (MA-01 to MA-19; one
+   high: InstaPay transfers already sent were failed at window close) fixed with tests;
+   thirteen money invariants now run over the whole database after every suite; takings count
+   reversals and refunds on their own day and show the drawer as cash only; the desk can take
+   money for subjects already registered; O-7 done for payments and cash refunds.
+   **Owner decisions:** MO-10 (a grace period for InstaPay references after the close, and a
+   cut-off) and MO-11 (whether reversing a cash payment means cash was handed back); also
+   MO-2, MO-5, MO-6, MO-12. Handed on: MO-1 (the rest of O-7) to state and time; MO-3
+   (`TZ=Africa/Cairo`) is in the production checklist.
    Next: **state and time** (Phase 1.3).
 3. **Discovery research pack** in parallel with 1 and 2.
 4. **Housekeeping the audits already named.** Done on 27 Sep 2026: the suite is kept off third

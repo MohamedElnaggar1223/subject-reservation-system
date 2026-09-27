@@ -8,6 +8,7 @@
  */
 
 import { z } from 'zod';
+import { isWholePiastres, PIASTRES_MESSAGE } from '../common.validations';
 
 // ─── Payment Method Enum ──────────────────────────────────────────────────────
 
@@ -160,7 +161,7 @@ export const InitiatePayment = z.object({
     .min(1, 'Select at least one registration to pay for'),
   // V3: only in_school / instapay accepted for new payments.
   paymentMethod: ActivePaymentMethodSchema,
-  escrowAmountToApply: z.number().min(0).max(1_000_000, 'Amount exceeds maximum allowed').default(0),
+  escrowAmountToApply: z.number().min(0).max(1_000_000, 'Amount exceeds maximum allowed').refine(isWholePiastres, PIASTRES_MESSAGE).default(0),
 });
 export type InitiatePaymentType = z.infer<typeof InitiatePayment>;
 

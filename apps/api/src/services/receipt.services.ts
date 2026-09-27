@@ -73,9 +73,16 @@ export async function executeReceiptGatedDrop(
     fromStatus?: 'confirmed' | 'preregistered';
   }
 ): Promise<{ gated: boolean; refundAmount: number }> {
-  const rec = await tx.query.receipt.findFirst({
-    where: (r, { eq }) => eq(r.registrationId, args.registrationId),
-  });
+  // Lock the receipt before deciding. Read without a lock, an officer could
+  // mark the paper handed over between this read and the void below: the drop
+  // then refunded at once and overwrote 'issued' with 'void' while the family
+  // held the paper (money audit MA-16). Receipt before registration is also
+  // the order reversePayment locks them in, so the two cannot deadlock.
+  const [rec] = await tx
+    .select({ id: receipt.id, status: receipt.status })
+    .from(receipt)
+    .where(eq(receipt.registrationId, args.registrationId))
+    .for('update');
 
   const now = new Date();
   const gated = !!rec && rec.status === 'issued';
@@ -115,7 +122,7 @@ export async function executeReceiptGatedDrop(
     await tx
       .update(receipt)
       .set({ status: 'void', notes: 'Voided — registration dropped before hand-over', updatedAt: now })
-      .where(eq(receipt.id, rec.id));
+      .where(and(eq(receipt.id, rec.id), eq(receipt.status, 'pending_issue')));
   }
 
   if (args.refundAmount > 0) {

@@ -16,9 +16,10 @@
  *   on one screen.
  */
 
-import { db, payment, paymentRegistration, registration, parentStudentLink, user as userTable, eq } from '@repo/db';
+import { db, payment, paymentRegistration, registration, parentStudentLink, user as userTable, eq, and, inArray } from '@repo/db';
 import { randomUUID } from 'crypto';
-import type { DeskOnboardFamilyType, DeskRegistrationType } from '@repo/validations';
+import type { DeskOnboardFamilyType, DeskRegistrationType, DeskCollectType } from '@repo/validations';
+import type { AuditContext } from './audit.services';
 import { auth } from '../lib/auth';
 import {
   prepareRegistrationInputs,
@@ -27,7 +28,7 @@ import {
 import { hasDeadlineExtension } from './exception.services';
 import { setStudentFields } from './user.services';
 import { getEscrowBalance, debitEscrow } from './escrow.services';
-import { confirmPayment } from './payment.services';
+import { confirmPayment, sessionOpenFor } from './payment.services';
 import {
   academicYearForDate,
   getApplicableFee,
@@ -308,6 +309,108 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     payment: { id: paymentId, collected: Math.max(0, totalCost - escrowToApply), escrowApplied: escrowToApply },
     totalCost,
     collected: Math.max(0, totalCost - escrowToApply),
+    receipts,
+  };
+}
+
+/**
+ * Take the money at the desk for subjects already registered and waiting for
+ * payment (money audit MA-18). Families are sent to the desk after a
+ * reversal, a rejected transfer or a cancelled checkout, and a register-only
+ * desk visit leaves subjects in the same state; the desk could only register
+ * new subjects, so it had no way to take that money.
+ *
+ * Same shape as a desk registration's collect step: one in-school payment
+ * with the family as payer of record, escrow applied if asked, confirmed at
+ * once through confirmPayment (receipts, notifications, audit rows).
+ */
+export async function collectAtDesk(staffId: string, data: DeskCollectType, auditCtx?: AuditContext) {
+  const regs = await db.query.registration.findMany({
+    where: (r, { inArray }) => inArray(r.id, data.registrationIds),
+    columns: { id: true, studentId: true, sessionId: true, status: true, priceAtRegistration: true },
+  });
+  if (regs.length !== data.registrationIds.length || regs.some((r) => r.studentId !== data.studentId)) {
+    throw new Error('One or more subjects do not belong to this student');
+  }
+  if (regs.some((r) => r.status !== 'pending_payment')) {
+    throw new Error('One or more subjects are not waiting for payment');
+  }
+  for (const sessionId of new Set(regs.map((r) => r.sessionId))) {
+    if (!(await sessionOpenFor(data.studentId, sessionId))) {
+      throw new Error(
+        'Registration window is not open — a finance admin can grant this student a deadline extension'
+      );
+    }
+  }
+
+  const totalCost = Math.round(regs.reduce((s, r) => s + r.priceAtRegistration, 0) * 100) / 100;
+  const escrowToApply = data.escrowAmountToApply ?? 0;
+  if (escrowToApply > totalCost) throw new Error('Escrow amount cannot exceed the total cost');
+  const payerParentId = await resolvePayerParent(data.studentId);
+  const paymentId = randomUUID();
+
+  await db.transaction(async (tx) => {
+    // Same guard as an app checkout (MA-06): lock the subjects, then make sure
+    // nothing else is already paying for them.
+    const locked = await tx
+      .select({ id: registration.id, status: registration.status })
+      .from(registration)
+      .where(inArray(registration.id, data.registrationIds))
+      .for('update');
+    if (locked.some((r) => r.status !== 'pending_payment')) {
+      throw new Error('One or more subjects are not waiting for payment');
+    }
+    const open = await tx
+      .select({ ref: payment.externalReference, method: payment.paymentMethod })
+      .from(paymentRegistration)
+      .innerJoin(payment, eq(payment.id, paymentRegistration.paymentId))
+      .where(and(inArray(paymentRegistration.registrationId, data.registrationIds), inArray(payment.status, ['pending', 'pending_verification'])));
+    if (open.length > 0) {
+      throw new Error(
+        `These subjects already have a ${open[0]!.method === 'instapay' ? 'transfer' : 'checkout'} in progress — confirm it or reject it in the Finance Workbench first`
+      );
+    }
+
+    await tx.insert(payment).values({
+      id: paymentId,
+      studentId: data.studentId,
+      parentId: payerParentId,
+      amount: Math.max(0, Math.round((totalCost - escrowToApply) * 100) / 100),
+      escrowAmountApplied: escrowToApply,
+      paymentMethod: 'in_school',
+      purpose: 'registration',
+      status: 'pending',
+      externalReference: `DESK-${paymentId.slice(0, 8).toUpperCase()}`,
+      metadata: { desk: true, staffId },
+    });
+    if (escrowToApply > 0) {
+      await debitEscrow(
+        { studentId: data.studentId, amount: escrowToApply, reason: 'payment', initiatedBy: staffId, relatedPaymentId: paymentId },
+        tx
+      );
+    }
+    await tx.insert(paymentRegistration).values(
+      data.registrationIds.map((registrationId) => ({ id: randomUUID(), paymentId, registrationId }))
+    );
+  });
+
+  await confirmPayment(
+    paymentId,
+    staffId,
+    undefined,
+    data.notes ?? 'Collected at the finance desk',
+    data.instrumentUsed,
+    auditCtx
+  );
+
+  const receipts = await db.query.receipt.findMany({
+    where: (r, { inArray: inArr }) => inArr(r.registrationId, data.registrationIds),
+    columns: { id: true, registrationId: true, receiptNumber: true, status: true },
+  });
+  return {
+    paymentId,
+    collected: Math.max(0, Math.round((totalCost - escrowToApply) * 100) / 100),
+    escrowApplied: escrowToApply,
     receipts,
   };
 }

@@ -257,7 +257,16 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
   const approveWithdrawalMutation = useMutation({
     mutationFn: (id: string) =>
       apiResponse(api.v1.escrow.admin.withdrawals[':id'].approve.$post({ param: { id } })),
-    onSuccess: () => afterAction('Withdrawal approved and closed.'),
+    // A partly paid request stays open after approval; each later hand-over
+    // needs approving again (MA-17).
+    onSuccess: (w) =>
+      afterAction(
+        w.status === 'fulfilled'
+          ? 'Withdrawal approved and closed.'
+          : w.status === 'rejected'
+            ? 'Cash handed over is approved; the rest was declined, so the request is closed.'
+            : 'Cash handed over so far is approved; the rest of the request is still open.'
+      ),
     onError: (err: Error) => setActionError(err.message),
   });
 
@@ -502,6 +511,11 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                         Cash released — approval pending
                       </span>
                     )}
+                    {w.status === 'rejected' && (
+                      <span className="px-2 py-0.5 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded text-xs font-medium">
+                        Rest declined — cash released needs approval
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Parent: {w.parent?.name ?? '—'} · Requested {new Date(w.createdAt).toLocaleDateString()}
@@ -509,11 +523,11 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                   <p className="text-xs text-muted-foreground mt-1">
                     Requested {w.requestedAmount.toFixed(2)} EGP
                     {released > 0 && ` · Released ${released.toFixed(2)} EGP`}
-                    {` · Remaining ${remaining.toFixed(2)} EGP`}
+                    {w.status !== 'rejected' && ` · Remaining ${remaining.toFixed(2)} EGP`}
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                  {w.status !== 'fulfilled' && (
+                  {(w.status === 'pending' || w.status === 'partially_fulfilled') && (
                     <>
                       <Button
                         size="sm"
@@ -539,7 +553,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                       </Button>
                     </>
                   )}
-                  {(w.status === 'fulfilled' || w.status === 'partially_fulfilled') && !w.approvedBy && (
+                  {(w.status === 'fulfilled' || w.status === 'partially_fulfilled' || (w.status === 'rejected' && (w.releasedAmount ?? 0) > 0)) && !w.approvedBy && (
                     isFinanceAdmin ? (
                       <Button
                         size="sm"
@@ -577,7 +591,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
       {rejectPaymentTarget && (
         <ReasonModal
           title="Reject this payment?"
-          description={`${rejectPaymentTarget.student.name} — ${(rejectPaymentTarget.amount + rejectPaymentTarget.escrowAmountApplied).toFixed(2)} EGP by ${PAYMENT_METHOD_LABELS[rejectPaymentTarget.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS] ?? rejectPaymentTarget.paymentMethod}${rejectPaymentTarget.verificationReference ? `, reference ${rejectPaymentTarget.verificationReference}` : ''}. The payment is marked not received${rejectPaymentTarget.escrowAmountApplied > 0 ? ` and the ${rejectPaymentTarget.escrowAmountApplied.toFixed(2)} EGP applied from escrow goes back` : ''}. The subjects stay open to pay while the window is open, and are released if it has closed. The family receives your reason.`}
+          description={`${rejectPaymentTarget.paymentMethod === 'instapay' && !rejectPaymentTarget.verificationReference ? `The parent has not submitted a transfer reference yet and may be transferring right now — reject only a checkout they abandoned (started ${new Date(rejectPaymentTarget.createdAt).toLocaleString()}). ` : ''}${rejectPaymentTarget.student.name} — ${(rejectPaymentTarget.amount + rejectPaymentTarget.escrowAmountApplied).toFixed(2)} EGP by ${PAYMENT_METHOD_LABELS[rejectPaymentTarget.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS] ?? rejectPaymentTarget.paymentMethod}${rejectPaymentTarget.verificationReference ? `, reference ${rejectPaymentTarget.verificationReference}` : ''}. The payment is marked not received${rejectPaymentTarget.escrowAmountApplied > 0 ? ` and the ${rejectPaymentTarget.escrowAmountApplied.toFixed(2)} EGP applied from escrow goes back` : ''}. The subjects stay open to pay while the window is open, and are released if it has closed. The family receives your reason.`}
           label="Reason (sent to the family)"
           placeholder="e.g. No transfer with this reference on the bank statement"
           confirmLabel="Reject Payment"

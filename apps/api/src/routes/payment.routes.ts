@@ -371,7 +371,9 @@ export const payments = new Hono<HonoEnv>()
         return success(c, confirmed);
       } catch (err) {
         const message = clientMessage(err, 'Failed to confirm payment');
-        return error(c, message, 400);
+        // A click that lands after another confirmation (or a rejection) has
+        // committed is a conflict, the same answer as one that lost the race.
+        return error(c, message, message.includes('already in') ? 409 : 400);
       }
     }
   )

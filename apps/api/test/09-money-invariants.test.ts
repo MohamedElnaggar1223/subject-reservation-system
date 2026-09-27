@@ -29,6 +29,8 @@ describe('money invariants over the whole database', () => {
         (select count(*) from escrow_transaction where reason in ('drop', 'swap_refund')) as drop_refunds,
         (select count(*) from withdrawal_disbursement)                                    as hand_overs,
         (select count(*) from withdrawal_request where status = 'rejected')              as rejected_withdrawals,
+        (select count(*) from withdrawal_request where approved_by is not null)          as approved_withdrawals,
+        (select count(*) from registration where status = 'preregistered')               as waiting_preregistrations,
         (select count(*) from registration where status = 'dropped_pending_receipt' or status = 'dropped') as drops
     `);
     for (const [kind, n] of Object.entries(counts!)) expect(Number(n), kind).toBeGreaterThan(0);
@@ -154,8 +156,36 @@ describe('money invariants over the whole database', () => {
     expect(broken).toEqual([]);
   });
 
-  it('every reversal records when and by whom, so its day in the takings is known', async () => {
-    const broken = await sql(`select id from payment where status = 'refunded' and (reversed_at is null or reversed_by is null)`);
+  it('every reversal records its day, so the takings know when the money went out', async () => {
+    // reversed_by may legitimately be empty: it is set null if that user is later deleted.
+    const broken = await sql(`select id from payment where status = 'refunded' and reversed_at is null`);
+    expect(broken).toEqual([]);
+  });
+
+  it('the held wallet holds exactly the price of paid preregistrations still waiting for their session (MA-15)', async () => {
+    const broken = await sql(`
+      select e.student_id, e.held_balance, coalesce(h.total, 0) as funded
+      from escrow e
+      left join (
+        select r.student_id, sum(r.price_at_registration) as total
+        from registration r
+        where r.status = 'preregistered' and exists (
+          select 1 from payment_registration pr join payment p on p.id = pr.payment_id
+          where pr.registration_id = r.id and p.purpose = 'preregistration' and p.status = 'completed')
+        group by r.student_id
+      ) h on h.student_id = e.student_id
+      where ${cents('e.held_balance')} <> ${cents('coalesce(h.total, 0)')}
+    `);
+    expect(broken).toEqual([]);
+  });
+
+  it('an approved refund request has no hand-over after its approval (MA-17)', async () => {
+    const broken = await sql(`
+      select w.id, w.approved_at, max(d.disbursed_at) as last_hand_over
+      from withdrawal_request w join withdrawal_disbursement d on d.withdrawal_request_id = w.id
+      where w.approved_by is not null
+      group by w.id having max(d.disbursed_at) > w.approved_at
+    `);
     expect(broken).toEqual([]);
   });
 

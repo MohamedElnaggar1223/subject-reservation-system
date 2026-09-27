@@ -27,6 +27,8 @@ import {
   and,
   inArray,
   isNull,
+  or,
+  gt,
   sql,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -500,10 +502,13 @@ export async function getPendingWithdrawalRequests() {
   const requests = await db.query.withdrawalRequest.findMany({
     // V3 D-C maker-checker: fulfilled rows stay in the queue until a
     // finance admin approves them (isNull(approvedBy)).
-    where: (wr, { inArray, and, or, eq, isNull }) =>
+    where: (wr, { inArray, and, or, eq, isNull, gt }) =>
       or(
         inArray(wr.status, ['pending', 'partially_fulfilled']),
-        and(eq(wr.status, 'fulfilled'), isNull(wr.approvedBy))
+        and(eq(wr.status, 'fulfilled'), isNull(wr.approvedBy)),
+        // Rejected after a partial hand-over: the cash that did go out still
+        // needs its second signature (MA-17).
+        and(eq(wr.status, 'rejected'), gt(wr.releasedAmount, 0), isNull(wr.approvedBy))
       ),
     with: {
       escrow: {
@@ -591,7 +596,8 @@ export async function fulfillWithdrawalRequest(
     }
 
     const currentReleased = req.releasedAmount ?? 0;
-    const newTotalReleased = currentReleased + data.releasedAmount;
+    // Whole piastres, so the running total always equals the sum of its hand-overs.
+    const newTotalReleased = Math.round((currentReleased + data.releasedAmount) * 100) / 100;
 
     if (newTotalReleased > req.requestedAmount) {
       throw new Error(
@@ -610,6 +616,12 @@ export async function fulfillWithdrawalRequest(
         adminNotes:     data.notes ?? req.adminNotes,
         resolvedAt:     now,
         resolvedBy:     adminId,
+        // A new hand-over needs its own second signature (V3 D-C). An approval
+        // given after an earlier partial hand-over used to stay on the row, so
+        // the rest was paid out unapproved and the request never came back to
+        // the finance admin's queue (money audit MA-17).
+        approvedBy:     null,
+        approvedAt:     null,
         updatedAt:      now,
       })
       .where(and(
@@ -709,7 +721,7 @@ export async function rejectWithdrawalRequest(
     }
 
     const alreadyReleased = wr.releasedAmount ?? 0;
-    const refund = wr.requestedAmount - alreadyReleased;
+    const refund = Math.round((wr.requestedAmount - alreadyReleased) * 100) / 100;
 
     // Credit back the unreleased remainder. For status='pending', refund
     // equals requestedAmount (nothing released). For 'partially_fulfilled',
@@ -830,9 +842,12 @@ export async function getWithdrawalRequestsForParent(
 
 
 /**
- * Finance admin approves a fulfilled withdrawal (V3 D-C maker-checker).
- * The officer's cash disbursement was never blocked on this; approval
- * closes the record. Only fulfilled/partially_fulfilled rows qualify.
+ * Finance admin approves the cash handed over against a withdrawal (V3 D-C
+ * maker-checker). The officer's disbursement was never blocked on this.
+ * Approval covers every hand-over made so far; a later hand-over clears it
+ * and needs approving again (MA-17). A fully paid request is then closed.
+ * Qualifies: fulfilled or partially fulfilled, or rejected after a partial
+ * hand-over (that cash still went out).
  */
 export async function approveWithdrawalRequest(id: string, financeAdminId: string) {
   const [updated] = await db
@@ -841,7 +856,10 @@ export async function approveWithdrawalRequest(id: string, financeAdminId: strin
     .where(
       and(
         eq(withdrawalRequest.id, id),
-        inArray(withdrawalRequest.status, ['fulfilled', 'partially_fulfilled']),
+        or(
+          inArray(withdrawalRequest.status, ['fulfilled', 'partially_fulfilled']),
+          and(eq(withdrawalRequest.status, 'rejected'), gt(withdrawalRequest.releasedAmount, 0)),
+        ),
         isNull(withdrawalRequest.approvedBy),
       )
     )

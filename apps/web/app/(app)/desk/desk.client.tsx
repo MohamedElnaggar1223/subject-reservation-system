@@ -114,6 +114,16 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
     onError: fail,
   });
 
+  const collectMutation = useMutation({
+    mutationFn: (v: { registrationIds: string[]; instrumentUsed: (typeof IN_SCHOOL_INSTRUMENTS)[number] }) =>
+      apiResponse(api.v1.registrations.desk.collect.$post({ json: { studentId: studentId!, ...v, escrowAmountToApply: 0 } })),
+    onSuccess: (d) =>
+      done(
+        `Collected ${formatPrice(d.collected)}. Receipts ready to hand over${d.receipts.length ? `: ${d.receipts.map((r) => r.receiptNumber).join(', ')}` : ''}.`
+      ),
+    onError: fail,
+  });
+
   const issueReceiptMutation = useMutation({
     mutationFn: (id: string) => apiResponse(api.v1.receipts[':id'].issue.$post({ param: { id } })),
     onSuccess: () => done('Receipt marked as handed to the parent.'),
@@ -306,6 +316,38 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
               onError={fail}
             />
           )}
+
+          {/* Subjects registered and waiting for payment (MA-18): after a
+              reversal, a rejected transfer, a cancelled checkout or a
+              register-only visit, the money is taken here in one click. */}
+          {(() => {
+            const unpaid = summary.registrations.filter((r) => r.status === 'pending_payment');
+            if (unpaid.length === 0) return null;
+            const total = unpaid.reduce((s, r) => s + r.priceAtRegistration, 0);
+            return (
+              <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {unpaid.length} subject{unpaid.length === 1 ? '' : 's'} waiting for payment — {formatPrice(total)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{unpaid.map((r) => r.subject.name).join(' · ')}</p>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  {IN_SCHOOL_INSTRUMENTS.slice(0, 3).map((inst) => (
+                    <Button
+                      key={inst}
+                      size="sm"
+                      variant="outline"
+                      disabled={collectMutation.isPending}
+                      onClick={() => collectMutation.mutate({ registrationIds: unpaid.map((r) => r.id), instrumentUsed: inst })}
+                    >
+                      Collect — {IN_SCHOOL_INSTRUMENT_LABELS[inst]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Registrations with receipts */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">

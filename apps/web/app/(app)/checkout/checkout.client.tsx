@@ -368,8 +368,15 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
           <h1 className="text-xl font-bold text-foreground font-display">Payment already started</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             A payment of {(open.amount + open.escrowAmountApplied).toFixed(2)} EGP ({methodLabel}) was started for{' '}
-            {summary.student.name}&apos;s subjects on {new Date(open.createdAt).toLocaleDateString()}.
+            {summary.student.name} on {new Date(open.createdAt).toLocaleDateString()}. It covers:
           </p>
+          <ul className="mt-2 text-sm text-foreground list-disc ps-5">
+            {open.paymentRegistrations.map((pr) => (
+              <li key={pr.registrationId}>
+                {pr.registration.subject.name} ({pr.registration.subject.code})
+              </li>
+            ))}
+          </ul>
 
           {open.status === 'pending_verification' ? (
             <div className="mt-5 p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl text-sm text-violet-800 dark:text-violet-300">

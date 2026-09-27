@@ -15,6 +15,15 @@ export const sanitizers = {
 };
 
 /**
+ * True when an EGP amount has at most two decimals (whole piastres). Money
+ * columns are numeric(12,2); an amount with more decimals is rounded by the
+ * database but not by the arithmetic around it, so running totals and their
+ * parts can drift apart (money audit review, flag 10).
+ */
+export const isWholePiastres = (n: number) => Math.abs(Math.round(n * 100) - n * 100) < 1e-6;
+export const PIASTRES_MESSAGE = 'Amounts can have at most two decimals';
+
+/**
  * Common reusable Zod schemas with built-in sanitization
  */
 export const CommonSchemas = {

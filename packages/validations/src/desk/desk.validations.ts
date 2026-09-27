@@ -7,7 +7,7 @@
 
 import { z } from 'zod';
 import { RoleSchema, GradeSchema } from '../roles';
-import { CommonSchemas } from '../common.validations';
+import { CommonSchemas, isWholePiastres, PIASTRES_MESSAGE } from '../common.validations';
 import { SubjectRegistrationOptions } from '../registration/registration.validations';
 
 // ─── Team management (G7) ────────────────────────────────────────────────────
@@ -74,12 +74,26 @@ export const DeskRegistration = z.object({
   collectNow: z
     .object({
       instrumentUsed: z.enum(['cash', 'card', 'instapay', 'other']),
-      escrowAmountToApply: z.number().min(0).max(1_000_000).default(0),
+      escrowAmountToApply: z.number().min(0).max(1_000_000).refine(isWholePiastres, PIASTRES_MESSAGE).default(0),
       notes: z.string().max(500).optional(),
     })
     .optional(),
 });
 export type DeskRegistrationType = z.infer<typeof DeskRegistration>;
+
+/**
+ * Desk collection for subjects already registered and waiting for payment —
+ * after a reversal, a rejected transfer or a cancelled checkout, or a
+ * register-only desk visit (money audit MA-18).
+ */
+export const DeskCollect = z.object({
+  studentId: z.string().min(1, 'Pick a student'),
+  registrationIds: z.array(z.string().min(1)).min(1, 'Select at least one subject').max(20),
+  instrumentUsed: z.enum(['cash', 'card', 'instapay', 'other']),
+  escrowAmountToApply: z.number().min(0).max(1_000_000).refine(isWholePiastres, PIASTRES_MESSAGE).default(0),
+  notes: z.string().max(500).optional(),
+});
+export type DeskCollectType = z.infer<typeof DeskCollect>;
 
 /** Desk school-fee collection: officer takes the money, gate unlocks now */
 export const DeskSchoolFeePayment = z.object({
