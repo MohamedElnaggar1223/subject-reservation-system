@@ -55,6 +55,11 @@ Source: `Nov 1 2026.xlsx` (a Google Form export; two session tabs — "June 2023
   "Arabic (Cambridge)"); 13 rows with no teacher; the tab named "2024" holds Nov 2026
   (copy-last-year-and-overwrite workflow). Email + phone are the de-facto identity; no
   student ID or board candidate number in the sheet (→ Q-05).
+- **Found by the import spike (28 Sep, IMPORT_SPIKE.md):** siblings share one student email
+  (13 emails in the June 2023 tab, 1 in November 2026, each used by two children with
+  different first names); student and parent give the same email on 5 / 2 rows; 5 / 4 emails
+  are malformed (no "@", no domain dot); inside the June 2023 tab 2 rows sit one column over;
+  every carry-forward row is an "A.2." entry (→ Q-02).
 
 ---
 
@@ -63,8 +68,8 @@ Source: `Nov 1 2026.xlsx` (a Google Form export; two session tabs — "June 2023
 | ID | Assumption | Source | Conf. | If wrong, what changes | Status |
 |---|---|---|---|---|---|
 | A-01 | Grade 10 sits board exams in **June only**; they register the same way as grades 11–12 and simply do not appear in November sheets. | User, 26 Sep | medium | If grade 10 also sits November, session rules and the core-subject gate change. | assumed |
-| A-02 | Outside-school ("self study" / "external") price is **50% of the combined fee on a first attempt and 20% on a retake**. | User, 26 Sep, interpreting sheet values | medium | Pricing engine today applies a flat 50% for any outside-school registration. Needs a retake-aware rate stored per registration. The other "20%" values in the sheet (dropped 20%) are refund percentages, not this rule. | assumed |
-| A-03 | The January-2027 rows inside the November-2026 tab are **preregistrations (deposits) for the upcoming January series** — the held-wallet / preregistration feature already built. | User, 26 Sep | medium | If one window legitimately covers two exam series instead, the session model needs multi-series windows. | assumed |
+| A-02 | Outside-school ("self study" / "external") price is **50% of the combined fee on a first attempt and 20% on a retake**. | User, 26 Sep, interpreting sheet values | medium | Pricing engine today applies a flat 50% for any outside-school registration. Needs a retake-aware rate stored per registration. The other "20%" values in the sheet (dropped 20%) are refund percentages, not this rule. **Import spike, 28 Sep (IS-03):** the pricing engine refuses self-study on a subject the school offers unless it is a retake, so 13 of 14 self-study rows (Nov 2026) were refused; this assumption and the code disagree today. | assumed |
+| A-03 | The January-2027 rows inside the November-2026 tab are **preregistrations (deposits) for the upcoming January series** — the held-wallet / preregistration feature already built. | User, 26 Sep | medium | If one window legitimately covers two exam series instead, the session model needs multi-series windows. **Import spike, 28 Sep (IS-05):** the 18 January rows are A-Level only (AS 9, AS/A2 7, A2 2); imported as January entries, they need their own sessions. | assumed |
 | A-04 | The per-unit roster tabs are **teaching groups** — the natural input to timetabling. | User + our inference | low | If they are exam-entry or invigilation lists, they are a report to generate, not a scheduling input. | assumed |
 | A-05 | The **Grade-10 core-subject mandate** (URD CORE-001..004: core subjects pre-selected, locked, cannot be dropped/swapped) still holds. | URD v2; **confirmed by user 26 Sep: "the core-subject is the unique thing to grade 10"** | high | — | confirmed |
 | A-06 | Each **registration window is specific to one exam series**; a family may deposit against a future series from within the current window (A-03). | User, 26 Sep | medium | If windows span series, the `registrationSession` model and the one-active-per-(type, level) index change. | assumed |
@@ -79,7 +84,7 @@ Source: `Nov 1 2026.xlsx` (a Google Form export; two session tabs — "June 2023
 | ID | Question | Why it matters | Hypotheses on the table | Status |
 |---|---|---|---|---|
 | Q-01 | "Grade 10 treated just the same as the others" — does that mean the **core-subject lock does not exist**, or only that they register through the same form? | Decides whether CORE-001..004 stay or go. | **Answered 26 Sep (user): (a).** Same form and pricing as other grades; the core-subject mandate is the one thing unique to grade 10. CORE-001..004 stay. | confirmed |
-| Q-02 | What is **"carry forward"**? | Very different models depending on the answer. | (a) User's belief: a payment carried from a prior session, or a payment moved. (b) Our reading: Edexcel IAL unit result carried into this series (no re-sit, no new fee). Possibly both exist. | parked — explicitly no decision |
+| Q-02 | What is **"carry forward"**? | Very different models depending on the answer. | (a) User's belief: a payment carried from a prior session, or a payment moved. (b) Our reading: Edexcel IAL unit result carried into this series (no re-sit, no new fee). Possibly both exist. **Evidence, 28 Sep (IMPORT_SPIKE.md IS-02):** all 19 carry-forward rows in the June 2023 tab are "A.2." entries, in Cambridge subjects (Biology, Computer Science, Economics, Physics, Psychology), noted "Carry forward on June / November 2022" — an AS result carried into an A2 entry, i.e. (b), but Cambridge rather than Edexcel. | parked — evidence favours (b); confirm with the coordinator |
 | Q-03 | Who fills the **Signature column** and what does a signature mean? | Decides whether a teacher/coordinator approval step exists in the flow. | (a) teacher confirms they will teach the student; (b) coordinator approves the entry; (c) fee acknowledgement. | parked |
 | Q-04 | What are the two **unlabeled lists** (24 and 28 students with section)? | Unknown; may be a routine report we should generate. | unpaid? unconfirmed? self-study? a class allocation? | parked |
 | Q-05 | What **identifier** does the school use for a student with the exam boards (candidate number / centre number)? Where does it live? | Import matching, board-entry export, results import. | Lives in a board portal or another sheet. | parked |
