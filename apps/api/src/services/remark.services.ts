@@ -175,33 +175,6 @@ export async function createRemarkRequest(
     );
   }
 
-  const priorRequests = await db.query.remarkRequest.findMany({
-    where: (rr, { eq, and, notInArray }) =>
-      and(
-        eq(rr.registrationId, data.registrationId),
-        notInArray(rr.status, ['cancelled', 'rejected'])
-      ),
-    with: { items: { columns: { paperCode: true } } },
-  });
-
-  // Cambridge atomic one-shot rule: one request ever per candidate+syllabus+series
-  if (reg.subject.council === 'cambridge' && priorRequests.length > 0) {
-    throw new Error(
-      'Cambridge accepts only ONE enquiry per subject per series — all papers must be submitted together, and a request already exists. Cancel it first if it has not been submitted.'
-    );
-  }
-
-  // OxfordAQA: once per paper
-  if (reg.subject.council === 'oxford') {
-    const usedPapers = new Set(priorRequests.flatMap((r) => r.items.map((i) => i.paperCode)));
-    const dupes = data.papers.filter((p) => usedPapers.has(p.paperCode));
-    if (dupes.length > 0) {
-      throw new Error(
-        `OxfordAQA allows one review per paper — already requested: ${dupes.map((d) => d.paperCode).join(', ')}`
-      );
-    }
-  }
-
   // Fee from the configured schedule (per paper)
   const feeRow = await db.query.remarkFeeSchedule.findFirst({
     where: (f, { eq, and }) =>
@@ -216,6 +189,37 @@ export async function createRemarkRequest(
 
   const requestId = randomUUID();
   const created = await db.transaction(async (tx) => {
+    // The one-enquiry rule (Cambridge) and one review per paper (OxfordAQA)
+    // are judged under the registration's lock: read before it, two requests
+    // at once both passed (state audit ST-08).
+    await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, data.registrationId)).for('update');
+    const priorRequests = await tx.query.remarkRequest.findMany({
+      where: (rr, { eq, and, notInArray }) =>
+        and(
+          eq(rr.registrationId, data.registrationId),
+          notInArray(rr.status, ['cancelled', 'rejected'])
+        ),
+      with: { items: { columns: { paperCode: true } } },
+    });
+
+    // Cambridge atomic one-shot rule: one request ever per candidate+syllabus+series
+    if (reg.subject.council === 'cambridge' && priorRequests.length > 0) {
+      throw new Error(
+        'Cambridge accepts only ONE enquiry per subject per series — all papers must be submitted together, and a request already exists. Cancel it first if it has not been submitted.'
+      );
+    }
+
+    // OxfordAQA: once per paper
+    if (reg.subject.council === 'oxford') {
+      const usedPapers = new Set(priorRequests.flatMap((r) => r.items.map((i) => i.paperCode)));
+      const dupes = data.papers.filter((p) => usedPapers.has(p.paperCode));
+      if (dupes.length > 0) {
+        throw new Error(
+          `OxfordAQA allows one review per paper — already requested: ${dupes.map((d) => d.paperCode).join(', ')}`
+        );
+      }
+    }
+
     const [header] = await tx
       .insert(remarkRequest)
       .values({
@@ -361,9 +365,14 @@ export async function initiateRemarkPayment(
   // for an open payment before inserting — two racing requests can no
   // longer both mint a pending payment for the same remark.
   const created = await db.transaction(async (tx) => {
-    await tx.execute(
-      sql`SELECT id FROM remark_request WHERE id = ${id} FOR UPDATE`
+    const locked = await tx.execute(
+      sql`SELECT status FROM remark_request WHERE id = ${id} FOR UPDATE`
     );
+    // Judged again under the lock: a cancellation may have committed since
+    // the read above (state audit ST-01).
+    if ((locked.rows[0] as { status?: string } | undefined)?.status !== 'pending_payment') {
+      throw new Error('Request is not awaiting payment');
+    }
 
     const existing = await tx.query.payment.findFirst({
       where: (p, { eq, and, inArray, sql: sqlOp }) =>
@@ -397,18 +406,8 @@ export async function initiateRemarkPayment(
   return created;
 }
 
-/**
- * Payment hook — called by confirmPayment when a purpose='remark'
- * payment completes. Idempotent via the status guard.
- */
-export async function onRemarkPaymentCompleted(remarkRequestId: string) {
-  await db
-    .update(remarkRequest)
-    .set({ status: 'awaiting_submission', updatedAt: new Date() })
-    .where(
-      and(eq(remarkRequest.id, remarkRequestId), eq(remarkRequest.status, 'pending_payment'))
-    );
-}
+// A confirmed remark fee moves its request to awaiting_submission inside
+// confirmPayment's own transaction (payment.services.ts; state audit ST-01).
 
 /** Staff records the board submission (the school is the exam centre) */
 export async function markSubmittedToBoard(id: string, boardReference: string) {
@@ -520,21 +519,35 @@ export async function cancelRemarkRequest(id: string, userId: string, role: stri
 
   // The status allow-list lives in the WHERE clause: the row is only
   // mutated when it is genuinely cancellable, so a concurrent transition
-  // (payment confirmed, board submission) can never be clobbered.
-  const [updated] = await db
-    .update(remarkRequest)
-    .set({ status: 'cancelled', updatedAt: new Date() })
-    .where(
-      and(
-        eq(remarkRequest.id, id),
-        inArray(remarkRequest.status, cancellableStatuses)
+  // (payment confirmed, board submission) can never be clobbered. Under the
+  // row's lock, a fee payment still open for it refuses the cancellation:
+  // cancelled with its transfer being checked, the fee was later taken for
+  // nothing (state audit ST-01).
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM remark_request WHERE id = ${id} FOR UPDATE`);
+    const open = await tx.query.payment.findFirst({
+      where: (p, { eq: eqOp, and: andOp, inArray: inArr, sql: sqlOp }) =>
+        andOp(eqOp(p.purpose, 'remark'), inArr(p.status, ['pending', 'pending_verification']), sqlOp`${p.metadata} ->> 'remarkRequestId' = ${id}`),
+      columns: { id: true },
+    });
+    if (open) {
+      throw new Error('A payment for this remark request is in progress — cancel that checkout first, or wait for the finance office to confirm or reject the transfer');
+    }
+    const [updated] = await tx
+      .update(remarkRequest)
+      .set({ status: 'cancelled', updatedAt: new Date() })
+      .where(
+        and(
+          eq(remarkRequest.id, id),
+          inArray(remarkRequest.status, cancellableStatuses)
+        )
       )
-    )
-    .returning();
-  if (!updated) {
-    throw new Error('This request can no longer be cancelled');
-  }
-  return updated;
+      .returning();
+    if (!updated) {
+      throw new Error('This request can no longer be cancelled');
+    }
+    return updated;
+  });
 }
 
 // ─── Queries ─────────────────────────────────────────────────────────────────

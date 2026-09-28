@@ -16,7 +16,7 @@
  * All database imports come from @repo/db — never from drizzle-orm directly.
  */
 
-import { db, registrationSession, registration, changeRequest, paymentRegistration, payment, user, eq, and, lte, inArray, sql } from '@repo/db';
+import { db, registrationSession, registration, changeRequest, paymentRegistration, payment, user, eq, and, lte, inArray, isNull, sql } from '@repo/db';
 import { capturePreregistrationsForSession } from './prereg.services';
 import { notifySessionOpened, createNotification, notifyPaymentReferenceDue } from './notification.services';
 import { failPayment } from './payment.services';
@@ -605,6 +605,9 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
     }
   }
 
+  // Finished: the scheduler's recovery sweep leaves this session alone now.
+  await db.update(registrationSession).set({ finalizedAt: new Date() }).where(eq(registrationSession.id, sessionId));
+
   return {
     expiredRegistrations: notifyExpired.length,
     rejectedChangeRequests: rejectedCRs.length,
@@ -637,17 +640,63 @@ export async function closeSession(id: string, adminId: string, reason?: string)
     )
     .returning();
 
-  // Finalize pending records when a session is manually closed
+  // Finalize pending records when a session is manually closed. If it fails
+  // the session is closed all the same, and the scheduler's recovery sweep
+  // finishes it (finalizedAt still empty; state audit ST-06).
   if (updated) {
-    const finalized = await finalizePendingRecords(id);
-    if (finalized.expiredRegistrations > 0 || finalized.rejectedChangeRequests > 0) {
-      console.log(
-        `[session:close] Finalized ${finalized.expiredRegistrations} registration(s) and ${finalized.rejectedChangeRequests} change request(s) for session ${id}.`
-      );
+    try {
+      const finalized = await finalizePendingRecords(id);
+      if (finalized.expiredRegistrations > 0 || finalized.rejectedChangeRequests > 0) {
+        console.log(
+          `[session:close] Finalized ${finalized.expiredRegistrations} registration(s) and ${finalized.rejectedChangeRequests} change request(s) for session ${id}.`
+        );
+      }
+    } catch (err) {
+      console.error(`[session:close] Finalisation of ${id} failed; the scheduler will finish it:`, err);
     }
   }
 
   return updated;
+}
+
+/**
+ * The scheduler's recovery sweep (state audit ST-06), run on every tick and
+ * idempotent:
+ * - a closed session whose finalisation never completed (it threw, or the
+ *   process stopped in between) is finalised now;
+ * - an active session still holding preregistrations is captured now — its
+ *   capture failed, or a preregistration was made while it opened. Capture
+ *   used to run once, for sessions opened on that same tick.
+ */
+export async function recoverSessionTransitions() {
+  let finalized = 0;
+  let captured = 0;
+  const unfinished = await db
+    .select({ id: registrationSession.id })
+    .from(registrationSession)
+    .where(and(eq(registrationSession.status, 'closed'), isNull(registrationSession.finalizedAt)));
+  for (const s of unfinished) {
+    try {
+      await finalizePendingRecords(s.id);
+      finalized++;
+    } catch (err) {
+      console.error(`[session:recover] Finalisation of ${s.id} failed again:`, err);
+    }
+  }
+  const waiting = await db
+    .selectDistinct({ id: registrationSession.id })
+    .from(registrationSession)
+    .innerJoin(registration, eq(registration.sessionId, registrationSession.id))
+    .where(and(eq(registrationSession.status, 'active'), eq(registration.status, 'preregistered')));
+  for (const s of waiting) {
+    try {
+      const r = await capturePreregistrationsForSession(s.id);
+      captured += r.captured + r.movedToPendingPayment;
+    } catch (err) {
+      console.error(`[session:recover] Capture for ${s.id} failed again:`, err);
+    }
+  }
+  return { finalized, captured };
 }
 
 /**
@@ -703,10 +752,20 @@ export async function autoManageSessions(): Promise<{
   for (const draft of draftsDue) {
     const conflict = await hasActiveSessionOfType(draft.sessionType, draft.qualificationLevel);
     if (!conflict) {
-      await db
+      // Only a draft still in draft: an admin may have activated (or
+      // activated and closed) it since the read. A clash with a session
+      // opened meanwhile skips this draft rather than aborting the tick after
+      // the closes above have committed (state audit ST-06).
+      const [opened] = await db
         .update(registrationSession)
         .set({ status: 'active', updatedAt: now })
-        .where(eq(registrationSession.id, draft.id));
+        .where(and(eq(registrationSession.id, draft.id), eq(registrationSession.status, 'draft')))
+        .returning({ id: registrationSession.id })
+        .catch((err) => {
+          console.error(`[session] Could not open ${draft.id}:`, err);
+          return [];
+        });
+      if (!opened) continue;
       activatedCount++;
       activatedSessions.push({
         id:          draft.id,

@@ -200,7 +200,8 @@ export async function respondToLinkRequest(
     throw new Error('Link request not found or already processed');
   }
 
-  // Update the link status
+  // Update the link status — only while it is still pending: a second answer
+  // at the same moment used to overwrite the first (state audit ST-09).
   const [updated] = await db
     .update(parentStudentLink)
     .set({
@@ -208,8 +209,9 @@ export async function respondToLinkRequest(
       respondedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(parentStudentLink.id, linkId))
+    .where(and(eq(parentStudentLink.id, linkId), eq(parentStudentLink.status, 'pending')))
     .returning();
+  if (!updated) throw new Error('Link request not found or already processed');
 
   // Notify the parent of the student's decision (AUTH-004) — fire-and-forget
   notifyLinkDecision(link.parentId, studentId, response.status === 'approved').catch((err) =>

@@ -92,6 +92,7 @@ Source: `Nov 1 2026.xlsx` (a Google Form export; two session tabs — "June 2023
 | Q-05 | What **identifier** does the school use for a student with the exam boards (candidate number / centre number)? Where does it live? | Import matching, board-entry export, results import. | Lives in a board portal or another sheet. | parked |
 | Q-06 | What does the **money record** look like? | Finance import, day-one migration, refund/receipt reality. | Another sheet, paper receipt book, or both. | parked → F-01 |
 | Q-07 | Do students carry **held/deposit** money across years (e.g. a Jan deposit made in November of grade 11 used in grade 12)? | Held-wallet lifecycle and year rollover. | — | parked |
+| Q-08 | **When does a student's grade change?** Today grades move when registration windows close (10→11 at a November close, 11→12 at a June close, 12→graduated at a November close), so a new grade-10 student is grade 11 by the June window where the grade-10 core-subject rule applies, and pays grade 11's school fee. | Core-subject rule (A-05), school fee per grade, who may register after graduation. | (a) Derive the grade from the year the student entered grade 10 and the academic year of the session (1 July boundary) — recommended (STATE_AUDIT.md §6). (b) One rollover on 1 July. (c) Keep window-driven progression with corrected triggers. And: may a student register for the November after graduating? | parked — owner decision |
 
 ---
 

@@ -137,7 +137,7 @@ export const schoolFees = new Hono<HonoEnv>()
       return success(c, result, 201);
     } catch (err) {
       const message = clientMessage(err, 'Failed to collect school fee');
-      const status = message.includes('already paid') ? 409 : 400;
+      const status = message.includes('already paid') || message.includes('in progress') ? 409 : 400;
       return error(c, message, status);
     }
   })

@@ -114,30 +114,37 @@ export async function onboardFamily(data: DeskOnboardFamilyType) {
     data.student.grade
   );
 
-  const existingLink = await db.query.parentStudentLink.findFirst({
-    where: (l, { eq, and }) =>
-      and(eq(l.parentId, parent.id), eq(l.studentId, student.id)),
+  // The live link (pending or approved — the database allows one per pair).
+  // Any link, rejected ones included, used to be picked and flipped, so a
+  // family with a rejected request and a pending one could not be enrolled
+  // (state audit ST-10). A rejected request stays as history.
+  const liveLink = await db.query.parentStudentLink.findFirst({
+    where: (l, { eq, and, inArray }) =>
+      and(eq(l.parentId, parent.id), eq(l.studentId, student.id), inArray(l.status, ['pending', 'approved'])),
   });
 
-  let linkStatus = 'approved';
-  if (!existingLink) {
+  if (liveLink?.status === 'approved') return { parent, student, linkStatus: 'already_linked' };
+  if (liveLink) {
+    // Staff vouch in person — approve the pending request, if it is still pending.
+    await db
+      .update(parentStudentLink)
+      .set({ status: 'approved', respondedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(parentStudentLink.id, liveLink.id), eq(parentStudentLink.status, 'pending')));
+  } else {
     await db.insert(parentStudentLink).values({
       id: randomUUID(),
       parentId: parent.id,
       studentId: student.id,
       status: 'approved',
-    });
-  } else if (existingLink.status !== 'approved') {
-    // Staff vouch in person — approve the pending/rejected link
-    await db
-      .update(parentStudentLink)
-      .set({ status: 'approved', updatedAt: new Date() })
-      .where(eq(parentStudentLink.id, existingLink.id));
-  } else {
-    linkStatus = 'already_linked';
+    }).onConflictDoNothing();
   }
+  const [now] = await db
+    .select({ status: parentStudentLink.status })
+    .from(parentStudentLink)
+    .where(and(eq(parentStudentLink.parentId, parent.id), eq(parentStudentLink.studentId, student.id), inArray(parentStudentLink.status, ['pending', 'approved'])));
+  if (now?.status !== 'approved') throw new Error('The link changed while enrolling the family — please try again');
 
-  return { parent, student, linkStatus };
+  return { parent, student, linkStatus: 'approved' };
 }
 
 // ─── Desk registration + payment (G1) ────────────────────────────────────────
@@ -448,6 +455,8 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
 /**
  * Collect the annual school fee at the desk — gate unlocks immediately.
  */
+const SCHOOL_FEE_IN_PROGRESS = 'A school-fee payment is already in progress for this student — confirm or reject it instead';
+
 export async function collectSchoolFeeAtDesk(
   staffId: string,
   studentId: string,
@@ -477,9 +486,19 @@ export async function collectSchoolFeeAtDesk(
   if (standing.paid) {
     throw new Error(`The ${academicYear} school fee is already paid`);
   }
+  // A family's own checkout for it (a transfer being checked, or pay-at-school)
+  // is confirmed or rejected from the workbench, not collected again here.
+  const open = await db.query.payment.findFirst({
+    where: (p, { eq: eqOp, and: andOp, inArray: inArr }) =>
+      andOp(eqOp(p.studentId, studentId), eqOp(p.purpose, 'school_fee'), eqOp(p.academicYear, academicYear), inArr(p.status, ['pending', 'pending_verification'])),
+    columns: { id: true },
+  });
+  if (open) throw new Error(SCHOOL_FEE_IN_PROGRESS);
 
   const paymentId = randomUUID();
   const payerParentId = await resolvePayerParent(studentId);
+  // The unique index (one open or paid school fee per student and year) is
+  // what stops two collections at the same moment (state audit ST-02).
   await db.insert(payment).values({
     id: paymentId,
     studentId,
@@ -492,6 +511,9 @@ export async function collectSchoolFeeAtDesk(
     status: 'pending',
     externalReference: `DESK-${paymentId.slice(0, 8).toUpperCase()}`,
     metadata: { desk: true, staffId },
+  }).catch((err) => {
+    if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') throw new Error(SCHOOL_FEE_IN_PROGRESS);
+    throw err;
   });
 
   await confirmDeskPayment(paymentId, staffId, notes ?? 'School fee collected at desk', instrumentUsed);

@@ -60,7 +60,7 @@ function schoolAccountDetails() {
 function friendlyStatus(message: string): 400 | 403 | 404 | 409 {
   if (message.includes('not linked') || message.includes('not authorized') || message.includes('only request')) return 403;
   if (message.includes('not found')) return 404;
-  if (message.includes('already') || message.includes('no longer') || message.includes('not awaiting') || message.includes('ONE enquiry') || message.includes('one review per paper')) return 409;
+  if (message.includes('already') || message.includes('no longer') || message.includes('not awaiting') || message.includes('in progress') || message.includes('ONE enquiry') || message.includes('one review per paper')) return 409;
   return 400;
 }
 

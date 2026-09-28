@@ -19,8 +19,10 @@
  *   - The audit log entry is awaited for compliance; notification is fire-and-forget
  */
 
-import { db, user, registration, changeRequest, eq, and, inArray, isNotNull } from '@repo/db';
+import { db, user, registration, changeRequest, registrationSession, gradeProgressionRun, eq, and, inArray, isNotNull } from '@repo/db';
+import { randomUUID } from 'crypto';
 import { notifyGradeChanged } from './notification.services';
+import { closePaymentsOfGraduatedStudents } from './payment.services';
 import { logAction } from './audit.services';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -140,6 +142,7 @@ export async function progressGrades(sessionType: string): Promise<Array<{
   }> = [];
 
   // Batch update all grade transitions in a single transaction
+  const graduated: string[] = [];
   await db.transaction(async (tx) => {
     const graduatedStudentIds: string[] = [];
 
@@ -168,7 +171,10 @@ export async function progressGrades(sessionType: string): Promise<Array<{
 
     // Clean up pending records for newly graduated students
     await cleanupPendingRecordsForGraduatedStudents(graduatedStudentIds, tx as unknown as typeof db);
+    graduated.push(...graduatedStudentIds);
   });
+  // Checkouts left open on the registrations just expired (state audit ST-04).
+  await closePaymentsOfGraduatedStudents(graduated);
 
   // Audit + notifications outside the transaction (fire-and-forget)
   for (const p of progressions) {
@@ -189,6 +195,69 @@ export async function progressGrades(sessionType: string): Promise<Array<{
   }
 
   return progressions;
+}
+
+/**
+ * Run grade progression once per (sessionType, series year) for the given
+ * closed sessions (all sharing a single sessionType) — the scheduler and the
+ * manual close both call this (state audit, inventory c13: the manual close
+ * used to call progressGrades directly, around the claim). On success, stamps gradeProgressionCompletedAt on those
+ * rows so subsequent ticks skip them. On failure, the column stays null
+ * and the next tick retries — M-10 durability.
+ *
+ * V3 (§5.5): progression must fire once per (sessionType, seriesYear),
+ * not once per session row — with qualification levels, an IGCSE
+ * November and an A-Level November session can close in the same year,
+ * and running progressGrades twice would double-advance students. The
+ * grade_progression_run unique index is the claim: the first closer to
+ * insert the row runs progression; later closers stamp their sessions
+ * and skip. A failed run deletes its claim so the next tick retries.
+ */
+export async function progressGradesOnce(
+  sessionType: 'june' | 'november' | 'january',
+  sessionIds: string[],
+): Promise<number> {
+  if (sessionIds.length === 0) return 0;
+
+  const rows = await db.query.registrationSession.findMany({
+    where: (s, { inArray: inArr }) => inArr(s.id, sessionIds),
+    columns: { id: true, endDate: true },
+  });
+  const seriesYears = [...new Set(rows.map((r) => String(r.endDate.getFullYear())))];
+
+  let progressed = 0;
+  for (const seriesYear of seriesYears) {
+    const claimed = await db
+      .insert(gradeProgressionRun)
+      .values({ id: randomUUID(), sessionType, seriesYear })
+      .onConflictDoNothing()
+      .returning({ id: gradeProgressionRun.id });
+
+    if (claimed.length === 0) continue; // another session of this series already ran it
+
+    try {
+      const progressions = await progressGrades(sessionType);
+      progressed += progressions.length;
+    } catch (err) {
+      // Release the claim so the next tick retries progression
+      await db
+        .delete(gradeProgressionRun)
+        .where(
+          and(
+            eq(gradeProgressionRun.sessionType, sessionType),
+            eq(gradeProgressionRun.seriesYear, seriesYear),
+          )
+        );
+      throw err;
+    }
+  }
+
+  await db
+    .update(registrationSession)
+    .set({ gradeProgressionCompletedAt: new Date() })
+    .where(inArray(registrationSession.id, sessionIds));
+
+  return progressed;
 }
 
 // ─── Manual Grade Adjustment ──────────────────────────────────────────────────
@@ -243,6 +312,8 @@ export async function manualGradeAdjustment(
 
     return [row];
   });
+  // Checkouts left open on the registrations just expired (state audit ST-04).
+  if (newGrade === null) await closePaymentsOfGraduatedStudents([studentId]);
 
   // Audit (awaited — admin action must always be logged)
   try {

@@ -362,3 +362,13 @@ export async function runSessionScheduler() {
   const { autoManageSessions } = await import('../src/services/session.services');
   return autoManageSessions();
 }
+
+/**
+ * Run the scheduler's recovery sweep (finish interrupted closes, capture
+ * preregistrations an opening left behind; STATE_AUDIT.md ST-06), as the
+ * scheduler does every minute.
+ */
+export async function runSessionRecovery() {
+  const { recoverSessionTransitions } = await import('../src/services/session.services');
+  return recoverSessionTransitions();
+}

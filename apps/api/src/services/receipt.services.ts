@@ -166,22 +166,25 @@ export async function executeReceiptGatedDrop(
   return { gated: false, refundAmount: args.refundAmount };
 }
 
+type ParkedReceipt = {
+  id: string;
+  registrationId: string;
+  refundAmountOnReturn: number | null;
+  refundReason: string | null;
+  refundInitiatedBy: string | null;
+};
+
 /**
  * Complete a parked drop after the paper came back (returned) or was
- * written off (lost/void). Credits the parked refund exactly once —
- * the status guard on the receipt update serializes double-clicks.
+ * written off (lost/void), in the same transaction as the receipt's own
+ * change. Credits the parked refund exactly once — the status guard on the
+ * receipt update serializes double-clicks. It used to run in a transaction of
+ * its own after the receipt had committed, so a failure left the receipt
+ * returned and the refund never credited, with nothing to retry it (state
+ * audit ST-05).
  */
-async function completeParkedDrop(
-  rec: {
-    id: string;
-    registrationId: string;
-    refundAmountOnReturn: number | null;
-    refundReason: string | null;
-    refundInitiatedBy: string | null;
-  },
-  staffId: string
-) {
-  await db.transaction(async (tx) => {
+async function completeParkedDrop(tx: Tx, rec: ParkedReceipt, staffId: string) {
+  {
     const [reg] = await tx
       .update(registration)
       .set({ status: 'dropped', updatedAt: new Date() })
@@ -205,9 +208,11 @@ async function completeParkedDrop(
         tx
       );
     }
-  });
+  }
+}
 
-  // NOT-008 (fire-and-forget): parent sees the credit land
+/** NOT-008 (fire-and-forget, after the commit): the parent sees the credit land. */
+async function notifyParkedRefund(rec: ParkedReceipt) {
   if (rec.refundAmountOnReturn && rec.refundAmountOnReturn > 0) {
     const reg = await db.query.registration.findFirst({
       where: (r, { eq }) => eq(r.id, rec.registrationId),
@@ -241,20 +246,23 @@ export async function markIssued(receiptId: string, staffId: string) {
 }
 
 export async function markReturned(receiptId: string, staffId: string, notes?: string) {
-  const [updated] = await db
-    .update(receipt)
-    .set({
-      status: 'returned',
-      returnedTo: staffId,
-      returnedAt: new Date(),
-      notes: notes ?? null,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(receipt.id, receiptId), inArray(receipt.status, ['return_required', 'issued'])))
-    .returning();
-  if (!updated) throw new Error('Receipt is not out with a parent');
-
-  await completeParkedDrop(updated, staffId);
+  const updated = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(receipt)
+      .set({
+        status: 'returned',
+        returnedTo: staffId,
+        returnedAt: new Date(),
+        notes: notes ?? null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(receipt.id, receiptId), inArray(receipt.status, ['return_required', 'issued'])))
+      .returning();
+    if (!row) throw new Error('Receipt is not out with a parent');
+    await completeParkedDrop(tx, row, staffId);
+    return row;
+  });
+  await notifyParkedRefund(updated);
   return updated;
 }
 
@@ -268,19 +276,22 @@ export async function markLostOrVoid(
   status: 'lost' | 'void',
   reason: string
 ) {
-  const [updated] = await db
-    .update(receipt)
-    .set({ status, notes: reason, updatedAt: new Date() })
-    .where(
-      and(
-        eq(receipt.id, receiptId),
-        inArray(receipt.status, ['pending_issue', 'issued', 'return_required'])
+  const updated = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(receipt)
+      .set({ status, notes: reason, updatedAt: new Date() })
+      .where(
+        and(
+          eq(receipt.id, receiptId),
+          inArray(receipt.status, ['pending_issue', 'issued', 'return_required'])
+        )
       )
-    )
-    .returning();
-  if (!updated) throw new Error('Receipt cannot be written off from its current status');
-
-  await completeParkedDrop(updated, staffId);
+      .returning();
+    if (!row) throw new Error('Receipt cannot be written off from its current status');
+    await completeParkedDrop(tx, row, staffId);
+    return row;
+  });
+  await notifyParkedRefund(updated);
   return updated;
 }
 

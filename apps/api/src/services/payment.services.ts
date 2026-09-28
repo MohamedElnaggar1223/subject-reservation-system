@@ -30,6 +30,7 @@ import {
   registration,
   registrationSession,
   receipt,
+  remarkRequest,
   eq,
   and,
   inArray,
@@ -70,7 +71,6 @@ import {
 } from './notification.services';
 import { createReceiptsForRegistrations } from './receipt.services';
 import { creditHeld } from './escrow.services';
-import { onRemarkPaymentCompleted } from './remark.services';
 import { refundPreregistrationsAtDeadline } from './prereg.services';
 import { isOwnDocument } from './file.services';
 
@@ -288,10 +288,13 @@ export async function initiatePayment(
     // concurrent checkouts each read "no open payment" before either commits,
     // so both created a payment and both debited escrow (money audit MA-06).
     // With it, the second checkout waits here and then sees the first's link.
+    // In id order, as every path that locks several registrations does, so
+    // two of them can never wait on each other.
     const locked = await tx
       .select({ id: registration.id, status: registration.status })
       .from(registration)
       .where(inArray(registration.id, data.registrationIds))
+      .orderBy(registration.id)
       .for('update');
     const expected = isPrereg ? 'preregistered' : 'pending_payment';
     if (locked.length !== data.registrationIds.length || locked.some((r) => r.status !== expected)) {
@@ -459,6 +462,7 @@ export async function confirmPayment(
           })
           .from(registration)
           .where(inArray(registration.id, regIds))
+          .orderBy(registration.id)
           .for('update')
       : [];
 
@@ -487,6 +491,23 @@ export async function confirmPayment(
       );
     }
 
+    // V3 §6.10: a remark fee moves its request on in this transaction, and
+    // only a request still awaiting payment. The move used to run after the
+    // commit, so a request cancelled while its transfer was being checked
+    // took the fee with nothing to show for it (state audit ST-01).
+    if (pay.purpose === 'remark') {
+      const remarkId = (pay.metadata as Record<string, unknown> | null)?.remarkRequestId;
+      const [rr] = typeof remarkId === 'string'
+        ? await tx.select({ id: remarkRequest.id, status: remarkRequest.status }).from(remarkRequest).where(eq(remarkRequest.id, remarkId)).for('update')
+        : [];
+      if (!rr || rr.status !== 'pending_payment') {
+        throw new Error('This remark request is no longer awaiting payment — reject the transfer instead');
+      }
+      await tx.update(remarkRequest).set({ status: 'awaiting_submission', updatedAt: now }).where(eq(remarkRequest.id, rr.id));
+      await logAction(confirmedBy ?? null, 'REMARK_PAYMENT_CONFIRMED', 'remark_request', rr.id, { status: 'pending_payment' },
+        { status: 'awaiting_submission', paymentId }, auditCtx, tx);
+    }
+
     const [paymentUpdate] = await tx
       .update(payment)
       .set({
@@ -507,6 +528,7 @@ export async function confirmPayment(
     if (!paymentUpdate) throw new Error('Payment was concurrently processed');
 
     // Move all linked registrations to 'confirmed'
+    let confirmedIds: string[] = [];
     if (regIds.length > 0) {
       if (pay.purpose === 'preregistration') {
         // V3 §6.8: prereg money lands in the HELD wallet for rows still
@@ -529,7 +551,7 @@ export async function confirmPayment(
             tx
           );
         }
-        await tx
+        confirmedIds = (await tx
           .update(registration)
           .set({ status: 'confirmed', updatedAt: now })
           .where(
@@ -537,9 +559,10 @@ export async function confirmPayment(
               inArray(registration.id, regIds),
               eq(registration.status, 'pending_payment')
             )
-          );
+          )
+          .returning({ id: registration.id })).map((r) => r.id);
       } else {
-        await tx
+        confirmedIds = (await tx
           .update(registration)
           .set({ status: 'confirmed', updatedAt: now })
           .where(
@@ -547,7 +570,8 @@ export async function confirmPayment(
               inArray(registration.id, regIds),
               eq(registration.status, 'pending_payment')
             )
-          );
+          )
+          .returning({ id: registration.id })).map((r) => r.id);
       }
 
       // V3 §6.5 (D-J): physical receipts are born when the money is paid —
@@ -557,7 +581,10 @@ export async function confirmPayment(
 
     await logAction(confirmedBy ?? null, 'PAYMENT_CONFIRMED', 'payment', paymentId,
       { status: current.status }, { status: 'completed', instrumentUsed: instrumentUsed ?? null, notes: adminNotes ?? null }, auditCtx, tx);
-    for (const regId of regIds) {
+    // Only rows that moved: a preregistration a payment funds stays
+    // preregistered (its money is held), and was logged as confirmed (state
+    // audit, inventory R12).
+    for (const regId of confirmedIds) {
       await logAction(confirmedBy ?? null, 'REGISTRATION_CONFIRMED', 'registration', regId, null, { paymentId }, auditCtx, tx);
     }
 
@@ -567,17 +594,6 @@ export async function confirmPayment(
   // Idempotent: payment was already processed by a concurrent webhook
   if (!updated) {
     return undefined;
-  }
-
-  // V3 §6.10: a completed remark-fee payment advances its request to
-  // awaiting_submission (idempotent status-guarded update).
-  if (pay.purpose === 'remark') {
-    const remarkId = (pay.metadata as Record<string, unknown> | null)?.remarkRequestId;
-    if (typeof remarkId === 'string') {
-      await onRemarkPaymentCompleted(remarkId).catch((err) =>
-        console.error('[payment] remark completion hook failed:', err)
-      );
-    }
   }
 
   // NOT-005: Notify parent of payment receipt (fire-and-forget)
@@ -764,6 +780,35 @@ export async function failPayment(
   // The registrations it expired, so a caller that tells families which
   // subjects did not go through can include them (the close does).
   return result && { failed: result.failed, expired: result.expired };
+}
+
+/**
+ * A student who graduates has their waiting registrations expired
+ * (grade.services); a checkout still open on them would otherwise keep the
+ * escrow it took, on registrations nothing can pay any more (state audit
+ * ST-04). Each is failed by the system — escrow back, family told — after the
+ * graduation has committed; a transfer that did arrive is recorded later
+ * ("Transfer found").
+ */
+export async function closePaymentsOfGraduatedStudents(studentIds: string[]) {
+  if (studentIds.length === 0) return 0;
+  const open = await db
+    .selectDistinct({ id: payment.id })
+    .from(payment)
+    .innerJoin(paymentRegistration, eq(paymentRegistration.paymentId, payment.id))
+    .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
+    .where(and(inArray(payment.studentId, studentIds), inArray(payment.status, [...OPEN_PAYMENT_STATUSES]), eq(registration.status, 'expired')));
+  let closed = 0;
+  for (const { id } of open) {
+    const r = await failOpenPayment(id, {
+      from: OPEN_PAYMENT_STATUSES,
+      actorId: null,
+      action: 'PAYMENT_FAILED',
+      reason: 'The student graduated before this payment was confirmed',
+    });
+    if (r) closed++;
+  }
+  return closed;
 }
 
 /**

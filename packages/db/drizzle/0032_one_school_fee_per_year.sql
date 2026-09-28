@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "payment_one_school_fee_per_year_idx" ON "payment" USING btree ("student_id","academic_year") WHERE purpose = 'school_fee' AND status IN ('pending', 'pending_verification', 'completed');

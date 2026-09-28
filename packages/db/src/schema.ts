@@ -406,6 +406,11 @@ export const registrationSession = pgTable(
     // a transient failure during progression doesn't leave students
     // stuck on the wrong grade indefinitely.
     gradeProgressionCompletedAt: timestamp("grade_progression_completed_at", { withTimezone: true }),
+    // Set when the close's finalisation (expire what is left, reject pending
+    // change requests, notify) has completed. The scheduler finalises any
+    // closed session still missing it, so a close interrupted halfway is
+    // finished on the next tick (state audit ST-06).
+    finalizedAt: timestamp("finalized_at", { withTimezone: true }),
     editHistory: jsonb("edit_history")
       .$type<SessionEditEntry[]>()
       .default([]),
@@ -787,6 +792,12 @@ export const payment = pgTable(
     index("payment_confirmedAt_idx").on(table.confirmedAt),
     index("payment_reversedAt_idx").on(table.reversedAt),
     uniqueIndex("payment_verification_reference_idx").on(table.verificationReference),
+    // One school fee per student per academic year: one payment open or paid
+    // at a time. Two desk collections at once, or the desk while the family's
+    // transfer was being checked, both took it (state audit ST-02).
+    uniqueIndex("payment_one_school_fee_per_year_idx")
+      .on(table.studentId, table.academicYear)
+      .where(sql`purpose = 'school_fee' AND status IN ('pending', 'pending_verification', 'completed')`),
     // L-8: Payment amount may be 0 for fully-escrow-funded payments (C-8
     // auto-confirm path) but never negative. Same for the escrow portion.
     check("payment_amount_nonneg", sql`${table.amount} >= 0`),

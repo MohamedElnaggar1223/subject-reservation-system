@@ -285,7 +285,14 @@ export async function initiateSchoolFeePayment(
       externalReference,
       metadata,
     })
-    .returning();
+    .returning()
+    .catch((err) => {
+      // One open or paid school fee per student and year (state audit ST-02).
+      if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') {
+        throw new Error('A school-fee payment is already pending for this student');
+      }
+      throw err;
+    });
 
   return created;
 }

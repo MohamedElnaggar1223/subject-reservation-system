@@ -225,6 +225,20 @@
       "when": 1790537049450,
       "tag": "0031_late_transfer_amount",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790557635760,
+      "tag": "0032_one_school_fee_per_year",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790557902648,
+      "tag": "0033_session_finalized_at",
+      "breakpoints": true
     }
   ]
 }

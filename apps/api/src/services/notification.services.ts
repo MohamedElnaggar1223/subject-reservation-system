@@ -1527,6 +1527,17 @@ export async function processScheduledAnnouncements(): Promise<number> {
   let dispatched = 0;
 
   for (const ann of pending) {
+    // Claim it before sending, and only while it is still pending: an admin's
+    // cancel in between used to be overwritten, a second scheduler instance
+    // sent it twice, and a failure after sending marked it failed (state
+    // audit ST-12). A crash after the claim leaves it marked sent — never
+    // sent twice.
+    const [claimed] = await db
+      .update(scheduledAnnouncement)
+      .set({ status: 'sent', sentAt: new Date() })
+      .where(and(eq(scheduledAnnouncement.id, ann.id), eq(scheduledAnnouncement.status, 'pending')))
+      .returning({ id: scheduledAnnouncement.id });
+    if (!claimed) continue;
     try {
       const result = await dispatchAnnouncement({
         title: ann.title,
@@ -1537,11 +1548,7 @@ export async function processScheduledAnnouncements(): Promise<number> {
 
       await db
         .update(scheduledAnnouncement)
-        .set({
-          status: 'sent',
-          sentAt: new Date(),
-          notificationCount: result.notificationCount,
-        })
+        .set({ notificationCount: result.notificationCount })
         .where(eq(scheduledAnnouncement.id, ann.id));
 
       // L-7: Audit the actual dispatch (not just the scheduling).
@@ -1579,9 +1586,10 @@ export async function processScheduledAnnouncements(): Promise<number> {
         .update(scheduledAnnouncement)
         .set({
           status: 'failed',
+          sentAt: null,
           errorMessage: errorMsg.slice(0, 500),
         })
-        .where(eq(scheduledAnnouncement.id, ann.id));
+        .where(and(eq(scheduledAnnouncement.id, ann.id), eq(scheduledAnnouncement.status, 'sent')));
     }
   }
 

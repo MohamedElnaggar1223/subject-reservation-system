@@ -161,6 +161,7 @@ export const AUDIT_ACTIONS = [
   'REMARK_FEE_SET',
   'REMARK_DEADLINE_SET',
   'REMARK_PAYMENT_INITIATED',
+  'REMARK_PAYMENT_CONFIRMED',
   // Admin
   'ADMIN_ANNOUNCEMENT',
 ] as const;
@@ -249,6 +250,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   REMARK_FEE_SET:             'Remark Fee Set',
   REMARK_DEADLINE_SET:        'Remark Deadline Set',
   REMARK_PAYMENT_INITIATED:   'Remark Payment Initiated',
+  REMARK_PAYMENT_CONFIRMED:   'Remark Fee Confirmed — Awaiting Submission',
   ADMIN_ANNOUNCEMENT:         'Admin Announcement Sent',
 };
 

@@ -660,15 +660,11 @@ export async function approveRegistrationRequest(
     throw new Error('Cannot approve registrations for a graduated student');
   }
 
-  // Verify the session is still active
-  const sessionId = regs[0]!.sessionId;
-  const sess = await db.query.registrationSession.findFirst({
-    where: (s, { eq: eqOp }) => eqOp(s.id, sessionId),
-    columns: { status: true },
-  });
-  if (!sess || sess.status !== 'active') {
-    throw new Error('Registration window is closed');
-  }
+  // The window must be open for the student — the same rule the request
+  // passed (a deadline extension counts). Checked against the session's
+  // status alone, a request made under an extension after the close could
+  // never be approved (state audit ST-07, MO-20).
+  for (const r of regs) await assertWindowOpen(r.studentId, r.sessionId);
 
   const studentIds = [...new Set(regs.map((r) => r.studentId))];
   for (const studentId of studentIds) {
@@ -786,6 +782,11 @@ export async function revertApprovedRegistrationRequest(
   }
 
   const updated = await db.transaction(async (tx) => {
+    // Lock the registrations before asking whether a checkout covers them —
+    // the checkout takes the same locks (initiatePayment). Asked without them,
+    // a checkout committing in between left an open payment on a request
+    // sent back to "awaiting approval" (state audit ST-03).
+    await tx.select({ id: registration.id }).from(registration).where(inArray(registration.id, data.registrationIds)).orderBy(registration.id).for('update');
     const paymentLinksInTx = await tx.query.paymentRegistration.findMany({
       where: (pr, { inArray }) => inArray(pr.registrationId, data.registrationIds),
       columns: { registrationId: true },
@@ -849,15 +850,10 @@ export async function rejectRegistrationRequest(
     throw new Error('One or more registrations are not awaiting approval');
   }
 
-  // Verify the session is still active (consistency with approval path)
-  const sessionId = regs[0]!.sessionId;
-  const sess = await db.query.registrationSession.findFirst({
-    where: (s, { eq: eqOp }) => eqOp(s.id, sessionId),
-    columns: { status: true },
-  });
-  if (!sess || sess.status !== 'active') {
-    throw new Error('Registration window is closed');
-  }
+  // A rejection ends a request whatever the window: nothing is entered or
+  // paid. It used to need an active session, so a request made under a
+  // deadline extension after the close could not be turned down either
+  // (state audit ST-07).
 
   const studentIds = [...new Set(regs.map((r) => r.studentId))];
   for (const studentId of studentIds) {

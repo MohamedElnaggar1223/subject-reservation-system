@@ -205,7 +205,13 @@ before it ships.
    Handed on:
    MO-1 (the rest of O-7) to state and time; MO-3 (`TZ=Africa/Cairo`) is in the production
    checklist.
-   Next: **state and time** (Phase 1.3).
+   Next: **state and time** (Phase 1.3) — done below.
+2b. **State-and-time audit** (Phase 1.3). Done on 28 Sep 2026: `STATE_AUDIT.md`, trail
+   `.audit/state-audit.tsv`. Thirteen findings (ST-01 to ST-13; three high: a remark fee taken
+   for a cancelled request, the school fee taken twice, a checkout left on a request sent back
+   for approval), twelve fixed, ten with a test that fails without the fix; the scheduler now
+   finishes an interrupted close and an uncaptured opening. For the owner: what a student's grade
+   is (ST-13, DISCOVERY.md Q-08). Handed on: the MO-1 remainder (SO-1, next commit).
 3. **Discovery research pack** in parallel with 1 and 2. **Import spike done 28 Sep**
    (`IMPORT_SPIKE.md`, reviewed on Opus 5.5): the school's sheet through the API — 199 of 220
    November 2026 rows and 399 of 434 June 2023 rows went in. It evidences three of the four

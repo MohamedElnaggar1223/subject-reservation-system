@@ -29,9 +29,8 @@ import { requireAuth, requireAdmin } from '../middleware/access-control.middlewa
 import type { HonoEnv } from '../lib/types';
 import * as sessionService from '../services/session.services';
 import { notifySessionOpened, notifySessionClosed, getStudentAndParentBroadcastIds } from '../services/notification.services';
-import { progressGrades } from '../services/grade.services';
+import { progressGradesOnce } from '../services/grade.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
-import { db, registrationSession as registrationSessionTable, eq } from '@repo/db';
 import { schoolDate } from '../services/window.services';
 
 /**
@@ -348,13 +347,11 @@ export const sessions = new Hono<HonoEnv>()
       // this session is done. On failure, leave the column null — the
       // scheduler will retry on its next tick.
       try {
-        const progressed = await progressGrades(session.sessionType);
-        await db
-          .update(registrationSessionTable)
-          .set({ gradeProgressionCompletedAt: new Date() })
-          .where(eq(registrationSessionTable.id, id));
-        if (progressed.length > 0) {
-          console.log(`[session:close] Progressed ${progressed.length} student(s) after manual close.`);
+        // Once per (series type, year), as the scheduler does: the claim
+        // stops a second close in the same series running it again.
+        const progressed = await progressGradesOnce(session.sessionType as 'june' | 'november' | 'january', [id]);
+        if (progressed > 0) {
+          console.log(`[session:close] Progressed ${progressed} student(s) after manual close.`);
         }
       } catch (err) {
         console.error('[session:close] Grade progression failed:', err);

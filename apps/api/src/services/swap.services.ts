@@ -943,8 +943,9 @@ export async function cancelChangeRequest(
       )
     )
     .returning();
-
-  return updated!;
+  // Another click, or a decision, got there first (state audit ST-11).
+  if (!updated) throw new Error('This request was already cancelled or decided');
+  return updated;
 }
 
 /**
