@@ -11,8 +11,10 @@ RF-nn / RH-nn), `SECURITY_AUDIT.md` (authorization, cross-family access, the aut
 and the production checklist), `MONEY_AUDIT.md` (ledger invariants, takings semantics, the
 money findings MA-nn), `DISCOVERY.md` (assumptions about the school, parked questions, artefacts
 still to obtain — check it before designing any feature), `PATTERNS.md` (the three golden
-rules of the codebase), `V3_PLAN.md` and `UX_AUDIT.md` (why the system is shaped the way it is), and `IMPORT_SPIKE.md`
-(what the school's own sheet does not fit — read it before changing the data model).
+rules of the codebase), `V3_PLAN.md` and `UX_AUDIT.md` (why the system is shaped the way it is), `IMPORT_SPIKE.md`
+(what the school's own sheet does not fit — read it before changing the data model), and
+`DISCOVERY_RESEARCH.md` (what the exam boards and Egypt's equivalency rules require, and the
+feature-value map for the gate).
 
 ## Models
 
