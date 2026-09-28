@@ -381,6 +381,20 @@ export async function holdRowLock(table: string, id: string): Promise<() => Prom
 }
 
 /**
+ * Wait until `n` sessions in this database are waiting on a lock — the
+ * requests a test queued behind holdRowLock — so their order is the order they
+ * were fired in, not a guess about how long a request takes to arrive.
+ */
+export async function lockWaiters(n: number, ms = 5000) {
+  return waitFor(async () => {
+    const [r] = await sql<{ n: string }>(
+      `select count(*) as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'`
+    );
+    return Number(r?.n ?? 0) >= n || null;
+  }, ms);
+}
+
+/**
  * Run the scheduler's recovery sweep (finish interrupted closes, capture
  * preregistrations an opening left behind; STATE_AUDIT.md ST-06), as the
  * scheduler does every minute.

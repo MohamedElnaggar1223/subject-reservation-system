@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, money, audited, openWindow, futureWindow, academicYearOf, loneStudent,
-  runSessionRecovery, holdRowLock, notified, type Client,
+  runSessionRecovery, holdRowLock, lockWaiters, notified, type Client,
 } from './helpers';
 
 /**
@@ -53,7 +53,7 @@ describe('state and time', () => {
   // ─── Remark requests and their fee ─────────────────────────────────────────
 
   describe('a remark request and its fee (ST-01)', () => {
-    let f: Family, physics: string, chemistry: string, biology: string;
+    let f: Family, physics: string, chemistry: string, biology: string, geography: string;
     const newRemark = async (registrationId: string) => {
       const r = await apiResponse(f.parent.api.v1.remarks.$post({
         json: { registrationId, serviceType: 'clerical_check', papers: [{ paperCode: '9702/12', paperName: 'Paper 1' }] },
@@ -69,11 +69,11 @@ describe('state and time', () => {
 
     beforeAll(async () => {
       f = await family('rm');
-      const desk = await deskCash(f, [subj.S1!, subj.S2!, subj.S3!]);
-      [physics, chemistry, biology] = desk.registrations.map((r) => r.id) as [string, string, string];
+      const desk = await deskCash(f, [subj.S1!, subj.S2!, subj.S3!, subj.S4!]);
+      [physics, chemistry, biology, geography] = desk.registrations.map((r) => r.id) as [string, string, string, string];
       await apiResponse(finadmin.api.v1.remarks.fees.$put({ json: { council: 'cambridge', serviceType: 'clerical_check', amountPerPaper: 400 } }));
       await apiResponse(officer.api.v1.remarks.results.$post({
-        json: { results: [{ registrationId: physics, grade: 'D' }, { registrationId: chemistry, grade: 'E' }, { registrationId: biology, grade: 'C' }] },
+        json: { results: [{ registrationId: physics, grade: 'D' }, { registrationId: chemistry, grade: 'E' }, { registrationId: biology, grade: 'C' }, { registrationId: geography, grade: 'D' }] },
       }));
     });
 
@@ -105,15 +105,38 @@ describe('state and time', () => {
       // The cancellation reaches the request's lock first, the payment right
       // behind it (having read "awaiting payment" before either commits).
       const release = await holdRowLock('remark_request', id);
-      const cancel = f.parent.api.v1.remarks[':id'].cancel.$post({ param: { id } });
-      await pause(150);
-      const pay = f.parent.api.v1.remarks[':id'].pay.$post({ param: { id }, json: { paymentMethod: 'instapay' } });
-      await pause(150);
-      await release();
+      let cancel, pay;
+      try {
+        cancel = f.parent.api.v1.remarks[':id'].cancel.$post({ param: { id } });
+        await lockWaiters(1);
+        pay = f.parent.api.v1.remarks[':id'].pay.$post({ param: { id }, json: { paymentMethod: 'instapay' } });
+        await lockWaiters(2);
+      } finally {
+        await release();
+      }
       const [c, p] = await Promise.all([cancel, pay]);
       expect([c.ok, p.ok]).toEqual([true, false]);
       expect(await statusOf('remark_request', id)).toBe('cancelled');
       expect(await sql(`select 1 from payment where purpose = 'remark' and metadata ->> 'remarkRequestId' = $1`, [id])).toEqual([]);
+    });
+
+    it('a payment and a cancellation arriving together, payment first: the cancellation sees the payment, and is refused', async () => {
+      const id = await newRemark(geography);
+      // The payment reaches the request's lock first; the cancellation queues
+      // behind it on the same lock and then finds the payment it committed.
+      const release = await holdRowLock('remark_request', id);
+      let pay, cancel;
+      try {
+        pay = f.parent.api.v1.remarks[':id'].pay.$post({ param: { id }, json: { paymentMethod: 'instapay' } });
+        await lockWaiters(1);
+        cancel = f.parent.api.v1.remarks[':id'].cancel.$post({ param: { id } });
+        await lockWaiters(2);
+      } finally {
+        await release();
+      }
+      const [p, c] = await Promise.all([pay, cancel]);
+      expect([p.ok, c.ok]).toEqual([true, false]);
+      expect(await statusOf('remark_request', id)).toBe('pending_payment');
     });
   });
 
@@ -168,11 +191,15 @@ describe('state and time', () => {
       await apiResponse(f.parent.api.v1.registrations.approve.$put({ json: { registrationIds: [id] } }));
       // The checkout queues on the registration's lock; the revert arrives while it waits.
       const release = await holdRowLock('registration', id);
-      const checkout = f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [id], paymentMethod: 'instapay', escrowAmountToApply: 0 } });
-      await pause(150);
-      const revert = f.parent.api.v1.registrations['revert-approval'].$put({ json: { registrationIds: [id] } });
-      await pause(150);
-      await release();
+      let checkout, revert;
+      try {
+        checkout = f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [id], paymentMethod: 'instapay', escrowAmountToApply: 0 } });
+        await lockWaiters(1);
+        revert = f.parent.api.v1.registrations['revert-approval'].$put({ json: { registrationIds: [id] } });
+        await lockWaiters(2);
+      } finally {
+        await release();
+      }
       const [c, r] = await Promise.all([checkout, revert]);
       expect([c.ok, r.ok]).toEqual([true, false]);
       expect(await statusOf('registration', id)).toBe('pending_payment');
@@ -326,6 +353,17 @@ describe('state and time', () => {
     const extend = (studentId: string, id: string) => apiResponse(finadmin.api.v1.exceptions.$post({
       json: { type: 'deadline_extension', studentId, sessionId: id, validUntil: new Date(Date.now() + 24 * 60 * 60 * 1000), reason: 'late family, approved by the head' },
     }));
+
+    it('nothing is stranded before the first sweep (so the sweep cannot hide an earlier suite\'s fault from 09)', async () => {
+      const stranded = await sql(`
+        select p.id from payment p
+        where p.status in ('pending', 'pending_verification')
+          and exists (select 1 from payment_registration pr where pr.payment_id = p.id)
+          and not exists (
+            select 1 from payment_registration pr join registration r on r.id = pr.registration_id
+            where pr.payment_id = p.id and r.status <> 'expired')`);
+      expect(stranded).toEqual([]);
+    });
 
     it('a close interrupted before its finalisation is finished on the next tick, and only once', async () => {
       const s = await session(adm, 'January (AS, state and time, recovery)', 'january', 'as_level', { ...openWindow(), activate: true });
