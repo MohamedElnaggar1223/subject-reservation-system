@@ -290,9 +290,11 @@ export async function markLostOrVoid(
     if (status === 'void') {
       // A paid subject's receipt is the family's proof of payment and is never
       // void (MA-20): voided, the desk would never offer it again and nothing
-      // reissues it. Void is for the paper of a dropped subject. Judged under
-      // the registration's lock, so a drop committing meanwhile is seen (ST-14).
-      const [rc] = await tx.select({ registrationId: receipt.registrationId }).from(receipt).where(eq(receipt.id, receiptId));
+      // reissues it. Void is for the paper of a dropped subject. Receipt first,
+      // then its registration — the order a drop, a return and a reversal lock
+      // them in, so a void racing one of them waits instead of deadlocking —
+      // and judged under both locks, so a drop committing meanwhile is seen (ST-14).
+      const [rc] = await tx.select({ registrationId: receipt.registrationId }).from(receipt).where(eq(receipt.id, receiptId)).for('update');
       if (rc) {
         const [reg] = await tx
           .select({ status: registration.status })

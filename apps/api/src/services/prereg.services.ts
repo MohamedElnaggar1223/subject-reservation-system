@@ -245,7 +245,7 @@ export async function refundPreregistrationsAtDeadline(sessionId: string) {
         if (!funded) {
           await tx.update(registration).set({ status: 'expired', updatedAt: new Date() })
             .where(and(eq(registration.id, reg.id), eq(registration.status, 'preregistered')));
-          await logActions(expiryEntries([reg], 'preregistered', 'preregistration_unfunded_at_deadline'), tx);
+          await logActions(expiryEntries([{ id: reg.id, from: 'preregistered' }], 'preregistration_unfunded_at_deadline'), tx);
           return { refunded: 0, gated: false };
         }
         await debitHeld(

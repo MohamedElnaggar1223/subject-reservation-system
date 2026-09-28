@@ -58,6 +58,7 @@ import {
   debitEscrow,
 } from './escrow.services';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
+import { expireWaitingRegistrations } from './expiry.services';
 import { sessionOpenFor, sessionWindow, entryDeadlineMessage, schoolDateTime } from './window.services';
 import {
   notifyPaymentConfirmed,
@@ -728,7 +729,7 @@ async function failOpenPayment(
       }
     }
     const registrationsExpired = expired.length;
-    await logActions(expiryEntries(expired, 'pending_payment', 'checkout_failed'), tx);
+    await logActions(expiryEntries(expired.map((r) => ({ id: r.id, from: 'pending_payment' })), 'payment_closed', opts.reason), tx);
 
     await logAction(opts.actorId, opts.action, 'payment', paymentId, { status: pay.status },
       { status: 'failed', reason: opts.reason, escrowReturned: pay.escrowAmountApplied, registrationsExpired }, opts.auditCtx, tx);
@@ -1193,32 +1194,35 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
       }
     }
 
+    // Each step is tried on its own: one session's failure must not skip the
+    // rest of this tick, and the next tick retries it (the sweep is idempotent).
     // Anything else still waiting on this series can never be entered now;
     // each student is told which subjects, as at the close.
-    const expired = await db.transaction(async (tx) => {
-      const rows = await tx
-        .update(registration)
-        .set({ status: 'expired', updatedAt: now })
-        .where(and(eq(registration.sessionId, s.id), inArray(registration.status, ['pending_approval', 'pending_payment'])))
-        .returning({ id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId });
-      await logActions(expiryEntries(rows, ['pending_approval', 'pending_payment'], 'entry_deadline'), tx);
-      return rows;
-    });
-    registrationsExpiredAtDeadline += expired.length;
-    if (expired.length > 0) {
-      await notifyRegistrationsExpiredAtEntryDeadline(s.id, s.entryDeadline!, expired)
-        .catch((err) => console.error(`[deadlines] Expiry notices for session ${s.id} failed:`, err));
+    try {
+      const expired = await db.transaction((tx) =>
+        expireWaitingRegistrations(tx, eq(registration.sessionId, s.id), 'entry_deadline', now));
+      registrationsExpiredAtDeadline += expired.length;
+      if (expired.length > 0) {
+        await notifyRegistrationsExpiredAtEntryDeadline(s.id, s.entryDeadline!, expired)
+          .catch((err) => console.error(`[deadlines] Expiry notices for session ${s.id} failed:`, err));
+      }
+    } catch (err) {
+      console.error(`[deadlines] Could not expire the waiting registrations of session ${s.id}:`, err);
     }
 
     // A series still in draft never opens now: its preregistrations are
     // refunded in full (owner decision MO-21).
     if (s.status === 'draft') {
-      const refunded = await refundPreregistrationsAtDeadline(s.id);
-      preregistrationsRefundedAtDeadline += refunded.filter((r) => r.refunded > 0).length;
-      preregistrationsExpiredUnopened += refunded.filter((r) => r.refunded === 0).length;
-      if (refunded.length > 0) {
-        await notifyPreregistrationsRefundedAtDeadline(s.id, s.entryDeadline!, refunded)
-          .catch((err) => console.error(`[deadlines] Prereg refund notices for session ${s.id} failed:`, err));
+      try {
+        const refunded = await refundPreregistrationsAtDeadline(s.id);
+        preregistrationsRefundedAtDeadline += refunded.filter((r) => r.refunded > 0).length;
+        preregistrationsExpiredUnopened += refunded.filter((r) => r.refunded === 0).length;
+        if (refunded.length > 0) {
+          await notifyPreregistrationsRefundedAtDeadline(s.id, s.entryDeadline!, refunded)
+            .catch((err) => console.error(`[deadlines] Prereg refund notices for session ${s.id} failed:`, err));
+        }
+      } catch (err) {
+        console.error(`[deadlines] Could not refund the preregistrations of session ${s.id}:`, err);
       }
     }
   }

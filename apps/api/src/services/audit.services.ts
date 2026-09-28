@@ -111,19 +111,22 @@ export async function logActions(
   })));
 }
 
-/** One REGISTRATION_EXPIRED row per registration a system sweep expired. */
-export function expiryEntries(
-  rows: { id: string }[],
-  from: string | string[],
-  reason: 'session_closed' | 'entry_deadline' | 'graduated' | 'checkout_failed' | 'preregistration_unfunded_at_deadline'
-) {
+export type ExpiryReason =
+  | 'session_closed' | 'entry_deadline' | 'graduated' | 'payment_closed' | 'preregistration_unfunded_at_deadline';
+
+/**
+ * One REGISTRATION_EXPIRED row per registration the system expired, with the
+ * status it had (`from`) and why; `detail` carries the payment's own reason
+ * when a closing payment expired it.
+ */
+export function expiryEntries(rows: { id: string; from: string }[], reason: ExpiryReason, detail?: string) {
   return rows.map((r) => ({
     userId: null,
     action: 'REGISTRATION_EXPIRED' as const,
     entityType: 'registration' as const,
     entityId: r.id,
-    previousData: { status: from },
-    newData: { status: 'expired', reason },
+    previousData: { status: r.from },
+    newData: { status: 'expired', reason, ...(detail ? { detail } : {}) },
   }));
 }
 

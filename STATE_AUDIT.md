@@ -178,7 +178,7 @@ first recovery sweep, so the sweep cannot hide an earlier suite's fault from `09
 | SO-4 | A graduated student's preregistrations for a later series stay preregistered, their held money held; they can be cancelled at the refund window's rate. Like MO-21, the owner may want a full refund. | Owner decision |
 | SO-5 | The scheduler assumes one API process; a second instance runs the same tick concurrently. Every step is status-guarded or claimed, but notifications could be sent twice. | Deployment checklist |
 | SO-6 | Non-money transitions (links, exceptions, change requests, sessions) are audited in the route after the commit, and a failed audit insert is only logged. | Engineering health |
-| SO-8 | A receipt printed wrong for a subject still paid for cannot be replaced: void is refused for it (ST-14), and nothing reissues a receipt except paying again after a reversal (MA-20's `…-R2`). The desk needs a "reissue" if misprints happen. | Owner decision (desk workflow) |
+| SO-8 | A receipt printed wrong for a subject still paid for cannot be replaced: void is refused for it (ST-14), and nothing reissues a receipt except paying again after a reversal (MA-20's `…-R2`). The desk needs a "reissue" if misprints happen. When it is built, `09`'s receipt rule (a handed-over receipt has exactly one `RECEIPT_ISSUED` row) must change with it: a reissue clears `issued_at` and the new paper is handed over again. | Owner decision (desk workflow) |
 | SO-7 | After a manual graduation in an open window, a registration kept for a transfer being checked stays waiting if that transfer is then rejected, and can be paid again: the checkout path does not check graduation. Manual-only while automatic progression is off. | Accepted, low |
 
 ---
@@ -219,9 +219,22 @@ changes the student model and the grade screens, so it waits for the owner's ans
 
 ---
 
+## 7. Reproduce
+
+```bash
+pnpm --filter @repo/api test                     # the whole suite; 08b is this audit
+pnpm --filter @repo/api test -- test/08b-state-and-time.test.ts
+pnpm --filter @repo/api test -- test/08c-audit-in-transaction.test.ts   # SO-1 (§8)
+```
+
+The red run before the fixes is `.audit/state-audit-evidence/red-before-fixes.log`.
+
+---
+
 ## 8. Follow-up: SO-1, every money movement commits with its audit row
 
-**Date:** 28 September 2026. Branch `so1-audit-in-tx`. Decisions in `.audit/state-audit.tsv`.
+**Date:** 28 September 2026. Branch `so1-audit-in-tx`. Decisions in `.audit/state-audit.tsv`;
+evidence in `.audit/state-audit-evidence/so1/`.
 
 **What moved.** The seventeen money actions that wrote their audit row in the route after the
 commit now write it in their service's transaction (`logAction(..., tx)`), and the route's
@@ -229,49 +242,60 @@ commit now write it in their service's transaction (`logAction(..., tx)`), and t
 registration, the school fee (the family's checkout and the desk's collection), the remark fee's
 checkout and its refund with the outcome, direct drops and swaps, a change request's approval,
 a preregistration cancelled, receipts handed over, brought back, lost and voided, escrow
-transfers and refund requests. Four that had no transaction now have one (the reference, the
-hand-over, the school fee's checkout and its desk payment). System transitions now write rows
-too, in the same transaction as the move: a new action, `REGISTRATION_EXPIRED` (reason: the
-close, the entry deadline, graduation, a failed checkout after its window, an unfunded
-preregistration at the deadline), `CHANGE_REQUEST_REJECTED` for rejections at a close and at
-graduation, and `PREREG_CAPTURED` at an opening. A bulk helper (`logActions`) writes a sweep's
-rows in one insert.
+transfers and refund requests. Five paths that had no transaction now have one (the reference,
+the hand-over, the school fee's checkout, its desk payment, and a desk registration taken
+without money). System transitions now write rows too, in the same transaction as the move: a
+new action, `REGISTRATION_EXPIRED`, recording the status the registration had and why it expired
+(`session_closed`, `entry_deadline`, `graduated`, `payment_closed` with the payment's own reason,
+`preregistration_unfunded_at_deadline`); `CHANGE_REQUEST_REJECTED` for rejections at a close and
+at graduation; and `PREREG_CAPTURED` at an opening, funded or not. The bulk expiries lock and read
+the rows first (`expiry.services.ts`), since Postgres 17 cannot return a row's old values from an
+UPDATE; `logActions` writes a sweep's rows in one insert.
 
-**Proof.** `08c-audit-in-transaction` makes the database refuse one action's audit row (a
-trigger, dropped afterwards), fires the real request, and checks that it failed and that nothing
-moved — no escrow, no payment, no status — then allows the row and sees the same request succeed
-with exactly one row. For the close and the opening, the step fails and the recovery sweep
-finishes it once the row is allowed. With each row written outside the transaction and its
-failure swallowed (the old route behaviour), each of the 17 audit scenarios fails for its own
-reason (the eighteenth test is ST-14's guard; trail: "control" rows). `09` gains four rules over every row the suite leaves: each
-payment has exactly one creation row, whichever path made it; each expired registration has
-exactly one expiry row; each capture of held money, escrow transfer and refund request has its
-row, for the same amount; each receipt handed over, brought back or lost has exactly one row.
-Each was shown red with its write removed. Escrow transfers had no scenario at all before this;
-`08c` adds one (both ledger rows and the audit row, or nothing).
+**Rows that changed shape** (nothing in the code reads these payloads): `ESCROW_TRANSFER` is
+recorded against the source student (it was an empty id) with both students and the amount;
+`DESK_REGISTRATION` carries the registrations, the payment, the amount to collect and the escrow
+applied (it carried a count and `collected`); a desk collection's `PAYMENT_CONFIRMED` now carries
+the connection address and user agent, as an app confirmation always did.
+
+**Proof — what each part shows.**
+- *A refused row stops the movement* — proven through the API for the seventeen actions and for
+  the close and the opening. `08c-audit-in-transaction` makes the database refuse one action's
+  audit row (a trigger, dropped afterwards), fires the real request, checks that it failed and
+  that nothing moved (no escrow, no payment, no status), then allows the row and sees the same
+  request succeed with exactly one row; the close and the opening fail their step, and the
+  recovery sweep finishes them once the row is allowed. With each row written outside the
+  transaction and its failure swallowed (the old route behaviour), each of the 17 audit scenarios
+  fails for its own reason (the eighteenth test is ST-14's guard; trail: "control" rows).
+- *Every row exists, and says the right thing* — over every row the suite leaves, `09` checks:
+  one creation row per payment, whichever path made it; one expiry row per expired registration,
+  each naming the status it had and a known reason; capture rows, funded or not, that agree with
+  the ledger; escrow-transfer and refund-request rows for the same amounts; one row per receipt
+  handed over, brought back or lost. Each rule was shown red with its write removed.
+- *Not proven by a refused row:* the expiries at an entry deadline, at graduation, with a closing
+  payment and for an unfunded preregistration, and the rejections at graduation. Their writes sit
+  in the move's transaction (read in the code); `09` proves they are written, not that a refused
+  one stops the move.
+- Escrow transfers had no scenario at all before this; `08c` adds one (both ledger rows and the
+  audit row, or nothing).
 
 **Found on the way: ST-14** (§4) — the receipt scenario voided a paid subject's receipt, which
-`09`'s MA-20 rule caught; the service allowed it. SO-8 (§5) is the desk question it leaves.
+`09`'s MA-20 rule caught; the service allowed it. SO-8 (§5) is the desk question it leaves. The
+guard locks the receipt, then its registration, the order every other receipt path takes.
+
+**Also fixed on the way:** the entry-deadline sweep stopped at the first session whose expiry or
+preregistration refunds failed, skipping every later session in that tick; each step is now tried
+on its own and retried on the next tick. The Audit Log's table keyed its inner row rather than
+the fragment around it (a React warning in development).
 
 **On the running system** (dev database, the API restarted on this code): a parent's refund
 request, a desk registration with cash and its receipt's hand-over each wrote their row with
 the actor and the connection address, now passed into the service; the admin Audit Log lists
 them; a finance admin's void of that paid receipt was refused with its sentence and wrote
-nothing. The dev database was two migrations behind (0032, 0033) and was migrated first. The
-Audit Log's table keyed its inner row rather than the fragment around it (a React warning in
-development); fixed.
+nothing. The dev database was two migrations behind (0032, 0033) and was migrated first.
 
-**Still after the commit:** non-money transitions (SO-6: links, exceptions, change-request
-creation, rejection and cancellation by a family, sessions opened and closed by hand, remark
-requests and their approval, results); a failed insert there is logged, not fatal.
-
----
-
-## 7. Reproduce
-
-```bash
-pnpm --filter @repo/api test                     # the whole suite; 08b is this audit
-pnpm --filter @repo/api test -- test/08b-state-and-time.test.ts
-```
-
-The red run before the fixes is `.audit/state-audit-evidence/red-before-fixes.log`.
+**Still after the commit** (none moves money; a failed insert there is logged, not fatal; SO-6):
+links, exceptions, change requests created, rejected or cancelled by a family, sessions opened
+and closed by hand, registration requests, approvals, reverts and rejections, preregistrations
+created, admin overrides, remark requests and their approval and submission, results recorded,
+and a grade change (`USER_GRADE_CHANGED`).

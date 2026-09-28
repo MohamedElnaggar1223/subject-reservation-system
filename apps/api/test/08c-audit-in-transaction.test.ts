@@ -409,6 +409,8 @@ describe('an audit row commits with its movement, or neither does (SO-1)', () =>
       await runSessionRecovery();
       expect(await statusOf('registration', unpaid)).toBe('expired');
       expect(await auditRows(unpaid, 'REGISTRATION_EXPIRED')).toBe(1);
+      expect(await one(`select previous_data, new_data from audit_log where entity_id = $1 and action = 'REGISTRATION_EXPIRED'`, [unpaid]))
+        .toEqual({ previous_data: { status: 'pending_payment' }, new_data: { status: 'expired', reason: 'session_closed' } });
       expect(await statusOf('change_request', request)).toBe('rejected');
       expect(await auditRows(request, 'CHANGE_REQUEST_REJECTED')).toBe(1);
       expect((await one<{ finalized_at: string | null }>(`select finalized_at from registration_session where id = $1`, [sessionId])).finalized_at).not.toBeNull();

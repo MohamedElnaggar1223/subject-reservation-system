@@ -299,6 +299,14 @@ describe('money invariants over the whole database', () => {
       group by r.id having count(a.id) <> 1
     `);
     expect(broken).toEqual([]);
+    // And each says what the registration was waiting for, and why it expired.
+    const vague = await sql(`
+      select entity_id, previous_data, new_data from audit_log
+      where action = 'REGISTRATION_EXPIRED'
+        and (coalesce(previous_data->>'status', '') not in ('pending_approval', 'pending_payment', 'preregistered')
+          or coalesce(new_data->>'reason', '') not in ('session_closed', 'entry_deadline', 'graduated', 'payment_closed', 'preregistration_unfunded_at_deadline'))
+    `);
+    expect(vague).toEqual([]);
   });
 
   it('every capture of held money, escrow transfer and refund request has its audit row, for the same amount (SO-1)', async () => {
@@ -310,6 +318,14 @@ describe('money invariants over the whole database', () => {
           and ${cents(`(a.new_data->>'heldCaptured')::numeric`)} = ${cents('t.amount')})
     `);
     expect(captures).toEqual([]);
+    // Every capture row, funded or not, agrees with the ledger: held money taken exactly when it says so.
+    const captureRows = await sql(`
+      select a.entity_id, a.new_data from audit_log a
+      where a.action = 'PREREG_CAPTURED'
+        and (coalesce((a.new_data->>'heldCaptured')::numeric, 0) > 0) <> exists (
+          select 1 from escrow_transaction t where t.reason = 'prereg_capture' and t.related_registration_id = a.entity_id)
+    `);
+    expect(captureRows).toEqual([]);
     // A transfer writes two ledger rows and one audit row, against the source.
     const transfers = await sql(`
       with ledger as (

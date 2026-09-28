@@ -24,7 +24,8 @@ import { randomUUID } from 'crypto';
 import { env } from '../env';
 import { notifyGradeChanged } from './notification.services';
 import { closePaymentsOfGraduatedStudents } from './payment.services';
-import { logAction, logActions, expiryEntries } from './audit.services';
+import { logAction, logActions } from './audit.services';
+import { expireWaitingRegistrations } from './expiry.services';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -66,22 +67,16 @@ async function cleanupPendingRecordsForGraduatedStudents(
   // checkout inside its grace: a November close keeps them for a family who
   // may already have paid, and graduation runs on the same tick (review of
   // the state audit, flag 1).
-  const expired = await executor
-    .update(registration)
-    .set({ status: 'expired', updatedAt: now })
-    .where(
-      and(
-        inArray(registration.studentId, graduatedStudentIds),
-        inArray(registration.status, ['pending_approval', 'pending_payment']),
-        sql`not exists (
-          select 1 from ${paymentRegistration} pr join ${payment} p on p.id = pr.payment_id
-          where pr.registration_id = ${registration.id}
-            and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
-        )`,
-      )
-    )
-    .returning({ id: registration.id });
-  await logActions(expiryEntries(expired, ['pending_approval', 'pending_payment'], 'graduated'), executor);
+  await expireWaitingRegistrations(executor,
+    and(
+      inArray(registration.studentId, graduatedStudentIds),
+      sql`not exists (
+        select 1 from ${paymentRegistration} pr join ${payment} p on p.id = pr.payment_id
+        where pr.registration_id = ${registration.id}
+          and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
+      )`,
+    ),
+    'graduated', now);
 
   // 2. Find all registration IDs belonging to graduated students
   const studentRegistrations = await executor.query.registration.findMany({
