@@ -19,6 +19,9 @@ export async function expireWaitingRegistrations(tx: Tx | typeof db, where: Cond
     .select({ id: registration.id, status: registration.status })
     .from(registration)
     .where(and(where, inArray(registration.status, [...WAITING])))
+    // In id order, as every path that locks several registrations does, so an
+    // expiry and a checkout on the same rows wait instead of deadlocking.
+    .orderBy(registration.id)
     .for('update');
   if (waiting.length === 0) return [];
   const from = new Map(waiting.map((w) => [w.id, w.status]));

@@ -126,7 +126,8 @@ payment funds stays preregistered and was logged as confirmed); the paths that l
 registrations or receipts by id — checkout, confirmation, revert, desk collection and reversal —
 lock them in id order, so two of them cannot wait on each other (the bulk updates — expiry at a
 close, at graduation and at an entry deadline, approve and reject — lock in scan order; a deadlock
-there is detected and one side fails and is retried); a new audit action,
+there is detected and one side fails and is retried; since SO-1 the three expiries lock in id
+order too, §8); a new audit action,
 `REMARK_PAYMENT_CONFIRMED`, records the remark's move; refusals that are conflicts now answer 409
 (a remark with a payment in progress, a school fee already in progress); an approval outside the
 window now reads "Registration window is not open" (still 400). `09` gains two rules: an open
@@ -281,7 +282,10 @@ the connection address and user agent, as an app confirmation always did.
 
 **Found on the way: ST-14** (§4) — the receipt scenario voided a paid subject's receipt, which
 `09`'s MA-20 rule caught; the service allowed it. SO-8 (§5) is the desk question it leaves. The
-guard locks the receipt, then its registration, the order every other receipt path takes.
+guard locks the receipt, then its registration, the order a drop, a return and a reversal take;
+cancelling a preregistration and its refund at the deadline lock the registration first, so a
+void racing one of them on the same paid preregistration can deadlock (Postgres aborts one side;
+the void would be refused anyway).
 
 **Also fixed on the way:** the entry-deadline sweep stopped at the first session whose expiry or
 preregistration refunds failed, skipping every later session in that tick; each step is now tried
