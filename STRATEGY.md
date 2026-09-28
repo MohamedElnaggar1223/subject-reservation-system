@@ -207,12 +207,13 @@ before it ships.
    checklist.
    Next: **state and time** (Phase 1.3).
 3. **Discovery research pack** in parallel with 1 and 2. **Import spike done 28 Sep**
-   (`IMPORT_SPIKE.md`): the school's sheet through the API — 196 of 220 November 2026 rows and
-   396 of 434 June 2023 rows went in. It evidences three of the four planned model changes
-   (paper-level units, sections, multi-series windows), adds two (carried-forward AS results,
-   self-study on any subject at an attempt-dependent rate), and shows the day-one import must
-   be a review workflow with the money record (F-01) behind it. Five sharpened questions for
-   the coordinator are in its §3.
+   (`IMPORT_SPIKE.md`, reviewed on Opus 5.5): the school's sheet through the API — 199 of 220
+   November 2026 rows and 399 of 434 June 2023 rows went in. It evidences three of the four
+   planned model changes (paper-level units, sections, multi-series windows), shows the
+   day-one import must be a review workflow with the money record (F-01) behind it, and
+   leaves three things for the coordinator before anything is built: carry forward, self-study
+   on subjects the school teaches, and which board each unit is entered with. The questions
+   are in its §3.
 4. **Housekeeping the audits already named.** Done on 27 Sep 2026: the suite is kept off third
    parties, CI runs the gates, `render.yaml` (another project's blueprint) and the template
    setup script are deleted, the template todo and documents screens are removed, stale

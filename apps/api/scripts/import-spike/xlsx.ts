@@ -52,9 +52,12 @@ export function readWorkbook(path: string): { name: string; rows: string[][] }[]
   return [...part('xl/workbook.xml').matchAll(/<sheet [^>]*name="([^"]+)"[^>]*r:id="([^"]+)"/g)].map((m) => {
     const target = rels.get(m[2]!)!;
     const xml = part(target.startsWith('xl/') ? target : `xl/${target}`);
-    const rows = [...xml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)].map((row) => {
+    // Each row sits at its own row number (r="…"), so blank rows Excel leaves
+    // out of the XML still count, and a report's row numbers match the sheet.
+    const rows: string[][] = [];
+    for (const row of xml.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
       const cells: string[] = [];
-      for (const c of row[1]!.matchAll(/<c ([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+      for (const c of (row[2] ?? '').matchAll(/<c ([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
         const attrs = c[1]!;
         const ref = /r="([A-Z]+\d+)"/.exec(attrs)?.[1];
         if (!ref) continue;
@@ -65,8 +68,9 @@ export function readWorkbook(path: string): { name: string; rows: string[][] }[]
           type === 'inlineStr' ? textOf(c[2] ?? '') :
           unescape(v ?? '');
       }
-      return Array.from(cells, (x) => x ?? '');
-    });
-    return { name: unescape(m[1]!), rows };
+      const at = Number(/\br="(\d+)"/.exec(row[1]!)?.[1] ?? rows.length + 1) - 1;
+      rows[at] = Array.from(cells, (x) => x ?? '');
+    }
+    return { name: unescape(m[1]!), rows: Array.from(rows, (r) => r ?? []) };
   });
 }

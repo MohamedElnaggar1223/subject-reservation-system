@@ -28,6 +28,9 @@ const file = args.find((a, i) => !a.startsWith('--') && !args[i - 1]?.startsWith
 if (!file) throw new Error('Usage: import-spike.ts <sheet.xlsx> [--tab <name>] [--out <report.md>]');
 const tabName = option('--tab') ?? '2024';
 const outPath = option('--out') ?? '/tmp/import-spike-report.md';
+// The database holds the sheet's real families under a known password: dropped at
+// the end of the run unless --keep is given for inspection.
+const keep = args.includes('--keep');
 
 process.env.TEST_DB_NAME = 'igcse_spike_test';
 const { TEST_DB_NAME, TEST_DATABASE_URL, TEST_PG_ADMIN_URL } = await import('../../test/env');
@@ -136,6 +139,16 @@ const LEVEL: Record<string, 'igcse' | 'as_level' | 'a_level'> = {
   'A.S./A.2.': 'a_level', 'A.S./A.L.': 'a_level', 'A.S.A.L.': 'a_level',
 };
 const LEVEL_NAME = { igcse: 'IGCSE', as_level: 'AS', a_level: 'A Level' } as const;
+const unitPattern = /\((?:P\d|M\d|S\d|Paper [\d &]+|Paper \d+)\)|\bPaper \d/i;
+/** Edit distance, to tell a respelled first name from a different child. */
+function distance(a: string, b: string): number {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)] as number[]);
+  for (let j = 1; j <= b.length; j++) d[0]![j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+    d[i]![j] = Math.min(d[i - 1]![j]! + 1, d[i]![j - 1]! + 1, d[i - 1]![j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+  }
+  return d[a.length]![b.length]!;
+}
 function phone(raw: string): string | null {
   const digits = raw.replace(/\D/g, '');
   if (/^01\d{9}$/.test(digits)) return digits;
@@ -166,6 +179,11 @@ for (const r of body) {
   const specRaw = cell(r, col.spec);
   const rawStudentPhone = cell(r, col.studentPhone);
   const rawParentPhone = cell(r, col.parentPhone);
+  // Read the free-text answers from wherever they sit: rows drift between the
+  // confirmation and fee-note columns (review of 48ce5be).
+  const rowTexts = unlabeled.map((i) => cell(r, i));
+  const feeText = rowTexts.find((v) => /school fees|refund \d+%|self study/i.test(v)) ?? '';
+  const confirmText = rowTexts.find((v) => /confirm my registration|drop the course/i.test(v)) ?? '';
   const row: Row = {
     row: r.row,
     name: cell(r, col.name),
@@ -181,11 +199,13 @@ for (const r of body) {
     parentName: cell(r, col.parentName),
     parentEmail: cell(r, col.parentEmail).toLowerCase(),
     parentPhone: phone(rawParentPhone),
-    confirm: cell(r, col.confirm),
-    selfStudy: /^yes$/i.test(cell(r, col.selfStudy)) || /self study/i.test(cell(r, col.feeNote)),
-    feeNote: cell(r, col.feeNote),
+    confirm: confirmText,
+    selfStudy: /^yes$/i.test(cell(r, col.selfStudy)) || /self study/i.test(feeText),
+    feeNote: feeText,
   };
-  if (/confirm my registration|drop the course/i.test(row.feeNote)) note('column-drift', 'Columns shifted on a row', 'A row whose values sit one column over (the confirmation text in the fee column): the form changed shape mid-collection. Read by position, it imports wrong.', r.row);
+  if ((feeText && col.feeNote >= 0 && cell(r, col.feeNote) !== feeText) || (confirmText && col.confirm >= 0 && cell(r, col.confirm) !== confirmText)) {
+    note('column-drift', 'Values in the wrong column', 'The confirmation or the fee note sits in the other one\'s column: the form changed shape mid-collection. Read by column, the row imports wrong (this script reads both texts from anywhere in the row).', r.row);
+  }
   const signature = cell(r, col.signature);
   if (/carry forward/i.test(signature)) note('carry-forward', '"Carry forward" in the Signature column', 'A result or payment carried from an earlier series (Q-02); the model has no carried-forward entry, so the row imports as a new registration.', r.row);
   else if (signature) note('signature', 'A staff name in the Signature column', 'Who signed and what the signature means is open (Q-03); not imported.', r.row);
@@ -203,8 +223,13 @@ for (const r of body) {
   if (r.cells[col.name] && r.cells[col.name] !== row.name) note('name-whitespace', 'Names needed trimming', 'Trailing or non-breaking spaces and doubled spaces; normalised on import.', r.row);
   if (!m) note('class-unreadable', 'Class & Grade not in the form "11A"', 'Grade and section cannot be read; the student is imported with no grade.', r.row);
   if (!row.level) note('level-unknown', 'Specification not recognised', `Values outside O.L./A.S./A.2./A.L.: the row cannot be placed in a session.`, r.row);
-  if (specRaw === 'A.2.') note('level-a2', 'A.2. (the second A-Level year) has no level of its own', 'The model has igcse, as_level and a_level; A2 is imported as a_level, so an A2 entry and a full A Level look the same.', r.row);
-  if (/^A\.S\.\/?A\.[2L]\.$/.test(specRaw)) note('level-combined', 'AS and A2 sat in one series ("A.S./A.2.")', 'One row stands for two entries (the AS units and the A2 units) at two levels; imported as one a_level registration.', r.row);
+  if (specRaw !== 'O.L.' && specRaw !== 'A.S.' && row.level) {
+    note(`level-code:${specRaw}`, `Level code "${specRaw}"`, specRaw === 'A.2.'
+      ? 'The second A-Level year alone; the model has igcse, as_level and a_level, so it is imported as a_level and looks like a full A Level.'
+      : specRaw === 'A.L.' ? 'A Level (this tab\'s code; the 2026 tab uses A.2. and A.S./A.2. instead); imported as a_level. Whether A.L. and A.2. mean the same is a question for the coordinator.'
+      : 'Names both AS and A Level on one row; imported as a_level. What it marks (the student\'s year, or what the unit counts toward) is a question for the coordinator.', r.row);
+    if (/\((?:P|M|S)\d\)/.test(row.subject) && specRaw !== 'A.2.') note('level-code-on-unit', 'A combined AS/A-Level code on a single unit (P1–P4, M1, S1)', 'A single unit cannot be two entries at two levels, so the code must mean something else — the student\'s year, or the qualifications the unit counts toward.', r.row);
+  }
   if (!row.series) note('series-missing', 'No readable exam series', 'The series column is empty or not a date; the row cannot be placed in a session.', r.row);
   if (rawStudentPhone && !row.studentPhone) note('phone-student', 'Student phone unusable', 'Not an Egyptian mobile after normalising; imported without a phone.', r.row);
   if (rawParentPhone && !row.parentPhone) note('phone-parent', 'Parent phone unusable', 'Not an Egyptian mobile after normalising; imported without a phone.', r.row);
@@ -235,10 +260,16 @@ for (const r of rows) {
   if (r.parentName) p.names.add(r.parentName.toLowerCase()); if (r.parentPhone) p.phones.add(r.parentPhone); p.children.add(r.studentEmail);
   parents.set(r.parentEmail, p);
 }
+const sharedEmails = new Set<string>();
 for (const s of students.values()) {
   const first = s.rows[0]!.row;
-  const firstNames = new Set([...s.names].map((n) => n.split(' ')[0]));
-  if (firstNames.size > 1) note('student-email-siblings', 'Two children under one student email', 'Siblings sharing an email become one student account: one child\'s registrations land on the other. The desk needs a separate email, or the import a key other than email.', first);
+  // Two children: the email spans two classes with different first names, or
+  // the first names differ by more than a respelling.
+  const firstNames = [...new Set([...s.names].map((n) => n.split(' ')[0]!))];
+  const differentChild = firstNames.some((a, i) => firstNames.slice(i + 1).some((b) => distance(a, b) > 2));
+  const twoChildren = firstNames.length > 1 && (s.sections.size > 1 || differentChild);
+  if (twoChildren) sharedEmails.add(s.email);
+  if (twoChildren) note('student-email-siblings', 'Two children under one student email', 'Siblings sharing an email become one student account: one child\'s registrations land on the other. The desk needs a separate email, or the import a key other than email.', first);
   else if (s.names.size > 1) note('student-name-variants', 'One student email, several spellings of the name', 'The first spelling is kept; the others are lost.', first);
   if (s.grades.size > 1 || s.sections.size > 1) note('student-class-conflict', 'One student in two classes', 'The first class is kept.', first);
   if (s.phones.size > 1) note('student-phone-conflict', 'One student, several phones', 'The first phone is kept.', first);
@@ -247,7 +278,12 @@ for (const s of students.values()) {
 }
 const byName = new Map<string, Set<string>>();
 for (const s of students.values()) for (const n of s.names) byName.set(n, (byName.get(n) ?? new Set()).add(s.email));
-for (const [, emails] of byName) if (emails.size > 1) note('student-same-name', 'Two student emails under the same name', 'Kept as two students; they may be one child with two emails, or namesakes.', students.get([...emails][0]!)!.rows[0]!.row);
+for (const [, emails] of byName) {
+  if (emails.size < 2) continue;
+  const row = students.get([...emails][0]!)!.rows[0]!.row;
+  if ([...emails].some((e) => sharedEmails.has(e))) note('student-misfiled', 'A child\'s rows under a sibling\'s email as well as their own', 'The same name appears under the child\'s own email and under a sibling\'s: rows filed under the wrong child. Matching on name and parent email in a review step resolves most of these.', row);
+  else note('student-same-name', 'Two student emails under the same name', 'Kept as two students; they may be one child with two emails, or namesakes.', row);
+}
 for (const p of parents.values()) {
   if (p.names.size > 1) note('parent-name-variants', 'One parent email, several spellings of the name', 'The first spelling is kept.', rows.find((r) => r.parentEmail === p.email)!.row);
   if (p.names.size === 0) note('parent-name-missing', 'No parent name', 'The account is named after the email.', rows.find((r) => r.parentEmail === p.email)!.row);
@@ -262,15 +298,18 @@ await apiResponse(adm.v1.users.$post({ json: { name: 'Spike Officer', email: 'of
 const officer = await signIn('officer@spike.local');
 
 const catalogue = new Map<string, string>(); // `${level}|${subject}` → subject id
-const unitPattern = /\((?:P\d|M\d|S\d|Paper [\d &]+|Paper \d+)\)|\bPaper \d/i;
+// A subject nobody takes in school is created as not taught there, so the
+// model's own rule (outside school when not offered) applies to it.
+const taughtAtSchool = new Set(rows.filter((r) => r.level && !r.selfStudy).map((r) => `${r.level}|${r.subject}`));
 let code = 0;
 for (const r of rows) {
   if (!r.level || !r.subject) continue;
   const key = `${r.level}|${r.subject}`;
   if (catalogue.has(key)) continue;
+  if (!taughtAtSchool.has(key)) note('subject-never-in-school', 'A subject with no in-school row', 'Every row for it is self-study; created as not taught at school, so outside-school study is allowed for it.', r.row);
   if (unitPattern.test(r.subject)) note('unit-as-subject', 'A-Level units and papers registered one by one', 'Each unit (P1, M1, S1, a Biology paper) becomes its own catalogue subject at its own price; nothing ties P1 and P2 to "AS Mathematics".', r.row);
   const created = await attempt<{ id: string }>(adm.v1.subjects.$post({
-    json: { name: `${r.subject} (${LEVEL_NAME[r.level]})`, code: `SPK-${r.level}-${++code}`, council: 'cambridge', courseFee: 0, registrationFee: 0, qualificationLevel: r.level, isOfferedAtSchool: true, isCore: false },
+    json: { name: `${r.subject} (${LEVEL_NAME[r.level]})`, code: `SPK-${r.level}-${++code}`, council: 'cambridge', courseFee: 0, registrationFee: 0, qualificationLevel: r.level, isOfferedAtSchool: taughtAtSchool.has(key), isCore: false },
   }));
   if (!created.ok) { note('subject-refused', 'Subject refused by the catalogue', created.error, r.row); continue; }
   catalogue.set(key, created.data.id);
@@ -408,4 +447,12 @@ for (const f of [...findings.values()].sort((a, b) => b.count - a.count)) {
 writeFileSync(outPath, lines.join('\n') + '\n');
 console.log(`[spike] ${rows.length} rows → ${readBack.registrations} registrations, ${readBack.students} students, ${readBack.parents} parents; ${findings.size} kinds of finding. Report: ${outPath}`);
 await (db as unknown as { $client: { end(): Promise<void> } }).$client.end();
+if (!keep) {
+  const { default: pg } = await import('pg');
+  const maintenance = new pg.Client({ connectionString: TEST_PG_ADMIN_URL });
+  await maintenance.connect();
+  await maintenance.query(`DROP DATABASE IF EXISTS ${TEST_DB_NAME}`);
+  await maintenance.end();
+  console.log(`[spike] dropped ${TEST_DB_NAME} (pass --keep to inspect it)`);
+}
 process.exit(0);
