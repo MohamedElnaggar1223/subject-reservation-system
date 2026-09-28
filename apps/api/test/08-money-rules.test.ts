@@ -3,7 +3,7 @@ import { apiResponse } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, notified, notificationsFor, money, audited,
   takings, takingsOn, takingsDelta, openWindow, futureWindow, localToday, localYesterday, waitFor, runPaymentDeadlines, runSessionScheduler,
-  type Client,
+  expireByHand, type Client,
 } from './helpers';
 
 /**
@@ -272,7 +272,7 @@ describe('money rules', () => {
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({
         json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 },
       }))).id!;
-      await sql(`update registration set status = 'expired' where id = $1`, [reg]);
+      await expireByHand(reg);
       const r = await refused(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: pay }, json: { reference: 'FT-MR-TOO-LATE' } }));
       expect(r).toEqual({ status: 400, error: 'The registration window has closed for this payment; it can no longer take a transfer reference.' });
       // Leave nothing open for the invariants: the family cancels it.

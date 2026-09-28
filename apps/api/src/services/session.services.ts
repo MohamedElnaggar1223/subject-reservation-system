@@ -21,7 +21,7 @@ import { capturePreregistrationsForSession } from './prereg.services';
 import { notifySessionOpened, createNotification, notifyPaymentReferenceDue } from './notification.services';
 import { failPayment, closeStrandedPayments } from './payment.services';
 import { schoolDate } from './window.services';
-import { logAction, type AuditContext } from './audit.services';
+import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 import { env } from '../env';
 import { randomUUID } from 'crypto';
 import type {
@@ -483,29 +483,34 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   // students whose swap-generated pending_payment expires must know their
   // new subject didn't go through — even though they still have the escrow
   // credit from the original drop).
-  const expiredRegs = await db
-    .update(registration)
-    .set({
-      status: 'expired',
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(registration.sessionId, sessionId),
-        inArray(registration.status, ['pending_approval', 'pending_payment']),
-        lte(registration.createdAt, closedAt),
-        sql`not exists (
-          select 1 from ${paymentRegistration} pr join ${payment} p on p.id = pr.payment_id
-          where pr.registration_id = ${registration.id}
-            and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
-        )`,
+  // Each expired row and its audit row commit together (SO-1).
+  const expiredRegs = await db.transaction(async (tx) => {
+    const rows = await tx
+      .update(registration)
+      .set({
+        status: 'expired',
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(registration.sessionId, sessionId),
+          inArray(registration.status, ['pending_approval', 'pending_payment']),
+          lte(registration.createdAt, closedAt),
+          sql`not exists (
+            select 1 from ${paymentRegistration} pr join ${payment} p on p.id = pr.payment_id
+            where pr.registration_id = ${registration.id}
+              and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
+          )`,
+        )
       )
-    )
-    .returning({
-      id: registration.id,
-      studentId: registration.studentId,
-      subjectId: registration.subjectId,
-    });
+      .returning({
+        id: registration.id,
+        studentId: registration.studentId,
+        subjectId: registration.subjectId,
+      });
+    await logActions(expiryEntries(rows, ['pending_approval', 'pending_payment'], 'session_closed'), tx);
+    return rows;
+  });
 
   // 3. Reject all pending_approval change requests for registrations in this session
   // First, get all registration IDs belonging to this session
@@ -517,21 +522,28 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
 
   let rejectedCRs: { id: string }[] = [];
   if (sessionRegIds.length > 0) {
-    rejectedCRs = await db
-      .update(changeRequest)
-      .set({
-        status: 'rejected',
-        comments: '[SYSTEM] Automatically rejected — registration session closed.',
-        processedAt: now,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          inArray(changeRequest.registrationId, sessionRegIds),
-          eq(changeRequest.status, 'pending_approval'),
+    rejectedCRs = await db.transaction(async (tx) => {
+      const rows = await tx
+        .update(changeRequest)
+        .set({
+          status: 'rejected',
+          comments: '[SYSTEM] Automatically rejected — registration session closed.',
+          processedAt: now,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            inArray(changeRequest.registrationId, sessionRegIds),
+            eq(changeRequest.status, 'pending_approval'),
+          )
         )
-      )
-      .returning({ id: changeRequest.id });
+        .returning({ id: changeRequest.id });
+      await logActions(rows.map((r) => ({
+        userId: null, action: 'CHANGE_REQUEST_REJECTED' as const, entityType: 'change_request' as const, entityId: r.id,
+        previousData: { status: 'pending_approval' }, newData: { status: 'rejected', reason: 'session_closed' },
+      })), tx);
+      return rows;
+    });
   }
 
   // 4. A checkout started while the close ran can still be 'pending' on a

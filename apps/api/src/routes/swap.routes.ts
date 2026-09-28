@@ -132,9 +132,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const result = await swapService.executeDirectDrop(id, data, user.id);
-        await logAction(user.id, 'DIRECT_DROP_EXECUTED', 'registration', id, null, result as Record<string, unknown>, extractAuditContext(c))
-          .catch((err) => console.error('[audit] DIRECT_DROP_EXECUTED failed:', err));
+        const result = await swapService.executeDirectDrop(id, data, user.id, extractAuditContext(c));
         return success(c, result);
       } catch (err) {
         const message = clientMessage(err, 'Failed to drop registration');
@@ -162,9 +160,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const result = await swapService.executeDirectSwap(id, data, user.id);
-        await logAction(user.id, 'DIRECT_SWAP_EXECUTED', 'registration', id, null, result as Record<string, unknown>, extractAuditContext(c))
-          .catch((err) => console.error('[audit] DIRECT_SWAP_EXECUTED failed:', err));
+        const result = await swapService.executeDirectSwap(id, data, user.id, extractAuditContext(c));
         return success(c, result);
       } catch (err) {
         const message = clientMessage(err, 'Failed to swap registration');
@@ -257,10 +253,7 @@ export const changeRequestRoutes = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const result = await swapService.approveChangeRequest(id, data, user.id);
-
-        await logAction(user.id, 'CHANGE_REQUEST_APPROVED', 'change_request', id, null, result as Record<string, unknown>, extractAuditContext(c))
-          .catch((err) => console.error('[audit] CHANGE_REQUEST_APPROVED failed:', err));
+        const result = await swapService.approveChangeRequest(id, data, user.id, extractAuditContext(c));
 
         return success(c, result);
       } catch (err) {

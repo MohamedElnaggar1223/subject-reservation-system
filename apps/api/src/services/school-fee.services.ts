@@ -13,6 +13,7 @@
 
 import { db, payment, schoolFeeSchedule, eq } from '@repo/db';
 import { hasFeeWaiver } from './exception.services';
+import { logAction, type AuditContext } from './audit.services';
 import { randomUUID } from 'crypto';
 import type {
   CreateSchoolFeeScheduleType,
@@ -215,7 +216,8 @@ export async function initiateSchoolFeePayment(
   parentId: string,
   studentId: string,
   paymentMethod: 'in_school' | 'instapay',
-  schoolAccountDetails: Record<string, unknown>
+  schoolAccountDetails: Record<string, unknown>,
+  auditCtx?: AuditContext
 ) {
   const link = await db.query.parentStudentLink.findFirst({
     where: (l, { eq, and }) =>
@@ -270,29 +272,33 @@ export async function initiateSchoolFeePayment(
     };
   }
 
-  const [created] = await db
-    .insert(payment)
-    .values({
-      id: paymentId,
-      studentId,
-      parentId,
-      amount: fee.amount,
-      escrowAmountApplied: 0,
-      paymentMethod,
-      purpose: 'school_fee',
-      academicYear,
-      status: 'pending',
-      externalReference,
-      metadata,
-    })
-    .returning()
-    .catch((err) => {
-      // One open or paid school fee per student and year (state audit ST-02).
-      if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') {
-        throw new Error('A school-fee payment is already pending for this student');
-      }
-      throw err;
-    });
-
-  return created;
+  return db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(payment)
+      .values({
+        id: paymentId,
+        studentId,
+        parentId,
+        amount: fee.amount,
+        escrowAmountApplied: 0,
+        paymentMethod,
+        purpose: 'school_fee',
+        academicYear,
+        status: 'pending',
+        externalReference,
+        metadata,
+      })
+      .returning()
+      .catch((err) => {
+        // One open or paid school fee per student and year (state audit ST-02).
+        if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') {
+          throw new Error('A school-fee payment is already pending for this student');
+        }
+        throw err;
+      });
+    // The payment and its audit row commit together (MO-1).
+    await logAction(parentId, 'SCHOOL_FEE_PAYMENT_INITIATED', 'payment', paymentId, null,
+      created as Record<string, unknown>, auditCtx, tx);
+    return created;
+  });
 }

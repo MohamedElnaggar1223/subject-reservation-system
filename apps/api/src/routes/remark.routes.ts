@@ -194,9 +194,7 @@ export const remarks = new Hono<HonoEnv>()
     const { id } = c.req.valid('param');
     const { paymentMethod } = c.req.valid('json');
     try {
-      const created = await remarkService.initiateRemarkPayment(id, user.id, paymentMethod, schoolAccountDetails());
-      await logAction(user.id, 'REMARK_PAYMENT_INITIATED', 'remark_request', id, null, { paymentMethod }, extractAuditContext(c))
-        .catch((err) => console.error('[audit] REMARK_PAYMENT_INITIATED failed:', err));
+      const created = await remarkService.initiateRemarkPayment(id, user.id, paymentMethod, schoolAccountDetails(), extractAuditContext(c));
       return success(c, created, 201);
     } catch (err) {
       const message = clientMessage(err, 'Failed to initiate payment');
@@ -224,9 +222,7 @@ export const remarks = new Hono<HonoEnv>()
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
     try {
-      const result = await remarkService.recordOutcome(id, user.id, data);
-      await logAction(user.id, 'REMARK_OUTCOME_RECORDED', 'remark_request', id, null, { ...data, refunded: result.refunded } as unknown as Record<string, unknown>, extractAuditContext(c))
-        .catch((err) => console.error('[audit] REMARK_OUTCOME_RECORDED failed:', err));
+      const result = await remarkService.recordOutcome(id, user.id, data, extractAuditContext(c));
       return success(c, result);
     } catch (err) {
       const message = clientMessage(err, 'Failed to record outcome');

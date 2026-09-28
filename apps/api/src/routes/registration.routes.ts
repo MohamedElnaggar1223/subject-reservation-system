@@ -344,11 +344,7 @@ export const registrations = new Hono<HonoEnv>()
       const user = c.get('user')!;
       const data = c.req.valid('json');
       try {
-        const result = await deskService.executeDeskRegistration(user.id, data);
-        await logAction(user.id, 'DESK_REGISTRATION', 'registration', data.studentId, null, {
-          subjects: data.subjectIds.length, collected: result.collected,
-        }, extractAuditContext(c))
-          .catch((err) => console.error('[audit] DESK_REGISTRATION failed:', err));
+        const result = await deskService.executeDeskRegistration(user.id, data, extractAuditContext(c));
         return success(c, result, 201);
       } catch (err) {
         const message = clientMessage(err, 'Failed to process desk registration');
@@ -433,9 +429,7 @@ export const registrations = new Hono<HonoEnv>()
       const { id } = c.req.valid('param');
 
       try {
-        const result = await preregService.cancelPreregistration(id, user.id);
-        await logAction(user.id, 'PREREG_CANCELLED', 'registration', id, null, result as Record<string, unknown>, extractAuditContext(c))
-          .catch((err) => console.error('[audit] PREREG_CANCELLED failed:', err));
+        const result = await preregService.cancelPreregistration(id, user.id, extractAuditContext(c));
         return success(c, result);
       } catch (err) {
         const message = clientMessage(err, 'Failed to cancel preregistration');

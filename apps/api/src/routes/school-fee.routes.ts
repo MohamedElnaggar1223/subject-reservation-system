@@ -131,9 +131,7 @@ export const schoolFees = new Hono<HonoEnv>()
     const user = c.get('user')!;
     const data = c.req.valid('json');
     try {
-      const result = await collectSchoolFeeAtDesk(user.id, data.studentId, data.instrumentUsed, data.notes, data.academicYear);
-      await logAction(user.id, 'DESK_SCHOOL_FEE_COLLECTED', 'payment', result.paymentId, null, result as Record<string, unknown>, extractAuditContext(c))
-        .catch((err) => console.error('[audit] DESK_SCHOOL_FEE_COLLECTED failed:', err));
+      const result = await collectSchoolFeeAtDesk(user.id, data.studentId, data.instrumentUsed, data.notes, data.academicYear, extractAuditContext(c));
       return success(c, result, 201);
     } catch (err) {
       const message = clientMessage(err, 'Failed to collect school fee');
@@ -155,10 +153,9 @@ export const schoolFees = new Hono<HonoEnv>()
         user.id,
         data.studentId,
         data.paymentMethod,
-        schoolAccountDetails()
+        schoolAccountDetails(),
+        extractAuditContext(c)
       );
-      await logAction(user.id, 'SCHOOL_FEE_PAYMENT_INITIATED', 'payment', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
-        .catch((err) => console.error('[audit] SCHOOL_FEE_PAYMENT_INITIATED failed:', err));
       return success(c, created, 201);
     } catch (err) {
       const message = clientMessage(err, 'Failed to initiate payment');

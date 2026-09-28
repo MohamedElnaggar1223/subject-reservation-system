@@ -41,7 +41,11 @@ describe('money invariants over the whole database', () => {
         (select count(*) from payment where purpose = 'remark' and status = 'completed')  as remark_fees_confirmed,
         (select count(*) from escrow_transaction where reason = 'late_transfer_undone')   as late_transfers_undone,
         (select count(*) from audit_log where action = 'PREREG_REFUNDED_AT_DEADLINE')     as prereg_refunded_at_deadline,
-        (select count(*) from registration where status = 'dropped_pending_receipt' or status = 'dropped') as drops
+        (select count(*) from registration where status = 'dropped_pending_receipt' or status = 'dropped') as drops,
+        (select count(*) from registration where status = 'expired')                     as expired_registrations,
+        (select count(*) from escrow_transaction where reason = 'prereg_capture')        as held_captures,
+        (select count(*) from escrow_transaction where reason = 'transfer_out')          as escrow_transfers,
+        (select count(*) from receipt where status = 'lost')                             as receipts_lost
     `);
     for (const [kind, n] of Object.entries(counts!)) expect(Number(n), kind).toBeGreaterThan(0);
   });
@@ -269,6 +273,78 @@ describe('money invariants over the whole database', () => {
       from withdrawal_request w join withdrawal_disbursement d on d.withdrawal_request_id = w.id
       where w.approved_by is not null
       group by w.id having max(d.disbursed_at) > w.approved_at
+    `);
+    expect(broken).toEqual([]);
+  });
+
+  it('every payment has exactly one audit row for its creation, whichever path made it (SO-1)', async () => {
+    // The desk's registration names its payment in the row's data; every other
+    // path writes the row against the payment itself.
+    const broken = await sql(`
+      select p.id, p.purpose, p.metadata->>'desk' as desk, count(a.id) as rows
+      from payment p
+      left join audit_log a on (a.entity_id = p.id or a.new_data->>'paymentId' = p.id)
+        and a.action in ('PAYMENT_INITIATED', 'SCHOOL_FEE_PAYMENT_INITIATED', 'DESK_SCHOOL_FEE_COLLECTED', 'REMARK_PAYMENT_INITIATED', 'DESK_REGISTRATION')
+      group by p.id having count(a.id) <> 1
+    `);
+    expect(broken).toEqual([]);
+  });
+
+  it('every expired registration has exactly one audit row saying why (SO-1)', async () => {
+    const broken = await sql(`
+      select r.id, count(a.id) as rows
+      from registration r
+      left join audit_log a on a.entity_id = r.id and a.action = 'REGISTRATION_EXPIRED'
+      where r.status = 'expired'
+      group by r.id having count(a.id) <> 1
+    `);
+    expect(broken).toEqual([]);
+  });
+
+  it('every capture of held money, escrow transfer and refund request has its audit row, for the same amount (SO-1)', async () => {
+    const captures = await sql(`
+      select t.related_registration_id, t.amount
+      from escrow_transaction t
+      where t.reason = 'prereg_capture' and not exists (
+        select 1 from audit_log a where a.action = 'PREREG_CAPTURED' and a.entity_id = t.related_registration_id
+          and ${cents(`(a.new_data->>'heldCaptured')::numeric`)} = ${cents('t.amount')})
+    `);
+    expect(captures).toEqual([]);
+    // A transfer writes two ledger rows and one audit row, against the source.
+    const transfers = await sql(`
+      with ledger as (
+        select e.student_id, count(*) as n, ${cents('sum(t.amount)')} as total
+        from escrow_transaction t join escrow e on e.id = t.escrow_id
+        where t.reason = 'transfer_out' group by e.student_id
+      ), audited as (
+        select entity_id as student_id, count(*) as n, ${cents(`sum((new_data->>'amount')::numeric)`)} as total
+        from audit_log where action = 'ESCROW_TRANSFER' group by entity_id
+      )
+      select coalesce(l.student_id, a.student_id) as student_id, l.n as ledger_rows, a.n as audit_rows, l.total as ledger_cents, a.total as audit_cents
+      from ledger l full join audited a on a.student_id = l.student_id
+      where l.n is distinct from a.n or l.total is distinct from a.total
+    `);
+    expect(transfers).toEqual([]);
+    const requests = await sql(`
+      select w.id, count(a.id) as rows
+      from withdrawal_request w
+      left join audit_log a on a.entity_id = w.id and a.action = 'WITHDRAWAL_REQUESTED'
+      group by w.id having count(a.id) <> 1
+    `);
+    expect(requests).toEqual([]);
+  });
+
+  it('every paper receipt handed over, brought back or written off as lost has exactly one audit row for it (SO-1)', async () => {
+    // Void is left out: a reversal voids receipts and records them in its own row.
+    const broken = await sql(`
+      select r.id, r.status,
+             (select count(*) from audit_log a where a.entity_id = r.id and a.action = 'RECEIPT_ISSUED') as issued,
+             (select count(*) from audit_log a where a.entity_id = r.id and a.action = 'RECEIPT_RETURNED') as returned,
+             (select count(*) from audit_log a where a.entity_id = r.id and a.action = 'RECEIPT_LOST') as lost
+      from receipt r
+      where (r.issued_at is not null) <> ((select count(*) from audit_log a where a.entity_id = r.id and a.action = 'RECEIPT_ISSUED') = 1)
+         or (r.status = 'returned') <> ((select count(*) from audit_log a where a.entity_id = r.id and a.action = 'RECEIPT_RETURNED') = 1)
+         or (r.status = 'lost') <> ((select count(*) from audit_log a where a.entity_id = r.id and a.action = 'RECEIPT_LOST') = 1)
     `);
     expect(broken).toEqual([]);
   });

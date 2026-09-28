@@ -57,7 +57,7 @@ import {
   creditEscrow,
   debitEscrow,
 } from './escrow.services';
-import { logAction, type AuditContext } from './audit.services';
+import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 import { sessionOpenFor, sessionWindow, entryDeadlineMessage, schoolDateTime } from './window.services';
 import {
   notifyPaymentConfirmed,
@@ -139,7 +139,8 @@ async function validateParentStudentLink(
  */
 export async function initiatePayment(
   parentId: string,
-  data: InitiatePaymentType
+  data: InitiatePaymentType,
+  auditCtx?: AuditContext
 ) {
   // Load registrations
   const regs = await db.query.registration.findMany({
@@ -359,6 +360,10 @@ export async function initiatePayment(
     }));
     await tx.insert(paymentRegistration).values(paymentRegRecords);
 
+    // The escrow debit and its audit row commit together (MO-1).
+    await logAction(parentId, 'PAYMENT_INITIATED', 'payment', paymentId, null,
+      { ...paymentRecord, registrationIds: data.registrationIds }, auditCtx, tx);
+
     return paymentRecord;
   });
 
@@ -384,7 +389,9 @@ export async function initiatePayment(
       paymentId,
       parentId,
       undefined,
-      'Auto-confirmed: fully paid from escrow'
+      'Auto-confirmed: fully paid from escrow',
+      undefined,
+      auditCtx
     );
     if (confirmed) {
       return { ...confirmed, metadata: { ...metadata, fullyEscrowFunded: true } };
@@ -721,6 +728,7 @@ async function failOpenPayment(
       }
     }
     const registrationsExpired = expired.length;
+    await logActions(expiryEntries(expired, 'pending_payment', 'checkout_failed'), tx);
 
     await logAction(opts.actorId, opts.action, 'payment', paymentId, { status: pay.status },
       { status: 'failed', reason: opts.reason, escrowReturned: pay.escrowAmountApplied, registrationsExpired }, opts.auditCtx, tx);
@@ -1187,11 +1195,15 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
 
     // Anything else still waiting on this series can never be entered now;
     // each student is told which subjects, as at the close.
-    const expired = await db
-      .update(registration)
-      .set({ status: 'expired', updatedAt: now })
-      .where(and(eq(registration.sessionId, s.id), inArray(registration.status, ['pending_approval', 'pending_payment'])))
-      .returning({ id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId });
+    const expired = await db.transaction(async (tx) => {
+      const rows = await tx
+        .update(registration)
+        .set({ status: 'expired', updatedAt: now })
+        .where(and(eq(registration.sessionId, s.id), inArray(registration.status, ['pending_approval', 'pending_payment'])))
+        .returning({ id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId });
+      await logActions(expiryEntries(rows, ['pending_approval', 'pending_payment'], 'entry_deadline'), tx);
+      return rows;
+    });
     registrationsExpiredAtDeadline += expired.length;
     if (expired.length > 0) {
       await notifyRegistrationsExpiredAtEntryDeadline(s.id, s.entryDeadline!, expired)
@@ -1282,7 +1294,8 @@ export async function getPayments(filters: ListPaymentsQueryType & {
 export async function submitInstapayReference(
   paymentId: string,
   parentId: string,
-  data: SubmitInstapayReferenceType
+  data: SubmitInstapayReferenceType,
+  auditCtx?: AuditContext
 ) {
   const pay = await db.query.payment.findFirst({
     where: (p, { eq }) => eq(p.id, paymentId),
@@ -1334,21 +1347,26 @@ export async function submitInstapayReference(
   if (setAside) throw new Error(duplicateReference);
 
   try {
-    const [updated] = await db
-      .update(payment)
-      .set({
-        verificationReference: data.reference,
-        verificationFileId: data.screenshotFileId ?? null,
-        status: 'pending_verification',
-        updatedAt: new Date(),
-      })
-      .where(and(eq(payment.id, paymentId), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])))
-      .returning();
+    return await db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(payment)
+        .set({
+          verificationReference: data.reference,
+          verificationFileId: data.screenshotFileId ?? null,
+          status: 'pending_verification',
+          updatedAt: new Date(),
+        })
+        .where(and(eq(payment.id, paymentId), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])))
+        .returning();
 
-    if (!updated) {
-      throw new Error('Payment was concurrently processed. Please refresh and try again.');
-    }
-    return updated;
+      if (!updated) {
+        throw new Error('Payment was concurrently processed. Please refresh and try again.');
+      }
+      // The reference that holds a payment past its window, and its audit row, commit together (MO-1).
+      await logAction(parentId, 'PAYMENT_REFERENCE_SUBMITTED', 'payment', paymentId, { status: pay.status },
+        { status: 'pending_verification', reference: data.reference }, auditCtx, tx);
+      return updated;
+    });
   } catch (err) {
     // Drizzle wraps the pg error: the outer message is the SQL text, the
     // unique-violation code and detail live on `cause` (RF-07).

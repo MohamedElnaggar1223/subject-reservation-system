@@ -70,6 +70,7 @@ import {
   notifyEscrowBalanceChanged,
 } from './notification.services';
 import { isGraduated } from './grade.services';
+import { logAction, type AuditContext } from './audit.services';
 
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
 
@@ -399,7 +400,8 @@ export async function createSwapRequest(
 export async function approveChangeRequest(
   changeRequestId: string,
   data: ApproveChangeRequestType,
-  parentId: string
+  parentId: string,
+  auditCtx?: AuditContext
 ) {
   const cr = await db.query.changeRequest.findFirst({
     where: (c, { eq }) => eq(c.id, changeRequestId),
@@ -485,9 +487,11 @@ export async function approveChangeRequest(
       initiatedBy: parentId,
     });
 
+    let newRegistrationId: string | null = null;
     if (cr.type === 'swap' && cr.newSubjectId && newPricing) {
+      newRegistrationId = randomUUID();
       await tx.insert(registration).values({
-        id: randomUUID(),
+        id: newRegistrationId,
         studentId: cr.registration.studentId,
         sessionId: cr.registration.sessionId,
         subjectId: cr.newSubjectId,
@@ -506,7 +510,11 @@ export async function approveChangeRequest(
       });
     }
 
-    return { success: true, type: cr.type, ...dropOutcome, refundPercentage: pct };
+    const outcome = { success: true, type: cr.type, ...dropOutcome, refundPercentage: pct };
+    // The drop, its refund and their audit row commit together (MO-1).
+    await logAction(parentId, 'CHANGE_REQUEST_APPROVED', 'change_request', changeRequestId, { status: 'pending_approval' },
+      { ...outcome, registrationId: cr.registrationId, newRegistrationId }, auditCtx, tx);
+    return outcome;
   });
 
   // NOT-007: Notify student of approval (fire-and-forget)
@@ -639,7 +647,8 @@ export async function rejectChangeRequest(
 export async function executeDirectDrop(
   registrationId: string,
   data: DirectDropType,
-  parentId: string
+  parentId: string,
+  auditCtx?: AuditContext
 ) {
   // validateChangeEligibility is called with checkOwnership=false (parent checks their own link)
   const { reg } = await validateChangeEligibility(registrationId, '', false);
@@ -662,7 +671,10 @@ export async function executeDirectDrop(
       refundReason: 'drop',
       initiatedBy: parentId,
     });
-    return { success: true, creditedAmount: dropOutcome.gated ? 0 : refundAmount, ...dropOutcome, refundPercentage: pct };
+    const outcome = { success: true, creditedAmount: dropOutcome.gated ? 0 : refundAmount, ...dropOutcome, refundPercentage: pct };
+    // The drop, its refund and their audit row commit together (MO-1).
+    await logAction(parentId, 'DIRECT_DROP_EXECUTED', 'registration', registrationId, { status: reg.status }, outcome, auditCtx, tx);
+    return outcome;
   });
 
   const impact =
@@ -716,7 +728,8 @@ export async function executeDirectDrop(
 export async function executeDirectSwap(
   registrationId: string,
   data: DirectSwapType,
-  parentId: string
+  parentId: string,
+  auditCtx?: AuditContext
 ) {
   const { reg } = await validateChangeEligibility(registrationId, '', false);
 
@@ -769,7 +782,7 @@ export async function executeDirectSwap(
       updatedAt: now,
     });
 
-    return {
+    const outcome = {
       success: true,
       creditedAmount: dropOutcome.gated ? 0 : refundAmount,
       newRegistrationId: newRegId,
@@ -777,6 +790,9 @@ export async function executeDirectSwap(
       ...dropOutcome,
       refundPercentage: pct,
     };
+    // The drop, its refund, the new registration and their audit row commit together (MO-1).
+    await logAction(parentId, 'DIRECT_SWAP_EXECUTED', 'registration', registrationId, { status: reg.status }, outcome, auditCtx, tx);
+    return outcome;
   });
 
   // NOT-007 / SWAP-004: Student receives email + in-app notification when

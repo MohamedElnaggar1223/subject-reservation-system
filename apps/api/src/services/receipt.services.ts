@@ -16,6 +16,7 @@ import { db, receipt, registration, eq, and, inArray } from '@repo/db';
 import { randomUUID } from 'crypto';
 import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { notifyEscrowBalanceChanged } from './notification.services';
+import { logAction, type AuditContext } from './audit.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type DbOrTx = typeof db | Tx;
@@ -235,17 +236,24 @@ async function notifyParkedRefund(rec: ParkedReceipt) {
 
 // ─── Finance desk actions ────────────────────────────────────────────────────
 
-export async function markIssued(receiptId: string, staffId: string) {
-  const [updated] = await db
-    .update(receipt)
-    .set({ status: 'issued', issuedBy: staffId, issuedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(receipt.id, receiptId), eq(receipt.status, 'pending_issue')))
-    .returning();
-  if (!updated) throw new Error('Receipt is not awaiting hand-over');
-  return updated;
+// Each hand-over, return and write-off writes its audit row in its own
+// transaction, so paper custody and its trail commit together (MO-1).
+
+export async function markIssued(receiptId: string, staffId: string, auditCtx?: AuditContext) {
+  return db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(receipt)
+      .set({ status: 'issued', issuedBy: staffId, issuedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(receipt.id, receiptId), eq(receipt.status, 'pending_issue')))
+      .returning();
+    if (!updated) throw new Error('Receipt is not awaiting hand-over');
+    await logAction(staffId, 'RECEIPT_ISSUED', 'receipt', receiptId, { status: 'pending_issue' },
+      updated as Record<string, unknown>, auditCtx, tx);
+    return updated;
+  });
 }
 
-export async function markReturned(receiptId: string, staffId: string, notes?: string) {
+export async function markReturned(receiptId: string, staffId: string, notes?: string, auditCtx?: AuditContext) {
   const updated = await db.transaction(async (tx) => {
     const [row] = await tx
       .update(receipt)
@@ -260,6 +268,7 @@ export async function markReturned(receiptId: string, staffId: string, notes?: s
       .returning();
     if (!row) throw new Error('Receipt is not out with a parent');
     await completeParkedDrop(tx, row, staffId);
+    await logAction(staffId, 'RECEIPT_RETURNED', 'receipt', receiptId, null, row as Record<string, unknown>, auditCtx, tx);
     return row;
   });
   await notifyParkedRefund(updated);
@@ -274,9 +283,27 @@ export async function markLostOrVoid(
   receiptId: string,
   staffId: string,
   status: 'lost' | 'void',
-  reason: string
+  reason: string,
+  auditCtx?: AuditContext
 ) {
   const updated = await db.transaction(async (tx) => {
+    if (status === 'void') {
+      // A paid subject's receipt is the family's proof of payment and is never
+      // void (MA-20): voided, the desk would never offer it again and nothing
+      // reissues it. Void is for the paper of a dropped subject. Judged under
+      // the registration's lock, so a drop committing meanwhile is seen (ST-14).
+      const [rc] = await tx.select({ registrationId: receipt.registrationId }).from(receipt).where(eq(receipt.id, receiptId));
+      if (rc) {
+        const [reg] = await tx
+          .select({ status: registration.status })
+          .from(registration)
+          .where(eq(registration.id, rc.registrationId))
+          .for('update');
+        if (reg && (reg.status === 'confirmed' || reg.status === 'preregistered')) {
+          throw new Error('This subject is still paid for, so its receipt stays valid and cannot be voided — void is for the receipt of a dropped subject');
+        }
+      }
+    }
     const [row] = await tx
       .update(receipt)
       .set({ status, notes: reason, updatedAt: new Date() })
@@ -289,6 +316,8 @@ export async function markLostOrVoid(
       .returning();
     if (!row) throw new Error('Receipt cannot be written off from its current status');
     await completeParkedDrop(tx, row, staffId);
+    await logAction(staffId, status === 'lost' ? 'RECEIPT_LOST' : 'RECEIPT_VOIDED', 'receipt', receiptId, null,
+      row as Record<string, unknown>, auditCtx, tx);
     return row;
   });
   await notifyParkedRefund(updated);

@@ -93,6 +93,9 @@ export const AUDIT_ACTIONS = [
   'REGISTRATION_REJECTED',
   'REGISTRATION_ADMIN_OVERRIDE',
   'REGISTRATION_CONFIRMED',
+  // A registration the system expired: at a close, at an entry deadline, at
+  // graduation, or with a failed checkout once its window had closed (SO-1).
+  'REGISTRATION_EXPIRED',
   // Payment lifecycle
   'PAYMENT_INITIATED',
   'PAYMENT_CONFIRMED',
@@ -189,6 +192,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   REGISTRATION_REJECTED:      'Registration Request Rejected',
   REGISTRATION_ADMIN_OVERRIDE:'Admin Override Applied',
   REGISTRATION_CONFIRMED:     'Registration Confirmed (Payment)',
+  REGISTRATION_EXPIRED:       'Registration Expired (System)',
   PAYMENT_INITIATED:          'Payment Initiated',
   PAYMENT_CONFIRMED:          'Payment Confirmed',
   PAYMENT_FAILED:             'Payment Failed',

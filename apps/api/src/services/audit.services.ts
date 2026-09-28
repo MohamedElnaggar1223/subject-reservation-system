@@ -80,6 +80,53 @@ export async function logAction(
   });
 }
 
+/**
+ * Append several audit entries in one insert, inside the caller's
+ * transaction: a system sweep that moves many rows (a close expiring every
+ * unpaid registration) writes one audit row per row it moved, and they
+ * commit with the moves or not at all (SO-1).
+ */
+export async function logActions(
+  entries: {
+    userId: string | null;
+    action: AuditAction;
+    entityType: AuditEntityType;
+    entityId: string;
+    previousData?: Record<string, unknown> | null;
+    newData?: Record<string, unknown> | null;
+  }[],
+  executor: Pick<typeof db, 'insert'>
+) {
+  if (entries.length === 0) return;
+  await executor.insert(auditLog).values(entries.map((e) => ({
+    id:           randomUUID(),
+    userId:       e.userId,
+    action:       e.action,
+    entityType:   e.entityType,
+    entityId:     e.entityId,
+    previousData: e.previousData ?? null,
+    newData:      e.newData ?? null,
+    ipAddress:    null,
+    userAgent:    null,
+  })));
+}
+
+/** One REGISTRATION_EXPIRED row per registration a system sweep expired. */
+export function expiryEntries(
+  rows: { id: string }[],
+  from: string | string[],
+  reason: 'session_closed' | 'entry_deadline' | 'graduated' | 'checkout_failed' | 'preregistration_unfunded_at_deadline'
+) {
+  return rows.map((r) => ({
+    userId: null,
+    action: 'REGISTRATION_EXPIRED' as const,
+    entityType: 'registration' as const,
+    entityId: r.id,
+    previousData: { status: from },
+    newData: { status: 'expired', reason },
+  }));
+}
+
 // ─── Read: Admin Queries ──────────────────────────────────────────────────────
 
 /**

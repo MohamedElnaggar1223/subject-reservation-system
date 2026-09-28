@@ -111,7 +111,9 @@ fixes were undone and what failed; exceptions are named in the Test column.
 **O-7 (handed on by the security audit).** Payment confirmation, reversal, failure,
 cancellation and rejection, desk collection (its payment and escrow debit, then its
 confirmation), and cash-refund hand-over, rejection and approval write their audit rows inside
-the money transaction. The other money actions still write after the commit (MO-1).
+the money transaction. The other money actions wrote after the commit (MO-1); since the
+state audit's follow-up SO-1 (STATE_AUDIT.md §8) every money action and system transition
+writes its row in its own transaction, and `08c` proves each one with the row refused.
 
 **Also tightened:** money inputs (escrow applied, transfers, withdrawals, hand-overs) accept at
 most two decimals, and refund totals are rounded to the piastre, so a request's hand-overs
@@ -242,7 +244,7 @@ The fourth review, of that response (fc1a101), again said "don't merge yet", on 
 
 | ID | Observation | Owner |
 |---|---|---|
-| MO-1 | O-7 remainder: payment initiation (the checkout's escrow debit) and school-fee initiation, drops, swaps, receipt returns and write-offs, escrow transfers, withdrawal requests and approvals, preregistration cancel and capture, remark refunds and desk registration still write their audit rows after the commit (awaited, so the gap is a crash or a failed insert between the two). | State-and-time audit (STATE_AUDIT.md SO-1: being moved into the transactions) |
+| MO-1 | O-7 remainder: payment initiation (the checkout's escrow debit) and school-fee initiation, drops, swaps, receipt returns and write-offs, escrow transfers, withdrawal requests and approvals, preregistration cancel and capture, remark refunds and desk registration still write their audit rows after the commit (awaited, so the gap is a crash or a failed insert between the two). | **Done** (STATE_AUDIT.md SO-1, §8): each writes its row in its transaction; `08c-audit-in-transaction` refuses each row and checks nothing moved |
 | MO-2 | A swap's drop leg follows the refund window (V3 §6.12): in a 50% window, swapping costs the family half the first subject. Correct to the plan; worth confirming for swaps as opposed to drops. | Owner decision |
 | MO-3 | The takings day is the API server's local day: production must run with `TZ=Africa/Cairo` (added to the production checklist in SECURITY_AUDIT.md §6). | Deployment checklist |
 | MO-4 | Cash refunds are assumed to leave the drawer as cash; a hand-over has no instrument. | Desk question |

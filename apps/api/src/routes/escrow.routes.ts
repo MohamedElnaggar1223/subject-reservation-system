@@ -47,7 +47,7 @@ import {
   requireStudentOrParent,
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
-import { logAction, extractAuditContext } from '../services/audit.services';
+import { extractAuditContext } from '../services/audit.services';
 import * as escrowService from '../services/escrow.services';
 import * as linkService from '../services/link.services';
 
@@ -195,9 +195,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const result = await escrowService.transferEscrow(data, user.id);
-        await logAction(user.id, 'ESCROW_TRANSFER', 'escrow', '', null, result as Record<string, unknown>, extractAuditContext(c))
-          .catch(err => console.error('[audit] ESCROW_TRANSFER failed:', err));
+        const result = await escrowService.transferEscrow(data, user.id, extractAuditContext(c));
         return success(c, result);
       } catch (err) {
         const message = clientMessage(err, 'Transfer failed');
@@ -222,9 +220,7 @@ export const escrowRoutes = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const result = await escrowService.createWithdrawalRequest(data, user.id);
-        await logAction(user.id, 'WITHDRAWAL_REQUESTED', 'escrow', result.id, null, result as Record<string, unknown>, extractAuditContext(c))
-          .catch(err => console.error('[audit] WITHDRAWAL_REQUESTED failed:', err));
+        const result = await escrowService.createWithdrawalRequest(data, user.id, extractAuditContext(c));
         return success(c, result, 201);
       } catch (err) {
         const message = clientMessage(err, 'Failed to create withdrawal request');

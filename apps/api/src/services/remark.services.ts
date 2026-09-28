@@ -36,6 +36,7 @@ import type {
 import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { notifyEscrowBalanceChanged } from './notification.services';
 import { isOwnDocument } from './file.services';
+import { logAction, type AuditContext } from './audit.services';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -327,7 +328,8 @@ export async function initiateRemarkPayment(
   id: string,
   parentId: string,
   paymentMethod: 'in_school' | 'instapay',
-  schoolAccountDetails: Record<string, unknown>
+  schoolAccountDetails: Record<string, unknown>,
+  auditCtx?: AuditContext
 ) {
   const rr = await db.query.remarkRequest.findFirst({
     where: (r, { eq }) => eq(r.id, id),
@@ -400,6 +402,9 @@ export async function initiateRemarkPayment(
         metadata,
       })
       .returning();
+    // The payment and its audit row commit together (MO-1).
+    await logAction(parentId, 'REMARK_PAYMENT_INITIATED', 'remark_request', id, { status: 'pending_payment' },
+      { paymentMethod, paymentId, amount: rr.feeCharged }, auditCtx, tx);
     return row;
   });
 
@@ -428,7 +433,8 @@ export async function markSubmittedToBoard(id: string, boardReference: string) {
 export async function recordOutcome(
   id: string,
   staffId: string,
-  data: RecordRemarkOutcomeType
+  data: RecordRemarkOutcomeType,
+  auditCtx?: AuditContext
 ) {
   const rr = await db.query.remarkRequest.findFirst({
     where: (r, { eq }) => eq(r.id, id),
@@ -476,6 +482,9 @@ export async function recordOutcome(
         tx
       );
     }
+    // The outcome, the fee refund and their audit row commit together (MO-1).
+    await logAction(staffId, 'REMARK_OUTCOME_RECORDED', 'remark_request', id, { status: 'submitted' },
+      { ...data, refunded: refundDue, refundAmount: refundDue ? rr.feeCharged : 0 } as unknown as Record<string, unknown>, auditCtx, tx);
   });
 
   if (refundDue) {

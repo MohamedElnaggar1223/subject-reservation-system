@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, money, audited, openWindow, futureWindow, academicYearOf, loneStudent,
-  runSessionRecovery, holdRowLock, lockWaiters, notified, type Client,
+  runSessionRecovery, holdRowLock, lockWaiters, notified, expireByHand, type Client,
 } from './helpers';
 
 /**
@@ -417,7 +417,7 @@ describe('state and time', () => {
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 300 } }))).id!;
       expect(await escrowOf(f.studentId)).toBe(1200);
       // Its registration expired, but closing the payment failed.
-      await sql(`update registration set status = 'expired' where id = $1`, [reg]);
+      await expireByHand(reg);
 
       expect((await runSessionRecovery()).strandedClosed).toBeGreaterThanOrEqual(1);
       expect(await statusOf('payment', pay)).toBe('failed');

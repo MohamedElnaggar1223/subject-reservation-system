@@ -26,7 +26,7 @@ import { refundPercentage } from './refund.services';
 import { isGraduated } from './grade.services';
 import { logger } from '../lib/logger';
 import { entryDeadlineMessage } from './window.services';
-import { logAction } from './audit.services';
+import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -145,7 +145,7 @@ async function preregPaymentState(registrationId: string, executor: typeof db | 
  * held funds release and the refund walks the normal receipt-gated
  * path with refund windows applied at cancellation time.
  */
-export async function cancelPreregistration(registrationId: string, parentId: string) {
+export async function cancelPreregistration(registrationId: string, parentId: string, auditCtx?: AuditContext) {
   const reg = await db.query.registration.findFirst({
     where: (r, { eq }) => eq(r.id, registrationId),
     with: { session: { columns: { id: true, status: true, entryDeadline: true } } },
@@ -203,7 +203,11 @@ export async function cancelPreregistration(registrationId: string, parentId: st
       fromStatus: 'preregistered',
     });
 
-    return { success: true, funded, refundPercentage: funded ? pct : 0, ...dropOutcome };
+    const outcome = { success: true, funded, refundPercentage: funded ? pct : 0, ...dropOutcome };
+    // The release, the refund and their audit row commit together (MO-1).
+    await logAction(parentId, 'PREREG_CANCELLED', 'registration', registrationId, { status: 'preregistered' },
+      { ...outcome, heldReleased: funded ? reg.priceAtRegistration : 0 }, auditCtx, tx);
+    return outcome;
   });
 
   return result;
@@ -241,6 +245,7 @@ export async function refundPreregistrationsAtDeadline(sessionId: string) {
         if (!funded) {
           await tx.update(registration).set({ status: 'expired', updatedAt: new Date() })
             .where(and(eq(registration.id, reg.id), eq(registration.status, 'preregistered')));
+          await logActions(expiryEntries([reg], 'preregistered', 'preregistration_unfunded_at_deadline'), tx);
           return { refunded: 0, gated: false };
         }
         await debitHeld(
@@ -307,6 +312,9 @@ export async function capturePreregistrationsForSession(sessionId: string): Prom
           .update(registration)
           .set({ status: funded ? 'confirmed' : 'pending_payment', updatedAt: new Date() })
           .where(eq(registration.id, reg.id));
+        // The move, the held money it takes, and their audit row commit together (SO-1).
+        await logAction(null, 'PREREG_CAPTURED', 'registration', reg.id, { status: 'preregistered' },
+          { status: funded ? 'confirmed' : 'pending_payment', heldCaptured: funded ? reg.priceAtRegistration : 0 }, undefined, tx);
         if (!funded) return 'moved' as const;
 
         await debitHeld(

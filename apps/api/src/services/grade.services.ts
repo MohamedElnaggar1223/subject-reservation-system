@@ -24,7 +24,7 @@ import { randomUUID } from 'crypto';
 import { env } from '../env';
 import { notifyGradeChanged } from './notification.services';
 import { closePaymentsOfGraduatedStudents } from './payment.services';
-import { logAction } from './audit.services';
+import { logAction, logActions, expiryEntries } from './audit.services';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -66,7 +66,7 @@ async function cleanupPendingRecordsForGraduatedStudents(
   // checkout inside its grace: a November close keeps them for a family who
   // may already have paid, and graduation runs on the same tick (review of
   // the state audit, flag 1).
-  await executor
+  const expired = await executor
     .update(registration)
     .set({ status: 'expired', updatedAt: now })
     .where(
@@ -79,7 +79,9 @@ async function cleanupPendingRecordsForGraduatedStudents(
             and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
         )`,
       )
-    );
+    )
+    .returning({ id: registration.id });
+  await logActions(expiryEntries(expired, ['pending_approval', 'pending_payment'], 'graduated'), executor);
 
   // 2. Find all registration IDs belonging to graduated students
   const studentRegistrations = await executor.query.registration.findMany({
@@ -90,7 +92,7 @@ async function cleanupPendingRecordsForGraduatedStudents(
 
   if (registrationIds.length > 0) {
     // 3. Reject all pending change requests for those registrations
-    await executor
+    const rejected = await executor
       .update(changeRequest)
       .set({ status: 'rejected', comments: 'Auto-rejected: student graduated', processedAt: now, updatedAt: now })
       .where(
@@ -98,7 +100,12 @@ async function cleanupPendingRecordsForGraduatedStudents(
           inArray(changeRequest.registrationId, registrationIds),
           eq(changeRequest.status, 'pending_approval')
         )
-      );
+      )
+      .returning({ id: changeRequest.id });
+    await logActions(rejected.map((r) => ({
+      userId: null, action: 'CHANGE_REQUEST_REJECTED' as const, entityType: 'change_request' as const, entityId: r.id,
+      previousData: { status: 'pending_approval' }, newData: { status: 'rejected', reason: 'graduated' },
+    })), executor);
   }
 }
 

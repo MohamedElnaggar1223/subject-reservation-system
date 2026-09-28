@@ -17,7 +17,7 @@
  *   "Requested by [Student A] -> Approved by [Parent B] -> Confirmed by [System]"
  */
 
-import { useState, useCallback } from 'react';
+import { Fragment, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import {
@@ -373,11 +373,8 @@ export default function AuditLogClient() {
               </thead>
               <tbody className="divide-y divide-border">
                 {entries.map((entry) => (
-                  <>
-                    <tr
-                      key={entry.id}
-                      className="hover:bg-muted/50 transition-colors"
-                    >
+                  <Fragment key={entry.id}>
+                    <tr className="hover:bg-muted/50 transition-colors">
                       {/* Time */}
                       <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap" title={formatAbsoluteTime(entry.createdAt)}>
                         {formatRelativeTime(entry.createdAt)}
@@ -433,7 +430,7 @@ export default function AuditLogClient() {
 
                     {/* Expanded diff row */}
                     {expanded === entry.id && (
-                      <tr key={`${entry.id}-diff`} className="bg-muted/50">
+                      <tr className="bg-muted/50">
                         <td colSpan={6} className="px-4 py-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {entry.previousData && (
@@ -461,7 +458,7 @@ export default function AuditLogClient() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

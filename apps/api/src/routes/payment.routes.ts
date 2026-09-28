@@ -55,7 +55,7 @@ import * as linkService from '../services/link.services';
 // import { validateFawryWebhookSignature } from '../integrations/fawry';
 // import { validatePaymobWebhookSignature } from '../integrations/paymob';
 import { logger } from '../lib/logger';
-import { logAction, extractAuditContext } from '../services/audit.services';
+import { extractAuditContext } from '../services/audit.services';
 
 export const payments = new Hono<HonoEnv>()
 
@@ -195,9 +195,7 @@ export const payments = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const result = await paymentService.initiatePayment(user.id, data);
-        await logAction(user.id, 'PAYMENT_INITIATED', 'payment', result.id ?? '', null, result as Record<string, unknown>, extractAuditContext(c))
-          .catch((err) => console.error('[audit] PAYMENT_INITIATED failed:', err));
+        const result = await paymentService.initiatePayment(user.id, data, extractAuditContext(c));
         return success(c, result, 201);
       } catch (err) {
         const message = clientMessage(err, 'Failed to initiate payment');
@@ -315,9 +313,7 @@ export const payments = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const updated = await paymentService.submitInstapayReference(id, user.id, data);
-        await logAction(user.id, 'PAYMENT_REFERENCE_SUBMITTED', 'payment', id, null, { reference: data.reference }, extractAuditContext(c))
-          .catch((err) => console.error('[audit] PAYMENT_REFERENCE_SUBMITTED failed:', err));
+        const updated = await paymentService.submitInstapayReference(id, user.id, data, extractAuditContext(c));
         return success(c, updated);
       } catch (err) {
         const message = clientMessage(err, 'Failed to submit reference');

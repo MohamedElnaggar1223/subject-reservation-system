@@ -153,7 +153,7 @@ export async function onboardFamily(data: DeskOnboardFamilyType) {
  * Register subjects for a student and (optionally) record the money the
  * officer just took — one action, receipts born immediately.
  */
-export async function executeDeskRegistration(staffId: string, data: DeskRegistrationType) {
+export async function executeDeskRegistration(staffId: string, data: DeskRegistrationType, auditCtx?: AuditContext) {
   if (await isGraduated(data.studentId)) {
     throw new Error('Graduated students cannot be registered for new subjects');
   }
@@ -239,7 +239,12 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
 
   // No money taken → register only; the family pays later (app or desk)
   if (!data.collectNow) {
-    const created = await db.insert(registration).values(records).returning();
+    const created = await db.transaction(async (tx) => {
+      const inserted = await tx.insert(registration).values(records).returning();
+      await logAction(staffId, 'DESK_REGISTRATION', 'registration', data.studentId, null,
+        { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), collected: 0 }, auditCtx, tx);
+      return inserted;
+    });
     return { registrations: created, payment: null, totalCost, collected: 0 };
   }
 
@@ -296,6 +301,12 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
       inserted.map((r) => ({ id: randomUUID(), paymentId, registrationId: r.id }))
     );
 
+    // The registrations, the escrow debit and their audit row commit together
+    // (MO-1); the confirmation that follows writes its own rows.
+    await logAction(staffId, 'DESK_REGISTRATION', 'registration', data.studentId, null,
+      { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), paymentId,
+        toCollect: Math.max(0, totalCost - escrowToApply), escrowApplied: escrowToApply }, auditCtx, tx);
+
     return inserted;
   });
 
@@ -305,7 +316,8 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     paymentId,
     staffId,
     data.collectNow.notes ?? 'Collected at the finance desk',
-    data.collectNow.instrumentUsed
+    data.collectNow.instrumentUsed,
+    auditCtx
   );
 
   const receipts = await db.query.receipt.findMany({
@@ -463,7 +475,8 @@ export async function collectSchoolFeeAtDesk(
   studentId: string,
   instrumentUsed: string,
   notes?: string,
-  requestedAcademicYear?: string
+  requestedAcademicYear?: string,
+  auditCtx?: AuditContext
 ) {
   const student = await db.query.user.findFirst({
     where: (u, { eq }) => eq(u.id, studentId),
@@ -498,26 +511,31 @@ export async function collectSchoolFeeAtDesk(
 
   const paymentId = randomUUID();
   const payerParentId = await resolvePayerParent(studentId);
-  // The unique index (one open or paid school fee per student and year) is
-  // what stops two collections at the same moment (state audit ST-02).
-  await db.insert(payment).values({
-    id: paymentId,
-    studentId,
-    parentId: payerParentId, // the family, not the officer (RF-03)
-    amount: fee.amount,
-    escrowAmountApplied: 0,
-    paymentMethod: 'in_school',
-    purpose: 'school_fee',
-    academicYear,
-    status: 'pending',
-    externalReference: `DESK-${paymentId.slice(0, 8).toUpperCase()}`,
-    metadata: { desk: true, staffId },
-  }).catch((err) => {
-    if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') throw new Error(SCHOOL_FEE_IN_PROGRESS);
-    throw err;
+  await db.transaction(async (tx) => {
+    // The unique index (one open or paid school fee per student and year) is
+    // what stops two collections at the same moment (state audit ST-02).
+    await tx.insert(payment).values({
+      id: paymentId,
+      studentId,
+      parentId: payerParentId, // the family, not the officer (RF-03)
+      amount: fee.amount,
+      escrowAmountApplied: 0,
+      paymentMethod: 'in_school',
+      purpose: 'school_fee',
+      academicYear,
+      status: 'pending',
+      externalReference: `DESK-${paymentId.slice(0, 8).toUpperCase()}`,
+      metadata: { desk: true, staffId },
+    }).catch((err) => {
+      if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') throw new Error(SCHOOL_FEE_IN_PROGRESS);
+      throw err;
+    });
+    // Written with the payment it describes (MO-1); the confirmation writes its own row.
+    await logAction(staffId, 'DESK_SCHOOL_FEE_COLLECTED', 'payment', paymentId, null,
+      { paymentId, academicYear, amount: fee.amount, instrumentUsed }, auditCtx, tx);
   });
 
-  await confirmDeskPayment(paymentId, staffId, notes ?? 'School fee collected at desk', instrumentUsed);
+  await confirmDeskPayment(paymentId, staffId, notes ?? 'School fee collected at desk', instrumentUsed, auditCtx);
 
   return { paymentId, academicYear, amount: fee.amount };
 }

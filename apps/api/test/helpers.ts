@@ -403,3 +403,39 @@ export async function runSessionRecovery() {
   const { recoverSessionTransitions } = await import('../src/services/session.services');
   return recoverSessionTransitions();
 }
+
+/**
+ * Make the database refuse one audit action until release() is called, so a
+ * test can prove a movement and its audit row commit together (SO-1): with
+ * the row refused, the request fails and nothing moves. `action` is a
+ * test-supplied constant. The trigger is dropped on release; test files run
+ * one at a time, so no other suite sees it.
+ */
+export async function refuseAudit(action: string): Promise<() => Promise<void>> {
+  if (!/^[A-Z_]+$/.test(action)) throw new Error(`not an audit action: ${action}`);
+  await sql(`create or replace function test_refuse_audit() returns trigger language plpgsql as $$
+    begin
+      if new.action = '${action}' then raise exception 'test: audit row % refused', new.action; end if;
+      return new;
+    end $$`);
+  await sql(`drop trigger if exists test_refuse_audit on audit_log`);
+  await sql(`create trigger test_refuse_audit before insert on audit_log for each row execute function test_refuse_audit()`);
+  return async () => {
+    await sql(`drop trigger if exists test_refuse_audit on audit_log`);
+    await sql(`drop function if exists test_refuse_audit()`);
+  };
+}
+
+/**
+ * The state a system expiry that committed leaves: the registration expired
+ * and its REGISTRATION_EXPIRED row, written together as the app does (SO-1).
+ * For tests that build a crash's aftermath by hand.
+ */
+export async function expireByHand(registrationId: string, reason = 'session_closed') {
+  await sql(`update registration set status = 'expired', updated_at = now() where id = $1`, [registrationId]);
+  await sql(
+    `insert into audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data)
+     values (gen_random_uuid()::text, null, 'REGISTRATION_EXPIRED', 'registration', $1, '{"status":"pending_payment"}', $2)`,
+    [registrationId, JSON.stringify({ status: 'expired', reason })]
+  );
+}

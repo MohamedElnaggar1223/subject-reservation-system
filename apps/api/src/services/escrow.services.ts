@@ -353,7 +353,8 @@ export async function getChildrenEscrowBalances(parentId: string) {
  */
 export async function transferEscrow(
   data: TransferEscrowType,
-  parentId: string
+  parentId: string,
+  auditCtx?: AuditContext
 ) {
   const [fromLinked, toLinked] = await Promise.all([
     validateParentStudentLink(parentId, data.fromStudentId),
@@ -384,6 +385,12 @@ export async function transferEscrow(
       reason:      'transfer_in',
       initiatedBy: parentId,
     }, tx);
+
+    // Both ledger rows and their audit row commit together (MO-1). The entity
+    // is the source student's escrow: a transfer has no row of its own.
+    await logAction(parentId, 'ESCROW_TRANSFER', 'escrow', data.fromStudentId, null,
+      { fromStudentId: data.fromStudentId, toStudentId: data.toStudentId, amount: data.amount, fromBalance: from, toBalance: to },
+      auditCtx, tx);
 
     return { newFromBalance: from, newToBalance: to };
   });
@@ -434,7 +441,8 @@ export async function transferEscrow(
  */
 export async function createWithdrawalRequest(
   data: RequestWithdrawalType,
-  parentId: string
+  parentId: string,
+  auditCtx?: AuditContext
 ) {
   const linked = await validateParentStudentLink(parentId, data.studentId);
   if (!linked) throw new Error('You are not linked to this student');
@@ -460,6 +468,10 @@ export async function createWithdrawalRequest(
         status: 'pending',
       })
       .returning();
+
+    // The hold on the balance and its audit row commit together (MO-1).
+    await logAction(parentId, 'WITHDRAWAL_REQUESTED', 'escrow', req!.id, null,
+      { ...req!, studentId: data.studentId }, auditCtx, tx);
 
     return req!;
   });
