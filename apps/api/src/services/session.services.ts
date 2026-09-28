@@ -19,7 +19,7 @@
 import { db, registrationSession, registration, changeRequest, paymentRegistration, payment, user, eq, and, lte, inArray, isNull, sql } from '@repo/db';
 import { capturePreregistrationsForSession } from './prereg.services';
 import { notifySessionOpened, createNotification, notifyPaymentReferenceDue } from './notification.services';
-import { failPayment } from './payment.services';
+import { failPayment, closeStrandedPayments } from './payment.services';
 import { schoolDate } from './window.services';
 import { logAction, type AuditContext } from './audit.services';
 import { env } from '../env';
@@ -419,8 +419,13 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   const now = new Date();
   const sessionForGrace = await db.query.registrationSession.findFirst({
     where: (s, { eq: eqOp }) => eqOp(s.id, sessionId),
-    columns: { entryDeadline: true },
+    columns: { entryDeadline: true, closedAt: true },
   });
+  // Only what existed when the window closed. A finalisation that runs late
+  // (the recovery sweep, after a failure) must not expire what a student with
+  // a deadline extension registered or checked out since the close (review of
+  // the state audit, flag 3).
+  const closedAt = sessionForGrace?.closedAt ?? now;
   const graceEnds = now.getTime() + env.INSTAPAY_REFERENCE_GRACE_HOURS * 60 * 60 * 1000;
   const referenceDueAt = new Date(Math.min(graceEnds, sessionForGrace?.entryDeadline?.getTime() ?? Infinity));
 
@@ -434,7 +439,10 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
     .from(payment)
     .innerJoin(paymentRegistration, eq(paymentRegistration.paymentId, payment.id))
     .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
-    .where(and(eq(registration.sessionId, sessionId), eq(registration.status, 'pending_payment'), eq(payment.status, 'pending')));
+    .where(and(
+      eq(registration.sessionId, sessionId), eq(registration.status, 'pending_payment'), eq(payment.status, 'pending'),
+      lte(payment.createdAt, closedAt),
+    ));
   const heldForReference: string[] = [];
   // Registrations a failed checkout expired itself (the window is closed), so
   // the per-student notice below still names them.
@@ -485,6 +493,7 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
       and(
         eq(registration.sessionId, sessionId),
         inArray(registration.status, ['pending_approval', 'pending_payment']),
+        lte(registration.createdAt, closedAt),
         sql`not exists (
           select 1 from ${paymentRegistration} pr join ${payment} p on p.id = pr.payment_id
           where pr.registration_id = ${registration.id}
@@ -696,7 +705,13 @@ export async function recoverSessionTransitions() {
       console.error(`[session:recover] Capture for ${s.id} failed again:`, err);
     }
   }
-  return { finalized, captured };
+  // A payment left open on registrations that have all expired (closing it
+  // after an expiry failed) can only hold escrow: close it.
+  const strandedClosed = await closeStrandedPayments().catch((err) => {
+    console.error('[session:recover] Closing stranded payments failed:', err);
+    return 0;
+  });
+  return { finalized, captured, strandedClosed };
 }
 
 /**

@@ -364,6 +364,23 @@ export async function runSessionScheduler() {
 }
 
 /**
+ * Hold a row's lock from a connection of its own until release() is called,
+ * so a race can be ordered on purpose: requests fired meanwhile queue on the
+ * lock in the order they reach it. `table` is a test-supplied constant.
+ */
+export async function holdRowLock(table: string, id: string): Promise<() => Promise<void>> {
+  const { default: pg } = await import('pg');
+  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  await client.query('BEGIN');
+  await client.query(`SELECT id FROM ${table} WHERE id = $1 FOR UPDATE`, [id]);
+  return async () => {
+    await client.query('COMMIT');
+    await client.end();
+  };
+}
+
+/**
  * Run the scheduler's recovery sweep (finish interrupted closes, capture
  * preregistrations an opening left behind; STATE_AUDIT.md ST-06), as the
  * scheduler does every minute.

@@ -210,8 +210,9 @@ before it ships.
    `.audit/state-audit.tsv`. Thirteen findings (ST-01 to ST-13; three high: a remark fee taken
    for a cancelled request, the school fee taken twice, a checkout left on a request sent back
    for approval), twelve fixed, ten with a test that fails without the fix; the scheduler now
-   finishes an interrupted close and an uncaptured opening. For the owner: what a student's grade
-   is (ST-13, DISCOVERY.md Q-08). Handed on: the MO-1 remainder (SO-1, next commit).
+   finishes an interrupted close and an uncaptured opening. Reviewed on Opus 5.5. For the owner:
+   what a student's grade is (ST-13, DISCOVERY.md Q-08); automatic grade progression is off until
+   then. Handed on: the MO-1 remainder (SO-1), the next effort — Phase 1.3 is done except for it.
 3. **Discovery research pack** in parallel with 1 and 2. **Import spike done 28 Sep**
    (`IMPORT_SPIKE.md`, reviewed on Opus 5.5): the school's sheet through the API — 199 of 220
    November 2026 rows and 399 of 434 June 2023 rows went in. It evidences three of the four

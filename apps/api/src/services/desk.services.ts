@@ -396,6 +396,7 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
       .select({ id: registration.id, status: registration.status })
       .from(registration)
       .where(inArray(registration.id, data.registrationIds))
+      .orderBy(registration.id)
       .for('update');
     if (locked.some((r) => r.status !== 'pending_payment')) {
       throw new Error('One or more subjects are not waiting for payment');

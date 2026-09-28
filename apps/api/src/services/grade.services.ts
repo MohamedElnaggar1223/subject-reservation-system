@@ -19,8 +19,9 @@
  *   - The audit log entry is awaited for compliance; notification is fire-and-forget
  */
 
-import { db, user, registration, changeRequest, registrationSession, gradeProgressionRun, eq, and, inArray, isNotNull } from '@repo/db';
+import { db, user, registration, changeRequest, registrationSession, gradeProgressionRun, payment, paymentRegistration, eq, and, inArray, isNotNull, sql } from '@repo/db';
 import { randomUUID } from 'crypto';
+import { env } from '../env';
 import { notifyGradeChanged } from './notification.services';
 import { closePaymentsOfGraduatedStudents } from './payment.services';
 import { logAction } from './audit.services';
@@ -60,14 +61,23 @@ async function cleanupPendingRecordsForGraduatedStudents(
 
   const now = new Date();
 
-  // 1. Expire all pending registrations for graduated students
+  // 1. Expire pending registrations for graduated students — except, as at a
+  // close, those held by a transfer awaiting verification or an InstaPay
+  // checkout inside its grace: a November close keeps them for a family who
+  // may already have paid, and graduation runs on the same tick (review of
+  // the state audit, flag 1).
   await executor
     .update(registration)
     .set({ status: 'expired', updatedAt: now })
     .where(
       and(
         inArray(registration.studentId, graduatedStudentIds),
-        inArray(registration.status, ['pending_approval', 'pending_payment'])
+        inArray(registration.status, ['pending_approval', 'pending_payment']),
+        sql`not exists (
+          select 1 from ${paymentRegistration} pr join ${payment} p on p.id = pr.payment_id
+          where pr.registration_id = ${registration.id}
+            and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
+        )`,
       )
     );
 
@@ -174,7 +184,11 @@ export async function progressGrades(sessionType: string): Promise<Array<{
     graduated.push(...graduatedStudentIds);
   });
   // Checkouts left open on the registrations just expired (state audit ST-04).
-  await closePaymentsOfGraduatedStudents(graduated);
+  // A failure here must not undo or skip anything already committed; the
+  // scheduler's recovery sweep closes any payment left on expired
+  // registrations.
+  await closePaymentsOfGraduatedStudents(graduated)
+    .catch((err) => console.error('[grade] Closing graduated students\' payments failed; the sweep will retry:', err));
 
   // Audit + notifications outside the transaction (fire-and-forget)
   for (const p of progressions) {
@@ -218,6 +232,15 @@ export async function progressGradesOnce(
   sessionIds: string[],
 ): Promise<number> {
   if (sessionIds.length === 0) return 0;
+  // Stop-gap until the owner answers Q-08 (STATE_AUDIT.md ST-13): the closes
+  // are stamped done, so the retry sweep does not keep asking, and no grade moves.
+  if (!env.AUTO_GRADE_PROGRESSION) {
+    await db
+      .update(registrationSession)
+      .set({ gradeProgressionCompletedAt: new Date() })
+      .where(inArray(registrationSession.id, sessionIds));
+    return 0;
+  }
 
   const rows = await db.query.registrationSession.findMany({
     where: (s, { inArray: inArr }) => inArr(s.id, sessionIds),
@@ -313,7 +336,10 @@ export async function manualGradeAdjustment(
     return [row];
   });
   // Checkouts left open on the registrations just expired (state audit ST-04).
-  if (newGrade === null) await closePaymentsOfGraduatedStudents([studentId]);
+  if (newGrade === null) {
+    await closePaymentsOfGraduatedStudents([studentId])
+      .catch((err) => console.error('[grade] Closing the graduated student\'s payments failed; the sweep will retry:', err));
+  }
 
   // Audit (awaited — admin action must always be logged)
   try {

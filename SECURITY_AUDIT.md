@@ -136,6 +136,10 @@ Set these before the first deployment; each one is a control this audit relies o
   local midnight (MONEY_AUDIT.md MO-3).
 - Before each series opens, the admin enters its exam-board entry deadline on the Sessions
   page; without one, unconfirmed payments are never closed automatically (MONEY_AUDIT.md §6a).
+- Leave `AUTO_GRADE_PROGRESSION` unset (off) until the owner decides what a student's grade is:
+  with it on, a registration window's close advances grades on the wrong calendar
+  (STATE_AUDIT.md ST-13); admins adjust grades by hand meanwhile.
+- Run one API process: the scheduler assumes it is the only one (STATE_AUDIT.md SO-5).
 
 ---
 

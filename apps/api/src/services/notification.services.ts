@@ -912,6 +912,27 @@ export async function notifyPreregistrationsRefundedAtDeadline(
   }
 }
 
+/** The recovery sweep closed a payment whose registrations had all expired. */
+export async function notifyStrandedPaymentClosed(paymentId: string, escrowReturned: number) {
+  const escrowNote = escrowReturned > 0 ? ` EGP ${escrowReturned.toFixed(2)} applied from escrow has been returned.` : '';
+  await notifyFamilyOfPayment(paymentId, 'PAYMENT_EXPIRED', 'Payment closed', (c) =>
+    `The subjects this payment of ${c.amount} for ${c.studentName} covered (${c.subjects}) are no longer open for registration, so the payment was closed before it was confirmed.${escrowNote} ` +
+    `If you did transfer the money, contact the finance desk with your bank receipt: once the transfer is found it is added to your escrow balance.`
+  );
+}
+
+/**
+ * A student graduated with a checkout open: the checkout was closed by the
+ * system and any escrow it took is back (state audit ST-04).
+ */
+export async function notifyPaymentClosedAtGraduation(paymentId: string, escrowReturned: number) {
+  const escrowNote = escrowReturned > 0 ? ` EGP ${escrowReturned.toFixed(2)} applied from escrow has been returned.` : '';
+  await notifyFamilyOfPayment(paymentId, 'PAYMENT_EXPIRED', 'Payment closed: student graduated', (c) =>
+    `${c.studentName} has graduated, so the payment of ${c.amount} for ${c.subjects} (${c.sessionName}) was closed before it was confirmed.${escrowNote} ` +
+    `If you did transfer the money, contact the finance desk with your bank receipt: once the transfer is found it is added to your escrow balance.`
+  );
+}
+
 /** At the board's entry deadline: registrations still waiting on the series expired. */
 export async function notifyRegistrationsExpiredAtEntryDeadline(
   sessionId: string,

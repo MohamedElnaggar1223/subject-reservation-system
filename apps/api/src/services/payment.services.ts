@@ -67,6 +67,8 @@ import {
   notifyPaymentClosedAtEntryDeadline,
   notifyRegistrationsExpiredAtEntryDeadline,
   notifyPreregistrationsRefundedAtDeadline,
+  notifyPaymentClosedAtGraduation,
+  notifyStrandedPaymentClosed,
   notifyEscrowBalanceChanged,
 } from './notification.services';
 import { createReceiptsForRegistrations } from './receipt.services';
@@ -800,13 +802,59 @@ export async function closePaymentsOfGraduatedStudents(studentIds: string[]) {
     .where(and(inArray(payment.studentId, studentIds), inArray(payment.status, [...OPEN_PAYMENT_STATUSES]), eq(registration.status, 'expired')));
   let closed = 0;
   for (const { id } of open) {
-    const r = await failOpenPayment(id, {
-      from: OPEN_PAYMENT_STATUSES,
-      actorId: null,
-      action: 'PAYMENT_FAILED',
-      reason: 'The student graduated before this payment was confirmed',
-    });
-    if (r) closed++;
+    try {
+      const r = await failOpenPayment(id, {
+        from: OPEN_PAYMENT_STATUSES,
+        actorId: null,
+        action: 'PAYMENT_FAILED',
+        reason: 'The student graduated before this payment was confirmed',
+      });
+      if (!r) continue;
+      closed++;
+      await notifyPaymentClosedAtGraduation(id, r.pay.escrowAmountApplied)
+        .catch((err) => console.error(`[payment] Graduation notice for ${id} failed:`, err));
+    } catch (err) {
+      console.error(`[payment] Could not close ${id} after graduation; the sweep will retry:`, err);
+    }
+  }
+  return closed;
+}
+
+/**
+ * The recovery sweep's safety net (review of the state audit, flag 2): an
+ * open payment whose registrations have all expired can never be confirmed
+ * (confirmation refuses expired registrations), so it only holds the escrow
+ * it took. Such a payment is left behind when closing it after an expiry
+ * failed; it is failed here, by the system, escrow back.
+ */
+export async function closeStrandedPayments() {
+  const stranded = await db
+    .select({ id: payment.id })
+    .from(payment)
+    .where(and(
+      inArray(payment.status, [...OPEN_PAYMENT_STATUSES]),
+      sql`exists (select 1 from payment_registration pr where pr.payment_id = ${payment.id})`,
+      sql`not exists (
+        select 1 from payment_registration pr join registration r on r.id = pr.registration_id
+        where pr.payment_id = ${payment.id} and r.status <> 'expired'
+      )`,
+    ));
+  let closed = 0;
+  for (const { id } of stranded) {
+    try {
+      const r = await failOpenPayment(id, {
+        from: OPEN_PAYMENT_STATUSES,
+        actorId: null,
+        action: 'PAYMENT_FAILED',
+        reason: 'Every registration this payment covered has expired',
+      });
+      if (!r) continue;
+      closed++;
+      await notifyStrandedPaymentClosed(id, r.pay.escrowAmountApplied)
+        .catch((err) => console.error(`[payment] Stranded-payment notice for ${id} failed:`, err));
+    } catch (err) {
+      console.error(`[payment] Could not close stranded payment ${id}:`, err);
+    }
   }
   return closed;
 }
@@ -1411,6 +1459,7 @@ export async function reversePayment(
         .select({ status: receipt.status, receiptNumber: receipt.receiptNumber })
         .from(receipt)
         .where(inArray(receipt.registrationId, regIds))
+        .orderBy(receipt.registrationId)
         .for('update');
       const outOfDesk = receipts.filter((r) => r.status !== 'pending_issue' && r.status !== 'void');
       if (outOfDesk.length > 0) {
@@ -1427,6 +1476,7 @@ export async function reversePayment(
         .select({ id: registration.id, status: registration.status })
         .from(registration)
         .where(inArray(registration.id, regIds))
+        .orderBy(registration.id)
         .for('update');
       if (regs.some((r) => r.status !== 'confirmed')) {
         throw new Error(

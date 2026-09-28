@@ -266,8 +266,8 @@ export function startSessionScheduler(): void {
       // and capture preregistrations still waiting in an open session.
       try {
         const r = await recoverSessionTransitions();
-        if (r.finalized + r.captured > 0) {
-          logger.info(`[session-closer] Recovery: finalised ${r.finalized} closed session(s), captured ${r.captured} preregistration(s).`);
+        if (r.finalized + r.captured + r.strandedClosed > 0) {
+          logger.info(`[session-closer] Recovery: finalised ${r.finalized} closed session(s), captured ${r.captured} preregistration(s), closed ${r.strandedClosed} stranded payment(s).`);
         }
       } catch (err) {
         logger.error('[session-closer] Recovery sweep failed:', err);

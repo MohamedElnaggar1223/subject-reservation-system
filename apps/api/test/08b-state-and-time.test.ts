@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, money, audited, openWindow, futureWindow, academicYearOf, loneStudent,
-  runSessionRecovery, type Client,
+  runSessionRecovery, holdRowLock, notified, type Client,
 } from './helpers';
 
 /**
@@ -53,7 +53,7 @@ describe('state and time', () => {
   // ─── Remark requests and their fee ─────────────────────────────────────────
 
   describe('a remark request and its fee (ST-01)', () => {
-    let f: Family, physics: string, chemistry: string;
+    let f: Family, physics: string, chemistry: string, biology: string;
     const newRemark = async (registrationId: string) => {
       const r = await apiResponse(f.parent.api.v1.remarks.$post({
         json: { registrationId, serviceType: 'clerical_check', papers: [{ paperCode: '9702/12', paperName: 'Paper 1' }] },
@@ -69,10 +69,12 @@ describe('state and time', () => {
 
     beforeAll(async () => {
       f = await family('rm');
-      const desk = await deskCash(f, [subj.S1!, subj.S2!]);
-      [physics, chemistry] = desk.registrations.map((r) => r.id) as [string, string];
+      const desk = await deskCash(f, [subj.S1!, subj.S2!, subj.S3!]);
+      [physics, chemistry, biology] = desk.registrations.map((r) => r.id) as [string, string, string];
       await apiResponse(finadmin.api.v1.remarks.fees.$put({ json: { council: 'cambridge', serviceType: 'clerical_check', amountPerPaper: 400 } }));
-      await apiResponse(officer.api.v1.remarks.results.$post({ json: { results: [{ registrationId: physics, grade: 'D' }, { registrationId: chemistry, grade: 'E' }] } }));
+      await apiResponse(officer.api.v1.remarks.results.$post({
+        json: { results: [{ registrationId: physics, grade: 'D' }, { registrationId: chemistry, grade: 'E' }, { registrationId: biology, grade: 'C' }] },
+      }));
     });
 
     it('cannot be cancelled while its fee transfer is being checked; the confirmation moves it on', async () => {
@@ -96,6 +98,22 @@ describe('state and time', () => {
       expect(confirm).toEqual({ status: 400, error: 'This remark request is no longer awaiting payment — reject the transfer instead' });
       expect(await statusOf('payment', pay)).toBe('pending_verification');
       await apiResponse(officer.api.v1.payments[':id'].reject.$post({ param: { id: pay }, json: { reason: 'The remark request was cancelled' } }));
+    });
+
+    it('a cancellation and a payment arriving together never leave a payment on a cancelled request', async () => {
+      const id = await newRemark(biology);
+      // The cancellation reaches the request's lock first, the payment right
+      // behind it (having read "awaiting payment" before either commits).
+      const release = await holdRowLock('remark_request', id);
+      const cancel = f.parent.api.v1.remarks[':id'].cancel.$post({ param: { id } });
+      await pause(150);
+      const pay = f.parent.api.v1.remarks[':id'].pay.$post({ param: { id }, json: { paymentMethod: 'instapay' } });
+      await pause(150);
+      await release();
+      const [c, p] = await Promise.all([cancel, pay]);
+      expect([c.ok, p.ok]).toEqual([true, false]);
+      expect(await statusOf('remark_request', id)).toBe('cancelled');
+      expect(await sql(`select 1 from payment where purpose = 'remark' and metadata ->> 'remarkRequestId' = $1`, [id])).toEqual([]);
     });
   });
 
@@ -128,7 +146,7 @@ describe('state and time', () => {
         `insert into payment (id, student_id, parent_id, amount, escrow_amount_applied, payment_method, purpose, academic_year, status)
          select gen_random_uuid(), student_id, parent_id, amount, 0, 'in_school', 'school_fee', academic_year, 'pending' from payment
          where student_id = $1 and purpose = 'school_fee'`, [f.studentId],
-      )).rejects.toThrow();
+      )).rejects.toMatchObject({ cause: expect.objectContaining({ code: '23505' }) });
     });
 
     it('the desk does not take it again while the family\'s transfer for it is being checked', async () => {
@@ -144,7 +162,23 @@ describe('state and time', () => {
   // ─── Approval, revert and checkout ─────────────────────────────────────────
 
   describe('a parent reverting an approval while checking out (ST-03)', () => {
-    it('never leaves an open payment on a request back in "awaiting approval"', async () => {
+    it('a revert arriving while the checkout holds the lock sees the checkout, and is refused', async () => {
+      const f = await family('rv0');
+      const [id] = (await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId, subjectIds: [subj.S14!] } }))).map((r) => r.id) as [string];
+      await apiResponse(f.parent.api.v1.registrations.approve.$put({ json: { registrationIds: [id] } }));
+      // The checkout queues on the registration's lock; the revert arrives while it waits.
+      const release = await holdRowLock('registration', id);
+      const checkout = f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [id], paymentMethod: 'instapay', escrowAmountToApply: 0 } });
+      await pause(150);
+      const revert = f.parent.api.v1.registrations['revert-approval'].$put({ json: { registrationIds: [id] } });
+      await pause(150);
+      await release();
+      const [c, r] = await Promise.all([checkout, revert]);
+      expect([c.ok, r.ok]).toEqual([true, false]);
+      expect(await statusOf('registration', id)).toBe('pending_payment');
+    });
+
+    it('never leaves an open payment on a request back in "awaiting approval", across a sweep of timings', async () => {
       const f = await family('rv');
       // Sixteen races: the interleaving that breaks it is narrow, and one clean run proves little.
       const subjects = [3, 4, 5, 6, 7, 8, 9, 10, 15, 16, 17, 18, 19, 20, 21, 22].map((n) => subj[`S${n}`]!);
@@ -186,6 +220,18 @@ describe('state and time', () => {
       expect(await statusOf('payment', pay)).toBe('failed');
       expect(await escrowOf(f.studentId)).toBe(1500);
       await audited([pay], ['PAYMENT_FAILED']);
+      const notice = await notified(f.parent.email, 'PAYMENT_EXPIRED', 1);
+      expect(notice[0]?.title).toBe('Payment closed: student graduated');
+    });
+
+    it('a checkout whose transfer is being checked keeps its registration through graduation, as at a close', async () => {
+      const f = await family('gr2', 12);
+      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [subj.S13!], studentId: f.studentId } })))[0]!.id;
+      const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
+      await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: pay }, json: { reference: 'FT-ST-GR-2' } }));
+      await apiResponse(adm.api.v1.grade[':id'].$put({ param: { id: f.studentId }, json: { newGrade: null, reason: 'left after the November entries' } }));
+      expect(await statusOf('registration', reg)).toBe('pending_payment');
+      expect(await statusOf('payment', pay)).toBe('pending_verification');
     });
   });
 
@@ -263,6 +309,15 @@ describe('state and time', () => {
       await apiResponse(f.parent.api.v1.registrations.reject.$put({ json: { registrationIds: [drop], comments: 'not this series' } }));
       expect(await statusOf('registration', drop)).toBe('rejected');
     });
+
+    it('a request left behind when the extension runs out can still be rejected, though no longer approved', async () => {
+      const [left] = (await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId, subjectIds: [subj.S5!] } }))).map((r) => r.id) as [string];
+      await sql(`update exception set valid_until = now() - interval '1 minute' where student_id = $1 and type = 'deadline_extension'`, [f.studentId]);
+      const approve = await refused(f.parent.api.v1.registrations.approve.$put({ json: { registrationIds: [left] } }));
+      expect(approve.status).toBe(400);
+      await apiResponse(f.parent.api.v1.registrations.reject.$put({ json: { registrationIds: [left], comments: 'the extension ran out' } }));
+      expect(await statusOf('registration', left)).toBe('rejected');
+    });
   });
 
   // ─── What the scheduler finishes (the session above is closed by now) ──────
@@ -280,13 +335,17 @@ describe('state and time', () => {
       await sql(`update registration_session set status = 'closed', closed_at = now() where id = $1`, [s]);
       expect(await statusOf('registration', waiting)).toBe('pending_payment');
 
-      expect((await runSessionRecovery()).finalized).toBeGreaterThanOrEqual(1);
-      expect(await statusOf('registration', waiting)).toBe('expired');
-
-      // Finished once: a registration made later under a deadline extension is left alone.
+      // Before the late finalisation, a student with a deadline extension registers and checks out.
       const late = await family('rc2');
       await extend(late.studentId, s);
       const lateReg = (await apiResponse(late.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, subjectIds: [subj.S4!], studentId: late.studentId } })))[0]!.id;
+      const latePay = (await apiResponse(late.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [lateReg], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
+
+      expect((await runSessionRecovery()).finalized).toBeGreaterThanOrEqual(1);
+      expect(await statusOf('registration', waiting)).toBe('expired');
+      // Only what existed at the close is finalised: the extension student's rows stand.
+      expect(await statusOf('registration', lateReg)).toBe('pending_payment');
+      expect(await statusOf('payment', latePay)).toBe('pending');
       await runSessionRecovery();
       expect(await statusOf('registration', lateReg)).toBe('pending_payment');
     });
@@ -307,6 +366,26 @@ describe('state and time', () => {
       expect(await statusOf('registration', pre)).toBe('confirmed');
       expect(await held()).toBe(0);
       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'state and time: capture done' } }));
+    });
+
+    it('a payment left open on registrations that have all expired is closed on the next tick, escrow back', async () => {
+      const s = await session(adm, 'January (AS, state and time, stranded)', 'january', 'as_level', { ...openWindow(), activate: true });
+      const f = await family('rc4');
+      const funded = await apiResponse(officer.api.v1.registrations.desk.$post({
+        json: { studentId: f.studentId, sessionId: s, subjectIds: [subj.S6!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      }));
+      await apiResponse(f.parent.api.v1.registrations[':id'].drop.$post({ param: { id: funded.registrations[0]!.id }, json: { reason: 'setup for escrow' } }));
+      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, subjectIds: [subj.S7!], studentId: f.studentId } })))[0]!.id;
+      const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 300 } }))).id!;
+      expect(await escrowOf(f.studentId)).toBe(1200);
+      // Its registration expired, but closing the payment failed.
+      await sql(`update registration set status = 'expired' where id = $1`, [reg]);
+
+      expect((await runSessionRecovery()).strandedClosed).toBeGreaterThanOrEqual(1);
+      expect(await statusOf('payment', pay)).toBe('failed');
+      expect(await escrowOf(f.studentId)).toBe(1500);
+      await audited([pay], ['PAYMENT_FAILED']);
+      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'state and time: stranded done' } }));
     });
   });
 });

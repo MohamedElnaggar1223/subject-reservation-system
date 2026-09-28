@@ -14,7 +14,9 @@ defect was then reproduced as a failing scenario through the API before it was f
 `apps/api/test/08b-state-and-time.test.ts`; races are fired at once on separate connections,
 and a race that needs an exact interleaving is swept across it. Each fix was undone once
 more to see its test fail (trail: "control" rows). Evidence and the red run are in the
-git-ignored `.audit/state-audit-evidence/`; decisions in `.audit/state-audit.tsv`.
+git-ignored `.audit/state-audit-evidence/`; decisions in `.audit/state-audit.tsv`. An
+independent review on Opus 5.5 found gaps in two of the new automatic behaviours and weak spots
+in the tests; all are acted on (§4b).
 
 ---
 
@@ -33,9 +35,11 @@ move money wrongly: a family can pay a remark fee for a request that was cancell
 the school fee can be taken twice (ST-02), and a checkout can leave an open payment, with its
 escrow, on a request sent back to "awaiting approval" (ST-03). Twelve are fixed. Ten have a test
 that fails with the fix undone; nine of those were first reproduced failing before any fix (the
-red run), and ST-06's recovery tests were written with the sweep, shown red by disabling it.
-ST-05, ST-12 and ST-06's guarded activation rest on reasoning. ST-13 — grades move when a
-registration window closes, not with the school year — is the owner's decision (§6).
+red run), and ST-06's recovery tests were written with the sweep, shown red by disabling it; the
+two races that need an exact interleaving are ordered on purpose, so they fail every time without
+their fix. ST-05, ST-12 and ST-06's guarded activation rest on reasoning. ST-13 — grades move when
+a registration window closes, not with the school year — is the owner's decision (§6); automatic
+progression is off until then.
 
 ---
 
@@ -102,20 +106,52 @@ in. Nothing else turns over on 1 July: **grades move when registration windows c
 | **ST-01** | **High** | A parent could cancel a remark request while its fee transfer was being checked; finance then confirmed the payment and the family had paid for a cancelled request, with nothing to show and no refund path (a remark payment cannot be reversed). The request's move to "awaiting submission" also ran after the payment's commit and swallowed errors, so a completed fee could leave its request awaiting payment — payable again. | Cancelling locks the request and refuses while a fee payment is open. Confirmation moves the request inside its own transaction, under the request's lock, and refuses a fee whose request no longer awaits payment ("reject the transfer instead"). Starting a payment re-checks the request under its lock. | `08b` "a remark request and its fee" (both scenarios) |
 | **ST-02** | **High** | The school fee could be taken twice: two officers collecting at the same moment both succeeded, and the desk collected it while the family's own transfer for it was being checked. Nothing locked or constrained it. | A unique index: one open or paid school fee per student per academic year (migration 0032). The desk refuses, with a sentence, while the family's checkout for it is open; any conflict reads as a sentence, not SQL. | `08b` "the school fee" (two officers at once; the desk while a transfer is checked; the database refuses a second one) |
 | **ST-03** | **High** | A parent reverting an approval while checking out the same subject could leave an open payment — with its escrow — on a registration back in "awaiting approval" (3 of 8 swept races before the fix). The revert re-read "no payment" without the lock the checkout takes. | The revert locks the registrations (in id order, as the checkout now does) before re-reading. | `08b` "a parent reverting an approval while checking out" (16 swept races) |
-| ST-04 | Medium | A student who graduated with a checkout open had the registration expired and the payment left open, with the escrow it took, on a registration nothing could pay: finance could only reject it by hand. | After the graduation commits, every checkout left open on the registrations it expired is failed by the system: escrow back, audited, the family told (a transfer that did arrive is recorded later with "Transfer found"). Both the scheduler's progression and the admin's manual graduation. | `08b` "a student who graduates with a checkout open" |
+| ST-04 | Medium | A student who graduated with a checkout open had the registration expired and the payment left open, with the escrow it took, on a registration nothing could pay: finance could only reject it by hand. | Graduation expires only what a close would: a registration held by a transfer being checked, or by an InstaPay checkout inside its grace, is kept (a November close keeps them, and graduation runs on the same tick). After the graduation commits, every checkout left on a registration it did expire is failed by the system — escrow back, audited, the family told — and an error there never escapes into the grade change: the recovery sweep closes any payment left on registrations that have all expired. Both the scheduler's progression and the admin's manual graduation. | `08b` "a student who graduates with a checkout open" (closed, escrow back, family told; a checked transfer kept); `08b` stranded payment; `09` "an open payment never covers … only registrations that have expired" |
 | ST-05 | Medium | A receipt's return, loss or write-off committed on its own, and the parked drop's refund was credited in a separate transaction afterwards: a failure there left the receipt returned, the registration waiting and the refund never credited, with nothing to retry it. | One transaction for the receipt and the parked refund; the family's notice after the commit. | By reasoning; the return and write-off paths are exercised by `01`, `08` and `09` |
-| ST-06 | Medium | The scheduler trusted itself to run once. A close whose finalisation failed (or a process stopped in between) was never finished — its registrations stayed waiting in a closed session. Preregistration capture ran only for sessions opened on that same tick, so a failed capture (or a preregistration made while the session opened) stayed preregistered in an open session, its held money stranded. Scheduled activation was an unguarded update that could reopen a session an admin had just closed, and one clash aborted the tick after its closes had committed. A manual close whose finalisation threw returned an error without its audit row. | `finalized_at` on each session (migration 0033, backfilled for sessions already closed); a recovery sweep every tick finalises closed sessions without it and captures preregistrations waiting in open ones; activation is status-guarded, one draft at a time; a manual close logs and leaves a failed finalisation to the sweep. | `08b` "the scheduler finishes what a close or an opening left undone" (an interrupted close, finished once; an uncaptured opening) |
-| ST-07 | Medium | MO-20: a student with a deadline extension could request a subject after the close, and the parent could then neither approve nor reject it — both checked the session's status alone — so it sat until the entry deadline, or forever without one. | Approval asks the same window as the request (a deadline extension counts). A rejection is allowed whatever the window. | `08b` "after the close, a student with a deadline extension" |
+| ST-06 | Medium | The scheduler trusted itself to run once. A close whose finalisation failed (or a process stopped in between) was never finished — its registrations stayed waiting in a closed session. Preregistration capture ran only for sessions opened on that same tick, so a failed capture (or a preregistration made while the session opened) stayed preregistered in an open session, its held money stranded. Scheduled activation was an unguarded update that could reopen a session an admin had just closed, and one clash aborted the tick after its closes had committed. A manual close whose finalisation threw returned an error without its audit row. | `finalized_at` on each session (migration 0033, backfilled for sessions already closed); a recovery sweep every tick finalises closed sessions without it, captures preregistrations waiting in open ones, and closes payments left on registrations that have all expired; finalisation touches only registrations and checkouts that existed when the window closed, so a late or repeated run never expires what a student with a deadline extension did since; activation is status-guarded, one draft at a time; a manual close logs and leaves a failed finalisation to the sweep. | `08b` "the scheduler finishes what a close or an opening left undone" (an interrupted close, finished once, sparing an extension student's later registration and checkout; an uncaptured opening; a stranded payment) |
+| ST-07 | Medium | MO-20: a student with a deadline extension could request a subject after the close, and the parent could then neither approve nor reject it — both checked the session's status alone — so it sat until the entry deadline, or forever without one. | Approval asks the same window as the request (a deadline extension counts). A rejection is allowed whatever the window. | `08b` "after the close, a student with a deadline extension" (approved and rejected; a request left when the extension runs out can be rejected, not approved) |
 | ST-08 | Medium | Cambridge's one-enquiry rule (and OxfordAQA's one review per paper) was checked before the insert without a lock: three remark requests at once for one result were all accepted. | The rules are judged inside the insert's transaction, under the registration's lock. | `08b` "two remark requests for one Cambridge result at once" |
 | ST-09 | Low | A student answering a link request twice at once (approve and reject) had both accepted, the second overwriting the first after the parent had been told. | The answer is status-guarded; the second is told the request was already answered. | `08b` "a student answering one link request twice at once" |
 | ST-10 | Low | Desk onboarding picked any link for the pair — a rejected one included — and flipped it, so a family with a rejected request and a pending one could not be enrolled (a unique-index error). | Onboarding takes the live link (pending or approved): approves a pending one, creates one when only rejected ones exist; a rejected request stays as history. | `08b` "the desk enrolls a family whose first link request was rejected" |
 | ST-11 | Low | Cancelling a change request that was already cancelled or decided reported success (the update matched nothing, and the route still audited a cancellation). | A no-op is refused with a sentence. | `08b` "a change request cancelled twice at once" |
 | ST-12 | Low | A scheduled announcement was sent before it was claimed: an admin's cancel in between was overwritten to "sent", a second scheduler instance would send it twice, and a failure after sending marked it failed. | The dispatch claims it first (pending → sent, status-guarded); a failed dispatch marks it failed only if it still holds the claim. | By reasoning |
-| ST-13 | Owner | Grades move when a registration window closes — 10→11 at a November close, 11→12 at a June close, 12→graduated at a November close — once per series type and year, whichever level's window closes first. A student who starts grade 10 in September is grade 11 by the June window, where the grade-10 core-subject mandate (A-05, confirmed) should apply, and pays grade 11's school fee for a year that is grade 10's. | Not built: the owner decides what a grade is (§6). The manual close now takes the same once-per-series claim as the scheduler (it called progression directly). | — |
+| ST-13 | Owner | Grades move when a registration window closes — 10→11 at a November close, 11→12 at a June close, 12→graduated at a November close — once per series type and year, whichever level's window closes first. On the school's calendar a student advances twice in one academic year (10→11 around October, 11→12 before February) and is graduated at the next November close, in their real grade-11 year, after which every registration path refuses them; meanwhile the grade-10 core-subject mandate (A-05) never applies and the school fee is charged for the wrong grade. | **Stop-gap: automatic progression is off** (`AUTO_GRADE_PROGRESSION`, default false; admins adjust grades by hand) until the owner decides what a grade is (§6). The manual close now takes the same once-per-series claim as the scheduler (it called progression directly). | — |
 
 **Also changed:** confirmation audits only the registrations it moves (a preregistration a
-payment funds stays preregistered and was logged as confirmed); registration row locks are
-taken in id order everywhere several are locked, so two paths cannot wait on each other.
+payment funds stays preregistered and was logged as confirmed); every path that locks several
+registrations or receipts locks them in id order — checkout, confirmation, revert, desk
+collection and reversal — so two of them cannot wait on each other; a new audit action,
+`REMARK_PAYMENT_CONFIRMED`, records the remark's move; refusals that are conflicts now answer 409
+(a remark with a payment in progress, a school fee already in progress); an approval outside the
+window now reads "Registration window is not open" (still 400). `09` gains two rules: an open
+payment never covers a request awaiting approval or only expired registrations, and a confirmed
+remark fee has always moved its request on.
+
+## 4b. What the review changed
+
+The Opus 5.5 review of the first commit (a58aa6f) said "don't merge yet":
+
+1. **Graduation collided with the November close** (ST-04): it expired registrations the close
+   had just kept for a family who may have paid, and the new code then failed their payments.
+   Graduation now keeps what a close keeps; the family is told when a payment is closed.
+2. **An error closing payments after graduation escaped after the grades had committed**,
+   skipping the cohort's audit rows and notices, with nothing to retry it. It is now caught per
+   payment and never escapes; the recovery sweep closes any payment left on expired registrations.
+3. **A late finalisation hit students with deadline extensions** (ST-06): re-run by the sweep, it
+   expired what they had registered since the close. Finalisation now touches only what existed at
+   the close.
+4. **ST-13 was understated** (a double advance in one year, graduation a year early), and "nothing
+   depends on it" was wrong once graduation fails payments. Automatic progression is off until the
+   owner decides.
+5. **Tests weaker than the report read:** the revert race (ST-03) and the cancel-versus-pay race
+   (ST-01) are now ordered on purpose — a test connection holds the row's lock while the two
+   requests queue behind it — so each fails every time without its fix; the school-fee check asserts
+   a unique violation, not any error; the rejection has its own case and control.
+6. **The lock-order sentence overclaimed:** desk collection and reversal now lock in id order too.
+7. **No new invariants** — two added to `09`.
+8. Migration 0032 was checked against the dev database (no duplicate school fees) before it ran;
+   there is no production data. Cancel's own lock on the remark request is belt and braces — the
+   payment start re-checks under the same lock, which is what the cancel-versus-pay test proves.
 
 ---
 
@@ -123,7 +159,7 @@ taken in id order everywhere several are locked, so two paths cannot wait on eac
 
 | ID | Observation | Owner |
 |---|---|---|
-| SO-1 | **MO-1 remainder.** Payment and school-fee initiation, remark-payment initiation, drops, swaps, receipt hand-overs, returns and write-offs, escrow transfers and refund requests still write their audit rows in the route after the commit; system transitions (expiry at a close, at an entry deadline and at graduation, capture, change requests rejected at a close) write none. Being moved into their transactions in a follow-up commit of this audit. | This audit, next commit |
+| SO-1 | **MO-1 remainder.** Payment and school-fee initiation, remark-payment initiation, drops, swaps, receipt hand-overs, returns and write-offs, escrow transfers and refund requests still write their audit rows in the route after the commit; system transitions (expiry at a close, at an entry deadline and at graduation, capture, change requests rejected at a close) write none. Moved into their transactions in a follow-up effort, after this audit merges. | Next effort |
 | SO-2 | A registration created at the very moment its session closes (its window read before the close, its insert after the finalisation) stays waiting in the closed session until the entry-deadline sweep, or indefinitely without a deadline. Narrow; closing it needs a session lock on six creation paths. | Accepted, low |
 | SO-3 | A change request created while its registration is being dropped fails at approval and waits until the close. | Accepted, low |
 | SO-4 | A graduated student's preregistrations for a later series stay preregistered, their held money held; they can be cancelled at the refund window's rate. Like MO-21, the owner may want a full refund. | Owner decision |
@@ -147,13 +183,22 @@ close in a year moves everyone. Consequences, in the school's calendar (Septembe
 - A grade-12 student graduates at the November close; "graduated" blocks new registrations,
   so the November sitting after graduation depends on the close's timing.
 
+Worse, the first window of a series type to close advances everyone, so on the school's
+calendar a student goes 10→11 around October and 11→12 before February — two grades in one
+academic year — and is graduated at the next November close, in their real grade-11 year; every
+registration path then refuses them.
+
+**Stop-gap (reversible, in this audit):** automatic progression is off by default
+(`AUTO_GRADE_PROGRESSION=false`); a close stamps its progression done without moving anyone, and
+admins adjust grades by hand. Graduation's effects on payments (ST-04) therefore only follow a
+manual graduation until the owner decides.
+
 **Recommendation:** store the year a student entered grade 10 (or will graduate), and derive
 the grade from the academic year of the session being registered for (1 July boundary, as the
 school fee already does). No progression job, no double advance, and a registration for a
 June series knows the student's grade that year. Graduation then means "past grade 12 for this
 academic year", and the owner decides whether the November after it stays open to them. This
-changes the student model and the grade screens, so it waits for the owner's answer; nothing
-in this audit depends on it.
+changes the student model and the grade screens, so it waits for the owner's answer.
 
 ---
 

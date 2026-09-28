@@ -38,6 +38,7 @@ describe('money invariants over the whole database', () => {
         (select count(*) from payment where reversal_money_returned = false)             as reversals_never_received,
         (select count(*) from payment where reference_due_at is not null)                as checkouts_held_after_close,
         (select count(*) from payment where late_transfer_at is not null)                as late_transfers_recorded,
+        (select count(*) from payment where purpose = 'remark' and status = 'completed')  as remark_fees_confirmed,
         (select count(*) from escrow_transaction where reason = 'late_transfer_undone')   as late_transfers_undone,
         (select count(*) from audit_log where action = 'PREREG_REFUNDED_AT_DEADLINE')     as prereg_refunded_at_deadline,
         (select count(*) from registration where status = 'dropped_pending_receipt' or status = 'dropped') as drops
@@ -212,6 +213,37 @@ describe('money invariants over the whole database', () => {
          or (reason = 'late_transfer_undone' and (related_payment_id is null or type <> 'debit'))
     `);
     expect(stray).toEqual([]);
+  });
+
+  it('an open payment never covers a request awaiting approval, nor only registrations that have expired (ST-03, ST-04, ST-06)', async () => {
+    // Awaiting approval: a revert raced a checkout (ST-03). Only expired: the
+    // payment can never be confirmed and only holds its escrow (ST-04; the
+    // recovery sweep closes any such payment, ST-06).
+    const onApproval = await sql(`
+      select p.id, r.id as registration_id from payment p
+      join payment_registration pr on pr.payment_id = p.id join registration r on r.id = pr.registration_id
+      where p.status in ('pending', 'pending_verification') and r.status = 'pending_approval'
+    `);
+    expect(onApproval).toEqual([]);
+    const onlyExpired = await sql(`
+      select p.id from payment p
+      where p.status in ('pending', 'pending_verification')
+        and exists (select 1 from payment_registration pr where pr.payment_id = p.id)
+        and not exists (
+          select 1 from payment_registration pr join registration r on r.id = pr.registration_id
+          where pr.payment_id = p.id and r.status <> 'expired')
+    `);
+    expect(onlyExpired).toEqual([]);
+  });
+
+  it('a confirmed remark fee has moved its request on: never left awaiting payment, and never on a cancelled request (ST-01)', async () => {
+    const broken = await sql(`
+      select p.id, rr.id as remark_id, rr.status from payment p
+      join remark_request rr on rr.id = p.metadata ->> 'remarkRequestId'
+      where p.purpose = 'remark' and p.status = 'completed'
+        and rr.status in ('pending_approval', 'pending_consent', 'pending_payment', 'cancelled', 'rejected')
+    `);
+    expect(broken).toEqual([]);
   });
 
   it('the held wallet holds exactly the price of paid preregistrations still waiting for their session (MA-15)', async () => {
