@@ -221,11 +221,13 @@ before it ships.
    leaves three things for the coordinator before anything is built: carry forward, self-study
    on subjects the school teaches, and which board each unit is entered with. The questions
    are in its §3. **Desk research done 28 Sep** (`DISCOVERY_RESEARCH.md`): the boards'
-   centre obligations and series (the sheet's units are Pearson IAL; Cambridge has no January
-   series), Egypt's equivalency rules as of the 2025 guide, what SCL is (and that it claims to keep
-   records across years), timetabling tools (no in-house solver at this size), and a feature-value
-   map — data-model changes first, then exam-entry management and campus leave, then homeroom
-   attendance.
+   centre obligations and series (the Mathematics units are Pearson IAL; Biology most likely too;
+   one window feeds up to three board series), Egypt's equivalency rules as of the 2025 guide,
+   what SCL is (it claims to keep records across years, and may wipe them at promotion), timetabling
+   tools (no in-house solver at this size), and a feature-value map. **For the gate:** the map
+   suggests data-model changes first, then exam-entry management, then campus leave with homeroom
+   attendance — which differs from Phase 4 below (campus leave as the release-1 wedge, exam-entry
+   management in Phase 5). The owner chooses at the gate.
 4. **Housekeeping the audits already named.** Done on 27 Sep 2026: the suite is kept off third
    parties, CI runs the gates, `render.yaml` (another project's blueprint) and the template
    setup script are deleted, the template todo and documents screens are removed, stale
