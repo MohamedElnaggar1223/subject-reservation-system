@@ -8,8 +8,9 @@ campus leave. Deliverable: design notes for the data model and a feature-value m
 **Method:** two research passes on Opus 5.5 over primary sources (board handbooks and timetables,
 the Ministry of Higher Education's admission guide, vendor documentation), with local copies of
 the PDFs; the claims the data model depends on were checked against those copies, and an
-independent review on Opus 5.5 checked them again (it found five claims in the first draft stated
-more firmly than the sources allow; they are worded as the sources support below).
+independent review on Opus 5.5 checked them again. It found claims in the first draft stated more
+firmly than the sources allow, and two that were wrong: the resit rule without its Mathematics
+exception, and "First Language Arabic only". All are corrected below.
 **Confidence:** *confirmed* = read in a primary source (a board document, the Ministry's guide, a
 vendor's own page for what the vendor claims); *strong inference* = several facts point one way
 and none against, not stated anywhere; *unconfirmed* = a press report, or a weaker inference.
@@ -75,10 +76,12 @@ Q-02 stays open.
   permitted pair.
 - **Resits:** any unit can be resat, and the better of the two most recent non-absent attempts
   counts toward an award — **except the IAL Mathematics suite**, where a unit used in an award is
-  locked to its qualification group (Mathematics or Further Mathematics), and a resit can only
-  re-use it if the awards it was locked to are re-entered [P1], [P4 rules 3, 6, 7]. The school
-  enters IAL Mathematics units, so the results model needs this exception, not only the general
-  rule.
+  locked to its qualification group, Mathematics or Further Mathematics (pure units are not locked
+  by an AS award). Inside its group a locked unit counts again without re-entry, so moving from AS
+  to A Level Mathematics needs none. Re-grading an award after a resit, or using a unit in the
+  other group, means re-entering the awards it was locked to, and a cash-in requested after the
+  entry deadline costs a fee [P1], [P4 rules 3, 6, 7 and Appendix], [P2 §1.3]. The school enters
+  IAL Mathematics units, so the results model needs this exception, not only the general rule.
 - **Results:** EDI or Edexcel Online, a day before candidates; unit UMS and grade under W-codes,
   awards under X/Y.
 
@@ -187,9 +190,10 @@ multi-series windows, the retake-aware outside rate), with the import spike's ev
    and the student's year. "A.S./A.2." is then derived, not stored (IS-01). The catalogue needs a
    unit table and a unit-to-award table.
 4. **Retakes are per unit.** A Pearson unit resat is a retake of that unit (in Mathematics,
-   re-using a locked unit also means re-entering the awards it counted toward); a Cambridge retake
-   is flagged per syllabus and series. This is what the retake-aware outside rate (A-02, IS-03)
-   must key on — the attempt at this unit or syllabus, from the student's own entry history.
+   re-grading an award after the resit also means re-entering that award); a Cambridge retake is
+   flagged per syllabus and series. Whether the school's retake rate applies to a unit resit is
+   still the coordinator's answer (A-02, IS-03); if it does, the rate can key on the attempt at
+   this unit or syllabus, from the student's own entry history.
 5. **Identifiers:** per student the Pearson UCI (permanent), the Cambridge candidate number per
    series (with history, for carry-forward), the legal name as on ID, and the national ID
    (sensitive); per centre the Cambridge and Pearson centre numbers, and whether the school enters
