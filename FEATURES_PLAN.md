@@ -465,7 +465,7 @@ third, after two merges):
   envelopes. **No new `useQuery<…>` generics:** `grep -rn 'useQuery<' apps/web/app | wc -l` must
   not rise above 35 (its count on 28 Sep 2026).
 - **Schema:** Drizzle in `packages/db`; migrations from `drizzle-kit generate --name <name>`;
-  backfills as custom migrations; rebuild `packages/db` and `packages/validations` after editing
+  backfills as custom migrations; rebuild `packages/db`, `packages/validations` and `packages/storage` after editing
   them; the migration protocol in §3.
 - **Tests are the proof.** Every workflow has scenarios in `apps/api/test` driven through the
   typed RPC client against real Postgres. Every new endpoint has its row in `authz-policy.tsv`
@@ -495,7 +495,8 @@ third, after two merges):
   reports the template busy, another agent is copying it: wait a few seconds and retry; never
   disconnect anyone), then migrated to the branch; copy `apps/api/.env` and `apps/web/.env.local` from the
   `lead-env` worktree and change the ports and URLs. A new worktree needs `pnpm install` and a
-  build of `packages/db` and `packages/validations`. Kill only processes it started, by PID.
+  build of `packages/db`, `packages/validations` and `packages/storage` (and again after merging
+  `main`). Kill only processes it started, by PID.
 - **Gates** before any push: `pnpm --filter @repo/api check-types`, `pnpm --filter web
   check-types`, the suite in local time and with `TZ=UTC`. A "green" claim names the commit it
   ran on.
@@ -540,8 +541,8 @@ API and web ports):
 
 | Feature | Implemented | Reviewed | Merged | Notes |
 |---|---|---|---|---|
-| F0a Core foundation | yes — `feature/foundation`, docs/features/FOUNDATION.md | | | awaiting review |
-| F0b Catalogue, series, enrolment | | | | |
+| F0a Core foundation | yes — docs/features/FOUNDATION.md | Opus 5.5, three rounds; lead review | 29 Sep 2026, `b747d47`, main CI 36613182503 green | owner questions in FOUNDATION §12; A-12/13/14 as settings |
+| F0b Catalogue, series, enrolment | in progress (`feature/catalogue`, started from F0a before it merged) | | | |
 | F1 Scheduling | | | | |
 | F4 Exam entries | | | | |
 | F2 Campus leave | | | | |

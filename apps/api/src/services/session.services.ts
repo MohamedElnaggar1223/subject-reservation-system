@@ -490,13 +490,18 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   const now = new Date();
   const sessionForGrace = await db.query.registrationSession.findFirst({
     where: (s, { eq: eqOp }) => eqOp(s.id, sessionId),
-    columns: { entryDeadline: true, closedAt: true },
+    columns: { entryDeadline: true },
   });
   // Only what existed when the window closed. A finalisation that runs late
   // (the recovery sweep, after a failure) must not expire what a student with
   // a deadline extension registered or checked out since the close (review of
   // the state audit, flag 3).
-  const closedAt = sessionForGrace?.closedAt ?? now;
+  // "Existed at the close" is judged in the database, against the stored
+  // closed_at, by the database's own clock (ST-15). A row's created_at comes
+  // from Postgres; compared with a time taken in the API (or read back into
+  // JavaScript, which drops the microseconds), a drifting clock put a checkout
+  // made just before the close after it, and the close then skipped or failed it.
+  const closedAt = sql`coalesce((select ${registrationSession.closedAt} from ${registrationSession} where ${registrationSession.id} = ${sessionId}), now())`;
   const graceEnds = now.getTime() + env.INSTAPAY_REFERENCE_GRACE_HOURS * 60 * 60 * 1000;
   const referenceDueAt = new Date(Math.min(graceEnds, sessionForGrace?.entryDeadline?.getTime() ?? Infinity));
 
@@ -703,7 +708,8 @@ export async function closeSession(id: string, adminId: string, reason?: string)
     .update(registrationSession)
     .set({
       status: 'closed',
-      closedAt: now,
+      // Stamped by the database's clock, the clock every created_at uses (ST-15).
+      closedAt: sql`now()`,
       closedBy: adminId,
       closeReason: reason ?? null,
       updatedAt: now,
@@ -804,7 +810,7 @@ export async function autoManageSessions(): Promise<{
   // call progressGrades() for each unique sessionType that just closed.
   const closedResult = await db
     .update(registrationSession)
-    .set({ status: 'closed', closedAt: now, updatedAt: now })
+    .set({ status: 'closed', closedAt: sql`now()`, updatedAt: now })
     .where(
       and(
         eq(registrationSession.status, 'active'),

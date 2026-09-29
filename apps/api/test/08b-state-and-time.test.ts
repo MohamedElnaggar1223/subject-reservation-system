@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, money, audited, openWindow, futureWindow, academicYearOf, loneStudent, localToday,
@@ -439,6 +439,29 @@ describe('state and time', () => {
       expect(await escrowOf(f.studentId)).toBe(1500);
       await audited([pay], ['PAYMENT_FAILED']);
       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'state and time: stranded done' } }));
+    });
+  });
+
+  describe('a close judges "before the close" by one clock (ST-15)', () => {
+    it("a checkout made just before the close is kept for its reference even when the API's clock runs behind the database's", async () => {
+      const s = await session(adm, 'January (AS, state and time, clock)', 'january', 'as_level', { ...openWindow(), activate: true });
+      const f = await family('clock');
+      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, subjectIds: [subj.S8!], studentId: f.studentId } })))[0]!.id;
+      const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
+      // The payment's time comes from Postgres; put the API's clock five seconds
+      // behind it, as a drifting host or container clock can, for the close.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() - 5_000);
+      try {
+        await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'state and time: clock' } }));
+      } finally {
+        vi.useRealTimers();
+      }
+      expect(await statusOf('payment', pay)).toBe('pending');
+      expect(await statusOf('registration', reg)).toBe('pending_payment');
+      expect((await one<{ due: string | null }>(`select reference_due_at as due from payment where id = $1`, [pay])).due).not.toBeNull();
+      // Leave nothing open for the invariants.
+      await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
     });
   });
 });
