@@ -39,6 +39,8 @@ import {
   RegistrationId,
   ROLES,
   FINANCE_ROLES,
+  STUDENT_RECORD_ROLES,
+  EligibilityQuery,
   hasRole,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
@@ -50,17 +52,46 @@ import {
   requireStudentOrParent,
   requireAdminOrParent,
   requireFinance,
-  requireNotGraduated,
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as registrationService from '../services/registration.services';
 import * as preregService from '../services/prereg.services';
 import * as deskService from '../services/desk.services';
 import * as linkService from '../services/link.services';
+import { mayRegisterFor } from '../services/eligibility.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 
 export const registrations = new Hono<HonoEnv>()
   .use('*', requireAuth())
+
+  /**
+   * GET /registrations/eligibility?studentId=&sessionId= (F0a)
+   *
+   * May this student register for this window's series, and why not? The
+   * student's grade in the series' academic year, and whether a graduate is
+   * retaking under A-12. Students ask about themselves, parents about a
+   * linked child, the desk, the coordinator and admin about anyone.
+   */
+  .get('/eligibility',
+    zValidator('query', EligibilityQuery),
+    async (c) => {
+      const user = c.get('user')!;
+      const { studentId, sessionId } = c.req.valid('query');
+      if (user.role === ROLES.STUDENT && studentId !== user.id) return error(c, 'Forbidden', 403);
+      if (user.role === ROLES.PARENT) {
+        const children = await linkService.getLinkedChildren(user.id);
+        if (!children.some((child) => child.studentId === studentId)) return error(c, 'You are not linked to this student', 403);
+      } else if (user.role !== ROLES.STUDENT && !hasRole(user.role, ...STUDENT_RECORD_ROLES)) {
+        return error(c, 'Forbidden', 403);
+      }
+      try {
+        return success(c, await mayRegisterFor(studentId, sessionId));
+      } catch (err) {
+        const message = clientMessage(err, 'Failed to check eligibility');
+        return error(c, message, message.includes('not found') ? 404 : 400);
+      }
+    }
+  )
 
   /**
    * GET /registrations/available
@@ -236,7 +267,6 @@ export const registrations = new Hono<HonoEnv>()
    */
   .post('/request',
     requireStudent(),
-    requireNotGraduated(),
     zValidator('json', RequestRegistration),
     async (c) => {
       const user = c.get('user')!;

@@ -11,10 +11,14 @@ export type FileType = 'avatar' | 'document' | 'general'
 export type ImageVariant = 'original' | 'thumbnail' | 'medium' | 'large'
 
 export interface UploadOptions {
-  bucket: string
   userId: string
   fileType: FileType
   generateThumbnails?: boolean  // Only for images
+  /** The purpose's own limits (F0a); default: the file type's. */
+  allowedMimeTypes?: readonly string[]
+  maxBytes?: number
+  /** The top-level folder of the key (the upload purpose); default: fileType. */
+  folder?: string
 }
 
 export interface UploadResult {

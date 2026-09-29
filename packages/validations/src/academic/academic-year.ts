@@ -161,3 +161,16 @@ export const CohortYearSchema = z.number().int().min(2000).max(2100);
 export const SeriesYearSchema = z.number().int().min(2000).max(2100);
 
 export const AcademicYearStartSchema = z.number().int().min(2000).max(2100);
+
+/**
+ * How a grade reads on a screen or a receipt: "Grade 11"; above 12
+ * "Graduated"; 9 "Grade 9 (starts grade 10 next year)"; unknown
+ * "Grade not recorded".
+ */
+export function gradeLabel(grade: number | null | undefined): string {
+  if (grade === null || grade === undefined) return 'Grade not recorded';
+  if (grade > LAST_GRADE) return 'Graduated';
+  if (grade === FIRST_GRADE - 1) return 'Grade 9 (starts grade 10 next year)';
+  if (grade < FIRST_GRADE - 1) return 'Not started yet';
+  return `Grade ${grade}`;
+}

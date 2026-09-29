@@ -41,7 +41,6 @@ import {
   requireStudent,
   requireParent,
   requireStudentOrParent,
-  requireNotGraduated,
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as swapService from '../services/swap.services';
@@ -61,7 +60,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
    */
   .post('/:id/request-drop',
     requireStudent(),
-    requireNotGraduated(),
+
     zValidator('param', RegistrationIdParam),
     zValidator('json', RequestDrop),
     async (c) => {
@@ -93,7 +92,7 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
    */
   .post('/:id/request-swap',
     requireStudent(),
-    requireNotGraduated(),
+
     zValidator('param', RegistrationIdParam),
     zValidator('json', RequestSwap),
     async (c) => {

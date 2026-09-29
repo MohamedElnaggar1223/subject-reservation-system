@@ -347,6 +347,8 @@ try {
     const s = await attempt<{ id: string; status: string }>(adm.v1.sessions.$post({
       json: {
         name: `${r.series.label} ${LEVEL_NAME[r.level]} (spike)`, sessionType: r.series.type, qualificationLevel: r.level,
+        // F0a: the series year is the one in the label ("November 2026").
+        seriesYear: Number(r.series.label.slice(-4)),
         startDate: new Date(Date.now() - day).toISOString(), endDate: new Date(Date.now() + 30 * day).toISOString(),
       },
     }));

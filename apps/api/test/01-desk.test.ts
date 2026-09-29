@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, academicYearStartOf } from '@repo/validations';
 import {
   admin, staff, onboard, loneStudent, subject, session, refused, one, sql, notified, audited, notificationsFor, money,
   takings, takingsDelta, openWindow, type Client, type Takings,
@@ -28,10 +28,12 @@ describe('the desk', () => {
 
   it('onboards a walk-in family: parent, grade-11 student, link approved on the spot', async () => {
     ({ parent, student, studentId } = await onboard(officer, 'desk'));
-    const s = await one<{ role: string; grade: number; student_id: string; phone: string }>(
-      `select role, grade, student_id, phone from "user" where id = $1`, [studentId]
+    // F0a: the desk's "grade 11 this year" is stored as the cohort (the year
+    // the student started grade 10), and today's grade is derived from it.
+    const s = await one<{ role: string; cohort_year: number; grade: number; student_id: string; phone: string }>(
+      `select role, cohort_year, school_grade(cohort_year, school_academic_year_start(now())) as grade, student_id, phone from "user" where id = $1`, [studentId]
     );
-    expect(s).toMatchObject({ role: 'student', grade: 11, phone: '01111111111' });
+    expect(s).toMatchObject({ role: 'student', cohort_year: academicYearStartOf() - 1, grade: 11, phone: '01111111111' });
     expect(s.student_id).toMatch(/^STU-\d{8}-[0-9A-Z]{5}$/);
     const link = await one<{ status: string }>(`select status from parent_student_link where student_id = $1`, [studentId]);
     expect(link.status).toBe('approved');

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, academicYearStartOf } from '@repo/validations';
 import { app, admin, staff, onboard, signUp, signIn, subject, session, openWindow, one, sql, PASSWORD, type Client } from './helpers';
 import { clientIp, rateLimitKey } from '../src/lib/client-ip';
 import { emailVerificationRequired } from '../src/lib/auth-policy';
@@ -46,11 +46,12 @@ describe('auth surface', () => {
   it('sign-up cannot choose a role, a grade, a student id or a verified email', async () => {
     const email = 'self.made.admin@test.local';
     const res = await raw('/api/auth/sign-up/email', {
-      json: { name: 'Self Made', email, password: PASSWORD, role: 'admin', grade: 12, studentId: 'STU-FAKE-1', emailVerified: true, phone: '0100' },
+      json: { name: 'Self Made', email, password: PASSWORD, role: 'admin', grade: 12, cohortYear: 2020, leftOn: '2026-01-01', studentId: 'STU-FAKE-1', emailVerified: true, phone: '0100' },
     });
     expect(res.status).toBeLessThan(500);
-    const rows = await sql<{ role: string | null; grade: number | null; student_id: string | null; email_verified: boolean }>(
-      `select role, grade, student_id, email_verified from "user" where email = $1`, [email]
+    // F0a: the grade is stored as the cohort; neither can be chosen at sign-up.
+    const rows = await sql<{ role: string | null; cohort_year: number | null; left_on: string | null; student_id: string | null; email_verified: boolean }>(
+      `select role, cohort_year, left_on, student_id, email_verified from "user" where email = $1`, [email]
     );
     // Either better-auth refuses the request outright, or it creates a plain account.
     if (res.status >= 400) {
@@ -58,19 +59,21 @@ describe('auth surface', () => {
     } else {
       expect(rows).toHaveLength(1);
       expect(rows[0]!.role === null || rows[0]!.role === 'user').toBe(true);
-      expect(rows[0]).toMatchObject({ grade: null, student_id: null, email_verified: false });
+      expect(rows[0]).toMatchObject({ cohort_year: null, left_on: null, student_id: null, email_verified: false });
     }
   });
 
   it('update-user cannot change a role, a grade or a student id', async () => {
     const res = await raw('/api/auth/update-user', {
-      cookie: parent.cookie, json: { name: 'Renamed Parent', role: 'admin', grade: 10, studentId: 'STU-FAKE-2' },
+      cookie: parent.cookie, json: { name: 'Renamed Parent', role: 'admin', grade: 10, cohortYear: 2020, studentId: 'STU-FAKE-2' },
     });
     expect(res.status).toBeLessThan(500);
-    expect(await one(`select role, grade, student_id from "user" where id = $1`, [parent.id])).toEqual({ role: 'parent', grade: null, student_id: null });
-    const s = await raw('/api/auth/update-user', { cookie: student.cookie, json: { role: 'finance_admin', grade: 10 } });
+    expect(await one(`select role, cohort_year, student_id from "user" where id = $1`, [parent.id])).toEqual({ role: 'parent', cohort_year: null, student_id: null });
+    const s = await raw('/api/auth/update-user', { cookie: student.cookie, json: { role: 'finance_admin', grade: 10, cohortYear: 2020, leftOn: null } });
     expect(s.status).toBeLessThan(500);
-    expect(await one<{ role: string; grade: number }>(`select role, grade from "user" where id = $1`, [studentId])).toEqual({ role: 'student', grade: 11 });
+    // Still grade 11 this year: the cohort did not move.
+    expect(await one<{ role: string; cohort_year: number }>(`select role, cohort_year from "user" where id = $1`, [studentId]))
+      .toEqual({ role: 'student', cohort_year: academicYearStartOf() - 1 });
   });
 
   it("better-auth's admin endpoints refuse everyone but an admin", async () => {
@@ -94,11 +97,11 @@ describe('auth surface', () => {
 
   it('a profile update ignores privileged fields', async () => {
     const res = await parent.api.v1.users.me.$put({
-      json: { name: 'Parent AS', role: 'admin', grade: 10, studentId: 'STU-FAKE-3', email: 'taken.over@test.local', emailVerified: false } as never,
+      json: { name: 'Parent AS', role: 'admin', grade: 10, cohortYear: 2020, leftOn: '2026-01-01', studentId: 'STU-FAKE-3', email: 'taken.over@test.local', emailVerified: false } as never,
     });
     expect(res.status).toBe(200);
-    expect(await one(`select role, grade, student_id, email from "user" where id = $1`, [parent.id]))
-      .toEqual({ role: 'parent', grade: null, student_id: null, email: parent.email });
+    expect(await one(`select role, cohort_year, left_on, student_id, email from "user" where id = $1`, [parent.id]))
+      .toEqual({ role: 'parent', cohort_year: null, left_on: null, student_id: null, email: parent.email });
   });
 
   it('account setup cannot switch a role that is already set', async () => {

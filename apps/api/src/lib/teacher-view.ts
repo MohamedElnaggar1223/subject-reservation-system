@@ -11,5 +11,8 @@ export function teacherForViewer<T extends { phone: string | null; email: string
   t: T,
   role: string | null | undefined
 ): T {
-  return role === 'admin' ? t : { ...t, phone: null, email: null };
+  // The staff account a record is linked to (F0a) is the admin's to see too.
+  return role === 'admin'
+    ? t
+    : { ...t, phone: null, email: null, ...('userId' in t ? { userId: null } : {}), ...('account' in t ? { account: null } : {}) };
 }

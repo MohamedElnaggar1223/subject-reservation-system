@@ -1,28 +1,23 @@
 /**
- * File Upload API Routes
+ * File routes — one upload path for every feature (FEATURES_PLAN.md F0a).
  *
- * EXAMPLE: Demonstrates file upload patterns with:
- * - Multipart form data handling
- * - File validation with Zod
- * - Image processing (avatars with thumbnails)
- * - Ownership verification
- * - Pagination for file lists
- * - Role-based access control
+ * - POST /files/upload          - Upload for a purpose: form { file, purpose, studentId? }.
+ *                                 The purpose (UPLOAD_PURPOSES in @repo/validations)
+ *                                 decides the types, the size, who may upload and
+ *                                 who may read it.
+ * - GET  /files/:id/content     - The file's bytes (?variant=thumbnail for an image),
+ *                                 for anyone the purpose lets read it
+ * - GET  /files/:id             - Its metadata, same rule
+ * - GET  /files/:id/download    - Its metadata with URLs (signed on R2; the content
+ *                                 path on the local store), same rule
+ * - GET  /files                 - The caller's own files
+ * - POST /files/avatar          - The caller's profile photo (purpose avatar)
+ * - POST /files/document        - A personal document (purpose document)
+ * - DELETE /files/:id           - Delete (owner or admin); never evidence
  *
- * Route Structure:
- * - POST /files/avatar     - Upload avatar with thumbnails
- * - POST /files/document   - Upload document (PDF, DOCX, etc.)
- * - GET /files             - List user's files (paginated)
- *
- * There is no general "upload anything" route: it accepted any type up to
- * 50 MB from any signed-in account and nothing used it (security audit,
- * RF-13). A file attached to a payment or remark must belong to the parent
- * attaching it (payment.services / remark.services use isFileOwner).
- * - GET /files/:id         - Get specific file (owner only)
- * - GET /files/:id/download - Download a file (owner only)
- * - DELETE /files/:id      - Delete file (admin or owner)
- *
- * Pattern: the standard route shape (auth middleware, zValidator, service call, success/error)
+ * A file the caller may not read answers 404, so its existence is not told.
+ * A file attached to a payment or remark must be the attaching parent's own
+ * evidence for that student (isAttachableEvidence, RF-13).
  */
 
 import { Hono } from 'hono'
@@ -30,14 +25,17 @@ import { zValidator } from '@hono/zod-validator'
 import {
   UploadAvatar,
   UploadDocument,
+  UploadFile,
   FileId,
   ListFilesQuery,
   ROLES,
 } from '@repo/validations'
+import { z } from 'zod'
 import { success, error, clientMessage } from '../lib/response.js'
 import { requireAuth } from '../middleware/access-control.middleware.js'
 import type { HonoEnv } from '../lib/types.js'
 import * as fileService from '../services/file.services.js'
+import { extractAuditContext } from '../services/audit.services.js'
 
 /**
  * Initialize route with typed environment
@@ -79,11 +77,11 @@ export const files = new Hono<HonoEnv>()
       const { file } = c.req.valid('form')
 
       try {
-        const uploaded = await fileService.updateUserAvatar(file, user.id)
+        const uploaded = await fileService.updateUserAvatar(file, { id: user.id, role: user.role })
         return success(c, uploaded, 201)
       } catch (err) {
         const message = clientMessage(err, 'Upload failed')
-        return error(c, message, 400)
+        return error(c, message, err instanceof fileService.FileError ? err.status : 400)
       }
     }
   )
@@ -107,11 +105,59 @@ export const files = new Hono<HonoEnv>()
       const { file } = c.req.valid('form')
 
       try {
-        const uploaded = await fileService.uploadFile(file, 'document', user.id)
+        const uploaded = await fileService.uploadFile(file, 'document', user.id, user.role)
         return success(c, uploaded, 201)
       } catch (err) {
         const message = clientMessage(err, 'Upload failed')
-        return error(c, message, 400)
+        return error(c, message, err instanceof fileService.FileError ? err.status : 400)
+      }
+    }
+  )
+
+  /**
+   * UPLOAD FOR A PURPOSE (F0a)
+   * POST /files/upload
+   * Form data: { file, purpose, studentId? }
+   */
+  .post('/upload',
+    zValidator('form', UploadFile),
+    async (c) => {
+      const user = c.get('user')!
+      const { file, purpose, studentId } = c.req.valid('form')
+      try {
+        const uploaded = await fileService.uploadForPurpose(file, purpose, studentId, { id: user.id, role: user.role }, extractAuditContext(c))
+        return success(c, uploaded, 201)
+      } catch (err) {
+        const message = clientMessage(err, 'Upload failed')
+        return error(c, message, err instanceof fileService.FileError ? err.status : 400)
+      }
+    }
+  )
+
+  /**
+   * A FILE'S BYTES (F0a)
+   * GET /files/:id/content?variant=
+   */
+  .get('/:id/content',
+    zValidator('param', FileId),
+    zValidator('query', z.object({ variant: z.enum(['original', 'thumbnail', 'medium', 'large']).optional() })),
+    async (c) => {
+      const user = c.get('user')!
+      const { id } = c.req.valid('param')
+      const { variant } = c.req.valid('query')
+      try {
+        const content = await fileService.getFileContent(id, { id: user.id, role: user.role }, variant)
+        return c.body(new Uint8Array(content.body), 200, {
+          'Content-Type': content.mimeType,
+          'Content-Disposition': `inline; filename="${content.name.replace(/[^\w.\- ]/g, '_')}"`,
+          'Cache-Control': 'private, no-store',
+          // Served from the API's origin: never run as a page.
+          'Content-Security-Policy': "default-src 'none'; sandbox",
+          'X-Content-Type-Options': 'nosniff',
+        })
+      } catch (err) {
+        const message = clientMessage(err, 'File not found')
+        return error(c, message, err instanceof fileService.FileError ? err.status : 404)
       }
     }
   )
@@ -163,7 +209,7 @@ export const files = new Hono<HonoEnv>()
       const user = c.get('user')!
       const { id } = c.req.valid('param')
 
-      const fileRecord = await fileService.getUserFile(id, user.id)
+      const fileRecord = await fileService.getReadableFile(id, { id: user.id, role: user.role })
 
       if (!fileRecord) {
         return error(c, 'File not found', 404)
@@ -195,8 +241,8 @@ export const files = new Hono<HonoEnv>()
       const user = c.get('user')!
       const { id } = c.req.valid('param')
 
-      // Get file with signed URLs
-      const fileWithUrls = await fileService.getUserFileWithSignedUrls(id, user.id)
+      // Get file with URLs (signed on R2; the content path on the local store)
+      const fileWithUrls = await fileService.getReadableFileWithUrls(id, { id: user.id, role: user.role })
 
       if (!fileWithUrls) {
         return error(c, 'File not found', 404)

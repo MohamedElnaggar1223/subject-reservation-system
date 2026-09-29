@@ -111,8 +111,13 @@ export async function logActions(
   })));
 }
 
+// 'graduated' is history: nothing writes it since F0a derived the grade from
+// the cohort. 'ineligible' is F0a's: the student may no longer sit the series
+// (withdrawn, cohort or series corrected, A-12 off, exception revoked), with
+// the cause in `detail`.
 export type ExpiryReason =
-  | 'session_closed' | 'entry_deadline' | 'graduated' | 'payment_closed' | 'preregistration_unfunded_at_deadline';
+  | 'session_closed' | 'entry_deadline' | 'graduated' | 'payment_closed' | 'preregistration_unfunded_at_deadline'
+  | 'ineligible';
 
 /**
  * One REGISTRATION_EXPIRED row per registration the system expired, with the

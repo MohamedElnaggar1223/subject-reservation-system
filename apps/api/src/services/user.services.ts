@@ -1,6 +1,6 @@
 /**
  * User Service
- * 
+ *
  * Manages user profile operations:
  * - Viewing user profiles
  * - Updating user profiles
@@ -8,13 +8,13 @@
  * - Admin user management
  */
 
-import { db, user, session, eq, ilike, or, and } from '@repo/db';
+import { db, user, session, teacher, eq, ilike, or, and, sql, gradeTodaySql, gradeTodayExtras } from '@repo/db';
 import { randomUUID } from 'crypto';
-import type { UpdateProfileType, AdminUpdateUserType, UserQueryFiltersType } from '@repo/validations';
+import { academicYearStartOf, cohortFromGrade, type UpdateProfileType, type AdminUpdateUserType, type UserQueryFiltersType } from '@repo/validations';
 
 /**
  * Get user profile by ID
- * 
+ *
  * @param userId - The user's ID
  * @returns User profile with relevant fields (excludes password/tokens)
  */
@@ -28,7 +28,9 @@ export async function getUserProfile(userId: string) {
       emailVerified: true,
       image: true,
       role: true,
-      grade: true,
+      cohortYear: true,
+      leftOn: true,
+      leftKind: true,
       studentId: true,
       phone: true,
       createdAt: true,
@@ -36,12 +38,19 @@ export async function getUserProfile(userId: string) {
       banned: true,
       banReason: true,
     },
+    // Today's grade (F0a): derived from the cohort, never stored.
+    extras: gradeTodayExtras,
+    with: {
+      // Teaching is a capability (F0a): the teacher record this account
+      // teaches as, if any.
+      teachingAs: { columns: { id: true, name: true, isActive: true } },
+    },
   });
 }
 
 /**
  * Get user by email
- * 
+ *
  * @param email - The user's email
  * @returns User profile or undefined
  */
@@ -53,7 +62,7 @@ export async function getUserByEmail(email: string) {
       name: true,
       email: true,
       role: true,
-      grade: true,
+      cohortYear: true,
       studentId: true,
     },
   });
@@ -61,7 +70,7 @@ export async function getUserByEmail(email: string) {
 
 /**
  * Get user by studentId
- * 
+ *
  * @param studentId - The student's unique identifier
  * @returns User profile or undefined
  */
@@ -73,7 +82,7 @@ export async function getUserByStudentId(studentId: string) {
       name: true,
       email: true,
       role: true,
-      grade: true,
+      cohortYear: true,
       studentId: true,
     },
   });
@@ -81,7 +90,7 @@ export async function getUserByStudentId(studentId: string) {
 
 /**
  * Update user profile
- * 
+ *
  * @param userId - The user's ID
  * @param data - Fields to update (name, phone)
  * @returns The updated user profile
@@ -101,7 +110,8 @@ export async function updateUserProfile(userId: string, data: UpdateProfileType)
       emailVerified: user.emailVerified,
       image: user.image,
       role: user.role,
-      grade: user.grade,
+      cohortYear: user.cohortYear,
+      grade: gradeTodaySql(user.cohortYear),
       studentId: user.studentId,
       phone: user.phone,
       createdAt: user.createdAt,
@@ -113,7 +123,7 @@ export async function updateUserProfile(userId: string, data: UpdateProfileType)
 
 /**
  * Admin update user
- * 
+ *
  * @param userId - The user's ID
  * @param data - Fields to update (includes admin-only fields)
  * @returns The updated user profile
@@ -133,7 +143,8 @@ export async function adminUpdateUser(userId: string, data: AdminUpdateUserType)
       emailVerified: user.emailVerified,
       image: user.image,
       role: user.role,
-      grade: user.grade,
+      cohortYear: user.cohortYear,
+      grade: gradeTodaySql(user.cohortYear),
       studentId: user.studentId,
       phone: user.phone,
       banned: user.banned,
@@ -180,30 +191,30 @@ export async function settleBan(userId: string, banned: boolean) {
 
 /**
  * Generate a unique student ID
- * 
+ *
  * Format: STU-YYYYMMDD-XXXXX (where X is random alphanumeric)
  * Example: STU-20260128-A7B3C
- * 
+ *
  * @returns A unique student ID string
  */
 export async function generateUniqueStudentId(): Promise<string> {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  
+
   // Try up to 10 times to generate a unique ID
   for (let attempt = 0; attempt < 10; attempt++) {
     const randomPart = randomUUID().slice(0, 5).toUpperCase();
     const studentId = `STU-${dateStr}-${randomPart}`;
-    
+
     // Check if this ID already exists
     const existing = await db.query.user.findFirst({
       where: (users, { eq }) => eq(users.studentId, studentId),
     });
-    
+
     if (!existing) {
       return studentId;
     }
   }
-  
+
   // Fallback: use full UUID suffix
   const fallbackId = `STU-${dateStr}-${randomUUID().slice(0, 8).toUpperCase()}`;
   return fallbackId;
@@ -211,20 +222,22 @@ export async function generateUniqueStudentId(): Promise<string> {
 
 /**
  * Set student-specific fields
- * 
- * Used after sign-up to set grade and studentId for students
- * 
+ *
+ * Used after sign-up (and by the desk and the admin's team form) to make an
+ * account a student: the grade they are in this academic year becomes the
+ * cohort that is stored (F0a), and a student ID is minted.
+ *
  * @param userId - The user's ID
- * @param grade - The student's grade (10, 11, or 12)
+ * @param gradeNow - The student's grade this academic year (9–12)
  * @returns The updated user
  */
-export async function setStudentFields(userId: string, grade: number) {
+export async function setStudentFields(userId: string, gradeNow: number) {
   const studentId = await generateUniqueStudentId();
-  
+
   const [updated] = await db
     .update(user)
     .set({
-      grade,
+      cohortYear: cohortFromGrade(gradeNow, academicYearStartOf()),
       studentId,
       role: 'student',
       updatedAt: new Date(),
@@ -232,29 +245,30 @@ export async function setStudentFields(userId: string, grade: number) {
     .where(eq(user.id, userId))
     .returning();
 
-  return updated;
+  return updated && { ...updated, grade: gradeNow };
 }
 
 /**
- * Update only the grade for an existing student (preserves studentId).
- * Used to fix students who have role='student' but a missing grade.
+ * Record the cohort of a student whose grade was never recorded (the setup
+ * page, called again). Changing a cohort that exists is an audited
+ * correction (student.services.ts), never this.
  */
-export async function updateStudentGrade(userId: string, grade: number) {
+export async function recordMissingCohort(userId: string, gradeNow: number) {
   const [updated] = await db
     .update(user)
     .set({
-      grade,
+      cohortYear: cohortFromGrade(gradeNow, academicYearStartOf()),
       updatedAt: new Date(),
     })
-    .where(eq(user.id, userId))
+    .where(and(eq(user.id, userId), sql`${user.cohortYear} IS NULL`))
     .returning();
 
-  return updated;
+  return updated && { ...updated, grade: gradeNow };
 }
 
 /**
  * Set user role
- * 
+ *
  * @param userId - The user's ID
  * @param role - The new role
  * @returns The updated user
@@ -274,7 +288,7 @@ export async function setUserRole(userId: string, role: string) {
 
 /**
  * Get all users (admin only)
- * 
+ *
  * @param filters - Optional filters (role, grade, search)
  * @returns Array of users
  */
@@ -282,15 +296,16 @@ export async function getAllUsers(filters?: UserQueryFiltersType) {
   return db.query.user.findMany({
     where: (users, { eq, and, or, ilike }) => {
       const conditions = [];
-      
+
       if (filters?.role) {
         conditions.push(eq(users.role, filters.role));
       }
-      
+
       if (filters?.grade) {
-        conditions.push(eq(users.grade, filters.grade));
+        // Today's grade, from the cohort (F0a)
+        conditions.push(sql`${gradeTodaySql(users.cohortYear)} = ${filters.grade}`);
       }
-      
+
       if (filters?.search) {
         conditions.push(
           or(
@@ -300,7 +315,7 @@ export async function getAllUsers(filters?: UserQueryFiltersType) {
           )
         );
       }
-      
+
       return conditions.length > 0 ? and(...conditions) : undefined;
     },
     columns: {
@@ -309,12 +324,18 @@ export async function getAllUsers(filters?: UserQueryFiltersType) {
       email: true,
       emailVerified: true,
       role: true,
-      grade: true,
+      cohortYear: true,
+      leftOn: true,
+      leftKind: true,
       studentId: true,
       phone: true,
       banned: true,
       createdAt: true,
       updatedAt: true,
+    },
+    extras: gradeTodayExtras,
+    with: {
+      teachingAs: { columns: { id: true, name: true } },
     },
     orderBy: (users, { desc }) => [desc(users.createdAt)],
   });
@@ -322,7 +343,7 @@ export async function getAllUsers(filters?: UserQueryFiltersType) {
 
 /**
  * Check if user exists
- * 
+ *
  * @param userId - The user's ID
  * @returns true if user exists
  */
@@ -331,7 +352,7 @@ export async function userExists(userId: string): Promise<boolean> {
     where: (users, { eq }) => eq(users.id, userId),
     columns: { id: true },
   });
-  
+
   return !!existing;
 }
 
@@ -367,10 +388,20 @@ export async function searchPeople(params: { search?: string; role?: 'student' |
       name: true,
       email: true,
       role: true,
-      grade: true,
+      cohortYear: true,
       studentId: true,
+      // Shown as such everywhere (F0a): the desk sees a student who left.
+      leftOn: true,
+      leftKind: true,
     },
+    extras: gradeTodayExtras,
     orderBy: (u, { asc }) => [asc(u.name)],
     limit: 25,
   });
+}
+
+/** The teacher record an account teaches as (F0a), if any. */
+export async function teacherIdForUser(userId: string): Promise<string | null> {
+  const [row] = await db.select({ id: teacher.id }).from(teacher).where(eq(teacher.userId, userId));
+  return row?.id ?? null;
 }

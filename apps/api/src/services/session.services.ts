@@ -23,6 +23,8 @@ import { failPayment, closeStrandedPayments } from './payment.services';
 import { schoolDate } from './window.services';
 import { logAction, logActions, type AuditContext } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
+import { expireIneligibleRegistrations } from './eligibility.services';
+import { A_LEVEL_ONLY_SESSION_TYPES, A_LEVEL_ONLY_MESSAGE, seriesLabel, type CorrectSessionSeriesType, type SessionType } from '@repo/validations';
 import { env } from '../env';
 import { randomUUID } from 'crypto';
 import type {
@@ -162,6 +164,7 @@ export async function createSession(data: CreateSessionType) {
       id,
       name: data.name,
       sessionType: data.sessionType,
+      seriesYear: data.seriesYear,
       qualificationLevel,
       startDate: data.startDate,
       endDate: data.endDate,
@@ -211,8 +214,8 @@ export async function updateDraftSession(
     if (!current) return undefined;
     const mergedType = data.sessionType ?? current.sessionType;
     const mergedLevel = data.qualificationLevel ?? current.qualificationLevel;
-    if (mergedType === 'january' && mergedLevel === 'igcse') {
-      throw new Error('January series are A-Level only — no January IGCSE exists in Egypt');
+    if (A_LEVEL_ONLY_SESSION_TYPES.includes(mergedType as SessionType) && mergedLevel === 'igcse') {
+      throw new Error(A_LEVEL_ONLY_MESSAGE);
     }
   }
 
@@ -286,6 +289,43 @@ export async function extendActiveSessionDeadline(
     .returning();
 
   return updated;
+}
+
+/**
+ * Correct a window's exam series (type and year), in any status, with a
+ * reason (F0a). The series decides the academic year every registration in
+ * the window is judged by, so the waiting registrations students may no
+ * longer sit expire in the same transaction (with their audit rows); the
+ * caller closes their open checkouts after it commits.
+ */
+export async function correctSessionSeries(id: string, data: CorrectSessionSeriesType, adminId: string, auditCtx?: AuditContext) {
+  try {
+    return await db.transaction(async (tx) => {
+      const [sess] = await tx.select().from(registrationSession).where(eq(registrationSession.id, id)).for('update');
+      if (!sess) throw new Error('Session not found');
+      if (sess.sessionType === data.sessionType && sess.seriesYear === data.seriesYear) {
+        throw new Error(`This window is already for the ${seriesLabel(data.sessionType, data.seriesYear)} series`);
+      }
+      if (A_LEVEL_ONLY_SESSION_TYPES.includes(data.sessionType) && sess.qualificationLevel === 'igcse') {
+        throw new Error(A_LEVEL_ONLY_MESSAGE);
+      }
+      const [updated] = await tx
+        .update(registrationSession)
+        .set({ sessionType: data.sessionType, seriesYear: data.seriesYear, updatedAt: new Date() })
+        .where(eq(registrationSession.id, id))
+        .returning();
+      await logAction(adminId, 'SESSION_SERIES_CORRECTED', 'session', id,
+        { sessionType: sess.sessionType, seriesYear: sess.seriesYear },
+        { sessionType: data.sessionType, seriesYear: data.seriesYear, reason: data.reason }, auditCtx, tx);
+      const expired = await expireIneligibleRegistrations(tx, { sessionIds: [id] }, 'series_corrected');
+      return { session: updated!, expired };
+    });
+  } catch (err) {
+    if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') {
+      throw new Error(`Another ${data.sessionType} window of this level is already open — close it first`);
+    }
+    throw err;
+  }
 }
 
 /**

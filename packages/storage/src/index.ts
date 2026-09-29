@@ -7,7 +7,8 @@
  * Single public API surface, hiding implementation details.
  */
 
-// Main client
+// Main clients: R2 in production, a local directory in development (F0a)
+export * from './storage-client.js'
 export * from './r2-client.js'
 
 // Utilities

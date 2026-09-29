@@ -23,13 +23,15 @@ import {
   SessionId,
   SetEntryDeadline,
   ListSessionsQuery,
+  CorrectSessionSeries,
+  ROLES,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
-import { requireAuth, requireAdmin } from '../middleware/access-control.middleware';
+import { requireAuth, requireAdmin, requireRole } from '../middleware/access-control.middleware';
+import { closePaymentsOfExpiredRegistrations } from '../services/payment.services';
 import type { HonoEnv } from '../lib/types';
 import * as sessionService from '../services/session.services';
 import { notifySessionOpened, notifySessionClosed, getStudentAndParentBroadcastIds } from '../services/notification.services';
-import { progressGradesOnce } from '../services/grade.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 import { schoolDate } from '../services/window.services';
 
@@ -81,7 +83,8 @@ export const sessions = new Hono<HonoEnv>()
    * Admin only. Returns all sessions ordered by startDate descending.
    */
   .get('/',
-    requireAdmin(),
+    // The coordinator reads the series too (the grade-10 exception names one).
+    requireRole(ROLES.ADMIN, ROLES.COORDINATOR),
     zValidator('query', ListSessionsQuery),
     async (c) => {
       const filters = c.req.valid('query');
@@ -212,7 +215,7 @@ export const sessions = new Hono<HonoEnv>()
       // very different side effects). Both directions are now accepted, so
       // long as the new endDate is still in the future. Reducing the deadline
       // to now-or-past still requires the explicit close route (to run
-      // finalizePendingRecords + grade progression + notifications).
+      // finalizePendingRecords + notifications).
       if (parsed.data.endDate.getTime() === session.endDate.getTime()) {
         return error(c, 'New end date is identical to the current end date', 400);
       }
@@ -257,6 +260,36 @@ export const sessions = new Hono<HonoEnv>()
       } catch (err) {
         const message = clientMessage(err, 'Failed to set the entry deadline');
         return error(c, message, message.includes('not found') ? 404 : 400);
+      }
+    }
+  )
+
+  /**
+   * CORRECT A WINDOW'S EXAM SERIES (F0a)
+   * PUT /sessions/:id/series  { sessionType, seriesYear, reason }
+   *
+   * Admin only, any status. Waiting registrations students may no longer sit
+   * under the corrected series expire; their open checkouts are closed with
+   * any escrow returned, and families told.
+   */
+  .put('/:id/series',
+    requireAdmin(),
+    zValidator('param', SessionId),
+    zValidator('json', CorrectSessionSeries),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      try {
+        const { session, expired } = await sessionService.correctSessionSeries(id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c));
+        const paymentsClosed = expired.length
+          ? await closePaymentsOfExpiredRegistrations(expired.map((r) => r.id), 'series_corrected').catch((err) => {
+              console.error('[session:series] Closing checkouts failed; the recovery sweep will retry:', err);
+              return 0;
+            })
+          : 0;
+        return success(c, { ...session, registrationsExpired: expired.length, paymentsClosed });
+      } catch (err) {
+        const message = clientMessage(err, 'Failed to correct the series');
+        return error(c, message, message.includes('not found') ? 404 : message.includes('already') ? 409 : 400);
       }
     }
   )
@@ -342,25 +375,8 @@ export const sessions = new Hono<HonoEnv>()
       await logAction(currentUser.id, 'SESSION_CLOSED', 'session', id, session as Record<string, unknown>, updated as Record<string, unknown>, extractAuditContext(c))
         .catch((err) => console.error('[audit] SESSION_CLOSED failed:', err));
 
-      // GRADE-001 + M-10: Await so admins see failures. On success, stamp
-      // gradeProgressionCompletedAt so the scheduler's retry sweep knows
-      // this session is done. On failure, leave the column null — the
-      // scheduler will retry on its next tick.
-      try {
-        // Once per (series type, year), as the scheduler does: the claim
-        // stops a second close in the same series running it again.
-        const progressed = await progressGradesOnce(session.sessionType as 'june' | 'november' | 'january', [id]);
-        if (progressed > 0) {
-          console.log(`[session:close] Progressed ${progressed} student(s) after manual close.`);
-        }
-      } catch (err) {
-        console.error('[session:close] Grade progression failed:', err);
-        return error(
-          c,
-          'Session was closed, but automatic grade progression failed. The scheduler will retry it on the next tick. You can also re-run it manually.',
-          500
-        );
-      }
+      // No grade moves at a close (F0a): a grade is derived from the cohort
+      // and the series' academic year (STATE_AUDIT.md ST-13).
 
       // Notify all active students and parents that the session has been closed
       {

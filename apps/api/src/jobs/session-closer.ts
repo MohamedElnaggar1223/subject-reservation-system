@@ -17,7 +17,6 @@ import { db, payment, registrationSession, eq, and, lte, gte, isNull } from '@re
 import { autoManageSessions, finalizePendingRecords, recoverSessionTransitions } from '../services/session.services';
 import { failPayment, enforcePaymentDeadlines } from '../services/payment.services';
 import { notifySessionOpened, notifySessionClosingSoon, notifySessionClosed, processScheduledAnnouncements, getStudentAndParentBroadcastIds } from '../services/notification.services';
-import { progressGradesOnce } from '../services/grade.services';
 import { capturePreregistrationsForSession } from '../services/prereg.services';
 import { logAction } from '../services/audit.services';
 import { logger } from '../lib/logger';
@@ -79,83 +78,10 @@ export function startSessionScheduler(): void {
             .catch((err) => logger.error(`[session-closer] Audit SESSION_AUTO_CLOSED failed for ${sess.id}:`, err));
         }
 
-        // GRADE-001: Progress student grades for each unique session type that just closed.
-        // Deduplicate session types and track which session IDs each type owns
-        // so that on success we can stamp the exact rows as progression-complete.
-        const idsByType = new Map<string, string[]>();
-        for (const s of closedSessions) {
-          const arr = idsByType.get(s.sessionType) ?? [];
-          arr.push(s.id);
-          idsByType.set(s.sessionType, arr);
-        }
-
-        for (const [sessionType, ids] of idsByType) {
-          try {
-            const count = await progressGradesOnce(
-              sessionType as 'june' | 'november' | 'january',
-              ids,
-            );
-            if (count > 0) {
-              logger.info(
-                `[session-closer] GRADE-001: Progressed ${count} student(s) after ${sessionType} session close.`
-              );
-            }
-          } catch (gradeErr) {
-            logger.error(
-              `[session-closer] GRADE-001 progression failed for sessionType "${sessionType}":`,
-              gradeErr,
-            );
-            // Intentionally NOT stamping gradeProgressionCompletedAt here —
-            // the retry sweep below will pick these sessions up next tick.
-          }
-        }
-      }
-
-      // M-10: Retry sweep for closed sessions whose grade progression hasn't
-      // completed yet (i.e. a previous tick's progress failed). This keeps
-      // students' grades from silently diverging when a transient DB hiccup,
-      // deploy restart, or code bug interrupted the original progression.
-      try {
-        const stalledSessions = await db
-          .select({
-            id: registrationSession.id,
-            name: registrationSession.name,
-            sessionType: registrationSession.sessionType,
-          })
-          .from(registrationSession)
-          .where(
-            and(
-              eq(registrationSession.status, 'closed'),
-              isNull(registrationSession.gradeProgressionCompletedAt),
-            )
-          );
-
-        if (stalledSessions.length > 0) {
-          const retryIdsByType = new Map<string, string[]>();
-          for (const s of stalledSessions) {
-            const arr = retryIdsByType.get(s.sessionType) ?? [];
-            arr.push(s.id);
-            retryIdsByType.set(s.sessionType, arr);
-          }
-          for (const [sessionType, ids] of retryIdsByType) {
-            try {
-              const count = await progressGradesOnce(
-                sessionType as 'june' | 'november' | 'january',
-                ids,
-              );
-              logger.info(
-                `[session-closer] GRADE-001 retry: re-ran progression for ${ids.length} stalled ${sessionType} session(s); ${count} student transition(s) applied.`
-              );
-            } catch (retryErr) {
-              logger.error(
-                `[session-closer] GRADE-001 retry failed for sessionType "${sessionType}":`,
-                retryErr,
-              );
-            }
-          }
-        }
-      } catch (err) {
-        logger.error('[session-closer] GRADE-001 retry sweep failed:', err);
+        // No grade moves at a close (F0a): grades are derived from each
+        // student's cohort and the series' academic year, so window-driven
+        // progression, its once-per-series claim and its retry sweep are gone
+        // (STATE_AUDIT.md ST-13, FEATURES_PLAN.md F0a).
       }
 
       // Send closure notifications for auto-closed sessions

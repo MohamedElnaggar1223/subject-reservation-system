@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, money, audited, openWindow, futureWindow, academicYearOf, loneStudent,
+  admin, staff, onboard, subject, session, refused, one, sql, money, audited, openWindow, futureWindow, academicYearOf, loneStudent, localToday,
   runSessionRecovery, holdRowLock, lockWaiters, notified, expireByHand, type Client,
 } from './helpers';
 
@@ -228,9 +228,14 @@ describe('state and time', () => {
     });
   });
 
-  // ─── Graduation ────────────────────────────────────────────────────────────
+  // ─── A student who may no longer sit the series (ST-04, F0a) ────────────────
+  // Before F0a these scenarios graduated the student by hand (PUT /v1/grade);
+  // graduation is no longer an event (the grade is derived from the cohort),
+  // so the same clean-up is driven by a withdrawal. The money outcomes are the
+  // ones asserted before: registration expired, checkout closed, escrow back,
+  // audited, family told. Cohort corrections and A-12 turned off: 08e.
 
-  describe('a student who graduates with a checkout open (ST-04)', () => {
+  describe('a student who is withdrawn with a checkout open (ST-04)', () => {
     it('gets the escrow back and the checkout closed, not stranded on an expired registration', async () => {
       const f = await family('gr', 12);
       // Free escrow the way it really happens: paid at the desk, dropped before the receipt left the desk.
@@ -241,24 +246,34 @@ describe('state and time', () => {
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 300 } }))).id!;
       expect(await escrowOf(f.studentId)).toBe(1200);
 
-      await apiResponse(adm.api.v1.grade[':id'].$put({ param: { id: f.studentId }, json: { newGrade: null, reason: 'left the school early' } }));
+      await apiResponse(adm.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'left the school early' } }));
 
       expect(await statusOf('registration', reg)).toBe('expired');
       expect(await statusOf('payment', pay)).toBe('failed');
       expect(await escrowOf(f.studentId)).toBe(1500);
       await audited([pay], ['PAYMENT_FAILED']);
+      await audited([reg], ['REGISTRATION_EXPIRED']);
+      expect(await one(`select new_data->>'reason' as reason, new_data->>'detail' as detail from audit_log where entity_id = $1 and action = 'REGISTRATION_EXPIRED'`, [reg]))
+        .toEqual({ reason: 'ineligible', detail: 'withdrawn' });
       const notice = await notified(f.parent.email, 'PAYMENT_EXPIRED', 1);
-      expect(notice[0]?.title).toBe('Payment closed: student graduated');
+      expect(notice[0]?.title).toBe('Payment closed');
+      expect(notice[0]?.body).toContain('has been withdrawn from the school');
     });
 
-    it('a checkout whose transfer is being checked keeps its registration through graduation, as at a close', async () => {
+    it('a checkout whose transfer is being checked keeps its registration through a withdrawal, as at a close', async () => {
       const f = await family('gr2', 12);
       const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [subj.S13!], studentId: f.studentId } })))[0]!.id;
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
       await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: pay }, json: { reference: 'FT-ST-GR-2' } }));
-      await apiResponse(adm.api.v1.grade[':id'].$put({ param: { id: f.studentId }, json: { newGrade: null, reason: 'left after the November entries' } }));
+      await apiResponse(adm.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'transferred', leftOn: localToday(), reason: 'left after the November entries' } }));
       expect(await statusOf('registration', reg)).toBe('pending_payment');
       expect(await statusOf('payment', pay)).toBe('pending_verification');
+      // SO-7, closed by F0a: finance rejects that transfer; the subject the
+      // student may no longer sit is released, never payable again.
+      await apiResponse(finadmin.api.v1.payments[':id'].reject.$post({ param: { id: pay }, json: { reason: 'not on the statement' } }));
+      expect(await statusOf('registration', reg)).toBe('expired');
+      const again = await refused(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
+      expect(again.status).toBe(400);
     });
   });
 

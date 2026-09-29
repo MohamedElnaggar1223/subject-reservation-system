@@ -47,6 +47,7 @@ import {
   eq,
   and,
   inArray,
+  gradeTodayExtras,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type {
@@ -69,7 +70,7 @@ import {
   notifyDirectDropSwapExecuted,
   notifyEscrowBalanceChanged,
 } from './notification.services';
-import { isGraduated } from './grade.services';
+import { assertMayRegisterFor, mayRegisterFor } from './eligibility.services';
 import { logAction, type AuditContext } from './audit.services';
 
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
@@ -168,11 +169,9 @@ async function validateChangeEligibility(
     throw new Error('Changes can only be made while the registration window is open (SWAP-006)');
   }
 
-  // Fetch student to check grade for core subject validation
-  const studentRecord = await db.query.user.findFirst({
-    where: (u, { eq }) => eq(u.id, reg.studentId),
-    columns: { grade: true },
-  });
+  // The student's grade in the series' academic year, for the core lock
+  // (F0a, A-05): not today's grade.
+  const seriesGrade = (await mayRegisterFor(reg.studentId, reg.sessionId)).grade;
 
   // Core subject check: Grade 10 June session core subjects are locked.
   // URD CORE-002 explicitly requires the lock to survive later admin edits
@@ -183,7 +182,7 @@ async function validateChangeEligibility(
   const coreAtRegistration =
     reg.wasCoreAtRegistration ?? reg.subject.isCore;
   if (
-    studentRecord?.grade === 10 &&
+    seriesGrade === 10 &&
     reg.session.sessionType === 'june' &&
     coreAtRegistration
   ) {
@@ -201,7 +200,7 @@ async function validateChangeEligibility(
     throw new Error('A pending change request already exists for this registration. Cancel it before submitting a new one.');
   }
 
-  return { reg, studentGrade: studentRecord?.grade ?? null };
+  return { reg, studentGrade: seriesGrade };
 }
 
 /**
@@ -262,12 +261,11 @@ export async function createDropRequest(
   data: RequestDropType,
   requestedBy: string
 ) {
-  // GRADE-003: Graduated students cannot create new change requests
-  if (await isGraduated(requestedBy)) {
-    throw new Error('Graduated students cannot submit drop requests');
-  }
-
   const { reg } = await validateChangeEligibility(registrationId, requestedBy, true);
+  // F0a: call site 7 of mayRegisterFor. A student who may no longer sit the
+  // series does not open change requests on it (graduated students could
+  // not before F0a); a parent can still drop a paid subject directly.
+  await assertMayRegisterFor(reg.studentId, reg.sessionId);
 
   const [request] = await db
     .insert(changeRequest)
@@ -317,12 +315,9 @@ export async function createSwapRequest(
   data: RequestSwapType,
   requestedBy: string
 ) {
-  // GRADE-003: Graduated students cannot create new change requests
-  if (await isGraduated(requestedBy)) {
-    throw new Error('Graduated students cannot submit swap requests');
-  }
-
   const { reg } = await validateChangeEligibility(registrationId, requestedBy, true);
+  // F0a: call site 8 of mayRegisterFor — a swap registers a new subject.
+  await assertMayRegisterFor(reg.studentId, reg.sessionId);
 
   const newSub = await validateNewSubjectForSwap(
     reg.studentId,
@@ -427,6 +422,9 @@ export async function approveChangeRequest(
   if (cr.registration.session.status !== 'active') {
     throw new Error('The registration window has closed; this request can no longer be approved');
   }
+  // F0a: call site 9 of mayRegisterFor — an approved swap registers a new
+  // subject, so the student must still be able to sit the series.
+  if (cr.type === 'swap') await assertMayRegisterFor(cr.registration.studentId, cr.registration.sessionId);
 
   let newSubjectIsCore = false;
   let newPricing: Awaited<ReturnType<typeof priceSwappedInSubject>> | null = null;
@@ -735,6 +733,9 @@ export async function executeDirectSwap(
 
   const linked = await validateParentStudentLink(parentId, reg.studentId);
   if (!linked) throw new Error('You are not linked to this student');
+  // F0a: call site 10 of mayRegisterFor — a parent's direct swap registers
+  // a new subject.
+  await assertMayRegisterFor(reg.studentId, reg.sessionId);
 
   const newSub = await validateNewSubjectForSwap(
     reg.studentId,
@@ -858,7 +859,7 @@ export async function getPendingChangeRequests(
           subject: { columns: { id: true, name: true, code: true } },
           session: { columns: { id: true, name: true, sessionType: true } },
           // Same shape as the parent listing so the route has one response type
-          student: { columns: { id: true, name: true, grade: true } },
+          student: { columns: { id: true, name: true, cohortYear: true }, extras: gradeTodayExtras },
         },
       },
       newSubject: { columns: { id: true, name: true, code: true } },
@@ -905,7 +906,7 @@ export async function getPendingChangeRequestsForParent(parentId: string) {
           subject: { columns: { id: true, name: true, code: true } },
           session: { columns: { id: true, name: true, sessionType: true } },
           student: {
-            columns: { id: true, name: true, grade: true },
+            columns: { id: true, name: true, cohortYear: true }, extras: gradeTodayExtras,
           },
         },
       },
@@ -979,7 +980,7 @@ export async function getChangeRequestById(id: string) {
         },
       },
       newSubject: true,
-      requestedByUser: { columns: { id: true, name: true, grade: true } },
+      requestedByUser: { columns: { id: true, name: true, cohortYear: true }, extras: gradeTodayExtras },
       approvedByUser: { columns: { id: true, name: true } },
     },
   });

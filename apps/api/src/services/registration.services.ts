@@ -31,6 +31,7 @@ import {
   and,
   inArray,
   notInArray,
+  gradeTodayExtras,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type {
@@ -47,7 +48,7 @@ import {
   notifyRegistrationDecision,
   notifyDirectRegistrationCreated,
 } from './notification.services';
-import { isGraduated } from './grade.services';
+import { assertMayRegisterFor, mayRegisterFor, type Eligibility } from './eligibility.services';
 import { computeRegistrationPricing } from './pricing.services';
 import { schoolFeeGateReason } from './school-fee.services';
 import { applyPricingExceptions } from './exception.services';
@@ -88,10 +89,13 @@ async function getRetakeSubjectIds(
  * level match, teacher validation, retake detection, pricing engine, and
  * the school-fee gate. Returns per-subject computed values keyed by
  * subject ID.
+ *
+ * `eligibility` is the path's own mayRegisterFor answer (F0a): the fee gate
+ * reads the series' academic year and the student's grade in it from it.
  */
 export async function prepareRegistrationInputs(
   studentId: string,
-  sess: { id: string; qualificationLevel: string; startDate: Date },
+  sess: { id: string; qualificationLevel: string },
   subjects: {
     id: string;
     qualificationLevel: string;
@@ -100,7 +104,8 @@ export async function prepareRegistrationInputs(
     isOfferedAtSchool: boolean;
     name: string;
   }[],
-  subjectOptions: Record<string, SubjectRegistrationOptionsType> | undefined
+  subjectOptions: Record<string, SubjectRegistrationOptionsType> | undefined,
+  eligibility: Eligibility
 ) {
   // Level match: an IGCSE session only takes IGCSE subjects, etc.
   const wrongLevel = subjects.filter((s) => s.qualificationLevel !== sess.qualificationLevel);
@@ -110,12 +115,9 @@ export async function prepareRegistrationInputs(
     );
   }
 
-  // School-fee gate (D-H): unpaid school fee blocks registration
-  const studentRow = await db.query.user.findFirst({
-    where: (u, { eq }) => eq(u.id, studentId),
-    columns: { grade: true },
-  });
-  const gate = await schoolFeeGateReason(studentId, studentRow?.grade ?? null, sess.startDate);
+  // School-fee gate (D-H): unpaid school fee blocks registration — the fee
+  // of the series' academic year at the student's grade in it (F0a).
+  const gate = await schoolFeeGateReason(studentId, eligibility);
   if (gate) throw new Error(gate);
 
   // Teacher validation: chosen teacher must be linked to that subject
@@ -246,6 +248,10 @@ async function getExistingRegistrationSubjectIds(
  * Validate that a Grade 10 student's registration request includes all
  * mandatory core subjects for a June session.
  *
+ * The grade is the student's grade in the series' academic year (F0a,
+ * A-05), not today's: a student starting grade 10 in September is grade 10
+ * for the June after it, whatever the date the window opens.
+ *
  * Returns { valid: true } for non-Grade-10 students or non-June sessions.
  * Returns { valid: false, missingCoreSubjects } when core subjects are missing.
  */
@@ -257,31 +263,12 @@ export async function validateCoreSubjectRequirements(
   valid: boolean;
   missingCoreSubjects: { id: string; name: string; code: string }[];
 }> {
-  const [studentRecord, sessionRecord] = await Promise.all([
-    db.query.user.findFirst({
-      where: (u, { eq }) => eq(u.id, studentId),
-      columns: { grade: true },
-    }),
-    db.query.registrationSession.findFirst({
-      where: (s, { eq }) => eq(s.id, sessionId),
-      columns: { sessionType: true },
-    }),
-  ]);
-
-  // Fail closed if either entity is missing: all current callers pre-check
-  // student/session existence, so this branch indicates a programming bug
-  // or a race (student deleted mid-request). Previously this returned
-  // valid=true which would silently bypass the CORE-003 rule if the
-  // helper were ever reused from a path that skipped the pre-check.
-  if (!studentRecord) {
-    throw new Error('Student not found during core-subject validation');
-  }
-  if (!sessionRecord) {
-    throw new Error('Session not found during core-subject validation');
-  }
+  // Fails closed: mayRegisterFor throws when the student or session is
+  // missing, so the CORE-003 rule is never skipped silently.
+  const eligibility = await mayRegisterFor(studentId, sessionId);
 
   // Core requirement only applies to Grade 10 in the June session
-  if (studentRecord.grade !== 10 || sessionRecord.sessionType !== 'june') {
+  if (eligibility.grade !== 10 || eligibility.series.sessionType !== 'june') {
     return { valid: true, missingCoreSubjects: [] };
   }
 
@@ -339,8 +326,8 @@ export async function getAvailableSubjects(
   studentId: string,
   sessionId: string
 ): Promise<AvailableSubjectRow[]> {
-  // GRADE-003: Graduated students have no available subjects
-  if (await isGraduated(studentId)) return [];
+  // F0a: nothing is available in a series the student may not register for
+  if (!(await mayRegisterFor(studentId, sessionId)).allowed) return [];
 
   const sess = await db.query.registrationSession.findFirst({
     where: (s, { eq }) => eq(s.id, sessionId),
@@ -414,10 +401,9 @@ export async function createRegistrationRequest(
   data: RequestRegistrationType,
   requestedBy: string
 ) {
-  // GRADE-003: Graduated students cannot register for new subjects
-  if (await isGraduated(studentId)) {
-    throw new Error('Graduated students cannot submit new registration requests');
-  }
+  // F0a: the series decides who may register (grade 10 June only, A-12,
+  // a student who left) — call site 1 of mayRegisterFor.
+  const eligibility = await assertMayRegisterFor(studentId, data.sessionId);
 
   // AUTH-003/REG-001: A student request requires a parent to approve it.
   // Without an approved link, the request would sit in 'pending_approval'
@@ -470,7 +456,8 @@ export async function createRegistrationRequest(
     studentId,
     sess,
     subjects,
-    data.subjectOptions
+    data.subjectOptions,
+    eligibility
   );
 
   const records = subjects.map((sub) => {
@@ -533,10 +520,8 @@ export async function createDirectRegistration(
   const linked = await validateParentStudentLink(parentId, data.studentId);
   if (!linked) throw new Error('You are not linked to this student');
 
-  // GRADE-003: Graduated students cannot be registered for new subjects
-  if (await isGraduated(data.studentId)) {
-    throw new Error('Graduated students cannot be registered for new subjects');
-  }
+  // F0a: call site 2 of mayRegisterFor (a parent's direct registration).
+  const eligibility = await assertMayRegisterFor(data.studentId, data.sessionId);
 
   const sess = await db.query.registrationSession.findFirst({
     where: (s, { eq }) => eq(s.id, data.sessionId),
@@ -579,7 +564,8 @@ export async function createDirectRegistration(
     data.studentId,
     sess,
     subjects,
-    data.subjectOptions
+    data.subjectOptions,
+    eligibility
   );
 
   const now = new Date();
@@ -654,10 +640,12 @@ export async function approveRegistrationRequest(
     throw new Error('One or more registrations are not awaiting approval');
   }
 
-  // GRADE-003: Cannot approve registrations for a graduated student
-  const firstStudentId = regs[0]!.studentId;
-  if (await isGraduated(firstStudentId)) {
-    throw new Error('Cannot approve registrations for a graduated student');
+  // F0a: call site 3 of mayRegisterFor — a request made before the student
+  // left, or before a correction, is not approved into a series they may no
+  // longer sit.
+  for (const key of new Set(regs.map((r) => `${r.studentId}|${r.sessionId}`))) {
+    const [studentId, sessionId] = key.split('|') as [string, string];
+    await assertMayRegisterFor(studentId, sessionId);
   }
 
   // The window must be open for the student — the same rule the request
@@ -931,13 +919,13 @@ export async function adminOverrideApproval(
 ) {
   const student = await db.query.user.findFirst({
     where: (u, { eq: eqOp }) => eqOp(u.id, data.studentId),
-    columns: { id: true, grade: true, role: true },
+    columns: { id: true, role: true },
   });
   if (!student) throw new Error('Student not found');
-  // GRADE-003: Only students with null grade are graduated; admins/parents also have null grade
-  if (student.role === 'student' && student.grade === null) {
-    throw new Error('Cannot register for a graduated student');
-  }
+  // F0a: call site 4 of mayRegisterFor. The override bypasses the parent's
+  // approval, never the series' eligibility (a coordinator's grade-10
+  // exception is the sanctioned way past the grade-10 rule).
+  const eligibility = await assertMayRegisterFor(data.studentId, data.sessionId);
 
   const sess = await db.query.registrationSession.findFirst({
     where: (s, { eq }) => eq(s.id, data.sessionId),
@@ -988,7 +976,8 @@ export async function adminOverrideApproval(
     data.studentId,
     sess,
     subjects,
-    undefined
+    undefined,
+    eligibility
   );
 
   const now = new Date();
@@ -1052,7 +1041,7 @@ export async function getRegistrations(filters: ListRegistrationsQueryType & {
       subject: true,
       session: true,
       student: {
-        columns: { id: true, name: true, email: true, grade: true, studentId: true },
+        columns: { id: true, name: true, email: true, cohortYear: true, studentId: true }, extras: gradeTodayExtras,
       },
     },
     orderBy: (r, { desc }) => [desc(r.createdAt)],
@@ -1123,7 +1112,7 @@ export async function getPendingApprovalRequests(parentId: string) {
       subject: true,
       session: true,
       student: {
-        columns: { id: true, name: true, email: true, grade: true, studentId: true },
+        columns: { id: true, name: true, email: true, cohortYear: true, studentId: true }, extras: gradeTodayExtras,
       },
     },
     orderBy: (r, { asc }) => [asc(r.createdAt)],

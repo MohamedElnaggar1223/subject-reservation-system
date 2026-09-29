@@ -17,7 +17,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { db } from '@repo/db';
+import { db, gradeTodayExtras } from '@repo/db';
 import {
   ReceiptId,
   MarkReceiptReturned,
@@ -188,7 +188,7 @@ export const receipts = new Hono<HonoEnv>()
       with: {
         registration: {
           with: {
-            student: { columns: { id: true, name: true, studentId: true, grade: true } },
+            student: { columns: { id: true, name: true, studentId: true, cohortYear: true }, extras: gradeTodayExtras },
             subject: { columns: { id: true, name: true, code: true, council: true } },
             session: { columns: { id: true, name: true } },
           },

@@ -32,7 +32,11 @@ import { escrowRoutes } from './routes/escrow.routes';
 import { registrationSwapRoutes, changeRequestRoutes } from './routes/swap.routes';
 import { notificationRoutes } from './routes/notification.routes';
 import { audit } from './routes/audit.routes';
-import { grade } from './routes/grade.routes';
+import { academicRoutes } from './routes/academic.routes';
+import { studentRoutes } from './routes/student.routes';
+import { settingsRoutes } from './routes/settings.routes';
+import { teachingRoutes } from './routes/teaching.routes';
+import { isGrantedRole, isGranted } from './lib/role-grants';
 import { reports } from './routes/report.routes';
 import { teachers } from './routes/teacher.routes';
 import { schoolFees } from './routes/school-fee.routes';
@@ -331,9 +335,14 @@ const v1 = new Hono<HonoEnv>()
    * - GET    /v1/audit/logs                       - Paginated audit log with filters (REP-006)
    * - GET    /v1/audit/entity/:type/:id           - Full chain-of-custody for a single entity
    *
-   * Grade management routes mounted at /v1/grade (admin only):
-   * - GET    /v1/grade/graduated                  - List all graduated students (GRADE-003)
-   * - PUT    /v1/grade/:studentId                 - Manual grade adjustment (GRADE-002)
+   * F0a — core foundation:
+   * - /v1/academic   academic years, terms, calendar, bell schedules, rooms, sections
+   * - /v1/students   the student record: grade, cohort, section, status; the
+   *                  cohort correction; leaving and readmission
+   * - /v1/settings   the settings store
+   * - /v1/teaching   the teacher capability of the signed-in account
+   * (The grade routes, /v1/grade, were removed: a grade is derived from the
+   * cohort; a correction is PUT /v1/students/:id/cohort.)
    *
    * Reports routes mounted at /v1/reports (admin only):
    * - GET    /v1/reports/dashboard                - Admin dashboard metrics (REP-008)
@@ -350,6 +359,15 @@ const v1 = new Hono<HonoEnv>()
   // Previously only four groups were covered, leaving account creation,
   // desk onboarding, and the expensive report endpoints unlimited.
   .use('/*', apiRateLimit)
+  // F0a: the coordinator, teacher and gate roles reach only the endpoints
+  // granted to them (lib/role-grants.ts); every route's own gate still applies.
+  .use('/*', async (c, next) => {
+    const user = c.get('user');
+    if (user && isGrantedRole(user.role) && !isGranted(user.role, c.req.method, c.req.path)) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+    return next();
+  })
   .route('/files', files)
   .route('/links', links)
   .route('/users', users)
@@ -362,13 +380,16 @@ const v1 = new Hono<HonoEnv>()
   .route('/change-requests', changeRequestRoutes)
   .route('/notifications', notificationRoutes)
   .route('/audit', audit)
-  .route('/grade', grade)
   .route('/reports', reports)
   .route('/teachers', teachers)
   .route('/school-fees', schoolFees)
   .route('/receipts', receipts)
   .route('/exceptions', exceptions)
-  .route('/remarks', remarks);
+  .route('/remarks', remarks)
+  .route('/academic', academicRoutes)
+  .route('/students', studentRoutes)
+  .route('/settings', settingsRoutes)
+  .route('/teaching', teachingRoutes);
 
 // Mount v1 under /v1 (keep chaining for proper RPC typing)
 // Exported for in-process tests (app.request) and for index.ts to serve.

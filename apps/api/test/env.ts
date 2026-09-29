@@ -5,6 +5,9 @@
  * entry, imports `dotenv/config`), so that file cannot reach a test run at
  * all; what the shell holds is handled below.
  */
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
 export const TEST_DB_NAME = process.env.TEST_DB_NAME ?? 'igcse_test';
 
 /** Maintenance connection used only to create/drop the test database. */
@@ -41,6 +44,9 @@ const defaults: Record<string, string> = {
   SCHOOL_BANK_NAME: 'Test Bank',
   SCHOOL_ACCOUNT_NAME: 'IGCSE School (test)',
   SCHOOL_ACCOUNT_NUMBER: '0000000000000000',
+  // Uploads go to the local store (R2 keys are blanked below), one directory
+  // per test database so parallel suites on this machine never share files.
+  LOCAL_UPLOAD_DIR: path.join(tmpdir(), `igcse-uploads-${TEST_DB_NAME}`),
 };
 
 for (const [key, value] of Object.entries(defaults)) {

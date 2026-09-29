@@ -39,3 +39,14 @@ export function seriesAcademicYearStartSql(sessionType: string | SQL | AnyPgColu
   const type = typeof sessionType === 'string' ? sql`${sessionType}::text` : sql`${sessionType}`;
   return sql<number>`school_series_academic_year_start(${type}, ${asInt(seriesYear)})`;
 }
+
+/**
+ * `extras` for a relational query on the user table: today's grade as
+ * `grade`, next to the columns, e.g.
+ *   student: { columns: { id: true, name: true }, extras: gradeTodayExtras }
+ * The number is raw: above 12 is graduated, below 10 not yet started, null
+ * unknown (the web formats it with gradeLabel).
+ */
+export function gradeTodayExtras(fields: { cohortYear: AnyPgColumn }) {
+  return { grade: gradeTodaySql(fields.cohortYear).as('grade') };
+}

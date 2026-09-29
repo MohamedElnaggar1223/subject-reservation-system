@@ -21,6 +21,9 @@
 
 import {
   db,
+  gradeTodaySql,
+  gradeInYearSql,
+  gradeTodayExtras,
   registration,
   registrationSession,
   subject,
@@ -41,6 +44,20 @@ import {
   sql,
   count,
 } from '@repo/db';
+import { gradeLabel, gradeInAcademicYear, seriesAcademicYearStart } from '@repo/validations';
+
+/**
+ * Today's grade as a report cell (F0a): the number for grades 10–12,
+ * 'graduated' past 12, 'upcoming' below 10, 'unknown' without a cohort,
+ * for a raw-SQL alias of the user table.
+ */
+const gradeTodayLabelSql = (alias: string) => sql.raw(
+  `(CASE WHEN ${alias}.cohort_year IS NULL THEN 'unknown'` +
+  ` WHEN school_grade(${alias}.cohort_year, school_academic_year_start(now())) > 12 THEN 'graduated'` +
+  ` WHEN school_grade(${alias}.cohort_year, school_academic_year_start(now())) < 10 THEN 'upcoming'` +
+  ` ELSE school_grade(${alias}.cohort_year, school_academic_year_start(now()))::text END)`
+);
+
 
 // ─── Pagination Helper ──────────────────────────────────────────────────────
 
@@ -116,12 +133,16 @@ export async function getAdminDashboardMetrics() {
     currentSessionRegistrationsRow,
     currentSessionRevenueRow,
   ] = await Promise.all([
-    // Student counts by grade + graduated
+    // Student counts by today's grade (F0a: from the cohort); -1 marks a
+    // student who left the school.
     db
-      .select({ grade: user.grade, count: count() })
+      .select({
+        grade: sql<number | null>`CASE WHEN ${user.leftOn} IS NOT NULL THEN -1 ELSE ${gradeTodaySql(user.cohortYear)} END`,
+        count: count(),
+      })
       .from(user)
       .where(eq(user.role, 'student'))
-      .groupBy(user.grade),
+      .groupBy(sql`1`),
 
     // Parent count
     db
@@ -226,12 +247,17 @@ export async function getAdminDashboardMetrics() {
   ]);
 
   // Map grade counts
-  const gradeMap: Record<string, number> = { grade10: 0, grade11: 0, grade12: 0, graduated: 0 };
+  const gradeMap: Record<string, number> = { grade10: 0, grade11: 0, grade12: 0, graduated: 0, left: 0, unknown: 0, upcoming: 0 };
   for (const row of studentsByGrade) {
-    if (row.grade === 10)   gradeMap.grade10    = Number(row.count);
-    else if (row.grade === 11) gradeMap.grade11 = Number(row.count);
-    else if (row.grade === 12) gradeMap.grade12 = Number(row.count);
-    else                    gradeMap.graduated  = Number(row.count); // grade = null
+    const n = Number(row.count);
+    const g = row.grade === null ? null : Number(row.grade);
+    if (g === -1)           gradeMap.left!     += n;
+    else if (g === null)    gradeMap.unknown!  += n;
+    else if (g === 10)      gradeMap.grade10!  += n;
+    else if (g === 11)      gradeMap.grade11!  += n;
+    else if (g === 12)      gradeMap.grade12!  += n;
+    else if (g > 12)        gradeMap.graduated! += n;
+    else                    gradeMap.upcoming! += n;
   }
 
   const revenueRows = (currentSessionRevenueRow as { rows?: { total: number | string }[] }).rows ?? [];
@@ -251,8 +277,11 @@ export async function getAdminDashboardMetrics() {
       grade11:   gradeMap.grade11,
       grade12:   gradeMap.grade12,
       graduated: gradeMap.graduated,
+      left:      gradeMap.left,
+      unknown:   gradeMap.unknown,
+      upcoming:  gradeMap.upcoming,
       active:    activeStudents,
-      total:     activeStudents + (gradeMap.graduated ?? 0),
+      total:     Object.values(gradeMap).reduce((a, b) => a + b, 0),
     },
     parents:             Number(parentCount[0]?.count ?? 0),
     activeSessions:      activeSessionRows.length,
@@ -299,6 +328,17 @@ export async function generateRegistrationReport(
   const limit = Math.min(pagination?.limit ?? 500, 5000);
   const offset = pagination?.offset ?? 0;
 
+  // The grade in a session report is the grade in the series' academic
+  // year (F0a), never today's.
+  const [sessionRow] = await db
+    .select({ sessionType: registrationSession.sessionType, seriesYear: registrationSession.seriesYear })
+    .from(registrationSession)
+    .where(eq(registrationSession.id, sessionId));
+  const seriesYearStart = sessionRow ? seriesAcademicYearStart(sessionRow.sessionType, sessionRow.seriesYear) : 0;
+  const gradeFilter = filters?.grade !== undefined
+    ? [sql`${gradeInYearSql(user.cohortYear, seriesYearStart)} = ${filters.grade}`]
+    : [];
+
   // 1) Count query — same filters, no joins, used for pagination totals
   const totalRow = await db
     .select({ count: sql<number>`COUNT(*)::int` })
@@ -309,7 +349,7 @@ export async function generateRegistrationReport(
       and(
         eq(registration.sessionId, sessionId),
         ...(filters?.status ? [eq(registration.status, filters.status)] : []),
-        ...(filters?.grade !== undefined ? [eq(user.grade, filters.grade)] : []),
+        ...gradeFilter,
         ...(filters?.council ? [eq(subject.council, filters.council)] : []),
       ),
     );
@@ -325,7 +365,7 @@ export async function generateRegistrationReport(
       and(
         eq(registration.sessionId, sessionId),
         ...(filters?.status ? [eq(registration.status, filters.status)] : []),
-        ...(filters?.grade !== undefined ? [eq(user.grade, filters.grade)] : []),
+        ...gradeFilter,
         ...(filters?.council ? [eq(subject.council, filters.council)] : []),
       ),
     )
@@ -341,7 +381,7 @@ export async function generateRegistrationReport(
   const rows = await db.query.registration.findMany({
     where: (r, { inArray: inArr }) => inArr(r.id, pageIds),
     with: {
-      student: { columns: { id: true, name: true, grade: true, studentId: true, email: true } },
+      student: { columns: { id: true, name: true, cohortYear: true, studentId: true, email: true } },
       subject: { columns: { id: true, name: true, code: true, council: true, isOfferedAtSchool: true } },
       requestedByUser: { columns: { id: true, name: true, role: true } },
       approvedByUser: { columns: { id: true, name: true, role: true } },
@@ -362,7 +402,7 @@ export async function generateRegistrationReport(
 
     return {
       studentName:       r.student.name,
-      studentGrade:      r.student.grade ?? 'Graduated',
+      studentGrade:      gradeLabel(gradeInAcademicYear(r.student.cohortYear, seriesYearStart)),
       studentId:         r.student.studentId ?? '—',
       studentEmail:      r.student.email,
       subjectName:       r.subject.name,
@@ -482,7 +522,8 @@ export async function generateEscrowReport(pagination?: PaginationParams) {
   const accounts = await db.query.escrow.findMany({
     with: {
       student: {
-        columns: { id: true, name: true, grade: true, studentId: true, email: true },
+        columns: { id: true, name: true, cohortYear: true, studentId: true, email: true },
+        extras: gradeTodayExtras,
       },
     },
     orderBy: (e, { desc: d }) => [d(e.balance)],
@@ -515,7 +556,7 @@ export async function generateEscrowReport(pagination?: PaginationParams) {
 
   const mapped = accounts.map((acc) => ({
     studentName:          acc.student?.name ?? '—',
-    studentGrade:         acc.student?.grade ?? 'Graduated',
+    studentGrade:         gradeLabel(acc.student?.grade),
     studentIdCode:        acc.student?.studentId ?? '—',
     studentEmail:         acc.student?.email ?? '—',
     balanceEGP:           Number(acc.balance),
@@ -602,9 +643,20 @@ export async function generateGrade10ComplianceReport(sessionId: string) {
     columns: { id: true, name: true, code: true },
   });
 
-  // Get all Grade 10 students
+  // Every student in grade 10 in the series' academic year (F0a), still at
+  // the school.
+  const [sessionRow] = await db
+    .select({ sessionType: registrationSession.sessionType, seriesYear: registrationSession.seriesYear })
+    .from(registrationSession)
+    .where(eq(registrationSession.id, sessionId));
+  if (!sessionRow) return { students: [], coreSubjects: coreSubjects.map((s) => s.name) };
+  const seriesYearStart = seriesAcademicYearStart(sessionRow.sessionType, sessionRow.seriesYear);
   const grade10Students = await db.query.user.findMany({
-    where: (u, { eq, and }) => and(eq(u.role, 'student'), eq(u.grade, 10)),
+    where: and(
+      eq(user.role, 'student'),
+      isNull(user.leftOn),
+      sql`${gradeInYearSql(user.cohortYear, seriesYearStart)} = 10`,
+    ),
     columns: { id: true, name: true, studentId: true, email: true },
   });
 
@@ -669,9 +721,10 @@ export async function generateStudentRoster(grade?: number | null, pagination?: 
   const limit = Math.min(pagination?.limit ?? 500, 5000);
   const offset = pagination?.offset ?? 0;
 
+  // Today's grade (F0a); null asks for graduates (past grade 12).
   const gradeCondition = (u: typeof user) => {
-    if (grade === null) return and(eq(u.role, 'student'), isNull(u.grade));
-    if (grade !== undefined) return and(eq(u.role, 'student'), eq(u.grade, grade));
+    if (grade === null) return and(eq(u.role, 'student'), sql`${gradeTodaySql(u.cohortYear)} > 12`);
+    if (grade !== undefined) return and(eq(u.role, 'student'), sql`${gradeTodaySql(u.cohortYear)} = ${grade}`);
     return eq(u.role, 'student');
   };
 
@@ -684,13 +737,11 @@ export async function generateStudentRoster(grade?: number | null, pagination?: 
   if (total === 0) return { data: [] as Record<string, unknown>[], total };
 
   const students = await db.query.user.findMany({
-    where: (u, { eq: eqOp, and: andOp, isNull: isNullOp }) => {
-      if (grade === null) return andOp(eqOp(u.role, 'student'), isNullOp(u.grade));
-      if (grade !== undefined) return andOp(eqOp(u.role, 'student'), eqOp(u.grade, grade));
-      return eqOp(u.role, 'student');
-    },
-    columns: { id: true, name: true, email: true, grade: true, studentId: true, phone: true, createdAt: true },
-    orderBy: (u, { asc }) => [asc(u.grade), asc(u.name)],
+    where: gradeCondition(user),
+    columns: { id: true, name: true, email: true, cohortYear: true, studentId: true, phone: true, createdAt: true, leftOn: true, leftKind: true },
+    extras: gradeTodayExtras,
+    // Grade 10 first: a later cohort is a lower grade.
+    orderBy: (u, { asc, desc }) => [desc(u.cohortYear), asc(u.name)],
     limit,
     offset,
   });
@@ -718,7 +769,7 @@ export async function generateStudentRoster(grade?: number | null, pagination?: 
     studentIdCode: stu.studentId ?? '—',
     email:         stu.email,
     phone:         stu.phone ?? '—',
-    grade:         stu.grade ?? 'Graduated',
+    grade:         stu.leftOn ? `Left (${stu.leftKind})` : gradeLabel(stu.grade),
     joinedAt:      stu.createdAt.toISOString(),
     parents:       (parentsByStudent[stu.id] ?? [])
       .map((p) => `${p.name} (${p.email})`)
@@ -747,7 +798,7 @@ export async function generatePendingApprovalsReport(pagination?: PaginationPara
     db.query.registration.findMany({
       where: (r, { eq }) => eq(r.status, 'pending_approval'),
       with: {
-        student:  { columns: { id: true, name: true, grade: true, studentId: true } },
+        student:  { columns: { id: true, name: true, cohortYear: true, studentId: true }, extras: gradeTodayExtras },
         subject:  { columns: { name: true, code: true } },
         session:  { columns: { name: true, sessionType: true } },
         approvedByUser: { columns: { name: true } },
@@ -758,7 +809,7 @@ export async function generatePendingApprovalsReport(pagination?: PaginationPara
     db.query.changeRequest.findMany({
       where: (cr, { eq }) => eq(cr.status, 'pending_approval'),
       with: {
-        requestedByUser: { columns: { id: true, name: true, grade: true } },
+        requestedByUser: { columns: { id: true, name: true, cohortYear: true }, extras: gradeTodayExtras },
         registration: {
           with: {
             subject:  { columns: { name: true, code: true } },
@@ -805,7 +856,7 @@ export async function generatePendingApprovalsReport(pagination?: PaginationPara
     registrationId:  r.id,
     studentName:     r.student?.name ?? '—',
     studentIdCode:   r.student?.studentId ?? '—',
-    studentGrade:    r.student?.grade ?? 'Graduated',
+    studentGrade:    gradeLabel(r.student?.grade),
     parent:          r.student?.id ? parentsByStudent[r.student.id] ?? '— (no linked parent)' : '—',
     subjectName:     r.subject?.name ?? '—',
     subjectCode:     r.subject?.code ?? '—',
@@ -819,7 +870,7 @@ export async function generatePendingApprovalsReport(pagination?: PaginationPara
     changeRequestId: cr.id,
     type:            cr.type,
     studentName:     cr.requestedByUser?.name ?? '—',
-    studentGrade:    cr.requestedByUser?.grade ?? 'Graduated',
+    studentGrade:    gradeLabel(cr.requestedByUser?.grade),
     parent:          cr.requestedByUser?.id ? parentsByStudent[cr.requestedByUser.id] ?? '— (no linked parent)' : '—',
     currentSubject:  cr.registration?.subject?.name ?? '—',
     newSubject:      cr.newSubject?.name ?? '—',
@@ -885,13 +936,13 @@ export async function generateComprehensiveStaffReport() {
 
     db
       .select({
-        grade: sql<string>`COALESCE(${user.grade}::text, 'graduated_or_non_student')`,
+        grade: sql<string>`${gradeTodayLabelSql('"user"')}`,
         count: sql<number>`COUNT(*)::int`,
       })
       .from(user)
       .where(eq(user.role, 'student'))
-      .groupBy(user.grade)
-      .orderBy(user.grade),
+      .groupBy(sql`1`)
+      .orderBy(sql`1`),
 
     db.execute(sql`
       SELECT
@@ -957,7 +1008,7 @@ export async function generateComprehensiveStaffReport() {
 
     db.execute(sql`
       SELECT
-        COALESCE(u.grade::text, 'graduated') AS grade,
+        ${gradeTodayLabelSql('u')} AS grade,
         s.council,
         COUNT(r.id)::int AS "registrationCount",
         COUNT(DISTINCT r.student_id)::int AS "studentCount",
@@ -965,8 +1016,8 @@ export async function generateComprehensiveStaffReport() {
       FROM ${registration} r
       JOIN ${user} u ON u.id = r.student_id
       JOIN ${subject} s ON s.id = r.subject_id
-      GROUP BY u.grade, s.council
-      ORDER BY u.grade, s.council
+      GROUP BY u.cohort_year, s.council
+      ORDER BY u.cohort_year DESC, s.council
     `),
 
     db
@@ -1037,7 +1088,7 @@ export async function generateComprehensiveStaffReport() {
 
     db.execute(sql`
       SELECT
-        COALESCE(u.grade::text, 'graduated') AS grade,
+        ${gradeTodayLabelSql('u')} AS grade,
         COUNT(DISTINCT u.id)::int AS "studentCount",
         COUNT(DISTINCT psl.student_id)::int AS "studentsWithApprovedParent",
         COUNT(psl.id) FILTER (WHERE psl.status = 'pending')::int AS "pendingLinks",
@@ -1047,8 +1098,8 @@ export async function generateComprehensiveStaffReport() {
         ON psl.student_id = u.id
        AND psl.status = 'approved'
       WHERE u.role = 'student'
-      GROUP BY u.grade
-      ORDER BY u.grade
+      GROUP BY u.cohort_year
+      ORDER BY u.cohort_year DESC
     `),
 
     db.execute(sql`
@@ -1113,7 +1164,7 @@ export async function generateComprehensiveStaffReport() {
       SELECT
         r.id AS "registrationId",
         u.name AS "studentName",
-        COALESCE(u.grade::text, 'graduated') AS grade,
+        ${gradeTodayLabelSql('u')} AS grade,
         s.name AS "subjectName",
         s.code AS "subjectCode",
         rs.name AS "sessionName",
@@ -1137,7 +1188,7 @@ export async function generateComprehensiveStaffReport() {
       SELECT
         r.id AS "registrationId",
         u.name AS "studentName",
-        COALESCE(u.grade::text, 'graduated') AS grade,
+        ${gradeTodayLabelSql('u')} AS grade,
         s.name AS "subjectName",
         s.code AS "subjectCode",
         rs.name AS "sessionName",
@@ -1157,7 +1208,7 @@ export async function generateComprehensiveStaffReport() {
       SELECT
         u.name AS "studentName",
         u.student_id AS "studentIdCode",
-        COALESCE(u.grade::text, 'graduated') AS grade,
+        ${gradeTodayLabelSql('u')} AS grade,
         rs.name AS "sessionName",
         COUNT(r.id)::int AS "activeSubjectCount",
         COALESCE(SUM(r.price_at_registration), 0)::numeric AS "reservedValueEGP",
@@ -1167,7 +1218,7 @@ export async function generateComprehensiveStaffReport() {
       JOIN ${user} u ON u.id = r.student_id
       JOIN ${registrationSession} rs ON rs.id = r.session_id
       WHERE r.status NOT IN ('dropped', 'rejected', 'expired')
-      GROUP BY u.id, u.name, u.student_id, u.grade, rs.id, rs.name
+      GROUP BY u.id, u.name, u.student_id, u.cohort_year, rs.id, rs.name
       ORDER BY "activeSubjectCount" DESC, "reservedValueEGP" DESC, u.name ASC
       LIMIT 500
     `),
@@ -1178,7 +1229,7 @@ export async function generateComprehensiveStaffReport() {
         u.name AS "studentName",
         u.student_id AS "studentIdCode",
         u.email AS "studentEmail",
-        COALESCE(u.grade::text, 'graduated') AS grade,
+        ${gradeTodayLabelSql('u')} AS grade,
         COUNT(psl.id) FILTER (WHERE psl.status = 'pending')::int AS "pendingLinkRequests"
       FROM ${user} u
       LEFT JOIN ${parentStudentLink} approved
@@ -1189,8 +1240,8 @@ export async function generateComprehensiveStaffReport() {
        AND psl.status = 'pending'
       WHERE u.role = 'student'
         AND approved.id IS NULL
-      GROUP BY u.id, u.name, u.student_id, u.email, u.grade
-      ORDER BY u.grade, u.name
+      GROUP BY u.id, u.name, u.student_id, u.email, u.cohort_year
+      ORDER BY u.cohort_year DESC, u.name
       LIMIT 500
     `),
 
@@ -1198,7 +1249,7 @@ export async function generateComprehensiveStaffReport() {
       SELECT
         u.name AS "studentName",
         u.student_id AS "studentIdCode",
-        COALESCE(u.grade::text, 'graduated') AS grade,
+        ${gradeTodayLabelSql('u')} AS grade,
         e.balance AS "balanceEGP",
         e.updated_at AS "lastUpdatedAt"
       FROM ${escrow} e

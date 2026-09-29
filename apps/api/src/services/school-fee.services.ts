@@ -6,28 +6,47 @@
  *   per-grade amounts) with an opening date.
  * - Parents pay it through the shared payments pipeline
  *   (payment.purpose = 'school_fee', in-school or InstaPay).
- * - An unpaid school fee blocks subject registration for sessions inside
- *   that academic year (checked via isSchoolFeeSettled). If no schedule
- *   exists for a year, the gate is off — the school hasn't configured it.
+ * - An unpaid school fee blocks subject registration for a series in that
+ *   academic year. If no schedule exists for a year, the gate is off — the
+ *   school hasn't configured it (or holds the registration, A-14).
+ *
+ * F0a: the gate reads the series' academic year and the student's grade in
+ * it, never the window's dates or today's grade: a November window opening
+ * in June asks for next year's fee at next year's grade. A graduate
+ * registering under A-12 owes no fee while the school says so (A-13).
  */
 
 import { db, payment, schoolFeeSchedule, eq } from '@repo/db';
 import { hasFeeWaiver } from './exception.services';
 import { logAction, type AuditContext } from './audit.services';
+import { getSetting } from './settings.services';
+import type { Eligibility } from './eligibility.services';
 import { randomUUID } from 'crypto';
-import type {
-  CreateSchoolFeeScheduleType,
-  UpdateSchoolFeeScheduleType,
+import {
+  academicYearLabel,
+  academicYearStartOf,
+  academicYearStartFromLabel,
+  gradeInAcademicYear,
+  LAST_GRADE,
+  type CreateSchoolFeeScheduleType,
+  type UpdateSchoolFeeScheduleType,
 } from '@repo/validations';
 
 /**
- * Derive the academic-year label a date falls in. The Egyptian school
- * year runs roughly September–June; July+ counts toward the year that
- * starts that autumn.
+ * The academic-year label a date falls in: 1 July to 30 June, in Cairo
+ * time whatever the server's zone (F0a; it used to read the server's local
+ * month).
  */
 export function academicYearForDate(date: Date): string {
-  const y = date.getFullYear();
-  return date.getMonth() >= 6 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+  return academicYearLabel(academicYearStartOf(date));
+}
+
+/** The student's grade in an academic year ('2026-2027'), from their cohort. */
+export async function studentGradeInYear(studentId: string, academicYear: string): Promise<number | null> {
+  const start = academicYearStartFromLabel(academicYear);
+  if (start === null) return null;
+  const s = await db.query.user.findFirst({ where: (u, { eq }) => eq(u.id, studentId), columns: { cohortYear: true } });
+  return gradeInAcademicYear(s?.cohortYear ?? null, start);
 }
 
 // ─── Schedule management ─────────────────────────────────────────────────────
@@ -122,17 +141,28 @@ export async function hasCompletedSchoolFeePayment(studentId: string, academicYe
 }
 
 /**
- * The registration gate (D-H). Returns null when registration may
- * proceed, or a human-readable blocking reason.
+ * The registration gate (D-H), for a student allowed to register for a
+ * series (mayRegisterFor). Returns null when registration may proceed, or a
+ * human-readable blocking reason.
+ *
+ * The fee is the one of the series' academic year at the student's grade in
+ * it (F0a). A graduate retaking under A-12 owes none while the school says
+ * so (A-13). With no schedule open for that year the gate is off, unless the
+ * series is in a later academic year than today and the school holds such
+ * registrations until the fee opens (A-14).
  */
-export async function schoolFeeGateReason(
-  studentId: string,
-  grade: number | null,
-  sessionStartDate: Date
-): Promise<string | null> {
-  const academicYear = academicYearForDate(sessionStartDate);
+export async function schoolFeeGateReason(studentId: string, eligibility: Eligibility): Promise<string | null> {
+  const { academicYear, grade } = eligibility;
+  if (eligibility.graduateRetake && (await getSetting('schoolFee.graduatesExempt'))) return null;
+
   const fee = await getApplicableFee(academicYear, grade);
-  if (!fee) return null; // no configured/open schedule → gate off
+  if (!fee) {
+    const laterYear = eligibility.academicYearStart > academicYearStartOf(new Date());
+    if (laterYear && (await getSetting('schoolFee.newYearWithoutSchedule')) === 'hold') {
+      return `The ${academicYear} school fee is not open yet — registration for the ${eligibility.series.label} series waits until it opens`;
+    }
+    return null; // no configured/open schedule → gate off
+  }
 
   // Hook 3 (§6.3): fee_waiver exception bypasses the gate
   if (await hasFeeWaiver(studentId)) return null;
@@ -159,10 +189,13 @@ export async function schoolFeeGateReason(
  */
 export async function getSchoolFeeStanding(
   studentId: string,
+  // The student's grade in `academicYear` (F0a: from the cohort).
   grade: number | null,
   academicYear: string
 ) {
-  const fee = await getApplicableFee(academicYear, grade);
+  // A graduate owes no fee while the school says so (A-13).
+  const exempt = grade !== null && grade > LAST_GRADE && (await getSetting('schoolFee.graduatesExempt'));
+  const fee = exempt ? null : await getApplicableFee(academicYear, grade);
   if (!fee) return { fee: null, required: false, waived: false, paid: false, settled: true };
   const [waived, paid] = await Promise.all([
     hasFeeWaiver(studentId),
@@ -172,17 +205,37 @@ export async function getSchoolFeeStanding(
 }
 
 /**
- * Status payload for the parent/student UI.
+ * The academic years a family may pay the fee for: the one today falls in,
+ * and the next (a series in it can open for registration before 1 July).
  */
-export async function getSchoolFeeStatus(studentId: string) {
+export function payableAcademicYears(now: Date = new Date()): string[] {
+  const start = academicYearStartOf(now);
+  return [academicYearLabel(start), academicYearLabel(start + 1)];
+}
+
+function checkPayableYear(requested: string | undefined): string {
+  const years = payableAcademicYears();
+  const academicYear = requested ?? years[0]!;
+  if (!years.includes(academicYear)) {
+    throw new Error(`The school fee can be paid for ${years.join(' or ')} only`);
+  }
+  return academicYear;
+}
+
+/**
+ * Status payload for the parent/student UI: the year today falls in by
+ * default, or the next one (F0a).
+ */
+export async function getSchoolFeeStatus(studentId: string, requestedYear?: string) {
   const student = await db.query.user.findFirst({
     where: (u, { eq }) => eq(u.id, studentId),
-    columns: { id: true, name: true, grade: true },
+    columns: { id: true, name: true, cohortYear: true },
   });
   if (!student) throw new Error('Student not found');
 
-  const academicYear = academicYearForDate(new Date());
-  const standing = await getSchoolFeeStanding(studentId, student.grade ?? null, academicYear);
+  const academicYear = checkPayableYear(requestedYear);
+  const grade = gradeInAcademicYear(student.cohortYear, academicYearStartFromLabel(academicYear)!);
+  const standing = await getSchoolFeeStanding(studentId, grade, academicYear);
   const fee = standing.fee;
   const paid = standing.paid;
 
@@ -196,9 +249,19 @@ export async function getSchoolFeeStatus(studentId: string) {
       ),
   });
 
+  // Next year's fee, when its schedule is open and it is still owed: a family
+  // registering for a series in that year is asked for it (F0a).
+  const nextYear = payableAcademicYears()[1]!;
+  const nextStanding = academicYear === nextYear
+    ? null
+    : await getSchoolFeeStanding(studentId, gradeInAcademicYear(student.cohortYear, academicYearStartFromLabel(nextYear)!), nextYear);
+
   return {
     academicYear,
-    student: { id: student.id, name: student.name, grade: student.grade },
+    student: { id: student.id, name: student.name, grade },
+    nextYear: nextStanding && nextStanding.fee && !nextStanding.settled
+      ? { academicYear: nextYear, amount: nextStanding.fee.amount, dueAt: nextStanding.fee.dueAt }
+      : null,
     amount: fee?.amount ?? null,
     dueAt: fee?.dueAt ?? null,
     required: standing.required,
@@ -217,7 +280,8 @@ export async function initiateSchoolFeePayment(
   studentId: string,
   paymentMethod: 'in_school' | 'instapay',
   schoolAccountDetails: Record<string, unknown>,
-  auditCtx?: AuditContext
+  auditCtx?: AuditContext,
+  requestedYear?: string
 ) {
   const link = await db.query.parentStudentLink.findFirst({
     where: (l, { eq, and }) =>
@@ -228,13 +292,16 @@ export async function initiateSchoolFeePayment(
 
   const student = await db.query.user.findFirst({
     where: (u, { eq }) => eq(u.id, studentId),
-    columns: { grade: true },
+    columns: { cohortYear: true },
   });
   if (!student) throw new Error('Student not found');
 
-  const academicYear = academicYearForDate(new Date());
-  const fee = await getApplicableFee(academicYear, student.grade ?? null);
+  const academicYear = checkPayableYear(requestedYear);
+  const grade = gradeInAcademicYear(student.cohortYear, academicYearStartFromLabel(academicYear)!);
+  const standing = await getSchoolFeeStanding(studentId, grade, academicYear);
+  const fee = standing.fee;
   if (!fee) throw new Error('No school fee is currently open for payment');
+  if (standing.waived) throw new Error(`The ${academicYear} school fee is waived for this student — nothing to pay`);
 
   if (await hasCompletedSchoolFeePayment(studentId, academicYear)) {
     throw new Error(`The ${academicYear} school fee is already paid`);

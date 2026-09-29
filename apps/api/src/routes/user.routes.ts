@@ -33,6 +33,8 @@ import { requireAuth, requireAdmin, requireFinance } from '../middleware/access-
 import type { HonoEnv } from '../lib/types';
 import { logAction, extractAuditContext } from '../services/audit.services';
 import * as userService from '../services/user.services';
+import { createTeacherForAccount, linkTeacherAccount, TeacherError } from '../services/teacher.services';
+import { db } from '@repo/db';
 
 export const users = new Hono<HonoEnv>()
   // All routes require authentication
@@ -143,9 +145,9 @@ export const users = new Hono<HonoEnv>()
   /**
    * COMPLETE STUDENT SETUP
    * POST /users/me/student-setup
-   * Body: { grade: 10 | 11 | 12 }
+   * Body: { grade: 9 | 10 | 11 | 12 } — the grade this academic year
    *
-   * Sets student-specific fields after sign-up.
+   * Sets student-specific fields after sign-up: the cohort is stored (F0a).
    * Can only be called once (when role is not set yet).
    */
   .post('/me/student-setup',
@@ -159,29 +161,28 @@ export const users = new Hono<HonoEnv>()
       }
 
       const { grade } = c.req.valid('json');
-      const currentUserWithProfile = currentUser as typeof currentUser & { grade?: number | null };
 
-      // Already configured as student — fix grade if missing, otherwise idempotent.
+      // Already configured as student — record the cohort if it was never
+      // recorded, otherwise idempotent: an existing cohort changes only by an
+      // admin's audited correction (F0a).
       // M-2: Keep the return shape identical to the first-time success branch
       // (includes grade + studentId) so clients merging state don't see those
       // fields disappear on a re-call.
       if (currentUser.role === 'student') {
-        if (currentUserWithProfile.grade === null || currentUserWithProfile.grade === undefined) {
-          try {
-            const fixed = await userService.updateStudentGrade(currentUser.id, grade);
-            if (fixed) {
-              return success(c, {
-                id: fixed.id,
-                name: fixed.name,
-                email: fixed.email,
-                role: fixed.role,
-                grade: fixed.grade,
-                studentId: fixed.studentId,
-              });
-            }
-          } catch (err) {
-            console.error('[student-setup] Failed to fix missing grade:', err);
+        try {
+          const fixed = await userService.recordMissingCohort(currentUser.id, grade);
+          if (fixed) {
+            return success(c, {
+              id: fixed.id,
+              name: fixed.name,
+              email: fixed.email,
+              role: fixed.role,
+              grade: fixed.grade,
+              studentId: fixed.studentId,
+            });
           }
+        } catch (err) {
+          console.error('[student-setup] Failed to record a missing cohort:', err);
         }
         // Fetch the canonical row so grade + studentId are included even
         // when they're not on the session user type (Better-auth doesn't
@@ -306,6 +307,18 @@ export const users = new Hono<HonoEnv>()
         }
         // Staff vouch for the person in front of them, as at the desk (RF-22).
         await userService.markEmailVerified(result.user.id);
+        // Teaching is a capability (F0a): link the new staff account to a
+        // teacher record, or make one for it.
+        if (data.teacherId || data.newTeacherRecord) {
+          await db.transaction(async (tx) => {
+            if (data.teacherId) await linkTeacherAccount(data.teacherId, result.user.id, user.id, extractAuditContext(c), tx);
+            else await createTeacherForAccount(tx, { id: result.user.id, name: data.name, email: data.email }, user.id, extractAuditContext(c));
+          }).catch(async (err) => {
+            // The account exists; without its record a teacher account would
+            // have no screens. Tell the admin exactly what is left to do.
+            throw new Error(`The account was created, but the teacher record could not be linked: ${err instanceof TeacherError ? err.message : 'try linking it on the Teachers page'}`);
+          });
+        }
 
         await logAction(user.id, 'STAFF_USER_CREATED', 'user', result.user.id, null, { email: data.email, role: data.role }, extractAuditContext(c))
           .catch((err) => console.error('[audit] STAFF_USER_CREATED failed:', err));
@@ -436,6 +449,10 @@ export const users = new Hono<HonoEnv>()
       const before = await userService.getUserProfile(id);
       if (!before) {
         return error(c, 'User not found', 404);
+      }
+      // A teacher account teaches as a teacher record (F0a): link one first.
+      if (data.role === 'teacher' && before.role !== 'teacher' && !before.teachingAs) {
+        return error(c, `Link ${before.name} to a teacher record first (Teachers, or the Team page's teacher link), then make them a teacher`, 400);
       }
 
       const updated = await userService.adminUpdateUser(id, data);

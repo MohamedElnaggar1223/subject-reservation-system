@@ -10,9 +10,13 @@
 
 import { db } from '@repo/db';
 import { academicYearForDate, getSchoolFeeStanding } from './school-fee.services';
+import { standingToday, type StudentStanding } from './eligibility.services';
+import { sectionOf } from './academic.services';
 
 export type ChildSummary = {
-  student: { id: string; name: string; grade: number | null };
+  // Today's grade from the cohort, where the student stands, and this
+  // year's section (F0a).
+  student: { id: string; name: string; grade: number | null; standing: StudentStanding; section: string | null };
   owing: number;
   owingRegistrationIds: string[];
   escrow: { freeBalance: number; heldBalance: number };
@@ -33,9 +37,11 @@ export type HomeSummary = {
 async function summariseStudent(studentId: string): Promise<ChildSummary> {
   const student = await db.query.user.findFirst({
     where: (u, { eq }) => eq(u.id, studentId),
-    columns: { id: true, name: true, grade: true },
+    columns: { id: true, name: true, cohortYear: true, leftOn: true, leftKind: true },
   });
   if (!student) throw new Error('Student not found');
+  const today = standingToday(student);
+  const section = await sectionOf(studentId);
 
   const [registrations, escrowAccount, changeRequests] = await Promise.all([
     db.query.registration.findMany({
@@ -75,11 +81,11 @@ async function summariseStudent(studentId: string): Promise<ChildSummary> {
   const academicYear = academicYearForDate(new Date());
   // One source of truth for the fee (RF-10) — this used to report a
   // waived, never-paid fee as paid:true.
-  const standing = await getSchoolFeeStanding(studentId, student.grade ?? null, academicYear);
+  const standing = await getSchoolFeeStanding(studentId, today.grade, academicYear);
   const fee = standing.fee;
 
   return {
-    student,
+    student: { id: student.id, name: student.name, grade: today.grade, standing: today.standing, section: section?.name ?? null },
     owing: Math.round(owing * 100) / 100,
     owingRegistrationIds: payable.map((r) => r.id),
     escrow: {

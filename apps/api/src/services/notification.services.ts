@@ -30,6 +30,7 @@ import {
   lte,
   inArray,
   sql,
+  gradeTodaySql,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type {
@@ -933,6 +934,32 @@ export async function notifyPaymentClosedAtGraduation(paymentId: string, escrowR
   );
 }
 
+/**
+ * A checkout left open on subjects the student may no longer sit (they left,
+ * a cohort or series was corrected, A-12 was turned off, a grade-10
+ * exception was revoked; F0a) was closed by the system, any escrow it took
+ * returned.
+ */
+export async function notifyPaymentClosedIneligible(
+  paymentId: string,
+  escrowReturned: number,
+  cause: 'withdrawn' | 'transferred' | 'cohort_corrected' | 'graduate_retakes_off' | 'series_corrected' | 'exception_revoked',
+) {
+  const escrowNote = escrowReturned > 0 ? ` EGP ${escrowReturned.toFixed(2)} applied from escrow has been returned.` : '';
+  const because: Record<typeof cause, (name: string) => string> = {
+    withdrawn: (n) => `${n} has been withdrawn from the school`,
+    transferred: (n) => `${n} has transferred to another school`,
+    cohort_corrected: (n) => `${n}'s grade was corrected and they may no longer sit this series`,
+    graduate_retakes_off: (n) => `the school no longer registers graduates such as ${n} for this series`,
+    series_corrected: (n) => `this registration window's exam series was corrected and ${n} may no longer sit it`,
+    exception_revoked: (n) => `${n}'s grade-10 exception for this series was revoked`,
+  };
+  await notifyFamilyOfPayment(paymentId, 'PAYMENT_EXPIRED', 'Payment closed', (c) =>
+    `${because[cause](c.studentName)}, so the payment of ${c.amount} for ${c.subjects} (${c.sessionName}) was closed before it was confirmed.${escrowNote} ` +
+    `If you did transfer the money, contact the finance desk with your bank receipt: once the transfer is found it is added to your escrow balance.`
+  );
+}
+
 /** At the board's entry deadline: registrations still waiting on the series expired. */
 export async function notifyRegistrationsExpiredAtEntryDeadline(
   sessionId: string,
@@ -1420,7 +1447,7 @@ async function dispatchAnnouncement(
       id: user.id,
       email: user.email,
       name: user.name,
-    }).from(user).where(and(eq(user.role, 'student'), notBanned));
+    }).from(user).where(and(eq(user.role, 'student'), notBanned, isNull(user.leftOn)));
   } else if (payload.recipients === 'parents') {
     targetUsers = await db.select({
       id: user.id,
@@ -1435,7 +1462,9 @@ async function dispatchAnnouncement(
       email: user.email,
       name: user.name,
     }).from(user).where(
-      and(eq(user.role, 'student'), eq(user.grade, grade), notBanned)
+      // Today's grade (Cairo time), from the cohort (F0a); a student who
+      // left the school is not in a grade.
+      and(eq(user.role, 'student'), sql`${gradeTodaySql(user.cohortYear)} = ${grade}`, notBanned, isNull(user.leftOn))
     );
   }
 

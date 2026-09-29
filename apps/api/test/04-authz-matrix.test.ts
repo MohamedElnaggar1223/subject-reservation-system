@@ -9,7 +9,8 @@ import { app, admin, staff, onboard, clientFor, type Api } from './helpers';
  *
  * Every /v1 endpoint the app registers is called once per principal:
  * anonymous, a linked student, a linked parent, a finance officer, a
- * finance admin and an admin. Bodies are empty and path ids are a random
+ * finance admin, an admin, and the three roles F0a added: a coordinator, a
+ * teacher (linked to a teacher record) and the gate. Bodies are empty and path ids are a random
  * UUID, so the probe proves the ROLE gate only: an allowed principal gets
  * past it (400/404/409/422/200/201), a refused one gets 401 or 403.
  * Ownership of real records is proven separately in 05-object-access.
@@ -26,8 +27,8 @@ import { app, admin, staff, onboard, clientFor, type Api } from './helpers';
  * Set AUTHZ_MATRIX_OUT=/path/file.tsv to write the observed matrix.
  */
 
-type Principal = 'anon' | 'student' | 'parent' | 'officer' | 'finadmin' | 'admin';
-const PRINCIPALS: Principal[] = ['anon', 'student', 'parent', 'officer', 'finadmin', 'admin'];
+type Principal = 'anon' | 'student' | 'parent' | 'officer' | 'finadmin' | 'admin' | 'coordinator' | 'teacher' | 'gate';
+const PRINCIPALS: Principal[] = ['anon', 'student', 'parent', 'officer', 'finadmin', 'admin', 'coordinator', 'teacher', 'gate'];
 const FAKE_ID = '00000000-0000-4000-8000-000000000000';
 
 type Endpoint = { method: string; path: string };
@@ -95,12 +96,18 @@ describe('authorization matrix', () => {
     const officer = await staff(adm, 'finance_officer', 'mx');
     const finadmin = await staff(adm, 'finance_admin', 'mx');
     const fam = await onboard(officer, 'mx');
+    const coordinator = await staff(adm, 'coordinator', 'mx');
+    const teacher = await staff(adm, 'teacher', 'mx');
+    const gate = await staff(adm, 'gate', 'mx');
     clients.anon = await clientFor();
     clients.student = fam.student.api;
     clients.parent = fam.parent.api;
     clients.officer = officer.api;
     clients.finadmin = finadmin.api;
     clients.admin = adm.api;
+    clients.coordinator = coordinator.api;
+    clients.teacher = teacher.api;
+    clients.gate = gate.api;
   });
 
   it('probes every /v1 endpoint as every principal', async () => {

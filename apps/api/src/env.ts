@@ -35,12 +35,13 @@ const envSchema = z.object({
   // waiting for its transfer reference survives the close (owner decision
   // MO-10): a family who transferred just before the close can still submit it.
   INSTAPAY_REFERENCE_GRACE_HOURS: z.coerce.number().min(0).max(24 * 14).default(24),
-  // Automatic grade progression when a registration window closes (URD
-  // GRADE-001). Off until the owner decides what a grade is (STATE_AUDIT.md
-  // ST-13, DISCOVERY.md Q-08): on the school's calendar it advances a student
-  // twice in one academic year and graduates them a year early. Admins adjust
-  // grades by hand meanwhile. "true" turns it back on.
-  AUTO_GRADE_PROGRESSION: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  // (AUTO_GRADE_PROGRESSION was removed by F0a: grades are derived from the
+  // cohort, so nothing progresses when a window closes. A deployment that
+  // still sets it is ignored.)
+  // Uploads (F0a): with the four R2 values set files go to R2; otherwise, in
+  // development and tests, to this directory on the API's disk. Production
+  // without R2 refuses uploads with a sentence.
+  LOCAL_UPLOAD_DIR: z.string().default('.uploads'),
 
   // Legacy provider credentials — integrations disabled in V3 (kept for the
   // future PSP InstaPay path; see V3_PLAN §2.3).

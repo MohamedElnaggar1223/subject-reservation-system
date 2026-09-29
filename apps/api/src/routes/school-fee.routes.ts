@@ -95,7 +95,7 @@ export const schoolFees = new Hono<HonoEnv>()
    */
   .get('/status', zValidator('query', SchoolFeeStatusQuery), async (c) => {
     const user = c.get('user')!;
-    const { studentId } = c.req.valid('query');
+    const { studentId, academicYear } = c.req.valid('query');
 
     const targetStudentId = studentId ?? user.id;
     if (targetStudentId !== user.id) {
@@ -113,7 +113,7 @@ export const schoolFees = new Hono<HonoEnv>()
     }
 
     try {
-      return success(c, await schoolFeeService.getSchoolFeeStatus(targetStudentId));
+      return success(c, await schoolFeeService.getSchoolFeeStatus(targetStudentId, academicYear));
     } catch (err) {
       const message = clientMessage(err, 'Failed to load status');
       return error(c, message, message.includes('not found') ? 404 : 400);
@@ -154,7 +154,8 @@ export const schoolFees = new Hono<HonoEnv>()
         data.studentId,
         data.paymentMethod,
         schoolAccountDetails(),
-        extractAuditContext(c)
+        extractAuditContext(c),
+        data.academicYear
       );
       return success(c, created, 201);
     } catch (err) {

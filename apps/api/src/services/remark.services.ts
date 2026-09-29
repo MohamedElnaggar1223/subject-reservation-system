@@ -24,7 +24,7 @@
  * - Grades can go DOWN: consent is blocking and audited.
  */
 
-import { db, remarkRequest, remarkRequestItem, remarkFeeSchedule, remarkDeadline, registration, payment, eq, and, inArray, isNull, sql } from '@repo/db';
+import { db, remarkRequest, remarkRequestItem, remarkFeeSchedule, remarkDeadline, registration, payment, eq, and, inArray, isNull, sql, gradeTodayExtras } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type {
   CreateRemarkRequestType,
@@ -35,7 +35,8 @@ import type {
 } from '@repo/validations';
 import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { notifyEscrowBalanceChanged } from './notification.services';
-import { isOwnDocument } from './file.services';
+import { isAttachableEvidence } from './file.services';
+import { REMARK_CONSENT_PURPOSES } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 
 function round2(n: number): number {
@@ -298,8 +299,9 @@ export async function confirmConsent(
   if (!(await validateParentStudentLink(parentId, rr.studentId))) {
     throw new Error('You are not linked to this student');
   }
-  // RF-13: the signed consent form must be one this parent uploaded.
-  if (data.consentFileId && !(await isOwnDocument(data.consentFileId, parentId))) {
+  // RF-13: the signed consent form must be one this parent uploaded; F0a:
+  // uploaded as a consent or a personal document, for this student.
+  if (data.consentFileId && !(await isAttachableEvidence(data.consentFileId, parentId, REMARK_CONSENT_PURPOSES, rr.studentId))) {
     throw new Error('You are not authorized to attach that file');
   }
 
@@ -571,7 +573,7 @@ export async function getRemarkRequests(scope: {
       : (r, { inArray }) => inArray(r.studentId, scope.studentIds ?? ['__none__']),
     with: {
       items: true,
-      student: { columns: { id: true, name: true, grade: true } },
+      student: { columns: { id: true, name: true, cohortYear: true }, extras: gradeTodayExtras },
       registration: {
         columns: { id: true, gradeReceived: true },
         with: {
@@ -596,7 +598,7 @@ export async function getPendingResults(sessionId: string) {
     where: (r, { eq, and }) => and(eq(r.sessionId, sessionId), eq(r.status, 'confirmed')),
     columns: { id: true, gradeReceived: true },
     with: {
-      student: { columns: { id: true, name: true, studentId: true, grade: true } },
+      student: { columns: { id: true, name: true, studentId: true, cohortYear: true }, extras: gradeTodayExtras },
       subject: { columns: { id: true, name: true, code: true, council: true } },
     },
     orderBy: (r, { asc }) => [asc(r.createdAt)],

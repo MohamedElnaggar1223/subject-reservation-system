@@ -12,7 +12,7 @@
  * the registration becomes 'dropped'.
  */
 
-import { db, receipt, registration, eq, and, inArray } from '@repo/db';
+import { db, receipt, registration, eq, and, inArray, gradeTodayExtras } from '@repo/db';
 import { randomUUID } from 'crypto';
 import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { notifyEscrowBalanceChanged } from './notification.services';
@@ -337,7 +337,7 @@ export async function getReceiptsQueue() {
       registration: {
         columns: { id: true, studentId: true, priceAtRegistration: true, status: true },
         with: {
-          student: { columns: { id: true, name: true, email: true, grade: true } },
+          student: { columns: { id: true, name: true, email: true, cohortYear: true }, extras: gradeTodayExtras },
           subject: { columns: { id: true, name: true, code: true } },
           session: { columns: { id: true, name: true } },
         },

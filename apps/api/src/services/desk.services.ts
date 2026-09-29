@@ -16,7 +16,7 @@
  *   on one screen.
  */
 
-import { db, payment, paymentRegistration, registration, parentStudentLink, user as userTable, eq, and, inArray } from '@repo/db';
+import { db, payment, paymentRegistration, registration, parentStudentLink, user as userTable, eq, and, inArray, gradeTodayExtras } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { DeskOnboardFamilyType, DeskRegistrationType, DeskCollectType } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
@@ -31,11 +31,12 @@ import { getEscrowBalance, debitEscrow } from './escrow.services';
 import { confirmPayment, failPayment } from './payment.services';
 import {
   academicYearForDate,
-  getApplicableFee,
   getSchoolFeeStanding,
-  hasCompletedSchoolFeePayment,
+  studentGradeInYear,
 } from './school-fee.services';
-import { isGraduated } from './grade.services';
+import { assertMayRegisterFor, mayRegisterFor, standingToday } from './eligibility.services';
+import { sectionOf } from './academic.services';
+import { academicYearLabel, academicYearStartOf, gradeInAcademicYear, gradeLabel, academicYearStartFromLabel } from '@repo/validations';
 
 // ─── Desk onboarding (G5) ────────────────────────────────────────────────────
 
@@ -154,9 +155,9 @@ export async function onboardFamily(data: DeskOnboardFamilyType) {
  * officer just took — one action, receipts born immediately.
  */
 export async function executeDeskRegistration(staffId: string, data: DeskRegistrationType, auditCtx?: AuditContext) {
-  if (await isGraduated(data.studentId)) {
-    throw new Error('Graduated students cannot be registered for new subjects');
-  }
+  // F0a: call site 5 of mayRegisterFor — the desk registers only for a
+  // series the student may sit.
+  const eligibility = await assertMayRegisterFor(data.studentId, data.sessionId);
 
   const sess = await db.query.registrationSession.findFirst({
     where: (s, { eq }) => eq(s.id, data.sessionId),
@@ -209,7 +210,8 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     data.studentId,
     sess,
     subjects,
-    data.subjectOptions
+    data.subjectOptions,
+    eligibility
   );
 
   const now = new Date();
@@ -385,6 +387,9 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
     throw new Error('One or more subjects are not waiting for payment');
   }
   for (const sessionId of new Set(regs.map((r) => r.sessionId))) {
+    // F0a: call site 6 of mayRegisterFor — no money for a subject the
+    // student may no longer sit (SO-7).
+    await assertMayRegisterFor(data.studentId, sessionId);
     const w = await sessionWindow(data.studentId, sessionId);
     if (!w.open) {
       throw new Error(
@@ -480,7 +485,7 @@ export async function collectSchoolFeeAtDesk(
 ) {
   const student = await db.query.user.findFirst({
     where: (u, { eq }) => eq(u.id, studentId),
-    columns: { id: true, grade: true },
+    columns: { id: true },
   });
   if (!student) throw new Error('Student not found');
 
@@ -490,8 +495,9 @@ export async function collectSchoolFeeAtDesk(
   // actually blocking the registration in front of them.
   const academicYear = requestedAcademicYear ?? academicYearForDate(new Date());
   // Same source of truth as every screen (RF-10): a waived family must not
-  // be charged at the desk any more than shown a "due" badge.
-  const standing = await getSchoolFeeStanding(studentId, student.grade ?? null, academicYear);
+  // be charged at the desk any more than shown a "due" badge. The fee is the
+  // one for the student's grade in that year (F0a).
+  const standing = await getSchoolFeeStanding(studentId, await studentGradeInYear(studentId, academicYear), academicYear);
   const fee = standing.fee;
   if (!fee) throw new Error('No school fee is currently open for this student');
   if (standing.waived) {
@@ -578,8 +584,10 @@ export async function getStudentSummary(studentId: string) {
     where: (u, { eq }) => eq(u.id, studentId),
     columns: {
       id: true, name: true, email: true, phone: true,
-      grade: true, studentId: true, createdAt: true, role: true,
+      cohortYear: true, studentId: true, createdAt: true, role: true,
+      leftOn: true, leftKind: true, leftReason: true,
     },
+    extras: gradeTodayExtras,
   });
   if (!student) throw new Error('Student not found');
   // Scope strictly to students: without this the Student-360 endpoint
@@ -641,29 +649,31 @@ export async function getStudentSummary(studentId: string) {
   });
   const receiptByReg = new Map(receipts.map((r) => [r.registrationId, r]));
 
-  // School-fee status. Check the year containing today AND the year of
-  // every open session — near the 1 July rollover these differ, and
-  // reporting only "today's" year told officers the fee was paid while
-  // registration kept refusing for the session's year.
+  // School-fee status. Check the year containing today AND the academic
+  // year of every open series — a November window opening in June belongs
+  // to the next year, and reporting only "today's" year told officers the
+  // fee was paid while registration kept refusing for the series' year. The
+  // fee is the one for the student's grade in each year (F0a).
   const academicYear = academicYearForDate(new Date());
   const openSessionRows = await db.query.registrationSession.findMany({
     where: (sn, { eq }) => eq(sn.status, 'active'),
-    columns: { startDate: true },
+    columns: { id: true },
   });
+  const openEligibility = await Promise.all(openSessionRows.map((sn) => mayRegisterFor(studentId, sn.id)));
   const candidateYears = [
-    ...new Set([academicYear, ...openSessionRows.map((sn) => academicYearForDate(sn.startDate))]),
+    ...new Set([academicYear, ...openEligibility.filter((e) => e.allowed && !e.graduateRetake).map((e) => e.academicYear)]),
   ];
 
   // One source of truth for the fee (RF-10): this screen used to tell the
   // officer to collect a fee the finance admin had waived.
   const schoolFeesDue: { academicYear: string; amount: number }[] = [];
   for (const year of candidateYears) {
-    const standing = await getSchoolFeeStanding(studentId, student.grade ?? null, year);
+    const standing = await getSchoolFeeStanding(studentId, gradeInAcademicYear(student.cohortYear, academicYearStartFromLabel(year)!), year);
     if (!standing.fee || standing.settled) continue;
     schoolFeesDue.push({ academicYear: year, amount: standing.fee.amount });
   }
 
-  const currentStanding = await getSchoolFeeStanding(studentId, student.grade ?? null, academicYear);
+  const currentStanding = await getSchoolFeeStanding(studentId, student.grade, academicYear);
   const fee = currentStanding.fee;
 
   // What does the family owe right now?
@@ -671,8 +681,21 @@ export async function getStudentSummary(studentId: string) {
     .filter((r) => r.status === 'pending_payment')
     .reduce((sum, r) => sum + r.priceAtRegistration, 0);
 
+  // The academic record (F0a): grade, cohort, section, status.
+  const today = standingToday(student);
+  const currentSection = await sectionOf(studentId);
+
   return {
     student,
+    academic: {
+      grade: today.grade,
+      gradeLabel: gradeLabel(today.grade),
+      standing: today.standing,
+      academicYear: today.academicYear,
+      cohortLabel: student.cohortYear === null ? null : academicYearLabel(student.cohortYear),
+      section: currentSection ? { id: currentSection.sectionId, name: currentSection.name, grade: currentSection.grade } : null,
+      currentAcademicYearStart: academicYearStartOf(),
+    },
     parents: links.map((l) => ({ ...l.parent, linkStatus: l.status })),
     escrow: {
       freeBalance: escrowAccount?.balance ?? 0,

@@ -10,7 +10,7 @@ import { emailVerificationRequired } from './auth-policy';
 // Next.js server; this is a standalone Hono API. With it present, every
 // server-side auth.api.* call (desk onboarding creates accounts that way)
 // tried to import next/headers, which does not exist in this process.
-import { ac, studentRole, adminRole, parentRole, financeOfficerRole, financeAdminRole } from './permissions'
+import { ac, studentRole, adminRole, parentRole, financeOfficerRole, financeAdminRole, coordinatorRole, teacherRole, gateRole } from './permissions'
 import { ROLES, CommonSchemas } from '@repo/validations';
 import { corsOrigins, env } from '../env';
 import { sendPasswordResetEmail, sendEmailVerificationEmail } from '../integrations/email';
@@ -76,6 +76,9 @@ export const auth = betterAuth({
         [ROLES.PARENT]: parentRole,
         [ROLES.FINANCE_OFFICER]: financeOfficerRole,
         [ROLES.FINANCE_ADMIN]: financeAdminRole,
+        [ROLES.COORDINATOR]: coordinatorRole,
+        [ROLES.TEACHER]: teacherRole,
+        [ROLES.GATE]: gateRole,
       }
     }),
   ],

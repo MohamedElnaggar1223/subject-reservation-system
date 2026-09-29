@@ -23,7 +23,7 @@ import { prepareRegistrationInputs } from './registration.services';
 import { creditHeld, debitHeld, getEscrowBalance } from './escrow.services';
 import { executeReceiptGatedDrop } from './receipt.services';
 import { refundPercentage } from './refund.services';
-import { isGraduated } from './grade.services';
+import { assertMayRegisterFor } from './eligibility.services';
 import { logger } from '../lib/logger';
 import { entryDeadlineMessage } from './window.services';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
@@ -48,9 +48,9 @@ export async function createPreregistration(parentId: string, data: PreregisterR
   const linked = await validateParentStudentLink(parentId, data.studentId);
   if (!linked) throw new Error('You are not linked to this student');
 
-  if (await isGraduated(data.studentId)) {
-    throw new Error('Graduated students cannot be preregistered for new subjects');
-  }
+  // F0a: call site 11 of mayRegisterFor — a preregistration is for a series
+  // the student may sit (a grade-10 student preregisters only for June).
+  const eligibility = await assertMayRegisterFor(data.studentId, data.sessionId);
 
   const sess = await db.query.registrationSession.findFirst({
     where: (s, { eq }) => eq(s.id, data.sessionId),
@@ -90,7 +90,8 @@ export async function createPreregistration(parentId: string, data: PreregisterR
     data.studentId,
     sess,
     subjects,
-    data.subjectOptions
+    data.subjectOptions,
+    eligibility
   );
 
   const now = new Date();

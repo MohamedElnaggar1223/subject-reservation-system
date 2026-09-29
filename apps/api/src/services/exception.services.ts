@@ -9,10 +9,58 @@
  * 4. Refund percent — custom_refund_percent overrides refund windows
  */
 
-import { db, exception, eq, and } from '@repo/db';
+import { db, exception, user, registrationSession, eq, and, inArray, gradeTodayExtras } from '@repo/db';
 import { randomUUID } from 'crypto';
-import type { CreateExceptionType, ListExceptionsQueryType } from '@repo/validations';
+import {
+  EXCEPTION_GRANT_ROLES, EXCEPTION_TYPE_LABELS, exceptionTypesGrantableBy, hasRole,
+  academicYearStartOf, gradeInAcademicYear, seriesAcademicYearStart, seriesLabel,
+  type CreateExceptionType, type ListExceptionsQueryType, type ExceptionType, type Role,
+} from '@repo/validations';
 import type { RegistrationPricing } from './pricing.services';
+import { logAction, type AuditContext } from './audit.services';
+import { expireIneligibleRegistrations } from './eligibility.services';
+
+export class ExceptionError extends Error {
+  constructor(message: string, public readonly status: 400 | 403 | 404 | 409 = 400) {
+    super(message);
+  }
+}
+
+function assertMayGrant(type: ExceptionType, role: string | null | undefined, verb: 'grant' | 'revoke') {
+  const roles = EXCEPTION_GRANT_ROLES[type];
+  if (!hasRole(role, ...(roles as readonly Role[]))) {
+    throw new ExceptionError(
+      `Only ${roles.map((r) => r.replace(/_/g, ' ')).join(' or ')} may ${verb} "${EXCEPTION_TYPE_LABELS[type]}"`,
+      403,
+    );
+  }
+}
+
+/**
+ * The grade-10 exception is for a student who is in grade 10 in the series
+ * it names (or, with no series, in grade 10 this academic year or starting
+ * next): a series they may sit anyway needs no exception.
+ */
+async function assertGrade10ExceptionFits(studentId: string, sessionId: string | null | undefined) {
+  const [s] = await db.select({ name: user.name, cohortYear: user.cohortYear }).from(user).where(eq(user.id, studentId));
+  if (!s) throw new ExceptionError('Student not found', 404);
+  if (sessionId) {
+    const [sess] = await db.select({ sessionType: registrationSession.sessionType, seriesYear: registrationSession.seriesYear })
+      .from(registrationSession).where(eq(registrationSession.id, sessionId));
+    if (!sess) throw new ExceptionError('Session not found', 404);
+    if (sess.sessionType === 'june') throw new ExceptionError('Grade 10 already sits the June series: no exception is needed');
+    const grade = gradeInAcademicYear(s.cohortYear, seriesAcademicYearStart(sess.sessionType, sess.seriesYear));
+    if (grade !== 10) {
+      throw new ExceptionError(`${s.name} is not in grade 10 for the ${seriesLabel(sess.sessionType, sess.seriesYear)} series: no exception is needed`);
+    }
+    return;
+  }
+  const now = academicYearStartOf();
+  const grade = gradeInAcademicYear(s.cohortYear, now);
+  if (grade !== 10 && grade !== 9) {
+    throw new ExceptionError(`${s.name} is not in grade 10 this year or next: no exception is needed`);
+  }
+}
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -20,54 +68,82 @@ function round2(n: number): number {
 
 // ─── Management ──────────────────────────────────────────────────────────────
 
-export async function grantException(data: CreateExceptionType, grantedBy: string) {
+/**
+ * Grant an exception. Each type names the roles that may grant it
+ * (EXCEPTION_GRANT_ROLES, F0a): money exceptions are the finance admin's,
+ * the grade-10 exception the coordinator's; admin may grant any. The grant
+ * and its audit row commit together.
+ */
+export async function grantException(data: CreateExceptionType, actor: { id: string; role: string | null | undefined }, ctx?: AuditContext) {
+  assertMayGrant(data.type, actor.role, 'grant');
   const student = await db.query.user.findFirst({
     where: (u, { eq }) => eq(u.id, data.studentId),
     columns: { id: true, role: true },
   });
   if (!student || student.role !== 'student') {
-    throw new Error('Exceptions can only be granted to students');
+    throw new ExceptionError('Exceptions can only be granted to students');
   }
+  if (data.type === 'grade10_other_series') await assertGrade10ExceptionFits(data.studentId, data.sessionId);
 
-  const [created] = await db
-    .insert(exception)
-    .values({
-      id: randomUUID(),
-      type: data.type,
-      studentId: data.studentId,
-      sessionId: data.sessionId ?? null,
-      subjectId: data.subjectId ?? null,
-      value: data.value ?? null,
-      reason: data.reason,
-      validUntil: data.validUntil ?? null,
-      status: 'active',
-      grantedBy,
-    })
-    .returning();
-  return created;
+  return db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(exception)
+      .values({
+        id: randomUUID(),
+        type: data.type,
+        studentId: data.studentId,
+        sessionId: data.sessionId ?? null,
+        subjectId: data.subjectId ?? null,
+        value: data.value ?? null,
+        reason: data.reason,
+        validUntil: data.validUntil ?? null,
+        status: 'active',
+        grantedBy: actor.id,
+      })
+      .returning();
+    await logAction(actor.id, 'EXCEPTION_GRANTED', 'exception', created!.id, null, created as Record<string, unknown>, ctx, tx);
+    return created!;
+  });
 }
 
-export async function revokeException(id: string, revokedBy: string) {
-  const [updated] = await db
-    .update(exception)
-    .set({ status: 'revoked', revokedBy, revokedAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(exception.id, id), eq(exception.status, 'active')))
-    .returning();
-  if (!updated) throw new Error('Exception not found or already revoked');
-  return updated;
+/**
+ * Revoke an exception — by a role that may grant its type. Revoking a
+ * grade-10 exception is an eligibility change (F0a): the waiting
+ * registrations it allowed expire in the same transaction, and the caller
+ * closes their open checkouts after it commits.
+ */
+export async function revokeException(id: string, actor: { id: string; role: string | null | undefined }, ctx?: AuditContext) {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select().from(exception).where(eq(exception.id, id)).for('update');
+    if (!row || row.status !== 'active') throw new ExceptionError('Exception not found or already revoked', 404);
+    assertMayGrant(row.type as ExceptionType, actor.role, 'revoke');
+    const now = new Date();
+    const [updated] = await tx
+      .update(exception)
+      .set({ status: 'revoked', revokedBy: actor.id, revokedAt: now, updatedAt: now })
+      .where(and(eq(exception.id, id), eq(exception.status, 'active')))
+      .returning();
+    await logAction(actor.id, 'EXCEPTION_REVOKED', 'exception', id, { status: 'active' }, updated as Record<string, unknown>, ctx, tx);
+    const expired = row.type === 'grade10_other_series'
+      ? await expireIneligibleRegistrations(tx, { studentIds: [row.studentId], ...(row.sessionId ? { sessionIds: [row.sessionId] } : {}) }, 'exception_revoked', now)
+      : [];
+    return { exception: updated!, expired };
+  });
 }
 
-export async function getExceptions(filters?: ListExceptionsQueryType) {
+/** Exceptions of the types the caller may grant (a coordinator sees the grade-10 ones only). */
+export async function getExceptions(filters: ListExceptionsQueryType | undefined, role: string | null | undefined) {
+  const types = exceptionTypesGrantableBy(role);
   return db.query.exception.findMany({
     where: (e, { eq, and }) => {
-      const conditions = [];
+      const conditions = [inArray(e.type, types.length ? types : ['__none__'])];
       if (filters?.studentId) conditions.push(eq(e.studentId, filters.studentId));
       if (filters?.status) conditions.push(eq(e.status, filters.status));
       if (filters?.type) conditions.push(eq(e.type, filters.type));
-      return conditions.length > 0 ? and(...conditions) : undefined;
+      return and(...conditions);
     },
     with: {
-      student: { columns: { id: true, name: true, email: true, grade: true } },
+      student: { columns: { id: true, name: true, email: true, cohortYear: true }, extras: gradeTodayExtras },
       session: { columns: { id: true, name: true } },
       subject: { columns: { id: true, name: true, code: true } },
     },

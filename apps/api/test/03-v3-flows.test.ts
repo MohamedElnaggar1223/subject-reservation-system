@@ -103,7 +103,7 @@ describe('V3 flows', () => {
   it('held wallet: preregister for a draft session, pay at the desk into held, capture on activation', async () => {
     const draft = futureWindow();
     const wrongLevel = await refused(
-      adm.api.v1.sessions.$post({ json: { name: 'January IGCSE?', sessionType: 'january', qualificationLevel: 'igcse', ...draft } })
+      adm.api.v1.sessions.$post({ json: { name: 'January IGCSE?', sessionType: 'january', seriesYear: 2027, qualificationLevel: 'igcse', ...draft } })
     );
     expect(wrongLevel.status).toBe(400);
 

@@ -37,6 +37,7 @@ import {
   lte,
   isNotNull,
   sql,
+  gradeTodayExtras,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type {
@@ -69,13 +70,17 @@ import {
   notifyRegistrationsExpiredAtEntryDeadline,
   notifyPreregistrationsRefundedAtDeadline,
   notifyPaymentClosedAtGraduation,
+  notifyPaymentClosedIneligible,
   notifyStrandedPaymentClosed,
   notifyEscrowBalanceChanged,
 } from './notification.services';
 import { createReceiptsForRegistrations } from './receipt.services';
 import { creditHeld } from './escrow.services';
+import { assertMayRegisterFor, mayRegisterFor, type EligibilityCause } from './eligibility.services';
+import { gradeLabel } from '@repo/validations';
 import { refundPreregistrationsAtDeadline } from './prereg.services';
-import { isOwnDocument } from './file.services';
+import { isAttachableEvidence } from './file.services';
+import { PAYMENT_EVIDENCE_PURPOSES } from '@repo/validations';
 
 // ─── School Receiving Account (InstaPay destination) ─────────────────────────
 //
@@ -198,6 +203,12 @@ export async function initiatePayment(
         : `Registration window is closed for: ${names}`
     );
   }
+  // F0a: a subject the student may no longer sit cannot be paid for — they
+  // left the school, their cohort or the window's series was corrected, or
+  // the school stopped registering graduates. A registration kept through
+  // that change for a transfer being checked is released if the transfer is
+  // rejected (failOpenPayment), never paid again (state audit SO-7).
+  for (const s of sessions) await assertMayRegisterFor(studentId, s.id);
 
   // Held-wallet funding is provider money only — no escrow application
   if (isPrereg && (data.escrowAmountToApply ?? 0) > 0) {
@@ -720,7 +731,9 @@ async function failOpenPayment(
         .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
         .where(and(eq(paymentRegistration.paymentId, paymentId), eq(registration.status, 'pending_payment')));
       for (const r of regs) {
-        if (await sessionOpenFor(pay.studentId, r.sessionId, tx)) continue;
+        // Still payable only while the window is open for the student and
+        // they may still sit the series (F0a; SO-7).
+        if (await sessionOpenFor(pay.studentId, r.sessionId, tx) && (await mayRegisterFor(pay.studentId, r.sessionId, tx)).allowed) continue;
         expired.push(...await tx
           .update(registration)
           .set({ status: 'expired', updatedAt: new Date() })
@@ -828,6 +841,57 @@ export async function closePaymentsOfGraduatedStudents(studentIds: string[]) {
   }
   return closed;
 }
+
+/**
+ * Checkouts left open on registrations the eligibility clean-up just expired
+ * (a student who left, a corrected cohort or series, A-12 turned off, a
+ * revoked grade-10 exception; FEATURES_PLAN.md F0a). It replaces
+ * closePaymentsOfGraduatedStudents, which served the one trigger graduation
+ * was (state audit ST-04). Each is failed by the system after the clean-up
+ * has committed — escrow back, audited in its own transaction, the family
+ * told why; a transfer that did arrive is recorded later ("Transfer found").
+ * A failure here is left to the recovery sweep (closeStrandedPayments).
+ */
+export async function closePaymentsOfExpiredRegistrations(registrationIds: string[], cause: EligibilityCause) {
+  if (registrationIds.length === 0) return 0;
+  const open = await db
+    .selectDistinct({ id: payment.id })
+    .from(payment)
+    .innerJoin(paymentRegistration, eq(paymentRegistration.paymentId, payment.id))
+    .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
+    .where(and(
+      inArray(paymentRegistration.registrationId, registrationIds),
+      inArray(payment.status, [...OPEN_PAYMENT_STATUSES]),
+      eq(registration.status, 'expired'),
+    ));
+  let closed = 0;
+  for (const { id } of open) {
+    try {
+      const r = await failOpenPayment(id, {
+        from: OPEN_PAYMENT_STATUSES,
+        actorId: null,
+        action: 'PAYMENT_FAILED',
+        reason: CLOSED_BECAUSE[cause],
+      });
+      if (!r) continue;
+      closed++;
+      await notifyPaymentClosedIneligible(id, r.pay.escrowAmountApplied, cause)
+        .catch((err) => console.error(`[payment] Eligibility notice for ${id} failed:`, err));
+    } catch (err) {
+      console.error(`[payment] Could not close ${id} after an eligibility change; the sweep will retry:`, err);
+    }
+  }
+  return closed;
+}
+
+const CLOSED_BECAUSE: Record<EligibilityCause, string> = {
+  withdrawn: 'The student was withdrawn from the school before this payment was confirmed',
+  transferred: 'The student transferred to another school before this payment was confirmed',
+  cohort_corrected: "The student's grade was corrected and they may no longer sit this series",
+  graduate_retakes_off: 'The school no longer registers graduates for this series',
+  series_corrected: "The window's exam series was corrected and the student may no longer sit it",
+  exception_revoked: "The student's grade-10 exception was revoked before this payment was confirmed",
+};
 
 /**
  * The recovery sweep's safety net (review of the state audit, flag 2): an
@@ -1315,7 +1379,8 @@ export async function submitInstapayReference(
   }
   // RF-13: a screenshot must be one this parent uploaded. The id used to be
   // stored as given, so any family could attach another family's document.
-  if (data.screenshotFileId && !(await isOwnDocument(data.screenshotFileId, parentId))) {
+  // F0a: and one uploaded as evidence, for this student.
+  if (data.screenshotFileId && !(await isAttachableEvidence(data.screenshotFileId, parentId, PAYMENT_EVIDENCE_PURPOSES, pay.studentId))) {
     throw new Error('You are not authorized to attach that file');
   }
   // A checkout whose registrations already expired with the window can take
@@ -1409,7 +1474,7 @@ export async function getPendingManualPayments() {
           },
         },
       },
-      student: { columns: { id: true, name: true, email: true, grade: true, studentId: true } },
+      student: { columns: { id: true, name: true, email: true, cohortYear: true, studentId: true }, extras: gradeTodayExtras },
       parent: { columns: { id: true, name: true, email: true } },
     },
     orderBy: (p, { asc }) => [asc(p.createdAt)],
@@ -1724,7 +1789,7 @@ export async function getPendingBankTransfers() {
           },
         },
       },
-      student: { columns: { id: true, name: true, email: true, grade: true, studentId: true } },
+      student: { columns: { id: true, name: true, email: true, cohortYear: true, studentId: true }, extras: gradeTodayExtras },
       parent: { columns: { id: true, name: true, email: true } },
     },
     orderBy: (p, { asc }) => [asc(p.createdAt)],
@@ -1753,7 +1818,7 @@ export async function generatePaymentReceipt(paymentId: string): Promise<Buffer>
   const pay = await db.query.payment.findFirst({
     where: (p, { eq }) => eq(p.id, paymentId),
     with: {
-      student: { columns: { id: true, name: true, email: true, grade: true, studentId: true } },
+      student: { columns: { id: true, name: true, email: true, cohortYear: true, studentId: true }, extras: gradeTodayExtras },
       parent: { columns: { id: true, name: true, email: true } },
       paymentRegistrations: {
         with: {
@@ -1817,7 +1882,7 @@ export async function generatePaymentReceipt(paymentId: string): Promise<Buffer>
   lines.push(thin);
   lines.push(`Name:            ${pay.student.name}`);
   lines.push(`Student ID:      ${pay.student.studentId ?? 'N/A'}`);
-  lines.push(`Grade:           ${pay.student.grade ? `Grade ${pay.student.grade}` : 'N/A'}`);
+  lines.push(`Grade:           ${gradeLabel(pay.student.grade)}`);
   lines.push(`Email:           ${pay.student.email}`);
   lines.push('');
   lines.push(thin);
@@ -1992,7 +2057,7 @@ export async function getCheckoutSummary(
     with: {
       subject: true,
       session: { columns: { id: true, name: true, sessionType: true } },
-      student: { columns: { id: true, name: true, grade: true } },
+      student: { columns: { id: true, name: true, cohortYear: true }, extras: gradeTodayExtras },
     },
   });
 

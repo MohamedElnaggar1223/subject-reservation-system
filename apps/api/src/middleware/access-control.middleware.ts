@@ -27,8 +27,7 @@
 
 import { createMiddleware } from 'hono/factory';
 import { HonoEnv } from '../lib/types';
-import { ROLES, hasRole, type Role } from '@repo/validations';
-import { isGraduated } from '../services/grade.services';
+import { ROLES, hasRole, STAFF_ROLES, ACADEMIC_ROLES, STUDENT_RECORD_ROLES, type Role } from '@repo/validations';
 
 /**
  * Require Authentication
@@ -102,38 +101,16 @@ export const requireFinance = () =>
 // Finance approvals (refund completion, exceptions, fee schedules).
 export const requireFinanceAdmin = () => requireRole(ROLES.FINANCE_ADMIN, ROLES.ADMIN);
 
-/**
- * Require Not Graduated
- *
- * Prevents graduated students from performing registration or change-request actions.
- * A graduated student is one with role='student' AND grade=null.
- *
- * Non-student roles (parents, admins) are always allowed through.
- * Students with a non-null grade are allowed through.
- *
- * Must be used after requireAuth() — relies on authenticated user in context.
- *
- * Returns 403 if the user is a graduated student.
- */
-export const requireNotGraduated = () => {
-  return createMiddleware<HonoEnv>(async (c, next) => {
-    const user = c.get('user');
-    const session = c.get('session');
+// requireNotGraduated was removed by F0a: whether a student may register is
+// decided per series by mayRegisterFor (services/eligibility.services.ts),
+// which every registration, swap and approval path asks.
 
-    if (!session || !user) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    // Only block graduated students (role='student' with grade=null).
-    // Uses isGraduated() which queries the DB for current grade, since
-    // the session user type may not include the grade field.
-    if (user.role === ROLES.STUDENT && await isGraduated(user.id)) {
-      return c.json({ error: 'Graduated students cannot perform this action' }, 403);
-    }
-
-    return next();
-  });
-};
+/** Every member of staff (not a family). */
+export const requireStaff = () => requireRole(...STAFF_ROLES);
+/** The academic lead's powers: coordinator and admin. */
+export const requireAcademic = () => requireRole(...ACADEMIC_ROLES);
+/** Staff who read students' academic records: the desk, the coordinator, admin. */
+export const requireStudentRecords = () => requireRole(...STUDENT_RECORD_ROLES);
 
 /**
  * Alias for backwards compatibility

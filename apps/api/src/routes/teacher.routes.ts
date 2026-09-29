@@ -15,8 +15,9 @@ import {
   UpdateTeacher,
   TeacherId,
   ListTeachersQuery,
+  LinkTeacherAccount,
 } from '@repo/validations';
-import { success, error } from '../lib/response';
+import { success, error, clientMessage } from '../lib/response';
 import { requireAuth, requireAdmin } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as teacherService from '../services/teacher.services';
@@ -62,6 +63,22 @@ export const teachers = new Hono<HonoEnv>()
     await logAction(user.id, 'TEACHER_UPDATED', 'teacher', id, null, data as Record<string, unknown>, extractAuditContext(c))
       .catch((err) => console.error('[audit] TEACHER_UPDATED failed:', err));
     return success(c, updated);
+  })
+
+  /**
+   * PUT /teachers/:id/account — link this teacher record to a staff account
+   * (teaching is a capability, F0a), or unlink it with { userId: null }.
+   */
+  .put('/:id/account', requireAdmin(), zValidator('param', TeacherId), zValidator('json', LinkTeacherAccount), async (c) => {
+    const user = c.get('user')!;
+    const { id } = c.req.valid('param');
+    const { userId } = c.req.valid('json');
+    try {
+      return success(c, await teacherService.linkTeacherAccount(id, userId, user.id, extractAuditContext(c)));
+    } catch (err) {
+      const status = err instanceof teacherService.TeacherError ? err.status : 400;
+      return error(c, clientMessage(err, 'Failed to link the account'), status);
+    }
   })
 
   .delete('/:id', requireAdmin(), zValidator('param', TeacherId), async (c) => {

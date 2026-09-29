@@ -69,6 +69,30 @@ export const financeAdminRole = ac.newRole({
 })
 
 /**
+ * Coordinator, Teacher and Gate (F0a)
+ * The academic lead, a teaching account, and reception/security. Their
+ * powers are the /v1 endpoints each feature grants them
+ * (lib/role-grants.ts); in better-auth they hold nothing.
+ *
+ * SECURITY: like the finance roles, these must NEVER hold better-auth's
+ * `user` resource (see the note on financeOfficerRole): it would open
+ * /api/auth/admin/* create-user with a client-supplied role and
+ * set-user-password against any account. 06-auth-surface checks each of
+ * them is refused there.
+ */
+export const coordinatorRole = ac.newRole({
+    student: ["read"],
+})
+
+export const teacherRole = ac.newRole({
+    student: ["read"],
+})
+
+export const gateRole = ac.newRole({
+    student: ["read"],
+})
+
+/**
  * Student Role
  * Can manage own registrations, view subjects, manage escrow
  */

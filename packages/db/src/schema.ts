@@ -249,7 +249,7 @@ export const fileVariantRelations = relations(fileVariant, ({ one }) => ({
   }),
 }));
 
-export const userRelations = relations(user, ({ many }) => ({
+export const userRelations = relations(user, ({ one, many }) => ({
   sessions: many(session),
   accounts: many(account),
   files: many(file),
@@ -267,6 +267,12 @@ export const userRelations = relations(user, ({ many }) => ({
   changeRequestsApproved: many(changeRequest, { relationName: "approvedChangeRequests" }),
   notifications: many(notification),
   auditLogs: many(auditLog),
+  // F0a: the teacher record this account teaches as, if any.
+  teachingAs: one(teacher, {
+    fields: [user.id],
+    references: [teacher.userId],
+  }),
+  sectionMemberships: many(sectionMembership),
 }));
 
 /**

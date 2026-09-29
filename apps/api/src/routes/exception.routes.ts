@@ -1,39 +1,45 @@
 /**
- * Exception API Routes (V3 §6.3)
+ * Exception API Routes (V3 §6.3, F0a)
  *
- * GET  /exceptions            - List exceptions (finance admin)
- * POST /exceptions            - Grant an exception (finance admin)
- * POST /exceptions/:id/revoke - Revoke an active exception (finance admin)
+ * GET  /exceptions            - List the exceptions of the types the caller may grant
+ * POST /exceptions            - Grant an exception
+ * POST /exceptions/:id/revoke - Revoke an active exception
+ *
+ * The role gate lets in every role that may grant some type (finance
+ * admin, coordinator, admin); the handler checks the type's own roles
+ * (EXCEPTION_GRANT_ROLES): a coordinator is refused a fee waiver, a
+ * finance admin the grade-10 exception.
  */
 
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { CreateException, ExceptionId, ListExceptionsQuery } from '@repo/validations';
+import { CreateException, ExceptionId, ListExceptionsQuery, EXCEPTION_ROLES } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
-import { requireAuth, requireFinanceAdmin } from '../middleware/access-control.middleware';
+import { requireAuth, requireRole } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as exceptionService from '../services/exception.services';
-import { logAction, extractAuditContext } from '../services/audit.services';
+import { closePaymentsOfExpiredRegistrations } from '../services/payment.services';
+import { extractAuditContext } from '../services/audit.services';
+
+const statusOf = (err: unknown) => (err instanceof exceptionService.ExceptionError ? err.status : 400);
 
 export const exceptions = new Hono<HonoEnv>()
   .use('*', requireAuth())
-  .use('*', requireFinanceAdmin())
+  .use('*', requireRole(...EXCEPTION_ROLES))
 
   .get('/', zValidator('query', ListExceptionsQuery), async (c) => {
     const filters = c.req.valid('query');
-    return success(c, await exceptionService.getExceptions(filters));
+    return success(c, await exceptionService.getExceptions(filters, c.get('user')!.role));
   })
 
   .post('/', zValidator('json', CreateException), async (c) => {
     const user = c.get('user')!;
     const data = c.req.valid('json');
     try {
-      const created = await exceptionService.grantException(data, user.id);
-      await logAction(user.id, 'EXCEPTION_GRANTED', 'exception', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
-        .catch((err) => console.error('[audit] EXCEPTION_GRANTED failed:', err));
+      const created = await exceptionService.grantException(data, { id: user.id, role: user.role }, extractAuditContext(c));
       return success(c, created, 201);
     } catch (err) {
-      return error(c, clientMessage(err, 'Failed to grant exception'), 400);
+      return error(c, clientMessage(err, 'Failed to grant exception'), statusOf(err));
     }
   })
 
@@ -41,13 +47,14 @@ export const exceptions = new Hono<HonoEnv>()
     const user = c.get('user')!;
     const { id } = c.req.valid('param');
     try {
-      const updated = await exceptionService.revokeException(id, user.id);
-      await logAction(user.id, 'EXCEPTION_REVOKED', 'exception', id, null, updated as Record<string, unknown>, extractAuditContext(c))
-        .catch((err) => console.error('[audit] EXCEPTION_REVOKED failed:', err));
-      return success(c, updated);
+      const { exception, expired } = await exceptionService.revokeException(id, { id: user.id, role: user.role }, extractAuditContext(c));
+      if (expired.length) {
+        await closePaymentsOfExpiredRegistrations(expired.map((r) => r.id), 'exception_revoked')
+          .catch((err) => console.error('[exceptions] Closing checkouts after a revoke failed; the recovery sweep will retry:', err));
+      }
+      return success(c, { ...exception, registrationsExpired: expired.length });
     } catch (err) {
-      const message = clientMessage(err, 'Failed to revoke exception');
-      return error(c, message, message.includes('not found') ? 404 : 400);
+      return error(c, clientMessage(err, 'Failed to revoke exception'), statusOf(err));
     }
   });
 

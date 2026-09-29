@@ -14,7 +14,7 @@
 import './env';
 import { expect } from 'vitest';
 import { hc } from 'hono/client';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, academicYearStartOf, academicYearLabel, seriesYearInAcademicYear } from '@repo/validations';
 import type { AppType } from '../src/app';
 
 type Json = Record<string, unknown>;
@@ -113,9 +113,19 @@ export async function admin(tag: string): Promise<Client> {
   return signIn(email);
 }
 
-export async function staff(adm: Client, role: 'finance_officer' | 'finance_admin', tag: string): Promise<Client> {
+/**
+ * A member of staff created on the Team page. A teacher account is linked
+ * to a new teacher record made from it (F0a: teaching is a capability).
+ */
+export async function staff(
+  adm: Client,
+  role: 'finance_officer' | 'finance_admin' | 'coordinator' | 'teacher' | 'gate',
+  tag: string,
+  opts: { teacherRecord?: boolean } = {},
+): Promise<Client> {
   const email = `${role}.${tag}@test.local`;
-  await apiResponse(adm.api.v1.users.$post({ json: { name: `${role} ${tag}`, email, password: PASSWORD, role } }));
+  const newTeacherRecord = role === 'teacher' || opts.teacherRecord ? true : undefined;
+  await apiResponse(adm.api.v1.users.$post({ json: { name: `${role} ${tag}`, email, password: PASSWORD, role, newTeacherRecord } }));
   return signIn(email);
 }
 
@@ -162,16 +172,23 @@ export async function subject(
   return r.id;
 }
 
+/**
+ * A registration window. Its exam series year (F0a) defaults to the series of
+ * that type in the academic year the window opens in, so a student's grade in
+ * it is their grade that year — the suites' families keep the grade they were
+ * onboarded with. A test about the series itself passes `seriesYear`.
+ */
 export async function session(
   adm: Client,
   name: string,
-  sessionType: 'june' | 'november' | 'january',
+  sessionType: 'june' | 'october' | 'november' | 'january',
   qualificationLevel: 'igcse' | 'as_level' | 'a_level',
-  opts: { startDate: string; endDate: string; activate?: boolean }
+  opts: { startDate: string; endDate: string; activate?: boolean; seriesYear?: number }
 ): Promise<string> {
+  const seriesYear = opts.seriesYear ?? seriesYearInAcademicYear(sessionType, academicYearStartOf(new Date(opts.startDate)));
   const r = await apiResponse(
     adm.api.v1.sessions.$post({
-      json: { name, sessionType, qualificationLevel, startDate: opts.startDate, endDate: opts.endDate },
+      json: { name, sessionType, seriesYear, qualificationLevel, startDate: opts.startDate, endDate: opts.endDate },
     })
   );
   // A session whose start date has already passed is born active; only a
@@ -283,8 +300,8 @@ export function localYesterday(): string {
 // (1 July rollover, see school-fee.services.ts academicYearForDate).
 
 export function academicYearOf(d: Date): string {
-  const y = d.getFullYear();
-  return d.getMonth() >= 6 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+  // The API's rule (F0a): 1 July, in Cairo time whatever the zone the suite runs in.
+  return academicYearLabel(academicYearStartOf(d));
 }
 
 const days = (n: number) => n * 24 * 60 * 60 * 1000;

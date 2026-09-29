@@ -13,7 +13,7 @@
  * - Admins can remove any link
  */
 
-import { db, parentStudentLink, user, eq, and, or } from '@repo/db';
+import { db, parentStudentLink, user, eq, and, or, gradeTodayExtras } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { CreateLinkRequestType, RespondToLinkType } from '@repo/validations';
 import {
@@ -164,9 +164,10 @@ export async function getPendingLinksForParent(parentId: string) {
           id: true,
           name: true,
           email: true,
-          grade: true,
+          cohortYear: true,
           studentId: true,
         },
+        extras: gradeTodayExtras,
       },
     },
     orderBy: (links, { desc }) => [desc(links.requestedAt)],
@@ -239,10 +240,11 @@ export async function getLinkedChildren(parentId: string) {
           id: true,
           name: true,
           email: true,
-          grade: true,
+          cohortYear: true,
           studentId: true,
           phone: true,
         },
+        extras: gradeTodayExtras,
       },
     },
     orderBy: (links, { asc }) => [asc(links.createdAt)],
@@ -319,9 +321,10 @@ export async function getLinkById(linkId: string) {
           id: true,
           name: true,
           email: true,
-          grade: true,
+          cohortYear: true,
           studentId: true,
         },
+        extras: gradeTodayExtras,
       },
     },
   });
@@ -358,9 +361,10 @@ export async function getAllLinks(status?: string) {
           id: true,
           name: true,
           email: true,
-          grade: true,
+          cohortYear: true,
           studentId: true,
         },
+        extras: gradeTodayExtras,
       },
     },
     orderBy: (links, { desc }) => [desc(links.createdAt)],

@@ -304,7 +304,10 @@ describe('money invariants over the whole database', () => {
       select entity_id, previous_data, new_data from audit_log
       where action = 'REGISTRATION_EXPIRED'
         and (coalesce(previous_data->>'status', '') not in ('pending_approval', 'pending_payment', 'preregistered')
-          or coalesce(new_data->>'reason', '') not in ('session_closed', 'entry_deadline', 'graduated', 'payment_closed', 'preregistration_unfunded_at_deadline'))
+          or coalesce(new_data->>'reason', '') not in ('session_closed', 'entry_deadline', 'graduated', 'payment_closed', 'preregistration_unfunded_at_deadline', 'ineligible')
+          -- F0a: a student no longer eligible for the series says what changed.
+          or (new_data->>'reason' = 'ineligible' and coalesce(new_data->>'detail', '') not in
+            ('withdrawn', 'transferred', 'cohort_corrected', 'graduate_retakes_off', 'series_corrected', 'exception_revoked')))
     `);
     expect(vague).toEqual([]);
   });

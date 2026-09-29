@@ -30,6 +30,7 @@ import {
   or,
   gt,
   sql,
+  gradeTodayExtras,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type {
@@ -313,7 +314,7 @@ export async function getChildrenEscrowBalances(parentId: string) {
       and(eq(l.parentId, parentId), eq(l.status, 'approved')),
     with: {
       student: {
-        columns: { id: true, name: true, email: true, grade: true, studentId: true },
+        columns: { id: true, name: true, email: true, cohortYear: true, studentId: true }, extras: gradeTodayExtras,
       },
     },
   });
@@ -526,7 +527,7 @@ export async function getPendingWithdrawalRequests() {
       escrow: {
         with: {
           student: {
-            columns: { id: true, name: true, email: true, grade: true, studentId: true },
+            columns: { id: true, name: true, email: true, cohortYear: true, studentId: true }, extras: gradeTodayExtras,
           },
         },
       },
@@ -841,7 +842,7 @@ export async function getWithdrawalRequestsForParent(
       escrow: {
         with: {
           student: {
-            columns: { id: true, name: true, grade: true },
+            columns: { id: true, name: true, cohortYear: true }, extras: gradeTodayExtras,
           },
         },
       },
