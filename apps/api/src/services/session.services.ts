@@ -27,11 +27,11 @@ import { expireIneligibleRegistrations } from './eligibility.services';
 import { A_LEVEL_ONLY_SESSION_TYPES, A_LEVEL_ONLY_MESSAGE, seriesLabel, type CorrectSessionSeriesType, type SessionType } from '@repo/validations';
 import { env } from '../env';
 import { randomUUID } from 'crypto';
+import { linkNewWindowSeries, seriesRuleSentence, windowDeadlines, windowChangeMisfit } from './series.services';
 import type {
   CreateSessionType,
   UpdateDraftSessionType,
   UpdateActiveSessionType,
-  SetEntryDeadlineType,
 } from '@repo/validations';
 
 /**
@@ -142,7 +142,7 @@ export async function hasActiveSessionOfType(
  * Returns the created session.
  * Throws if the immediate-active path would violate the unique-per-type constraint.
  */
-export async function createSession(data: CreateSessionType) {
+export async function createSession(data: CreateSessionType, actorId?: string) {
   const initialStatus = resolveInitialStatus(data.startDate);
 
   const qualificationLevel = data.qualificationLevel ?? 'igcse';
@@ -158,21 +158,29 @@ export async function createSession(data: CreateSessionType) {
 
   const id = randomUUID();
 
-  const [created] = await db
-    .insert(registrationSession)
-    .values({
-      id,
-      name: data.name,
-      sessionType: data.sessionType,
-      seriesYear: data.seriesYear,
-      qualificationLevel,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      entryDeadline: data.entryDeadline ?? null,
-      status: initialStatus,
-      editHistory: [],
-    })
-    .returning();
+  // F0b: the window and the board series it feeds are created together.
+  const created = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(registrationSession)
+      .values({
+        id,
+        name: data.name,
+        sessionType: data.sessionType,
+        seriesYear: data.seriesYear,
+        qualificationLevel,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        status: initialStatus,
+        editHistory: [],
+      })
+      .returning();
+    if (data.boardSeries?.length) await linkNewWindowSeries(tx, row!, data.boardSeries, actorId ?? null);
+    return row;
+  }).catch((err) => {
+    const sentence = seriesRuleSentence(err);
+    if (sentence) throw new Error(sentence);
+    throw err;
+  });
 
   if (initialStatus === 'active') {
     const students = await db.query.user.findMany({
@@ -209,15 +217,23 @@ export async function updateDraftSession(
 ) {
   // V3 §5.5: validate the MERGED state never yields a January IGCSE
   // session (no January IGCSE series exists in Egypt).
+  const current = await getSessionById(id);
+  if (!current) return undefined;
   if (data.sessionType !== undefined || data.qualificationLevel !== undefined) {
-    const current = await getSessionById(id);
-    if (!current) return undefined;
     const mergedType = data.sessionType ?? current.sessionType;
     const mergedLevel = data.qualificationLevel ?? current.qualificationLevel;
     if (A_LEVEL_ONLY_SESSION_TYPES.includes(mergedType as SessionType) && mergedLevel === 'igcse') {
       throw new Error(A_LEVEL_ONLY_MESSAGE);
     }
   }
+  // F0b: the board series the window feeds must still fit it.
+  const misfit = await windowChangeMisfit(db, id, {
+    sessionType: data.sessionType ?? current.sessionType,
+    seriesYear: data.seriesYear ?? current.seriesYear,
+    qualificationLevel: data.qualificationLevel ?? current.qualificationLevel,
+    endDate: data.endDate ?? current.endDate,
+  });
+  if (misfit) throw new Error(misfit);
 
   const [updated] = await db
     .update(registrationSession)
@@ -309,6 +325,9 @@ export async function correctSessionSeries(id: string, data: CorrectSessionSerie
       if (A_LEVEL_ONLY_SESSION_TYPES.includes(data.sessionType) && sess.qualificationLevel === 'igcse') {
         throw new Error(A_LEVEL_ONLY_MESSAGE);
       }
+      // F0b: the board series the window feeds must still fit its series.
+      const misfit = await windowChangeMisfit(tx, id, { ...sess, sessionType: data.sessionType, seriesYear: data.seriesYear });
+      if (misfit) throw new Error(misfit);
       const [updated] = await tx
         .update(registrationSession)
         .set({ sessionType: data.sessionType, seriesYear: data.seriesYear, updatedAt: new Date() })
@@ -342,8 +361,11 @@ export async function activateSession(id: string) {
   if (!session || session.status !== 'draft') return undefined;
   // Past the board's deadline no entry can be made, and opening would capture
   // the held money of paid preregistrations for entries the board refuses.
-  if (session.entryDeadline && session.entryDeadline <= new Date()) {
-    throw new Error(`This series cannot be opened: the exam board's entry deadline (${schoolDate(session.entryDeadline)}) has passed`);
+  // F0b: past the deadline of any board series the window feeds (a window
+  // closes before every one of them, so this is a window already over).
+  const { earliest } = await windowDeadlines(id);
+  if (earliest && earliest <= new Date()) {
+    throw new Error(`This series cannot be opened: the exam board's entry deadline (${schoolDate(earliest)}) has passed`);
   }
 
   const conflict = await hasActiveSessionOfType(session.sessionType, session.qualificationLevel, id);
@@ -395,41 +417,8 @@ export async function activateSession(id: string) {
   }
 }
 
-/**
- * Set or clear a series' exam-board entry deadline (owner decision MO-10), in
- * any status: boards publish their calendars on their own timetable. It must
- * fall after the window closes and in the future — a date already past would
- * close every unconfirmed payment on the next scheduler tick, which a typo
- * must not be able to do. Audited in the same transaction.
- */
-export async function setEntryDeadline(
-  sessionId: string,
-  data: SetEntryDeadlineType,
-  adminId: string,
-  auditCtx?: AuditContext
-) {
-  return db.transaction(async (tx) => {
-    const [sess] = await tx.select().from(registrationSession).where(eq(registrationSession.id, sessionId)).for('update');
-    if (!sess) throw new Error('Session not found');
-    if (data.entryDeadline) {
-      if (data.entryDeadline <= sess.endDate) {
-        throw new Error("The board's entry deadline must be after the registration window closes");
-      }
-      if (data.entryDeadline <= new Date()) {
-        throw new Error("The board's entry deadline must be in the future");
-      }
-    }
-    const [updated] = await tx
-      .update(registrationSession)
-      .set({ entryDeadline: data.entryDeadline, updatedAt: new Date() })
-      .where(eq(registrationSession.id, sessionId))
-      .returning();
-    await logAction(adminId, 'SESSION_ENTRY_DEADLINE_SET', 'session', sessionId,
-      { entryDeadline: sess.entryDeadline?.toISOString() ?? null },
-      { entryDeadline: data.entryDeadline?.toISOString() ?? null, reason: data.reason }, auditCtx, tx);
-    return updated!;
-  });
-}
+// F0b: the exam board's entry deadline (MO-10) is set on each board series
+// (series.services.ts updateBoardSeries), no longer on the window.
 
 /**
  * Finalize all pending records when a session closes.
@@ -460,7 +449,7 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   const now = new Date();
   const sessionForGrace = await db.query.registrationSession.findFirst({
     where: (s, { eq: eqOp }) => eqOp(s.id, sessionId),
-    columns: { entryDeadline: true, closedAt: true },
+    columns: { closedAt: true },
   });
   // Only what existed when the window closed. A finalisation that runs late
   // (the recovery sweep, after a failure) must not expire what a student with
@@ -468,7 +457,17 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   // the state audit, flag 3).
   const closedAt = sessionForGrace?.closedAt ?? now;
   const graceEnds = now.getTime() + env.INSTAPAY_REFERENCE_GRACE_HOURS * 60 * 60 * 1000;
-  const referenceDueAt = new Date(Math.min(graceEnds, sessionForGrace?.entryDeadline?.getTime() ?? Infinity));
+  // Never past the board's entry deadline — F0b: the earliest deadline of the
+  // board series the checkout's own subjects are entered in.
+  const referenceDueFor = async (paymentId: string) => {
+    const [row] = await db.execute(sql`
+      select min(bs.entry_deadline) as deadline
+      from payment_registration pr join registration r on r.id = pr.registration_id
+      join board_series bs on bs.id = r.board_series_id
+      where pr.payment_id = ${paymentId}`).then((r) => r.rows as { deadline: string | Date | null }[]);
+    const deadline = row?.deadline ? new Date(row.deadline).getTime() : Infinity;
+    return new Date(Math.min(graceEnds, deadline));
+  };
 
   // 1. Unpaid checkouts first. An InstaPay one keeps its registrations until
   //    referenceDueAt (kept even if it already had a due date from another
@@ -490,6 +489,7 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   const expiredWithPayment: { id: string; studentId: string; subjectId: string; sessionId: string }[] = [];
   for (const p of unpaid) {
     try {
+      const referenceDueAt = await referenceDueFor(p.id);
       if (p.method === 'instapay' && referenceDueAt > now) {
         // Kept only while the time it is kept until lies ahead: a due time an
         // earlier close already set (a checkout spanning two sessions) stays,

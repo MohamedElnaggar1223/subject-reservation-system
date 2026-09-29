@@ -72,6 +72,7 @@ import {
 } from './notification.services';
 import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterFor } from './eligibility.services';
 import { logAction, type AuditContext } from './audit.services';
+import { routeAndCheck } from './series.services';
 
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
 
@@ -234,6 +235,7 @@ async function validateNewSubjectForSwap(
     columns: {
       id: true,
       name: true,
+      council: true,
       isActive: true,
       isOfferedAtSchool: true,
       courseFee: true,
@@ -446,15 +448,19 @@ export async function approveChangeRequest(
 
   let newSubjectIsCore = false;
   let newPricing: Awaited<ReturnType<typeof priceSwappedInSubject>> | null = null;
+  let newSubjectForRoute: { id: string; name: string; council: string } | null = null;
   if (cr.type === 'swap' && cr.newSubjectId) {
     const newSubject = await db.query.subject.findFirst({
       where: (s, { eq: eqOp }) => eqOp(s.id, cr.newSubjectId!),
-      columns: { id: true, isActive: true, isCore: true, isOfferedAtSchool: true, courseFee: true, registrationFee: true },
+      columns: { id: true, name: true, council: true, isActive: true, isCore: true, isOfferedAtSchool: true, courseFee: true, registrationFee: true },
     });
     if (!newSubject || !newSubject.isActive) {
       throw new Error('The requested subject is no longer available');
     }
     newSubjectIsCore = newSubject.isCore;
+    newSubjectForRoute = newSubject;
+    // F0b: the new subject is entered in its board series, which must be open.
+    await routeAndCheck(db, cr.registration.sessionId, [newSubject]);
     // Priced now, the way a fresh registration made now would be; the quote
     // on the request (priceAtRequest) is what the parent was shown.
     newPricing = await priceSwappedInSubject(cr.registration.studentId, cr.registration.sessionId, newSubject);
@@ -508,13 +514,15 @@ export async function approveChangeRequest(
     });
 
     let newRegistrationId: string | null = null;
-    if (cr.type === 'swap' && cr.newSubjectId && newPricing) {
+    if (cr.type === 'swap' && cr.newSubjectId && newPricing && newSubjectForRoute) {
       newRegistrationId = randomUUID();
+      const routes = await routeAndCheck(tx, cr.registration.sessionId, [newSubjectForRoute], true);
       await tx.insert(registration).values({
         id: newRegistrationId,
         studentId: cr.registration.studentId,
         sessionId: cr.registration.sessionId,
         subjectId: cr.newSubjectId,
+        boardSeriesId: routes.get(cr.newSubjectId) ?? null,
         priceAtRegistration: newPricing.total,
         courseFeeAtRegistration: newPricing.courseFee,
         registrationFeeAtRegistration: newPricing.registrationFee,
@@ -771,6 +779,8 @@ export async function executeDirectSwap(
     registrationId
   );
 
+  // F0b: the new subject is entered in its board series, which must be open.
+  await routeAndCheck(db, reg.sessionId, [newSub]);
   const newPricing = await priceSwappedInSubject(reg.studentId, reg.sessionId, newSub);
   const newSubjectPrice = newPricing.total;
   const now = new Date();
@@ -784,6 +794,7 @@ export async function executeDirectSwap(
     // Asked again with the student and window held, before anything else is
     // locked (F0a; see assertMayRegisterForInTx).
     await assertMayRegisterForInTx(tx, reg.studentId, reg.sessionId);
+    const routes = await routeAndCheck(tx, reg.sessionId, [newSub], true);
     const dropOutcome = await executeReceiptGatedDrop(tx, {
       registrationId,
       studentId: reg.studentId,
@@ -799,6 +810,7 @@ export async function executeDirectSwap(
       studentId: reg.studentId,
       sessionId: reg.sessionId,
       subjectId: data.newSubjectId,
+      boardSeriesId: routes.get(data.newSubjectId) ?? null,
       priceAtRegistration: newPricing.total,
       courseFeeAtRegistration: newPricing.courseFee,
       registrationFeeAtRegistration: newPricing.registrationFee,

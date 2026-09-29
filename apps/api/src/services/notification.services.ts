@@ -949,11 +949,16 @@ export async function notifyPaymentClosedIneligible(
   );
 }
 
-/** At the board's entry deadline: registrations still waiting on the series expired. */
+/**
+ * At the board's entry deadline: registrations still waiting on the series
+ * expired. F0b: the deadline is a board series' (`seriesName`), one of the
+ * series the window (`sessionId`) feeds.
+ */
 export async function notifyRegistrationsExpiredAtEntryDeadline(
   sessionId: string,
   entryDeadline: Date,
-  expired: { studentId: string; subjectId: string }[]
+  expired: { studentId: string; subjectId: string }[],
+  seriesName?: string | null,
 ) {
   const [sessionRow, subjects] = await Promise.all([
     db.query.registrationSession.findFirst({ where: (s, { eq: eqOp }) => eqOp(s.id, sessionId), columns: { name: true } }),
@@ -968,7 +973,7 @@ export async function notifyRegistrationsExpiredAtEntryDeadline(
   const sessionName = sessionRow?.name ?? 'the series';
   for (const [studentId, names] of byStudent) {
     const title = `Not entered for ${sessionName}`;
-    const body = `The exam board's entry deadline for ${sessionName} (${schoolDate(entryDeadline)}) has passed, so these subjects were not entered: ${names.join(', ')}.`;
+    const body = `The exam board's entry deadline for ${seriesName ? `${seriesName} (registered in ${sessionName})` : sessionName} (${schoolDate(entryDeadline)}) has passed, so these subjects were not entered: ${names.join(', ')}.`;
     await createNotification(studentId, 'SESSION_CLOSED', title, body, { sessionId, subjectNames: names, reason: 'entry_deadline' });
     for (const { parentId } of await getLinkedParents(studentId)) {
       await createNotification(parentId, 'SESSION_CLOSED', title, body, { sessionId, studentId, subjectNames: names, reason: 'entry_deadline' });

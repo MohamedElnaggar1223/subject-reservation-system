@@ -21,9 +21,10 @@ import {
   UpdateActiveSession,
   CloseSession,
   SessionId,
-  SetEntryDeadline,
   ListSessionsQuery,
   CorrectSessionSeries,
+  SetSessionBoardSeries,
+  MoveRegistrationsToSeries,
   ROLES,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
@@ -31,19 +32,27 @@ import { requireAuth, requireAdmin, requireRole } from '../middleware/access-con
 import { closePaymentsOfExpiredRegistrations } from '../services/payment.services';
 import type { HonoEnv } from '../lib/types';
 import * as sessionService from '../services/session.services';
+import * as seriesService from '../services/series.services';
 import { notifySessionOpened, notifySessionClosed, getStudentAndParentBroadcastIds } from '../services/notification.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 import { schoolDate } from '../services/window.services';
 
 /**
- * A window may not close on or after its series' exam-board entry deadline:
- * the deadline sweep would close payments in a window that is still open
- * (owner decision MO-10). Returns the refusal, or null.
+ * A window may not close on or after the exam-board entry deadline of any
+ * board series it feeds: the deadline sweep would close payments in a window
+ * that is still open (owner decision MO-10; per series since F0b). Returns
+ * the refusal, or null.
  */
-function windowAfterEntryDeadline(endDate: Date, entryDeadline: Date | null): string | null {
-  if (!entryDeadline || endDate < entryDeadline) return null;
-  return `The window cannot close on or after the exam board's entry deadline (${schoolDate(entryDeadline)}) — move the board deadline first`;
+async function windowAfterEntryDeadline(sessionId: string, endDate: Date): Promise<string | null> {
+  const { earliest } = await seriesService.windowDeadlines(sessionId);
+  if (!earliest || endDate < earliest) return null;
+  return `The window cannot close on or after the exam board's entry deadline (${schoolDate(earliest)}) — move the board deadline first`;
 }
+
+const seriesFailure = (err: unknown, fallback: string) => ({
+  message: clientMessage(err, fallback),
+  status: err instanceof seriesService.SeriesError ? err.status : 400,
+});
 
 export const sessions = new Hono<HonoEnv>()
   .use('*', requireAuth())
@@ -130,7 +139,7 @@ export const sessions = new Hono<HonoEnv>()
       const data = c.req.valid('json');
 
       try {
-        const created = await sessionService.createSession(data);
+        const created = await sessionService.createSession(data, user.id);
 
         await logAction(user.id, 'SESSION_CREATED', 'session', created!.id, null, created as Record<string, unknown>, extractAuditContext(c))
           .catch((err) => console.error('[audit] SESSION_CREATED failed:', err));
@@ -177,9 +186,14 @@ export const sessions = new Hono<HonoEnv>()
         // Extract reason before passing the remaining fields to the service.
         // It isn't a column on registrationSession — it lives in the audit log.
         const { reason, ...updateFields } = parsed.data;
-        const deadlineClash = windowAfterEntryDeadline(updateFields.endDate ?? session.endDate, session.entryDeadline);
+        const deadlineClash = await windowAfterEntryDeadline(id, updateFields.endDate ?? session.endDate);
         if (deadlineClash) return error(c, deadlineClash, 400);
-        const updated = await sessionService.updateDraftSession(id, updateFields);
+        let updated;
+        try {
+          updated = await sessionService.updateDraftSession(id, updateFields);
+        } catch (err) {
+          return error(c, clientMessage(err, 'Failed to update the session'), 400);
+        }
         if (!updated) {
           return error(c, 'Session is no longer in draft status', 409);
         }
@@ -220,7 +234,7 @@ export const sessions = new Hono<HonoEnv>()
         return error(c, 'New end date is identical to the current end date', 400);
       }
 
-      const deadlineClash = windowAfterEntryDeadline(parsed.data.endDate, session.entryDeadline);
+      const deadlineClash = await windowAfterEntryDeadline(id, parsed.data.endDate);
       if (deadlineClash) return error(c, deadlineClash, 400);
 
       const updated = await sessionService.extendActiveSessionDeadline(
@@ -241,25 +255,51 @@ export const sessions = new Hono<HonoEnv>()
   )
 
   /**
-   * SET THE EXAM BOARD'S ENTRY DEADLINE  (owner decision MO-10)
-   * PUT /sessions/:id/entry-deadline
+   * THE BOARD SERIES A WINDOW FEEDS (F0b; IS-14)
+   * GET  /sessions/:id/board-series        admin, coordinator (read)
+   * PUT  /sessions/:id/board-series        admin: the whole set, defaults and subject routes
+   * POST /sessions/:id/board-series/move   admin: registrations to another series of the window
    *
-   * Admin only, in any status. After the deadline, open payments on the
-   * series are closed automatically and waiting registrations expire. Null
-   * removes the cut-off. Audited with the reason.
+   * The exam board's entry deadline (MO-10) is set on each series
+   * (PUT /board-series/:id); the window's own deadline is gone.
    */
-  .put('/:id/entry-deadline',
+  .get('/:id/board-series',
+    requireRole(ROLES.ADMIN, ROLES.COORDINATOR),
+    zValidator('param', SessionId),
+    async (c) => {
+      try {
+        return success(c, await seriesService.getWindowSeries(c.req.valid('param').id));
+      } catch (err) {
+        const f = seriesFailure(err, 'Failed to load the window\'s series');
+        return error(c, f.message, f.status);
+      }
+    }
+  )
+
+  .put('/:id/board-series',
     requireAdmin(),
     zValidator('param', SessionId),
-    zValidator('json', SetEntryDeadline),
+    zValidator('json', SetSessionBoardSeries),
     async (c) => {
-      const { id } = c.req.valid('param');
-      const data = c.req.valid('json');
       try {
-        return success(c, await sessionService.setEntryDeadline(id, data, c.get('user')!.id, extractAuditContext(c)));
+        return success(c, await seriesService.setWindowSeries(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
-        const message = clientMessage(err, 'Failed to set the entry deadline');
-        return error(c, message, message.includes('not found') ? 404 : 400);
+        const f = seriesFailure(err, 'Failed to save the window\'s series');
+        return error(c, f.message, f.status);
+      }
+    }
+  )
+
+  .post('/:id/board-series/move',
+    requireAdmin(),
+    zValidator('param', SessionId),
+    zValidator('json', MoveRegistrationsToSeries),
+    async (c) => {
+      try {
+        return success(c, await seriesService.moveRegistrations(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
+      } catch (err) {
+        const f = seriesFailure(err, 'Failed to move the registrations');
+        return error(c, f.message, f.status);
       }
     }
   )

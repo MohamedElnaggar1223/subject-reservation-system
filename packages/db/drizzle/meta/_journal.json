@@ -260,6 +260,27 @@
       "when": 1790682521288,
       "tag": "0036_foundation_drop_stored_grade",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1790699603519,
+      "tag": "0037_catalogue_structure",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1790699604161,
+      "tag": "0038_catalogue_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1790699633399,
+      "tag": "0039_catalogue_deadline_to_series",
+      "breakpoints": true
     }
   ]
 }

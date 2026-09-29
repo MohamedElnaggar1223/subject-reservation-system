@@ -49,3 +49,10 @@ export * from './academic/eligibility'
 export * from './academic/structure.validations'
 export * from './student/student.validations'
 export * from './settings/settings'
+/**
+ * F0b — the exam catalogue, board series and course enrolment.
+ */
+export * from './catalogue/catalogue.validations'
+export * from './catalogue/level-code'
+export * from './catalogue/board-series.validations'
+export * from './enrolment/enrolment.validations'

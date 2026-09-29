@@ -159,12 +159,15 @@ export async function subject(
   code: string,
   name: string,
   fees: { course: number; registration: number },
-  extra: { qualificationLevel?: 'igcse' | 'as_level' | 'a_level'; isOfferedAtSchool?: boolean; isCore?: boolean } = {}
+  extra: {
+    qualificationLevel?: 'igcse' | 'as_level' | 'a_level'; isOfferedAtSchool?: boolean; isCore?: boolean;
+    council?: 'cambridge' | 'pearson_edexcel' | 'oxford';
+  } = {}
 ): Promise<string> {
   const r = await apiResponse(
     adm.api.v1.subjects.$post({
       json: {
-        name, code, council: 'cambridge', courseFee: fees.course, registrationFee: fees.registration,
+        name, code, council: extra.council ?? 'cambridge', courseFee: fees.course, registrationFee: fees.registration,
         isOfferedAtSchool: true, isCore: false, ...extra,
       },
     })
@@ -197,6 +200,40 @@ export async function session(
     await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: r.id } }));
   }
   return r.id;
+}
+
+/**
+ * F0b: make a board series of the window's own month and year (labelled with
+ * `label`, so suites can each have their own) and add it to the series the
+ * window feeds, as the default for its board. Registrations the window holds
+ * that no series held yet are entered in it. Returns the series id.
+ */
+export async function feedSeries(
+  adm: Client,
+  sessionId: string,
+  opts: { boardCode?: 'cambridge' | 'pearson_edexcel' | 'oxford'; label: string; entryDeadline?: Date; month?: 'january' | 'june' | 'october' | 'november'; year?: number },
+): Promise<string> {
+  const w = await one<{ type: 'january' | 'june' | 'october' | 'november'; year: number }>(
+    `select session_type as type, series_year as year from registration_session where id = $1`, [sessionId],
+  );
+  const created = await apiResponse(adm.api.v1['board-series'].$post({
+    json: {
+      boardCode: opts.boardCode ?? 'pearson_edexcel', month: opts.month ?? w.type, year: opts.year ?? w.year, label: opts.label,
+      entryDeadline: opts.entryDeadline ?? null,
+    },
+  }));
+  const current = await apiResponse(adm.api.v1.sessions[':id']['board-series'].$get({ param: { id: sessionId } }));
+  await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({
+    param: { id: sessionId },
+    json: {
+      series: [
+        ...current.series.map((s) => ({ boardSeriesId: s.boardSeriesId, isDefault: s.boardCode === created.boardCode ? false : s.isDefault })),
+        { boardSeriesId: created.id, isDefault: true },
+      ],
+      routes: [],
+    },
+  }));
+  return created.id;
 }
 
 // ─── Observation ─────────────────────────────────────────────────────────────

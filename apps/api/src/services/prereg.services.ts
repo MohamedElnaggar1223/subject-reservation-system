@@ -19,7 +19,8 @@
 import { db, registration, eq, and } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { PreregisterRegistrationType } from '@repo/validations';
-import { prepareRegistrationInputs } from './registration.services';
+import { prepareRegistrationInputs, insertRoutedRegistrations } from './registration.services';
+import { routeAndCheck } from './series.services';
 import { creditHeld, debitHeld, getEscrowBalance } from './escrow.services';
 import { executeReceiptGatedDrop } from './receipt.services';
 import { refundPercentage } from './refund.services';
@@ -59,8 +60,6 @@ export async function createPreregistration(parentId: string, data: PreregisterR
   if (sess.status !== 'draft') {
     throw new Error('Preregistration is only available for upcoming (not-yet-open) sessions');
   }
-  // Past the series' board deadline nothing more can be entered (MO-10).
-  if (sess.entryDeadline && sess.entryDeadline <= new Date()) throw new Error(entryDeadlineMessage(sess.entryDeadline));
 
   const subjects = await db.query.subject.findMany({
     where: (s, { eq, and, inArray }) =>
@@ -69,6 +68,9 @@ export async function createPreregistration(parentId: string, data: PreregisterR
   if (subjects.length !== data.subjectIds.length) {
     throw new Error('One or more subjects are invalid or inactive');
   }
+  // Past a subject's board series deadline nothing more can be entered
+  // (MO-10, per series since F0b).
+  await routeAndCheck(db, data.sessionId, subjects);
 
   const existing = await db.query.registration.findMany({
     where: (r, { eq, and, notInArray, inArray }) =>
@@ -119,7 +121,7 @@ export async function createPreregistration(parentId: string, data: PreregisterR
   // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
   return db.transaction(async (tx) => {
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    return tx.insert(registration).values(records).returning();
+    return insertRoutedRegistrations(tx, data.sessionId, subjects, records);
   });
 }
 
@@ -153,7 +155,11 @@ async function preregPaymentState(registrationId: string, executor: typeof db | 
 export async function cancelPreregistration(registrationId: string, parentId: string, auditCtx?: AuditContext) {
   const reg = await db.query.registration.findFirst({
     where: (r, { eq }) => eq(r.id, registrationId),
-    with: { session: { columns: { id: true, status: true, entryDeadline: true } } },
+    with: {
+      session: { columns: { id: true, status: true } },
+      // F0b: its board series' deadline (MO-10, per series).
+      boardSeries: { columns: { entryDeadline: true } },
+    },
   });
   if (!reg) throw new Error('Registration not found');
   if (reg.status !== 'preregistered') {
@@ -169,7 +175,7 @@ export async function cancelPreregistration(registrationId: string, parentId: st
   // Past the board's deadline the series never opens: the full price back, as
   // the deadline sweep gives — the refund windows are for a family's own
   // drop (MO-21; review of ae4f88b, flag 1).
-  const pastDeadline = !!reg.session.entryDeadline && reg.session.entryDeadline <= new Date();
+  const pastDeadline = !!reg.boardSeries?.entryDeadline && reg.boardSeries.entryDeadline <= new Date();
   const pct = pastDeadline ? 100 : await refundPercentage(new Date(), reg.sessionId, reg.studentId);
 
   const result = await db.transaction(async (tx) => {
@@ -231,9 +237,12 @@ export async function cancelPreregistration(registrationId: string, parentId: st
  * the family must come back first (MA-16). An unpaid row expires. Each
  * money move writes its audit row in its transaction.
  */
-export async function refundPreregistrationsAtDeadline(sessionId: string) {
+export async function refundPreregistrationsAtDeadline(sessionId: string, boardSeriesId: string) {
+  // F0b: the deadline is a board series'; only the preregistrations entered
+  // in that series are refunded (a window can feed several).
   const preregs = await db.query.registration.findMany({
-    where: (r, { eq: eqOp, and: andOp }) => andOp(eqOp(r.sessionId, sessionId), eqOp(r.status, 'preregistered')),
+    where: (r, { eq: eqOp, and: andOp }) =>
+      andOp(eqOp(r.sessionId, sessionId), eqOp(r.boardSeriesId, boardSeriesId), eqOp(r.status, 'preregistered')),
     columns: { id: true, studentId: true, subjectId: true, priceAtRegistration: true },
   });
 

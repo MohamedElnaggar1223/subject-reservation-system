@@ -11,6 +11,7 @@ import { db, teacher, user, eq, gradeTodayExtras } from '@repo/db';
 import { randomUUID } from 'crypto';
 import { STAFF_ROLES, ROLES, academicYearStartOf, type CreateTeacherType, type UpdateTeacherType, type ListTeachersQueryType } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
+import { classesOf } from './enrolment.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -154,6 +155,8 @@ export async function getTeachingFor(userId: string) {
   return {
     teacher: { id: t.id, name: t.name, isActive: t.isActive },
     subjects: t.subjectTeachers.map((st) => st.subject),
+    // F0b: the classes they teach this year, from the course enrolment (in school only).
+    classes: await classesOf(t.id),
     homeroomSections: sections
       .filter((s) => s.academicYear.startYear === current)
       .map((s) => ({

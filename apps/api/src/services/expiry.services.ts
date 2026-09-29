@@ -30,7 +30,7 @@ export async function expireWaitingRegistrations(tx: Tx | typeof db, where: Cond
     .update(registration)
     .set({ status: 'expired', updatedAt: now })
     .where(and(inArray(registration.id, [...from.keys()]), inArray(registration.status, [...WAITING])))
-    .returning({ id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId });
+    .returning({ id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId, sessionId: registration.sessionId });
   await logActions(expiryEntries(rows.map((r) => ({ id: r.id, from: from.get(r.id)! })), reason, detail), tx);
   return rows;
 }

@@ -58,6 +58,8 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
         'schoolFee.graduatesExempt': false,
         'schoolFee.newYearWithoutSchedule': false,
         'calendar.schoolWeekdays': true,
+        // F0b: what "A.S./A.2." marks is the coordinator's answer (IS-01).
+        'catalogue.levelCodeReading': true,
       });
     });
 

@@ -96,16 +96,17 @@ export const CreateSession = z
     qualificationLevel: QualificationLevelSchema.default('igcse'),
     startDate: z.coerce.date(),
     endDate: z.coerce.date(),
-    // The exam board's entry deadline for this series (owner decision MO-10).
-    entryDeadline: z.coerce.date().optional().nullable(),
+    // F0b: the board series the window feeds (one default per board). The
+    // exam board's entry deadline (owner decision MO-10) is a date of each
+    // board series, no longer of the window.
+    boardSeries: z
+      .array(z.object({ boardSeriesId: z.string().min(1), isDefault: z.boolean() }))
+      .max(12)
+      .optional(),
   })
   .refine((data) => data.endDate > data.startDate, {
     message: 'End date must be after start date',
     path: ['endDate'],
-  })
-  .refine((data) => !data.entryDeadline || data.entryDeadline > data.endDate, {
-    message: "The board's entry deadline must be after the registration window closes",
-    path: ['entryDeadline'],
   })
   .refine(
     (data) => !(A_LEVEL_ONLY_SESSION_TYPES.includes(data.sessionType) && data.qualificationLevel === 'igcse'),
@@ -179,19 +180,9 @@ export type UpdateActiveSessionType = z.infer<typeof UpdateActiveSession>;
 export const UpdateSession = z.union([UpdateDraftSession, UpdateActiveSession]);
 export type UpdateSessionType = z.infer<typeof UpdateSession>;
 
-/**
- * Set the exam board's entry deadline (owner decision MO-10)
- *
- * Admin-only, in any status: boards publish their calendars on their own
- * timetable, often after the window has opened or closed. After the
- * deadline, open payments for the series are rejected automatically and
- * waiting registrations expire. Null removes the cut-off.
- */
-export const SetEntryDeadline = z.object({
-  entryDeadline: z.coerce.date().nullable(),
-  reason: z.string().trim().min(5, 'Please provide a reason (min 5 characters)').max(500, 'Reason too long'),
-});
-export type SetEntryDeadlineType = z.infer<typeof SetEntryDeadline>;
+// F0b: the exam board's entry deadline moved from the window to each board
+// series (UpdateBoardSeries, catalogue/board-series.validations.ts): one
+// window can feed several series with different deadlines (IS-14).
 
 /**
  * Correct a window's exam series (F0a)

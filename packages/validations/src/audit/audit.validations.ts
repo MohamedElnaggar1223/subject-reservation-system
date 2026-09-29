@@ -52,6 +52,13 @@ export const AUDIT_ENTITY_TYPES = [
   'room',
   'section',
   'file',
+  // F0b
+  'board',
+  'qualification',
+  'exam_unit',
+  'qualification_option',
+  'board_series',
+  'enrolment',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -83,6 +90,12 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   room:           'Room',
   section:        'Section',
   file:           'File',
+  board:          'Exam Board',
+  qualification:  'Qualification',
+  exam_unit:      'Unit or Component',
+  qualification_option: 'Option Code',
+  board_series:   'Board Series',
+  enrolment:      'Course Enrolment',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -202,6 +215,27 @@ export const AUDIT_ACTIONS = [
   'SECTION_MEMBERS_ADDED',
   'SECTION_MEMBERSHIP_ENDED',
   'SECTIONS_ROLLED_OVER',
+  // F0b: the exam catalogue, board series and course enrolment
+  'BOARD_UPDATED',
+  'QUALIFICATION_CREATED',
+  'QUALIFICATION_UPDATED',
+  'QUALIFICATION_UNITS_SET',
+  'QUALIFICATION_OPTION_CREATED',
+  'QUALIFICATION_OPTION_UPDATED',
+  'EXAM_UNIT_CREATED',
+  'EXAM_UNIT_UPDATED',
+  'SUBJECT_CATALOGUE_MAPPED',
+  'CATALOGUE_STARTER_LOADED',
+  'BOARD_SERIES_CREATED',
+  'BOARD_SERIES_UPDATED',
+  'BOARD_SERIES_DELETED',
+  'BOARD_SERIES_DEADLINE_SET',
+  'SESSION_BOARD_SERIES_SET',
+  'REGISTRATION_SERIES_MOVED',
+  'ENROLMENT_CREATED',
+  'ENROLMENT_UPDATED',
+  'ENROLMENT_ENDED',
+  'ENROLMENTS_BULK_CREATED',
   // Parent-student links (security audit RF-14: access to a child's money
   // and records hangs on these, so every change is recorded)
   'LINK_REQUESTED',
@@ -330,6 +364,26 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   SECTION_MEMBERS_ADDED:      'Students Added to Section',
   SECTION_MEMBERSHIP_ENDED:   'Student Left Section',
   SECTIONS_ROLLED_OVER:       'Sections Rolled Over to New Year',
+  BOARD_UPDATED:              'Exam Board Updated',
+  QUALIFICATION_CREATED:      'Qualification Added',
+  QUALIFICATION_UPDATED:      'Qualification Updated',
+  QUALIFICATION_UNITS_SET:    'Units Counting Toward an Award Set',
+  QUALIFICATION_OPTION_CREATED: 'Option Code Added',
+  QUALIFICATION_OPTION_UPDATED: 'Option Code Updated',
+  EXAM_UNIT_CREATED:          'Unit Added',
+  EXAM_UNIT_UPDATED:          'Unit Updated',
+  SUBJECT_CATALOGUE_MAPPED:   'Subject Mapped to the Catalogue',
+  CATALOGUE_STARTER_LOADED:   'Catalogue Starter Set Loaded',
+  BOARD_SERIES_CREATED:       'Board Series Added',
+  BOARD_SERIES_UPDATED:       'Board Series Dates Updated',
+  BOARD_SERIES_DELETED:       'Board Series Removed',
+  BOARD_SERIES_DEADLINE_SET:  'Board Entry Deadline Set',
+  SESSION_BOARD_SERIES_SET:   'Window Board Series Set',
+  REGISTRATION_SERIES_MOVED:  'Registration Moved to Another Series',
+  ENROLMENT_CREATED:          'Course Enrolment Added',
+  ENROLMENT_UPDATED:          'Course Enrolment Changed',
+  ENROLMENT_ENDED:            'Course Enrolment Ended',
+  ENROLMENTS_BULK_CREATED:    'Course Enrolments Created in Bulk',
 };
 
 // ─── Query Filters ────────────────────────────────────────────────────────────

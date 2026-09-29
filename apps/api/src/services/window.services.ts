@@ -16,6 +16,7 @@
 
 import { db, registrationSession, eq } from '@repo/db';
 import { hasDeadlineExtension } from './exception.services';
+import { seriesDeadline, windowDeadlines } from './series.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -27,17 +28,29 @@ export type SessionWindow = {
   status: string | null;
 };
 
+/**
+ * F0b: the entry deadline is a board series' (MO-10 per series). Asked for a
+ * registration, pass its `boardSeriesId`: its series' deadline decides. Asked
+ * for the window as a whole (before a subject is chosen), the window is past
+ * its deadline only once every series it feeds is — until then each subject
+ * is checked against its own series when it is registered
+ * (series.services.ts assertRoutesOpen). A window that feeds no series has
+ * no deadline, as a window with none set had before.
+ */
 export async function sessionWindow(
   studentId: string,
   sessionId: string,
   executor: typeof db | Tx = db,
-  now: Date = new Date()
+  now: Date = new Date(),
+  boardSeriesId?: string | null,
 ): Promise<SessionWindow> {
   const [sess] = await executor
-    .select({ status: registrationSession.status, entryDeadline: registrationSession.entryDeadline })
+    .select({ status: registrationSession.status })
     .from(registrationSession)
     .where(eq(registrationSession.id, sessionId));
-  const entryDeadline = sess?.entryDeadline ?? null;
+  const entryDeadline = boardSeriesId
+    ? await seriesDeadline(boardSeriesId, executor)
+    : (await windowDeadlines(sessionId, executor)).latest;
   const entryDeadlinePassed = !!entryDeadline && entryDeadline <= now;
   if (!sess || entryDeadlinePassed) {
     return { open: false, entryDeadlinePassed, entryDeadline, status: sess?.status ?? null };
@@ -46,8 +59,10 @@ export async function sessionWindow(
   return { open, entryDeadlinePassed: false, entryDeadline, status: sess.status };
 }
 
-export async function sessionOpenFor(studentId: string, sessionId: string, executor: typeof db | Tx = db): Promise<boolean> {
-  return (await sessionWindow(studentId, sessionId, executor)).open;
+export async function sessionOpenFor(
+  studentId: string, sessionId: string, executor: typeof db | Tx = db, boardSeriesId?: string | null,
+): Promise<boolean> {
+  return (await sessionWindow(studentId, sessionId, executor, new Date(), boardSeriesId)).open;
 }
 
 /** A date as the school reads it, in Cairo time. */

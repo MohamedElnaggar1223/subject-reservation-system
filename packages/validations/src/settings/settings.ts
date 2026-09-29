@@ -18,8 +18,9 @@
 
 import { z } from 'zod';
 import { ROLES, type Role } from '../roles';
+import { LevelCodeReadingSchema, LEVEL_CODE_READINGS, LEVEL_CODE_READING_LABELS } from '../catalogue/level-code';
 
-export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar';
+export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar' | 'catalogue';
 
 export type SettingDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   schema: S;
@@ -90,6 +91,22 @@ export const SETTINGS = {
       'The weekdays the school is open during term. The calendar marks holidays, early dismissals, exam-only days and extra school days on top of these.',
     editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
     input: 'weekdays',
+  }),
+  // F0b: what the school's "A.S./A.2." marks on a single AS unit — the
+  // coordinator's question (IMPORT_SPIKE.md §3 question 1). The code is
+  // derived, never stored, so an answer changes this setting and every
+  // screen reads it the new way.
+  'catalogue.levelCodeReading': defineSetting({
+    schema: LevelCodeReadingSchema,
+    default: 'student_series' as const,
+    group: 'catalogue',
+    label: 'What "A.S./A.2." marks on a single AS unit',
+    description:
+      'The school writes "A.S./A.2." on some single AS units such as M1 and S1. An entry that mixes AS and A2 units (Biology Paper 3 & 4) is always "A.S./A.2."; for an AS unit alone, choose what the code means. Nothing stored changes: every screen derives the code from the unit\'s own level, the awards it counts toward and the student\'s year.',
+    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    source: 'IS-01',
+    input: 'choice',
+    choices: LEVEL_CODE_READINGS.map((r) => ({ value: r, label: LEVEL_CODE_READING_LABELS[r] })),
   }),
 } as const;
 

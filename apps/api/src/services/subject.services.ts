@@ -9,7 +9,8 @@
  * All database imports come from @repo/db — never from drizzle-orm directly.
  */
 
-import { db, subject, subjectTeacher, eq, and, or, ilike } from '@repo/db';
+import { db, subject, subjectTeacher, subjectUnit, eq, and, or, ilike } from '@repo/db';
+import { applyBoardChange } from './catalogue.services';
 import { randomUUID } from 'crypto';
 import type { CreateSubjectType, UpdateSubjectType } from '@repo/validations';
 
@@ -133,28 +134,40 @@ export async function getSubjectById(id: string) {
  * does not create an invalid state (e.g. non-school subject without customPrice).
  * Returns the updated subject or undefined if not found.
  */
-export async function updateSubject(id: string, data: UpdateSubjectType) {
-  const current = await db.query.subject.findFirst({
-    where: (s, { eq }) => eq(s.id, id),
+export async function updateSubject(id: string, data: UpdateSubjectType, actorId?: string) {
+  return db.transaction(async (tx) => {
+    const [current] = await tx.select().from(subject).where(eq(subject.id, id)).for('update');
+    if (!current) return undefined;
+
+    // Keep the legacy single-price column in sync with the fee split
+    const mergedCourseFee = data.courseFee ?? current.courseFee;
+    const mergedRegistrationFee = data.registrationFee ?? current.registrationFee;
+
+    // F0b: a new board moves the subject's live registrations to their
+    // windows' series of that board (or is refused, naming why), and clears
+    // the old board's catalogue links (catalogue.services.ts applyBoardChange).
+    const { council, ...rest } = data;
+    if (council && council !== current.council) {
+      await applyBoardChange(tx, current, council, actorId ?? null);
+    }
+    // A new level no longer fits the old award and units: they are cleared,
+    // for the Catalogue screen to map again.
+    const levelChanged = data.qualificationLevel && data.qualificationLevel !== current.qualificationLevel;
+    if (levelChanged) await tx.delete(subjectUnit).where(eq(subjectUnit.subjectId, id));
+
+    const [updated] = await tx
+      .update(subject)
+      .set({
+        ...rest,
+        ...(levelChanged ? { qualificationId: null } : {}),
+        priceInSchool: mergedCourseFee + mergedRegistrationFee,
+        updatedAt: new Date(),
+      })
+      .where(eq(subject.id, id))
+      .returning();
+
+    return updated;
   });
-
-  if (!current) return undefined;
-
-  // Keep the legacy single-price column in sync with the fee split
-  const mergedCourseFee = data.courseFee ?? current.courseFee;
-  const mergedRegistrationFee = data.registrationFee ?? current.registrationFee;
-
-  const [updated] = await db
-    .update(subject)
-    .set({
-      ...data,
-      priceInSchool: mergedCourseFee + mergedRegistrationFee,
-      updatedAt: new Date(),
-    })
-    .where(eq(subject.id, id))
-    .returning();
-
-  return updated;
 }
 
 /**

@@ -53,15 +53,42 @@ import { computeRegistrationPricing } from './pricing.services';
 import { schoolFeeGateReason } from './school-fee.services';
 import { applyPricingExceptions } from './exception.services';
 import { sessionWindow, entryDeadlineMessage } from './window.services';
+import { routeAndCheck, routeSubjects } from './series.services';
 import type { SubjectRegistrationOptionsType } from '@repo/validations';
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
 
-/** Refuse unless the series is open for this student (window.services.ts). */
-async function assertWindowOpen(studentId: string, sessionId: string) {
-  const w = await sessionWindow(studentId, sessionId);
+/**
+ * Refuse unless the series is open for this student (window.services.ts):
+ * for a registration, its own board series' deadline decides (F0b).
+ */
+async function assertWindowOpen(studentId: string, sessionId: string, boardSeriesId?: string | null) {
+  const w = await sessionWindow(studentId, sessionId, db, new Date(), boardSeriesId);
   if (w.open) return;
   throw new Error(w.entryDeadlinePassed ? entryDeadlineMessage(w.entryDeadline!) : 'Registration window is not open');
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Insert new registrations, each entered in the board series its window
+ * routes its subject to (F0b), refusing a subject the window enters in no
+ * series or in one past its entry deadline (MO-10, per series). Runs in the
+ * caller's transaction after assertMayRegisterForInTx, so the window row is
+ * held and its routing cannot change under the insert. Every path that
+ * creates a registration comes here.
+ */
+export async function insertRoutedRegistrations(
+  tx: Tx,
+  sessionId: string,
+  subjects: { id: string; name: string; council: string }[],
+  records: Omit<typeof registration.$inferInsert, 'boardSeriesId'>[],
+) {
+  const routes = await routeAndCheck(tx, sessionId, subjects, true);
+  return tx
+    .insert(registration)
+    .values(records.map((r) => ({ ...r, boardSeriesId: routes.get(r.subjectId) ?? null })))
+    .returning();
 }
 
 /**
@@ -317,6 +344,8 @@ export type AvailableSubjectRow = {
   isRetake: boolean;
   pricing: { courseFee: number; registrationFee: number; total: number; isOutsideSchool: boolean };
   outsidePricing: { courseFee: number; registrationFee: number; total: number; isOutsideSchool: boolean } | null;
+  /** F0b: the board series the subject would be entered in (null: the window feeds none). */
+  boardSeries: { id: string; name: string; entryDeadline: Date | null } | null;
 };
 
 // Explicit return type: the drizzle relational inference chained through
@@ -363,7 +392,18 @@ export async function getAvailableSubjects(
   // variants so the UI can show exactly what each choice costs.
   const retakeSet = await getRetakeSubjectIds(studentId, sessionId);
 
-  return subjects.map(({ subjectTeachers, ...sub }) => {
+  // F0b: the series each subject would be entered in. A subject the window
+  // enters in no series, or in one past its entry deadline, is not offered.
+  const routing = await routeSubjects(db, sessionId, subjects);
+  const now = new Date();
+  const offered = subjects.filter((s) => {
+    if (!routing.feedsSeries) return true;
+    const r = routing.routes.get(s.id);
+    return !!r && !(r.entryDeadline && r.entryDeadline <= now);
+  });
+
+  return offered.map(({ subjectTeachers, ...sub }) => {
+    const route = routing.routes.get(sub.id) ?? null;
     const isRetake = retakeSet.has(sub.id);
     const inSchoolPricing = computeRegistrationPricing(sub, {
       isRetake,
@@ -383,6 +423,7 @@ export async function getAvailableSubjects(
       isRetake,
       pricing: inSchoolPricing,
       outsidePricing,
+      boardSeries: route ? { id: route.boardSeriesId, name: route.name, entryDeadline: route.entryDeadline } : null,
     };
   });
 }
@@ -439,6 +480,8 @@ export async function createRegistrationRequest(
   if (duplicates.length > 0) {
     throw new Error('Some subjects are already registered for this session');
   }
+  // F0b: each subject's board series is open (asked again in the transaction).
+  await routeAndCheck(db, data.sessionId, subjects);
 
   const coreCheck = await validateCoreSubjectRequirements(
     studentId,
@@ -483,7 +526,7 @@ export async function createRegistrationRequest(
   // correction racing this request either lands first or expires it (F0a).
   const inserted = await db.transaction(async (tx) => {
     await assertMayRegisterForInTx(tx, studentId, data.sessionId);
-    return tx.insert(registration).values(records).returning();
+    return insertRoutedRegistrations(tx, data.sessionId, subjects, records);
   });
 
   // NOT-003: Notify all linked parents of the new request (fire-and-forget)
@@ -552,6 +595,8 @@ export async function createDirectRegistration(
   if (duplicates.length > 0) {
     throw new Error('Some subjects are already registered for this session');
   }
+  // F0b: each subject's board series is open (asked again in the transaction).
+  await routeAndCheck(db, data.sessionId, subjects);
 
   const coreCheck = await validateCoreSubjectRequirements(
     data.studentId,
@@ -598,7 +643,7 @@ export async function createDirectRegistration(
   // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
   const created = await db.transaction(async (tx) => {
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    return tx.insert(registration).values(records).returning();
+    return insertRoutedRegistrations(tx, data.sessionId, subjects, records);
   });
 
   // REG-003: Notify student via in-app + email that their parent registered
@@ -661,7 +706,7 @@ export async function approveRegistrationRequest(
   // passed (a deadline extension counts). Checked against the session's
   // status alone, a request made under an extension after the close could
   // never be approved (state audit ST-07, MO-20).
-  for (const r of regs) await assertWindowOpen(r.studentId, r.sessionId);
+  for (const r of regs) await assertWindowOpen(r.studentId, r.sessionId, r.boardSeriesId);
 
   const studentIds = [...new Set(regs.map((r) => r.studentId))];
   for (const studentId of studentIds) {
@@ -960,6 +1005,8 @@ export async function adminOverrideApproval(
   if (duplicates.length > 0) {
     throw new Error('Some subjects are already registered for this session');
   }
+  // F0b: each subject's board series is open (asked again in the transaction).
+  await routeAndCheck(db, data.sessionId, subjects);
 
   // CORE-003: Admin override bypasses parent approval (REG-007), NOT the
   // Grade 10 June core-subject curriculum rule. Core requirements must
@@ -1014,7 +1061,7 @@ export async function adminOverrideApproval(
   // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
   return db.transaction(async (tx) => {
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    return tx.insert(registration).values(records).returning();
+    return insertRoutedRegistrations(tx, data.sessionId, subjects, records);
   });
 }
 

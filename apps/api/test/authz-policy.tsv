@@ -130,7 +130,6 @@ GET	/v1/school-fees/status	D	A	A	A	A	A	D	D	D
 GET	/v1/session	D	A	A	A	A	A	A	A	A
 POST	/v1/sessions/:id/activate	D	D	D	D	D	A	D	D	D
 POST	/v1/sessions/:id/close	D	D	D	D	D	A	D	D	D
-PUT	/v1/sessions/:id/entry-deadline	D	D	D	D	D	A	D	D	D
 GET	/v1/sessions/:id	D	D	D	D	D	A	D	D	D
 PUT	/v1/sessions/:id	D	D	D	D	D	A	D	D	D
 GET	/v1/sessions/active	D	A	A	A	A	A	A	D	D
@@ -204,3 +203,37 @@ GET	/v1/files/:id/content	D	A	A	A	A	A	A	A	A
 GET	/v1/registrations/eligibility	D	A	A	A	A	A	A	D	D
 PUT	/v1/sessions/:id/series	D	D	D	D	D	A	D	D	D
 PUT	/v1/teachers/:id/account	D	D	D	D	D	A	D	D	D
+# F0b (FEATURES_PLAN.md): the exam catalogue, board series, the series a window feeds,
+# course enrolment. The entry deadline (MO-10) is the admin's: PUT /v1/board-series/:id refuses
+# a coordinator who changes it (08h). A family reads only its own child's enrolment (05).
+GET	/v1/catalogue	D	D	D	A	A	A	A	A	D
+GET	/v1/catalogue/entries	D	D	D	D	D	A	A	D	D
+PUT	/v1/catalogue/boards/:code	D	D	D	D	D	A	A	D	D
+POST	/v1/catalogue/qualifications	D	D	D	D	D	A	A	D	D
+PUT	/v1/catalogue/qualifications/:id	D	D	D	D	D	A	A	D	D
+PUT	/v1/catalogue/qualifications/:id/units	D	D	D	D	D	A	A	D	D
+POST	/v1/catalogue/qualifications/:id/options	D	D	D	D	D	A	A	D	D
+PUT	/v1/catalogue/options/:id	D	D	D	D	D	A	A	D	D
+POST	/v1/catalogue/units	D	D	D	D	D	A	A	D	D
+PUT	/v1/catalogue/units/:id	D	D	D	D	D	A	A	D	D
+PUT	/v1/catalogue/registrable/:subjectId	D	D	D	D	D	A	A	D	D
+POST	/v1/catalogue/starter	D	D	D	D	D	A	A	D	D
+GET	/v1/board-series	D	D	D	A	A	A	A	D	D
+POST	/v1/board-series	D	D	D	D	D	A	A	D	D
+PUT	/v1/board-series/:id	D	D	D	D	D	A	A	D	D
+DELETE	/v1/board-series/:id	D	D	D	D	D	A	A	D	D
+GET	/v1/sessions/:id/board-series	D	D	D	D	D	A	A	D	D
+PUT	/v1/sessions/:id/board-series	D	D	D	D	D	A	D	D	D
+POST	/v1/sessions/:id/board-series/move	D	D	D	D	D	A	D	D	D
+GET	/v1/enrolments	D	D	D	A	A	A	A	D	D
+GET	/v1/enrolments/check	D	D	D	A	A	A	A	D	D
+GET	/v1/enrolments/teaching-demand	D	D	D	D	D	A	A	D	D
+GET	/v1/enrolments/students	D	D	D	D	D	A	A	D	D
+GET	/v1/enrolments/class	D	D	D	A	A	A	A	A	D
+GET	/v1/enrolments/student/:studentId	D	A	A	A	A	A	A	D	D
+POST	/v1/enrolments	D	D	D	D	D	A	A	D	D
+PUT	/v1/enrolments/:id	D	D	D	D	D	A	A	D	D
+POST	/v1/enrolments/:id/end	D	D	D	D	D	A	A	D	D
+POST	/v1/enrolments/bulk	D	D	D	D	D	A	A	D	D
+POST	/v1/enrolments/section	D	D	D	D	D	A	A	D	D
+POST	/v1/enrolments/batch	D	D	D	D	D	A	A	D	D

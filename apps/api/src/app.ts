@@ -36,6 +36,9 @@ import { academicRoutes } from './routes/academic.routes';
 import { studentRoutes } from './routes/student.routes';
 import { settingsRoutes } from './routes/settings.routes';
 import { teachingRoutes } from './routes/teaching.routes';
+import { catalogueRoutes } from './routes/catalogue.routes';
+import { boardSeriesRoutes } from './routes/board-series.routes';
+import { enrolmentRoutes } from './routes/enrolment.routes';
 import { isGrantedRole, isGranted } from './lib/role-grants';
 import { reports } from './routes/report.routes';
 import { teachers } from './routes/teacher.routes';
@@ -344,6 +347,13 @@ const v1 = new Hono<HonoEnv>()
    * (The grade routes, /v1/grade, were removed: a grade is derived from the
    * cohort; a correction is PUT /v1/students/:id/cohort.)
    *
+   * F0b — exam catalogue, series and course enrolment:
+   * - /v1/catalogue      boards, qualifications, units, the unit-to-award
+   *                      map, option codes, what each subject enters
+   * - /v1/board-series   board series and their dates (the entry deadline)
+   * - /v1/sessions/:id/board-series   the series a window feeds
+   * - /v1/enrolments     course enrolment per academic year
+   *
    * Reports routes mounted at /v1/reports (admin only):
    * - GET    /v1/reports/dashboard                - Admin dashboard metrics (REP-008)
    * - GET    /v1/reports/registrations            - Registration report per session (REP-001)
@@ -389,7 +399,11 @@ const v1 = new Hono<HonoEnv>()
   .route('/academic', academicRoutes)
   .route('/students', studentRoutes)
   .route('/settings', settingsRoutes)
-  .route('/teaching', teachingRoutes);
+  .route('/teaching', teachingRoutes)
+  // F0b: the exam catalogue, board series, course enrolment
+  .route('/catalogue', catalogueRoutes)
+  .route('/board-series', boardSeriesRoutes)
+  .route('/enrolments', enrolmentRoutes);
 
 // Mount v1 under /v1 (keep chaining for proper RPC typing)
 // Exported for in-process tests (app.request) and for index.ts to serve.

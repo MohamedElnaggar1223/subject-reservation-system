@@ -24,8 +24,10 @@ import { auth } from '../lib/auth';
 import {
   prepareRegistrationInputs,
   validateCoreSubjectRequirements,
+  insertRoutedRegistrations,
 } from './registration.services';
 import { sessionWindow, entryDeadlineMessage } from './window.services';
+import { routeAndCheck } from './series.services';
 import { setStudentFields } from './user.services';
 import { getEscrowBalance, debitEscrow } from './escrow.services';
 import { confirmPayment, failPayment } from './payment.services';
@@ -193,6 +195,8 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
   if (already.length > 0) {
     throw new Error('Some subjects are already registered for this session');
   }
+  // F0b: each subject's board series is open (asked again in the transaction).
+  await routeAndCheck(db, data.sessionId, subjects);
 
   const coreCheck = await validateCoreSubjectRequirements(
     data.studentId,
@@ -244,7 +248,7 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     const created = await db.transaction(async (tx) => {
       // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
       await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-      const inserted = await tx.insert(registration).values(records).returning();
+      const inserted = await insertRoutedRegistrations(tx, data.sessionId, subjects, records);
       await logAction(staffId, 'DESK_REGISTRATION', 'registration', data.studentId, null,
         { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), collected: 0 }, auditCtx, tx);
       return inserted;
@@ -273,7 +277,7 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
   const created = await db.transaction(async (tx) => {
     // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    const inserted = await tx.insert(registration).values(records).returning();
+    const inserted = await insertRoutedRegistrations(tx, data.sessionId, subjects, records);
 
     await tx.insert(payment).values({
       id: paymentId,
@@ -382,7 +386,7 @@ async function confirmDeskPayment(
 export async function collectAtDesk(staffId: string, data: DeskCollectType, auditCtx?: AuditContext) {
   const regs = await db.query.registration.findMany({
     where: (r, { inArray }) => inArray(r.id, data.registrationIds),
-    columns: { id: true, studentId: true, sessionId: true, status: true, priceAtRegistration: true },
+    columns: { id: true, studentId: true, sessionId: true, status: true, priceAtRegistration: true, boardSeriesId: true },
   });
   if (regs.length !== data.registrationIds.length || regs.some((r) => r.studentId !== data.studentId)) {
     throw new Error('One or more subjects do not belong to this student');
@@ -390,11 +394,13 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
   if (regs.some((r) => r.status !== 'pending_payment')) {
     throw new Error('One or more subjects are not waiting for payment');
   }
-  for (const sessionId of new Set(regs.map((r) => r.sessionId))) {
-    // F0a: call site 6 of mayRegisterFor — no money for a subject the
-    // student may no longer sit (SO-7).
-    await assertMayRegisterFor(data.studentId, sessionId);
-    const w = await sessionWindow(data.studentId, sessionId);
+  // F0a: call site 6 of mayRegisterFor — no money for a subject the
+  // student may no longer sit (SO-7).
+  for (const sessionId of new Set(regs.map((r) => r.sessionId))) await assertMayRegisterFor(data.studentId, sessionId);
+  // F0b: each subject's own board series decides its deadline (MO-10).
+  for (const key of new Set(regs.map((r) => `${r.sessionId}|${r.boardSeriesId ?? ''}`))) {
+    const [sessionId, boardSeriesId] = key.split('|') as [string, string];
+    const w = await sessionWindow(data.studentId, sessionId, db, new Date(), boardSeriesId || null);
     if (!w.open) {
       throw new Error(
         w.entryDeadlinePassed

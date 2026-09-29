@@ -78,8 +78,26 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     'GET /v1/sessions/upcoming',
     'GET /v1/teachers',
     'GET /v1/teachers/:id',
+    // F0b: the exam catalogue, board series (the entry deadline stays the
+    // admin's: the handler refuses it), the windows' series (read), and
+    // course enrolment.
+    'GET /v1/catalogue',
+    '* /v1/catalogue/*',
+    'GET /v1/board-series',
+    '* /v1/board-series/*',
+    'POST /v1/board-series',
+    'GET /v1/sessions/:id/board-series',
+    'GET /v1/enrolments',
+    'POST /v1/enrolments',
+    '* /v1/enrolments/*',
   ],
-  teacher: [...SELF_SERVICE, ...SCHOOL_INFO],
+  teacher: [
+    ...SELF_SERVICE,
+    ...SCHOOL_INFO,
+    // F0b: what they teach — the catalogue, and their own class lists.
+    'GET /v1/catalogue',
+    'GET /v1/enrolments/class',
+  ],
   gate: [...SELF_SERVICE, ...SCHOOL_INFO],
 };
 

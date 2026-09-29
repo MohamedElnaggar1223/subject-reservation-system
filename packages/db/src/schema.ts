@@ -18,7 +18,7 @@
  */
 
 import { relations, sql } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, numeric, integer, jsonb, uniqueIndex, check, date, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, numeric, integer, jsonb, uniqueIndex, unique, check, date, primaryKey, foreignKey, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -322,6 +322,157 @@ export const parentStudentLink = pgTable(
 
 /**
  * ============================================
+ * F0b — THE EXAM CATALOGUE
+ * ============================================
+ *
+ * Boards, the qualifications (awards) they issue, the units or components a
+ * candidate sits, and which units count toward which awards (FEATURES_PLAN.md
+ * F0b; DISCOVERY_RESEARCH.md §5 notes 2–4; IMPORT_SPIKE.md IS-01). A unit's
+ * own level (AS, A2, IGCSE) is kept apart from the awards it counts toward
+ * and from the student's year: the school's "A.S./A.2." is derived from the
+ * three (@repo/validations level-code.ts), never stored.
+ *
+ * The registrable row families register for (`subject`) enters a whole
+ * qualification or a set of units (`subject_unit`); its board is
+ * `subject.council`, a board code here.
+ */
+export const examBoard = pgTable(
+  "exam_board",
+  {
+    // 'pearson_edexcel' | 'cambridge' | 'oxford' — the subject table's council values.
+    code: text("code").primaryKey(),
+    name: text("name").notNull(),
+    shortName: text("short_name").notNull(),
+    entryPortal: text("entry_portal"),
+    // The months the board sits series in ('january' | 'june' | 'october' | 'november').
+    seriesMonths: jsonb("series_months").$type<string[]>().notNull().default([]),
+    notes: text("notes"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+);
+
+export const qualification = pgTable(
+  "qualification",
+  {
+    id: text("id").primaryKey(),
+    boardCode: text("board_code").notNull().references(() => examBoard.code, { onDelete: "restrict" }),
+    // A Pearson cash-in code (XMA01, YMA01), a Cambridge syllabus (9700, 0610), an International GCSE (4BI1).
+    code: text("code").notNull(),
+    title: text("title").notNull(),
+    // 'igcse' | 'as_level' | 'a_level'
+    level: text("level").notNull(),
+    // "International A Level", "International GCSE", "Cambridge IGCSE", "O Level"…
+    suite: text("suite").notNull().default(""),
+    // The subject it is in: AS and A Level of one subject share it (F5 counts them once).
+    subjectArea: text("subject_area").notNull(),
+    // 'qualification' | 'units_cash_in' | 'syllabus_option'
+    entryMethod: text("entry_method").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    // One award per board, code and level: Cambridge's syllabus 9700 leads to
+    // an AS Level and to an A Level, two awards under one code.
+    uniqueIndex("qualification_board_code_level_idx").on(table.boardCode, table.code, table.level),
+    check("qualification_level_valid", sql`${table.level} IN ('igcse', 'as_level', 'a_level')`),
+    check("qualification_entry_method_valid", sql`${table.entryMethod} IN ('qualification', 'units_cash_in', 'syllabus_option')`),
+  ]
+);
+
+export const examUnit = pgTable(
+  "exam_unit",
+  {
+    id: text("id").primaryKey(),
+    boardCode: text("board_code").notNull().references(() => examBoard.code, { onDelete: "restrict" }),
+    // A Pearson W unit (WMA11) or a Cambridge component (9700/12).
+    code: text("code").notNull(),
+    // What the school calls it: "P1", "M1", "Paper 3".
+    shortCode: text("short_code"),
+    title: text("title").notNull(),
+    // The unit's own level (IS-01): 'igcse' | 'as' | 'a2'.
+    unitLevel: text("unit_level").notNull(),
+    // 'unit' | 'component'
+    kind: text("kind").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("examUnit_board_code_idx").on(table.boardCode, table.code),
+    check("exam_unit_level_valid", sql`${table.unitLevel} IN ('igcse', 'as', 'a2')`),
+    check("exam_unit_kind_valid", sql`${table.kind} IN ('unit', 'component')`),
+  ]
+);
+
+/** The unit-to-award map: which units count toward which awards. */
+export const qualificationUnit = pgTable(
+  "qualification_unit",
+  {
+    id: text("id").primaryKey(),
+    qualificationId: text("qualification_id").notNull().references(() => qualification.id, { onDelete: "cascade" }),
+    unitId: text("unit_id").notNull().references(() => examUnit.id, { onDelete: "restrict" }),
+    // 'required' | 'optional'
+    requirement: text("requirement").notNull(),
+    // Units one chooses from ("Applied: one of M1, S1, D1").
+    choiceGroup: text("choice_group"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("qualificationUnit_unique_idx").on(table.qualificationId, table.unitId),
+    index("qualificationUnit_unitId_idx").on(table.unitId),
+    check("qualification_unit_requirement_valid", sql`${table.requirement} IN ('required', 'optional')`),
+  ]
+);
+
+/** Cambridge option codes: the component sets a syllabus can be entered with. */
+export const qualificationOption = pgTable(
+  "qualification_option",
+  {
+    id: text("id").primaryKey(),
+    qualificationId: text("qualification_id").notNull().references(() => qualification.id, { onDelete: "cascade" }),
+    code: text("code").notNull(),
+    label: text("label").notNull(),
+    // Marks from an earlier series count (carry forward, DISCOVERY.md Q-02).
+    carryForward: boolean("carry_forward").notNull().default(false),
+    isActive: boolean("is_active").notNull().default(true),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("qualificationOption_code_idx").on(table.qualificationId, table.code),
+  ]
+);
+
+export const qualificationOptionUnit = pgTable(
+  "qualification_option_unit",
+  {
+    optionId: text("option_id").notNull().references(() => qualificationOption.id, { onDelete: "cascade" }),
+    unitId: text("unit_id").notNull().references(() => examUnit.id, { onDelete: "restrict" }),
+  },
+  (table) => [primaryKey({ columns: [table.optionId, table.unitId] })]
+);
+
+/**
+ * ============================================
  * SUBJECT TABLE
  * ============================================
  *
@@ -341,7 +492,9 @@ export const subject = pgTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     code: text("code").notNull().unique(),
-    council: text("council").notNull(), // 'pearson_edexcel' | 'cambridge' | 'oxford'
+    // The board the row is entered with (F0b: a board of the catalogue; staff
+    // change it on the Catalogue screen — owner decision 3).
+    council: text("council").notNull().references(() => examBoard.code, { onDelete: "restrict" }), // 'pearson_edexcel' | 'cambridge' | 'oxford'
     // V3 fee split (§6.2): teaching fee + board entry fee. The old single
     // priceInSchool is retained read-only for pre-V3 rows; new pricing
     // always derives from courseFee + registrationFee.
@@ -357,6 +510,9 @@ export const subject = pgTable(
     customPrice: numeric("custom_price", { precision: 12, scale: 2, mode: "number" }),
     isActive: boolean("is_active").notNull().default(true),
     isCore: boolean("is_core").notNull().default(false),
+    // F0b: the award this row enters, or counts toward when it is units
+    // (subject_unit). Its board is `council`.
+    qualificationId: text("qualification_id").references(() => qualification.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -364,6 +520,7 @@ export const subject = pgTable(
       .notNull(),
   },
   (table) => [
+    index("subject_qualificationId_idx").on(table.qualificationId),
     index("subject_code_idx").on(table.code),
     index("subject_council_idx").on(table.council),
     index("subject_isActive_idx").on(table.isActive),
@@ -424,11 +581,10 @@ export const registrationSession = pgTable(
     qualificationLevel: text("qualification_level").notNull().default("igcse"),
     startDate: timestamp("start_date", { withTimezone: true }).notNull(),
     endDate: timestamp("end_date", { withTimezone: true }).notNull(),
-    // The exam board's entry deadline for this series, entered by the admin
-    // from the board's calendar. After it, nothing unconfirmed can be paid:
-    // open payments are rejected automatically and waiting registrations
-    // expire (money audit, owner decision MO-10). Null: no automatic cut-off.
-    entryDeadline: timestamp("entry_deadline", { withTimezone: true }),
+    // F0b: the exam board's entry deadline (owner decision MO-10) moved to the
+    // board series the window feeds (board_series.entry_deadline): one window
+    // can feed several series with different deadlines (IS-14). Migration
+    // 0038 carried each window's deadline to its series; 0039 dropped it here.
     status: text("status").notNull().default("draft"), // 'draft' | 'active' | 'closed'
     closedAt: timestamp("closed_at", { withTimezone: true }),
     closedBy: text("closed_by").references(() => user.id, { onDelete: "set null" }),
@@ -457,15 +613,109 @@ export const registrationSession = pgTable(
     uniqueIndex("one_active_per_session_type_idx")
       .on(table.sessionType, table.qualificationLevel)
       .where(sql`status = 'active'`),
-    // The board's entry deadline falls after the window closes, so the
-    // deadline sweep never runs inside an open window (MO-10). The routes
-    // refuse it with a sentence; the database refuses whatever gets past them.
-    check(
-      "session_entry_deadline_after_end",
-      sql`${table.entryDeadline} IS NULL OR ${table.entryDeadline} > ${table.endDate}`,
-    ),
+    // (F0b: the window closing before its deadline is now kept by the
+    // triggers of migration 0038, against every board series it feeds.)
     check("session_series_year_range", sql`${table.seriesYear} BETWEEN 2000 AND 2100`),
     index("reg_session_series_idx").on(table.sessionType, table.seriesYear),
+  ]
+);
+
+/**
+ * ============================================
+ * F0b — BOARD SERIES
+ * ============================================
+ *
+ * One board's sitting (Pearson IAL October 2026, Cambridge November 2026)
+ * with every date the board sets (DISCOVERY_RESEARCH.md §5 note 1). A
+ * registration window feeds one or more series (IS-14); each registration is
+ * entered in exactly one (`registration.board_series_id`).
+ *
+ * The entry deadline is the school's hard stop (owner decision MO-10): past
+ * it nothing more is entered, paid or confirmed for the series, and the
+ * scheduler closes what is still open on it. The late-fee dates are shown
+ * for information only. The database keeps every window a series feeds
+ * closing before its deadline, and every series of a window in the window's
+ * academic year and, like the window, June or not (triggers, migration
+ * 0038).
+ */
+export const boardSeries = pgTable(
+  "board_series",
+  {
+    id: text("id").primaryKey(),
+    boardCode: text("board_code").notNull().references(() => examBoard.code, { onDelete: "restrict" }),
+    // 'january' | 'june' | 'october' | 'november' — the same names as a window's session type.
+    month: text("month").notNull(),
+    year: integer("year").notNull(),
+    // Only when one board runs two calendars in one month ("IAL").
+    label: text("label").notNull().default(""),
+    entryDeadline: timestamp("entry_deadline", { withTimezone: true }),
+    estimatedEntriesDue: date("estimated_entries_due", { mode: "string" }),
+    lateFeeFrom: date("late_fee_from", { mode: "string" }),
+    highLateFeeFrom: date("high_late_fee_from", { mode: "string" }),
+    lateEntriesClose: date("late_entries_close", { mode: "string" }),
+    retakeDeadline: date("retake_deadline", { mode: "string" }),
+    forecastGradesDue: date("forecast_grades_due", { mode: "string" }),
+    neaDue: date("nea_due", { mode: "string" }),
+    accessArrangementsDue: date("access_arrangements_due", { mode: "string" }),
+    examsStart: date("exams_start", { mode: "string" }),
+    examsEnd: date("exams_end", { mode: "string" }),
+    resultsOn: date("results_on", { mode: "string" }),
+    certificatesOn: date("certificates_on", { mode: "string" }),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("boardSeries_unique_idx").on(table.boardCode, table.month, table.year, table.label),
+    index("boardSeries_entryDeadline_idx").on(table.entryDeadline),
+    check("board_series_month_valid", sql`${table.month} IN ('january', 'june', 'october', 'november')`),
+    check("board_series_year_range", sql`${table.year} BETWEEN 2000 AND 2100`),
+    check("board_series_exams_ordered", sql`${table.examsStart} IS NULL OR ${table.examsEnd} IS NULL OR ${table.examsEnd} >= ${table.examsStart}`),
+  ]
+);
+
+/** The series a window feeds; per board, one is the default its subjects are entered in. */
+export const sessionBoardSeries = pgTable(
+  "session_board_series",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id").notNull().references(() => registrationSession.id, { onDelete: "restrict" }),
+    boardSeriesId: text("board_series_id").notNull().references(() => boardSeries.id, { onDelete: "restrict" }),
+    // The series' board, kept here so the database holds one default per board per window.
+    boardCode: text("board_code").notNull(),
+    isDefault: boolean("is_default").notNull().default(false),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    // A constraint, not an index: the composite keys below reference it.
+    unique("sessionBoardSeries_pair_key").on(table.sessionId, table.boardSeriesId),
+    uniqueIndex("sessionBoardSeries_one_default_idx").on(table.sessionId, table.boardCode).where(sql`is_default`),
+    index("sessionBoardSeries_seriesId_idx").on(table.boardSeriesId),
+  ]
+);
+
+/** A subject a window enters in another of its series of that board than the default. */
+export const sessionSubjectSeries = pgTable(
+  "session_subject_series",
+  {
+    sessionId: text("session_id").notNull(),
+    subjectId: text("subject_id").notNull().references(() => subject.id, { onDelete: "cascade" }),
+    boardSeriesId: text("board_series_id").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.sessionId, table.subjectId] }),
+    // Only to a series the window feeds; unlinking the series removes the route.
+    foreignKey({
+      name: "sessionSubjectSeries_link_fk",
+      columns: [table.sessionId, table.boardSeriesId],
+      foreignColumns: [sessionBoardSeries.sessionId, sessionBoardSeries.boardSeriesId],
+    }).onDelete("cascade"),
   ]
 );
 
@@ -641,6 +891,10 @@ export const registration = pgTable(
     // registrations even if an admin later clears subject.isCore for future
     // cohorts. Defaults to false; populated from subject.isCore at insert.
     wasCoreAtRegistration: boolean("was_core_at_registration").notNull().default(false),
+    // F0b: the board series this entry goes to — one the window feeds (the
+    // composite key below). Its entry deadline is this registration's hard
+    // stop (MO-10). Null only in a window that feeds no series.
+    boardSeriesId: text("board_series_id"),
     // Lifecycle status
     status: text("status").notNull().default("pending_approval"),
     // Who initiated this registration (student or parent)
@@ -681,6 +935,13 @@ export const registration = pgTable(
       "registration_price_at_registration_nonneg",
       sql`${table.priceAtRegistration} >= 0`,
     ),
+    // F0b: entered only in a series its window feeds; a series with entries cannot leave the window.
+    foreignKey({
+      name: "registration_board_series_link_fk",
+      columns: [table.sessionId, table.boardSeriesId],
+      foreignColumns: [sessionBoardSeries.sessionId, sessionBoardSeries.boardSeriesId],
+    }).onDelete("restrict"),
+    index("registration_boardSeriesId_idx").on(table.boardSeriesId),
   ]
 );
 
@@ -695,15 +956,94 @@ export const registration = pgTable(
  */
 export const registrationSessionRelations = relations(registrationSession, ({ many }) => ({
   registrations: many(registration),
+  // F0b: the board series the window feeds, and its subject routes.
+  boardSeriesLinks: many(sessionBoardSeries),
+  subjectRoutes: many(sessionSubjectSeries),
 }));
 
 /**
  * SUBJECT RELATIONS
  * (reverse side — one subject has many registrations)
  */
-export const subjectRelations = relations(subject, ({ many }) => ({
+export const subjectRelations = relations(subject, ({ one, many }) => ({
   registrations: many(registration),
   subjectTeachers: many(subjectTeacher),
+  // F0b: what the row enters with the board.
+  qualification: one(qualification, { fields: [subject.qualificationId], references: [qualification.id] }),
+  units: many(subjectUnit),
+  board: one(examBoard, { fields: [subject.council], references: [examBoard.code] }),
+}));
+
+/**
+ * F0b: the units a registrable row enters — a unit ("P1") or a paper set
+ * ("Biology (Paper 1 & Paper 2)"). None: the row enters its whole qualification.
+ */
+export const subjectUnit = pgTable(
+  "subject_unit",
+  {
+    subjectId: text("subject_id").notNull().references(() => subject.id, { onDelete: "cascade" }),
+    unitId: text("unit_id").notNull().references(() => examUnit.id, { onDelete: "restrict" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subjectId, table.unitId] }),
+    index("subjectUnit_unitId_idx").on(table.unitId),
+  ]
+);
+
+export const subjectUnitRelations = relations(subjectUnit, ({ one }) => ({
+  subject: one(subject, { fields: [subjectUnit.subjectId], references: [subject.id] }),
+  unit: one(examUnit, { fields: [subjectUnit.unitId], references: [examUnit.id] }),
+}));
+
+export const examBoardRelations = relations(examBoard, ({ many }) => ({
+  qualifications: many(qualification),
+  units: many(examUnit),
+  series: many(boardSeries),
+}));
+
+export const qualificationRelations = relations(qualification, ({ one, many }) => ({
+  board: one(examBoard, { fields: [qualification.boardCode], references: [examBoard.code] }),
+  units: many(qualificationUnit),
+  options: many(qualificationOption),
+  subjects: many(subject),
+}));
+
+export const examUnitRelations = relations(examUnit, ({ one, many }) => ({
+  board: one(examBoard, { fields: [examUnit.boardCode], references: [examBoard.code] }),
+  awards: many(qualificationUnit),
+  subjects: many(subjectUnit),
+}));
+
+export const qualificationUnitRelations = relations(qualificationUnit, ({ one }) => ({
+  qualification: one(qualification, { fields: [qualificationUnit.qualificationId], references: [qualification.id] }),
+  unit: one(examUnit, { fields: [qualificationUnit.unitId], references: [examUnit.id] }),
+}));
+
+export const qualificationOptionRelations = relations(qualificationOption, ({ one, many }) => ({
+  qualification: one(qualification, { fields: [qualificationOption.qualificationId], references: [qualification.id] }),
+  units: many(qualificationOptionUnit),
+}));
+
+export const qualificationOptionUnitRelations = relations(qualificationOptionUnit, ({ one }) => ({
+  option: one(qualificationOption, { fields: [qualificationOptionUnit.optionId], references: [qualificationOption.id] }),
+  unit: one(examUnit, { fields: [qualificationOptionUnit.unitId], references: [examUnit.id] }),
+}));
+
+export const boardSeriesRelations = relations(boardSeries, ({ one, many }) => ({
+  board: one(examBoard, { fields: [boardSeries.boardCode], references: [examBoard.code] }),
+  windowLinks: many(sessionBoardSeries),
+  registrations: many(registration),
+}));
+
+export const sessionBoardSeriesRelations = relations(sessionBoardSeries, ({ one }) => ({
+  session: one(registrationSession, { fields: [sessionBoardSeries.sessionId], references: [registrationSession.id] }),
+  boardSeries: one(boardSeries, { fields: [sessionBoardSeries.boardSeriesId], references: [boardSeries.id] }),
+}));
+
+export const sessionSubjectSeriesRelations = relations(sessionSubjectSeries, ({ one }) => ({
+  session: one(registrationSession, { fields: [sessionSubjectSeries.sessionId], references: [registrationSession.id] }),
+  subject: one(subject, { fields: [sessionSubjectSeries.subjectId], references: [subject.id] }),
+  boardSeries: one(boardSeries, { fields: [sessionSubjectSeries.boardSeriesId], references: [boardSeries.id] }),
 }));
 
 /**
@@ -1437,6 +1777,11 @@ export const registrationWithPaymentRelations = relations(registration, ({ one, 
     fields: [registration.teacherId],
     references: [teacher.id],
   }),
+  // F0b: the board series it is entered in.
+  boardSeries: one(boardSeries, {
+    fields: [registration.boardSeriesId],
+    references: [boardSeries.id],
+  }),
 }));
 
 /**
@@ -2057,4 +2402,65 @@ export const sectionMembershipRelations = relations(sectionMembership, ({ one })
   section: one(section, { fields: [sectionMembership.sectionId], references: [section.id] }),
   student: one(user, { fields: [sectionMembership.studentId], references: [user.id] }),
   academicYear: one(academicYear, { fields: [sectionMembership.academicYearId], references: [academicYear.id] }),
+}));
+
+/**
+ * ============================================
+ * F0b — COURSE ENROLMENT
+ * ============================================
+ *
+ * What each student is taught in an academic year: each subject or unit (a
+ * registrable row), by which teacher, in school or as self-study. Not an exam
+ * registration — the two are checked against each other and disagreements
+ * are flagged, never blocked. F1 builds teaching groups from the in-school
+ * enrolments (self-study forms no group); F4 takes the student's teacher for
+ * forecast grades from here. History is kept: an enrolment that stops is
+ * ended, never deleted; one open enrolment per student, subject and year.
+ */
+export const courseEnrolment = pgTable(
+  "course_enrolment",
+  {
+    id: text("id").primaryKey(),
+    academicYearId: text("academic_year_id").notNull().references(() => academicYear.id, { onDelete: "restrict" }),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    subjectId: text("subject_id").notNull().references(() => subject.id, { onDelete: "restrict" }),
+    teacherId: text("teacher_id").references(() => teacher.id, { onDelete: "set null" }),
+    // 'in_school' | 'self_study'
+    mode: text("mode").notNull().default("in_school"),
+    // 'manual' | 'carried_forward' | 'registrations' | 'section' | 'import'
+    source: text("source").notNull(),
+    // The enrolment, registration or sheet row it came from.
+    sourceRef: text("source_ref"),
+    startedOn: date("started_on", { mode: "string" }).notNull(),
+    endedOn: date("ended_on", { mode: "string" }),
+    endReason: text("end_reason"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    endedBy: text("ended_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("courseEnrolment_year_idx").on(table.academicYearId),
+    index("courseEnrolment_studentId_idx").on(table.studentId),
+    index("courseEnrolment_subjectId_idx").on(table.subjectId),
+    index("courseEnrolment_teacherId_idx").on(table.teacherId),
+    uniqueIndex("courseEnrolment_one_open_idx")
+      .on(table.studentId, table.subjectId, table.academicYearId)
+      .where(sql`ended_on IS NULL`),
+    check("course_enrolment_mode_valid", sql`${table.mode} IN ('in_school', 'self_study')`),
+    check("course_enrolment_source_valid", sql`${table.source} IN ('manual', 'carried_forward', 'registrations', 'section', 'import')`),
+    // Self-study is not taught: it has no teacher and forms no teaching group.
+    check("course_enrolment_self_study_untaught", sql`${table.mode} <> 'self_study' OR ${table.teacherId} IS NULL`),
+    check("course_enrolment_dates_ordered", sql`${table.endedOn} IS NULL OR ${table.endedOn} >= ${table.startedOn}`),
+  ]
+);
+
+export const courseEnrolmentRelations = relations(courseEnrolment, ({ one }) => ({
+  academicYear: one(academicYear, { fields: [courseEnrolment.academicYearId], references: [academicYear.id] }),
+  student: one(user, { fields: [courseEnrolment.studentId], references: [user.id] }),
+  subject: one(subject, { fields: [courseEnrolment.subjectId], references: [subject.id] }),
+  teacher: one(teacher, { fields: [courseEnrolment.teacherId], references: [teacher.id] }),
 }));
