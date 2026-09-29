@@ -67,9 +67,17 @@ recorded" (null).
 1. A student with a stored grade G: cohort = (academic year the migration runs in) − (G − 10).
 2. A student with no grade was either graduated (graduation stored `grade = null`) or never
    finished sign-up. A graduate is told apart by evidence they once had a grade: the audit row
-   that set it to null (its date's academic year − 3), or any registration (every old path
-   required a grade; graduated as of the migration). Otherwise the cohort stays null ("grade
-   not recorded"): refused registration, listed on the Students screen, fixed by an admin.
+   that set it to null, or any registration (every old path required a grade). The row's date
+   in Cairo decides which year was their grade 12: **July–December** — they had just finished
+   grade 12, so cohort = the row's academic year − 3; **January–June** — graduated during their
+   grade-12 year, so cohort = the row's academic year − 2 (the lead's decision on review flag
+   3). A registration alone: graduated as of the migration (this academic year − 3). Each
+   inferred cohort writes a `STUDENT_COHORT_INFERRED` row (basis, the date read), so staff can
+   review them: the Students screen filters "graduation inferred by the backfill" and the
+   record lists the row; an admin corrects a wrong one with the cohort correction.
+   Otherwise the cohort stays null ("grade not recorded"), marked by a
+   `STUDENT_COHORT_UNRECORDED` row: refused registration, listed on the Students screen, and
+   recorded by staff only — the student cannot record it at the setup page.
 3. Every window gets its series year: the year in its name ("November 2026") when there is one,
    otherwise the first time the series month comes on or after the window closes.
 4. Files get a purpose (`avatar` for avatars, otherwise `document`).
@@ -80,7 +88,10 @@ audit row, a graduate with only a registration, a never-graded student, October 
 windows without a year in the name), and `igcse_audit` (the database the plan names; copied
 with pg_dump, untouched). Every copy: 0 mismatches between the stored grade before and today's
 grade after, 0 non-students with a cohort, 0 windows without a series, the boundary instants
-right in SQL, row counts unchanged.
+right in SQL, row counts unchanged. The graduate rule was then proven on a fourth fresh copy
+enriched with a **20 May 2026** graduation (→ cohort 2023, grade 13 today) and a **10 November
+2025** graduation (→ 2022, grade 14), with one `STUDENT_COHORT_INFERRED` row per inferred
+graduate (`backfill-rich2-{before,after}.txt`).
 
 ---
 
@@ -141,8 +152,14 @@ no row) the verdict rests on, then the same judgement. Every eligibility change 
 row FOR UPDATE (the student: withdrawal, transfer, cohort correction; the window: series
 correction; the exception: revocation; the setting: `updateSetting` holds its key) before its
 clean-up reads registrations. So a change either lands first and the registration is refused,
-or waits and then expires the registration. `08g` forces the dangerous order (control C19,
-C20). The approval path needs nothing: its UPDATE is guarded by status.
+or waits and then expires the registration. `08g` forces both orders: a registration queued
+behind an uncommitted row while each change fires (controls C19, C20), and a withdrawal that
+lands first against the desk taking money, a preregistration, a swap approval and a direct swap
+(controls C22–C25). The approval path needs nothing: its UPDATE is guarded by status.
+
+**A grade-10 exception that lapses** (`validUntil` passes) only bounds when it can be used:
+registrations already made under it stand. Revoking it explicitly still runs the clean-up
+(`exception_revoked`).
 
 ### Today's grade
 
@@ -153,10 +170,18 @@ the academic year of now in Cairo. `2027-06-30T20:30:00Z` is still 30 June (grad
 ### Inputs
 
 Sign-up, the setup page, desk onboarding and the Team form take "grade this academic year"
-(9–12; 9 = starts grade 10 next year) and store the cohort. `POST /users/me/student-setup`
-records a cohort only when none is recorded (`recordMissingCohort`). A correction is the
-admin's, audited with a reason: `PUT /v1/students/:id/cohort { cohortYear | gradeNow, reason }`
+(9–12; 9 = starts grade 10 next year) and store the cohort, each with a
+`STUDENT_COHORT_RECORDED` row naming who recorded it (`self_setup`, `desk`, `admin`). A student
+records their own grade only at their own first setup — a cohort nobody ever set
+(`recordMissingCohort` refuses, 403, when any row shows it was set, cleared or left for staff,
+such as the backfill's `STUDENT_COHORT_UNRECORDED`). A correction is the admin's, audited with a
+reason: `PUT /v1/students/:id/cohort { cohortYear | gradeNow, reason }`
 (`STUDENT_COHORT_CORRECTED`, the family told).
+
+**A draft window's series.** The draft update (`PUT /v1/sessions/:id`) writes its
+`SESSION_UPDATED` row in its own transaction; it refuses a change to the series type or year
+once anyone has preregistered (409, pointing to "Correct series", which records a reason and
+checks each student again), and records `seriesChanged` when there is none.
 
 ### The core-subject rule and the school fee
 
@@ -196,8 +221,16 @@ STATE_AUDIT SO-7), and checkout refuses it. `closePaymentsOfGraduatedStudents` a
 a withdrawal and a transfer) and `08e` showed nothing called them. Readmission
 (`POST /v1/students/:id/readmit`, admin) revives nothing.
 
-Preregistrations are left alone: a paid one holds money whose refund is the owner's decision
-(SO-4), and an unpaid one cannot be paid (checkout asks) and expires with its window.
+Preregistrations are left alone by the clean-up: a paid one holds money whose refund is the
+owner's decision (SO-4). **At the series' opening the capture asks too** (inside its locked
+transaction, `mayRegisterForInTx`): a preregistration of a student who may no longer sit the
+series is neither confirmed nor moved to payment — it stays preregistered, its money held, one
+`PREREG_HELD_INELIGIBLE` row (the reason, the amount held) and a notice to finance and the admin
+(`PREREGISTRATION_HELD`), once; the recovery sweep asks again each tick and captures it if the
+student may sit the series again (a readmission). `08e` "withdrawn with preregistrations, then
+the series opens" (a paid and an unpaid one), control C21, and `09`.
+
+A leaver's **confirmed** registrations are untouched: only waiting ones expire.
 
 ---
 
@@ -258,7 +291,8 @@ the screen lists it for the roles that may read settings.
 `packages/validations/src/file/upload-purposes.ts`: every file has a purpose that decides its
 types, size, who may upload it, whether it concerns a student, and who may read it back
 (`owner`, `family` = the student and their approved linked parents, or named roles). The
-magic bytes decide a file's type.
+magic bytes decide a file's type, and the stored name's extension is the detected type's, never
+the uploader's (a PDF named `letter.exe` is stored as `.pdf`).
 
 | Purpose | Upload | Read | Used by |
 |---|---|---|---|
@@ -326,7 +360,7 @@ to a teacher record.
 | Calendar | `/academic/calendar` | coordinator, admin (staff read) | Twelve month blocks coloured by hand and a legend. Each day already shows what it is (school week, terms, entries); a click asks the API; shift-click selects a range, so a week's break is two clicks, a name and Enter; school days counted per month and year. |
 | Bell schedules | `/academic/bells` | coordinator, admin (staff read) | Bell times typed cell by cell, a second copy for the short day. "Fill a day in one go" from first bell, lesson count, length and breaks; Enter adds the next lesson; 815 becomes 08:15; a variant starts as a copy; a weekday can have its own rows; overlaps marked on the row. |
 | Rooms | `/academic/rooms` | coordinator, admin (staff read) | A rooms sheet with free-text equipment. The add row keeps type, capacity and features, so identical classrooms are a name and Enter each; features are chips; rooms leave use rather than being deleted. |
-| Students | `/students` | coordinator, desk, admin | A sheet per class plus a master list with a grade column retyped every September. Grade and standing derived; one box searches name, email or ID; "without a section this year" in one tick; filters in the address; Enter opens the first match. |
+| Students | `/students` | coordinator, desk, admin | A sheet per class plus a master list with a grade column retyped every September. Grade and standing derived; one box searches name, email or ID; "without a section this year" in one tick; "graduation inferred by the backfill" lists every cohort the migration inferred, for review; filters in the address; Enter opens the first match. |
 | Student record | `/students/:id` (and the desk's "Academic record") | coordinator, desk (read), admin | The grade, class and "left" note live in three places. One panel: today's grade and standing, the cohort and its three years, this year's section (warning when a correction left it in the wrong grade), each open series with the rule's sentence, the section history, the record's changes; actions say beforehand what they will do and afterwards what happened. |
 | Sections | `/academic/sections` | coordinator, admin (desk read) | A tab per class retyped each September. The year on one screen by grade with teacher, room and fill, and how many students still have no section; a section opens to a search already showing exactly those; several searches build one selection. |
 | Roll-over | `/academic/sections` (roll-over) | coordinator, admin | A day of renaming tabs and deleting rows. A preview (new names editable, who moves, who stays and why, who graduates), then one click; running it again changes nothing. |
@@ -346,16 +380,20 @@ to a teacher record.
 | File | Proves |
 |---|---|
 | `08d-foundation-grade` | the boundary table (rows 1–10, each a test), unknown cohort, the 1 July instants in code and SQL, all 13 call sites, the grade-10 exception, the core rule by series grade, row 4's fee with and without a 2027/28 schedule, paying next year's fee, A-13, A-14, inputs, the cohort correction |
-| `08e-foundation-eligibility-changes` | withdrawn, cohort moved back, A-12 off, series corrected, exception revoked, readmission |
+| `08e-foundation-eligibility-changes` | withdrawn, cohort moved back, A-12 off, series corrected, exception revoked, readmission; a withdrawn student's preregistrations held at the opening; a draft's series refused under preregistrations and audited without |
 | `08f-foundation-structure` | settings, uploads, years and terms, bells, the calendar day, rooms, sections, the teacher linked to a coordinator, the Team rules, the roll-over |
-| `08g-foundation-races` | a registration racing each eligibility change (forced order), two withdrawals, two A-12 changes, two placements, two roll-overs |
+| `08g-foundation-races` | a registration racing each eligibility change (forced order); a withdrawal landing first against the desk with money, a preregistration, a swap approval and a direct swap; two withdrawals, two A-12 changes, two placements, two roll-overs |
 | `05` | uploads between families, eligibility between families, each exception type's roles in both directions, another class and the gate |
 | `04` | every endpoint for every role, the three new ones included |
 | `06` | the new roles refused at better-auth's admin endpoints; privilege fields (`cohortYear`, `leftOn`) cannot be injected at sign-up or profile update |
-| `09` | an `ineligible` expiry must name its cause |
+| `09` | an `ineligible` expiry must name its cause; nothing waits for a series its student may not sit (bar an open checkout's hold), and no preregistration was captured while its student was refused |
 
-**Negative controls** (`.audit/foundation-evidence/controls.py`, one trail row each): C01–C20,
-each fix undone once and shown red, then restored; `grep -rn "NEGATIVE CONTROL" apps packages`
+**Negative controls** (`.audit/foundation-evidence/controls.py`, one trail row each): C01–C27,
+each fix undone once and shown red, then restored; re-run in full at the review's head (C01
+now undoes both the check and its locked re-check: either alone still refuses). C21 capture
+without eligibility; C22–C25 the locked re-check at the desk with money, a preregistration, a
+swap approval and a direct swap; C26 a draft's series edited under preregistrations; C27 a
+backfilled student recording their own grade. `grep -rn "NEGATIVE CONTROL" apps packages`
 returns nothing.
 
 **Changed assertions** (each with its own trail row: old, new, why):
@@ -366,8 +404,12 @@ returns nothing.
   graduation; every money outcome kept (expired, payment failed, escrow back to 1500,
   `PAYMENT_FAILED`, the family told) and extended (a rejected transfer then releases the
   registration: SO-7).
-- `09` **(not pre-authorised — for the lead):** the "every expiry says why" rule accepts the new
-  reason `ineligible` and requires it to name a cause. Nothing else in 09 changed.
+- `09`: the "every expiry says why" rule accepts the new reason `ineligible` and requires it to
+  name a cause (not pre-authorised; the reviewer judged it sound and the lead kept it). The new
+  eligibility invariant is added, not changed.
+- Helpers feeding money scenarios (trail rows): `academicYearOf` now reads the academic year in
+  Cairo (the API's rule), and `session()` derives the window's `seriesYear` from its start
+  date, so each family keeps its onboarded grade in the suites' windows.
 
 ---
 
@@ -392,7 +434,8 @@ returns nothing.
 
 - **Pending swap requests on a paid subject of a student who left** stay pending; approving
   one is refused with the reason (call site 9). Rejecting them at the withdrawal would be
-  tidier; it touches the change-request flow and was left for the lead's call.
+  tidier; it touches the change-request flow and was left for the lead's call (FEATURES_PLAN
+  §7 lists this and the other narrowings).
 - **Refund windows** still pick their academic year from the window's start date
   (`refund.services`); now that `academicYearForDate` is Cairo-based the two agree, but moving
   refunds to the series' year is a money change for the lead.
@@ -434,4 +477,13 @@ returns nothing.
 - 14:07Z — the helpers' screens reviewed, driven and committed (4276c24, 06a008e); the panel
   gains the exception's revoke; the student record's series carry `code`.
 - 14:09Z — gates green at 06a008e: API and web check-types clean; the suite in local time and
-  with `TZ=UTC`, 16 files, 226 passed, 1 todo each. Branch pushed.
+  with `TZ=UTC`, 16 files, 226 passed, 1 todo each. Branch pushed; CI green.
+- 16:00–16:50Z — the Opus 5.5 review's flags fixed: the capture holds an ineligible student's
+  preregistration; the graduate backfill by month with an audit row per inference (proven on a
+  fresh copy: May → 2023, November → 2022); a draft's series guarded; a student's own grade only
+  at first setup; the 09 eligibility invariant; races for every creating path; controls
+  C01–C27 re-run (C24/C25 bit once the swap races ran on an open window); FEATURES_PLAN §7's
+  narrowings and STATE_AUDIT ST-04, ST-13, SO-4, SO-7 updated; Team, Settings and Sessions
+  re-driven in Arabic.
+- 16:55Z — gates green at 9c84172: check-types clean; the suite in local time and UTC, 16 files,
+  236 passed, 1 todo each.

@@ -550,6 +550,19 @@ API and web ports):
 | F7 Day-one import | | | | |
 | F6 UI audit | | | | |
 
+**F0a narrowings** (as built; details in docs/features/FOUNDATION.md §3 and §11) — each is held
+for the owner or the lead, not decided by the implementer:
+- **Preregistrations are left out of the eligibility clean-up.** A student who leaves (or whose
+  cohort or series is corrected, or A-12 turned off) keeps their preregistrations; at the series'
+  opening the capture holds them instead of confirming them — money held, one audit row, finance
+  told. Refunding them is the owner's call (STATE_AUDIT SO-4).
+- **Pending swap requests on a leaver's paid subject stay pending.** Approving one is refused with
+  the reason (it would register a new subject); the request is not rejected at the withdrawal.
+- **Refund windows still take their academic year from the window's start date**
+  (`refund.services`), not the series'; moving them is a money change for the lead.
+- **A leaver's confirmed registrations are untouched.** Only waiting registrations expire; paid
+  subjects stay paid, and dropping one follows the ordinary drop and refund rules.
+
 ---
 
 ## 8. Review of this plan
