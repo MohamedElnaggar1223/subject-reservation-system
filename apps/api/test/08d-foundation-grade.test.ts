@@ -328,6 +328,14 @@ describe('F0a: grade and eligibility', () => {
       // Grade 11 in 2026/27: no core rule, whatever today's grade says.
       const eleventh = await apiResponse(eleven.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.jun2027!, subjectIds: [subj.a!], studentId: eleven.studentId } }));
       expect(eleventh).toHaveLength(1);
+
+      // In grade 9 today, grade 10 in next year's June: the rule follows the
+      // series' grade, whatever today's grade is.
+      const nine = await family('core9', 9);
+      const juneNext = await makeSession('June next year', 'june', 'igcse', seriesYearInAcademicYear('june', academicYearStartOf() + 1));
+      await extend(nine.studentId, juneNext);
+      expect((await refused(nine.parent.api.v1.registrations.direct.$post({ json: { sessionId: juneNext, subjectIds: [subj.a!], studentId: nine.studentId } }))).error)
+        .toBe('Grade 10 June session requires all core subjects. Missing: English (core, F0a grade)');
       await sql(`update subject set is_core = false where id = $1`, [subj.core]);
     });
   });
