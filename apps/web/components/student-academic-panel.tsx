@@ -44,6 +44,7 @@ import { Button } from '~/components/ui/button';
 import { ReasonModal } from '~/components/ui/reason-modal';
 import { Badge, Notice, StandingBadge } from '~/components/ui/tone';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
+import { StudentEnrolmentBlock } from '~/components/student-enrolment-block';
 
 // ─── Shared with the students and sections screens ───────────────────────────
 
@@ -432,6 +433,9 @@ export function StudentAcademicPanel({
           )}
         </Block>
       </div>
+
+      {/* F0b: what they are taught this year */}
+      <StudentEnrolmentBlock studentId={studentId} canEdit={isAcademic} />
 
       {/* Actions the viewer may take */}
       {canCorrect || canLeave || canReadmit ? (

@@ -72,11 +72,21 @@ type NavSection = {
 const ACADEMIC_ITEMS: NavItem[] = [
   { labelKey: 'nav.students', href: '/students', icon: 'students' },
   { labelKey: 'nav.sections', href: '/academic/sections', icon: 'sections' },
+  { labelKey: 'nav.enrolment', href: '/academic/enrolment', icon: 'registrations' },
   { labelKey: 'nav.academicYear', href: '/academic/years', icon: 'sessions' },
   { labelKey: 'nav.calendar', href: '/academic/calendar', icon: 'calendar' },
   { labelKey: 'nav.bellSchedules', href: '/academic/bells', icon: 'bell' },
   { labelKey: 'nav.rooms', href: '/academic/rooms', icon: 'rooms' },
 ];
+
+/** The exam catalogue and the boards' series (F0b): the coordinator's and admin's. */
+const EXAMS_SECTION: NavSection = {
+  titleKey: 'nav.exams',
+  items: [
+    { labelKey: 'nav.catalogue', href: '/exams/catalogue', icon: 'documents' },
+    { labelKey: 'nav.boardSeries', href: '/exams/series', icon: 'calendar' },
+  ],
+};
 
 const ACCOUNT_SECTION: NavSection = {
   titleKey: 'nav.account',
@@ -96,6 +106,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
     return [
       { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, ...teaching] },
       { titleKey: 'nav.academic', items: ACADEMIC_ITEMS },
+      EXAMS_SECTION,
       { titleKey: 'nav.school', items: [{ labelKey: 'nav.settings', href: '/settings', icon: 'settings' }] },
       ACCOUNT_SECTION,
     ];
@@ -125,6 +136,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
         ],
       },
       { titleKey: 'nav.academic', items: ACADEMIC_ITEMS },
+      EXAMS_SECTION,
       {
         titleKey: 'nav.management',
         items: [

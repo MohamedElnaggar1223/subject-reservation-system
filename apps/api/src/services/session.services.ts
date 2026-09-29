@@ -16,7 +16,7 @@
  * All database imports come from @repo/db — never from drizzle-orm directly.
  */
 
-import { db, registrationSession, registration, changeRequest, paymentRegistration, payment, user, eq, and, lte, inArray, isNull, sql } from '@repo/db';
+import { db, registrationSession, registration, changeRequest, paymentRegistration, payment, user, examBoard, eq, and, lte, inArray, isNull, sql } from '@repo/db';
 import { capturePreregistrationsForSession } from './prereg.services';
 import { notifySessionOpened, createNotification, notifyPaymentReferenceDue } from './notification.services';
 import { failPayment, closeStrandedPayments } from './payment.services';
@@ -27,7 +27,7 @@ import { expireIneligibleRegistrations } from './eligibility.services';
 import { A_LEVEL_ONLY_SESSION_TYPES, A_LEVEL_ONLY_MESSAGE, seriesLabel, type CorrectSessionSeriesType, type SessionType } from '@repo/validations';
 import { env } from '../env';
 import { randomUUID } from 'crypto';
-import { linkNewWindowSeries, seriesRuleSentence, windowDeadlines, windowChangeMisfit } from './series.services';
+import { linkNewWindowSeries, seriesRuleSentence, windowDeadlines, windowChangeMisfit, boardSeriesName } from './series.services';
 import type {
   CreateSessionType,
   UpdateDraftSessionType,
@@ -71,15 +71,24 @@ export async function getSessions(filters?: {
   status?: string;
   sessionType?: string;
 }) {
-  return db.query.registrationSession.findMany({
+  const rows = await db.query.registrationSession.findMany({
     where: (s, { eq, and }) => {
       const conditions = [];
       if (filters?.status) conditions.push(eq(s.status, filters.status));
       if (filters?.sessionType) conditions.push(eq(s.sessionType, filters.sessionType));
       return conditions.length > 0 ? and(...conditions) : undefined;
     },
+    // F0b: the board series each window feeds, with their entry deadlines.
+    with: { boardSeriesLinks: { columns: { isDefault: true }, with: { boardSeries: { columns: { id: true, boardCode: true, month: true, year: true, label: true, entryDeadline: true } } } } },
     orderBy: (s, { desc }) => [desc(s.startDate)],
   });
+  const names = new Map((await db.select({ code: examBoard.code, name: examBoard.name }).from(examBoard)).map((b) => [b.code, b.name]));
+  return rows.map(({ boardSeriesLinks, ...s }) => ({
+    ...s,
+    boardSeries: boardSeriesLinks
+      .map((l) => ({ id: l.boardSeries.id, name: boardSeriesName(names, l.boardSeries), boardCode: l.boardSeries.boardCode, entryDeadline: l.boardSeries.entryDeadline, isDefault: l.isDefault }))
+      .sort((a, b) => (a.entryDeadline?.getTime() ?? Infinity) - (b.entryDeadline?.getTime() ?? Infinity) || a.name.localeCompare(b.name)),
+  }));
 }
 
 /**

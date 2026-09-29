@@ -19,12 +19,13 @@
  *   students taught in school. Self-study forms no group.
  * - F4: `teacherOf(studentId, subjectId, academicYearStart)` — the teacher who
  *   gives the forecast grade (null: self-study, or none recorded).
- * - F7: `upsertEnrolments(tx, rows, actor, { source: 'import' })`.
+ * - F7: `upsertEnrolments(tx, academicYearId, rows, actorId, { source: 'import', commit })`
+ *   (or `batchEnrol(..., 'import')` for rows that name students and subjects as a sheet does).
  */
 
 import {
   db, courseEnrolment, academicYear, subject, teacher, subjectTeacher, user, section, sectionMembership, registration, registrationSession,
-  eq, and, inArray, isNull, sql, asc, or, gradeTodayExtras,
+  eq, and, inArray, isNull, sql, asc, or,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
@@ -562,7 +563,7 @@ function emptyFlags() {
 type FlagRow = {
   studentId: string; studentName: string; studentCode: string | null; section: string | null;
   subjectId: string; subjectName: string; subjectCode: string;
-  registrationId: string | null; window: string | null; registrationStatus: string | null; takenOutsideSchool: boolean | null; registrationTeacher: string | null;
+  registrationId: string | null; window: string | null; registrationStatus: string | null; takenOutsideSchool: boolean | null; registrationTeacher: string | null; registrationTeacherId: string | null;
   enrolmentId: string | null; mode: string | null; teacherName: string | null;
 };
 
@@ -613,7 +614,7 @@ export async function checkEnrolments(academicYearId: string, studentId?: string
     studentId: sid, studentName: st.get(sid)?.name ?? '', studentCode: st.get(sid)?.code ?? null, section: sections.get(sid)?.name ?? null,
     subjectId: subId, subjectName: su.get(subId)?.name ?? '', subjectCode: su.get(subId)?.code ?? '',
     registrationId: r?.id ?? null, window: r?.window ?? null, registrationStatus: r?.status ?? null, takenOutsideSchool: r?.outside ?? null,
-    registrationTeacher: r?.teacherId ? te.get(r.teacherId) ?? null : null,
+    registrationTeacher: r?.teacherId ? te.get(r.teacherId) ?? null : null, registrationTeacherId: r?.teacherId ?? null,
     enrolmentId: e?.id ?? null, mode: e?.mode ?? null, teacherName: e?.teacherId ? te.get(e.teacherId) ?? null : null,
   });
   const flags = emptyFlags();
@@ -740,9 +741,8 @@ export async function enrolableStudents(academicYearId: string, search?: string)
       search ? orOp(ilike(u.name, `%${search}%`), ilike(u.email, `%${search}%`), ilike(u.studentId, `%${search}%`)) : undefined,
     ),
     columns: { id: true, name: true, email: true, studentId: true, cohortYear: true },
-    extras: gradeTodayExtras,
     orderBy: (u, { asc: a }) => [a(u.name)],
     limit: 50,
   });
-  return rows;
+  return rows.map((r) => ({ ...r, gradeThatYear: gradeInAcademicYear(r.cohortYear, y.startYear) }));
 }

@@ -13,6 +13,7 @@
  */
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiResponse, academicYearShortLabel, academicYearStartOf, gradeLabel, ROLES } from '@repo/validations';
 import { api } from '~/lib/hono';
@@ -41,7 +42,7 @@ export default function TeachingClient({ viewerRole }: { viewerRole: string }): 
       <div className="mb-6">
         <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">My teaching</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          The teacher record you teach as, your subjects, and the homeroom sections you lead this year.
+          The teacher record you teach as, your subjects, the classes you teach and the homeroom sections you lead this year.
         </p>
       </div>
 
@@ -88,6 +89,24 @@ export default function TeachingClient({ viewerRole }: { viewerRole: string }): 
                   </li>
                 ))}
               </ul>
+            )}
+          </section>
+
+          <section aria-labelledby="classes-heading">
+            <h2 id="classes-heading" className="mb-3 font-display text-lg font-bold text-foreground">
+              <span>My classes</span> <span className="text-sm font-normal text-muted-foreground" dir="ltr">{year}</span>
+            </h2>
+            {data.classes.length === 0 ? (
+              <EmptyState
+                title="No students are enrolled with you this year"
+                message="The coordinator enrols students with their teachers on the Course enrolment page."
+              />
+            ) : (
+              <div className="space-y-3">
+                {data.classes.map((c) => (
+                  <ClassList key={c.subjectId} subjectId={c.subjectId} name={c.name} code={c.code} count={c.students} opensStudents={opensStudents} />
+                ))}
+              </div>
             )}
           </section>
 
@@ -162,6 +181,62 @@ export default function TeachingClient({ viewerRole }: { viewerRole: string }): 
             )}
           </section>
         </div>
+      )}
+    </div>
+  );
+}
+
+const fetchClass = (subjectId: string) => apiResponse(api.v1.enrolments.class.$get({ query: { subjectId } }));
+
+/** One class: the subject and its count; opened, the students taught it in school this year. */
+function ClassList({ subjectId, name, code, count, opensStudents }: { subjectId: string; name: string; code: string; count: number; opensStudents: boolean }) {
+  const [open, setOpen] = useState(false);
+  const q = useQuery({ queryKey: ['teaching', 'class', subjectId], queryFn: () => fetchClass(subjectId), enabled: open });
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex w-full flex-wrap items-baseline justify-between gap-2 px-5 py-3 text-start outline-none hover:bg-accent/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
+        <span>
+          <span className="font-display text-lg font-bold text-foreground">{name}</span>{' '}
+          <span className="font-mono text-xs text-muted-foreground" dir="ltr">{code}</span>
+        </span>
+        <span className="text-sm text-muted-foreground">
+          <span className="text-foreground">{count}</span> <span>{count === 1 ? 'student' : 'students'}</span>
+        </span>
+      </button>
+      {open && (
+        q.isLoading ? (
+          <p className="border-t border-border px-5 py-3 text-sm text-muted-foreground">Loading the class list…</p>
+        ) : q.isError || !q.data ? (
+          <p className="border-t border-border px-5 py-3 text-sm text-red-700 dark:text-red-400">{q.error instanceof Error ? q.error.message : 'The class list did not load'}</p>
+        ) : (
+          <div className="overflow-x-auto border-t border-border">
+            <table className="w-full min-w-[520px] text-sm">
+              <thead className="bg-muted">
+                <tr>
+                  <th scope="col" className="px-5 py-2.5 text-start font-semibold text-muted-foreground">Name</th>
+                  <th scope="col" className="px-5 py-2.5 text-start font-semibold text-muted-foreground">Section</th>
+                  <th scope="col" className="px-5 py-2.5 text-start font-semibold text-muted-foreground">Grade</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {q.data.students.map((st) => (
+                  <tr key={st.enrolmentId}>
+                    <td className="px-5 py-2.5 font-medium text-foreground">
+                      {opensStudents ? <Link href={`/students/${st.studentId}`} className="hover:underline">{st.name}</Link> : st.name}
+                    </td>
+                    <td className="px-5 py-2.5 text-foreground">{st.section ?? '—'}</td>
+                    <td className="px-5 py-2.5 text-foreground">{gradeLabel(st.grade)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
     </div>
   );

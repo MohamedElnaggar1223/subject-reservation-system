@@ -18,6 +18,7 @@ import {
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Notice } from '~/components/ui/tone';
+import { WindowSeriesPanel } from './window-series.client';
 
 // Typed by the API, never by hand (PATTERNS.md).
 const fetchSessions = () => apiResponse(api.v1.sessions.$get({ query: {} }));
@@ -72,7 +73,6 @@ const emptyCreateForm = {
   qualificationLevel: 'igcse' as 'igcse' | 'as_level' | 'a_level',
   startDate: '',
   endDate: '',
-  entryDeadline: '',
 };
 
 export default function SessionsAdminClient(): React.JSX.Element {
@@ -91,11 +91,8 @@ export default function SessionsAdminClient(): React.JSX.Element {
   // Detail / history modal state
   const [historySession, setHistorySession] = useState<Session | null>(null);
 
-  // Board entry deadline modal state (owner decision MO-10)
-  const [deadlineSession, setDeadlineSession] = useState<Session | null>(null);
-  const [deadlineValue, setDeadlineValue] = useState('');
-  const [deadlineReason, setDeadlineReason] = useState('');
-  const [deadlineError, setDeadlineError] = useState('');
+  // F0b: the board series a window feeds (their entry deadlines are MO-10's hard stop)
+  const [seriesPanelFor, setSeriesPanelFor] = useState<string | null>(null);
 
   const [filterStatus, setFilterStatus] = useState('');
   const [filterSessionType, setFilterSessionType] = useState('');
@@ -109,17 +106,6 @@ export default function SessionsAdminClient(): React.JSX.Element {
   const { data: sessions } = useSuspenseQuery({
     queryKey: ['sessions', 'admin'],
     queryFn: fetchSessions,
-  });
-
-  const deadlineMutation = useMutation({
-    mutationFn: async ({ id, entryDeadline, reason }: { id: string; entryDeadline: Date | null; reason: string }) =>
-      apiResponse(api.v1.sessions[':id']['entry-deadline'].$put({ param: { id }, json: { entryDeadline, reason } })),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sessions'] });
-      setDeadlineSession(null);
-      setDeadlineError('');
-    },
-    onError: (err: Error) => setDeadlineError(err.message),
   });
 
   const seriesMutation = useMutation({
@@ -162,11 +148,13 @@ export default function SessionsAdminClient(): React.JSX.Element {
   const createMutation = useMutation({
     mutationFn: async (data: CreateSessionType) =>
       apiResponse(api.v1.sessions.$post({ json: data })),
-    onSuccess: () => {
+    onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
       setShowCreateForm(false);
       setCreateForm(emptyCreateForm);
       setCreateError('');
+      // F0b: next, the board series the new window feeds.
+      setSeriesPanelFor(created.id);
     },
     onError: (err: Error) => setCreateError(err.message),
   });
@@ -234,12 +222,6 @@ export default function SessionsAdminClient(): React.JSX.Element {
       return;
     }
 
-    const entryDeadline = createForm.entryDeadline ? new Date(createForm.entryDeadline) : null;
-    if (entryDeadline && entryDeadline <= end) {
-      setCreateError("The board's entry deadline must be after the registration window closes.");
-      return;
-    }
-
     createMutation.mutate({
       name: createForm.name.trim(),
       sessionType: createForm.sessionType,
@@ -247,27 +229,11 @@ export default function SessionsAdminClient(): React.JSX.Element {
       qualificationLevel: createForm.qualificationLevel,
       startDate: start,
       endDate: end,
-      entryDeadline,
     });
   }
 
   const suggestedCreateSeriesYear = suggestedSeriesYear(createForm.sessionType, createForm.startDate);
   const createSeriesYear = createForm.seriesYear ? Number(createForm.seriesYear) : suggestedCreateSeriesYear;
-
-  function handleSetDeadline(e: React.FormEvent) {
-    e.preventDefault();
-    setDeadlineError('');
-    if (!deadlineSession) return;
-    if (deadlineReason.trim().length < 5) {
-      setDeadlineError('Please provide a reason (min 5 characters).');
-      return;
-    }
-    deadlineMutation.mutate({
-      id: deadlineSession.id,
-      entryDeadline: deadlineValue ? new Date(deadlineValue) : null,
-      reason: deadlineReason.trim(),
-    });
-  }
 
   function handleExtend(e: React.FormEvent) {
     e.preventDefault();
@@ -492,20 +458,9 @@ export default function SessionsAdminClient(): React.JSX.Element {
                 </div>
               </div>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">
-                  Exam board entry deadline
-                </label>
-                <input
-                  type="datetime-local"
-                  value={createForm.entryDeadline}
-                  onChange={(e) => setCreateForm({ ...createForm, entryDeadline: e.target.value })}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  From the board&apos;s calendar; you can set it later. After it, anything still unpaid for this series is closed automatically.
-                </p>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Next, you choose the board series this window feeds (IAL October, Cambridge November…). Each series carries its own exam board entry deadline.
+              </p>
 
               <div className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
                 If start date is now or in the past, the session will open immediately as <strong>Active</strong>. Otherwise it starts as <strong>Draft</strong> and is activated when the start date arrives.
@@ -614,74 +569,8 @@ export default function SessionsAdminClient(): React.JSX.Element {
         </div>
       )}
 
-      {/* Board Entry Deadline Modal (MO-10) */}
-      {deadlineSession && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-card shadow-xl border border-border">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-lg font-semibold text-foreground font-display">Exam Board Entry Deadline</h2>
-              <button
-                onClick={() => { setDeadlineSession(null); setDeadlineError(''); }}
-                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleSetDeadline} className="space-y-4 px-6 py-5">
-              {deadlineError && (
-                <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                  {deadlineError}
-                </div>
-              )}
-
-              <div className="rounded-lg bg-muted px-4 py-3 text-sm text-foreground">
-                <p>Session: <strong>{deadlineSession.name}</strong></p>
-                <p className="mt-0.5">Window closes: <strong>{formatDate(deadlineSession.endDate)}</strong></p>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">Deadline</label>
-                <input
-                  type="datetime-local"
-                  value={deadlineValue}
-                  min={toDatetimeLocal(deadlineSession.endDate)}
-                  onChange={(e) => setDeadlineValue(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <p className="mt-1 text-xs text-muted-foreground">
-                  After this moment, every payment still unconfirmed for this series is closed automatically (escrow returned, family told) and waiting registrations expire. Leave empty to remove the cut-off.
-                </p>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-foreground">
-                  Reason <span className="text-destructive">*</span>
-                </label>
-                <textarea
-                  value={deadlineReason}
-                  onChange={(e) => setDeadlineReason(e.target.value)}
-                  placeholder="e.g. Cambridge June calendar published"
-                  rows={2}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-                />
-                <p className="mt-1 text-xs text-muted-foreground">This reason is recorded in the audit log.</p>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-1">
-                <Button type="button" variant="outline" onClick={() => { setDeadlineSession(null); setDeadlineError(''); }}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={deadlineMutation.isPending}>
-                  {deadlineMutation.isPending ? 'Saving...' : 'Save Deadline'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* F0b: the board series a window feeds (MO-10's deadline is each series') */}
+      {seriesPanelFor && <WindowSeriesPanel sessionId={seriesPanelFor} onClose={() => setSeriesPanelFor(null)} />}
 
       {/* Correct Series Modal (F0a) */}
       {seriesSession && (
@@ -934,11 +823,23 @@ export default function SessionsAdminClient(): React.JSX.Element {
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {seriesSummary(s.sessionType, s.seriesYear)}
                     </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {s.entryDeadline
-                        ? <>Board entry deadline {formatDateTime(s.entryDeadline)}</>
-                        : <>No board entry deadline set</>}
-                    </p>
+                    {s.boardSeries.length === 0 ? (
+                      <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                        Feeds no board series yet: no entry deadline applies
+                      </p>
+                    ) : (
+                      <ul className="mt-0.5 space-y-0.5 text-xs text-muted-foreground">
+                        {s.boardSeries.map((b) => (
+                          <li key={b.id}>
+                            <bdi>{b.name}</bdi>
+                            {' · '}
+                            {b.entryDeadline
+                              ? <><span>entry deadline</span> <span dir="ltr">{formatDateTime(b.entryDeadline)}</span></>
+                              : <span>no entry deadline yet</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     {s.status === 'closed' && s.closedAt && (
                       <p className="mt-0.5 text-xs text-muted-foreground">
                         Closed {formatDate(s.closedAt)}
@@ -957,17 +858,8 @@ export default function SessionsAdminClient(): React.JSX.Element {
 
                 {/* Actions */}
                 <div className="flex shrink-0 items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setDeadlineSession(s);
-                      setDeadlineValue(s.entryDeadline ? toDatetimeLocal(s.entryDeadline) : '');
-                      setDeadlineReason('');
-                      setDeadlineError('');
-                    }}
-                  >
-                    {s.entryDeadline ? 'Board Deadline' : 'Set Board Deadline'}
+                  <Button size="sm" variant="outline" onClick={() => setSeriesPanelFor(s.id)}>
+                    Board series
                   </Button>
                   <Button
                     size="sm"
