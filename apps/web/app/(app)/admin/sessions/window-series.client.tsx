@@ -157,7 +157,7 @@ export function WindowSeriesPanel({ sessionId, onClose }: { sessionId: string; o
                     return (
                       <li key={l.boardSeriesId} className="flex flex-wrap items-center gap-3 px-3 py-2">
                         <div className="min-w-56 flex-1">
-                          <p className="font-medium text-foreground"><bdi data-i18n-skip="true">{s.name}</bdi></p>
+                          <p className="font-medium text-foreground"><bdi>{s.name}</bdi></p>
                           <p className="text-xs text-muted-foreground">
                             {s.entryDeadline ? <><span>Entry deadline</span> <InstantText iso={s.entryDeadline} /></> : <span>No entry deadline yet</span>}
                             {' · '}<span className="tabular-nums">{s.registrations}</span> <span>registrations in it</span>
@@ -167,10 +167,10 @@ export function WindowSeriesPanel({ sessionId, onClose }: { sessionId: string; o
                         {siblings > 1 ? (
                           <label className="flex items-center gap-1 text-sm">
                             <input type="radio" name={`default-${s.boardCode}`} checked={l.isDefault} onChange={() => toggleDefault(l.boardSeriesId)} className="size-4" />
-                            <span>Default for {s.boardName}</span>
+                            <span><span>Default for</span> <bdi>{s.boardName}</bdi></span>
                           </label>
                         ) : (
-                          <Badge tone="neutral">Default for {s.boardName}</Badge>
+                          <Badge tone="neutral"><span>Default for</span>&nbsp;<bdi>{s.boardName}</bdi></Badge>
                         )}
                         <Button variant="ghost" size="sm" disabled={s.registrations > 0} title={s.registrations > 0 ? 'It holds registrations: move them first' : undefined} onClick={() => removeLink(l.boardSeriesId)}>
                           Remove
