@@ -368,6 +368,63 @@ describe('money invariants over the whole database', () => {
     expect(broken).toEqual([]);
   });
 
+  // ─── F0b: the entry deadline is a board series' (MO-10 per series) ────────
+
+  it('there are board series to check: windows feeding several, entries in them, entries closed at a deadline', async () => {
+    const [counts] = await sql<Record<string, string>>(`
+      select
+        (select count(*) from (select session_id from session_board_series group by session_id having count(*) > 1) w) as windows_feeding_several_series,
+        (select count(*) from registration where board_series_id is not null)                                     as entries_in_a_series,
+        (select count(*) from audit_log a join registration r on r.id = a.entity_id
+          where a.action = 'REGISTRATION_EXPIRED' and a.new_data->>'reason' = 'entry_deadline' and r.board_series_id is not null) as expired_at_a_series_deadline,
+        (select count(*) from payment p where p.status = 'failed' and p.metadata->'failure'->>'reason' = 'The exam board''s entry deadline passed before this payment was confirmed') as payments_closed_at_a_deadline
+    `);
+    for (const [kind, n] of Object.entries(counts!)) expect(Number(n), kind).toBeGreaterThan(0);
+  });
+
+  it('every live registration in a window that feeds board series is entered in one of them, of its subject\'s board (F0b)', async () => {
+    const broken = await sql(`
+      select r.id, r.status, r.board_series_id, s.council, b.board_code
+      from registration r
+      join subject s on s.id = r.subject_id
+      left join board_series b on b.id = r.board_series_id
+      where r.status not in ('rejected', 'expired', 'dropped')
+        and (
+          (r.board_series_id is null and exists (select 1 from session_board_series l where l.session_id = r.session_id))
+          or (r.board_series_id is not null and not exists (
+                select 1 from session_board_series l where l.session_id = r.session_id and l.board_series_id = r.board_series_id))
+          or (b.board_code is not null and b.board_code <> s.council)
+        )
+    `);
+    expect(broken).toEqual([]);
+  });
+
+  it('a registration expired at an entry deadline was in a series whose deadline had passed (MO-10 per series)', async () => {
+    const broken = await sql(`
+      select r.id, r.board_series_id, b.entry_deadline, a.created_at
+      from audit_log a
+      join registration r on r.id = a.entity_id
+      left join board_series b on b.id = r.board_series_id
+      where a.action = 'REGISTRATION_EXPIRED' and a.new_data->>'reason' = 'entry_deadline'
+        and (b.id is null or b.entry_deadline is null or b.entry_deadline > a.created_at)
+    `);
+    expect(broken).toEqual([]);
+  });
+
+  it('every window closes before the entry deadline of every series it feeds, and every series is in its academic year and kind (F0b)', async () => {
+    const broken = await sql(`
+      select l.session_id, l.board_series_id, w.end_date, b.entry_deadline, w.session_type, w.series_year, b.month, b.year
+      from session_board_series l
+      join registration_session w on w.id = l.session_id
+      join board_series b on b.id = l.board_series_id
+      where (b.entry_deadline is not null and w.end_date >= b.entry_deadline)
+         or school_series_academic_year_start(b.month, b.year) <> school_series_academic_year_start(w.session_type, w.series_year)
+         or (b.month = 'june') <> (w.session_type = 'june')
+         or l.board_code <> b.board_code
+    `);
+    expect(broken).toEqual([]);
+  });
+
   it('every money transition left exactly one audit row (O-7)', async () => {
     const broken = await sql(`
       select p.id, p.status, a.actions

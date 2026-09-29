@@ -390,7 +390,7 @@ export async function windowChangeMisfit(
   const { names } = await boardNameMap(executor);
   for (const { series } of rows) {
     const misfit = seriesMisfit(proposed, series, names);
-    if (misfit) return `This window feeds ${boardSeriesName(names, series)}: ${misfit.charAt(0).toLowerCase()}${misfit.slice(1)} — change the window's series on its board series panel first`;
+    if (misfit) return `This window feeds ${boardSeriesName(names, series)}, which would no longer fit: ${misfit} — change the window's series on its board series panel first`;
   }
   return null;
 }

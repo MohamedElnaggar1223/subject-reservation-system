@@ -343,6 +343,8 @@ export async function correctSessionSeries(id: string, data: CorrectSessionSerie
     if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') {
       throw new Error(`Another ${data.sessionType} window of this level is already open — close it first`);
     }
+    const sentence = seriesRuleSentence(err);
+    if (sentence) throw new Error(sentence);
     throw err;
   }
 }

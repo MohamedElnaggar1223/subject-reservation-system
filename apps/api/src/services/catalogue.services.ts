@@ -398,6 +398,11 @@ export async function mapRegistrable(subjectId: string, data: MapRegistrableType
     if (wrongLevel.length) {
       throw new CatalogueError(`${wrongLevel.map((u) => u.code).join(', ')} ${s.qualificationLevel === 'igcse' ? 'are AS or A2 units' : 'are IGCSE components'}: ${s.name} is registered at ${levelWord(s.qualificationLevel)}`);
     }
+    // An AS row enters AS units only; an A Level row may mix AS and A2 papers ("Paper 3 & Paper 4").
+    const a2OnAs = s.qualificationLevel === 'as_level' ? units.filter((u) => u.unitLevel === 'a2') : [];
+    if (a2OnAs.length) {
+      throw new CatalogueError(`${a2OnAs.map((u) => u.code).join(', ')} are A2 units: ${s.name} is registered at AS Level, which enters AS units only`);
+    }
     if (q && units.length) {
       const onAward = await tx.select({ unitId: qualificationUnit.unitId }).from(qualificationUnit)
         .where(and(eq(qualificationUnit.qualificationId, q.id), inArray(qualificationUnit.unitId, data.unitIds)));

@@ -192,7 +192,10 @@ export const sessions = new Hono<HonoEnv>()
         try {
           updated = await sessionService.updateDraftSession(id, updateFields);
         } catch (err) {
-          return error(c, clientMessage(err, 'Failed to update the session'), 400);
+          // F0b: a board series changed at the same moment and the database
+          // refused the window (it must close before every series' deadline).
+          const sentence = seriesService.seriesRuleSentence(err);
+          return error(c, sentence ?? clientMessage(err, 'Failed to update the session'), sentence ? 409 : 400);
         }
         if (!updated) {
           return error(c, 'Session is no longer in draft status', 409);
@@ -237,11 +240,14 @@ export const sessions = new Hono<HonoEnv>()
       const deadlineClash = await windowAfterEntryDeadline(id, parsed.data.endDate);
       if (deadlineClash) return error(c, deadlineClash, 400);
 
-      const updated = await sessionService.extendActiveSessionDeadline(
-        id,
-        parsed.data,
-        currentUser.id
-      );
+      let updated;
+      try {
+        updated = await sessionService.extendActiveSessionDeadline(id, parsed.data, currentUser.id);
+      } catch (err) {
+        // F0b: see the draft path above.
+        const sentence = seriesService.seriesRuleSentence(err);
+        return error(c, sentence ?? clientMessage(err, 'Failed to update session'), sentence ? 409 : 500);
+      }
 
       if (!updated) {
         return error(c, 'Failed to update session', 500);

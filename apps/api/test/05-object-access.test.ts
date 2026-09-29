@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, academicYearStartOf } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, one, sql, notified, money,
   openWindow, futureWindow, type Client,
@@ -395,6 +395,42 @@ describe('object-level access between families', () => {
     await refusedAs('gate reads section A', gate.api.v1.academic.sections[':id'].$get({ param: { id: sectionA } }));
     await refusedAs('gate asks student A eligibility', gate.api.v1.registrations.eligibility.$get({ query: { studentId: studentAId, sessionId } }));
     await refusedAs('gate reads A family file', gate.api.v1.files[':id'].content.$get({ param: { id: fileA }, query: {} }));
+  });
+
+  // ─── F0b ─────────────────────────────────────────────────────────────────
+
+  it("F0b course enrolment: B cannot read or change A's student's enrolment; a teacher reads only their own class", async () => {
+    const coordinator = await staff(adm, 'coordinator', 'oa-enr');
+    const [teacherA, teacherB] = [await staff(adm, 'teacher', 'oa-enr-a'), await staff(adm, 'teacher', 'oa-enr-b')];
+    const teacherAId = (await one<{ id: string }>(`select id from teacher where user_id = $1`, [teacherA.id])).id;
+    // Last academic year (A's student was in grade 11): later suites create this year's.
+    const Y = academicYearStartOf() - 1;
+    const years = await apiResponse(coordinator.api.v1.academic.years.$get());
+    const yearId = years.find((y) => y.startYear === Y)?.id
+      ?? (await apiResponse(coordinator.api.v1.academic.years.$post({ json: { startYear: Y, startsOn: `${Y}-09-06`, endsOn: `${Y + 1}-06-25` } }))).id;
+    const e = await apiResponse(coordinator.api.v1.enrolments.$post({
+      json: { academicYearId: yearId, studentId: studentAId, subjectId: phys, teacherId: teacherAId, mode: 'in_school' },
+    }));
+    const snapshot = () => sql(`select * from course_enrolment where student_id = $1`, [studentAId]);
+    const before = await snapshot();
+
+    // Another family: answered as not found, nothing learned, nothing changed.
+    expect(await refusedAs('parentB reads A enrolment', parentB.api.v1.enrolments.student[':studentId'].$get({ param: { studentId: studentAId }, query: { academicYearId: yearId } }))).toBe(404);
+    expect(await refusedAs('studentB reads A enrolment', studentB.api.v1.enrolments.student[':studentId'].$get({ param: { studentId: studentAId }, query: { academicYearId: yearId } }))).toBe(404);
+    await refusedAs('parentB lists enrolments', parentB.api.v1.enrolments.$get({ query: { academicYearId: yearId, studentId: studentAId } }));
+    await refusedAs('parentB checks A enrolment', parentB.api.v1.enrolments.check.$get({ query: { academicYearId: yearId, studentId: studentAId } }));
+    await refusedAs('parentB ends A enrolment', parentB.api.v1.enrolments[':id'].end.$post({ param: { id: e.id }, json: { reason: 'not theirs to end' } }));
+    await refusedAs('studentB changes A enrolment', studentB.api.v1.enrolments[':id'].$put({ param: { id: e.id }, json: { mode: 'self_study' } }));
+    // A's own family reads it.
+    expect((await apiResponse(parentA.api.v1.enrolments.student[':studentId'].$get({ param: { studentId: studentAId }, query: { academicYearId: yearId } }))).enrolments.map((x) => x.subjectId)).toEqual([phys]);
+    expect((await apiResponse(studentA.api.v1.enrolments.student[':studentId'].$get({ param: { studentId: studentAId }, query: { academicYearId: yearId } }))).enrolments.map((x) => x.subjectId)).toEqual([phys]);
+
+    // Another class: teacher B does not read teacher A's Physics class, nor enrol anyone.
+    await refusedAs('teacherB reads teacher A class', teacherB.api.v1.enrolments.class.$get({ query: { subjectId: phys, academicYearId: yearId } }));
+    await refusedAs('teacherB reads A enrolment', teacherB.api.v1.enrolments.student[':studentId'].$get({ param: { studentId: studentAId }, query: {} }));
+    await refusedAs('teacherB enrols student A', teacherB.api.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: studentAId, subjectId: chem, mode: 'in_school' } }));
+    expect((await apiResponse(teacherA.api.v1.enrolments.class.$get({ query: { subjectId: phys, academicYearId: yearId } }))).students.map((x) => x.studentId)).toEqual([studentAId]);
+    expect(await snapshot()).toEqual(before);
   });
 
   it('F0a exceptions: each type names who may grant it — a coordinator is refused a fee waiver, a finance admin the grade-10 exception', async () => {

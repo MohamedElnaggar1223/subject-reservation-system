@@ -973,7 +973,9 @@ export async function notifyRegistrationsExpiredAtEntryDeadline(
   const sessionName = sessionRow?.name ?? 'the series';
   for (const [studentId, names] of byStudent) {
     const title = `Not entered for ${sessionName}`;
-    const body = `The exam board's entry deadline for ${seriesName ? `${seriesName} (registered in ${sessionName})` : sessionName} (${schoolDate(entryDeadline)}) has passed, so these subjects were not entered: ${names.join(', ')}.`;
+    const body = seriesName
+      ? `The exam board's entry deadline for ${seriesName} (${schoolDate(entryDeadline)}) has passed, so these subjects registered in ${sessionName} were not entered: ${names.join(', ')}.`
+      : `The exam board's entry deadline for ${sessionName} (${schoolDate(entryDeadline)}) has passed, so these subjects were not entered: ${names.join(', ')}.`;
     await createNotification(studentId, 'SESSION_CLOSED', title, body, { sessionId, subjectNames: names, reason: 'entry_deadline' });
     for (const { parentId } of await getLinkedParents(studentId)) {
       await createNotification(parentId, 'SESSION_CLOSED', title, body, { sessionId, studentId, subjectNames: names, reason: 'entry_deadline' });

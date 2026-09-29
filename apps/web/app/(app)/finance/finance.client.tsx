@@ -378,12 +378,14 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                       </p>
                     )}
                     {(() => {
-                      const closed = pay.paymentRegistrations.find(
-                        (pr) => pr.registration.session.status === 'closed' && pr.registration.session.entryDeadline
-                      );
-                      return closed ? (
+                      // F0b: each subject's own board series carries the deadline; the earliest one closes this payment.
+                      const deadlines = pay.paymentRegistrations
+                        .filter((pr) => pr.registration.session.status === 'closed' && pr.registration.boardSeries?.entryDeadline)
+                        .map((pr) => pr.registration.boardSeries!.entryDeadline!)
+                        .sort();
+                      return deadlines[0] ? (
                         <p className="text-xs mt-1 text-amber-600 dark:text-amber-400">
-                          Confirm or reject before the board deadline, {new Date(closed.registration.session.entryDeadline!).toLocaleDateString()} — after it this payment is closed automatically.
+                          Confirm or reject before the board deadline, {new Date(deadlines[0]).toLocaleDateString()} — after it this payment is closed automatically.
                         </p>
                       ) : null;
                     })()}
