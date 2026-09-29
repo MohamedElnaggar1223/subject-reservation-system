@@ -35,7 +35,6 @@ import * as sessionService from '../services/session.services';
 import * as seriesService from '../services/series.services';
 import { notifySessionOpened, notifySessionClosed, getStudentAndParentBroadcastIds } from '../services/notification.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
-import { schoolDate } from '../services/window.services';
 
 /**
  * A window may not close on or after the exam-board entry deadline of any
@@ -46,7 +45,7 @@ import { schoolDate } from '../services/window.services';
 async function windowAfterEntryDeadline(sessionId: string, endDate: Date): Promise<string | null> {
   const { earliest } = await seriesService.windowDeadlines(sessionId);
   if (!earliest || endDate < earliest) return null;
-  return `The window cannot close on or after the exam board's entry deadline (${schoolDate(earliest)}) — move the board deadline first`;
+  return seriesService.windowPastDeadlineSentence(earliest);
 }
 
 const seriesFailure = (err: unknown, fallback: string) => ({

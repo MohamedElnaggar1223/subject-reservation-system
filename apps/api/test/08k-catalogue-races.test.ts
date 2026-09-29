@@ -126,7 +126,7 @@ describe('F0b: races', () => {
       expect(await holds(w, s)).toBe(true);
     });
 
-    it('the deadline first: it moves, and the window that would pass it is refused by the database', async () => {
+    it('the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock', async () => {
       const { w, s, end } = await setUp('deadline first');
       const release = await holdRowLock('registration_session', w);
       let first: Promise<Res> | undefined;
@@ -134,7 +134,41 @@ describe('F0b: races', () => {
       try {
         first = moveDeadline(s, new Date(end.getTime() + days(3)));
         await lockWaiters(1);
-        // The window's route checked the old deadline before queueing; the database checks the new one.
+        // The window's route checked the old deadline before queueing; the
+        // draft update (F0a: under the window's row lock) reads the new one.
+        second = extendWindow(w, new Date(end.getTime() + days(5)));
+        await lockWaiters(2);
+      } finally {
+        await release();
+      }
+      const [dl, ext] = await Promise.all([first!, second!]);
+      expect(dl.status).toBe(200);
+      expect(ext.status).toBe(400);
+      expect((await ext.json() as { error: string }).error).toMatch(/^The window cannot close on or after the exam board's entry deadline \(.+\) — move the board deadline first$/);
+      expect(await holds(w, s)).toBe(true);
+    });
+
+    it('the deadline first, an open window: it moves, and the extension that would pass it is refused by the database', async () => {
+      // An open window's extension takes no lock of its own before its UPDATE:
+      // the database's trigger is what reads the moved deadline. A (type,
+      // level) pair no earlier file holds open is used, and closed after.
+      const openPairs = new Set((await sql<{ t: string; l: string }>(`select session_type as t, qualification_level as l from registration_session where status = 'active'`)).map((r) => `${r.t}|${r.l}`));
+      const pair = (['october|a_level', 'october|as_level', 'november|a_level', 'november|as_level', 'january|a_level', 'january|as_level'] as const).find((p) => !openPairs.has(p));
+      expect(pair).toBeDefined();
+      const [type, level] = pair!.split('|') as ['october' | 'november' | 'january', 'a_level' | 'as_level'];
+      const now = Date.now();
+      const w = await session(adm, `Open window (F0b races, deadline first)`, type, level, {
+        startDate: new Date(now - days(1)).toISOString(), endDate: new Date(now + days(10)).toISOString(), seriesYear: seriesYearInAcademicYear(type, Y),
+      });
+      const end = new Date((await one<{ end: string }>(`select end_date as end from registration_session where id = $1`, [w])).end);
+      expect((await one<{ status: string }>(`select status from registration_session where id = $1`, [w])).status).toBe('active');
+      const s = await feedSeries(adm, w, { label: 'F0b races open', entryDeadline: new Date(end.getTime() + days(10)) });
+      const release = await holdRowLock('registration_session', w);
+      let first: Promise<Res> | undefined;
+      let second: Promise<Res> | undefined;
+      try {
+        first = moveDeadline(s, new Date(end.getTime() + days(3)));
+        await lockWaiters(1);
         second = extendWindow(w, new Date(end.getTime() + days(5)));
         await lockWaiters(2);
       } finally {
@@ -145,6 +179,7 @@ describe('F0b: races', () => {
       expect(ext.status).toBe(409);
       expect((await ext.json() as { error: string }).error).toBe("A window must close before the exam board's entry deadline of every series it feeds — the window or the deadline changed at the same moment; reload and try again");
       expect(await holds(w, s)).toBe(true);
+      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: w }, json: { reason: 'race test done: free the pair' } }));
     });
   });
 

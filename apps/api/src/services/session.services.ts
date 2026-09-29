@@ -27,7 +27,7 @@ import { expireIneligibleRegistrations } from './eligibility.services';
 import { A_LEVEL_ONLY_SESSION_TYPES, A_LEVEL_ONLY_MESSAGE, seriesLabel, type CorrectSessionSeriesType, type SessionType } from '@repo/validations';
 import { env } from '../env';
 import { randomUUID } from 'crypto';
-import { linkNewWindowSeries, seriesRuleSentence, windowDeadlines, windowChangeMisfit, boardSeriesName } from './series.services';
+import { linkNewWindowSeries, seriesRuleSentence, windowDeadlines, windowChangeMisfit, windowPastDeadlineSentence, boardSeriesName } from './series.services';
 import type {
   CreateSessionType,
   UpdateDraftSessionType,
@@ -248,8 +248,12 @@ export async function updateDraftSession(
     if (A_LEVEL_ONLY_SESSION_TYPES.includes(mergedType as SessionType) && mergedLevel === 'igcse') {
       throw new DraftSessionError(A_LEVEL_ONLY_MESSAGE, 400);
     }
-    // F0b: the board series the window feeds must still fit it (its
-    // academic year, June or not, closing before each series' deadline).
+    // F0b: the window still closes before the entry deadline of every series
+    // it feeds — read under the window's lock, so a deadline moved while this
+    // waited is the one judged (the route's check ran before the lock) —
+    // and the series still fit it (its academic year, June or not).
+    const { earliest } = await windowDeadlines(id, tx);
+    if (earliest && (data.endDate ?? current.endDate) >= earliest) throw new DraftSessionError(windowPastDeadlineSentence(earliest), 400);
     const misfit = await windowChangeMisfit(tx, id, {
       sessionType: mergedType,
       seriesYear: data.seriesYear ?? current.seriesYear,

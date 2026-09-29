@@ -673,6 +673,11 @@ export async function routeAndCheck(
  * must close before it) and — when every series has one — the latest (past
  * it, nothing in the window can be entered at all).
  */
+/** The refusal when a window would close on or after a fed series' entry deadline (MO-10). */
+export function windowPastDeadlineSentence(earliest: Date) {
+  return `The window cannot close on or after the exam board's entry deadline (${schoolDate(earliest)}) — move the board deadline first`;
+}
+
 export async function windowDeadlines(sessionId: string, executor: Executor = db) {
   const rows = await executor
     .select({ entryDeadline: boardSeries.entryDeadline })
