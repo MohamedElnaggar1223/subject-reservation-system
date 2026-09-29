@@ -57,7 +57,7 @@ export const catalogueArabic: Record<string, string> = {
   'Change it on the Settings page': 'غيّرها من صفحة الإعدادات',
   'when the coordinator confirms what the school means.': 'عندما يؤكد المنسق ما تقصده المدرسة.',
   'An AS entry of a student who also sits A2 units in that series': 'قيد AS لطالب يؤدي أيضًا وحدات A2 في الدورة نفسها',
-  'A student in grade 12': 'طالب في الصف 12',
+  'An AS entry sat in the student’s A2 year (grade 12)': 'قيد AS يؤديه الطالب في عام A2 (الصف 12)',
   'An AS unit that also counts toward an A Level': 'وحدة AS تُحتسب أيضًا لمؤهل المستوى A',
   'Only an entry that mixes AS and A2 units': 'فقط القيد الذي يجمع وحدات AS وA2',
   'to map': 'بلا ربط',

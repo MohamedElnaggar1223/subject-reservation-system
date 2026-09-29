@@ -403,7 +403,7 @@ branch.
 | From | Provides | Used by |
 |---|---|---|
 | F0a | the cohort (`user.cohortYear`); the grade as `gradeInAcademicYear(cohortYear, academicYearStart)` / `gradeToday(cohortYear)` and `academicYearStartOf(instant)`, `seriesAcademicYearStart(type, year)` (`@repo/validations`), and in SQL `gradeInYearSql` / `gradeTodaySql` / `gradeTodayExtras` (`@repo/db`, over the functions `school_grade`, `school_academic_year_start`, `school_series_academic_year_start`); `mayRegisterFor(studentId, sessionId)` and `expireIneligibleRegistrations(tx, scope, cause)` (eligibility.services); windows' `seriesYear`; academic years, terms, calendar entries and `getSchoolDay(date)`, bell schedules and periods, rooms, sections and memberships with `sectionOf(studentId, year?)`; roles `coordinator` / `teacher` / `gate` with `lib/role-grants.ts`; `teacher.userId` and `getTeachingFor(userId)`; the settings store (`SETTINGS` registry, `getSetting(key)`, `updateSetting`, `onSettingChanged`); uploads (`UPLOAD_PURPOSES`, `POST /v1/files/upload`, `GET /v1/files/:id/content`, `uploadForPurpose`, `getReadableFile`). Details: docs/features/FOUNDATION.md | all |
-| F0b | catalogue (qualifications, units, awards), board series, windows' series, course enrolment | F1, F4, F5, F7 |
+| F0b | the catalogue: `exam_board`, `qualification`, `exam_unit` (own level), `qualification_unit` (the unit-to-award map), option codes, `subject.qualificationId` / `subject_unit` (what a registrable row enters), `getCatalogue()`, `findRegistrable(term)`, `deriveLevelCode(input, reading)` with the setting `catalogue.levelCodeReading`; board series (`board_series` with the entry deadline and the board's dates, `listBoardSeries`, `seriesDeadline`, `windowDeadlines`), the series a window feeds (`session_board_series`, `session_subject_series`) and `registration.boardSeriesId`; F4's `entryItemsFor(registrationIds)` / `entryItemsForWindow(sessionId)` and `teacherOf(studentId, subjectId, academicYearStart)`; F1's `getTeachingDemand(academicYearId)`; F7's `upsertEnrolments(tx, academicYearId, rows, actorId, { source: 'import', commit })` / `batchEnrol(…, 'import')`; course enrolment (`course_enrolment`, `checkEnrolments`). Details: docs/features/CATALOGUE.md §7 | F1, F4, F5, F7 |
 | F1 | teaching groups and members; published timetable; `getScheduleFor(studentId \| teacherId, date)` | F2, F3 |
 | F4 | candidates, entries, results per unit and award, `getSittings(studentId)`, `getExamsFor(studentId, date)` | F2, F3, F5 |
 | F2 | leave requests and states; `getLeaveCoverage(studentId, date)` | F3 |
@@ -541,7 +541,7 @@ API and web ports):
 | Feature | Implemented | Reviewed | Merged | Notes |
 |---|---|---|---|---|
 | F0a Core foundation | yes — `feature/foundation`, docs/features/FOUNDATION.md | | | awaiting review |
-| F0b Catalogue, series, enrolment | | | | |
+| F0b Catalogue, series, enrolment | yes — `feature/catalogue`, docs/features/CATALOGUE.md | | | awaiting review |
 | F1 Scheduling | | | | |
 | F4 Exam entries | | | | |
 | F2 Campus leave | | | | |

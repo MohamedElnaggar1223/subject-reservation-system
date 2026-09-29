@@ -185,7 +185,11 @@ and raised eleven points. What each changed:
    "not completed" notice for the subjects a failed checkout expired itself — found by the
    fourth review, below.
 7. **The window/deadline order was a route check on an unlocked read.** The database now
-   enforces it (`session_entry_deadline_after_end`, migration 0030; undone: red).
+   enforces it (`session_entry_deadline_after_end`, migration 0030; undone: red). F0b moved the
+   deadline onto each board series (0039 drops the window's column): the trigger
+   `window_closes_before_series_deadline` (0038) holds a window's close before the deadline of
+   every series it feeds, whichever of the two changes (undone: red, `.audit/catalogue.tsv`
+   C4, C4b).
 8. **Notices.** Registrations expired at the deadline now tell the family which subjects were
    not entered ("Not entered for …", tested); a payment closed at one series' deadline says
    its subjects *in that series* were not entered; a reversal past the deadline no longer says
@@ -282,9 +286,12 @@ The fourth review, of that response (fc1a101), again said "don't merge yet", on 
   refused. A pay-at-school checkout still fails at the close: no money is in flight.
 - When the time passes with no reference, the scheduler's sweep (every minute) cancels the
   checkout, returns any escrow, releases the subjects and tells the family.
-- Each series can carry the **exam board's entry deadline** (admin, from the board's
-  calendar; after the window's close and in the future; any status; audited with a reason).
-  When it passes, the sweep closes every payment still open on the series — a transfer
+- Each **board series** can carry the **exam board's entry deadline** (admin only, from the
+  board's calendar; after the close of every window feeding it and in the future; any status;
+  audited with a reason). Since F0b a window feeds one or more board series and each
+  registration is entered in one of them, so the deadline is the series', not the window's:
+  a window feeding IAL October and IAL January enforces each at its own time
+  (docs/features/CATALOGUE.md). When it passes, the sweep closes every payment still open on the series — a transfer
   finance never verified included — as a system failure, not a rejection (nobody judged the
   transfer), returns escrow, and tells the family ("Payment Not Completed": if you did
   transfer, bring the bank receipt to the finance desk). It expires every registration still
