@@ -7,7 +7,14 @@ import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { formatPrice } from '~/lib/format';
 import { invalidateFinancialState } from '~/lib/financial-cache';
-import { apiResponse, REGISTRATION_STATUS_LABELS, COUNCIL_LABELS } from '@repo/validations';
+import {
+  apiResponse,
+  gradeInAcademicYear,
+  gradeLabel,
+  REGISTRATION_STATUS_LABELS,
+  COUNCIL_LABELS,
+  seriesAcademicYearStart,
+} from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -24,13 +31,17 @@ type Session = {
   id: string;
   name: string;
   sessionType: string;
+  // The exam series' year (F0a): with the type, it names the academic year.
+  seriesYear: number;
   status: string;
 };
 
 type Student = {
   id: string;
   name: string;
+  // Today's grade (derived by the API) and the cohort it comes from (F0a).
   grade: number | null;
+  cohortYear: number | null;
   studentId: string | null;
 };
 
@@ -195,9 +206,11 @@ function RegistrationCard({
   // lock stays stable even if an admin later clears subject.isCore
   // (URD CORE-002). Fall back to the live flag for legacy rows.
   const coreAtRegistration = reg.wasCoreAtRegistration ?? !!reg.subject.isCore;
+  // Grade 10 in the series' academic year (F0a), as the API judges it — not
+  // today's grade, which moves on 1 July.
   const isCoreProtected =
     coreAtRegistration &&
-    reg.student.grade === 10 &&
+    gradeInAcademicYear(reg.student.cohortYear, seriesAcademicYearStart(reg.session.sessionType, reg.session.seriesYear)) === 10 &&
     reg.session.sessionType === 'june';
   // M-18: A pending change request already exists against this registration —
   // disable the drop/swap buttons instead of letting the user click through
@@ -962,7 +975,7 @@ export default function RegistrationsClient({ userRole, userId }: Props): React.
                       <span className="font-semibold text-foreground">{session.name}</span>
                       {isParent && (
                         <span className="ml-2 text-sm text-muted-foreground">
-                          · {student.name}{student.grade ? ` (Grade ${student.grade})` : ''}
+                          · {student.name}{student.grade != null ? ` (${gradeLabel(student.grade)})` : ''}
                         </span>
                       )}
                     </div>

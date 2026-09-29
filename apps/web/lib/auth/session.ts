@@ -1,7 +1,7 @@
 import { cache } from 'react'
 import { getServerApi } from '~/lib/hono-server'
 import { apiResponse } from '@repo/validations'
-import { ROLES, type Role } from '@repo/validations'
+import { ROLES, ACADEMIC_ROLES, STUDENT_RECORD_ROLES, STAFF_ROLES, SETTINGS_READ_ROLES, type Role } from '@repo/validations'
 import { redirect } from 'next/navigation'
 
 const fetchSession = async () => apiResponse((await getServerApi()).v1.session.$get())
@@ -54,6 +54,12 @@ export const requireParent = () => requireRole(ROLES.PARENT)
 // Finance desk staff — admin included as a superset
 export const requireFinance = () =>
   requireRole([ROLES.FINANCE_OFFICER, ROLES.FINANCE_ADMIN, ROLES.ADMIN])
+
+// F0a: the academic lead's screens, the student record, every member of staff
+export const requireAcademic = () => requireRole([...ACADEMIC_ROLES])
+export const requireStudentRecords = () => requireRole([...STUDENT_RECORD_ROLES])
+export const requireStaff = () => requireRole([...STAFF_ROLES])
+export const requireSettingsReader = () => requireRole([...SETTINGS_READ_ROLES])
 
 // Alias for backwards compatibility
 export const requireAuthenticated = requireAuth

@@ -10,7 +10,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, EXCEPTION_TYPES, EXCEPTION_TYPE_LABELS } from '@repo/validations';
+import { apiResponse, gradeLabel, EXCEPTION_TYPES, EXCEPTION_TYPE_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 type ExceptionRow = {
@@ -161,7 +161,7 @@ export default function ExceptionsAdminClient(): React.JSX.Element {
               <option value="">{studentsFailed ? 'Could not load students' : 'Pick a student…'}</option>
               {students.map((st) => (
                 <option key={st.id} value={st.id}>
-                  {st.name}{st.grade ? ` (G${st.grade})` : ''}
+                  {st.name}{st.grade != null ? ` (${gradeLabel(st.grade)})` : ''}
                 </option>
               ))}
             </select>
@@ -270,7 +270,7 @@ export default function ExceptionsAdminClient(): React.JSX.Element {
                 <tr key={e.id} className={`hover:bg-muted/50 transition-colors ${e.status === 'revoked' ? 'opacity-60' : ''}`}>
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{e.student?.name ?? '—'}</div>
-                    {e.student?.grade && <div className="text-xs text-muted-foreground">Grade {e.student.grade}</div>}
+                    {e.student?.grade != null && <div className="text-xs text-muted-foreground">{gradeLabel(e.student.grade)}</div>}
                   </td>
                   <td className="px-4 py-3 text-card-foreground">
                     {EXCEPTION_TYPE_LABELS[e.type as keyof typeof EXCEPTION_TYPE_LABELS] ?? e.type}

@@ -18,7 +18,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { invalidateFinancialState } from '~/lib/financial-cache';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, gradeLabel } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 const fetchPendingPayments = () => apiResponse(api.v1.payments['pending-bank'].$get());
@@ -135,9 +135,9 @@ export default function AdminPaymentsClient() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold text-foreground">{pay.student.name}</p>
-                      {pay.student.grade && (
+                      {pay.student.grade != null && (
                         <span className="px-2 py-0.5 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400 rounded text-xs font-medium">
-                          Grade {pay.student.grade}
+                          {gradeLabel(pay.student.grade)}
                         </span>
                       )}
                       {waitingHours >= 24 && (

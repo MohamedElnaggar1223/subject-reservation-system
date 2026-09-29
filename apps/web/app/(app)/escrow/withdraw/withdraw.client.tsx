@@ -13,7 +13,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { invalidateFinancialState } from '~/lib/financial-cache';
-import { apiResponse, WITHDRAWAL_STATUS_LABELS } from '@repo/validations';
+import { apiResponse, gradeLabel, WITHDRAWAL_STATUS_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 type ChildBalance = {
@@ -186,9 +186,9 @@ export default function WithdrawClient() {
                   <div>
                     <p className="text-sm font-medium text-foreground">
                       {req.escrow.student.name}
-                      {req.escrow.student.grade && (
-                        <span className="text-xs text-muted-foreground ml-1">
-                          (Grade {req.escrow.student.grade})
+                      {req.escrow.student.grade != null && (
+                        <span className="text-xs text-muted-foreground ms-1">
+                          ({gradeLabel(req.escrow.student.grade)})
                         </span>
                       )}
                     </p>

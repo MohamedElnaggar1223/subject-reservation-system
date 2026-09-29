@@ -12,7 +12,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, gradeLabel } from '@repo/validations';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
@@ -139,7 +139,7 @@ export default function SchoolFeeClient({ initialStudentId }: { initialStudentId
                 }`}
               >
                 {child.student.name}
-                {child.student.grade && <span className="ml-1 text-muted-foreground">· Grade {child.student.grade}</span>}
+                {child.student.grade != null && <span className="ms-1 text-muted-foreground">· {gradeLabel(child.student.grade)}</span>}
               </button>
             ))}
           </div>

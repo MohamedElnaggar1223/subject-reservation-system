@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { foundationArabic } from './i18n-foundation';
 
 export type Language = 'en' | 'ar';
 
@@ -67,6 +68,17 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.browseSubjects': 'Browse Subjects',
     'nav.requests': 'Requests',
     'nav.pendingRequests': 'Pending Requests',
+    'nav.academic': 'Academic',
+    'nav.school': 'School',
+    'nav.today': 'Today',
+    'nav.students': 'Students',
+    'nav.sections': 'Sections',
+    'nav.academicYear': 'Academic Year',
+    'nav.calendar': 'Calendar',
+    'nav.bellSchedules': 'Bell Schedules',
+    'nav.rooms': 'Rooms',
+    'nav.settings': 'Settings',
+    'nav.myTeaching': 'My Teaching',
     'reports.title': 'Reports',
     'reports.description': 'Generate and export data reports. All reports support CSV download.',
     'reports.pendingApprovals': 'Pending Approvals',
@@ -131,6 +143,10 @@ const translations: Record<Language, Record<string, string>> = {
     'dashboard.totalParents': 'Total Parents',
     'dashboard.pendingWithdrawals': 'Pending Withdrawals',
     'dashboard.studentsByGrade': 'Students by Grade',
+    'dashboard.gradeUpcoming': 'Grade 9 (next year)',
+    'dashboard.gradeUnknown': 'Grade not recorded',
+    'dashboard.leftSchool': 'Left the school',
+    'dashboard.fixOnStudents': 'Record on the Students page',
     'dashboard.pendingApprovalsDescription': 'Registration requests + drop/swap requests awaiting parent approval',
     'dashboard.fullReport': 'Full report',
     'dashboard.loadingPendingApprovals': 'Loading pending approvals...',
@@ -147,6 +163,17 @@ const translations: Record<Language, Record<string, string>> = {
     'dashboard.swap': 'Swap',
   },
   ar: {
+    'nav.academic': 'الشؤون الأكاديمية',
+    'nav.school': 'المدرسة',
+    'nav.today': 'اليوم',
+    'nav.students': 'الطلاب',
+    'nav.sections': 'الفصول',
+    'nav.academicYear': 'العام الدراسي',
+    'nav.calendar': 'التقويم',
+    'nav.bellSchedules': 'مواعيد الحصص',
+    'nav.rooms': 'القاعات',
+    'nav.settings': 'الإعدادات',
+    'nav.myTeaching': 'تدريسي',
     'app.subjectReservation': 'حجز المواد',
     'common.user': 'مستخدم',
     'common.signOut': 'تسجيل الخروج',
@@ -263,6 +290,10 @@ const translations: Record<Language, Record<string, string>> = {
     'dashboard.totalParents': 'إجمالي أولياء الأمور',
     'dashboard.pendingWithdrawals': 'سحوبات معلقة',
     'dashboard.studentsByGrade': 'الطلاب حسب الصف',
+    'dashboard.gradeUpcoming': 'الصف 9 (العام القادم)',
+    'dashboard.gradeUnknown': 'الصف غير مسجل',
+    'dashboard.leftSchool': 'غادروا المدرسة',
+    'dashboard.fixOnStudents': 'سجّله من صفحة الطلاب',
     'dashboard.pendingApprovalsDescription': 'طلبات التسجيل وطلبات الحذف/التبديل التي تنتظر موافقة ولي الأمر',
     'dashboard.fullReport': 'التقرير الكامل',
     'dashboard.loadingPendingApprovals': 'جار تحميل الموافقات المعلقة...',
@@ -1453,6 +1484,9 @@ const autoArabicText: Record<string, string> = {
   '(Admin)': '(الإدارة)',
   '(Student)': '(الطالب)',
 };
+
+// F0a screens keep their Arabic in lib/i18n-foundation, one file per area.
+Object.assign(autoArabicText, foundationArabic);
 
 const textNodeOriginals = new WeakMap<Text, string>();
 

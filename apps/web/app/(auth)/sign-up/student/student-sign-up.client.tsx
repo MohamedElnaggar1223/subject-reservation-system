@@ -11,7 +11,10 @@ import { cn } from "~/lib/utils";
 import AuthLayout from "~/components/auth-layout";
 import { getSignUpError, getNetworkError } from "~/lib/auth-errors";
 
+// The grade this academic year; the API stores the cohort (F0a). Grade 9 is
+// a family enrolling before the student starts grade 10.
 const GRADES = [
+  { value: 9, label: "Grade 9", description: "Starts grade 10 next year" },
   { value: 10, label: "Grade 10", description: "First year of IGCSE" },
   { value: 11, label: "Grade 11", description: "Second year of IGCSE" },
   { value: 12, label: "Grade 12", description: "Final year" },
@@ -201,7 +204,7 @@ export default function StudentSignUpClient(): React.JSX.Element {
         {/* Grade selection as radio cards */}
         <div className="space-y-2">
           <Label>Current Grade</Label>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {GRADES.map((g) => (
               <button
                 key={g.value}

@@ -3,18 +3,48 @@
 import { useState } from 'react';
 import { useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, SESSION_TYPE_LABELS, type CreateSessionType } from '@repo/validations';
+import {
+  apiResponse,
+  academicYearShortLabel,
+  academicYearStartOf,
+  A_LEVEL_ONLY_MESSAGE,
+  A_LEVEL_ONLY_SESSION_TYPES,
+  SESSION_TYPE_LABELS,
+  seriesAcademicYearStart,
+  seriesLabel,
+  seriesYearInAcademicYear,
+  type CreateSessionType,
+  type SessionType,
+} from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { Notice } from '~/components/ui/tone';
 
 // Typed by the API, never by hand (PATTERNS.md).
 const fetchSessions = () => apiResponse(api.v1.sessions.$get({ query: {} }));
 type Session = Awaited<ReturnType<typeof fetchSessions>>[number];
 
-const SESSION_TYPE_OPTIONS = [
+const SESSION_TYPE_OPTIONS: { value: SessionType; label: string }[] = [
   { value: 'june', label: 'June' },
+  { value: 'october', label: 'October' },
   { value: 'november', label: 'November' },
   { value: 'january', label: 'January' },
 ];
+
+/**
+ * The exam series a window most likely registers for (F0a): the series of
+ * this type in the academic year the window opens in — a June window opening
+ * in March 2027 is for June 2027, a January window opening in October 2026
+ * for January 2027. Only a suggestion: the admin can type another year.
+ */
+function suggestedSeriesYear(sessionType: string, startDate: string): number {
+  const opens = startDate ? new Date(startDate) : new Date();
+  return seriesYearInAcademicYear(sessionType, academicYearStartOf(Number.isNaN(opens.getTime()) ? new Date() : opens));
+}
+
+/** "June 2027 series · academic year 2026/27" — what a window's grade rules read. */
+function seriesSummary(sessionType: string, seriesYear: number): string {
+  return `${seriesLabel(sessionType, seriesYear)} series · academic year ${academicYearShortLabel(seriesAcademicYearStart(sessionType, seriesYear))}`;
+}
 
 const LEVEL_OPTIONS = [
   { value: 'igcse', label: 'IGCSE' },
@@ -36,7 +66,9 @@ const STATUS_COLORS: Record<string, string> = {
 
 const emptyCreateForm = {
   name: '',
-  sessionType: 'june' as 'june' | 'november' | 'january',
+  sessionType: 'june' as SessionType,
+  // Empty until the admin types a year: the suggestion is used.
+  seriesYear: '',
   qualificationLevel: 'igcse' as 'igcse' | 'as_level' | 'a_level',
   startDate: '',
   endDate: '',
@@ -68,6 +100,12 @@ export default function SessionsAdminClient(): React.JSX.Element {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterSessionType, setFilterSessionType] = useState('');
 
+  // Correct a window's exam series (F0a): PUT /sessions/:id/series
+  const [seriesSession, setSeriesSession] = useState<Session | null>(null);
+  const [seriesForm, setSeriesForm] = useState({ sessionType: 'june' as SessionType, seriesYear: '', reason: '' });
+  const [seriesError, setSeriesError] = useState('');
+  const [seriesResult, setSeriesResult] = useState('');
+
   const { data: sessions } = useSuspenseQuery({
     queryKey: ['sessions', 'admin'],
     queryFn: fetchSessions,
@@ -83,6 +121,43 @@ export default function SessionsAdminClient(): React.JSX.Element {
     },
     onError: (err: Error) => setDeadlineError(err.message),
   });
+
+  const seriesMutation = useMutation({
+    mutationFn: async ({ id, sessionType, seriesYear, reason }: { id: string; sessionType: SessionType; seriesYear: number; reason: string }) =>
+      apiResponse(api.v1.sessions[':id'].series.$put({ param: { id }, json: { sessionType, seriesYear, reason } })),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      setSeriesSession(null);
+      setSeriesError('');
+      setSeriesResult(
+        `${updated.name} is now for the ${seriesLabel(updated.sessionType, updated.seriesYear)} series. ` +
+        (updated.registrationsExpired > 0
+          ? `${updated.registrationsExpired} waiting registration(s) the new series does not allow expired; ${updated.paymentsClosed} open checkout(s) closed and families told.`
+          : 'No waiting registration was affected.')
+      );
+    },
+    onError: (err: Error) => setSeriesError(err.message),
+  });
+
+  function handleCorrectSeries(e: React.FormEvent) {
+    e.preventDefault();
+    setSeriesError('');
+    if (!seriesSession) return;
+    const year = Number(seriesForm.seriesYear);
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+      setSeriesError('Enter the series year, e.g. 2027.');
+      return;
+    }
+    if (A_LEVEL_ONLY_SESSION_TYPES.includes(seriesForm.sessionType) && seriesSession.qualificationLevel === 'igcse') {
+      setSeriesError(A_LEVEL_ONLY_MESSAGE);
+      return;
+    }
+    if (seriesForm.reason.trim().length < 5) {
+      setSeriesError('Please provide a reason (min 5 characters).');
+      return;
+    }
+    seriesMutation.mutate({ id: seriesSession.id, sessionType: seriesForm.sessionType, seriesYear: year, reason: seriesForm.reason.trim() });
+  }
 
   const createMutation = useMutation({
     mutationFn: async (data: CreateSessionType) =>
@@ -148,8 +223,14 @@ export default function SessionsAdminClient(): React.JSX.Element {
       return;
     }
 
-    if (createForm.sessionType === 'january' && createForm.qualificationLevel === 'igcse') {
-      setCreateError('January series are A-Level only — no January IGCSE exists in Egypt.');
+    if (A_LEVEL_ONLY_SESSION_TYPES.includes(createForm.sessionType) && createForm.qualificationLevel === 'igcse') {
+      setCreateError(A_LEVEL_ONLY_MESSAGE);
+      return;
+    }
+
+    const seriesYear = createForm.seriesYear ? Number(createForm.seriesYear) : suggestedCreateSeriesYear;
+    if (!Number.isInteger(seriesYear) || seriesYear < 2000 || seriesYear > 2100) {
+      setCreateError('Enter the exam series year, e.g. 2027.');
       return;
     }
 
@@ -162,12 +243,16 @@ export default function SessionsAdminClient(): React.JSX.Element {
     createMutation.mutate({
       name: createForm.name.trim(),
       sessionType: createForm.sessionType,
+      seriesYear,
       qualificationLevel: createForm.qualificationLevel,
       startDate: start,
       endDate: end,
       entryDeadline,
     });
   }
+
+  const suggestedCreateSeriesYear = suggestedSeriesYear(createForm.sessionType, createForm.startDate);
+  const createSeriesYear = createForm.seriesYear ? Number(createForm.seriesYear) : suggestedCreateSeriesYear;
 
   function handleSetDeadline(e: React.FormEvent) {
     e.preventDefault();
@@ -275,7 +360,7 @@ export default function SessionsAdminClient(): React.JSX.Element {
                 </div>
                 <p className="mt-1 text-sm font-medium text-emerald-900 dark:text-emerald-200">{s.name}</p>
                 <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-400">
-                  Closes {formatDate(s.endDate)}
+                  <span>{seriesLabel(s.sessionType, s.seriesYear)}</span> · <span>Closes {formatDate(s.endDate)}</span>
                 </p>
               </div>
             ))}
@@ -338,6 +423,31 @@ export default function SessionsAdminClient(): React.JSX.Element {
               </div>
 
               <div>
+                <label htmlFor="create-series-year" className="mb-1 block text-sm font-medium text-foreground">
+                  Exam series year <span className="text-destructive">*</span>
+                </label>
+                <input
+                  id="create-series-year"
+                  type="number"
+                  inputMode="numeric"
+                  min={2000}
+                  max={2100}
+                  value={createForm.seriesYear}
+                  placeholder={String(suggestedCreateSeriesYear)}
+                  onChange={(e) => setCreateForm({ ...createForm, seriesYear: e.target.value })}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {Number.isInteger(createSeriesYear) && createSeriesYear >= 2000 && createSeriesYear <= 2100
+                    ? <><span>{seriesSummary(createForm.sessionType, createSeriesYear)}</span>{!createForm.seriesYear && <> <span>(suggested from the start date)</span></>}</>
+                    : <span>Enter the exam series year, e.g. 2027.</span>}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Grades are read in this academic year: who is in grade 10, and who has graduated.
+                </p>
+              </div>
+
+              <div>
                 <label className="mb-1 block text-sm font-medium text-foreground">
                   Qualification Level <span className="text-destructive">*</span>
                 </label>
@@ -351,7 +461,7 @@ export default function SessionsAdminClient(): React.JSX.Element {
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  January series are A-Level only (no January IGCSE exists in Egypt).
+                  January and October series are A-Level only (no IGCSE sitting exists in Egypt).
                 </p>
               </div>
 
@@ -573,6 +683,102 @@ export default function SessionsAdminClient(): React.JSX.Element {
         </div>
       )}
 
+      {/* Correct Series Modal (F0a) */}
+      {seriesSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-card shadow-xl border border-border">
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <h2 className="text-lg font-semibold text-foreground font-display">Correct exam series</h2>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => { setSeriesSession(null); setSeriesError(''); }}
+                className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleCorrectSeries} className="space-y-4 px-6 py-5">
+              {seriesError && (
+                <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                  {seriesError}
+                </div>
+              )}
+
+              <div className="rounded-lg bg-muted px-4 py-3 text-sm text-foreground">
+                <p><span>Session:</span> <strong>{seriesSession.name}</strong></p>
+                <p className="mt-0.5"><span>Now:</span> <strong>{seriesSummary(seriesSession.sessionType, seriesSession.seriesYear)}</strong></p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="series-type" className="mb-1 block text-sm font-medium text-foreground">Series</label>
+                  <select
+                    id="series-type"
+                    value={seriesForm.sessionType}
+                    onChange={(e) => setSeriesForm({ ...seriesForm, sessionType: e.target.value as SessionType })}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    {SESSION_TYPE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="series-year" className="mb-1 block text-sm font-medium text-foreground">Year</label>
+                  <input
+                    id="series-year"
+                    type="number"
+                    inputMode="numeric"
+                    min={2000}
+                    max={2100}
+                    value={seriesForm.seriesYear}
+                    onChange={(e) => setSeriesForm({ ...seriesForm, seriesYear: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              </div>
+              {Number.isInteger(Number(seriesForm.seriesYear)) && Number(seriesForm.seriesYear) >= 2000 && Number(seriesForm.seriesYear) <= 2100 && (
+                <p className="text-xs text-muted-foreground">
+                  <span>Becomes:</span> <span>{seriesSummary(seriesForm.sessionType, Number(seriesForm.seriesYear))}</span>
+                </p>
+              )}
+
+              <Notice tone="warning">
+                Waiting registrations the corrected series no longer allows (a student's grade in that year) expire now; their open checkouts are closed, any wallet money returned, and families told. Confirmed registrations are not touched.
+              </Notice>
+
+              <div>
+                <label htmlFor="series-reason" className="mb-1 block text-sm font-medium text-foreground">
+                  Reason <span className="text-destructive">*</span>
+                </label>
+                <textarea
+                  id="series-reason"
+                  value={seriesForm.reason}
+                  onChange={(e) => setSeriesForm({ ...seriesForm, reason: e.target.value })}
+                  placeholder="e.g. The window was entered as June 2026; it is for June 2027"
+                  rows={2}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">This reason is recorded in the audit log.</p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-1">
+                <Button type="button" variant="outline" onClick={() => { setSeriesSession(null); setSeriesError(''); }}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={seriesMutation.isPending}>
+                  {seriesMutation.isPending ? 'Saving...' : 'Correct series'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Edit History Modal */}
       {historySession && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -634,6 +840,15 @@ export default function SessionsAdminClient(): React.JSX.Element {
         </div>
       )}
 
+      {seriesResult && (
+        <Notice tone="success" className="mb-4">
+          <div className="flex items-start justify-between gap-3">
+            <span>{seriesResult}</span>
+            <button type="button" className="text-xs underline hover:no-underline" onClick={() => setSeriesResult('')}>Dismiss</button>
+          </div>
+        </Notice>
+      )}
+
       {/* Filter bar */}
       <div className="mb-4 flex flex-wrap gap-4">
         {/* Status filter */}
@@ -657,7 +872,7 @@ export default function SessionsAdminClient(): React.JSX.Element {
         {/* Session type filter */}
         <div className="flex gap-2">
           <span className="self-center text-xs font-medium text-muted-foreground mr-1">Type:</span>
-          {['', 'june', 'november', 'january'].map((type) => (
+          {['', 'june', 'october', 'november', 'january'].map((type) => (
             <button
               key={type}
               onClick={() => setFilterSessionType(type)}
@@ -710,6 +925,9 @@ export default function SessionsAdminClient(): React.JSX.Element {
                       {formatDate(s.startDate)} → {formatDate(s.endDate)}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
+                      {seriesSummary(s.sessionType, s.seriesYear)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {s.entryDeadline
                         ? <>Board entry deadline {formatDateTime(s.entryDeadline)}</>
                         : <>No board entry deadline set</>}
@@ -743,6 +961,18 @@ export default function SessionsAdminClient(): React.JSX.Element {
                     }}
                   >
                     {s.entryDeadline ? 'Board Deadline' : 'Set Board Deadline'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSeriesSession(s);
+                      setSeriesForm({ sessionType: s.sessionType as SessionType, seriesYear: String(s.seriesYear), reason: '' });
+                      setSeriesError('');
+                      setSeriesResult('');
+                    }}
+                  >
+                    Correct Series
                   </Button>
                   {s.status === 'draft' && (
                     <Button

@@ -13,7 +13,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { invalidateFinancialState } from '~/lib/financial-cache';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, gradeLabel } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 type ChildBalance = {
@@ -145,7 +145,7 @@ export default function TransferClient() {
               <option value="">Select child</option>
               {children.map((child) => (
                 <option key={child.id} value={child.id} disabled={child.id === toId}>
-                  {child.name} ({child.grade ? `Grade ${child.grade}` : 'N/A'}) — {child.escrowBalance.toFixed(2)} EGP
+                  {child.name} ({gradeLabel(child.grade)}) — {child.escrowBalance.toFixed(2)} EGP
                 </option>
               ))}
             </select>
@@ -167,7 +167,7 @@ export default function TransferClient() {
               <option value="">Select child</option>
               {children.map((child) => (
                 <option key={child.id} value={child.id} disabled={child.id === fromId}>
-                  {child.name} ({child.grade ? `Grade ${child.grade}` : 'N/A'}) — {child.escrowBalance.toFixed(2)} EGP
+                  {child.name} ({gradeLabel(child.grade)}) — {child.escrowBalance.toFixed(2)} EGP
                 </option>
               ))}
             </select>

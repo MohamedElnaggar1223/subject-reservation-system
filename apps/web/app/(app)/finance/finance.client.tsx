@@ -21,6 +21,7 @@ import { api } from '~/lib/hono';
 import { invalidateFinancialState } from '~/lib/financial-cache';
 import {
   apiResponse,
+  gradeLabel,
   IN_SCHOOL_INSTRUMENTS,
   IN_SCHOOL_INSTRUMENT_LABELS,
   PAYMENT_METHOD_LABELS,
@@ -339,8 +340,8 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-semibold text-foreground">{pay.student.name}</p>
-                      {pay.student.grade && (
-                        <span className="px-2 py-0.5 bg-muted rounded text-xs">Grade {pay.student.grade}</span>
+                      {pay.student.grade != null && (
+                        <span className="px-2 py-0.5 bg-muted rounded text-xs">{gradeLabel(pay.student.grade)}</span>
                       )}
                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${METHOD_BADGE[pay.paymentMethod] ?? 'bg-muted'}`}>
                         {methodLabel}

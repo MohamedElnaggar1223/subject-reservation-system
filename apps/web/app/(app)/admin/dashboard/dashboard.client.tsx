@@ -26,6 +26,10 @@ type DashboardMetrics = {
     grade11: number;
     grade12: number;
     graduated: number;
+    // F0a: students below grade 10, without a recorded cohort, and who left.
+    upcoming: number;
+    unknown: number;
+    left: number;
     active: number;
     total: number;
   };
@@ -390,6 +394,21 @@ export default function AdminDashboardClient() {
                 sub={`${t('dashboard.total')}: ${metrics.students.total}`}
                 accent="indigo"
               />
+              {metrics.students.upcoming > 0 && (
+                <MetricCard label={t('dashboard.gradeUpcoming')} value={metrics.students.upcoming} accent="indigo" />
+              )}
+              {metrics.students.unknown > 0 && (
+                <MetricCard
+                  label={t('dashboard.gradeUnknown')}
+                  value={metrics.students.unknown}
+                  sub={t('dashboard.fixOnStudents')}
+                  accent="amber"
+                  href="/students?status=unknown"
+                />
+              )}
+              {metrics.students.left > 0 && (
+                <MetricCard label={t('dashboard.leftSchool')} value={metrics.students.left} accent="indigo" />
+              )}
             </div>
           </div>
         </>
@@ -477,7 +496,7 @@ export default function AdminDashboardClient() {
                         {r.studentName}
                       </div>
                       <div className="text-muted-foreground text-xs">
-                        {t('reports.grade')} {r.studentGrade}
+                        {r.studentGrade}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
@@ -507,7 +526,7 @@ export default function AdminDashboardClient() {
                         {cr.studentName}
                       </div>
                       <div className="text-muted-foreground text-xs">
-                        {t('reports.grade')} {cr.studentGrade}
+                        {cr.studentGrade}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">

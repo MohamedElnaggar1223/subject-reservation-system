@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useSuspenseQuery, useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, COUNCIL_LABELS, REGISTRATION_STATUS_LABELS } from '@repo/validations';
+import { apiResponse, gradeLabel, COUNCIL_LABELS, REGISTRATION_STATUS_LABELS } from '@repo/validations';
+import { Notice } from '~/components/ui/tone';
 import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
 
@@ -60,6 +61,8 @@ type SchoolFeeStatus = {
 
 const fetchChildren = () => apiResponse(api.v1.links.children.$get());
 type Child = Awaited<ReturnType<typeof fetchChildren>>[number];
+const fetchEligibility = (studentId: string, sessionId: string) =>
+  apiResponse(api.v1.registrations.eligibility.$get({ query: { studentId, sessionId } }));
 
 const COUNCIL_COLORS: Record<string, string> = {
   pearson_edexcel: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-700',
@@ -130,10 +133,9 @@ function CountdownDisplay({ endDate }: { endDate: string }) {
 interface Props {
   userId: string;
   userRole: string | null;
-  studentGrade?: number | null;
 }
 
-export default function RegisterClient({ userId, userRole, studentGrade: propStudentGrade }: Props): React.JSX.Element {
+export default function RegisterClient({ userId, userRole }: Props): React.JSX.Element {
   const isParent = userRole === 'parent';
   const queryClient = useQueryClient();
 
@@ -151,11 +153,21 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
   // Effective student ID: the student being registered for
   const effectiveStudentId = isParent ? (selectedChild?.student.id ?? null) : userId;
 
-  // Determine the effective grade: parent uses child's grade, student uses prop
-  const effectiveGrade = isParent ? (selectedChild?.student.grade ?? null) : (propStudentGrade ?? null);
+  // F0a: may this student register for the chosen window's series, and in
+  // which grade? The grade is the one in the series' academic year (a June
+  // 2027 window is grade 10 for a student who is in grade 9 today), so the
+  // page asks the API rather than reading today's grade.
+  const { data: eligibility } = useQuery({
+    queryKey: ['registrations', 'eligibility', effectiveStudentId, selectedSession?.id],
+    queryFn: () => fetchEligibility(effectiveStudentId!, selectedSession!.id),
+    enabled: !!selectedSession && !!effectiveStudentId,
+    retry: false,
+  });
+  const refusedReason = eligibility && !eligibility.allowed ? eligibility.reason : null;
 
-  // Core subject enforcement only applies to Grade 10 June sessions
-  const isCoreEnforced = effectiveGrade === 10 && selectedSession?.sessionType === 'june';
+  // Core subject enforcement only applies to Grade 10 June sessions — grade
+  // 10 in the series' academic year.
+  const isCoreEnforced = eligibility?.grade === 10 && selectedSession?.sessionType === 'june';
 
   // ─── Queries ───────────────────────────────────────────────────────────────
 
@@ -471,9 +483,9 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
                   }`}
                 >
                   {child.student.name}
-                  {child.student.grade && (
-                    <span className="ml-1 text-muted-foreground">
-                      · Grade {child.student.grade}
+                  {child.student.grade != null && (
+                    <span className="ms-1 text-muted-foreground">
+                      · {gradeLabel(child.student.grade)}
                     </span>
                   )}
                 </button>
@@ -544,7 +556,16 @@ export default function RegisterClient({ userId, userRole, studentGrade: propStu
             </select>
           </div>
 
-          {loadingSubjects ? (
+          {eligibility?.graduateRetake && (
+            <Notice tone="info" className="mb-3">
+              <span>A graduate retake: the school registers graduates for the</span> <span>{eligibility.series.label}</span> <span>series.</span>
+            </Notice>
+          )}
+          {refusedReason ? (
+            <Notice tone="warning" title="This series is not open to this student">
+              {refusedReason}
+            </Notice>
+          ) : loadingSubjects ? (
             <div className="text-center py-8 text-muted-foreground">
               <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent mx-auto mb-2" />
               Loading subjects...

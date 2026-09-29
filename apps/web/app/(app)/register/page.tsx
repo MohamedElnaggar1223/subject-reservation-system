@@ -39,7 +39,9 @@ export default async function RegisterPage(): Promise<React.JSX.Element> {
     queryFn: () => apiResponse(api.v1.sessions.active.$get()),
   });
 
-  // Fetch student grade for core subject enforcement
+  // A student whose grade is not recorded (no cohort, F0a) finishes setup
+  // first; who may register for which series is the API's call
+  // (mayRegisterFor), shown on the page once a window is chosen.
   let studentGrade: number | null = null;
   if (role === 'student') {
     try {
@@ -49,7 +51,6 @@ export default async function RegisterPage(): Promise<React.JSX.Element> {
       // Fallback: unable to fetch grade
     }
 
-    // Students without a grade haven't completed setup (or have graduated)
     if (studentGrade === null) {
       redirect('/complete-setup');
     }
@@ -68,7 +69,6 @@ export default async function RegisterPage(): Promise<React.JSX.Element> {
       <RegisterClient
         userId={session.user.id}
         userRole={role}
-        studentGrade={studentGrade}
       />
     </HydrationBoundary>
   );

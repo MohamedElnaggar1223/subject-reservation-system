@@ -24,6 +24,7 @@ import { authClient } from "~/lib/auth-client";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { gradeLabel } from "@repo/validations";
 
 interface LinkedUser {
   id: string;
@@ -289,7 +290,7 @@ export default function LinksClient(): React.JSX.Element {
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {link.student.email}
-                        {link.student.grade && ` · Grade ${link.student.grade}`}
+                        {link.student.grade != null && ` · ${gradeLabel(link.student.grade)}`}
                       </p>
                     </>
                   )}
@@ -361,7 +362,7 @@ export default function LinksClient(): React.JSX.Element {
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {link.student.email}
-                          {link.student.grade && ` · Grade ${link.student.grade}`}
+                          {link.student.grade != null && ` · ${gradeLabel(link.student.grade)}`}
                         </p>
                         {link.student.studentId && (
                           <p className="mt-0.5 font-mono text-xs text-muted-foreground">

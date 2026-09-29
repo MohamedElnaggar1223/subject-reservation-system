@@ -36,7 +36,7 @@ import {
 } from './school-fee.services';
 import { assertMayRegisterFor, mayRegisterFor, standingToday } from './eligibility.services';
 import { sectionOf } from './academic.services';
-import { academicYearLabel, academicYearStartOf, gradeInAcademicYear, gradeLabel, academicYearStartFromLabel } from '@repo/validations';
+import { academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, gradeLabel, academicYearStartFromLabel } from '@repo/validations';
 
 // ─── Desk onboarding (G5) ────────────────────────────────────────────────────
 
@@ -692,7 +692,7 @@ export async function getStudentSummary(studentId: string) {
       gradeLabel: gradeLabel(today.grade),
       standing: today.standing,
       academicYear: today.academicYear,
-      cohortLabel: student.cohortYear === null ? null : academicYearLabel(student.cohortYear),
+      cohortLabel: student.cohortYear === null ? null : academicYearShortLabel(student.cohortYear),
       section: currentSection ? { id: currentSection.sectionId, name: currentSection.name, grade: currentSection.grade } : null,
       currentAcademicYearStart: academicYearStartOf(),
     },

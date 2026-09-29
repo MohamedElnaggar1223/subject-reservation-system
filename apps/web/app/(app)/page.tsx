@@ -3,9 +3,13 @@
  *
  * Server component that:
  * - Checks authentication and redirects appropriately
- * - Fetches user profile for grade data
- * - Shows "Graduated" banner when student has grade === null
- * - Hides registration/swap links for graduated students
+ * - Fetches the student's profile: today's grade (from the cohort, F0a) and
+ *   whether they left the school
+ * - Asks the API whether the student may register for each open window
+ *   (mayRegisterFor) — a graduate may still retake under A-12
+ * - Shows a banner for a graduate, a student who left, a grade-9 student and
+ *   a student whose grade is not recorded, and hides registration links
+ *   only when no open window would take the student
  */
 
 import type { JSX } from "react";
@@ -13,7 +17,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireAuthenticated } from "~/lib/auth/session";
 import { getServerApi } from "~/lib/hono-server";
-import { apiResponse } from "@repo/validations";
+import { apiResponse, gradeLabel, gradeStanding } from "@repo/validations";
+import { Notice } from "~/components/ui/tone";
 import SessionBanner from "./session-banner.client";
 import HomeSummaryCard from "./home-summary.client";
 
@@ -38,20 +43,10 @@ export default async function Home(): Promise<JSX.Element> {
   if (role === 'finance_officer' || role === 'finance_admin') {
     redirect('/desk');
   }
-
-  // Fetch full profile to get grade info for students
-  let grade: number | null = null;
-  if (role === 'student') {
-    try {
-      const serverApi = await getServerApi();
-      const profile = await apiResponse(serverApi.v1.users.me.$get()) as { grade: number | null };
-      grade = profile.grade;
-    } catch {
-      // Fallback: unable to fetch grade
-    }
-  }
-
-  const isGraduated = role === 'student' && grade === null;
+  // F0a: the coordinator and the gate start at the school's day; a teacher
+  // at their teaching.
+  if (role === 'coordinator' || role === 'gate') redirect('/today');
+  if (role === 'teacher') redirect('/teaching');
 
   if (isAdmin) redirect('/admin/sessions');
 
@@ -65,6 +60,42 @@ export default async function Home(): Promise<JSX.Element> {
   } catch {
     // Non-fatal: dashboard still renders without the banner.
   }
+
+  // A student's grade today (derived from the cohort, F0a), whether they
+  // left the school, and whether any open window would take them.
+  let grade: number | null = null;
+  let leftKind: string | null = null;
+  let leftOn: string | null = null;
+  let profileLoaded = false;
+  let mayRegisterNow = false;
+  if (role === 'student') {
+    try {
+      const serverApi = await getServerApi();
+      const profile = await apiResponse(serverApi.v1.users.me.$get());
+      grade = profile.grade;
+      leftKind = profile.leftKind;
+      leftOn = profile.leftOn;
+      profileLoaded = true;
+      const verdicts = await Promise.all(
+        activeSessions.map((s) =>
+          apiResponse(serverApi.v1.registrations.eligibility.$get({ query: { studentId: session.user.id, sessionId: s.id } }))
+            .then((v) => v.allowed)
+            .catch(() => false)
+        )
+      );
+      mayRegisterNow = verdicts.some(Boolean);
+    } catch {
+      // Fallback: unable to fetch the profile; show the links as before.
+    }
+  }
+
+  const standing = leftKind ? 'left' : gradeStanding(grade);
+  // Registration links hide only when we know the student cannot register:
+  // they left, graduated (unless an open window takes them under A-12), have
+  // no recorded grade, or have not reached grade 10.
+  const registrationClosed =
+    role === 'student' && profileLoaded && standing !== 'in_school' && !mayRegisterNow;
+  const isGraduated = role === 'student' && profileLoaded && standing === 'graduated';
 
   /* ── Quick-link definitions ───────────────────────────────────────────────── */
 
@@ -89,7 +120,7 @@ export default async function Home(): Promise<JSX.Element> {
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
         </svg>
       ),
-      visible: !isGraduated,
+      visible: !registrationClosed,
     },
     {
       href: '/registrations',
@@ -122,7 +153,7 @@ export default async function Home(): Promise<JSX.Element> {
           <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
         </svg>
       ),
-      visible: !isGraduated && role === 'student',
+      visible: !registrationClosed && role === 'student',
     },
     {
       href: '/links',
@@ -183,9 +214,9 @@ export default async function Home(): Promise<JSX.Element> {
           <span className="inline-flex items-center rounded-full bg-brand-100 px-3 py-0.5 text-xs font-semibold text-brand-700 capitalize">
             {role || 'user'}
           </span>
-          {role === 'student' && grade !== null && (
+          {role === 'student' && profileLoaded && !leftKind && (
             <span className="inline-flex items-center rounded-full bg-secondary px-3 py-0.5 text-xs font-semibold text-secondary-foreground">
-              Grade {grade}
+              {gradeLabel(grade)}
             </span>
           )}
         </div>
@@ -194,8 +225,8 @@ export default async function Home(): Promise<JSX.Element> {
         </p>
       </div>
 
-      {/* SES-005: Active session status + countdown (hidden for graduated students) */}
-      {!isGraduated && <SessionBanner sessions={activeSessions} />}
+      {/* SES-005: Active session status + countdown (hidden when no open window would take the student) */}
+      {!registrationClosed && <SessionBanner sessions={activeSessions} />}
 
       {/* "What do we owe / what's next" — actions before links */}
       <HomeSummaryCard />
@@ -214,12 +245,36 @@ export default async function Home(): Promise<JSX.Element> {
                 Congratulations, Graduate!
               </h2>
               <p className="text-brand-700 mt-1 text-sm leading-relaxed">
-                Your student record shows you have graduated. Registration, drop, and swap features are no longer available.
+                {mayRegisterNow
+                  ? 'Your student record shows you have graduated. The school lets graduates retake subjects in the October, November and January series, and a window is open now.'
+                  : 'Your student record shows you have graduated. Registration, drop, and swap features are no longer available.'}
+              </p>
+              <p className="text-brand-700 mt-1 text-sm leading-relaxed">
                 If you believe this is an error, please contact the school administration.
               </p>
             </div>
           </div>
         </div>
+      )}
+
+      {/* F0a: a student who left, one whose grade is not recorded, and one who starts grade 10 next year */}
+      {role === 'student' && profileLoaded && standing === 'left' && (
+        <Notice tone="neutral" className="animate-fade-up stagger-1 mb-8" title={leftKind === 'transferred' ? 'You transferred to another school' : 'You have left the school'}>
+          <p>
+            <span>Your record shows you left on</span> <span>{leftOn}</span>. <span>Registration is closed. Your registrations, receipts and any balance stay available here.</span>
+          </p>
+          <p className="mt-1">If you believe this is an error, please contact the school administration.</p>
+        </Notice>
+      )}
+      {role === 'student' && profileLoaded && standing === 'unknown' && (
+        <Notice tone="warning" className="animate-fade-up stagger-1 mb-8" title="Your grade is not recorded yet">
+          <p>The school office needs to record which grade you are in before you can register for exams. Ask them to update your record.</p>
+        </Notice>
+      )}
+      {role === 'student' && profileLoaded && standing === 'upcoming' && (
+        <Notice tone="info" className="animate-fade-up stagger-1 mb-8" title="You start grade 10 next academic year">
+          <p>Exam registration opens to you from grade 10.</p>
+        </Notice>
       )}
 
       {/* Quick Links Grid */}

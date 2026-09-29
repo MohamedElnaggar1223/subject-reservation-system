@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { api } from '~/lib/hono';
 import { formatPrice } from '~/lib/format';
 import { invalidateFinancialState } from '~/lib/financial-cache';
-import { apiResponse, COUNCIL_LABELS, CHANGE_REQUEST_STATUS_LABELS } from '@repo/validations';
+import { apiResponse, gradeLabel, COUNCIL_LABELS, CHANGE_REQUEST_STATUS_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -404,9 +404,9 @@ export default function ApprovalsClient(): React.JSX.Element {
                 <span className="font-semibold text-foreground">
                   {student.name}
                 </span>
-                {student.grade && (
-                  <span className="text-muted-foreground text-sm ml-1">
-                    · Grade {student.grade}
+                {student.grade != null && (
+                  <span className="text-muted-foreground text-sm ms-1">
+                    · {gradeLabel(student.grade)}
                   </span>
                 )}
                 <span className="text-muted-foreground text-sm ml-2">
@@ -717,7 +717,7 @@ function ChangeRequestsSection() {
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     {cr.registration.student.name}
-                    {cr.registration.student.grade ? ` (Grade ${cr.registration.student.grade})` : ''}
+                    {cr.registration.student.grade != null ? ` (${gradeLabel(cr.registration.student.grade)})` : ''}
                     {' · '}{cr.registration.session.name}
                     {' · '}{new Date(cr.createdAt).toLocaleDateString()}
                   </p>

@@ -1,6 +1,8 @@
 import { requireAuth } from '~/lib/auth/session';
 import { redirect } from 'next/navigation';
 import NavShell from '~/components/nav-shell';
+import { getServerApi } from '~/lib/hono-server';
+import { apiResponse, isStaffRole } from '@repo/validations';
 
 /**
  * M-1: Client-side enforcement of AUTH-001/002 "Email verification required".
@@ -11,11 +13,11 @@ import NavShell from '~/components/nav-shell';
  * server policy is, unverified users cannot access the authenticated app
  * shell — they get bounced to /verify-email with a resend prompt.
  *
- * Admins and finance staff are exempted because they're seeded/provisioned
- * outside the normal sign-up flow and shouldn't be locked out if their
- * emailVerified flag was never set.
+ * Staff are exempted because they're seeded/provisioned outside the normal
+ * sign-up flow and shouldn't be locked out if their emailVerified flag was
+ * never set (F0a adds the coordinator, teacher and gate roles).
  */
-const VERIFICATION_EXEMPT_ROLES = ['admin', 'finance_officer', 'finance_admin'];
+const VERIFICATION_EXEMPT_ROLES = ['admin', 'finance_officer', 'finance_admin', 'coordinator', 'teacher', 'gate'];
 const EMAIL_VERIFICATION_ENFORCED =
   process.env.REQUIRE_EMAIL_VERIFICATION === 'true' ||
   process.env.NODE_ENV === 'production';
@@ -40,11 +42,24 @@ export default async function AppLayout({
     redirect('/verify-email?reason=unverified');
   }
 
+  // Teaching is a capability (F0a): a member of staff linked to a teacher
+  // record gets "My Teaching" whatever their role.
+  let teaches = false;
+  if (isStaffRole(session.user.role)) {
+    try {
+      const profile = await apiResponse((await getServerApi()).v1.users.me.$get());
+      teaches = !!profile.teachingAs;
+    } catch {
+      // The navigation still renders without it.
+    }
+  }
+
   return (
     <NavShell
       userName={session.user.name}
       userRole={session.user.role}
       userEmail={session.user.email}
+      teaches={teaches}
     >
       {children}
     </NavShell>

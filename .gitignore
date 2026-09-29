@@ -40,3 +40,6 @@ yarn-error.log*
 AI_CONTEXT.md
 # Decision logs (show-me-your-work), working artifacts
 .audit/
+
+# F0a local upload store (development and tests)
+.uploads/

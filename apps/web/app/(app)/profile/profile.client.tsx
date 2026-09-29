@@ -7,6 +7,7 @@ import { authClient } from "~/lib/auth-client";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { gradeLabel } from "@repo/validations";
 
 interface UserProfile {
   id: string;
@@ -187,9 +188,9 @@ export default function ProfileClient(): React.JSX.Element {
                   {profile.role}
                 </span>
               )}
-              {profile.grade && (
+              {profile.role === 'student' && (
                 <span className="inline-flex rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                  Grade {profile.grade}
+                  {gradeLabel(profile.grade)}
                 </span>
               )}
             </div>

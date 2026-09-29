@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import {
   apiResponse,
+  gradeLabel,
   REGISTRATION_STATUS_LABELS,
   RECEIPT_STATUS_LABELS,
   IN_SCHOOL_INSTRUMENTS,
@@ -23,37 +24,15 @@ import {
 import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
 import { ReasonModal } from '~/components/ui/reason-modal';
+import { Badge, StandingBadge } from '~/components/ui/tone';
+import { StudentAcademicPanel } from '~/components/student-academic-panel';
 
-// ─── Types (explicit — RPC inference quirk, see checkout-summary note) ────────
+// ─── Types, derived from their fetchers (CLAUDE.md: Hono RPC everywhere) ──────
 
-type StudentHit = { id: string; name: string; email: string; grade: number | null; studentId: string | null };
-
-type Summary = {
-  student: { id: string; name: string; email: string; phone: string | null; grade: number | null; studentId: string | null };
-  parents: { id: string; name: string; email: string; phone: string | null; linkStatus: string }[];
-  escrow: { freeBalance: number; heldBalance: number };
-  schoolFee: { academicYear: string; required: boolean; waived: boolean; amount: number | null; paid: boolean };
-  owing: number;
-  registrations: {
-    id: string;
-    status: string;
-    priceAtRegistration: number;
-    isRetake: boolean;
-    takenOutsideSchool: boolean;
-    subject: { id: string; name: string; code: string; council: string };
-    session: { id: string; name: string; status: string };
-    teacher: { id: string; name: string } | null;
-    receipt: { id: string; receiptNumber: string; status: string; refundAmountOnReturn: number | null } | null;
-  }[];
-  payments: {
-    id: string; amount: number; escrowAmountApplied: number; paymentMethod: string;
-    purpose: string; status: string; instrumentUsed: string | null;
-    externalReference: string | null; createdAt: string; confirmedAt: string | null;
-    verificationReference: string | null; lateTransferAt: string | null;
-  }[];
-  exceptions: { id: string; type: string; value: number | null; reason: string; validUntil: string | null }[];
-  remarks: { id: string; serviceType: string; status: string; feeCharged: number; registration: { subject: { name: string; code: string } } }[];
-};
+const fetchHits = (search: string) =>
+  apiResponse(api.v1.users.search.$get({ query: { role: 'student', search: search || undefined } }));
+const fetchSummary = (id: string) => apiResponse(api.v1.users[':id'].summary.$get({ param: { id } }));
+type Summary = Awaited<ReturnType<typeof fetchSummary>>;
 
 type SessionRow = { id: string; name: string; status: string; qualificationLevel: string };
 type AvailableSubject = {
@@ -83,25 +62,20 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
   const [transferTarget, setTransferTarget] = useState<{ id: string; label: string; amount: number; reference: string | null } | null>(null);
 
   // ── Search ────────────────────────────────────────────────────────────────
-  const { data: hits = [], isError: searchFailed, isFetching: searching } = useQuery<StudentHit[]>({
+  const { data: hits = [], isError: searchFailed, isFetching: searching } = useQuery({
     queryKey: ['users', 'search', 'desk', search],
-    queryFn: async () =>
-      (await apiResponse(
-        api.v1.users.search.$get({ query: { role: 'student', search: search || undefined } })
-      )) as StudentHit[],
+    queryFn: () => fetchHits(search),
     enabled: search.trim().length >= 2 && !studentId,
     retry: false,
   });
 
   // ── Summary ───────────────────────────────────────────────────────────────
-  const { data: summary, isFetching: loadingSummary } = useQuery<Summary>({
+  const { data: summary, isFetching: loadingSummary } = useQuery({
     queryKey: ['desk', 'summary', studentId],
-    queryFn: async () =>
-      (await apiResponse(
-        api.v1.users[':id'].summary.$get({ param: { id: studentId! } })
-      )) as Summary,
+    queryFn: () => fetchSummary(studentId!),
     enabled: !!studentId,
   });
+  const [showAcademic, setShowAcademic] = useState(false);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['desk'] });
@@ -246,10 +220,11 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                 className="w-full text-left px-4 py-2.5 hover:bg-muted transition-colors"
               >
                 <span className="font-medium text-foreground text-sm">{h.name}</span>
-                <span className="text-xs text-muted-foreground ml-2">
-                  {h.grade ? `G${h.grade}` : 'Graduated'} · {h.email}
+                <span className="text-xs text-muted-foreground ms-2">
+                  {gradeLabel(h.grade)} · {h.email}
                   {h.studentId && <> · <span className="font-mono">{h.studentId}</span></>}
                 </span>
+                {h.leftKind && <Badge tone="danger" className="ms-2">{h.leftKind === 'transferred' ? 'Transferred' : 'Withdrawn'}</Badge>}
               </button>
             ))}
           </div>
@@ -270,11 +245,23 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
               <div>
                 <h2 className="text-lg font-bold text-foreground font-display">
                   {summary.student.name}
-                  <span className="text-sm font-normal text-muted-foreground ml-2">
-                    {summary.student.grade ? `Grade ${summary.student.grade}` : 'Graduated'}
+                  <span className="text-sm font-normal text-muted-foreground ms-2">
+                    {summary.academic.gradeLabel}
+                    {summary.academic.section && <> · <span>{summary.academic.section.name}</span></>}
                     {summary.student.studentId && <> · <span className="font-mono">{summary.student.studentId}</span></>}
                   </span>
                 </h2>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <StandingBadge standing={summary.academic.standing} />
+                  {summary.academic.cohortLabel && (
+                    <span className="text-xs text-muted-foreground">
+                      <span>Started grade 10 in</span> <span>{summary.academic.cohortLabel}</span>
+                    </span>
+                  )}
+                  <button type="button" className="text-xs text-primary underline hover:no-underline" onClick={() => setShowAcademic((v) => !v)}>
+                    {showAcademic ? 'Hide academic record' : 'Academic record'}
+                  </button>
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Parents:{' '}
                   {summary.parents.length === 0
@@ -298,6 +285,14 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                 </div>
               </div>
             </div>
+
+            {/* The academic record (F0a): grade, cohort, section, status and the
+                actions the viewer's role allows — the same panel as /students. */}
+            {showAcademic && (
+              <div className="mt-4 border-t border-border pt-4">
+                <StudentAcademicPanel studentId={summary.student.id} viewerRole={userRole} />
+              </div>
+            )}
 
             {/* School fee state + actions */}
             <div className="mt-4 flex items-center gap-3 flex-wrap">
@@ -613,7 +608,7 @@ function OnboardCard({ onDone, onError }: { onDone: (msg: string) => void; onErr
   const qc = useQueryClient();
   const [form, setForm] = useState({
     parentName: '', parentEmail: '', parentPassword: '', parentPhone: '',
-    studentName: '', studentEmail: '', studentPassword: '', studentGrade: '' as '' | '10' | '11' | '12',
+    studentName: '', studentEmail: '', studentPassword: '', studentGrade: '' as '' | '9' | '10' | '11' | '12',
   });
   const [localError, setLocalError] = useState('');
 
@@ -632,7 +627,8 @@ function OnboardCard({ onDone, onError }: { onDone: (msg: string) => void; onErr
               email: form.studentEmail.trim(),
               name: form.studentName.trim() || undefined,
               password: form.studentPassword || undefined,
-              grade: form.studentGrade ? (Number(form.studentGrade) as 10 | 11 | 12) : undefined,
+              // The grade this academic year; the API stores the cohort (F0a).
+              grade: form.studentGrade ? (Number(form.studentGrade) as 9 | 10 | 11 | 12) : undefined,
             },
           },
         })
@@ -681,7 +677,8 @@ function OnboardCard({ onDone, onError }: { onDone: (msg: string) => void; onErr
           <select value={form.studentGrade}
             onChange={(e) => setForm({ ...form, studentGrade: e.target.value as typeof form.studentGrade })}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
-            <option value="">Grade (new account)…</option>
+            <option value="">Grade this year (new account)…</option>
+            <option value="9">Grade 9 (starts grade 10 next year)</option>
             <option value="10">Grade 10</option>
             <option value="11">Grade 11</option>
             <option value="12">Grade 12</option>

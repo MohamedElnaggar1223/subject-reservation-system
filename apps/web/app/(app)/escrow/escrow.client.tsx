@@ -20,7 +20,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api } from '~/lib/hono';
-import { apiResponse, WITHDRAWAL_STATUS_LABELS } from '@repo/validations';
+import { apiResponse, gradeLabel, WITHDRAWAL_STATUS_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 // ─── Reason Labels ────────────────────────────────────────────────────────────
@@ -180,8 +180,8 @@ export default function EscrowClient({ userRole, userId }: EscrowClientProps) {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-foreground">{child.name}</p>
-                  {child.grade && (
-                    <p className="text-xs text-muted-foreground mt-0.5">Grade {child.grade}</p>
+                  {child.grade != null && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{gradeLabel(child.grade)}</p>
                   )}
                 </div>
                 <div className="text-right">

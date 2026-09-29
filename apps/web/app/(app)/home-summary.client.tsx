@@ -11,13 +11,15 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api } from '~/lib/hono';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, gradeLabel } from '@repo/validations';
 import { formatPrice } from '~/lib/format';
 
 // Explicit type — this endpoint's RPC inference degrades in the web
 // compile (documented pattern; see PATTERNS.md)
 type ChildSummary = {
-  student: { id: string; name: string; grade: number | null };
+  // Today's grade (derived from the cohort), where the student stands and
+  // this year's section (F0a).
+  student: { id: string; name: string; grade: number | null; standing: string; section: string | null };
   owing: number;
   owingRegistrationIds: string[];
   escrow: { freeBalance: number; heldBalance: number };
@@ -193,6 +195,20 @@ export default function HomeSummaryCard(): React.JSX.Element | null {
               <span>{a.label}</span>
               <span aria-hidden>→</span>
             </Link>
+          ))}
+        </div>
+      )}
+
+      {/* F0a: each child's grade and section this year, as the school has them */}
+      {isParent && data.children.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+          {data.children.map((c) => (
+            <span key={c.student.id} className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5">
+              <span className="font-medium text-foreground">{c.student.name}</span>
+              <span>·</span>
+              <span>{gradeLabel(c.student.grade)}</span>
+              {c.student.section && (<><span>·</span><span>{c.student.section}</span></>)}
+            </span>
           ))}
         </div>
       )}

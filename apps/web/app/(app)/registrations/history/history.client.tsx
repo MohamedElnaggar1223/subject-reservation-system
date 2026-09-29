@@ -29,7 +29,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api } from '~/lib/hono';
 import { formatPrice } from '~/lib/format';
-import { apiResponse, COUNCIL_LABELS, REGISTRATION_STATUS_LABELS, CHANGE_REQUEST_STATUS_LABELS } from '@repo/validations';
+import { apiResponse, gradeLabel, COUNCIL_LABELS, REGISTRATION_STATUS_LABELS, CHANGE_REQUEST_STATUS_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -290,7 +290,7 @@ export default function HistoryClient({ userRole, userId, initialStudentId }: Hi
             <option value="">Select a child</option>
             {children.map((child) => (
               <option key={child.student.id} value={child.student.id}>
-                {child.student.name}{child.student.grade ? ` (Grade ${child.student.grade})` : ''}
+                {child.student.name}{child.student.grade != null ? ` (${gradeLabel(child.student.grade)})` : ''}
               </option>
             ))}
           </select>

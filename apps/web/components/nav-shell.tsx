@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { authClient } from '~/lib/auth-client';
 import { api } from '~/lib/hono';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, ROLE_LABELS, isRole } from '@repo/validations';
 import { cn } from '~/lib/utils';
 import { useI18n, type TranslationKey } from '~/lib/i18n';
 
@@ -45,6 +45,14 @@ const icons = {
   close: 'M6 18L18 6M6 6l12 12',
   documents: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
   language: 'M12 21a9 9 0 100-18m0 18a9 9 0 010-18m0 18c2.071 0 3.75-4.03 3.75-9S14.071 3 12 3m0 18c-2.071 0-3.75-4.03-3.75-9S9.929 3 12 3M3.6 9h16.8M3.6 15h16.8',
+  // F0a
+  students: 'M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5',
+  sections: 'M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z',
+  calendar: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z',
+  bell: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z',
+  rooms: 'M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21',
+  settings: 'M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+  today: 'M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z',
 } as const;
 
 /* ─── Navigation Config ─────────────────────────────────────────────────────── */
@@ -60,19 +68,69 @@ type NavSection = {
   items: NavItem[];
 };
 
-function getNavSections(role: string | null | undefined): NavSection[] {
+/** The academic structure (F0a): the coordinator's and admin's. */
+const ACADEMIC_ITEMS: NavItem[] = [
+  { labelKey: 'nav.students', href: '/students', icon: 'students' },
+  { labelKey: 'nav.sections', href: '/academic/sections', icon: 'sections' },
+  { labelKey: 'nav.academicYear', href: '/academic/years', icon: 'sessions' },
+  { labelKey: 'nav.calendar', href: '/academic/calendar', icon: 'calendar' },
+  { labelKey: 'nav.bellSchedules', href: '/academic/bells', icon: 'bell' },
+  { labelKey: 'nav.rooms', href: '/academic/rooms', icon: 'rooms' },
+];
+
+const ACCOUNT_SECTION: NavSection = {
+  titleKey: 'nav.account',
+  items: [
+    { labelKey: 'nav.notifications', href: '/notifications', icon: 'notifications' },
+    { labelKey: 'nav.profile', href: '/profile', icon: 'profile' },
+  ],
+};
+
+/** Teaching is a capability (F0a): any staff account linked to a teacher record. */
+const TEACHING_ITEM: NavItem = { labelKey: 'nav.myTeaching', href: '/teaching', icon: 'subjects' };
+
+function getNavSections(role: string | null | undefined, teaches = false): NavSection[] {
+  const teaching = teaches ? [TEACHING_ITEM] : [];
+
+  if (role === 'coordinator') {
+    return [
+      { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, ...teaching] },
+      { titleKey: 'nav.academic', items: ACADEMIC_ITEMS },
+      { titleKey: 'nav.school', items: [{ labelKey: 'nav.settings', href: '/settings', icon: 'settings' }] },
+      ACCOUNT_SECTION,
+    ];
+  }
+
+  if (role === 'teacher') {
+    return [
+      { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, TEACHING_ITEM] },
+      ACCOUNT_SECTION,
+    ];
+  }
+
+  if (role === 'gate') {
+    return [
+      { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, ...teaching] },
+      ACCOUNT_SECTION,
+    ];
+  }
+
   if (role === 'admin') {
     return [
       {
         items: [
           { labelKey: 'nav.dashboard', href: '/admin/dashboard', icon: 'dashboard' },
+          { labelKey: 'nav.today', href: '/today', icon: 'today' },
+          ...teaching,
         ],
       },
+      { titleKey: 'nav.academic', items: ACADEMIC_ITEMS },
       {
         titleKey: 'nav.management',
         items: [
           { labelKey: 'nav.desk', href: '/desk', icon: 'home' },
           { labelKey: 'nav.team', href: '/admin/team', icon: 'profile' },
+          { labelKey: 'nav.settings', href: '/settings', icon: 'settings' },
           { labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' },
           { labelKey: 'nav.subjects', href: '/admin/subjects', icon: 'subjects' },
           { labelKey: 'nav.payments', href: '/admin/payments', icon: 'payments' },
@@ -108,6 +166,8 @@ function getNavSections(role: string | null | undefined): NavSection[] {
       {
         items: [
           { labelKey: 'nav.desk', href: '/desk', icon: 'home' },
+          { labelKey: 'nav.students', href: '/students', icon: 'students' },
+          ...teaching,
           { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'payments' },
           { labelKey: 'nav.dailyTakings', href: '/takings', icon: 'escrow' },
           { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
@@ -121,6 +181,7 @@ function getNavSections(role: string | null | undefined): NavSection[] {
               items: [
                 { labelKey: 'nav.schoolFees' as const, href: '/admin/school-fees', icon: 'escrow' as const },
                 { labelKey: 'nav.exceptions' as const, href: '/admin/exceptions', icon: 'approvals' as const },
+                { labelKey: 'nav.settings' as const, href: '/settings', icon: 'settings' as const },
               ],
             },
           ]
@@ -274,16 +335,19 @@ export default function NavShell({
   userName,
   userRole,
   userEmail,
+  teaches = false,
 }: {
   children: React.ReactNode;
   userName?: string | null;
   userRole?: string | null;
   userEmail?: string | null;
+  /** The account is linked to a teacher record (F0a). */
+  teaches?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { language, toggleLanguage, t } = useI18n();
-  const sections = getNavSections(userRole);
+  const sections = getNavSections(userRole, teaches);
 
   // L-5: Unread notification badge. Refetches every 30s so the number
   // reflects mark-as-read actions and new notifications without a
@@ -369,7 +433,7 @@ export default function NavShell({
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-sidebar-foreground">{userName || t('common.user')}</p>
-              <p className="truncate text-[11px] text-sidebar-foreground/50 capitalize">{userRole || 'user'}</p>
+              <p className="truncate text-[11px] text-sidebar-foreground/50">{userRole && isRole(userRole) ? ROLE_LABELS[userRole] : userRole || 'user'}</p>
             </div>
           )}
         </div>

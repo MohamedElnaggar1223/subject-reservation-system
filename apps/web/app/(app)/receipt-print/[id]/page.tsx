@@ -7,7 +7,7 @@
 
 import { requireAuth } from '~/lib/auth/session';
 import { getServerApi } from '~/lib/hono-server';
-import { apiResponse } from '@repo/validations';
+import { apiResponse, gradeLabel } from '@repo/validations';
 import PrintButton from './print-button.client';
 
 export const metadata = {
@@ -76,7 +76,7 @@ export default async function ReceiptPrintPage({
 
         <dl className="space-y-2 text-sm text-foreground print:text-black">
           {[
-            ['Student', `${reg.student.name}${reg.student.grade ? ` (Grade ${reg.student.grade})` : ''}`],
+            ['Student', `${reg.student.name}${reg.student.grade != null ? ` (${gradeLabel(reg.student.grade)})` : ''}`],
             ['Student ID', reg.student.studentId ?? '—'],
             ['Subject', `${reg.subject.name} (${reg.subject.code})`],
             ['Council', COUNCILS[reg.subject.council] ?? reg.subject.council],
