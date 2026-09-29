@@ -66,7 +66,7 @@ function StudentFinder({ year, chosen, onChoose }: { year: AcademicYearRow; chos
                 s.id === chosen ? 'bg-primary/10 font-semibold text-foreground' : 'text-foreground hover:bg-accent',
               )}
             >
-              <bdi>{s.name}</bdi>
+              <bdi data-i18n-skip="true">{s.name}</bdi>
               <span className="block text-xs text-muted-foreground">
                 {s.gradeThatYear != null && <span>{gradeLabel(s.gradeThatYear)}</span>}
                 {s.studentId && <> · <span dir="ltr" className="font-mono">{s.studentId}</span></>}
@@ -121,10 +121,10 @@ function StudentYearPanel({ studentId, year }: { studentId: string; year: Academ
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-display text-xl font-bold text-foreground"><bdi>{student.name}</bdi></h2>
+          <h2 className="font-display text-xl font-bold text-foreground"><bdi data-i18n-skip="true">{student.name}</bdi></h2>
           <p className="text-sm text-muted-foreground">
             {student.grade != null && <span>{gradeLabel(student.grade)}</span>}
-            {section && <> · <bdi>{section.name}</bdi></>}
+            {section && <> · <bdi data-i18n-skip="true">{section.name}</bdi></>}
             {student.studentCode && <> · <span dir="ltr" className="font-mono">{student.studentCode}</span></>}
           </p>
         </div>
@@ -139,8 +139,8 @@ function StudentYearPanel({ studentId, year }: { studentId: string; year: Academ
             {flags.registeredNotEnrolled.map((f) => (
               <li key={f.registrationId ?? f.subjectId} className="flex flex-wrap items-center justify-between gap-2">
                 <span>
-                  <bdi className="font-semibold">{f.subjectName}</bdi> · <bdi>{f.window}</bdi>
-                  {f.takenOutsideSchool ? <> · <span>taken outside school</span></> : f.registrationTeacher ? <> · <bdi>{f.registrationTeacher}</bdi></> : null}
+                  <bdi data-i18n-skip="true" className="font-semibold">{f.subjectName}</bdi> · <bdi>{f.window}</bdi>
+                  {f.takenOutsideSchool ? <> · <span>taken outside school</span></> : f.registrationTeacher ? <> · <bdi data-i18n-skip="true">{f.registrationTeacher}</bdi></> : null}
                 </span>
                 <Button
                   size="sm"
@@ -178,7 +178,7 @@ function StudentYearPanel({ studentId, year }: { studentId: string; year: Academ
               return (
                 <tr key={e.id} className="align-top">
                   <td className="px-3 py-2">
-                    <bdi className="font-medium text-foreground">{e.subjectName}</bdi>
+                    <bdi data-i18n-skip="true" className="font-medium text-foreground">{e.subjectName}</bdi>
                     <span className="ms-1 font-mono text-xs text-muted-foreground" dir="ltr">{e.subjectCode}</span>
                     {unregistered && <p className="text-xs text-muted-foreground">No exam registration this year yet.</p>}
                   </td>
@@ -217,7 +217,7 @@ function StudentYearPanel({ studentId, year }: { studentId: string; year: Academ
                     )}
                     {flagged && (
                       <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-                        <span>The registration names</span> <bdi>{flagged.registrationTeacher}</bdi>.{' '}
+                        <span>The registration names</span> <bdi data-i18n-skip="true">{flagged.registrationTeacher}</bdi>.{' '}
                         <button type="button" className="font-semibold underline" onClick={() => update.mutate({ id: e.id, teacherId: flagged.registrationTeacherId })}>
                           Use the registration&apos;s teacher
                         </button>
@@ -243,7 +243,7 @@ function StudentYearPanel({ studentId, year }: { studentId: string; year: Academ
           <ul className="mt-2 space-y-1 text-muted-foreground">
             {ended.map((e) => (
               <li key={e.id}>
-                <bdi className="text-foreground">{e.subjectName}</bdi> · <DateText date={e.startedOn} /> – <DateText date={e.endedOn!} /> · <bdi>{e.endReason}</bdi>
+                <bdi data-i18n-skip="true" className="text-foreground">{e.subjectName}</bdi> · <DateText date={e.startedOn} /> – <DateText date={e.endedOn!} /> · <bdi data-i18n-skip="true">{e.endReason}</bdi>
               </li>
             ))}
           </ul>

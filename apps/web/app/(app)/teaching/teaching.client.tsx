@@ -201,7 +201,7 @@ function ClassList({ subjectId, name, code, count, opensStudents }: { subjectId:
         className="flex w-full flex-wrap items-baseline justify-between gap-2 px-5 py-3 text-start outline-none hover:bg-accent/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
         <span>
-          <span className="font-display text-lg font-bold text-foreground">{name}</span>{' '}
+          <bdi data-i18n-skip="true" className="font-display text-lg font-bold text-foreground">{name}</bdi>{' '}
           <span className="font-mono text-xs text-muted-foreground" dir="ltr">{code}</span>
         </span>
         <span className="text-sm text-muted-foreground">

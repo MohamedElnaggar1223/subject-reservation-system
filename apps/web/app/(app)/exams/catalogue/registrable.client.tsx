@@ -71,7 +71,7 @@ export function RegistrableTab({ data }: { data: CatalogueData }) {
               {rows.map((r) => (
                 <tr key={r.id} className={cn(!r.isActive && 'bg-muted/40 text-muted-foreground')}>
                   <td className="px-3 py-2.5">
-                    <p className="font-medium text-foreground"><bdi>{r.name}</bdi></p>
+                    <p className="font-medium text-foreground"><bdi data-i18n-skip="true">{r.name}</bdi></p>
                     <p className="text-xs text-muted-foreground">
                       <span className="font-mono">{r.code}</span> · <span>{levelLabel(r.qualificationLevel)}</span>
                       {!r.isActive && <> · <span>Not offered</span></>}
@@ -86,7 +86,7 @@ export function RegistrableTab({ data }: { data: CatalogueData }) {
                         {r.qualification && (
                           <p>
                             <span className="font-mono text-xs text-foreground">{r.qualification.code}</span>{' '}
-                            <bdi className="text-foreground">{r.qualification.title}</bdi>
+                            <bdi data-i18n-skip="true" className="text-foreground">{r.qualification.title}</bdi>
                           </p>
                         )}
                         {r.units.length > 0 && (
@@ -176,7 +176,7 @@ function MapDialog({ row, data, onClose }: { row: RegistrableRow; data: Catalogu
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="map-title">
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl">
         <h2 id="map-title" className="font-display text-lg font-bold text-foreground">
-          <span>What</span> <bdi>{row.name}</bdi> <span>enters</span>
+          <span>What</span> <bdi data-i18n-skip="true">{row.name}</bdi> <span>enters</span>
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           <span>Registered at</span> <span>{levelLabel(row.qualificationLevel)}</span>. <span>Choose the board, then the award it enters, or the units or papers it is made of.</span>
@@ -254,7 +254,7 @@ function MapDialog({ row, data, onClose }: { row: RegistrableRow; data: Catalogu
                           <input type="checkbox" checked={on} onChange={() => setUnitIds(on ? unitIds.filter((x) => x !== u.id) : [...unitIds, u.id])} className="size-4" />
                           <span className="font-mono text-xs">{u.code}</span>
                           {u.shortCode && <Badge tone="neutral">{u.shortCode}</Badge>}
-                          <bdi className="text-foreground">{u.title}</bdi>
+                          <bdi data-i18n-skip="true" className="text-foreground">{u.title}</bdi>
                           <Badge tone={UNIT_LEVEL_TONE[u.unitLevel] ?? 'neutral'}>{unitLevelLabel(u.unitLevel)}</Badge>
                         </label>
                       </li>

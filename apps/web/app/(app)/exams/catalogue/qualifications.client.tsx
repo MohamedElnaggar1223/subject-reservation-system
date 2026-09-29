@@ -151,7 +151,7 @@ function QualificationCard({ q, data }: { q: QualificationRow; data: CatalogueDa
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="font-semibold text-foreground">
-            <span className="font-mono">{q.code}</span> <bdi>{q.title}</bdi>
+            <span className="font-mono">{q.code}</span> <bdi data-i18n-skip="true">{q.title}</bdi>
           </p>
           <p className="text-xs text-muted-foreground">
             <span>{levelLabel(q.level)}</span>
@@ -182,11 +182,11 @@ function QualificationCard({ q, data }: { q: QualificationRow; data: CatalogueDa
               {q.units.map((u) => (
                 <tr key={u.unitId}>
                   <td className="py-1.5">
-                    <span className="font-mono text-xs">{u.code}</span>{u.shortCode && <> <Badge tone="neutral">{u.shortCode}</Badge></>} <bdi className="text-foreground">{u.title}</bdi>
+                    <span className="font-mono text-xs">{u.code}</span>{u.shortCode && <> <Badge tone="neutral">{u.shortCode}</Badge></>} <bdi data-i18n-skip="true" className="text-foreground">{u.title}</bdi>
                   </td>
                   <td className="py-1.5"><Badge tone={UNIT_LEVEL_TONE[u.unitLevel] ?? 'neutral'}>{unitLevelLabel(u.unitLevel)}</Badge></td>
                   <td className="py-1.5 text-xs text-foreground">
-                    {u.requirement === 'required' ? <span>Required</span> : <><span>Optional</span>{u.choiceGroup && <>: <bdi className="text-muted-foreground">{u.choiceGroup}</bdi></>}</>}
+                    {u.requirement === 'required' ? <span>Required</span> : <><span>Optional</span>{u.choiceGroup && <>: <bdi data-i18n-skip="true" className="text-muted-foreground">{u.choiceGroup}</bdi></>}</>}
                   </td>
                 </tr>
               ))}
@@ -203,7 +203,7 @@ function QualificationCard({ q, data }: { q: QualificationRow; data: CatalogueDa
                   <label className="flex min-w-56 flex-1 cursor-pointer items-center gap-2">
                     <input type="checkbox" className="size-4" checked={!!d} onChange={() => setDraft(d ? draft.filter((x) => x.unitId !== u.id) : [...draft, { unitId: u.id, requirement: 'required', choiceGroup: '' }])} />
                     <span className="font-mono text-xs">{u.code}</span>{u.shortCode && <Badge tone="neutral">{u.shortCode}</Badge>}
-                    <bdi className="text-foreground">{u.title}</bdi>
+                    <bdi data-i18n-skip="true" className="text-foreground">{u.title}</bdi>
                     <Badge tone={UNIT_LEVEL_TONE[u.unitLevel] ?? 'neutral'}>{unitLevelLabel(u.unitLevel)}</Badge>
                   </label>
                   {d && (
@@ -241,7 +241,7 @@ function QualificationCard({ q, data }: { q: QualificationRow; data: CatalogueDa
             {q.options.map((o) => (
               <li key={o.id} className="flex flex-wrap items-center gap-2 text-sm">
                 <Badge tone="info" className="font-mono">{o.code}</Badge>
-                <bdi className="text-foreground">{o.label}</bdi>
+                <bdi data-i18n-skip="true" className="text-foreground">{o.label}</bdi>
                 {o.carryForward && <Badge tone="warning">Carry forward</Badge>}
                 <span className="text-xs text-muted-foreground">{o.units.map((u) => u.shortCode ?? u.code).join(', ')}</span>
               </li>

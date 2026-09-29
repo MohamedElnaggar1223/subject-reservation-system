@@ -83,7 +83,7 @@ function UnitLine({ u, boardName }: { u: UnitRow; boardName: string }) {
           <span className="font-mono text-xs text-foreground">{u.code}</span>
           {u.shortCode && <> <Badge tone="neutral">{u.shortCode}</Badge></>}
         </td>
-        <td className="px-3 py-2.5 text-foreground"><bdi>{u.title}</bdi><p className="text-xs text-muted-foreground">{KIND_LABEL[u.kind as UnitKind] ?? u.kind}</p></td>
+        <td className="px-3 py-2.5 text-foreground"><bdi data-i18n-skip="true">{u.title}</bdi><p className="text-xs text-muted-foreground">{KIND_LABEL[u.kind as UnitKind] ?? u.kind}</p></td>
         <td className="px-3 py-2.5 text-foreground">{boardName}</td>
         <td className="px-3 py-2.5"><Badge tone={UNIT_LEVEL_TONE[u.unitLevel] ?? 'neutral'}>{unitLevelLabel(u.unitLevel)}</Badge></td>
         <td className="px-3 py-2.5">

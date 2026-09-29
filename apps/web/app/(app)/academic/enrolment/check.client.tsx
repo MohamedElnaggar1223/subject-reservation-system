@@ -96,7 +96,7 @@ export function Check({ year, onOpenStudent }: { year: AcademicYearRow; onOpenSt
         detail={(r) => (
           <>
             <bdi>{r.window}</bdi>
-            {r.takenOutsideSchool ? <> · <span>taken outside school</span></> : r.registrationTeacher ? <> · <bdi>{r.registrationTeacher}</bdi></> : <> · <span>no teacher named</span></>}
+            {r.takenOutsideSchool ? <> · <span>taken outside school</span></> : r.registrationTeacher ? <> · <bdi data-i18n-skip="true">{r.registrationTeacher}</bdi></> : <> · <span>no teacher named</span></>}
           </>
         )}
         fix={(r) => (
@@ -140,7 +140,7 @@ export function Check({ year, onOpenStudent }: { year: AcademicYearRow; onOpenSt
         onOpenStudent={onOpenStudent}
         detail={(r) => (
           <>
-            <span>Enrolled with</span> <bdi>{r.teacherName}</bdi> · <span>registration names</span> <bdi>{r.registrationTeacher}</bdi>
+            <span>Enrolled with</span> <bdi data-i18n-skip="true">{r.teacherName}</bdi> · <span>registration names</span> <bdi data-i18n-skip="true">{r.registrationTeacher}</bdi>
           </>
         )}
         fix={(r) => (
@@ -156,7 +156,7 @@ export function Check({ year, onOpenStudent }: { year: AcademicYearRow; onOpenSt
         rows={f.enrolledNotRegistered}
         tone="neutral"
         onOpenStudent={onOpenStudent}
-        detail={(r) => (r.mode === 'self_study' ? <span>Self-study</span> : r.teacherName ? <bdi>{r.teacherName}</bdi> : <span>No teacher yet</span>)}
+        detail={(r) => (r.mode === 'self_study' ? <span>Self-study</span> : r.teacherName ? <bdi data-i18n-skip="true">{r.teacherName}</bdi> : <span>No teacher yet</span>)}
         fix={(r) => (
           <Button size="sm" variant="ghost" disabled={pending || !r.enrolmentId} onClick={() => setEnding(r)}>End…</Button>
         )}
@@ -209,9 +209,9 @@ function FlagSection({
           {rows.map((r) => (
             <li key={`${r.studentId}|${r.subjectId}|${r.registrationId ?? ''}`} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
               <div className="min-w-0">
-                <button type="button" className="font-semibold text-foreground hover:underline" onClick={() => onOpenStudent(r.studentId)}><bdi>{r.studentName}</bdi></button>
-                {r.section && <span className="text-muted-foreground"> · <bdi>{r.section}</bdi></span>}
-                <span className="text-muted-foreground"> · </span><bdi className="text-foreground">{r.subjectName}</bdi>
+                <button type="button" className="font-semibold text-foreground hover:underline" onClick={() => onOpenStudent(r.studentId)}><bdi data-i18n-skip="true">{r.studentName}</bdi></button>
+                {r.section && <span className="text-muted-foreground"> · <bdi data-i18n-skip="true">{r.section}</bdi></span>}
+                <span className="text-muted-foreground"> · </span><bdi data-i18n-skip="true" className="text-foreground">{r.subjectName}</bdi>
                 <p className="text-xs text-muted-foreground">{detail(r)}</p>
               </div>
               {fix(r)}

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { foundationArabic } from './i18n-foundation';
+import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
 
 export type Language = 'en' | 'ar';
 
@@ -178,10 +179,10 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.rooms': 'القاعات',
     'nav.settings': 'الإعدادات',
     'nav.myTeaching': 'تدريسي',
-    'nav.enrolment': 'تسجيل المقررات',
+    'nav.enrolment': 'الالتحاق بالمقررات',
     'nav.exams': 'الامتحانات',
     'nav.catalogue': 'دليل الامتحانات',
-    'nav.boardSeries': 'دورات الهيئات',
+    'nav.boardSeries': 'دورات المجالس',
     'app.subjectReservation': 'حجز المواد',
     'common.user': 'مستخدم',
     'common.signOut': 'تسجيل الخروج',
@@ -1495,6 +1496,9 @@ const autoArabicText: Record<string, string> = {
 
 // F0a screens keep their Arabic in lib/i18n-foundation, one file per area.
 Object.assign(autoArabicText, foundationArabic);
+// F0b screens (lib/i18n-catalogue.ts): only words the app does not already
+// translate, so a shared word keeps the Arabic the other screens use.
+for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1570,6 +1574,9 @@ function translateDynamicText(text: string): string | null {
   // F0a: the API's refusal sentences that carry a name, a date or a year.
   const f0aRefusal = translateFoundationRefusal(text);
   if (f0aRefusal) return f0aRefusal;
+  // F0b: the catalogue's, the series' and the enrolment's sentences with names in them.
+  const f0bText = translateCatalogueText(text);
+  if (f0bText) return f0bText;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

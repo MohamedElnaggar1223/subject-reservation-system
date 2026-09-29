@@ -59,7 +59,7 @@ export function BySection({ year, onOpenStudent }: { year: AcademicYearRow; onOp
               s.id === sectionId ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-foreground hover:bg-accent',
             )}
           >
-            <bdi>{s.name}</bdi> <span className="font-normal opacity-80">({s.memberCount})</span>
+            <bdi data-i18n-skip="true">{s.name}</bdi> <span className="font-normal opacity-80">({s.memberCount})</span>
           </button>
         ))}
       </div>
@@ -132,7 +132,7 @@ function SectionGrid({ sectionId, year, onOpenStudent }: { sectionId: string; ye
     <div>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          <bdi className="font-semibold text-foreground">{detail.data.name}</bdi> · <span>{gradeLabel(detail.data.grade)}</span> · <span className="tabular-nums">{members.length}</span> <span>students</span>
+          <bdi data-i18n-skip="true" className="font-semibold text-foreground">{detail.data.name}</bdi> · <span>{gradeLabel(detail.data.grade)}</span> · <span className="tabular-nums">{members.length}</span> <span>students</span>
         </p>
         <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); if (adding) { setExtra([...extra, adding]); setAdding(''); } }}>
           <div>
@@ -164,7 +164,7 @@ function SectionGrid({ sectionId, year, onOpenStudent }: { sectionId: string; ye
                   const count = members.filter((m) => byCell.has(`${m.student.id}|${c.subjectId}`)).length;
                   return (
                     <th key={c.subjectId} scope="col" className="min-w-44 px-2 py-2 text-start font-semibold text-foreground">
-                      <p className="leading-tight"><bdi>{s?.name ?? c.subjectId}</bdi></p>
+                      <p className="leading-tight"><bdi data-i18n-skip="true">{s?.name ?? c.subjectId}</bdi></p>
                       <p className="text-xs font-normal text-muted-foreground"><span className="tabular-nums">{count}</span>/<span className="tabular-nums">{members.length}</span></p>
                       <select aria-label={`Teacher for ${s?.name ?? ''}`} value={c.mode === 'self_study' ? '' : c.teacherId} disabled={c.mode === 'self_study'} onChange={(e) => set({ teacherId: e.target.value })} className={cn(SELECT_CLASS, 'mt-1 h-8 text-xs font-normal')}>
                         <option value="">No teacher yet</option>
@@ -186,7 +186,7 @@ function SectionGrid({ sectionId, year, onOpenStudent }: { sectionId: string; ye
               {members.map((m) => (
                 <tr key={m.id}>
                   <th scope="row" className="sticky start-0 z-10 bg-card px-3 py-1.5 text-start font-medium">
-                    <button type="button" className="text-foreground hover:underline" onClick={() => onOpenStudent(m.student.id)}><bdi>{m.student.name}</bdi></button>
+                    <button type="button" className="text-foreground hover:underline" onClick={() => onOpenStudent(m.student.id)}><bdi data-i18n-skip="true">{m.student.name}</bdi></button>
                   </th>
                   {columns.map((c) => {
                     const e = byCell.get(`${m.student.id}|${c.subjectId}`);
@@ -268,7 +268,7 @@ function FromRegistrations({ sectionId, sectionName, year, onDone }: { sectionId
       {!r ? (
         <>
           <span className="text-muted-foreground">
-            <span>Take</span> <bdi>{sectionName}</bdi><span>&apos;s subjects from their exam registrations this year, with the teacher each registration names.</span>
+            <span>Take</span> <bdi data-i18n-skip="true">{sectionName}</bdi><span>&apos;s subjects from their exam registrations this year, with the teacher each registration names.</span>
           </span>
           <Button size="sm" variant="outline" disabled={run.isPending} onClick={() => run.mutate(false)}>
             {run.isPending ? 'Working…' : 'See what they give'}
@@ -320,7 +320,7 @@ export function EditEnrolment({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-enrolment-title">
       <form className="w-full max-w-md space-y-4 rounded-xl border border-border bg-card p-6 shadow-xl" onSubmit={(ev) => { ev.preventDefault(); save.mutate(); }}>
-        <h2 id="edit-enrolment-title" className="font-display text-lg font-bold text-foreground"><bdi>{e.studentName}</bdi> · <bdi>{e.subjectName}</bdi></h2>
+        <h2 id="edit-enrolment-title" className="font-display text-lg font-bold text-foreground"><bdi data-i18n-skip="true">{e.studentName}</bdi> · <bdi data-i18n-skip="true">{e.subjectName}</bdi></h2>
         <div role="radiogroup" aria-label="How it is taught" className="flex gap-2">
           {(['in_school', 'self_study'] as const).map((m) => (
             <label key={m} className={cn('flex flex-1 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm', mode === m ? 'border-primary bg-primary/5' : 'border-border')}>

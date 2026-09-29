@@ -157,7 +157,7 @@ export function WindowSeriesPanel({ sessionId, onClose }: { sessionId: string; o
                     return (
                       <li key={l.boardSeriesId} className="flex flex-wrap items-center gap-3 px-3 py-2">
                         <div className="min-w-56 flex-1">
-                          <p className="font-medium text-foreground"><bdi>{s.name}</bdi></p>
+                          <p className="font-medium text-foreground"><bdi data-i18n-skip="true">{s.name}</bdi></p>
                           <p className="text-xs text-muted-foreground">
                             {s.entryDeadline ? <><span>Entry deadline</span> <InstantText iso={s.entryDeadline} /></> : <span>No entry deadline yet</span>}
                             {' · '}<span className="tabular-nums">{s.registrations}</span> <span>registrations in it</span>
@@ -207,7 +207,7 @@ export function WindowSeriesPanel({ sessionId, onClose }: { sessionId: string; o
                       return (
                         <tr key={s.id}>
                           <td className="px-3 py-1.5">
-                            <bdi className="text-foreground">{s.name}</bdi> <span className="font-mono text-xs text-muted-foreground">{s.code}</span>
+                            <bdi data-i18n-skip="true" className="text-foreground">{s.name}</bdi> <span className="font-mono text-xs text-muted-foreground">{s.code}</span>
                             {s.registrations > 0 && <span className="text-xs text-muted-foreground"> · <span className="tabular-nums">{s.registrations}</span> <span>registered</span></span>}
                           </td>
                           <td className="px-3 py-1.5 text-foreground">{s.boardName}</td>
@@ -384,8 +384,8 @@ function Entries({ sessionId, links }: { sessionId: string; links: { id: string;
                         <td className="px-2 py-1.5">
                           <input type="checkbox" className="size-4" aria-label={`Choose ${e.studentName} ${e.subject.name}`} checked={on} onChange={() => setSelected(on ? selected.filter((x) => x !== e.registrationId) : [...selected, e.registrationId])} />
                         </td>
-                        <td className="px-3 py-1.5 text-foreground"><bdi>{e.studentName}</bdi></td>
-                        <td className="px-3 py-1.5 text-foreground"><bdi>{e.subject.name}</bdi></td>
+                        <td className="px-3 py-1.5 text-foreground"><bdi data-i18n-skip="true">{e.studentName}</bdi></td>
+                        <td className="px-3 py-1.5 text-foreground"><bdi data-i18n-skip="true">{e.subject.name}</bdi></td>
                         <td className="px-3 py-1.5 text-foreground">{e.boardSeries ? <bdi>{e.boardSeries.name}</bdi> : <Badge tone="warning">None</Badge>}</td>
                         <td className="px-3 py-1.5"><LevelCodeBadge code={e.levelCode} /></td>
                       </tr>

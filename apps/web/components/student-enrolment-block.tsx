@@ -38,12 +38,12 @@ export function StudentEnrolmentBlock({ studentId, canEdit }: { studentId: strin
         <ul className="flex flex-wrap gap-2">
           {open.map((e) => (
             <li key={e.id} className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm">
-              <bdi className="font-medium text-foreground">{e.subjectName}</bdi>
+              <bdi data-i18n-skip="true" className="font-medium text-foreground">{e.subjectName}</bdi>
               <span className="text-muted-foreground"> · </span>
               {e.mode === 'self_study' ? (
                 <span className="text-muted-foreground">Self-study</span>
               ) : e.teacherName ? (
-                <bdi className="text-muted-foreground">{e.teacherName}</bdi>
+                <bdi data-i18n-skip="true" className="text-muted-foreground">{e.teacherName}</bdi>
               ) : (
                 <span className="text-muted-foreground">No teacher yet</span>
               )}

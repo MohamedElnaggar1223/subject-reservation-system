@@ -59,7 +59,7 @@ export function SeriesName({ boardName, month, year, label }: { boardName: strin
   return (
     <span>
       <span>{boardName}</span> <span>{MONTH_LABEL[month] ?? month}</span> <span dir="ltr">{year}</span>
-      {label ? <> <span className="text-muted-foreground">(<bdi>{label}</bdi>)</span></> : null}
+      {label ? <> <span className="text-muted-foreground">(<bdi data-i18n-skip="true">{label}</bdi>)</span></> : null}
     </span>
   );
 }
@@ -104,7 +104,7 @@ export function MaybeDate({ date }: { date: string | null | undefined }) {
 /** The school's level code, as a badge. */
 export function LevelCodeBadge({ code }: { code: string }) {
   const tone: Tone = code === 'A.S./A.2.' ? 'info' : code === 'O.L.' ? 'neutral' : 'success';
-  return <Badge tone={tone} className="font-mono" ><bdi>{code}</bdi></Badge>;
+  return <Badge tone={tone} className="font-mono" ><bdi data-i18n-skip="true">{code}</bdi></Badge>;
 }
 
 export const SELECT_CLASS =

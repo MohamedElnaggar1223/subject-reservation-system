@@ -139,7 +139,7 @@ function FromSource({ year, source }: { year: AcademicYearRow; source: 'previous
               <div className="grid gap-2 md:grid-cols-2">
                 {lastSubjects.map((s) => (
                   <div key={s.id} className="flex items-center gap-2 text-sm">
-                    <span className="w-48 shrink-0 truncate" title={s.name}><bdi>{s.name}</bdi> <span className="text-xs text-muted-foreground">(<span className="tabular-nums">{s.n}</span>)</span></span>
+                    <span className="w-48 shrink-0 truncate" title={s.name}><bdi data-i18n-skip="true">{s.name}</bdi> <span className="text-xs text-muted-foreground">(<span className="tabular-nums">{s.n}</span>)</span></span>
                     <span aria-hidden="true" className="text-muted-foreground rtl:rotate-180">→</span>
                     <select
                       aria-label={`${s.name} becomes`}
@@ -180,7 +180,7 @@ function FromSource({ year, source }: { year: AcademicYearRow; source: 'previous
                 return (
                   <label key={s.id} className={cn('flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm', on ? 'border-primary bg-primary/5' : 'border-border')}>
                     <input type="checkbox" checked={on} onChange={() => { setSectionIds(on ? sectionIds.filter((x) => x !== s.id) : [...sectionIds, s.id]); changed(); }} />
-                    <bdi>{s.name}</bdi>
+                    <bdi data-i18n-skip="true">{s.name}</bdi>
                   </label>
                 );
               })}
@@ -282,9 +282,9 @@ function OutcomeTable({
                     </td>
                   )}
                   {lines && <td className="px-3 py-1.5 tabular-nums text-muted-foreground">{r.line}</td>}
-                  <td className="px-3 py-1.5"><bdi>{r.studentName}</bdi></td>
-                  <td className="px-3 py-1.5"><bdi>{r.subjectName}</bdi></td>
-                  <td className="px-3 py-1.5 text-muted-foreground">{r.mode === 'self_study' ? <span>Self-study</span> : r.teacherName ? <bdi>{r.teacherName}</bdi> : <span>No teacher yet</span>}</td>
+                  <td className="px-3 py-1.5"><bdi data-i18n-skip="true">{r.studentName}</bdi></td>
+                  <td className="px-3 py-1.5"><bdi data-i18n-skip="true">{r.subjectName}</bdi></td>
+                  <td className="px-3 py-1.5 text-muted-foreground">{r.mode === 'self_study' ? <span>Self-study</span> : r.teacherName ? <bdi data-i18n-skip="true">{r.teacherName}</bdi> : <span>No teacher yet</span>}</td>
                   <td className="px-3 py-1.5">
                     <Badge tone={OUTCOME[r.outcome].tone}>{OUTCOME[r.outcome].label}</Badge>
                     {r.reason && <span className="ms-2 text-xs text-muted-foreground">{r.reason}</span>}
