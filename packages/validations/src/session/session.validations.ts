@@ -9,6 +9,7 @@
 
 import { z } from 'zod';
 import { QualificationLevelSchema } from '../subject/subject.validations';
+import { SeriesYearSchema } from '../academic/academic-year';
 
 /**
  * IGCSE exam session types.
@@ -16,16 +17,24 @@ import { QualificationLevelSchema } from '../subject/subject.validations';
  *
  * V3 (§5.5): sessions also carry a qualificationLevel. January series
  * are A-Level-only in Egypt — no January IGCSE exists (Edexcel
- * discontinued it in 2023; Cambridge/OxfordAQA never ran one).
+ * discontinued it in 2023; Cambridge/OxfordAQA never ran one). October is
+ * Pearson IAL's autumn series (DISCOVERY_RESEARCH.md §1): A-Level only too.
+ *
+ * F0a: every window carries its series year. The series (type + year)
+ * belongs to one academic year — June and January of year Y to Y−1/Y,
+ * October and November of year Y to Y/Y+1 — and that year, never the
+ * window's own dates, decides the grade a student registers in.
  */
 export const SESSION_TYPES = {
   JUNE: 'june',
+  OCTOBER: 'october',
   NOVEMBER: 'november',
   JANUARY: 'january',
 } as const;
 
 export const SessionTypeSchema = z.enum([
   SESSION_TYPES.JUNE,
+  SESSION_TYPES.OCTOBER,
   SESSION_TYPES.NOVEMBER,
   SESSION_TYPES.JANUARY,
 ]);
@@ -34,9 +43,14 @@ export type SessionType = z.infer<typeof SessionTypeSchema>;
 
 export const SESSION_TYPE_LABELS: Record<SessionType, string> = {
   june: 'June',
+  october: 'October',
   november: 'November',
   january: 'January',
 };
+
+/** Session types that are A-Level only (no IGCSE sitting exists). */
+export const A_LEVEL_ONLY_SESSION_TYPES: readonly SessionType[] = ['january', 'october'];
+export const A_LEVEL_ONLY_MESSAGE = 'January and October series are A-Level only — no IGCSE sitting exists in Egypt';
 
 /**
  * Session status values
@@ -77,6 +91,8 @@ export const CreateSession = z
       .min(1, 'Session name is required')
       .max(100, 'Session name too long'),
     sessionType: SessionTypeSchema,
+    // The year of the exam series, e.g. 2027 for June 2027 (F0a).
+    seriesYear: SeriesYearSchema,
     qualificationLevel: QualificationLevelSchema.default('igcse'),
     startDate: z.coerce.date(),
     endDate: z.coerce.date(),
@@ -92,9 +108,9 @@ export const CreateSession = z
     path: ['entryDeadline'],
   })
   .refine(
-    (data) => !(data.sessionType === 'january' && data.qualificationLevel === 'igcse'),
+    (data) => !(A_LEVEL_ONLY_SESSION_TYPES.includes(data.sessionType) && data.qualificationLevel === 'igcse'),
     {
-      message: 'January series are A-Level only — no January IGCSE exists in Egypt',
+      message: A_LEVEL_ONLY_MESSAGE,
       path: ['qualificationLevel'],
     }
   );
@@ -117,6 +133,7 @@ export const UpdateDraftSession = z
       .max(100, 'Session name too long')
       .optional(),
     sessionType: SessionTypeSchema.optional(),
+    seriesYear: SeriesYearSchema.optional(),
     qualificationLevel: QualificationLevelSchema.optional(),
     startDate: z.coerce.date().optional(),
     endDate: z.coerce.date().optional(),
@@ -175,6 +192,21 @@ export const SetEntryDeadline = z.object({
   reason: z.string().trim().min(5, 'Please provide a reason (min 5 characters)').max(500, 'Reason too long'),
 });
 export type SetEntryDeadlineType = z.infer<typeof SetEntryDeadline>;
+
+/**
+ * Correct a window's exam series (F0a)
+ *
+ * Admin-only, in any status, with a reason: the series decides the academic
+ * year every registration in the window is judged by. Registrations that
+ * students may no longer sit under the corrected series expire, their open
+ * checkouts close with any escrow returned (as a withdrawal does).
+ */
+export const CorrectSessionSeries = z.object({
+  sessionType: SessionTypeSchema,
+  seriesYear: SeriesYearSchema,
+  reason: z.string().trim().min(5, 'Please provide a reason (min 5 characters)').max(500, 'Reason too long'),
+});
+export type CorrectSessionSeriesType = z.infer<typeof CorrectSessionSeries>;
 
 /**
  * Close Session

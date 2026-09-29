@@ -43,6 +43,15 @@ export const AUDIT_ENTITY_TYPES = [
   'link',
   'remark_fee',
   'remark_deadline',
+  // F0a
+  'setting',
+  'academic_year',
+  'term',
+  'calendar_entry',
+  'bell_schedule',
+  'room',
+  'section',
+  'file',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -66,6 +75,14 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   link:           'Parent-Student Link',
   remark_fee:     'Remark Fee',
   remark_deadline:'Remark Deadline',
+  setting:        'Setting',
+  academic_year:  'Academic Year',
+  term:           'Term',
+  calendar_entry: 'Calendar Day',
+  bell_schedule:  'Bell Schedule',
+  room:           'Room',
+  section:        'Section',
+  file:           'File',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -153,7 +170,38 @@ export const AUDIT_ACTIONS = [
   // User / grade
   'USER_UPDATED',
   'USER_UPDATED_BY_ADMIN',
+  // Kept for history: grades moved by window closes and by hand until F0a
+  // replaced the stored grade with the cohort.
   'USER_GRADE_CHANGED',
+  // F0a: the student record
+  'STUDENT_COHORT_CORRECTED',
+  'STUDENT_LEFT',
+  'STUDENT_READMITTED',
+  'TEACHER_ACCOUNT_LINKED',
+  'SESSION_SERIES_CORRECTED',
+  // F0a: settings and uploads
+  'SETTING_CHANGED',
+  'FILE_UPLOADED',
+  // F0a: academic structure
+  'ACADEMIC_YEAR_CREATED',
+  'ACADEMIC_YEAR_UPDATED',
+  'TERM_CREATED',
+  'TERM_UPDATED',
+  'TERM_DELETED',
+  'CALENDAR_ENTRY_CREATED',
+  'CALENDAR_ENTRY_DELETED',
+  'BELL_SCHEDULE_CREATED',
+  'BELL_SCHEDULE_UPDATED',
+  'BELL_PERIODS_REPLACED',
+  'BELL_SCHEDULE_DELETED',
+  'ROOM_CREATED',
+  'ROOM_UPDATED',
+  'SECTION_CREATED',
+  'SECTION_UPDATED',
+  'SECTION_DELETED',
+  'SECTION_MEMBERS_ADDED',
+  'SECTION_MEMBERSHIP_ENDED',
+  'SECTIONS_ROLLED_OVER',
   // Parent-student links (security audit RF-14: access to a child's money
   // and records hangs on these, so every change is recorded)
   'LINK_REQUESTED',
@@ -256,6 +304,32 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   REMARK_PAYMENT_INITIATED:   'Remark Payment Initiated',
   REMARK_PAYMENT_CONFIRMED:   'Remark Fee Confirmed — Awaiting Submission',
   ADMIN_ANNOUNCEMENT:         'Admin Announcement Sent',
+  STUDENT_COHORT_CORRECTED:   'Student Cohort Corrected',
+  STUDENT_LEFT:               'Student Left the School',
+  STUDENT_READMITTED:         'Student Readmitted',
+  TEACHER_ACCOUNT_LINKED:     'Teacher Record Linked to Account',
+  SESSION_SERIES_CORRECTED:   'Session Exam Series Corrected',
+  SETTING_CHANGED:            'School Setting Changed',
+  FILE_UPLOADED:              'File Uploaded',
+  ACADEMIC_YEAR_CREATED:      'Academic Year Created',
+  ACADEMIC_YEAR_UPDATED:      'Academic Year Updated',
+  TERM_CREATED:               'Term Created',
+  TERM_UPDATED:               'Term Updated',
+  TERM_DELETED:               'Term Deleted',
+  CALENDAR_ENTRY_CREATED:     'Calendar Day Added',
+  CALENDAR_ENTRY_DELETED:     'Calendar Day Removed',
+  BELL_SCHEDULE_CREATED:      'Bell Schedule Created',
+  BELL_SCHEDULE_UPDATED:      'Bell Schedule Updated',
+  BELL_PERIODS_REPLACED:      'Bell Periods Saved',
+  BELL_SCHEDULE_DELETED:      'Bell Schedule Deleted',
+  ROOM_CREATED:               'Room Created',
+  ROOM_UPDATED:               'Room Updated',
+  SECTION_CREATED:            'Section Created',
+  SECTION_UPDATED:            'Section Updated',
+  SECTION_DELETED:            'Section Deleted',
+  SECTION_MEMBERS_ADDED:      'Students Added to Section',
+  SECTION_MEMBERSHIP_ENDED:   'Student Left Section',
+  SECTIONS_ROLLED_OVER:       'Sections Rolled Over to New Year',
 };
 
 // ─── Query Filters ────────────────────────────────────────────────────────────

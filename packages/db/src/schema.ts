@@ -18,7 +18,7 @@
  */
 
 import { relations, sql } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, numeric, integer, jsonb, uniqueIndex, check } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, numeric, integer, jsonb, uniqueIndex, check, date, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -36,10 +36,28 @@ export const user = pgTable("user", {
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires"),
   // IGCSE System Extensions
-  grade: integer("grade"), // 10, 11, 12, or null (for parents/admins/graduated)
+  // (F0a dropped the stored `grade`: a grade is derived from cohortYear.)
   studentId: text("student_id").unique(), // Auto-generated unique ID for students
   phone: text("phone"), // Optional contact number
-});
+  // F0a: the academic year (its start year, 2026 = 2026/27) the student
+  // starts grade 10 in. A grade is derived from it for any academic year
+  // (10 + year − cohort); nothing moves it but an audited correction. Null
+  // for staff and parents, and for a student whose grade was never recorded.
+  cohortYear: integer("cohort_year"),
+  // F0a: a student who left the school — withdrawn or transferred — on
+  // leftOn, for leftReason. Refused from new registrations; everything they
+  // did stays. Cleared when they are readmitted (both audited).
+  leftOn: date("left_on", { mode: "string" }),
+  leftKind: text("left_kind"), // 'withdrawn' | 'transferred'
+  leftReason: text("left_reason"),
+  leftRecordedBy: text("left_recorded_by").references((): AnyPgColumn => user.id, { onDelete: "set null" }),
+  leftRecordedAt: timestamp("left_recorded_at", { withTimezone: true }),
+}, (table) => [
+  index("user_cohortYear_idx").on(table.cohortYear),
+  check("user_left_kind_valid", sql`${table.leftKind} IS NULL OR ${table.leftKind} IN ('withdrawn', 'transferred')`),
+  check("user_left_whole", sql`(${table.leftOn} IS NULL) = (${table.leftKind} IS NULL)`),
+  check("user_cohort_year_range", sql`${table.cohortYear} IS NULL OR ${table.cohortYear} BETWEEN 2000 AND 2100`),
+]);
 
 export const session = pgTable(
   "session",
@@ -150,11 +168,16 @@ export const file = pgTable(
 
     // Classification
     fileType: text("file_type").notNull(),     // 'avatar' | 'document' | 'general'
+    // F0a: what the file is for (UPLOAD_PURPOSES in @repo/validations), which
+    // decides its limits and who may read it.
+    purpose: text("purpose").notNull().default("document"),
 
     // Ownership
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
+    // F0a: the student the file concerns, for purposes read by a family.
+    studentId: text("student_id").references(() => user.id, { onDelete: "cascade" }),
 
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -166,6 +189,8 @@ export const file = pgTable(
     index("file_userId_idx").on(table.userId),
     // Index on fileType for filtering by type
     index("file_fileType_idx").on(table.fileType),
+    index("file_studentId_idx").on(table.studentId),
+    index("file_purpose_idx").on(table.purpose),
   ],
 );
 
@@ -383,7 +408,11 @@ export const registrationSession = pgTable(
   {
     id: text("id").primaryKey(),
     name: text("name").notNull(),
-    sessionType: text("session_type").notNull(), // 'june' | 'november' | 'january'
+    sessionType: text("session_type").notNull(), // 'june' | 'october' | 'november' | 'january'
+    // F0a: the year of the exam series (2027 for June 2027). The series
+    // belongs to one academic year — June and January of Y to Y−1/Y, October
+    // and November of Y to Y/Y+1 — which decides every student's grade in it.
+    seriesYear: integer("series_year").notNull(),
     // 'igcse' | 'as_level' | 'a_level'. January series are A-Level-only in
     // Egypt (no January IGCSE exists — V3_PLAN §2.1); enforced in the service.
     qualificationLevel: text("qualification_level").notNull().default("igcse"),
@@ -400,12 +429,6 @@ export const registrationSession = pgTable(
     closeReason: text("close_reason"),
     // Task 1.5: Persistent flag for 24h closing reminder (replaces volatile in-memory Set)
     reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
-    // GRADE-001 durability (M-10): null until the session-closer has
-    // successfully run progressGrades for this session. The scheduler
-    // retries any closed session with this still-null on each tick, so
-    // a transient failure during progression doesn't leave students
-    // stuck on the wrong grade indefinitely.
-    gradeProgressionCompletedAt: timestamp("grade_progression_completed_at", { withTimezone: true }),
     // Set when the close's finalisation (expire what is left, reject pending
     // change requests, notify) has completed. The scheduler finalises any
     // closed session still missing it, so a close interrupted halfway is
@@ -435,6 +458,8 @@ export const registrationSession = pgTable(
       "session_entry_deadline_after_end",
       sql`${table.entryDeadline} IS NULL OR ${table.entryDeadline} > ${table.endDate}`,
     ),
+    check("session_series_year_range", sql`${table.seriesYear} BETWEEN 2000 AND 2100`),
+    index("reg_session_series_idx").on(table.sessionType, table.seriesYear),
   ]
 );
 
@@ -471,13 +496,19 @@ export const teacher = pgTable(
     phone: text("phone"),
     email: text("email"),
     isActive: boolean("is_active").notNull().default(true),
+    // F0a: the staff account that teaches as this teacher (teaching is a
+    // capability: any staff role can hold it). One account per record.
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .$onUpdate(() => new Date())
       .notNull(),
   },
-  (table) => [index("teacher_isActive_idx").on(table.isActive)]
+  (table) => [
+    index("teacher_isActive_idx").on(table.isActive),
+    uniqueIndex("teacher_userId_unique_idx").on(table.userId),
+  ]
 );
 
 /**
@@ -542,30 +573,9 @@ export const schoolFeeSchedule = pgTable(
   ]
 );
 
-/**
- * ============================================
- * GRADE PROGRESSION RUN TABLE (V3 §5.5)
- * ============================================
- *
- * Series-level guard for GRADE-001. With qualification levels, two
- * sessions of the same series (e.g. IGCSE November + A-Level November)
- * can close in the same year; progression must fire exactly once per
- * (sessionType, academicYearLabel). The unique index makes the second
- * trigger a no-op; a failed run leaves no row so the scheduler retries.
- */
-export const gradeProgressionRun = pgTable(
-  "grade_progression_run",
-  {
-    id: text("id").primaryKey(),
-    sessionType: text("session_type").notNull(),
-    // Calendar year the series belongs to, e.g. '2026'
-    seriesYear: text("series_year").notNull(),
-    completedAt: timestamp("completed_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex("gradeProgressionRun_unique_idx").on(table.sessionType, table.seriesYear),
-  ]
-);
+// The grade progression run table (V3 §5.5, GRADE-001) was dropped by F0a:
+// grades are derived from each student's cohort and the series' academic
+// year, so nothing progresses when a window closes (STATE_AUDIT.md ST-13).
 
 /**
  * ============================================
@@ -1426,9 +1436,14 @@ export const registrationWithPaymentRelations = relations(registration, ({ one, 
 /**
  * TEACHER RELATIONS
  */
-export const teacherRelations = relations(teacher, ({ many }) => ({
+export const teacherRelations = relations(teacher, ({ one, many }) => ({
   subjectTeachers: many(subjectTeacher),
   registrations: many(registration),
+  account: one(user, {
+    fields: [teacher.userId],
+    references: [user.id],
+  }),
+  homeroomSections: many(section),
 }));
 
 export const subjectTeacherRelations = relations(subjectTeacher, ({ one }) => ({
@@ -1768,3 +1783,272 @@ export const scheduledAnnouncementRelations = relations(scheduledAnnouncement, (
   }),
 }));
 
+
+/**
+ * ============================================
+ * F0a — SCHOOL SETTINGS
+ * ============================================
+ *
+ * One row per setting the school has changed from its default. Keys and
+ * their schemas, defaults and the roles that may change them are declared in
+ * @repo/validations (SETTINGS); a key never set reads as its default. Every
+ * change is audited (SETTING_CHANGED) in the transaction that writes it.
+ */
+export const schoolSetting = pgTable("school_setting", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").$type<unknown>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+});
+
+/**
+ * ============================================
+ * F0a — ACADEMIC STRUCTURE
+ * ============================================
+ *
+ * Academic years (1 July – 30 June, named by their start year) with the
+ * school's own first and last day; terms inside them; the school calendar
+ * (holidays, early dismissals, exam-only days, extra school days) on top of
+ * the school week (the calendar.schoolWeekdays setting); bell schedules and
+ * their periods per weekday; rooms; homeroom sections per academic year and
+ * their membership, which keeps its history.
+ */
+export const academicYear = pgTable(
+  "academic_year",
+  {
+    id: text("id").primaryKey(),
+    startYear: integer("start_year").notNull(),
+    startsOn: date("starts_on", { mode: "string" }).notNull(),
+    endsOn: date("ends_on", { mode: "string" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("academicYear_startYear_idx").on(table.startYear),
+    check("academic_year_dates_ordered", sql`${table.startsOn} <= ${table.endsOn}`),
+    // The school's days fall inside 1 July – 30 June of the year.
+    check(
+      "academic_year_dates_inside",
+      sql`${table.startsOn} >= make_date(${table.startYear}, 7, 1) AND ${table.endsOn} <= make_date(${table.startYear} + 1, 6, 30)`,
+    ),
+  ]
+);
+
+export const academicTerm = pgTable(
+  "academic_term",
+  {
+    id: text("id").primaryKey(),
+    academicYearId: text("academic_year_id")
+      .notNull()
+      .references(() => academicYear.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    startsOn: date("starts_on", { mode: "string" }).notNull(),
+    endsOn: date("ends_on", { mode: "string" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("academicTerm_yearId_idx").on(table.academicYearId),
+    check("academic_term_dates_ordered", sql`${table.startsOn} <= ${table.endsOn}`),
+  ]
+);
+
+export const bellSchedule = pgTable(
+  "bell_schedule",
+  {
+    id: text("id").primaryKey(),
+    academicYearId: text("academic_year_id")
+      .notNull()
+      .references(() => academicYear.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // The school's ordinary day; every other schedule is a variant a
+    // calendar day runs on.
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("bellSchedule_yearId_idx").on(table.academicYearId),
+    uniqueIndex("bellSchedule_one_default_idx").on(table.academicYearId).where(sql`is_default`),
+  ]
+);
+
+export const bellPeriod = pgTable(
+  "bell_period",
+  {
+    id: text("id").primaryKey(),
+    bellScheduleId: text("bell_schedule_id")
+      .notNull()
+      .references(() => bellSchedule.id, { onDelete: "cascade" }),
+    // 0 = Sunday … 6 = Saturday; null = every school day.
+    weekday: integer("weekday"),
+    position: integer("position").notNull(),
+    label: text("label").notNull(),
+    kind: text("kind").notNull(), // 'lesson' | 'break' | 'assembly' | 'registration'
+    startsAt: text("starts_at").notNull(), // HH:MM
+    endsAt: text("ends_at").notNull(),
+  },
+  (table) => [
+    index("bellPeriod_scheduleId_idx").on(table.bellScheduleId),
+    check("bell_period_weekday_range", sql`${table.weekday} IS NULL OR ${table.weekday} BETWEEN 0 AND 6`),
+    check("bell_period_times", sql`${table.startsAt} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' AND ${table.endsAt} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' AND ${table.endsAt} > ${table.startsAt}`),
+  ]
+);
+
+export const calendarEntry = pgTable(
+  "calendar_entry",
+  {
+    id: text("id").primaryKey(),
+    academicYearId: text("academic_year_id")
+      .notNull()
+      .references(() => academicYear.id, { onDelete: "cascade" }),
+    // 'holiday' | 'early_dismissal' | 'exam_only' | 'school_day'
+    kind: text("kind").notNull(),
+    name: text("name").notNull(),
+    startsOn: date("starts_on", { mode: "string" }).notNull(),
+    endsOn: date("ends_on", { mode: "string" }).notNull(),
+    // The bells that day, when not the default schedule.
+    bellScheduleId: text("bell_schedule_id").references(() => bellSchedule.id, { onDelete: "set null" }),
+    notes: text("notes"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("calendarEntry_yearId_idx").on(table.academicYearId),
+    index("calendarEntry_dates_idx").on(table.startsOn, table.endsOn),
+    check("calendar_entry_dates_ordered", sql`${table.startsOn} <= ${table.endsOn}`),
+    check("calendar_entry_kind_valid", sql`${table.kind} IN ('holiday', 'early_dismissal', 'exam_only', 'school_day')`),
+  ]
+);
+
+export const room = pgTable(
+  "room",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    capacity: integer("capacity"),
+    // 'classroom' | 'science_lab' | 'computer_lab' | 'hall' | 'library' | 'art_room' | 'sports' | 'other'
+    type: text("type").notNull().default("classroom"),
+    features: jsonb("features").$type<string[]>().notNull().default([]),
+    notes: text("notes"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("room_name_unique_idx").on(sql`lower(${table.name})`),
+    check("room_capacity_positive", sql`${table.capacity} IS NULL OR ${table.capacity} > 0`),
+  ]
+);
+
+export const section = pgTable(
+  "section",
+  {
+    id: text("id").primaryKey(),
+    academicYearId: text("academic_year_id")
+      .notNull()
+      .references(() => academicYear.id, { onDelete: "restrict" }),
+    grade: integer("grade").notNull(),
+    name: text("name").notNull(),
+    homeroomTeacherId: text("homeroom_teacher_id").references(() => teacher.id, { onDelete: "set null" }),
+    roomId: text("room_id").references(() => room.id, { onDelete: "set null" }),
+    capacity: integer("capacity"),
+    // The section of the year before that a roll-over made this one from;
+    // a second roll-over finds it and changes nothing.
+    rolledFromSectionId: text("rolled_from_section_id").references((): AnyPgColumn => section.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("section_yearId_idx").on(table.academicYearId),
+    uniqueIndex("section_year_name_idx").on(table.academicYearId, sql`lower(${table.name})`),
+    uniqueIndex("section_rolled_from_idx").on(table.rolledFromSectionId),
+    check("section_grade_range", sql`${table.grade} BETWEEN 10 AND 12`),
+    check("section_capacity_positive", sql`${table.capacity} IS NULL OR ${table.capacity} > 0`),
+  ]
+);
+
+export const sectionMembership = pgTable(
+  "section_membership",
+  {
+    id: text("id").primaryKey(),
+    sectionId: text("section_id")
+      .notNull()
+      .references(() => section.id, { onDelete: "restrict" }),
+    studentId: text("student_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    // The section's year, kept here so the database holds the rule: one open
+    // membership per student per academic year.
+    academicYearId: text("academic_year_id")
+      .notNull()
+      .references(() => academicYear.id, { onDelete: "restrict" }),
+    startedOn: date("started_on", { mode: "string" }).notNull(),
+    endedOn: date("ended_on", { mode: "string" }),
+    endReason: text("end_reason"),
+    addedBy: text("added_by").references(() => user.id, { onDelete: "set null" }),
+    endedBy: text("ended_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("sectionMembership_sectionId_idx").on(table.sectionId),
+    index("sectionMembership_studentId_idx").on(table.studentId),
+    uniqueIndex("sectionMembership_one_open_per_year_idx")
+      .on(table.studentId, table.academicYearId)
+      .where(sql`ended_on IS NULL`),
+    check("section_membership_dates_ordered", sql`${table.endedOn} IS NULL OR ${table.endedOn} >= ${table.startedOn}`),
+  ]
+);
+
+export const academicYearRelations = relations(academicYear, ({ many }) => ({
+  terms: many(academicTerm),
+  calendarEntries: many(calendarEntry),
+  bellSchedules: many(bellSchedule),
+  sections: many(section),
+}));
+
+export const academicTermRelations = relations(academicTerm, ({ one }) => ({
+  academicYear: one(academicYear, { fields: [academicTerm.academicYearId], references: [academicYear.id] }),
+}));
+
+export const bellScheduleRelations = relations(bellSchedule, ({ one, many }) => ({
+  academicYear: one(academicYear, { fields: [bellSchedule.academicYearId], references: [academicYear.id] }),
+  periods: many(bellPeriod),
+}));
+
+export const bellPeriodRelations = relations(bellPeriod, ({ one }) => ({
+  schedule: one(bellSchedule, { fields: [bellPeriod.bellScheduleId], references: [bellSchedule.id] }),
+}));
+
+export const calendarEntryRelations = relations(calendarEntry, ({ one }) => ({
+  academicYear: one(academicYear, { fields: [calendarEntry.academicYearId], references: [academicYear.id] }),
+  bellSchedule: one(bellSchedule, { fields: [calendarEntry.bellScheduleId], references: [bellSchedule.id] }),
+}));
+
+export const sectionRelations = relations(section, ({ one, many }) => ({
+  academicYear: one(academicYear, { fields: [section.academicYearId], references: [academicYear.id] }),
+  homeroomTeacher: one(teacher, { fields: [section.homeroomTeacherId], references: [teacher.id] }),
+  room: one(room, { fields: [section.roomId], references: [room.id] }),
+  memberships: many(sectionMembership),
+}));
+
+export const sectionMembershipRelations = relations(sectionMembership, ({ one }) => ({
+  section: one(section, { fields: [sectionMembership.sectionId], references: [section.id] }),
+  student: one(user, { fields: [sectionMembership.studentId], references: [user.id] }),
+  academicYear: one(academicYear, { fields: [sectionMembership.academicYearId], references: [academicYear.id] }),
+}));

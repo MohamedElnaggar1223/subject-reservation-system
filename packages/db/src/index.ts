@@ -17,6 +17,9 @@ export * from './schema'
 // Health checks
 export * from './health'
 
+// The grade rule in SQL (F0a)
+export * from './academic'
+
 /**
  * Drizzle ORM Query Builders
  *

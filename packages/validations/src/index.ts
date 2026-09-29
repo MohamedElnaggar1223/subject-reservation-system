@@ -17,6 +17,7 @@ export * from './api-response'
  * Domain-Specific Validations
  */
 export * from './file/file.validations'
+export * from './file/upload-purposes'
 
 /**
  * IGCSE System Validations
@@ -38,3 +39,12 @@ export * from './receipt/receipt.validations'
 export * from './exception/exception.validations'
 export * from './remark/remark.validations'
 export * from './desk/desk.validations'
+
+/**
+ * F0a — core foundation: the academic year and grade rules, the academic
+ * structure, the student record, and the settings store.
+ */
+export * from './academic/academic-year'
+export * from './academic/structure.validations'
+export * from './student/student.validations'
+export * from './settings/settings'

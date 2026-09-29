@@ -239,6 +239,27 @@
       "when": 1790557902648,
       "tag": "0033_session_finalized_at",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1790682459417,
+      "tag": "0034_foundation_structure",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1790682482956,
+      "tag": "0035_foundation_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790682521288,
+      "tag": "0036_foundation_drop_stored_grade",
+      "breakpoints": true
     }
   ]
 }

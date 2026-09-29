@@ -1,8 +1,11 @@
 /**
- * Teacher Validation Schemas (V3 §6.7)
+ * Teacher Validation Schemas (V3 §6.7, F0a)
  *
- * Teachers are data-only profiles — no login, no portal. Admins manage
- * them; students optionally pick a preferred teacher at registration.
+ * A teacher record is the person who teaches, linked to the subjects they
+ * teach. Since F0a a record can be linked to one staff account
+ * (teacher.userId): teaching is a capability, so a coordinator or admin who
+ * teaches gets the teacher screens for their own lessons, and a `teacher`
+ * account is always linked to one.
  */
 
 import { z } from 'zod';
@@ -57,3 +60,9 @@ export const ListTeachersQuery = z.object({
     .optional(),
 });
 export type ListTeachersQueryType = z.infer<typeof ListTeachersQuery>;
+
+/** Link a teacher record to a staff account, or unlink it (userId null). */
+export const LinkTeacherAccount = z.object({
+  userId: z.string().min(1).nullable(),
+});
+export type LinkTeacherAccountType = z.infer<typeof LinkTeacherAccount>;

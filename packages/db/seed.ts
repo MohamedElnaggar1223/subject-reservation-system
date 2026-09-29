@@ -256,6 +256,8 @@ interface SessionSeed {
   id: string;
   name: string;
   sessionType: string;
+  // The exam series' year (F0a): it, not the window's dates, decides the grade.
+  seriesYear: number;
   startDate: Date;
   endDate: Date;
   status: string;
@@ -266,6 +268,7 @@ const sessions: SessionSeed[] = [
     id: sessionId("june-2026"),
     name: "June 2026",
     sessionType: "june",
+    seriesYear: 2026,
     startDate: new Date("2026-02-01T00:00:00Z"),
     endDate: new Date("2026-04-30T23:59:59Z"),
     status: "active",
@@ -274,6 +277,7 @@ const sessions: SessionSeed[] = [
     id: sessionId("november-2026"),
     name: "November 2026",
     sessionType: "november",
+    seriesYear: 2026,
     startDate: new Date("2026-07-01T00:00:00Z"),
     endDate: new Date("2026-09-30T23:59:59Z"),
     status: "draft",

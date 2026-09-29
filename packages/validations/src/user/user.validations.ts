@@ -9,6 +9,7 @@
 
 import { z } from 'zod';
 import { GradeSchema, RoleSchema } from '../roles';
+import { EntryGradeSchema } from '../academic/academic-year';
 
 /**
  * User ID validation (UUID format)
@@ -35,7 +36,9 @@ export type UpdateProfileType = z.infer<typeof UpdateProfile>;
 
 /**
  * Admin Update User
- * Admin can update additional fields like grade and role
+ * Admin can update the name, phone, role and ban. A student's grade is not
+ * edited here: it is derived from the cohort, and a correction is an audited
+ * cohort change with a reason (PUT /v1/students/:id/cohort, F0a).
  */
 export const AdminUpdateUser = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long').optional(),
@@ -45,7 +48,6 @@ export const AdminUpdateUser = z.object({
     .max(20, 'Phone number too long')
     .optional()
     .nullable(),
-  grade: GradeSchema.optional().nullable(),
   // V3: admins provision finance staff by promoting an account's role
   role: RoleSchema.optional(),
   banned: z.boolean().optional(),
@@ -55,33 +57,24 @@ export type AdminUpdateUserType = z.infer<typeof AdminUpdateUser>;
 
 /**
  * Student Registration Data
- * Additional fields collected during student sign-up
+ * Additional fields collected during student sign-up: the grade the student
+ * is in this academic year (9 = starts grade 10 next year). The cohort is
+ * stored (F0a).
  */
 export const StudentRegistrationData = z.object({
-  grade: GradeSchema,
+  grade: EntryGradeSchema,
 });
 export type StudentRegistrationDataType = z.infer<typeof StudentRegistrationData>;
 
 /**
- * User query filters (for admin)
+ * User query filters (for admin). `grade` is today's grade.
  */
 export const UserQueryFilters = z.object({
   role: RoleSchema.optional(),
-  grade: GradeSchema.optional(),
+  grade: z.coerce.number().pipe(GradeSchema).optional(),
   search: z.string().optional(),
 });
 export type UserQueryFiltersType = z.infer<typeof UserQueryFilters>;
 
-/**
- * Manual Grade Adjustment (GRADE-002)
- * Admin sets a student's grade with a mandatory reason.
- * newGrade of null means the student is marked as graduated.
- */
-export const ManualGradeAdjustment = z.object({
-  newGrade: GradeSchema.nullable(),
-  reason: z
-    .string()
-    .min(5, 'Reason must be at least 5 characters')
-    .max(500, 'Reason too long'),
-});
-export type ManualGradeAdjustmentType = z.infer<typeof ManualGradeAdjustment>;
+// The manual grade adjustment (GRADE-002) was removed by F0a: a grade is
+// derived from the cohort; see CorrectCohort in student.validations.ts.

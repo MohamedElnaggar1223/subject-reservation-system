@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { ROLES, type Role } from '../roles';
 
 export const EXCEPTION_TYPES = [
   'discount_percent',
@@ -15,6 +16,10 @@ export const EXCEPTION_TYPES = [
   'deadline_extension',
   'late_registration',
   'custom_refund_percent',
+  // F0a: a grade-10 student may sit a series other than June (an audited
+  // exception to "grade 10 sits June only"). Scope: one series, or every
+  // series of their grade-10 year when no session is given.
+  'grade10_other_series',
 ] as const;
 
 export const ExceptionTypeSchema = z.enum(EXCEPTION_TYPES);
@@ -28,7 +33,31 @@ export const EXCEPTION_TYPE_LABELS: Record<typeof EXCEPTION_TYPES[number], strin
   deadline_extension:    'Deadline Extension',
   late_registration:     'Late Registration Permission',
   custom_refund_percent: 'Custom Refund %',
+  grade10_other_series:  'Grade 10: sit a series other than June',
 };
+
+/**
+ * Who may grant (and revoke) each exception type, checked in the handler
+ * (F0a). Money exceptions are the finance admin's; the grade-10 rule is
+ * academic, the coordinator's. Admin may grant every type.
+ */
+export const EXCEPTION_GRANT_ROLES: Record<(typeof EXCEPTION_TYPES)[number], readonly Role[]> = {
+  discount_percent:      [ROLES.FINANCE_ADMIN, ROLES.ADMIN],
+  discount_fixed:        [ROLES.FINANCE_ADMIN, ROLES.ADMIN],
+  custom_price:          [ROLES.FINANCE_ADMIN, ROLES.ADMIN],
+  fee_waiver:            [ROLES.FINANCE_ADMIN, ROLES.ADMIN],
+  deadline_extension:    [ROLES.FINANCE_ADMIN, ROLES.ADMIN],
+  late_registration:     [ROLES.FINANCE_ADMIN, ROLES.ADMIN],
+  custom_refund_percent: [ROLES.FINANCE_ADMIN, ROLES.ADMIN],
+  grade10_other_series:  [ROLES.COORDINATOR, ROLES.ADMIN],
+};
+
+/** Every role that may grant at least one exception type. */
+export const EXCEPTION_ROLES = [ROLES.FINANCE_ADMIN, ROLES.COORDINATOR, ROLES.ADMIN] as const;
+
+export function exceptionTypesGrantableBy(role: string | null | undefined): (typeof EXCEPTION_TYPES)[number][] {
+  return EXCEPTION_TYPES.filter((t) => (EXCEPTION_GRANT_ROLES[t] as readonly string[]).includes(role ?? ''));
+}
 
 /** Types whose `value` is required and meaningful */
 export const VALUE_EXCEPTION_TYPES = [

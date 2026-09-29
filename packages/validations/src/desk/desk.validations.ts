@@ -6,7 +6,8 @@
  */
 
 import { z } from 'zod';
-import { RoleSchema, GradeSchema } from '../roles';
+import { RoleSchema } from '../roles';
+import { EntryGradeSchema } from '../academic/academic-year';
 import { CommonSchemas, isWholePiastres, PIASTRES_MESSAGE } from '../common.validations';
 import { SubjectRegistrationOptions } from '../registration/registration.validations';
 
@@ -18,12 +19,30 @@ export const AdminCreateUser = z
     email: z.string().email('Invalid email'),
     password: CommonSchemas.password,
     role: RoleSchema,
-    // Required when creating a student
-    grade: GradeSchema.optional(),
+    // Required when creating a student: the grade this academic year; the
+    // cohort is stored (F0a).
+    grade: EntryGradeSchema.optional(),
+    // Teaching is a capability: a staff account may be linked to a teacher
+    // record — an existing one, or a new one made from this account's name
+    // and email. A teacher account needs one of the two.
+    teacherId: z.string().min(1).optional(),
+    newTeacherRecord: z.boolean().optional(),
   })
   .refine((d) => d.role !== 'student' || d.grade !== undefined, {
     message: 'Students need a grade',
     path: ['grade'],
+  })
+  .refine((d) => d.role !== 'teacher' || !!d.teacherId || d.newTeacherRecord === true, {
+    message: 'A teacher account links to a teacher record: pick one, or create one',
+    path: ['teacherId'],
+  })
+  .refine((d) => !(d.teacherId && d.newTeacherRecord), {
+    message: 'Link an existing teacher record or create one, not both',
+    path: ['teacherId'],
+  })
+  .refine((d) => !(d.teacherId || d.newTeacherRecord) || !['student', 'parent'].includes(d.role), {
+    message: 'Only staff accounts can be linked to a teacher record',
+    path: ['teacherId'],
   });
 export type AdminCreateUserType = z.infer<typeof AdminCreateUser>;
 
@@ -51,7 +70,8 @@ const DeskPerson = z.object({
 export const DeskOnboardFamily = z.object({
   parent: DeskPerson,
   student: DeskPerson.extend({
-    grade: GradeSchema.optional(),
+    // The grade this academic year (9 = starts grade 10 next year).
+    grade: EntryGradeSchema.optional(),
   }),
 });
 export type DeskOnboardFamilyType = z.infer<typeof DeskOnboardFamily>;

@@ -54,6 +54,9 @@ export type UpdateSchoolFeeScheduleType = z.infer<typeof UpdateSchoolFeeSchedule
 export const SchoolFeeStatusQuery = z.object({
   // Parents pass the child; students default to themselves
   studentId: z.string().min(1).optional(),
+  // Default: the academic year today falls in. A registration for a series
+  // in the next academic year asks for that year's fee (F0a).
+  academicYear: AcademicYearSchema.optional(),
 });
 export type SchoolFeeStatusQueryType = z.infer<typeof SchoolFeeStatusQuery>;
 
@@ -64,5 +67,8 @@ export type SchoolFeeStatusQueryType = z.infer<typeof SchoolFeeStatusQuery>;
 export const PaySchoolFee = z.object({
   studentId: z.string().min(1, 'Invalid student ID'),
   paymentMethod: z.enum(['in_school', 'instapay']),
+  // Default: the academic year today falls in; the next one may be paid
+  // ahead, for a series that belongs to it (F0a).
+  academicYear: AcademicYearSchema.optional(),
 });
 export type PaySchoolFeeType = z.infer<typeof PaySchoolFee>;
