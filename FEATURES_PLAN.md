@@ -555,7 +555,8 @@ for the owner or the lead, not decided by the implementer:
 - **Preregistrations are left out of the eligibility clean-up.** A student who leaves (or whose
   cohort or series is corrected, or A-12 turned off) keeps their preregistrations; at the series'
   opening the capture holds them instead of confirming them — money held, one audit row, finance
-  told. Refunding them is the owner's call (STATE_AUDIT SO-4).
+  told. Nothing releases a held preregistration until the owner decides (STATE_AUDIT SO-4): the
+  family cannot cancel it once the series is open, and after the window closes it stays held.
 - **Pending swap requests on a leaver's paid subject stay pending.** Approving one is refused with
   the reason (it would register a new subject); the request is not rejected at the withdrawal.
 - **Refund windows still take their academic year from the window's start date**

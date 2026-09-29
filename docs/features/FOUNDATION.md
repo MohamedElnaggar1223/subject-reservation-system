@@ -91,7 +91,12 @@ grade after, 0 non-students with a cohort, 0 windows without a series, the bound
 right in SQL, row counts unchanged. The graduate rule was then proven on a fourth fresh copy
 enriched with a **20 May 2026** graduation (→ cohort 2023, grade 13 today) and a **10 November
 2025** graduation (→ 2022, grade 14), with one `STUDENT_COHORT_INFERRED` row per inferred
-graduate (`backfill-rich2-{before,after}.txt`).
+graduate (`backfill-rich2-{before,after}.txt`). **At the current 0035** (with the audit rows) the
+proof was re-run on fresh copies of `igcse_audit` (pg_dump; 77 audit rows before and after,
+nothing inferred or unrecorded, counts unchanged) and of the enriched set (80 → 85 audit rows:
+four `STUDENT_COHORT_INFERRED`, one `STUDENT_COHORT_UNRECORDED`, 0 mismatches)
+(`backfill-{audit3,rich3}-{before,after}.txt`); the dev database `igcse_foundation_dev` was
+rebuilt from a fresh copy of `igcse_template_dev` and the stale proof copies dropped.
 
 ---
 
@@ -157,9 +162,15 @@ behind an uncommitted row while each change fires (controls C19, C20), and a wit
 lands first against the desk taking money, a preregistration, a swap approval and a direct swap
 (controls C22–C25). The approval path needs nothing: its UPDATE is guarded by status.
 
-**A grade-10 exception that lapses** (`validUntil` passes) only bounds when it can be used:
-registrations already made under it stand. Revoking it explicitly still runs the clean-up
-(`exception_revoked`).
+**A grade-10 exception that runs out** (`validUntil` passes) stops allowing new registrations,
+and a scheduler step gives the waiting registrations it covered the same clean-up as a
+revocation (the lead's decision on the confirmation review): `lapseGrade10Exceptions`
+(`exception-lapse.services.ts`), every tick, claims each due exception with a status-guarded
+update (active → `lapsed`), writes `EXCEPTION_LAPSED` and expires what it covered (cause
+`exception_lapsed`) in that transaction, and closes their open checkouts after the commit.
+Paid registrations stand. A second scheduler instance or a revocation at the same moment finds
+nothing to claim; a failure leaves it active for the next tick (ST-06, ST-12). `08e` "a grade-10
+exception that runs out" (two instances at once, one claim), control C29.
 
 ### Today's grade
 
@@ -213,6 +224,7 @@ the commit `closePaymentsOfExpiredRegistrations` fails their open checkouts (esc
 | `graduate_retakes_off` | A-12 turned off (the setting's hook) | graduates' registrations pending; race |
 | `series_corrected` | `PUT /v1/sessions/:id/series` (admin) | series corrected; race |
 | `exception_revoked` | a grade-10 exception revoked | revoked; race |
+| `exception_lapsed` | a grade-10 exception's `validUntil` passes (scheduler) | runs out; two instances at once |
 
 A rejected transfer later releases a kept registration the student may no longer sit
 (`failOpenPayment` expires it when the window is closed **or** the student is ineligible —
@@ -226,9 +238,13 @@ owner's decision (SO-4). **At the series' opening the capture asks too** (inside
 transaction, `mayRegisterForInTx`): a preregistration of a student who may no longer sit the
 series is neither confirmed nor moved to payment — it stays preregistered, its money held, one
 `PREREG_HELD_INELIGIBLE` row (the reason, the amount held) and a notice to finance and the admin
-(`PREREGISTRATION_HELD`), once; the recovery sweep asks again each tick and captures it if the
-student may sit the series again (a readmission). `08e` "withdrawn with preregistrations, then
-the series opens" (a paid and an unpaid one), control C21, and `09`.
+(`PREREGISTRATION_HELD`), once. While the window is open, the recovery sweep asks again each
+tick and captures it if the student may sit the series again (a readmission). **Nothing else
+releases a held preregistration:** the family cannot cancel an opened series' preregistration
+and the direct drop moves only confirmed subjects, so it stays preregistered, its money held,
+until the owner decides (SO-4) — and after the window closes it stays held (no release path is
+built, by the lead's decision). `08e` "withdrawn with preregistrations, then the series opens"
+(a paid and an unpaid one), control C21, and `09`.
 
 A leaver's **confirmed** registrations are untouched: only waiting ones expire.
 
@@ -380,21 +396,22 @@ to a teacher record.
 | File | Proves |
 |---|---|
 | `08d-foundation-grade` | the boundary table (rows 1–10, each a test), unknown cohort, the 1 July instants in code and SQL, all 13 call sites, the grade-10 exception, the core rule by series grade, row 4's fee with and without a 2027/28 schedule, paying next year's fee, A-13, A-14, inputs, the cohort correction |
-| `08e-foundation-eligibility-changes` | withdrawn, cohort moved back, A-12 off, series corrected, exception revoked, readmission; a withdrawn student's preregistrations held at the opening; a draft's series refused under preregistrations and audited without |
+| `08e-foundation-eligibility-changes` | withdrawn (an InstaPay and an in-school checkout), cohort moved back, A-12 off, series corrected, exception revoked, an exception running out, readmission; a withdrawn student's preregistrations held at the opening; a draft's series refused under preregistrations and audited without |
 | `08f-foundation-structure` | settings, uploads, years and terms, bells, the calendar day, rooms, sections, the teacher linked to a coordinator, the Team rules, the roll-over |
-| `08g-foundation-races` | a registration racing each eligibility change (forced order); a withdrawal landing first against the desk with money, a preregistration, a swap approval and a direct swap; two withdrawals, two A-12 changes, two placements, two roll-overs |
+| `08g-foundation-races` | a registration racing a withdrawal, a transfer, a cohort correction, a series correction, a revoked grade-10 exception and A-12 turned off (forced order); a withdrawal landing first against the desk taking money, a preregistration, a swap approval and a direct swap (on a window of its own); two withdrawals, two A-12 changes, two placements, two roll-overs |
 | `05` | uploads between families, eligibility between families, each exception type's roles in both directions, another class and the gate |
 | `04` | every endpoint for every role, the three new ones included |
 | `06` | the new roles refused at better-auth's admin endpoints; privilege fields (`cohortYear`, `leftOn`) cannot be injected at sign-up or profile update |
-| `09` | an `ineligible` expiry must name its cause; nothing waits for a series its student may not sit (bar an open checkout's hold), and no preregistration was captured while its student was refused |
+| `09` | an `ineligible` expiry must name its cause; nothing waits for a series its student may not sit (bar the clean-up's own holds: a transfer being checked, an InstaPay checkout inside its grace), and no preregistration was captured while its student was refused |
 
-**Negative controls** (`.audit/foundation-evidence/controls.py`, one trail row each): C01–C27,
-each fix undone once and shown red, then restored; re-run in full at the review's head (C01
-now undoes both the check and its locked re-check: either alone still refuses). C21 capture
+**Negative controls** (`.audit/foundation-evidence/controls.py`, one trail row each, naming
+the commit they ran on): C01–C29, each fix undone once and shown red, then restored (C01
+undoes both the check and its locked re-check: either alone still refuses). C21 capture
 without eligibility; C22–C25 the locked re-check at the desk with money, a preregistration, a
 swap approval and a direct swap; C26 a draft's series edited under preregistrations; C27 a
-backfilled student recording their own grade. `grep -rn "NEGATIVE CONTROL" apps packages`
-returns nothing.
+backfilled student recording their own grade; C28 the clean-up held by any open checkout (an
+in-school one: 08e and 09 red); C29 a lapsed exception without the clean-up.
+`grep -rn "NEGATIVE CONTROL" apps packages` returns nothing.
 
 **Changed assertions** (each with its own trail row: old, new, why):
 - `01` desk onboarding: the stored grade → cohort and derived grade (not money).
@@ -487,3 +504,9 @@ returns nothing.
   re-driven in Arabic.
 - 16:55Z — gates green at 9c84172: check-types clean; the suite in local time and UTC, 16 files,
   236 passed, 1 todo each.
+- 17:10–17:40Z — the confirmation's eight flags: held preregistrations described truly (no
+  release path, SO-4); the backfill proof re-run at the current 0035 and the dev database
+  rebuilt; 09 exempts only the clean-up's holds (C28 with an in-school checkout); a lapsed
+  grade-10 exception cleaned up by a claimed scheduler step (C29); reviewed inferences leave the
+  filter; 08g races a transfer and a cohort correction and its swaps use a window of their own;
+  dates in the page language; controls C01–C29 re-run on 03cd5ee.
