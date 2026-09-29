@@ -326,6 +326,15 @@ export async function takingsOn(officer: Client, date: string): Promise<Takings>
   return (await fetchTakings(officer, date)).totals;
 }
 
+/**
+ * The school's date (Africa/Cairo) — the day a section move, a leaving date or
+ * any other school-calendar date means. Not localToday(): a run in another zone
+ * (CI runs in UTC) is on a different date for part of every day.
+ */
+export function schoolToday(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date());
+}
+
 /** Yesterday's local date, for scenarios that move a timestamp back a day. */
 export function localYesterday(): string {
   return new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString('en-CA');

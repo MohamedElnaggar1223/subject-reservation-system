@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, one, sql, futureWindow, openWindow, localToday, lockWaiters, holdRowLock,
+  admin, staff, onboard, subject, session, one, sql, futureWindow, openWindow, schoolToday, lockWaiters, holdRowLock,
   type Client,
 } from './helpers';
 
@@ -120,7 +120,7 @@ describe('F0a: races', () => {
       const f = await family('withdraw');
       await extend(f.studentId, nov);
       const { reg, chg } = await race(f, nov, subj[0]!, () =>
-        coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'race check' } }));
+        coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: schoolToday(), reason: 'race check' } }));
       expect(reg.status).toBe(201);
       expect(chg.status).toBe(200);
       const [created] = (await reg.json() as { data: { id: string }[] }).data;
@@ -133,7 +133,7 @@ describe('F0a: races', () => {
       const f = await family('transfer');
       await extend(f.studentId, nov);
       const { reg, chg } = await race(f, nov, subj[5]!, () =>
-        coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'transferred', leftOn: localToday(), reason: 'race check' } }));
+        coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'transferred', leftOn: schoolToday(), reason: 'race check' } }));
       expect(reg.status).toBe(201);
       expect(chg.status).toBe(200);
       const [created] = (await reg.json() as { data: { id: string }[] }).data;
@@ -220,7 +220,7 @@ describe('F0a: races', () => {
     let leaving: Promise<Res> | undefined;
     let creating: Promise<Res> | undefined;
     try {
-      leaving = coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'race check' } });
+      leaving = coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: schoolToday(), reason: 'race check' } });
       await lockWaiters(1);
       creating = path();
       await Promise.race([creating, lockWaiters(2)]);
@@ -316,7 +316,7 @@ describe('F0a: races', () => {
     it('two coordinators withdraw the same student at once: one leaving recorded, one refused, one audit row', async () => {
       const f = await family('twice');
       const results = await Promise.all([coordinator, coordinator2].map((c) =>
-        c.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'recorded twice' } })));
+        c.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: schoolToday(), reason: 'recorded twice' } })));
       expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
       expect((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'STUDENT_LEFT' and entity_id = $1`, [f.studentId])).n).toBe('1');
     });

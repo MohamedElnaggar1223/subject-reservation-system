@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { apiResponse, academicYearStartOf, schoolDateString } from '@repo/validations';
+import { apiResponse, academicYearStartOf } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, lockWaiters, type Client,
+  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, lockWaiters, schoolToday, type Client,
 } from './helpers';
 
 /** Hold the year's enrolment lock (upsertEnrolments' advisory lock) from outside, so two commits queue behind it together. */
@@ -100,7 +100,7 @@ describe('F0b: course enrolment', () => {
       expect(self).toMatchObject({ mode: 'self_study', teacherId: null });
       await apiResponse(coordinator.api.v1.enrolments[':id'].$put({ param: { id: bio.id }, json: { mode: 'in_school', teacherId: tB } }));
       const ended = await apiResponse(coordinator.api.v1.enrolments[':id'].end.$post({ param: { id: bio.id }, json: { reason: 'dropped Biology in October' } }));
-      expect(ended).toMatchObject({ endReason: 'dropped Biology in October', endedOn: schoolDateString(new Date()) });
+      expect(ended).toMatchObject({ endReason: 'dropped Biology in October', endedOn: schoolToday() });
       await audited([bio.id], ['ENROLMENT_CREATED', 'ENROLMENT_UPDATED', 'ENROLMENT_UPDATED', 'ENROLMENT_ENDED']);
       expect(await refused(coordinator.api.v1.enrolments[':id'].end.$post({ param: { id: bio.id }, json: { reason: 'again' } }))).toEqual({ status: 409, error: 'This enrolment already ended' });
       const all = await apiResponse(coordinator.api.v1.enrolments.$get({ query: { academicYearId: thisYear, studentId: s.s1!.studentId, includeEnded: 'true' } }));
@@ -111,7 +111,7 @@ describe('F0b: course enrolment', () => {
     it('a student who leaves the school stops being taught: their enrolments end with the leaving, and new ones are refused', async () => {
       await apiResponse(enrol({ studentId: s.s5!.studentId, subjectId: subj.ENG!, teacherId: tA }));
       await apiResponse(coordinator.api.v1.students[':id'].leave.$post({
-        param: { id: s.s5!.studentId }, json: { kind: 'withdrawn', leftOn: schoolDateString(new Date()), reason: 'family moved abroad' },
+        param: { id: s.s5!.studentId }, json: { kind: 'withdrawn', leftOn: schoolToday(), reason: 'family moved abroad' },
       }));
       expect(await openEnrolments(s.s5!.studentId)).toEqual([]);
       expect((await one<{ reason: string }>(`select end_reason as reason from course_enrolment where student_id = $1`, [s.s5!.studentId])).reason).toBe('Left the school (withdrawn)');

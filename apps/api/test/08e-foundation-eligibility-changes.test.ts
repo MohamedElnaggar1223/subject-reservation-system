@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, money, audited, notified, openWindow, futureWindow, localToday,
+  admin, staff, onboard, subject, session, refused, one, sql, money, audited, notified, openWindow, futureWindow, schoolToday,
   runSessionRecovery, waitFor, notificationsFor,
   type Client,
 } from './helpers';
@@ -77,7 +77,7 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     const { reg, pay } = await checkout(f, subj.S2!);
     expect(await escrowOf(f.studentId)).toBe(money(funded - 300));
 
-    const r = await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'moved abroad' } }));
+    const r = await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: schoolToday(), reason: 'moved abroad' } }));
     expect(r).toMatchObject({ registrationsExpired: 1, paymentsClosed: 1 });
 
     expect(await statusOf('registration', reg)).toBe('expired');
@@ -90,7 +90,7 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     expect(notice[0]?.body).toContain('has been withdrawn from the school');
     // Shown as such: the desk's search and the student's record.
     const found = await apiResponse(officer.api.v1.users.search.$get({ query: { search: f.student.email } }));
-    expect(found[0]).toMatchObject({ leftKind: 'withdrawn', leftOn: localToday() });
+    expect(found[0]).toMatchObject({ leftKind: 'withdrawn', leftOn: schoolToday() });
     expect((await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: f.studentId } }))).academic.standing).toBe('withdrawn');
 
     // Back at the school: may register again; what expired stays expired.
@@ -108,7 +108,7 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
     expect(await statusOf('payment', pay)).toBe('pending');
 
-    const r = await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'left mid-checkout' } }));
+    const r = await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: schoolToday(), reason: 'left mid-checkout' } }));
     expect(r).toMatchObject({ registrationsExpired: 1, paymentsClosed: 1 });
     expect(await statusOf('registration', reg)).toBe('expired');
     expect(await expiryOf(reg)).toEqual({ was: 'pending_payment', reason: 'ineligible', detail: 'withdrawn' });
@@ -250,7 +250,7 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     const heldOf = async () => money((await one<{ held: string }>(`select held_balance as held from escrow where student_id = $1`, [f.studentId])).held);
     expect(await heldOf()).toBe(1200);
 
-    await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'left before the series opened' } }));
+    await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: schoolToday(), reason: 'left before the series opened' } }));
     // The withdrawal leaves preregistrations for the owner (SO-4).
     expect([await statusOf('registration', paid), await statusOf('registration', unpaid)]).toEqual(['preregistered', 'preregistered']);
 

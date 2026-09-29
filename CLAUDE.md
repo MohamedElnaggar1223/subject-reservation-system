@@ -75,7 +75,11 @@ COMMITTED a re-read inside a transaction serializes nothing (MONEY_AUDIT.md MA-0
 Work on a branch in a worktree; when the three gates above are green, merge to `main` and
 push it directly — the owner does not want to wait for a merge. Never force-push. Decision
 trails for audits and multi-phase work live in `.audit/*.tsv` (force-added; the directory is
-otherwise ignored so cookies and test accounts never land in git).
+otherwise ignored so cookies and test accounts never land in git). Rows are written with
+`scripts/trail-row.py`, one per event, when it happens: it stamps the current UTC time, and a
+row written later must give the event's own time and where it comes from (`--at`, `--source`:
+the session log, a file's modification time, a CI run). Twice a batch of rows was written with
+one time for events hours apart; the script refuses a row with the previous row's time.
 
 ## The desk comes first
 
