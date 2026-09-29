@@ -218,7 +218,7 @@ export const links = new Hono<HonoEnv>()
       const user = c.get('user')!;
       const data = c.req.valid('json');
       try {
-        const result = await onboardFamily(data);
+        const result = await onboardFamily(data, user.id);
         await logAction(user.id, 'DESK_FAMILY_ONBOARDED', 'user', result.student.id, null, {
           parent: result.parent.email, student: result.student.email, linkStatus: result.linkStatus,
         }, extractAuditContext(c))

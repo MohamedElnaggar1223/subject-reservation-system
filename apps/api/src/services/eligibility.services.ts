@@ -198,6 +198,13 @@ export async function assertMayRegisterFor(studentId: string, sessionId: string,
  * setting — callers run this first in their transaction.
  */
 export async function assertMayRegisterForInTx(tx: Tx, studentId: string, sessionId: string): Promise<Eligibility> {
+  const e = await mayRegisterForInTx(tx, studentId, sessionId);
+  if (!e.allowed) throw new Error(e.reason!);
+  return e;
+}
+
+/** The locked judgement without the throw (a preregistration's capture holds a refused row instead). */
+export async function mayRegisterForInTx(tx: Tx, studentId: string, sessionId: string): Promise<Eligibility> {
   await tx.select({ id: user.id }).from(user).where(eq(user.id, studentId)).for('share');
   await tx.select({ id: registrationSession.id }).from(registrationSession).where(eq(registrationSession.id, sessionId)).for('share');
   let e = await mayRegisterFor(studentId, sessionId, tx);
@@ -209,7 +216,6 @@ export async function assertMayRegisterForInTx(tx: Tx, studentId: string, sessio
     await lockSetting(tx, 'eligibility.graduateRetakes', 'shared');
     e = await mayRegisterFor(studentId, sessionId, tx);
   }
-  if (!e.allowed) throw new Error(e.reason!);
   return e;
 }
 

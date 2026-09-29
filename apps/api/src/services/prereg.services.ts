@@ -16,14 +16,15 @@
  *    normal receipt-gated refund path with refund windows applied (D-J).
  */
 
-import { db, registration, eq, and } from '@repo/db';
+import { db, registration, auditLog, eq, and } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { PreregisterRegistrationType } from '@repo/validations';
 import { prepareRegistrationInputs } from './registration.services';
 import { creditHeld, debitHeld, getEscrowBalance } from './escrow.services';
 import { executeReceiptGatedDrop } from './receipt.services';
 import { refundPercentage } from './refund.services';
-import { assertMayRegisterFor, assertMayRegisterForInTx } from './eligibility.services';
+import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterForInTx } from './eligibility.services';
+import { notifyFinanceOfHeldPreregistration } from './notification.services';
 import { logger } from '../lib/logger';
 import { entryDeadlineMessage } from './window.services';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
@@ -285,10 +286,20 @@ export async function refundPreregistrationsAtDeadline(sessionId: string) {
  * registration confirms. Unfunded preregs: fall back to
  * pending_payment so the parent pays through the normal open-session
  * flow.
+ *
+ * F0a: a student who may no longer sit the series (withdrawn, transferred,
+ * a corrected cohort or series, A-12 off) is neither confirmed nor moved to
+ * payment: the row stays preregistered with its money held, one
+ * PREREG_HELD_INELIGIBLE row says why, and finance is told — refunding it
+ * is the owner's call (STATE_AUDIT.md SO-4). Asked with the student and the
+ * window held (mayRegisterForInTx), after the row's own lock. A held row is
+ * captured on a later tick if the student may sit the series again (a
+ * readmission).
  */
 export async function capturePreregistrationsForSession(sessionId: string): Promise<{
   captured: number;
   movedToPendingPayment: number;
+  heldIneligible: number;
 }> {
   const preregs = await db.query.registration.findMany({
     where: (r, { eq, and }) =>
@@ -298,6 +309,8 @@ export async function capturePreregistrationsForSession(sessionId: string): Prom
 
   let captured = 0;
   let movedToPendingPayment = 0;
+  let heldIneligible = 0;
+  const newlyHeld: { registrationId: string; held: number; reason: string }[] = [];
 
   for (const reg of preregs) {
     try {
@@ -313,6 +326,18 @@ export async function capturePreregistrationsForSession(sessionId: string): Prom
         if (row?.status !== 'preregistered') return 'skipped' as const;
 
         const { funded } = await preregPaymentState(reg.id, tx);
+        const eligibility = await mayRegisterForInTx(tx, reg.studentId, sessionId);
+        if (!eligibility.allowed) {
+          // Recorded once: the recovery sweep asks again every tick.
+          const [already] = await tx.select({ id: auditLog.id }).from(auditLog)
+            .where(and(eq(auditLog.action, 'PREREG_HELD_INELIGIBLE'), eq(auditLog.entityId, reg.id))).limit(1);
+          if (already) return 'held' as const;
+          const held = funded ? reg.priceAtRegistration : 0;
+          await logAction(null, 'PREREG_HELD_INELIGIBLE', 'registration', reg.id, { status: 'preregistered' },
+            { status: 'preregistered', heldAmount: held, code: eligibility.code, reason: eligibility.reason }, undefined, tx);
+          newlyHeld.push({ registrationId: reg.id, held, reason: eligibility.reason ?? eligibility.code });
+          return 'held' as const;
+        }
         await tx
           .update(registration)
           .set({ status: funded ? 'confirmed' : 'pending_payment', updatedAt: new Date() })
@@ -336,6 +361,7 @@ export async function capturePreregistrationsForSession(sessionId: string): Prom
       });
       if (outcome === 'captured') captured++;
       if (outcome === 'moved') movedToPendingPayment++;
+      if (outcome === 'held') heldIneligible++;
     } catch (err) {
       // A single failed capture (e.g. insufficient held after manual
       // intervention) must not block the rest; the row stays
@@ -344,7 +370,11 @@ export async function capturePreregistrationsForSession(sessionId: string): Prom
     }
   }
 
-  return { captured, movedToPendingPayment };
+  for (const h of newlyHeld) {
+    await notifyFinanceOfHeldPreregistration(h.registrationId, h.held, h.reason)
+      .catch((err) => logger.error(`[prereg] Held-preregistration notice for ${h.registrationId} failed:`, err));
+  }
+  return { captured, movedToPendingPayment, heldIneligible };
 }
 
 /** Held-balance snapshot used by the escrow UI */

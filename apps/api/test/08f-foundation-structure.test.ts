@@ -150,6 +150,11 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
       expect((await refused(upload(a.parent, 'collector_photo', file(big, 'big.png', 'image/png'), a.studentId))).error).toContain('5MB');
       // A purpose that concerns a student needs one.
       expect((await refused(upload(a.parent, 'supporting_document', file(PDF, 'x.pdf', 'application/pdf')))).status).toBe(400);
+      // The stored name's extension is the detected type's, never the uploader's.
+      const named = await apiResponse(upload(a.parent, 'supporting_document', file(PDF, 'letter.exe', 'application/pdf'), a.studentId));
+      const stored = await one<{ storage_key: string; mime_type: string }>(`select storage_key, mime_type from file where id = $1`, [named.id]);
+      expect(stored.mime_type).toBe('application/pdf');
+      expect(stored.storage_key.endsWith('.pdf')).toBe(true);
     });
 
     it("only the parent's own evidence for this child attaches to a payment; finance then reads a legacy document so attached (O-5)", async () => {
@@ -296,6 +301,19 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
       // Adding again changes nothing.
       expect(await apiResponse(coordinator.api.v1.academic.sections[':id'].members.$post({ param: { id: s11a }, json: { studentIds: [x.studentId] } })))
         .toEqual({ added: 0, moved: 0, alreadyIn: 1 });
+    });
+
+    it('graduations the backfill inferred are listed for staff to review, and the record says so', async () => {
+      const g = await family('inferred', 12);
+      // What migration 0035 writes for a graduate it inferred from a graduation row.
+      await sql(`insert into audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data)
+                 values (gen_random_uuid()::text, null, 'STUDENT_COHORT_INFERRED', 'user', $1, '{"grade": null}', $2)`,
+        [g.studentId, JSON.stringify({ cohortYear: Y - 2, basis: 'graduation_row', graduatedAt: `${Y}-05-20T10:00:00Z` })]);
+      const list = await apiResponse(coordinator.api.v1.students.$get({ query: { inferred: 'true', limit: '500' } }));
+      expect(list.students.find((s) => s.id === g.studentId)).toMatchObject({ cohortInferred: true });
+      expect(list.students.every((s) => s.cohortInferred)).toBe(true);
+      const record = await apiResponse(coordinator.api.v1.students[':id'].$get({ param: { id: g.studentId } }));
+      expect(record.changes.map((c) => c.action)).toContain('STUDENT_COHORT_INFERRED');
     });
 
     it('moving a student keeps the history; the student record and the desk show the section', async () => {

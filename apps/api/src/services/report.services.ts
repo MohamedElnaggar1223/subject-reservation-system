@@ -44,7 +44,7 @@ import {
   sql,
   count,
 } from '@repo/db';
-import { gradeLabel, gradeInAcademicYear, seriesAcademicYearStart } from '@repo/validations';
+import { academicYearLabel, academicYearStartOf, gradeLabel, gradeInAcademicYear, seriesAcademicYearStart } from '@repo/validations';
 
 /**
  * Today's grade as a report cell (F0a): the number for grades 10–12,
@@ -1416,10 +1416,8 @@ export async function generateComprehensiveStaffReport() {
  * surfaced to the admin before a parent trips over it.
  */
 export async function getSetupChecklist() {
-  const now = new Date();
-  const year = now.getMonth() >= 6
-    ? `${now.getFullYear()}-${now.getFullYear() + 1}`
-    : `${now.getFullYear() - 1}-${now.getFullYear()}`;
+  // This academic year as the school counts it: 1 July, Cairo time (F0a).
+  const year = academicYearLabel(academicYearStartOf());
 
   const [sessions, subjects, subjectTeacherLinks, schoolFeeRows, refundWindows, remarkFees] =
     await Promise.all([

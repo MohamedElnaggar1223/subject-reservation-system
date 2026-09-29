@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, one, sql, futureWindow, localToday, lockWaiters,
+  admin, staff, onboard, subject, session, one, sql, futureWindow, openWindow, localToday, lockWaiters, holdRowLock,
   type Client,
 } from './helpers';
 
@@ -179,6 +179,97 @@ describe('F0a: races', () => {
   });
 
   // ─── Two people at once ────────────────────────────────────────────────────
+
+  // ─── A withdrawal landing first: every creating path asks again ────────────
+
+  /**
+   * The other order, for each path that creates a registration: the test
+   * holds the student's row, the withdrawal queues on it, then the path is
+   * fired — its first checks (outside any transaction) still see a student
+   * at school. The row is released: the withdrawal commits first. The path
+   * must now refuse; without its locked re-check it inserts a registration
+   * for a student who has already left (controls C22–C25).
+   */
+  async function afterWithdrawal(f: Family, path: () => Promise<Res>) {
+    const release = await holdRowLock('"user"', f.studentId);
+    let leaving: Promise<Res> | undefined;
+    let creating: Promise<Res> | undefined;
+    try {
+      leaving = coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'race check' } });
+      await lockWaiters(1);
+      creating = path();
+      await Promise.race([creating, lockWaiters(2)]);
+    } finally {
+      await release();
+    }
+    const [left, created] = await Promise.all([leaving!, creating!]);
+    expect(left.status).toBe(200);
+    return created;
+  }
+  const createdAfterLeaving = (studentId: string) =>
+    sql(`select r.id, r.status from registration r
+         where r.student_id = $1 and r.created_at >= (select min(a.created_at) from audit_log a where a.action = 'STUDENT_LEFT' and a.entity_id = $2)`,
+      [studentId, studentId]);
+
+  describe('a withdrawal that lands first refuses every creating path', () => {
+    // A change is made only while its window is open by status (SWAP-006): the swaps need an open
+    // IGCSE window — an earlier suite's when there is one (one active window per type and level).
+    let open: string;
+    beforeAll(async () => {
+      const [found] = await sql<{ id: string }>(
+        `select id from registration_session where status = 'active' and qualification_level = 'igcse' and end_date > now() + interval '1 day' order by created_at limit 1`);
+      open = found?.id ?? await session(adm, 'June (IGCSE, F0a races)', 'june', 'igcse', { ...openWindow(), activate: true });
+    });
+    const deskCash = (f: Family, sessionId: string, subjectId: string) =>
+      officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId, subjectIds: [subjectId], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } } });
+
+    it('the desk taking the money: refused, nothing registered and no money recorded', async () => {
+      const f = await family('first-desk');
+      await extend(f.studentId, nov);
+      const created = await afterWithdrawal(f, () => deskCash(f, nov, subj[0]!));
+      expect(created.status).toBe(400);
+      expect(((await created.json()) as { error: string }).error).toContain('was withdrawn from the school');
+      expect(await sql(`select 1 from registration where student_id = $1`, [f.studentId])).toEqual([]);
+      expect(await sql(`select 1 from payment where student_id = $1`, [f.studentId])).toEqual([]);
+    });
+
+    it('a preregistration: refused, nothing registered', async () => {
+      const f = await family('first-prereg');
+      const draft = await session(adm, 'November (IGCSE, F0a races, prereg)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', thisYear) });
+      const created = await afterWithdrawal(f, () =>
+        f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, subjectIds: [subj[1]!], studentId: f.studentId } }));
+      expect(created.status).toBe(400);
+      expect(((await created.json()) as { error: string }).error).toContain('was withdrawn from the school');
+      expect(await sql(`select 1 from registration where student_id = $1`, [f.studentId])).toEqual([]);
+    });
+
+    it('approving a swap: refused, the paid subject stays and nothing new waits', async () => {
+      const f = await family('first-swap-approve');
+      const paid = (await apiResponse(deskCash(f, open, subj[2]!))).registrations[0]!.id;
+      // The student's swap request, as the request route writes it.
+      const cr = { id: crypto.randomUUID() };
+      await sql(`insert into change_request (id, registration_id, type, requested_by, reason, new_subject_id, price_at_request, price_difference, status)
+                 values ($1, $2, 'swap', $3, 'timetable clash', $4, 1200, 0, 'pending_approval')`, [cr.id, paid, f.studentId, subj[3]!]);
+      const created = await afterWithdrawal(f, () => f.parent.api.v1['change-requests'][':id'].approve.$put({ param: { id: cr.id }, json: {} }));
+      expect(created.status).toBe(400);
+      expect(((await created.json()) as { error: string }).error).toContain('was withdrawn from the school');
+      expect((await one<{ status: string }>(`select status from registration where id = $1`, [paid])).status).toBe('confirmed');
+      expect(await createdAfterLeaving(f.studentId)).toEqual([]);
+      expect(await waitingFor(f.studentId, open)).toEqual([]);
+    });
+
+    it("a parent's direct swap: refused, the paid subject stays and nothing new waits", async () => {
+      const f = await family('first-swap-direct');
+      const paid = (await apiResponse(deskCash(f, open, subj[4]!))).registrations[0]!.id;
+      const created = await afterWithdrawal(f, () =>
+        f.parent.api.v1.registrations[':id'].swap.$post({ param: { id: paid }, json: { newSubjectId: subj[5]!, reason: 'timetable clash' } }));
+      expect(created.status).toBe(400);
+      expect(((await created.json()) as { error: string }).error).toContain('was withdrawn from the school');
+      expect((await one<{ status: string }>(`select status from registration where id = $1`, [paid])).status).toBe('confirmed');
+      expect(await createdAfterLeaving(f.studentId)).toEqual([]);
+      expect(await waitingFor(f.studentId, open)).toEqual([]);
+    });
+  });
 
   describe('two people at once', () => {
     it('two coordinators withdraw the same student at once: one leaving recorded, one refused, one audit row', async () => {

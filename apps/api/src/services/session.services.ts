@@ -16,7 +16,7 @@
  * All database imports come from @repo/db — never from drizzle-orm directly.
  */
 
-import { db, registrationSession, registration, changeRequest, paymentRegistration, payment, user, eq, and, lte, inArray, isNull, sql } from '@repo/db';
+import { db, registrationSession, registration, changeRequest, paymentRegistration, payment, user, eq, and, lte, inArray, notInArray, isNull, sql } from '@repo/db';
 import { capturePreregistrationsForSession } from './prereg.services';
 import { notifySessionOpened, createNotification, notifyPaymentReferenceDue } from './notification.services';
 import { failPayment, closeStrandedPayments } from './payment.services';
@@ -196,41 +196,71 @@ export async function createSession(data: CreateSessionType) {
   return created;
 }
 
+export class DraftSessionError extends Error {
+  constructor(message: string, public readonly status: 400 | 409) {
+    super(message);
+  }
+}
+
 /**
- * Update a DRAFT session.
+ * Update a DRAFT session, audited in the same transaction (SESSION_UPDATED,
+ * before and after, with the reason).
  *
- * All fields (name, sessionType, startDate, endDate) may be changed
- * while the session has not yet been activated.
- * Returns the updated session, or undefined if not found.
+ * All fields may be changed while the session has not yet been activated,
+ * except its exam series (type and year) once anyone has preregistered for
+ * it: the series decides each student's grade, so that change goes through
+ * the audited series correction (PUT /sessions/:id/series), which asks
+ * again whether each student may sit it (F0a). Returns the updated session,
+ * or undefined if it is not found or no longer a draft.
  */
 export async function updateDraftSession(
   id: string,
-  data: UpdateDraftSessionType
+  data: UpdateDraftSessionType,
+  actorId: string,
+  reason: string | null,
+  auditCtx?: AuditContext,
 ) {
-  // V3 §5.5: validate the MERGED state never yields a January IGCSE
-  // session (no January IGCSE series exists in Egypt).
-  if (data.sessionType !== undefined || data.qualificationLevel !== undefined) {
-    const current = await getSessionById(id);
-    if (!current) return undefined;
+  return db.transaction(async (tx) => {
+    const [current] = await tx.select().from(registrationSession).where(eq(registrationSession.id, id)).for('update');
+    if (!current || current.status !== 'draft') return undefined;
+
+    // V3 §5.5: validate the MERGED state never yields a January IGCSE
+    // session (no January IGCSE series exists in Egypt).
     const mergedType = data.sessionType ?? current.sessionType;
     const mergedLevel = data.qualificationLevel ?? current.qualificationLevel;
     if (A_LEVEL_ONLY_SESSION_TYPES.includes(mergedType as SessionType) && mergedLevel === 'igcse') {
-      throw new Error(A_LEVEL_ONLY_MESSAGE);
+      throw new DraftSessionError(A_LEVEL_ONLY_MESSAGE, 400);
     }
-  }
 
-  const [updated] = await db
-    .update(registrationSession)
-    .set({ ...data, updatedAt: new Date() })
-    .where(
-      and(
-        eq(registrationSession.id, id),
-        eq(registrationSession.status, 'draft')
-      )
-    )
-    .returning();
+    const seriesChanges =
+      (data.sessionType !== undefined && data.sessionType !== current.sessionType) ||
+      (data.seriesYear !== undefined && data.seriesYear !== current.seriesYear);
+    if (seriesChanges) {
+      const [taken] = await tx.select({ id: registration.id }).from(registration)
+        .where(and(eq(registration.sessionId, id), notInArray(registration.status, ['dropped', 'rejected', 'expired'])))
+        .limit(1);
+      if (taken) {
+        throw new DraftSessionError(
+          'This window already has preregistrations: change its exam series with "Correct series", which records a reason and checks each student again',
+          409,
+        );
+      }
+    }
 
-  return updated;
+    const [updated] = await tx
+      .update(registrationSession)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(registrationSession.id, id), eq(registrationSession.status, 'draft')))
+      .returning();
+    await logAction(actorId, 'SESSION_UPDATED', 'session', id, current as Record<string, unknown>,
+      {
+        ...(updated as Record<string, unknown>),
+        _updateReason: reason,
+        ...(seriesChanges ? { seriesChanged: { from: seriesLabel(current.sessionType, current.seriesYear), to: seriesLabel(mergedType, updated!.seriesYear) } } : {}),
+      },
+      auditCtx, tx);
+    return updated;
+  });
 }
 
 /**

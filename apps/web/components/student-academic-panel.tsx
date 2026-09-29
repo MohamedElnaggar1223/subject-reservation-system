@@ -654,6 +654,26 @@ function ChangeItem({ change: c }: { change: ChangeRow }) {
         <span>Left on</span> <span>{dates.day(on)}</span>
       </p>
     );
+  } else if (c.action === 'STUDENT_COHORT_INFERRED') {
+    // The F0a backfill read a graduation from the old records: staff review it here.
+    title = 'Cohort inferred by the backfill';
+    const on = field(c.after, 'graduatedAt');
+    detail = (
+      <p>
+        <span>Started grade 10 in</span> <span className="font-semibold" dir="ltr">{cohortText(field(c.after, 'cohortYear'))}</span>
+        {typeof on === 'string' && <> · <span>Graduated on</span> <span>{dates.instant(on)}</span></>}
+        {field(c.after, 'basis') === 'registration' && <> · <span>From a past registration</span></>}
+      </p>
+    );
+  } else if (c.action === 'STUDENT_COHORT_RECORDED') {
+    title = 'Grade recorded at first setup';
+    detail = (
+      <p>
+        <span>Started grade 10 in</span> <span className="font-semibold" dir="ltr">{cohortText(field(c.after, 'cohortYear'))}</span>
+      </p>
+    );
+  } else if (c.action === 'STUDENT_COHORT_UNRECORDED') {
+    title = 'Grade not recorded at the move to cohorts';
   } else if (c.action === 'STUDENT_READMITTED') {
     title = 'Readmitted';
   } else if (c.action === 'USER_GRADE_CHANGED') {

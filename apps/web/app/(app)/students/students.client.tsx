@@ -21,7 +21,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { apiResponse, academicYearShortLabel, academicYearStartFromLabel, gradeLabel, STUDENT_STATUSES } from '@repo/validations';
 import { api } from '~/lib/hono';
 import { Button } from '~/components/ui/button';
-import { StandingBadge } from '~/components/ui/tone';
+import { Badge, StandingBadge } from '~/components/ui/tone';
 import { EmptyState, ErrorState, LoadingState } from '~/components/ui/query-state';
 
 type StudentsQuery = Parameters<typeof api.v1.students.$get>[0]['query'];
@@ -61,6 +61,8 @@ export default function StudentsClient(): React.JSX.Element {
     : undefined;
   const sectionId = params.get('section') ?? '';
   const unplaced = params.get('unplaced') === '1';
+  // Graduations the F0a backfill inferred, for staff to review (and correct on the record).
+  const inferred = params.get('inferred') === '1';
   const page = Math.max(0, Number(params.get('page') ?? 0) || 0);
   const q = params.get('q') ?? '';
 
@@ -103,6 +105,7 @@ export default function StudentsClient(): React.JSX.Element {
     status,
     sectionId: sectionId || undefined,
     withoutSection: unplaced ? 'true' : undefined,
+    inferred: inferred ? 'true' : undefined,
     limit: String(PAGE_SIZE),
     offset: String(page * PAGE_SIZE),
   };
@@ -118,7 +121,7 @@ export default function StudentsClient(): React.JSX.Element {
 
   const rows = data?.students ?? [];
   const total = data?.total ?? 0;
-  const filtered = !!(q || grade || status || sectionId || unplaced);
+  const filtered = !!(q || grade || status || sectionId || unplaced || inferred);
   const open = (id: string) => router.push(`/students/${id}`);
 
   const rowLinks = () => Array.from(tableRef.current?.querySelectorAll<HTMLAnchorElement>('a[data-row-link]') ?? []);
@@ -248,6 +251,15 @@ export default function StudentsClient(): React.JSX.Element {
             />
             <span>Without a section this year</span>
           </label>
+          <label className="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-sm text-foreground">
+            <input
+              type="checkbox"
+              checked={inferred}
+              onChange={(e) => setParams({ inferred: e.target.checked ? '1' : null })}
+              className="size-4"
+            />
+            <span>Graduation inferred by the backfill</span>
+          </label>
           {filtered && (
             <Button
               variant="ghost"
@@ -333,6 +345,7 @@ export default function StudentsClient(): React.JSX.Element {
                     <td className="px-4 py-2.5 text-foreground">{s.gradeLabel}</td>
                     <td className="px-4 py-2.5">
                       <StandingBadge standing={s.standing} />
+                      {s.cohortInferred && <Badge tone="warning" className="ms-2">Inferred</Badge>}
                     </td>
                     <td className="px-4 py-2.5 text-foreground">
                       {s.sectionName ?? <span className="text-muted-foreground">—</span>}

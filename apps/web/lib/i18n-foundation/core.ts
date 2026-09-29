@@ -135,8 +135,20 @@ export const coreArabic: Record<string, string> = {
   '+ Register Subjects': '+ تسجيل مواد',
   'Active exceptions:': 'الاستثناءات النشطة:',
 
+  // Notifications (F0a)
+  'Preregistration Held': 'تعليق تسجيل مسبق',
+
   // Exceptions (the F0a type)
   'Grade 10: sit a series other than June': 'الصف 10: دخول دورة غير يونيو',
+
+  // Sessions (the create form's strings that had no Arabic)
+  'Only one active session per type and level is allowed at a time.': 'يُسمح بجلسة نشطة واحدة فقط لكل نوع ومستوى في الوقت نفسه.',
+  'Qualification Level': 'المستوى الدراسي',
+  'AS Level': 'المستوى AS',
+  'A Level': 'المستوى A',
+  'Exam board entry deadline': 'آخر موعد للقيد لدى المجلس',
+  "From the board's calendar; you can set it later. After it, anything still unpaid for this series is closed automatically.":
+    'من تقويم المجلس؛ يمكنك تحديده لاحقًا. بعده يُغلق تلقائيًا كل ما لم يُدفع لهذه الدورة.',
 
   // Sessions
   'Board entry deadline': 'آخر موعد للقيد لدى المجلس',

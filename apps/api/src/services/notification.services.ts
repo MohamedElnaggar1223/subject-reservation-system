@@ -949,6 +949,33 @@ export async function notifyPaymentClosedIneligible(
   );
 }
 
+/**
+ * F0a: a paid or unpaid preregistration held at its series' opening because
+ * the student may no longer sit the series. Finance and the admin are told:
+ * the money stays held, and refunding it is the owner's call (SO-4).
+ */
+export async function notifyFinanceOfHeldPreregistration(registrationId: string, heldAmount: number, reason: string) {
+  const reg = await db.query.registration.findFirst({
+    where: (r, { eq: eqOp }) => eqOp(r.id, registrationId),
+    columns: { id: true, studentId: true },
+    with: {
+      student: { columns: { name: true } },
+      subject: { columns: { name: true, code: true } },
+      session: { columns: { name: true } },
+    },
+  });
+  if (!reg) return;
+  const staff = await db.select({ id: user.id }).from(user)
+    .where(and(inArray(user.role, ['finance_officer', 'finance_admin', 'admin']), or(eq(user.banned, false), isNull(user.banned))));
+  const money = heldAmount > 0 ? `EGP ${heldAmount.toFixed(2)} stays held in the family's wallet` : 'It was not paid for';
+  const title = `Preregistration held: ${reg.student.name}`;
+  const body = `${reg.student.name}'s preregistration for ${reg.subject.name} (${reg.subject.code}), ${reg.session.name}, was not confirmed when the series opened: ${reason}. ` +
+    `${money}. Refunding it is the school's decision; the family can also cancel it.`;
+  for (const s of staff) {
+    await createNotification(s.id, 'PREREGISTRATION_HELD', title, body, { registrationId, studentId: reg.studentId, heldAmount });
+  }
+}
+
 /** At the board's entry deadline: registrations still waiting on the series expired. */
 export async function notifyRegistrationsExpiredAtEntryDeadline(
   sessionId: string,

@@ -179,24 +179,18 @@ export const sessions = new Hono<HonoEnv>()
         const { reason, ...updateFields } = parsed.data;
         const deadlineClash = windowAfterEntryDeadline(updateFields.endDate ?? session.endDate, session.entryDeadline);
         if (deadlineClash) return error(c, deadlineClash, 400);
-        const updated = await sessionService.updateDraftSession(id, updateFields);
-        if (!updated) {
-          return error(c, 'Session is no longer in draft status', 409);
+        // The update and its SESSION_UPDATED row (with the reason) commit
+        // together; a series change is refused once anyone has preregistered (F0a).
+        try {
+          const updated = await sessionService.updateDraftSession(id, updateFields, currentUser.id, reason ?? null, extractAuditContext(c));
+          if (!updated) {
+            return error(c, 'Session is no longer in draft status', 409);
+          }
+          return success(c, updated);
+        } catch (err) {
+          if (err instanceof sessionService.DraftSessionError) return error(c, err.message, err.status);
+          throw err;
         }
-
-        // Including _updateReason in the audit newData preserves the
-        // rationale alongside the before/after field snapshots.
-        await logAction(
-          currentUser.id,
-          'SESSION_UPDATED',
-          'session',
-          id,
-          session as Record<string, unknown>,
-          { ...(updated as Record<string, unknown>), _updateReason: reason ?? null },
-          extractAuditContext(c),
-        ).catch((err) => console.error('[audit] SESSION_UPDATED (draft) failed:', err));
-
-        return success(c, updated);
       }
 
       // status === 'active'

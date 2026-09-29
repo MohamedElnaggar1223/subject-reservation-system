@@ -387,4 +387,54 @@ describe('money invariants over the whole database', () => {
     `);
     expect(broken).toEqual([]);
   });
+
+  it('F0a: nothing waits for, and nothing was captured into, a series its student may not sit', async () => {
+    const { mayRegisterFor } = await import('../src/services/eligibility.services');
+    const verdicts = new Map<string, boolean>();
+    const allowed = async (studentId: string, sessionId: string) => {
+      const key = `${studentId}|${sessionId}`;
+      if (!verdicts.has(key)) verdicts.set(key, (await mayRegisterFor(studentId, sessionId)).allowed);
+      return verdicts.get(key)!;
+    };
+
+    // A waiting registration of a student refused for its series, unless an
+    // open checkout holds it (a transfer being checked, InstaPay's grace: the
+    // family may already have paid; the payment's own close releases it).
+    const waiting = await sql<{ id: string; student_id: string; session_id: string; held: boolean }>(`
+      select r.id, r.student_id, r.session_id,
+        exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id
+                where pr.registration_id = r.id and p.status in ('pending', 'pending_verification')) as held
+      from registration r
+      where r.status in ('pending_approval', 'pending_payment')
+    `);
+    const stranded: string[] = [];
+    for (const w of waiting) if (!w.held && !(await allowed(w.student_id, w.session_id))) stranded.push(w.id);
+    expect(stranded).toEqual([]);
+
+    // A preregistration captured (confirmed, or moved to payment) while its
+    // student was already refused: refused now, and no eligibility change
+    // came after the capture.
+    const captured = await sql<{ id: string; student_id: string; session_id: string; at: string }>(`
+      select r.id, r.student_id, r.session_id, a.created_at as at
+      from audit_log a join registration r on r.id = a.entity_id
+      where a.action = 'PREREG_CAPTURED'
+    `);
+    const capturedWhileRefused: string[] = [];
+    for (const c of captured) {
+      if (await allowed(c.student_id, c.session_id)) continue;
+      const later = await sql(`
+        select 1 from audit_log a
+        where a.created_at > $1 and (
+          (a.action in ('STUDENT_LEFT', 'STUDENT_COHORT_CORRECTED') and a.entity_id = $2)
+          or (a.action = 'SESSION_SERIES_CORRECTED' and a.entity_id = $3)
+          or (a.action = 'SETTING_CHANGED' and a.entity_id = 'eligibility.graduateRetakes')
+          or (a.action = 'EXCEPTION_REVOKED' and exists (select 1 from exception e where e.id = a.entity_id and e.student_id = $4)))
+        limit 1
+      `, [c.at, c.student_id, c.session_id, c.student_id]);
+      if (later.length === 0) capturedWhileRefused.push(c.id);
+    }
+    expect(capturedWhileRefused).toEqual([]);
+    // There was something to check: 08e holds preregistrations of a student who left.
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'PREREG_HELD_INELIGIBLE'`))[0]?.n)).toBeGreaterThan(0);
+  });
 });
