@@ -1551,7 +1551,26 @@ function translateDynamicText(text: string): string | null {
   const egpTransferredMatch = /^(.+) EGP transferred from (.+) to (.+)$/.exec(text);
   if (egpTransferredMatch) return `تم تحويل ${egpTransferredMatch[1]} جنيه من ${egpTransferredMatch[2]} إلى ${egpTransferredMatch[3]}`;
 
-  const dateMonthMatch = /^(.+?)\b(January|June|November)\b(.+)?$/.exec(text);
+  // F0a: "June 2027 series · academic year 2026/27" and a bare "June 2027".
+  const seriesSummaryMatch = /^(January|June|October|November) (\d{4}) series · academic year (.+)$/.exec(text);
+  if (seriesSummaryMatch) {
+    const month = translateExactText(seriesSummaryMatch[1] ?? '') ?? seriesSummaryMatch[1];
+    return `دورة ${month} ${seriesSummaryMatch[2]} · العام الدراسي ${seriesSummaryMatch[3]}`;
+  }
+  const seriesMatch = /^(January|June|October|November) (\d{4})$/.exec(text);
+  if (seriesMatch) return `${translateExactText(seriesMatch[1] ?? '') ?? seriesMatch[1]} ${seriesMatch[2]}`;
+  // Accessible names that carry a person's name (the Team grid).
+  const roleOfMatch = /^Role of (.+)$/.exec(text);
+  if (roleOfMatch) return `دور ${roleOfMatch[1]}`;
+  const teacherRecordForMatch = /^Teacher record for (.+)$/.exec(text);
+  if (teacherRecordForMatch) return `سجل المعلم لـ ${teacherRecordForMatch[1]}`;
+  // A comma list whose every item is a known word (weekdays, roles).
+  if (text.includes(', ')) {
+    const parts = text.split(', ').map((p) => autoArabicText[p]);
+    if (parts.every(Boolean)) return parts.join('، ');
+  }
+
+  const dateMonthMatch = /^(.+?)\b(January|June|October|November)\b(.+)?$/.exec(text);
   if (dateMonthMatch) {
     const month = translateExactText(dateMonthMatch[2] ?? '') ?? dateMonthMatch[2];
     return `${dateMonthMatch[1] ?? ''}${month}${dateMonthMatch[3] ?? ''}`;

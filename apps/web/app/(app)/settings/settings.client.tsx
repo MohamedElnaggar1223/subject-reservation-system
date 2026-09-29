@@ -46,7 +46,7 @@ export default function SettingsClient(): React.JSX.Element {
     queryKey: ['settings'],
     queryFn: fetchSettings,
   });
-  const [saved, setSaved] = useState('');
+  const [saved, setSaved] = useState<{ label: string; value: string } | null>(null);
 
   return (
     <div className="px-6 py-8 max-w-4xl mx-auto animate-fade-up">
@@ -60,8 +60,8 @@ export default function SettingsClient(): React.JSX.Element {
       {saved && (
         <Notice tone="success" className="mb-6">
           <div className="flex items-start justify-between gap-3">
-            <span>{saved}</span>
-            <button type="button" className="text-xs underline hover:no-underline" onClick={() => setSaved('')}>Dismiss</button>
+            <span><span>Saved:</span> <span>{saved.label}</span> → <span>{saved.value}</span></span>
+            <button type="button" className="text-xs underline hover:no-underline" onClick={() => setSaved(null)}>Dismiss</button>
           </div>
         </Notice>
       )}
@@ -95,7 +95,7 @@ export default function SettingsClient(): React.JSX.Element {
   );
 }
 
-function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (message: string) => void }): React.JSX.Element {
+function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (saved: { label: string; value: string }) => void }): React.JSX.Element {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<unknown>(s.value);
@@ -109,12 +109,12 @@ function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (mess
       queryClient.invalidateQueries({ queryKey: ['settings'] });
       setEditing(false);
       setFormError('');
-      onSaved(`“${updated.label}” is now: ${describeValue(updated, updated.value)}.`);
+      onSaved({ label: updated.label, value: describeValue(updated, updated.value) });
     },
     onError: (err: Error) => setFormError(err.message),
   });
 
-  const whoMayChange = s.editableBy.map((r) => ROLE_LABELS[r as Role] ?? r).join(', ');
+  const whoMayChange = s.editableBy.map((r) => ROLE_LABELS[r as Role] ?? r);
   const unchanged = JSON.stringify(draft) === JSON.stringify(s.value);
 
   return (
@@ -138,7 +138,10 @@ function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (mess
             ? <><span>Last changed</span> <span>{formatWhen(s.updatedAt)}</span>{s.updatedBy && <> · <span>{s.updatedBy}</span></>}</>
             : <span>Never changed</span>}
           {' · '}
-          <span>Who may change it:</span> <span>{whoMayChange}</span>
+          <span>Who may change it:</span>{' '}
+          {whoMayChange.map((label, i) => (
+            <span key={label}>{i > 0 && ', '}<span>{label}</span></span>
+          ))}
         </span>
         {s.canEdit && !editing && (
           <Button size="sm" variant="outline" onClick={() => { setDraft(s.value); setReason(''); setFormError(''); setEditing(true); }}>

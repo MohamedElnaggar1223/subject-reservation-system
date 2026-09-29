@@ -10,7 +10,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, gradeLabel, EXCEPTION_TYPES, EXCEPTION_TYPE_LABELS } from '@repo/validations';
+import { apiResponse, gradeLabel, exceptionTypesGrantableBy, EXCEPTION_TYPES, EXCEPTION_TYPE_LABELS } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 
 type ExceptionRow = {
@@ -43,9 +43,12 @@ const emptyForm = {
   validUntil: '',
 };
 
-export default function ExceptionsAdminClient(): React.JSX.Element {
+export default function ExceptionsAdminClient({ viewerRole }: { viewerRole: string | null }): React.JSX.Element {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState(emptyForm);
+  // Only the types this role may grant (F0a: the grade-10 exception is the
+  // coordinator's and the admin's, the money ones finance's and the admin's).
+  const grantable = exceptionTypesGrantableBy(viewerRole);
+  const [form, setForm] = useState({ ...emptyForm, type: grantable[0] ?? emptyForm.type });
   const [formError, setFormError] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
 
@@ -93,7 +96,7 @@ export default function ExceptionsAdminClient(): React.JSX.Element {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['exceptions'] });
-      setForm(emptyForm);
+      setForm({ ...emptyForm, type: grantable[0] ?? emptyForm.type });
       setFormError('');
     },
     onError: (err: Error) => setFormError(err.message),
@@ -138,7 +141,7 @@ export default function ExceptionsAdminClient(): React.JSX.Element {
               onChange={(e) => setForm({ ...form, type: e.target.value as typeof form.type })}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
             >
-              {EXCEPTION_TYPES.map((t) => (
+              {grantable.map((t) => (
                 <option key={t} value={t}>{EXCEPTION_TYPE_LABELS[t]}</option>
               ))}
             </select>

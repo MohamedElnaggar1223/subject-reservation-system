@@ -319,7 +319,7 @@ export default function TeamAdminClient(): React.JSX.Element {
                       onChange={(e) => {
                         const newRole = e.target.value as Role;
                         if (newRole === 'teacher' && !u.teachingAs) {
-                          setRowError(`Link ${u.name} to a teacher record first (Teaches as), then make them a teacher.`);
+                          setRowError('Link this account to a teacher record first (Teaches as), then make it a teacher.');
                           return;
                         }
                         if (confirm(`Change ${u.name}'s role to ${ROLE_LABELS[newRole] ?? newRole}?`)) {

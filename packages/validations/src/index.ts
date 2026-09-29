@@ -45,6 +45,7 @@ export * from './desk/desk.validations'
  * structure, the student record, and the settings store.
  */
 export * from './academic/academic-year'
+export * from './academic/eligibility'
 export * from './academic/structure.validations'
 export * from './student/student.validations'
 export * from './settings/settings'

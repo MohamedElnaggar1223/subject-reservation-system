@@ -104,7 +104,7 @@ export default function SessionsAdminClient(): React.JSX.Element {
   const [seriesSession, setSeriesSession] = useState<Session | null>(null);
   const [seriesForm, setSeriesForm] = useState({ sessionType: 'june' as SessionType, seriesYear: '', reason: '' });
   const [seriesError, setSeriesError] = useState('');
-  const [seriesResult, setSeriesResult] = useState('');
+  const [seriesResult, setSeriesResult] = useState<{ name: string; series: string; expired: number; closed: number } | null>(null);
 
   const { data: sessions } = useSuspenseQuery({
     queryKey: ['sessions', 'admin'],
@@ -129,12 +129,12 @@ export default function SessionsAdminClient(): React.JSX.Element {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
       setSeriesSession(null);
       setSeriesError('');
-      setSeriesResult(
-        `${updated.name} is now for the ${seriesLabel(updated.sessionType, updated.seriesYear)} series. ` +
-        (updated.registrationsExpired > 0
-          ? `${updated.registrationsExpired} waiting registration(s) the new series does not allow expired; ${updated.paymentsClosed} open checkout(s) closed and families told.`
-          : 'No waiting registration was affected.')
-      );
+      setSeriesResult({
+        name: updated.name,
+        series: seriesLabel(updated.sessionType, updated.seriesYear),
+        expired: updated.registrationsExpired,
+        closed: updated.paymentsClosed,
+      });
     },
     onError: (err: Error) => setSeriesError(err.message),
   });
@@ -843,8 +843,15 @@ export default function SessionsAdminClient(): React.JSX.Element {
       {seriesResult && (
         <Notice tone="success" className="mb-4">
           <div className="flex items-start justify-between gap-3">
-            <span>{seriesResult}</span>
-            <button type="button" className="text-xs underline hover:no-underline" onClick={() => setSeriesResult('')}>Dismiss</button>
+            <div>
+              <p><span>Series corrected:</span> <strong>{seriesResult.name}</strong> → <span>{seriesResult.series}</span></p>
+              <p className="mt-1">
+                {seriesResult.expired > 0
+                  ? <><span>Waiting registrations expired:</span> <span>{seriesResult.expired}</span> · <span>Open checkouts closed (families told):</span> <span>{seriesResult.closed}</span></>
+                  : <span>No waiting registration was affected.</span>}
+              </p>
+            </div>
+            <button type="button" className="text-xs underline hover:no-underline" onClick={() => setSeriesResult(null)}>Dismiss</button>
           </div>
         </Notice>
       )}
@@ -969,7 +976,7 @@ export default function SessionsAdminClient(): React.JSX.Element {
                       setSeriesSession(s);
                       setSeriesForm({ sessionType: s.sessionType as SessionType, seriesYear: String(s.seriesYear), reason: '' });
                       setSeriesError('');
-                      setSeriesResult('');
+                      setSeriesResult(null);
                     }}
                   >
                     Correct Series

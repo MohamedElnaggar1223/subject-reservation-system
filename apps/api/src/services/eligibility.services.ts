@@ -42,6 +42,7 @@ import {
   academicYearLabel, academicYearShortLabel, seriesAcademicYearStart, seriesLabel, gradeInAcademicYear,
   academicYearStartOf, GRADUATE_RETAKE_SESSION_TYPES, LAST_GRADE, FIRST_GRADE,
 } from '@repo/validations';
+import type { Eligibility, EligibilityCode, StudentStatus } from '@repo/validations';
 import { getSetting, lockSetting, onSettingChanged } from './settings.services';
 import { logActions, type ExpiryReason } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
@@ -54,31 +55,8 @@ function readableDate(date: string): string {
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
 
-export type EligibilityCode =
-  | 'ok'
-  | 'not_a_student'
-  | 'left'
-  | 'grade_unknown'
-  | 'not_started'
-  | 'grade10_june_only'
-  | 'graduate_retakes_off'
-  | 'graduated';
-
-export type Eligibility = {
-  allowed: boolean;
-  code: EligibilityCode;
-  /** The sentence a refused path answers with; null when allowed. */
-  reason: string | null;
-  /** The student's grade in the series' academic year (past 12: graduated). */
-  grade: number | null;
-  academicYearStart: number;
-  academicYear: string;
-  series: { sessionType: string; seriesYear: number; label: string };
-  /** Allowed as a graduate retaking (A-12): owes no school fee under A-13. */
-  graduateRetake: boolean;
-  /** The grade-10 exception that allowed a series other than June. */
-  grade10ExceptionId: string | null;
-};
+// The answer's shape lives in @repo/validations so the web can name it.
+export type { Eligibility, EligibilityCode };
 
 export type EligibilityStudent = {
   id: string;
@@ -237,7 +215,8 @@ export async function assertMayRegisterForInTx(tx: Tx, studentId: string, sessio
 
 // ─── Today's standing ────────────────────────────────────────────────────────
 
-export type StudentStanding = 'in_school' | 'upcoming' | 'graduated' | 'withdrawn' | 'transferred' | 'unknown';
+/** Where a student stands today: the Students screen's statuses (@repo/validations). */
+export type StudentStanding = StudentStatus;
 
 /** Where a student stands today (Cairo time): what every screen shows next to their name. */
 export function standingToday(s: { cohortYear: number | null; leftKind: string | null; leftOn: string | null }, now: Date = new Date()) {
