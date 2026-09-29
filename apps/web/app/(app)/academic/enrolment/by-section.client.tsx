@@ -29,7 +29,12 @@ const fetchEnrolments = (academicYearId: string, sectionId: string) =>
 type EnrolmentRow = Awaited<ReturnType<typeof fetchEnrolments>>[number];
 type Mode = 'in_school' | 'self_study';
 
-const initials = (name: string | null) => (name ?? '').split(/\s+/).filter(Boolean).map((w) => w[0]!.toUpperCase()).slice(0, 3).join('');
+/** A teacher's short mark in a grid cell: the initials of the first two words ("Hoda Samir" → "HS"), or the first two letters of one. */
+function initials(name: string | null) {
+  const words = (name ?? '').replace(/\(.*?\)/g, ' ').split(/\s+/).filter((w) => /^\p{L}/u.test(w));
+  if (words.length === 1) return words[0]!.slice(0, 2);
+  return words.slice(0, 2).map((w) => w[0]!.toUpperCase()).join('');
+}
 
 export function BySection({ year, onOpenStudent }: { year: AcademicYearRow; onOpenStudent: (id: string) => void }) {
   const sections = useQuery({ queryKey: ['academic', 'sections', year.id], queryFn: () => fetchSections(year.id) });
@@ -141,6 +146,7 @@ function SectionGrid({ sectionId, year, onOpenStudent }: { sectionId: string; ye
         </form>
       </div>
       {error && <Notice tone="danger" className="mb-3">{error}</Notice>}
+      {members.length > 0 && <FromRegistrations sectionId={sectionId} sectionName={detail.data.name} year={year} onDone={invalidate} />}
       {members.length === 0 ? (
         <EmptyState title="This section has no students yet" message="Add them on the Sections page, then enrol the whole section here." />
       ) : columns.length === 0 ? (
@@ -241,6 +247,55 @@ function SectionGrid({ sectionId, year, onOpenStudent }: { sectionId: string; ye
           onClose={() => setEnding(null)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * The section's subjects from its students' exam registrations this year, with
+ * the teacher each registration names: a preview line, then one click.
+ */
+function FromRegistrations({ sectionId, sectionName, year, onDone }: { sectionId: string; sectionName: string; year: AcademicYearRow; onDone: () => void }) {
+  const run = useMutation({
+    mutationFn: (commit: boolean) => apiResponse(api.v1.enrolments.bulk.$post({
+      json: { academicYearId: year.id, source: 'registrations', sectionIds: [sectionId], subjectMap: [], exclude: [], commit },
+    })),
+    onSuccess: (r) => { if (r.committed) onDone(); },
+  });
+  const r = run.data;
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-border px-4 py-3 text-sm">
+      {!r ? (
+        <>
+          <span className="text-muted-foreground">
+            <span>Take</span> <bdi>{sectionName}</bdi><span>&apos;s subjects from their exam registrations this year, with the teacher each registration names.</span>
+          </span>
+          <Button size="sm" variant="outline" disabled={run.isPending} onClick={() => run.mutate(false)}>
+            {run.isPending ? 'Working…' : 'See what they give'}
+          </Button>
+        </>
+      ) : r.committed ? (
+        <span className="text-foreground">
+          <span className="tabular-nums">{r.summary.created}</span> <span>enrolled from their registrations.</span>
+          {r.summary.refused > 0 && <> <span className="tabular-nums">{r.summary.refused}</span> <span>refused:</span> {r.rows.filter((x) => x.outcome === 'refused').map((x) => `${x.studentName} · ${x.subjectName}: ${x.reason}`).join('; ')}</>}
+        </span>
+      ) : r.summary.toCreate === 0 ? (
+        <span className="text-muted-foreground">
+          {r.rows.length === 0 ? 'No live exam registrations for this section this year.' : 'Every registration of this section already has its enrolment.'}
+        </span>
+      ) : (
+        <>
+          <span className="text-foreground">
+            <span className="tabular-nums">{r.summary.toCreate}</span> <span>enrolments from their registrations</span>
+            {r.summary.existing > 0 && <> · <span className="tabular-nums">{r.summary.existing}</span> <span>already enrolled</span></>}
+            {r.summary.refused > 0 && <> · <span className="tabular-nums">{r.summary.refused}</span> <span>refused</span></>}
+          </span>
+          <Button size="sm" disabled={run.isPending} onClick={() => run.mutate(true)}>
+            {run.isPending ? 'Enrolling…' : 'Enrol them'}
+          </Button>
+        </>
+      )}
+      {run.error && <span className="text-destructive">{run.error.message}</span>}
     </div>
   );
 }

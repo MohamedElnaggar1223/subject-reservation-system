@@ -41,7 +41,11 @@ const SOURCES: [Source, string, string][] = [
 ];
 
 export function Bulk({ year }: { year: AcademicYearRow }) {
-  const [source, setSource] = useState<Source>('previous_enrolment');
+  const years = useAcademicYears();
+  const hasPrevious = !!years.data?.some((y) => y.startYear === year.startYear - 1);
+  // Carry forward first once there is a year to carry from; the first year starts from the registrations.
+  const [chosen, setSource] = useState<Source | null>(null);
+  const source: Source = chosen ?? (hasPrevious ? 'previous_enrolment' : 'registrations');
   return (
     <div className="space-y-5">
       <div role="radiogroup" aria-label="Where the enrolments come from" className="grid gap-3 md:grid-cols-3">

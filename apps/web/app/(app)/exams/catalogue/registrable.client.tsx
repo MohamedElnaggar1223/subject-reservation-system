@@ -116,9 +116,13 @@ export function RegistrableTab({ data }: { data: CatalogueData }) {
                   </td>
                   <td className="px-3 py-2.5">
                     <div className="flex flex-col items-start gap-1 text-xs">
-                      <span className="inline-flex items-center gap-1"><span className="text-muted-foreground">Grade 11</span> <LevelCodeBadge code={r.levelCode.grade11} /></span>
-                      {r.levelCode.grade12WithA2 !== r.levelCode.grade11 && (
-                        <span className="inline-flex items-center gap-1"><span className="text-muted-foreground">Grade 12 sitting A2 units too</span> <LevelCodeBadge code={r.levelCode.grade12WithA2} /></span>
+                      {r.levelCode.grade12WithA2 === r.levelCode.grade11 ? (
+                        <LevelCodeBadge code={r.levelCode.grade11} />
+                      ) : (
+                        <>
+                          <span className="inline-flex items-center gap-1"><span className="text-muted-foreground">Grade 11</span> <LevelCodeBadge code={r.levelCode.grade11} /></span>
+                          <span className="inline-flex items-center gap-1"><span className="text-muted-foreground">Grade 12 sitting A2 units too</span> <LevelCodeBadge code={r.levelCode.grade12WithA2} /></span>
+                        </>
                       )}
                     </div>
                   </td>

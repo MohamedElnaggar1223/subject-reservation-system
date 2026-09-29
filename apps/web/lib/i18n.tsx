@@ -1771,8 +1771,15 @@ function localizeDom(language: Language) {
       const current = element.getAttribute(attr);
       if (!current) continue;
       const originalAttr = `data-i18n-original-${attr}`;
-      if (!element.hasAttribute(originalAttr)) element.setAttribute(originalAttr, current);
-      const original = element.getAttribute(originalAttr) ?? current;
+      let original = element.getAttribute(originalAttr);
+      // As for text: a value that is neither the recorded source nor its
+      // translation was written by React since the last pass (a grid cell
+      // whose "Enrol X in Y" button became "X: Y with Z"), so it is the new
+      // source. Keeping the first one forever put stale names back.
+      if (original === null || (current !== original && current !== translatePreservingWhitespace(original))) {
+        original = current;
+        element.setAttribute(originalAttr, current);
+      }
       const nextValue = language === 'ar' ? translatePreservingWhitespace(original) : original;
       if (element.getAttribute(attr) !== nextValue) element.setAttribute(attr, nextValue);
     }

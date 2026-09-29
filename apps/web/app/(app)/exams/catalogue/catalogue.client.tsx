@@ -22,7 +22,9 @@
  */
 
 import Link from 'next/link';
+import type { Route } from 'next';
 import { useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import { apiResponse, LEVEL_CODE_READING_LABELS, STARTER_SET_LABELS, STARTER_SETS, type LevelCodeReading, type StarterSet } from '@repo/validations';
@@ -37,11 +39,21 @@ import { RegistrableTab } from './registrable.client';
 import { QualificationsTab } from './qualifications.client';
 import { UnitsTab } from './units.client';
 
-type Tab = 'registrable' | 'qualifications' | 'units';
+const TABS = ['registrable', 'qualifications', 'units'] as const;
+type Tab = (typeof TABS)[number];
 
 export default function CatalogueClient(): React.JSX.Element {
   const { data, isLoading, isError, refetch } = useCatalogue();
-  const [tab, setTab] = useState<Tab>('registrable');
+  // The tab lives in the address, so a link or the back button lands on it.
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const tab: Tab = TABS.find((t) => t === params.get('tab')) ?? 'registrable';
+  const setTab = (t: Tab) => {
+    const next = new URLSearchParams(params.toString());
+    next.set('tab', t);
+    router.replace(`${pathname}?${next.toString()}` as Route, { scroll: false });
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-8 animate-fade-up">

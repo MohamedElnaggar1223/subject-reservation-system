@@ -22,7 +22,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, seriesYearInAcademicYear } from '@repo/validations';
+import { apiResponse, seriesYearInAcademicYear, A_LEVEL_ONLY_SESSION_TYPES } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -46,11 +46,14 @@ export function WindowSeriesPanel({ sessionId, onClose }: { sessionId: string; o
   const [error, setError] = useState('');
   const [saved, setSaved] = useState<string | null>(null);
 
+  // The edit starts from the saved state once, and again after each save —
+  // not on every refetch (a series made in the panel refetches it, and must
+  // not wipe what is being edited).
   useEffect(() => {
-    if (!data) return;
+    if (!data || links !== null) return;
     setLinks(data.series.map((s) => ({ boardSeriesId: s.boardSeriesId, isDefault: s.isDefault })));
     setRoutes(Object.fromEntries(data.subjects.filter((s) => s.routedTo).map((s) => [s.id, s.routedTo!])));
-  }, [data]);
+  }, [data, links]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -74,12 +77,13 @@ export function WindowSeriesPanel({ sessionId, onClose }: { sessionId: string; o
         reason: reason.trim() || undefined,
       },
     })),
-    onSuccess: (r) => {
-      queryClient.invalidateQueries({ queryKey: ['sessions'] });
-      queryClient.invalidateQueries({ queryKey: SERIES_KEY });
-      queryClient.invalidateQueries({ queryKey: ['catalogue', 'entries', sessionId] });
+    onSuccess: async (r) => {
       setError('');
       setSaved(r.registrationsRouted > 0 ? `routed:${r.registrationsRouted}` : 'saved');
+      queryClient.invalidateQueries({ queryKey: SERIES_KEY });
+      queryClient.invalidateQueries({ queryKey: ['catalogue', 'entries', sessionId] });
+      await queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      setLinks(null);
     },
     onError: (err: Error) => { setSaved(null); setError(err.message); },
   });
@@ -120,7 +124,7 @@ export function WindowSeriesPanel({ sessionId, onClose }: { sessionId: string; o
               <p className="text-sm text-muted-foreground">
                 <span>{data.session.series}</span> · <span>Academic year</span> <span dir="ltr">{data.session.academicYear}</span>
                 {' · '}<span>Only series of this academic year, and</span>{' '}
-                <span>{data.session.sessionType === 'june' ? 'June series only' : 'October, November or January series'}</span>
+                <span>{data.session.sessionType === 'june' ? 'June series only' : data.session.qualificationLevel === 'igcse' ? 'November series only (October and January are A-level only)' : 'October, November or January series'}</span>
                 <span>, can feed it.</span>
               </p>
             )}
@@ -264,7 +268,7 @@ function AddSeries({
   sessionId, session, candidates, onAdd,
 }: {
   sessionId: string;
-  session: { sessionType: string; academicYearStart: number };
+  session: { sessionType: string; qualificationLevel: string; academicYearStart: number };
   candidates: { id: string; name: string; boardCode: string; entryDeadline: string | null; entryDeadlinePassed: boolean }[];
   onAdd: (id: string) => void;
 }) {
@@ -274,7 +278,10 @@ function AddSeries({
   const [board, setBoard] = useState('');
   const [month, setMonth] = useState('');
   const [error, setError] = useState('');
-  const months = session.sessionType === 'june' ? ['june'] : ['october', 'november', 'january'];
+  // The window's kind: June feeds June; otherwise October, November or January — November only for IGCSE.
+  const months = session.sessionType === 'june'
+    ? ['june']
+    : ['october', 'november', 'january'].filter((m) => session.qualificationLevel !== 'igcse' || !(A_LEVEL_ONLY_SESSION_TYPES as readonly string[]).includes(m));
   const boardMonths = catalogue?.boards.find((b) => b.code === board)?.seriesMonths ?? months;
   const create = useMutation({
     mutationFn: () => apiResponse(api.v1['board-series'].$post({
