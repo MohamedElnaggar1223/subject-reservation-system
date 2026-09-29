@@ -292,9 +292,11 @@ export async function refundPreregistrationsAtDeadline(sessionId: string) {
  * payment: the row stays preregistered with its money held, one
  * PREREG_HELD_INELIGIBLE row says why, and finance is told — refunding it
  * is the owner's call (STATE_AUDIT.md SO-4). Asked with the student and the
- * window held (mayRegisterForInTx), after the row's own lock. A held row is
- * captured on a later tick if the student may sit the series again (a
- * readmission).
+ * window held (mayRegisterForInTx), after the row's own lock. While the
+ * window is open, a held row is captured on a later tick if the student may
+ * sit the series again (a readmission). Nothing else releases it: the family
+ * cannot cancel an opened series' preregistration, and after the window
+ * closes it stays held until the owner decides (SO-4).
  */
 export async function capturePreregistrationsForSession(sessionId: string): Promise<{
   captured: number;

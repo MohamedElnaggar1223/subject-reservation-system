@@ -102,6 +102,19 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     expect((await refused(coordinator.api.v1.students[':id'].readmit.$post({ param: { id: f.studentId }, json: { reason: 'not the coordinator' } }))).status).toBe(403);
   });
 
+  it('withdrawn with an in-school checkout open: nothing holds it (only a transfer being checked or InstaPay\'s grace does) — the registration expires and the checkout closes', async () => {
+    const f = await family('in-school');
+    const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, subjectIds: [subj.S3!], studentId: f.studentId } })))[0]!.id;
+    const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
+    expect(await statusOf('payment', pay)).toBe('pending');
+
+    const r = await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'left mid-checkout' } }));
+    expect(r).toMatchObject({ registrationsExpired: 1, paymentsClosed: 1 });
+    expect(await statusOf('registration', reg)).toBe('expired');
+    expect(await expiryOf(reg)).toEqual({ was: 'pending_payment', reason: 'ineligible', detail: 'withdrawn' });
+    expect(await statusOf('payment', pay)).toBe('failed');
+  });
+
   it('a cohort moved back a year: the October registration is now out of reach (grade 10: June only) and expires; its checkout closes; the June registration stays', async () => {
     const f = await family('moved-back');
     const funded = await fund(f, subj.S3!);
@@ -191,6 +204,37 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     expect(r).toMatchObject({ status: 'revoked', registrationsExpired: 1 });
     expect(await statusOf('registration', reg)).toBe('expired');
     expect((await expiryOf(reg) as { detail: string }).detail).toBe('exception_revoked');
+  });
+
+  it("a grade-10 exception that runs out: the scheduler lapses it once — its waiting registration expires, the paid one stands", async () => {
+    const f = await family('g10lapse', 10);
+    const grant = await apiResponse(coordinator.api.v1.exceptions.$post({
+      json: { type: 'grade10_other_series', studentId: f.studentId, sessionId: october, reason: 'one AS unit early', validUntil: new Date(Date.now() + days(2)).toISOString() },
+    }));
+    const paid = (await apiResponse(officer.api.v1.registrations.desk.$post({
+      json: { studentId: f.studentId, sessionId: october, subjectIds: [subj.S1!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+    }))).registrations[0]!.id;
+    const waiting = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, subjectIds: [subj.S7!], studentId: f.studentId } })))[0]!.id;
+    const { lapseGrade10Exceptions } = await import('../src/services/exception-lapse.services');
+    const exceptionStatus = async () => (await one<{ status: string }>(`select status from exception where id = $1`, [grant.id])).status;
+
+    // Not yet due: nothing moves.
+    expect((await lapseGrade10Exceptions()).lapsed).toBe(0);
+    expect(await exceptionStatus()).toBe('active');
+    // Its time passes (valid_until moved into the past, as the clock would).
+    await sql(`update exception set valid_until = now() - interval '1 minute' where id = $1`, [grant.id]);
+    // Two scheduler instances on the same tick: one claims it.
+    const [a, b] = await Promise.all([lapseGrade10Exceptions(), lapseGrade10Exceptions()]);
+    expect(a.lapsed + b.lapsed).toBe(1);
+    expect(await exceptionStatus()).toBe('lapsed');
+    expect((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'EXCEPTION_LAPSED' and entity_id = $1`, [grant.id])).n).toBe('1');
+    expect(await statusOf('registration', waiting)).toBe('expired');
+    expect(await expiryOf(waiting)).toEqual({ was: 'pending_payment', reason: 'ineligible', detail: 'exception_lapsed' });
+    expect(await statusOf('registration', paid)).toBe('confirmed');
+    expect(await apiResponse(adm.api.v1.registrations.eligibility.$get({ query: { studentId: f.studentId, sessionId: october } })))
+      .toMatchObject({ allowed: false, code: 'grade10_june_only' });
+    // A later tick finds nothing.
+    expect((await lapseGrade10Exceptions()).lapsed).toBe(0);
   });
 
   it("withdrawn with preregistrations, then the series opens: neither is captured — the paid one keeps its money held, the unpaid one stays unpayable; one audit row each, finance told", async () => {

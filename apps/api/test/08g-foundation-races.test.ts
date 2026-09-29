@@ -129,6 +129,31 @@ describe('F0a: races', () => {
       expect(await chg.json()).toMatchObject({ data: { registrationsExpired: 1 } });
     });
 
+    it('a transfer: the registration commits first, then the transfer expires it', async () => {
+      const f = await family('transfer');
+      await extend(f.studentId, nov);
+      const { reg, chg } = await race(f, nov, subj[5]!, () =>
+        coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'transferred', leftOn: localToday(), reason: 'race check' } }));
+      expect(reg.status).toBe(201);
+      expect(chg.status).toBe(200);
+      const [created] = (await reg.json() as { data: { id: string }[] }).data;
+      expect(await waitingFor(f.studentId, nov)).toEqual([]);
+      expect(await expiryOf(created!.id)).toEqual({ reason: 'ineligible', detail: 'transferred' });
+    });
+
+    it('a cohort correction: the registration commits first, then the correction expires it', async () => {
+      const f = await family('cohort');
+      await extend(f.studentId, nov);
+      // Moved back a year: grade 10 in this November, and grade 10 sits June only.
+      const { reg, chg } = await race(f, nov, subj[0]!, () =>
+        adm.api.v1.students[':id'].cohort.$put({ param: { id: f.studentId }, json: { cohortYear: thisYear, reason: 'repeats grade 10' } }));
+      expect(reg.status).toBe(201);
+      expect(chg.status).toBe(200);
+      const [created] = (await reg.json() as { data: { id: string }[] }).data;
+      expect(await waitingFor(f.studentId, nov)).toEqual([]);
+      expect(await expiryOf(created!.id)).toEqual({ reason: 'ineligible', detail: 'cohort_corrected' });
+    });
+
     it("a window's series corrected: the registration commits first, then the correction expires it", async () => {
       const f = await family('series');
       const own = await session(adm, 'November (IGCSE, F0a races, series)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', thisYear) });
@@ -212,13 +237,29 @@ describe('F0a: races', () => {
       [studentId, studentId]);
 
   describe('a withdrawal that lands first refuses every creating path', () => {
-    // A change is made only while its window is open by status (SWAP-006): the swaps need an open
-    // IGCSE window — an earlier suite's when there is one (one active window per type and level).
+    // A change is made only while its window is open by status (SWAP-006): the swaps get an open
+    // window of their own, in a type and level no earlier suite holds open (one active window per
+    // type and level), with subjects of that level; it is closed after.
     let open: string;
+    const swapSubj: string[] = [];
     beforeAll(async () => {
-      const [found] = await sql<{ id: string }>(
-        `select id from registration_session where status = 'active' and qualification_level = 'igcse' and end_date > now() + interval '1 day' order by created_at limit 1`);
-      open = found?.id ?? await session(adm, 'June (IGCSE, F0a races)', 'june', 'igcse', { ...openWindow(), activate: true });
+      const combos = [
+        ['january', 'as_level'], ['january', 'a_level'], ['october', 'as_level'], ['october', 'a_level'],
+        ['june', 'as_level'], ['june', 'a_level'], ['november', 'as_level'], ['november', 'a_level'],
+        ['june', 'igcse'], ['november', 'igcse'],
+      ] as const;
+      const taken = new Set((await sql<{ k: string }>(
+        `select session_type || '/' || qualification_level as k from registration_session where status = 'active'`)).map((r) => r.k));
+      const free = combos.find(([t, l]) => !taken.has(`${t}/${l}`));
+      if (!free) throw new Error('08g needs one type and level with no open window; every combination is held open by an earlier suite');
+      const [type, level] = free;
+      for (const [i, name] of ['Biology', 'Physics', 'Chemistry', 'Maths'].entries()) {
+        swapSubj.push(await subject(adm, `F0R-S${i + 1}`, `${name} (F0a races, swaps)`, { course: 1000, registration: 200 }, { qualificationLevel: level }));
+      }
+      open = await session(adm, `${type} ${level} (F0a races, swaps)`, type, level, { ...openWindow(), activate: true });
+    });
+    afterAll(async () => {
+      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: open }, json: {} }));
     });
     const deskCash = (f: Family, sessionId: string, subjectId: string) =>
       officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId, subjectIds: [subjectId], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } } });
@@ -245,11 +286,11 @@ describe('F0a: races', () => {
 
     it('approving a swap: refused, the paid subject stays and nothing new waits', async () => {
       const f = await family('first-swap-approve');
-      const paid = (await apiResponse(deskCash(f, open, subj[2]!))).registrations[0]!.id;
+      const paid = (await apiResponse(deskCash(f, open, swapSubj[0]!))).registrations[0]!.id;
       // The student's swap request, as the request route writes it.
       const cr = { id: crypto.randomUUID() };
       await sql(`insert into change_request (id, registration_id, type, requested_by, reason, new_subject_id, price_at_request, price_difference, status)
-                 values ($1, $2, 'swap', $3, 'timetable clash', $4, 1200, 0, 'pending_approval')`, [cr.id, paid, f.studentId, subj[3]!]);
+                 values ($1, $2, 'swap', $3, 'timetable clash', $4, 1200, 0, 'pending_approval')`, [cr.id, paid, f.studentId, swapSubj[1]!]);
       const created = await afterWithdrawal(f, () => f.parent.api.v1['change-requests'][':id'].approve.$put({ param: { id: cr.id }, json: {} }));
       expect(created.status).toBe(400);
       expect(((await created.json()) as { error: string }).error).toContain('was withdrawn from the school');
@@ -260,9 +301,9 @@ describe('F0a: races', () => {
 
     it("a parent's direct swap: refused, the paid subject stays and nothing new waits", async () => {
       const f = await family('first-swap-direct');
-      const paid = (await apiResponse(deskCash(f, open, subj[4]!))).registrations[0]!.id;
+      const paid = (await apiResponse(deskCash(f, open, swapSubj[2]!))).registrations[0]!.id;
       const created = await afterWithdrawal(f, () =>
-        f.parent.api.v1.registrations[':id'].swap.$post({ param: { id: paid }, json: { newSubjectId: subj[5]!, reason: 'timetable clash' } }));
+        f.parent.api.v1.registrations[':id'].swap.$post({ param: { id: paid }, json: { newSubjectId: swapSubj[3]!, reason: 'timetable clash' } }));
       expect(created.status).toBe(400);
       expect(((await created.json()) as { error: string }).error).toContain('was withdrawn from the school');
       expect((await one<{ status: string }>(`select status from registration where id = $1`, [paid])).status).toBe('confirmed');

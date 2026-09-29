@@ -245,7 +245,8 @@ export type EligibilityCause =
   | 'cohort_corrected'
   | 'graduate_retakes_off'
   | 'series_corrected'
-  | 'exception_revoked';
+  | 'exception_revoked'
+  | 'exception_lapsed';
 
 /**
  * Expire every waiting registration (awaiting approval or payment) in the
@@ -336,6 +337,7 @@ export const CAUSE_SENTENCE: Record<EligibilityCause, string> = {
   graduate_retakes_off: 'the school no longer registers graduates for later series',
   series_corrected: "the window's exam series was corrected",
   exception_revoked: 'the grade-10 exception was revoked',
+  exception_lapsed: 'the grade-10 exception ran out',
 };
 
 // A-12 turned off: graduates' waiting registrations for the series it

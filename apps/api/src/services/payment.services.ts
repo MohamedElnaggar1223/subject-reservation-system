@@ -856,6 +856,7 @@ const CLOSED_BECAUSE: Record<EligibilityCause, string> = {
   graduate_retakes_off: 'The school no longer registers graduates for this series',
   series_corrected: "The window's exam series was corrected and the student may no longer sit it",
   exception_revoked: "The student's grade-10 exception was revoked before this payment was confirmed",
+  exception_lapsed: "The student's grade-10 exception ran out before this payment was confirmed",
 };
 
 /**

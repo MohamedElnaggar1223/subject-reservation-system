@@ -43,8 +43,17 @@ const standingSql = sql<string>`CASE
  * section, searchable and filterable. The coordinator's way in (they have
  * no Student 360, which carries money).
  */
-/** The backfill inferred this student's graduation (a row per inference, for staff to review). */
-const inferredSql = sql`EXISTS (SELECT 1 FROM ${auditLog} a WHERE a.action = 'STUDENT_COHORT_INFERRED' AND a.entity_id = ${user.id})`;
+/**
+ * The backfill inferred this student's graduation (a row per inference, for
+ * staff to review), and nobody has corrected the cohort since: a later
+ * STUDENT_COHORT_CORRECTED means staff reviewed it.
+ */
+const inferredSql = sql`EXISTS (
+  SELECT 1 FROM ${auditLog} a
+  WHERE a.action = 'STUDENT_COHORT_INFERRED' AND a.entity_id = ${user.id}
+    AND NOT EXISTS (
+      SELECT 1 FROM ${auditLog} c
+      WHERE c.action = 'STUDENT_COHORT_CORRECTED' AND c.entity_id = a.entity_id AND c.created_at > a.created_at))`;
 
 export async function listStudents(q: ListStudentsQueryType) {
   const current = academicYearStartOf();

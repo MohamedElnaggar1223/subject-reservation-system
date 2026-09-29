@@ -16,6 +16,7 @@ import { api } from '~/lib/hono';
 import { apiResponse, ROLE_LABELS, WEEKDAY_LABELS, type Role } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
+import { useI18n } from '~/lib/i18n';
 
 // Typed by the API, never by hand (CLAUDE.md: Hono RPC everywhere).
 const fetchSettings = () => apiResponse(api.v1.settings.$get());
@@ -37,8 +38,9 @@ function describeValue(s: Setting, value: unknown): string {
   return JSON.stringify(value);
 }
 
-function formatWhen(iso: string | Date): string {
-  return new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+/** A moment in the page's language (Arabic month names with Latin digits, as the rest of the app writes numbers). */
+function formatWhen(iso: string | Date, language: string): string {
+  return new Date(iso).toLocaleString(language === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export default function SettingsClient(): React.JSX.Element {
@@ -97,6 +99,7 @@ export default function SettingsClient(): React.JSX.Element {
 
 function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (saved: { label: string; value: string }) => void }): React.JSX.Element {
   const queryClient = useQueryClient();
+  const { language } = useI18n();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<unknown>(s.value);
   const [reason, setReason] = useState('');
@@ -135,7 +138,7 @@ function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (save
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>
           {s.updatedAt
-            ? <><span>Last changed</span> <span>{formatWhen(s.updatedAt)}</span>{s.updatedBy && <> · <span>{s.updatedBy}</span></>}</>
+            ? <><span>Last changed</span> <span>{formatWhen(s.updatedAt, language)}</span>{s.updatedBy && <> · <span>{s.updatedBy}</span></>}</>
             : <span>Never changed</span>}
           {' · '}
           <span>Who may change it:</span>{' '}

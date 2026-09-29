@@ -307,7 +307,7 @@ describe('money invariants over the whole database', () => {
           or coalesce(new_data->>'reason', '') not in ('session_closed', 'entry_deadline', 'graduated', 'payment_closed', 'preregistration_unfunded_at_deadline', 'ineligible')
           -- F0a: a student no longer eligible for the series says what changed.
           or (new_data->>'reason' = 'ineligible' and coalesce(new_data->>'detail', '') not in
-            ('withdrawn', 'transferred', 'cohort_corrected', 'graduate_retakes_off', 'series_corrected', 'exception_revoked')))
+            ('withdrawn', 'transferred', 'cohort_corrected', 'graduate_retakes_off', 'series_corrected', 'exception_revoked', 'exception_lapsed')))
     `);
     expect(vague).toEqual([]);
   });
@@ -397,13 +397,17 @@ describe('money invariants over the whole database', () => {
       return verdicts.get(key)!;
     };
 
-    // A waiting registration of a student refused for its series, unless an
-    // open checkout holds it (a transfer being checked, InstaPay's grace: the
-    // family may already have paid; the payment's own close releases it).
+    // A waiting registration of a student refused for its series, unless a
+    // checkout holds it on the clean-up's own terms (eligibility.services
+    // expireIneligibleRegistrations): a transfer being checked, or an
+    // InstaPay checkout still inside its grace — the family may already have
+    // paid, and the payment's own close releases it. Any other open checkout
+    // (in school, a lapsed grace) holds nothing.
     const waiting = await sql<{ id: string; student_id: string; session_id: string; held: boolean }>(`
       select r.id, r.student_id, r.session_id,
         exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id
-                where pr.registration_id = r.id and p.status in ('pending', 'pending_verification')) as held
+                where pr.registration_id = r.id
+                  and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > now()))) as held
       from registration r
       where r.status in ('pending_approval', 'pending_payment')
     `);
@@ -428,7 +432,7 @@ describe('money invariants over the whole database', () => {
           (a.action in ('STUDENT_LEFT', 'STUDENT_COHORT_CORRECTED') and a.entity_id = $2)
           or (a.action = 'SESSION_SERIES_CORRECTED' and a.entity_id = $3)
           or (a.action = 'SETTING_CHANGED' and a.entity_id = 'eligibility.graduateRetakes')
-          or (a.action = 'EXCEPTION_REVOKED' and exists (select 1 from exception e where e.id = a.entity_id and e.student_id = $4)))
+          or (a.action in ('EXCEPTION_REVOKED', 'EXCEPTION_LAPSED') and exists (select 1 from exception e where e.id = a.entity_id and e.student_id = $4)))
         limit 1
       `, [c.at, c.student_id, c.session_id, c.student_id]);
       if (later.length === 0) capturedWhileRefused.push(c.id);

@@ -18,6 +18,7 @@ import { autoManageSessions, finalizePendingRecords, recoverSessionTransitions }
 import { failPayment, enforcePaymentDeadlines } from '../services/payment.services';
 import { notifySessionOpened, notifySessionClosingSoon, notifySessionClosed, processScheduledAnnouncements, getStudentAndParentBroadcastIds } from '../services/notification.services';
 import { capturePreregistrationsForSession } from '../services/prereg.services';
+import { lapseGrade10Exceptions } from '../services/exception-lapse.services';
 import { logAction } from '../services/audit.services';
 import { logger } from '../lib/logger';
 
@@ -197,6 +198,18 @@ export function startSessionScheduler(): void {
         }
       } catch (err) {
         logger.error('[session-closer] Recovery sweep failed:', err);
+      }
+
+      // F0a: a grade-10 exception whose validUntil has passed stops covering
+      // the waiting registrations it allowed — the same clean-up as a
+      // revocation, claimed per exception (status-guarded), idempotent.
+      try {
+        const l = await lapseGrade10Exceptions();
+        if (l.lapsed > 0) {
+          logger.info(`[session-closer] ${l.lapsed} grade-10 exception(s) ran out; ${l.registrationsExpired} registration(s) expired, ${l.paymentsClosed} checkout(s) closed.`);
+        }
+      } catch (err) {
+        logger.error('[session-closer] Grade-10 exception lapse failed:', err);
       }
 
       // Process scheduled announcements whose time has arrived

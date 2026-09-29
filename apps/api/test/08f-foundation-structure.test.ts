@@ -314,6 +314,11 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
       expect(list.students.every((s) => s.cohortInferred)).toBe(true);
       const record = await apiResponse(coordinator.api.v1.students[':id'].$get({ param: { id: g.studentId } }));
       expect(record.changes.map((c) => c.action)).toContain('STUDENT_COHORT_INFERRED');
+      // Reviewed: once staff correct the cohort, the student leaves the filter (the record keeps both rows).
+      await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: g.studentId }, json: { cohortYear: Y - 3, reason: 'graduated a year earlier than inferred' } }));
+      const after = await apiResponse(coordinator.api.v1.students.$get({ query: { inferred: 'true', limit: '500' } }));
+      expect(after.students.some((s) => s.id === g.studentId)).toBe(false);
+      expect((await apiResponse(coordinator.api.v1.students.$get({ query: { search: g.student.email } }))).students[0]).toMatchObject({ cohortInferred: false });
     });
 
     it('moving a student keeps the history; the student record and the desk show the section', async () => {

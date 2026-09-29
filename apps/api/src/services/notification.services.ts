@@ -932,7 +932,7 @@ export async function notifyStrandedPaymentClosed(paymentId: string, escrowRetur
 export async function notifyPaymentClosedIneligible(
   paymentId: string,
   escrowReturned: number,
-  cause: 'withdrawn' | 'transferred' | 'cohort_corrected' | 'graduate_retakes_off' | 'series_corrected' | 'exception_revoked',
+  cause: 'withdrawn' | 'transferred' | 'cohort_corrected' | 'graduate_retakes_off' | 'series_corrected' | 'exception_revoked' | 'exception_lapsed',
 ) {
   const escrowNote = escrowReturned > 0 ? ` EGP ${escrowReturned.toFixed(2)} applied from escrow has been returned.` : '';
   const because: Record<typeof cause, (name: string) => string> = {
@@ -942,6 +942,7 @@ export async function notifyPaymentClosedIneligible(
     graduate_retakes_off: (n) => `the school no longer registers graduates such as ${n} for this series`,
     series_corrected: (n) => `this registration window's exam series was corrected and ${n} may no longer sit it`,
     exception_revoked: (n) => `${n}'s grade-10 exception for this series was revoked`,
+    exception_lapsed: (n) => `${n}'s grade-10 exception for this series ran out`,
   };
   await notifyFamilyOfPayment(paymentId, 'PAYMENT_EXPIRED', 'Payment closed', (c) =>
     `${because[cause](c.studentName)}, so the payment of ${c.amount} for ${c.subjects} (${c.sessionName}) was closed before it was confirmed.${escrowNote} ` +
@@ -952,7 +953,9 @@ export async function notifyPaymentClosedIneligible(
 /**
  * F0a: a paid or unpaid preregistration held at its series' opening because
  * the student may no longer sit the series. Finance and the admin are told:
- * the money stays held, and refunding it is the owner's call (SO-4).
+ * the money stays held and nothing releases it until the owner decides
+ * (SO-4) — the family cannot cancel an opened series' preregistration, and
+ * after the window closes it stays held.
  */
 export async function notifyFinanceOfHeldPreregistration(registrationId: string, heldAmount: number, reason: string) {
   const reg = await db.query.registration.findFirst({
@@ -970,7 +973,8 @@ export async function notifyFinanceOfHeldPreregistration(registrationId: string,
   const money = heldAmount > 0 ? `EGP ${heldAmount.toFixed(2)} stays held in the family's wallet` : 'It was not paid for';
   const title = `Preregistration held: ${reg.student.name}`;
   const body = `${reg.student.name}'s preregistration for ${reg.subject.name} (${reg.subject.code}), ${reg.session.name}, was not confirmed when the series opened: ${reason}. ` +
-    `${money}. Refunding it is the school's decision; the family can also cancel it.`;
+    `${money}. Nothing releases it until the school decides what to do with it (a refund is the owner's decision); ` +
+    `the family cannot cancel it now that the series is open, and after the window closes it stays held.`;
   for (const s of staff) {
     await createNotification(s.id, 'PREREGISTRATION_HELD', title, body, { registrationId, studentId: reg.studentId, heldAmount });
   }

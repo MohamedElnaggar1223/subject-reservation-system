@@ -270,7 +270,7 @@ export default function ExceptionsAdminClient({ viewerRole }: { viewerRole: stri
             </thead>
             <tbody className="divide-y divide-border">
               {exceptions.map((e) => (
-                <tr key={e.id} className={`hover:bg-muted/50 transition-colors ${e.status === 'revoked' ? 'opacity-60' : ''}`}>
+                <tr key={e.id} className={`hover:bg-muted/50 transition-colors ${e.status === 'revoked' || e.status === 'lapsed' ? 'opacity-60' : ''}`}>
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{e.student?.name ?? '—'}</div>
                     {e.student?.grade != null && <div className="text-xs text-muted-foreground">{gradeLabel(e.student.grade)}</div>}
