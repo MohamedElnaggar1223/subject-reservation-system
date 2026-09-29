@@ -1,8 +1,21 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf, schoolDateString } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, type Client,
+  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, lockWaiters, type Client,
 } from './helpers';
+
+/** Hold the year's enrolment lock (upsertEnrolments' advisory lock) from outside, so two commits queue behind it together. */
+async function holdEnrolmentLock(academicYearId: string): Promise<() => Promise<void>> {
+  const { default: pg } = await import('pg');
+  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  await client.query('BEGIN');
+  await client.query(`select pg_advisory_xact_lock(hashtext($1))`, [`enrolment:${academicYearId}`]);
+  return async () => {
+    await client.query('COMMIT');
+    await client.end();
+  };
+}
 
 /**
  * F0b — course enrolment per academic year (FEATURES_PLAN.md F0b).
@@ -253,10 +266,19 @@ describe('F0b: course enrolment', () => {
     it('two coordinators commit the same rows at the same moment: each enrolment is made once', async () => {
       const other = await staff(adm, 'coordinator', 'enr-2');
       const rows = [s.s1!, s.s2!].map((st) => ({ student: st.studentId, subject: 'EN-PHY', mode: 'self_study' as const }));
-      const [a, b] = await Promise.all([
-        apiResponse(coordinator.api.v1.enrolments.batch.$post({ json: { academicYearId: thisYear, rows, commit: true } })),
-        apiResponse(other.api.v1.enrolments.batch.$post({ json: { academicYearId: thisYear, rows, commit: true } })),
-      ]);
+      // Both judge the rows before either writes (each sees s2 not enrolled),
+      // then queue behind the year's lock: the second's insert must find the first's.
+      const release = await holdEnrolmentLock(thisYear);
+      let first: Promise<unknown> | undefined;
+      let second: Promise<unknown> | undefined;
+      try {
+        first = apiResponse(coordinator.api.v1.enrolments.batch.$post({ json: { academicYearId: thisYear, rows, commit: true } }));
+        second = apiResponse(other.api.v1.enrolments.batch.$post({ json: { academicYearId: thisYear, rows, commit: true } }));
+        await lockWaiters(2);
+      } finally {
+        await release();
+      }
+      const [a, b] = (await Promise.all([first!, second!])) as { summary: { created: number; existing: number } }[];
       // s1 already studies Physics alone; s2 gets it once, whoever commits first.
       expect(a.summary.created + b.summary.created).toBe(1);
       expect(a.summary.existing + b.summary.existing).toBe(3);
