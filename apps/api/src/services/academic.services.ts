@@ -583,6 +583,17 @@ export async function addSectionMembers(sectionId: string, data: AddSectionMembe
       .for('update', { of: sectionMembership });
     const openBy = new Map(open.map((o) => [o.studentId, o]));
     const toAdd = ids.filter((id) => openBy.get(id)?.sectionId !== sectionId);
+    // A move starts on or after the day the student joined their current
+    // section: dated before it, the new section would begin before the old one
+    // did and the history would overlap (found on 30 Sep 2026 when a test's
+    // date and the school's differed by a day).
+    const tooEarly = toAdd
+      .map((id) => ({ id, prev: openBy.get(id) }))
+      .filter((m) => m.prev && startsOn < m.prev.startedOn)
+      .map((m) => `${students.find((st) => st.id === m.id)!.name} joined ${m.prev!.sectionName} on ${readableDate(m.prev!.startedOn)}`);
+    if (tooEarly.length) {
+      throw new AcademicError(`A move must start on or after the day the student joined their current section: ${tooEarly.join('; ')}`, 409);
+    }
     if (s.capacity !== null) {
       const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(sectionMembership)
         .where(and(eq(sectionMembership.sectionId, sectionId), isNull(sectionMembership.endedOn))) as [{ n: number }];

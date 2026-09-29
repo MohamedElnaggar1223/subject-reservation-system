@@ -525,7 +525,8 @@ export async function approveChangeRequest(
         approvedBy: parentId,
         approvedAt: now,
         approvalComments: `Swap from registration ${cr.registrationId}`,
-        createdAt: now,
+        // created_at from the column's default: the database's clock, the one a
+        // close compares it with (ST-15).
         updatedAt: now,
       });
     }
@@ -809,7 +810,7 @@ export async function executeDirectSwap(
       approvedBy: parentId,
       approvedAt: now,
       approvalComments: `Direct swap from registration ${registrationId}`,
-      createdAt: now,
+      // created_at from the column's default: the database's clock (ST-15).
       updatedAt: now,
     });
 
