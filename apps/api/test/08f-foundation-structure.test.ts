@@ -321,7 +321,7 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
       expect((await apiResponse(coordinator.api.v1.students.$get({ query: { search: g.student.email } }))).students[0]).toMatchObject({ cohortInferred: false });
     });
 
-    it('a move dated before the student joined their current section is refused: the history never overlaps', async () => {
+    it('a move dated before the student joined their current section is refused: the new section never starts before the old one', async () => {
       const current = await one<{ started_on: string }>(
         `select to_char(m.started_on, 'YYYY-MM-DD') as started_on from section_membership m where m.student_id = $1 and m.ended_on is null`, [y.studentId]);
       const dayBefore = new Date(`${current.started_on}T12:00:00Z`);

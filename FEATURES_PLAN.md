@@ -240,6 +240,9 @@ a window's series, Course enrolment (per student, per section, bulk).
   cover teacher and the classes; cover log and report.
 - Exposes `getScheduleFor(studentId | teacherId, date)` (lessons with period, times, group,
   teacher, room, cover applied).
+- Reads a student's section on a date knowing that a move made on the day they joined leaves them
+  in both sections for that day (STATE_AUDIT.md ST-16), and that a leaving date is clamped to the
+  section's start (SO-9): decide which membership wins, or refuse those cases first.
 **Scenarios:** groups from enrolment excluding self-study; each clash type detected; the
 generator placing a school-sized input within the time limit, deterministic (two runs, same
 result), respecting locks, explaining an impossible lesson; publish notifying; a cover
