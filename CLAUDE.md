@@ -14,7 +14,8 @@ still to obtain — check it before designing any feature), `PATTERNS.md` (the t
 rules of the codebase), `V3_PLAN.md` and `UX_AUDIT.md` (why the system is shaped the way it is), `IMPORT_SPIKE.md`
 (what the school's own sheet does not fit — read it before changing the data model), and
 `DISCOVERY_RESEARCH.md` (what the exam boards and Egypt's equivalency rules require, and the
-feature-value map for the gate).
+feature-value map for the gate), and `FEATURES_PLAN.md` (the new features' full scope, the
+contracts between them, the build order and how each is implemented and reviewed).
 
 ## Models
 

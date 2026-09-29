@@ -140,6 +140,9 @@ units, sections, teacher accounts, multi-series windows and the retake-aware out
 
 ### Phase 3 — the gate (owner in the room)
 
+**Decided 28 Sep 2026 (superseded by FEATURES_PLAN.md):** the owner chose full versions of every
+feature, not releases, with the staff side first; Phases 4 and 5 below are kept as history.
+
 Pick release 1 from the map, resolve the open product questions in §7, and only then write
 requirements for that release. The register's parked questions that release 1 depends on get
 answered or explicitly assumed.
@@ -236,7 +239,10 @@ before it ships.
    38; `grep -rn 'useQuery<' apps/web/app` finds 36 at c0f246e); close RF-04 and RF-05. The
    security audit also inherits the unused `/v1/files` upload endpoints (see
    `.audit/housekeeping.tsv`).
-5. **The gate**, once 1–3 are done.
+5. **The gate** — decided by the owner on 28 Sep 2026: build every feature in full, staff side
+   first, one Opus 5.5 agent per feature and a separate Opus 5.5 review of each, then a
+   complete UI audit. The grade changes at the end of the June session (Q-08). Plan, scope,
+   contracts and build order: `FEATURES_PLAN.md`.
 
 ---
 
@@ -252,6 +258,12 @@ before it ships.
 - Which **qualification labels** the school sees: their O.L./A.S./A.2./A.L. or ours?
 - The **day-one import source**: the school's sheet, an SCL export at the grade 9→10 boundary,
   or both?
+- **A-12:** may a student who has finished grade 12 register for the October, November and
+  January series right after it (retakes)? Default yes, a school setting (FEATURES_PLAN.md §0b).
+- **A-13:** does such a graduate owe a school fee? Default no, a school setting.
+- **A-14:** a November window opening in June belongs to the next academic year, whose school
+  fee may not be open yet: register without it (default, as today), hold the registration, or
+  ask for the fee later?
 
 ---
 
