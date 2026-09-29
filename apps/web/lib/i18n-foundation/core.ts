@@ -109,7 +109,7 @@ export const coreArabic: Record<string, string> = {
   'Grade / ID': 'الصف / الرقم',
   'Standing': 'الوضع',
   'staff': 'الموظفون',
-  'students': 'الطلاب',
+  'students': 'طلاب',
   'parents': 'أولياء الأمور',
   'No unlinked record': 'لا يوجد سجل غير مرتبط',
   'Does not teach — link…': 'لا يُدرّس - ربط…',
@@ -129,6 +129,11 @@ export const coreArabic: Record<string, string> = {
   'Their own teaching. Needs a teacher record — pick one or create one.': 'تدريسه الخاص. يحتاج إلى سجل معلم - اختر سجلًا أو أنشئ واحدًا.',
   'Reception and security: the school day and, later, the leave list.': 'الاستقبال والأمن: اليوم الدراسي، ولاحقًا قائمة الانصراف.',
   'Everything, except what only a parent may do for their own family.': 'كل شيء، عدا ما لا يفعله إلا ولي الأمر لأسرته.',
+
+  // The desk (strings the Student 360 already had)
+  'Parents:': 'أولياء الأمور:',
+  '+ Register Subjects': '+ تسجيل مواد',
+  'Active exceptions:': 'الاستثناءات النشطة:',
 
   // Exceptions (the F0a type)
   'Grade 10: sit a series other than June': 'الصف 10: دخول دورة غير يونيو',

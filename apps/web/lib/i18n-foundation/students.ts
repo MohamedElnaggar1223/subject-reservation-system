@@ -1,0 +1,266 @@
+/** Arabic for the F0a students, sections and teaching screens: exact English text → Arabic. */
+export const studentsArabic: Record<string, string> = {
+  // ── Shared words ────────────────────────────────────────────────────────
+  'Students': 'الطلاب',
+  'Sections': 'الفصول',
+  'This year': 'هذا العام',
+  'Room': 'القاعة',
+  'Homeroom teacher': 'رائد الفصل',
+  'Not named yet': 'لم يُحدَّد بعد',
+  'No room yet': 'لا قاعة بعد',
+  'Full': 'مكتمل',
+  'Since': 'منذ',
+  'Until': 'حتى',
+  'Into': 'إلى',
+  'now': 'الآن',
+  'Moved to': 'نُقل إلى',
+  'At least 5 characters; kept in the audit trail.': '5 أحرف على الأقل؛ يُحفظ في مسار التدقيق.',
+  'Name, email or student ID': 'الاسم أو البريد الإلكتروني أو رقم الطالب',
+  'Section this year': 'الفصل هذا العام',
+  'All sections': 'كل الفصول',
+  'Updating…': 'جارٍ التحديث…',
+
+  // ── The academic record (StudentAcademicPanel) ──────────────────────────
+  'Loading the academic record…': 'جارٍ تحميل السجل الأكاديمي…',
+  'Could not load the academic record': 'تعذر تحميل السجل الأكاديمي',
+  'Cohort': 'الدفعة',
+  'Not recorded': 'غير مسجلة',
+  'Not recorded. Use Correct cohort to record the grade they are in this year.':
+    'غير مسجلة. استخدم «تصحيح الدفعة» لتسجيل الصف الذي هو فيه هذا العام.',
+  'Not recorded. The admin records it before the student can register.':
+    'غير مسجلة. تسجلها الإدارة قبل أن يتمكن الطالب من التسجيل.',
+  'No section this year.': 'لا فصل له هذا العام.',
+  'Not in a section yet.': 'لم يُوضع في فصل بعد.',
+  'Correct cohort': 'تصحيح الدفعة',
+  'Record leaving': 'تسجيل المغادرة',
+  'Readmit': 'إعادة القبول',
+  'The coordinator and the admin change the academic record; you can read it here.':
+    'المنسق والإدارة يعدّلان السجل الأكاديمي؛ ويمكنك الاطلاع عليه هنا.',
+  'Exam series open now': 'دورات الامتحانات المفتوحة الآن',
+  'No exam series is open or being prepared.': 'لا توجد دورة امتحانات مفتوحة أو قيد الإعداد.',
+  'Being prepared': 'قيد الإعداد',
+  'May register': 'يمكنه التسجيل',
+  'May not register': 'لا يمكنه التسجيل',
+  'Grade in this series:': 'الصف في هذه الدورة:',
+  'Grant the grade-10 exception': 'منح استثناء الصف 10',
+  'Section history': 'سجل الفصول',
+  'Never in a section.': 'لم يكن في أي فصل.',
+  'Changes to the record': 'التغييرات على السجل',
+  'No corrections, leavings or readmissions.': 'لا توجد تصحيحات أو مغادرات أو إعادات قبول.',
+  'Record changed': 'تغيّر السجل',
+  'Grade changed': 'تغيّر الصف',
+  'Transferred to another school': 'انتقل إلى مدرسة أخرى',
+  'Withdrawn from the school': 'انسحب من المدرسة',
+  'Left on': 'غادر في',
+  'They are refused new registrations. Only the admin can readmit them.':
+    'لا يُقبل له تسجيل جديد. والإدارة وحدها يمكنها إعادة قبوله.',
+  'Their section does not match their grade': 'فصله لا يطابق صفه',
+  'Section:': 'الفصل:',
+  'Grade this year:': 'الصف هذا العام:',
+  'Move them to a section of their grade': 'انقله إلى فصل من صفه',
+  'The coordinator moves them to a section of their grade.': 'ينقله المنسق إلى فصل من صفه.',
+  // Results of the actions
+  'Cohort corrected': 'تم تصحيح الدفعة',
+  'Registrations expired:': 'تسجيلات انتهت صلاحيتها:',
+  'Open checkouts closed:': 'عمليات دفع مفتوحة أُغلقت:',
+  'The family has been told of the change.': 'تم إبلاغ الأسرة بالتغيير.',
+  'Leaving recorded': 'تم تسجيل المغادرة',
+  'Section memberships ended:': 'عضويات فصول انتهت:',
+  'Everything the student did stays on record. Only the admin can readmit them.':
+    'يبقى كل ما قام به الطالب في السجل. والإدارة وحدها يمكنها إعادة قبوله.',
+  'Readmitted': 'أُعيد قبوله',
+  'They may register again and be placed in a section. What expired when they left stays expired.':
+    'يمكنه التسجيل مجددًا ووضعه في فصل. وما انتهت صلاحيته عند مغادرته يبقى منتهيًا.',
+  'Exception granted': 'تم منح الاستثناء',
+  'Series:': 'الدورة:',
+  'They may now register for this series. The exception can be revoked here.':
+    'يمكنه الآن التسجيل في هذه الدورة. ويمكن إلغاء الاستثناء من هنا.',
+  'Exception revoked': 'تم إلغاء الاستثناء',
+  'Grade-10 exception': 'استثناء الصف 10',
+  'Revoke the exception': 'إلغاء الاستثناء',
+  'A graduate retake: no school fee.': 'إعادة لخريج: بلا مصاريف دراسية.',
+  'They may no longer register for that series; waiting registrations it allowed have expired, and their open checkouts closed.':
+    'لم يعد بإمكانه التسجيل في تلك الدورة؛ وانتهت التسجيلات المنتظرة التي سمح بها الاستثناء، وأُغلقت عمليات الدفع المفتوحة لها.',
+  // Readmission and the grade-10 exception
+  'Readmit this student': 'إعادة قبول هذا الطالب',
+  'They may register again and be placed in a section. What expired when they left stays expired. Recorded with your reason.':
+    'يمكنه التسجيل مجددًا ووضعه في فصل. وما انتهت صلاحيته عند مغادرته يبقى منتهيًا. يُسجَّل ذلك مع السبب الذي تذكره.',
+  'Grade 10 sits the June series only. This exception lets the student register for this series; it is recorded with your reason and can be revoked here.':
+    'الصف 10 يؤدي دورة يونيو فقط. يسمح هذا الاستثناء للطالب بالتسجيل في هذه الدورة، ويُسجَّل مع السبب الذي تذكره، ويمكن إلغاؤه من هنا.',
+  'Grant the exception': 'منح الاستثناء',
+  // The cohort correction
+  'Correct the cohort': 'تصحيح الدفعة',
+  'For a student who repeats a year, or whose grade was entered wrong. Their grade in every year follows from the year they started grade 10.':
+    'لطالب يعيد سنة، أو أُدخل صفه خطأً. يُستنتج صفه في كل عام من السنة التي بدأ فيها الصف 10.',
+  'Recorded now:': 'المسجل حاليًا:',
+  'What do you know?': 'ما الذي تعرفه؟',
+  'The grade they are in this year': 'الصف الذي هو فيه هذا العام',
+  'The year they started grade 10': 'السنة التي بدأ فيها الصف 10',
+  'Grade in': 'الصف في',
+  'Choose the academic year': 'اختر العام الدراسي',
+  'That is the cohort already recorded: nothing would change.': 'هذه هي الدفعة المسجلة بالفعل: لن يتغير شيء.',
+  'After the correction': 'بعد التصحيح',
+  'In the exam series open now': 'في دورات الامتحانات المفتوحة الآن',
+  'Registrations for series they may no longer sit expire, their open checkouts close with any escrow returned, and the family is told. The correction is recorded with your reason.':
+    'تنتهي صلاحية التسجيلات في الدورات التي لم يعد بإمكانه أداؤها، وتُغلق عمليات الدفع المفتوحة ويُعاد أي رصيد، وتُبلَّغ الأسرة. ويُسجَّل التصحيح مع السبب الذي تذكره.',
+  'e.g. Repeating grade 11': 'مثال: يعيد الصف 11',
+  // Recording a leaving
+  'Record that the student left': 'تسجيل مغادرة الطالب',
+  'They are refused new registrations, their section membership ends that day, and registrations still waiting expire with their open checkouts closed. Everything they did stays on record; only the admin can readmit them.':
+    'لا يُقبل له تسجيل جديد، وتنتهي عضويته في الفصل في ذلك اليوم، وتنتهي صلاحية التسجيلات المعلقة وتُغلق عمليات الدفع المفتوحة. يبقى كل ما قام به في السجل، والإدارة وحدها يمكنها إعادة قبوله.',
+  'How did they leave?': 'كيف غادر؟',
+  'The family took them out of the school.': 'سحبته الأسرة من المدرسة.',
+  'They moved to another school.': 'انتقل إلى مدرسة أخرى.',
+  'The day they left': 'يوم المغادرة',
+  'The day cannot be in the future.': 'لا يمكن أن يكون اليوم في المستقبل.',
+  'e.g. The family moved to Alexandria': 'مثال: انتقلت الأسرة إلى الإسكندرية',
+
+  // ── Students list ───────────────────────────────────────────────────────
+  'Every student with the grade they are in today, where they stand, and their section this year.':
+    'كل طالب مع صفه اليوم ووضعه وفصله هذا العام.',
+  'Enter opens the first student; the arrow keys move through the list.':
+    'مفتاح Enter يفتح أول طالب، ومفاتيح الأسهم تتنقل في القائمة.',
+  'Grade today': 'الصف اليوم',
+  'Any grade': 'أي صف',
+  'Any standing': 'أي وضع',
+  'Any section': 'أي فصل',
+  'Without a section this year': 'بلا فصل هذا العام',
+  'Loading students…': 'جارٍ تحميل الطلاب…',
+  'Could not load the students': 'تعذر تحميل الطلاب',
+  'No student matches': 'لا يوجد طالب مطابق',
+  'Check the spelling, or clear the filters to see every student.':
+    'تحقق من الكتابة، أو امسح عوامل التصفية لرؤية كل الطلاب.',
+  'No students yet': 'لا يوجد طلاب بعد',
+  'Students appear here when the desk onboards a family or a family signs up.':
+    'يظهر الطلاب هنا عندما يسجّل المكتب أسرة جديدة أو تنشئ أسرة حسابها.',
+  'Pages': 'الصفحات',
+
+  // ── A student's page ────────────────────────────────────────────────────
+  'All students': 'كل الطلاب',
+  'Loading the student…': 'جارٍ تحميل الطالب…',
+  'Could not open this student': 'تعذر فتح صفحة هذا الطالب',
+  'Payments and receipts at the desk': 'المدفوعات والإيصالات في المكتب',
+
+  // ── My teaching ─────────────────────────────────────────────────────────
+  'My teaching': 'تدريسي',
+  'The teacher record you teach as, your subjects, and the homeroom sections you lead this year.':
+    'سجل المعلم الذي تدرّس به، وموادك، والفصول التي أنت رائدها هذا العام.',
+  'Loading your teaching…': 'جارٍ تحميل بيانات تدريسك…',
+  'Could not load your teaching': 'تعذر تحميل بيانات تدريسك',
+  'Your account is not linked to a teacher record': 'حسابك غير مرتبط بسجل معلم',
+  'The admin links it on the Team page: they pick your account and the teacher record you teach as, or create one.':
+    'تربطه الإدارة من صفحة الفريق: تختار حسابك وسجل المعلم الذي تدرّس به، أو تنشئ سجلًا جديدًا.',
+  'Open the Team page': 'فتح صفحة الفريق',
+  'You teach as': 'تدرّس باسم',
+  'No subjects are assigned to you yet. The admin assigns teachers on the Subjects page.':
+    'لم تُسند إليك مواد بعد. تُسند الإدارة المعلمين من صفحة المواد.',
+  'Homeroom sections': 'الفصول التي أنت رائدها',
+  'You do not lead a homeroom section this year': 'لست رائد فصل هذا العام',
+  "The coordinator names each section's homeroom teacher on the Sections page.":
+    'يحدد المنسق رائد كل فصل من صفحة الفصول.',
+  'No students in this section yet.': 'لا يوجد طلاب في هذا الفصل بعد.',
+
+  // ── Sections ────────────────────────────────────────────────────────────
+  'The homeroom sections of a year, their teachers, rooms and students.': 'فصول العام الدراسي ورواد الفصول والقاعات والطلاب.',
+  'Roll over into': 'ترحيل إلى',
+  'Roll over from': 'ترحيل من',
+  'Students not yet in a section this year:': 'طلاب لم يُوضعوا في فصل هذا العام:',
+  'See who': 'عرض الأسماء',
+  'Every student at school has a section.': 'لكل طالب في المدرسة فصل.',
+  'Loading the sections…': 'جارٍ تحميل الفصول…',
+  'Could not load the sections': 'تعذر تحميل الفصول',
+  'No sections in this year yet': 'لا توجد فصول في هذا العام بعد',
+  'Add a section for each class. If the year before has sections, roll them over instead: they move up a grade with their students.':
+    'أضف فصلًا لكل مجموعة من الطلاب. وإذا كانت للعام السابق فصول فرحّلها بدلًا من ذلك: فتنتقل صفًا أعلى مع طلابها.',
+  'Add a section': 'إضافة فصل',
+  'Not in a section:': 'بلا فصل:',
+  'Could not load the academic years': 'تعذر تحميل الأعوام الدراسية',
+  'No academic years yet': 'لا توجد أعوام دراسية بعد',
+  'Sections belong to an academic year. Create this year, with its first and last day, then add its sections here.':
+    'تنتمي الفصول إلى عام دراسي. أنشئ هذا العام بيومه الأول والأخير، ثم أضف فصوله هنا.',
+  'Open Academic years': 'فتح الأعوام الدراسية',
+  // The section form
+  'Edit the section': 'تعديل الفصل',
+  'A section keeps its grade; its students were placed by it.': 'يحتفظ الفصل بصفه؛ فقد وُضع طلابه على أساسه.',
+  'e.g. 11A': 'مثال: 11A',
+  'No rooms yet: add them on the Rooms page.': 'لا توجد قاعات بعد: أضفها من صفحة القاعات.',
+  'No limit': 'بلا حد',
+  'A whole number from 1 to 200, or empty for no limit.': 'عدد صحيح من 1 إلى 200، أو اتركه فارغًا بلا حد.',
+  "Use the room's capacity:": 'استخدام سعة القاعة:',
+  'Add the section': 'إضافة الفصل',
+  // A section's page
+  'Loading the section…': 'جارٍ تحميل الفصل…',
+  'Could not open this section': 'تعذر فتح هذا الفصل',
+  'Delete this section?': 'حذف هذا الفصل؟',
+  'Taken out of the section. The membership stays in the history below.': 'أُخرج من الفصل. وتبقى العضوية في السجل أدناه.',
+  'Members': 'الأعضاء',
+  'No students in this section yet': 'لا يوجد طلاب في هذا الفصل بعد',
+  'Add them with the search on this page.': 'أضفهم بالبحث في هذه الصفحة.',
+  'Grade that year': 'الصف في ذلك العام',
+  "Not this section's grade": 'ليس صف هذا الفصل',
+  'Take out': 'إخراج',
+  'No one has left this section.': 'لم يغادر أحد هذا الفصل.',
+  'Their membership of this section ends today and stays in its history. To move a student to another section, add them there instead: this membership then ends by itself.':
+    'تنتهي عضويته في هذا الفصل اليوم وتبقى في سجله. ولنقل طالب إلى فصل آخر أضفه هناك بدلًا من ذلك، فتنتهي هذه العضوية تلقائيًا.',
+  'Take out of the section': 'إخراج من الفصل',
+  // Adding students
+  'Add students': 'إضافة طلاب',
+  'Students of this grade, including those in other sections: adding one moves them here.':
+    'طلاب هذا الصف، بمن فيهم من هم في فصول أخرى: إضافة أحدهم تنقله إلى هنا.',
+  'Students of this grade with no section this year.': 'طلاب هذا الصف الذين ليس لهم فصل هذا العام.',
+  'Students of this grade in that year. One already in another section of that year is moved here.':
+    'طلاب هذا الصف في ذلك العام. ومن كان في فصل آخر من ذلك العام يُنقل إلى هنا.',
+  'Added:': 'أُضيف:',
+  'Moved from another section:': 'نُقل من فصل آخر:',
+  'Already in this section:': 'موجود بالفعل في هذا الفصل:',
+  'No student can be in this grade in that year yet.': 'لا يمكن أن يكون أي طالب في هذا الصف في ذلك العام بعد.',
+  'Include students in other sections (they move here)': 'تضمين طلاب في فصول أخرى (يُنقلون إلى هنا)',
+  'Finding students…': 'جارٍ البحث عن الطلاب…',
+  'Could not search': 'تعذر البحث',
+  'No student of this grade matches.': 'لا يوجد طالب مطابق من هذا الصف.',
+  'Every student of this grade has a section this year.': 'لكل طالب في هذا الصف فصل هذا العام.',
+  'No other student of this grade.': 'لا يوجد طالب آخر من هذا الصف.',
+  'Select all shown': 'تحديد كل المعروضين',
+  'Moves from': 'يُنقل من',
+  'Showing the first': 'عرض أول',
+  'search to narrow the list.': 'ابحث لتضييق القائمة.',
+  'Selected:': 'المحددون:',
+  'Starting on (optional)': 'بدءًا من (اختياري)',
+  "Empty: today, or the year's first day if it has not started.": 'إذا تُرك فارغًا: اليوم، أو أول يوم في العام إن لم يبدأ بعد.',
+  'Places left in this section:': 'الأماكن المتبقية في هذا الفصل:',
+  'This section is full: raise its capacity with Edit to add more.': 'هذا الفصل مكتمل: ارفع سعته من «تعديل» لإضافة المزيد.',
+  'Add': 'إضافة',
+  'Tick the students to add': 'حدّد الطلاب المراد إضافتهم',
+  // The roll-over
+  'Roll the sections over': 'ترحيل الفصول',
+  'Each grade 10 and grade 11 section becomes a section one grade up in the next year, with its homeroom teacher, room and capacity, and the students who are in that grade then. Grade 12 sections stay in their year: those students finish school.':
+    'يصبح كل فصل من الصف 10 والصف 11 فصلًا أعلى بصف واحد في العام التالي، بنفس رائد الفصل والقاعة والسعة، ومعه الطلاب الذين يكونون في ذلك الصف حينها. وتبقى فصول الصف 12 في عامها: فهؤلاء الطلاب ينهون دراستهم.',
+  'The next academic year does not exist yet': 'العام الدراسي التالي غير موجود بعد',
+  'Create it on the Academic years page, with its first and last day, then come back to roll the sections over.':
+    'أنشئه من صفحة الأعوام الدراسية بيومه الأول والأخير، ثم عد لترحيل الفصول.',
+  'Nothing to roll over': 'لا يوجد ما يُرحَّل',
+  'This year has no sections. Add them on the Sections page, or roll over the year before.':
+    'لا توجد فصول في هذا العام. أضفها من صفحة الفصول، أو رحّل العام السابق.',
+  'The roll-over is done': 'تم الترحيل',
+  'Sections created:': 'فصول أُنشئت:',
+  'Students moved:': 'طلاب نُقلوا:',
+  'Go to': 'الانتقال إلى',
+  'Working out the roll-over…': 'جارٍ إعداد الترحيل…',
+  'Nothing to do': 'لا يوجد ما يلزم فعله',
+  'Every section is already in the next year, and every student who moves up is placed.':
+    'كل فصل موجود بالفعل في العام التالي، وكل طالب ينتقل صفًا أعلى قد وُضع في فصله.',
+  'Sections to create:': 'فصول ستُنشأ:',
+  'Students to move:': 'طلاب سيُنقلون:',
+  'Graduating:': 'المتخرجون:',
+  'Already there': 'موجود بالفعل',
+  'Name in the new year': 'الاسم في العام الجديد',
+  'Moving:': 'ينتقلون:',
+  'Staying:': 'يبقون:',
+  'Already placed:': 'موضوعون بالفعل:',
+  'Moving up': 'ينتقلون صفًا أعلى',
+  'Staying for you to place': 'يبقون لتضعهم بنفسك',
+  'Grade 12: finishing school': 'الصف 12: ينهون الدراسة',
+  'You changed a name: preview again to check it before you commit.': 'غيّرت اسمًا: اعرض المعاينة مجددًا للتحقق منه قبل التنفيذ.',
+  'Preview again': 'معاينة مجددًا',
+  'Create the sections and move the students': 'إنشاء الفصول ونقل الطلاب',
+};

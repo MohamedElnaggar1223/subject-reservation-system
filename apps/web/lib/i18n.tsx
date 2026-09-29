@@ -1559,6 +1559,10 @@ function translateDynamicText(text: string): string | null {
   }
   const seriesMatch = /^(January|June|October|November) (\d{4})$/.exec(text);
   if (seriesMatch) return `${translateExactText(seriesMatch[1] ?? '') ?? seriesMatch[1]} ${seriesMatch[2]}`;
+  // F0a: the API's refusal sentences that carry a name, a date or a year.
+  const f0aRefusal = translateFoundationRefusal(text);
+  if (f0aRefusal) return f0aRefusal;
+
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);
   if (roleOfMatch) return `دور ${roleOfMatch[1]}`;
@@ -1637,6 +1641,47 @@ function translateDynamicText(text: string): string | null {
   const linkStatusMatch = /^Link request (.+)!$/.exec(text);
   if (linkStatusMatch) return `تم ${linkStatusMatch[1] === 'approved' ? 'قبول' : 'تحديث'} طلب الربط!`;
 
+  return null;
+}
+
+/**
+ * F0a's API sentences with a name, a date or a year in them (eligibility,
+ * the academic structure). Names and dates stay as the API wrote them.
+ */
+function translateFoundationRefusal(text: string): string | null {
+  const rules: [RegExp, (m: RegExpExecArray) => string][] = [
+    // Eligibility (mayRegisterFor)
+    [/^Only students can be registered for subjects$/, () => 'يمكن تسجيل الطلاب فقط في المواد'],
+    [/^(.+) transferred to another school on (.+) and cannot be registered for new subjects$/, (m) => `انتقل ${m[1]} إلى مدرسة أخرى في ${m[2]} ولا يمكن تسجيله في مواد جديدة`],
+    [/^(.+) was withdrawn from the school on (.+) and cannot be registered for new subjects$/, (m) => `انسحب ${m[1]} من المدرسة في ${m[2]} ولا يمكن تسجيله في مواد جديدة`],
+    [/^(.+)'s grade is not recorded — an admin records it on the student's page before they can register$/, (m) => `صف ${m[1]} غير مسجل - يسجله المدير من صفحة الطالب قبل أن يتمكن من التسجيل`],
+    [/^(.+) starts grade 10 in (.+): the (.+) series comes before that$/, (m) => `يبدأ ${m[1]} الصف 10 في ${m[2]}: دورة ${m[3]} تسبق ذلك`],
+    [/^Grade 10 sits the June series only: (.+) is in grade 10 in (.+), so the (.+) series is not open to them\. A coordinator can grant an exception\.$/,
+      (m) => `يدخل الصف 10 دورة يونيو فقط: ${m[1]} في الصف 10 في ${m[2]}، لذا دورة ${m[3]} غير متاحة له. يمكن للمنسق منح استثناء.`],
+    [/^(.+) finished grade 12 in (.+), and the school does not register graduates for later series$/, (m) => `أنهى ${m[1]} الصف 12 في ${m[2]}، والمدرسة لا تسجل الخريجين في الدورات اللاحقة`],
+    [/^(.+) finished grade 12 in (.+): a graduate may register only for the October, November and January series of the academic year right after it$/,
+      (m) => `أنهى ${m[1]} الصف 12 في ${m[2]}: يمكن للخريج التسجيل فقط في دورات أكتوبر ونوفمبر ويناير من العام الدراسي التالي مباشرة`],
+    // The academic structure
+    [/^(\d{4}\/\d{2}) runs from 1 July (\d{4}) to 30 June (\d{4}): its dates must fall inside it$/, (m) => `يمتد ${m[1]} من 1 يوليو ${m[2]} إلى 30 يونيو ${m[3]}: يجب أن تقع تواريخه ضمنه`],
+    [/^(\d{4}\/\d{2}) already exists$/, (m) => `${m[1]} موجود بالفعل`],
+    [/^These terms would fall outside the year: (.+) — change them first$/, (m) => `ستقع هذه الفصول خارج العام: ${m[1]} - عدّلها أولًا`],
+    [/^A term falls inside the school year \((.+)\)$/, (m) => `يجب أن يقع الفصل الدراسي داخل العام الدراسي (${m[1]})`],
+    [/^The days fall inside the school year \((.+)\)$/, (m) => `يجب أن تقع الأيام داخل العام الدراسي (${m[1]})`],
+    [/^The start date falls inside the school year \((.+)\)$/, (m) => `يجب أن يقع تاريخ البدء داخل العام الدراسي (${m[1]})`],
+    [/^It overlaps (.+)$/, (m) => `يتداخل مع ${m[1]}`],
+    [/^Those days already have an entry: (.+)$/, (m) => `لهذه الأيام إدخال بالفعل: ${m[1]}`],
+    [/^A room named (.+) already exists$/, (m) => `توجد قاعة باسم ${m[1]} بالفعل`],
+    [/^That year already has a section named (.+)$/, (m) => `يوجد في ذلك العام فصل باسم ${m[1]} بالفعل`],
+    [/^(.+) holds (\d+): it has (\d+), and (\d+) more would not fit$/, (m) => `يتسع ${m[1]} لـ ${m[2]}: فيه ${m[3]}، ولا يتسع لـ ${m[4]} آخرين`],
+    [/^(.+) is a grade (\d+) section: (.+)$/, (m) => `${m[1]} فصل للصف ${m[2]}: ${m[3]}`],
+    [/^Sections move into the year right after: (.+) rolls into (.+)$/, (m) => `تنتقل الفصول إلى العام التالي مباشرة: ${m[1]} ينتقل إلى ${m[2]}`],
+    [/^(\S+) already has a section named (.+) that did not come from (.+) — choose another name for it$/, (m) => `يوجد في ${m[1]} فصل باسم ${m[2]} لم يأتِ من ${m[3]} - اختر له اسمًا آخر`],
+    [/^(.+ \(\d{2}:\d{2}–\d{2}:\d{2}\)) and (.+ \(\d{2}:\d{2}–\d{2}:\d{2}\)) overlap$/, (m) => `${m[1]} و${m[2]} متداخلتان`],
+  ];
+  for (const [re, to] of rules) {
+    const m = re.exec(text);
+    if (m) return to(m);
+  }
   return null;
 }
 

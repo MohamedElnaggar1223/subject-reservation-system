@@ -117,7 +117,10 @@ export async function getStudentRecord(studentId: string) {
   ]);
   const series = await Promise.all(openSeries.map(async (sess) => {
     const e = await mayRegisterFor(studentId, sess.id);
-    return { sessionId: sess.id, name: sess.name, status: sess.status, series: e.series.label, academicYear: e.academicYear, grade: e.grade, allowed: e.allowed, reason: e.reason };
+    return {
+      sessionId: sess.id, name: sess.name, status: sess.status, series: e.series.label, academicYear: e.academicYear, grade: e.grade,
+      allowed: e.allowed, code: e.code, reason: e.reason, graduateRetake: e.graduateRetake, grade10ExceptionId: e.grade10ExceptionId,
+    };
   }));
 
   return {
