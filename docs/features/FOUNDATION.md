@@ -311,10 +311,26 @@ Staff first. Every string goes through `lib/i18n.tsx` (F0a's Arabic in
 `lib/i18n-foundation/`); each screen was driven in headless Chrome in English and Arabic
 (right-to-left), screenshots in `.audit/foundation-evidence/screens/`.
 
-*(Screens section: see the table below; the helpers' screens are described once reviewed.)*
+The academic, students, sections and teaching screens were built by two helpers (Opus 5.5)
+and reviewed, driven and committed by the lead; each client file opens with its spreadsheet
+comparison (UX_AUDIT §4). New screens are registered in `nav-shell.tsx`: the coordinator lands
+on Today with Academic (Students, Sections, Academic year, Calendar, Bell schedules, Rooms) and
+Settings; the teacher on Today and My teaching; the gate on Today; the desk gains Students;
+the finance admin Settings; the admin all of them. "My teaching" appears for any account linked
+to a teacher record.
 
 | Screen | Route | Who | The spreadsheet version, and why this beats it |
 |---|---|---|---|
+| Today | `/today` | all staff | The bell sheet by the gate, the wall calendar and a call to the office ("is today the short day?"). One headline says what today is (school day, holiday, early dismissal, exam-only, weekend, out of term), the term and bells, the current period with minutes left and what is next. |
+| Academic years and terms | `/academic/years` | coordinator, admin (staff read) | A workbook copied each summer, retyped; nothing stops overlapping terms. Every year on one screen, labels from the start year, dates held inside 1 July – 30 June, terms on a timeline with today marked; an overlap is refused beside the row. |
+| Calendar | `/academic/calendar` | coordinator, admin (staff read) | Twelve month blocks coloured by hand and a legend. Each day already shows what it is (school week, terms, entries); a click asks the API; shift-click selects a range, so a week's break is two clicks, a name and Enter; school days counted per month and year. |
+| Bell schedules | `/academic/bells` | coordinator, admin (staff read) | Bell times typed cell by cell, a second copy for the short day. "Fill a day in one go" from first bell, lesson count, length and breaks; Enter adds the next lesson; 815 becomes 08:15; a variant starts as a copy; a weekday can have its own rows; overlaps marked on the row. |
+| Rooms | `/academic/rooms` | coordinator, admin (staff read) | A rooms sheet with free-text equipment. The add row keeps type, capacity and features, so identical classrooms are a name and Enter each; features are chips; rooms leave use rather than being deleted. |
+| Students | `/students` | coordinator, desk, admin | A sheet per class plus a master list with a grade column retyped every September. Grade and standing derived; one box searches name, email or ID; "without a section this year" in one tick; filters in the address; Enter opens the first match. |
+| Student record | `/students/:id` (and the desk's "Academic record") | coordinator, desk (read), admin | The grade, class and "left" note live in three places. One panel: today's grade and standing, the cohort and its three years, this year's section (warning when a correction left it in the wrong grade), each open series with the rule's sentence, the section history, the record's changes; actions say beforehand what they will do and afterwards what happened. |
+| Sections | `/academic/sections` | coordinator, admin (desk read) | A tab per class retyped each September. The year on one screen by grade with teacher, room and fill, and how many students still have no section; a section opens to a search already showing exactly those; several searches build one selection. |
+| Roll-over | `/academic/sections` (roll-over) | coordinator, admin | A day of renaming tabs and deleting rows. A preview (new names editable, who moves, who stays and why, who graduates), then one click; running it again changes nothing. |
+| My teaching | `/teaching` | any account linked to a teacher record | A printed class list corrected by hand. The live homeroom list with today's grades, and the subjects; an unlinked account is told who links it. |
 | Team | `/admin/team` | admin | A staff list in a sheet plus a separate ask to IT for an account. One form makes the account, picks the role (with what it does) and links the teacher record; the grid changes a role or the link in place; students show grade and standing. |
 | Settings | `/settings` | admin, finance, coordinator | Today a rule change is a message to a developer. One card per rule in plain words: current value, who last changed it, who may; a change needs a reason and is audited. |
 | Sessions | `/admin/sessions` | admin | The window's series was implied by its name. The form suggests the series year from the type and start date and shows the academic year its grades are read in; a wrong series is corrected with a reason, and the result says how many waiting registrations expired. |
@@ -380,8 +396,18 @@ returns nothing.
 - **Refund windows** still pick their academic year from the window's start date
   (`refund.services`); now that `academicYearForDate` is Cairo-based the two agree, but moving
   refunds to the series' year is a money change for the lead.
-- **API refusal sentences are English**, like every API error; the screens' own text is
-  translated.
+- **API refusal sentences** that carry a name, a date or a year have Arabic patterns for
+  eligibility and the academic structure (`translateFoundationRefusal` in `lib/i18n.tsx`);
+  other API errors stay English, as before F0a. Section end reasons and roll-over "why" texts
+  are English sentences from the API that the screens translate by format; structured fields
+  would be sturdier.
+- **Students list:** `withoutSection` and the section name are this year's only, so adding
+  students to a next-year section cannot filter "no section that year"; the calendar grid
+  repeats the API's day rules in the browser (a range endpoint, `GET
+  /academic/calendar/days?from&to`, would remove the duplicate). Both noted by the helpers.
+- **Found, not F0a's:** every Arabic page logs a hydration mismatch (the I18nProvider reads
+  localStorage during its first render — on origin/main too; the Next dev badge "1 Issue").
+  The translator's month rule also rewrites month names inside other English API sentences.
 
 ## 12. Questions for the owner
 
@@ -403,3 +429,9 @@ returns nothing.
 - 13:35Z — backfill proven on a copy of `igcse_audit`.
 - 13:48Z — registration-creating transactions re-check eligibility with locks; 08g races; C19,
   C20 red; 05 class and gate cases (ed2f0a0).
+- 13:58Z — web check-types surfaced TS2742 once every screen compiled; the Eligibility answer's
+  type moved to `@repo/validations`.
+- 14:07Z — the helpers' screens reviewed, driven and committed (4276c24, 06a008e); the panel
+  gains the exception's revoke; the student record's series carry `code`.
+- 14:09Z — gates green at 06a008e: API and web check-types clean; the suite in local time and
+  with `TZ=UTC`, 16 files, 226 passed, 1 todo each. Branch pushed.

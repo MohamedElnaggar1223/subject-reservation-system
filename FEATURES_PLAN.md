@@ -540,7 +540,7 @@ API and web ports):
 
 | Feature | Implemented | Reviewed | Merged | Notes |
 |---|---|---|---|---|
-| F0a Core foundation | | | | |
+| F0a Core foundation | yes — `feature/foundation`, docs/features/FOUNDATION.md | | | awaiting review |
 | F0b Catalogue, series, enrolment | | | | |
 | F1 Scheduling | | | | |
 | F4 Exam entries | | | | |
