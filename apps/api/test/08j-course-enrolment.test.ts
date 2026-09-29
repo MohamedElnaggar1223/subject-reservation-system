@@ -278,7 +278,7 @@ describe('F0b: course enrolment', () => {
       } finally {
         await release();
       }
-      const [a, b] = (await Promise.all([first!, second!])) as { summary: { created: number; existing: number } }[];
+      const [a, b] = (await Promise.all([first!, second!])) as [{ summary: { created: number; existing: number } }, { summary: { created: number; existing: number } }];
       // s1 already studies Physics alone; s2 gets it once, whoever commits first.
       expect(a.summary.created + b.summary.created).toBe(1);
       expect(a.summary.existing + b.summary.existing).toBe(3);

@@ -188,32 +188,22 @@ export const sessions = new Hono<HonoEnv>()
         const { reason, ...updateFields } = parsed.data;
         const deadlineClash = await windowAfterEntryDeadline(id, updateFields.endDate ?? session.endDate);
         if (deadlineClash) return error(c, deadlineClash, 400);
-        let updated;
+        // The update and its SESSION_UPDATED row (with the reason) commit
+        // together; a series change is refused once anyone has preregistered (F0a).
         try {
-          updated = await sessionService.updateDraftSession(id, updateFields);
+          const updated = await sessionService.updateDraftSession(id, updateFields, currentUser.id, reason ?? null, extractAuditContext(c));
+          if (!updated) {
+            return error(c, 'Session is no longer in draft status', 409);
+          }
+          return success(c, updated);
         } catch (err) {
+          if (err instanceof sessionService.DraftSessionError) return error(c, err.message, err.status);
           // F0b: a board series changed at the same moment and the database
           // refused the window (it must close before every series' deadline).
           const sentence = seriesService.seriesRuleSentence(err);
-          return error(c, sentence ?? clientMessage(err, 'Failed to update the session'), sentence ? 409 : 400);
+          if (sentence) return error(c, sentence, 409);
+          throw err;
         }
-        if (!updated) {
-          return error(c, 'Session is no longer in draft status', 409);
-        }
-
-        // Including _updateReason in the audit newData preserves the
-        // rationale alongside the before/after field snapshots.
-        await logAction(
-          currentUser.id,
-          'SESSION_UPDATED',
-          'session',
-          id,
-          session as Record<string, unknown>,
-          { ...(updated as Record<string, unknown>), _updateReason: reason ?? null },
-          extractAuditContext(c),
-        ).catch((err) => console.error('[audit] SESSION_UPDATED (draft) failed:', err));
-
-        return success(c, updated);
       }
 
       // status === 'active'

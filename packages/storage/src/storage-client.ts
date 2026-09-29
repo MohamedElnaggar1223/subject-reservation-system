@@ -73,7 +73,7 @@ export abstract class StorageClient {
       return { key: original.key, size: original.size, mimeType: 'image/webp', variants: infos }
     }
 
-    const key = `${baseKey}.${extensionFor(file.name, mimeType)}`
+    const key = `${baseKey}.${extensionFor(mimeType)}`
     await this.putObject(key, Buffer.from(buffer), mimeType)
     return { key, size: buffer.byteLength, mimeType }
   }
@@ -84,10 +84,12 @@ function safeSegment(s: string): string {
   return s.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80) || '_'
 }
 
-/** The file's own extension when it is a plain one, else the type's. */
-function extensionFor(filename: string, mimeType: string): string {
-  const m = /\.([A-Za-z0-9]{1,8})$/.exec(filename)
-  return (m?.[1] ?? MIME_TO_EXT[mimeType] ?? 'bin').toLowerCase()
+/**
+ * The stored extension comes from the type the bytes were detected as,
+ * never the uploader's file name: a PDF named "photo.exe" is stored as .pdf.
+ */
+function extensionFor(mimeType: string): string {
+  return MIME_TO_EXT[mimeType] ?? 'bin'
 }
 
 /**

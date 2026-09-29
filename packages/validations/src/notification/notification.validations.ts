@@ -49,6 +49,8 @@ export const NOTIFICATION_TYPES = [
   // Parent-student link events (AUTH-003, AUTH-004)
   'LINK_REQUEST_RECEIVED',
   'LINK_DECISION',
+  // Staff: a preregistration held at its series' opening (F0a)
+  'PREREGISTRATION_HELD',
 ] as const;
 
 export const NotificationTypeSchema = z.enum(NOTIFICATION_TYPES);
@@ -75,6 +77,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   BULK_ANNOUNCEMENT:                'Announcement',
   LINK_REQUEST_RECEIVED:            'New Parent Link Request',
   LINK_DECISION:                    'Link Request Decision',
+  PREREGISTRATION_HELD:             'Preregistration Held',
 };
 
 // Icons mapped per type (used in the notification center UI)
@@ -99,6 +102,7 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   BULK_ANNOUNCEMENT:                '📢',
   LINK_REQUEST_RECEIVED:            '🔗',
   LINK_DECISION:                    '🔗',
+  PREREGISTRATION_HELD:             '⏸️',
 };
 
 // ─── Admin bulk announcement recipient groups ─────────────────────────────────

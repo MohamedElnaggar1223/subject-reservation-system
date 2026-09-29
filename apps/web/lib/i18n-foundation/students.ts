@@ -76,6 +76,13 @@ export const studentsArabic: Record<string, string> = {
   'They may now register for this series. The exception can be revoked here.':
     'يمكنه الآن التسجيل في هذه الدورة. ويمكن إلغاء الاستثناء من هنا.',
   'Exception revoked': 'تم إلغاء الاستثناء',
+  'Graduation inferred by the backfill': 'تخرج مستنتج من ترحيل البيانات',
+  'Inferred': 'مستنتج',
+  'Cohort inferred by the backfill': 'دفعة مستنتجة من ترحيل البيانات',
+  'Graduated on': 'تخرج في',
+  'Grade recorded at first setup': 'سُجّل الصف عند الإعداد الأول',
+  'Grade not recorded at the move to cohorts': 'لم يُسجَّل الصف عند الانتقال إلى الدفعات',
+  'From a past registration': 'من تسجيل سابق',
   'Grade-10 exception': 'استثناء الصف 10',
   'Revoke the exception': 'إلغاء الاستثناء',
   'A graduate retake: no school fee.': 'إعادة لخريج: بلا مصاريف دراسية.',

@@ -8,7 +8,8 @@
  * - Admin user management
  */
 
-import { db, user, session, teacher, eq, ilike, or, and, sql, gradeTodaySql, gradeTodayExtras } from '@repo/db';
+import { db, user, session, teacher, auditLog, eq, ilike, or, and, inArray, sql, gradeTodaySql, gradeTodayExtras } from '@repo/db';
+import { logAction } from './audit.services';
 import { randomUUID } from 'crypto';
 import { academicYearStartOf, cohortFromGrade, type UpdateProfileType, type AdminUpdateUserType, type UserQueryFiltersType } from '@repo/validations';
 
@@ -231,39 +232,59 @@ export async function generateUniqueStudentId(): Promise<string> {
  * @param gradeNow - The student's grade this academic year (9–12)
  * @returns The updated user
  */
-export async function setStudentFields(userId: string, gradeNow: number) {
+/** Who recorded a new student's grade: the student at their own first setup, the admin, or the desk. */
+export type CohortRecordedBy = { actorId: string | null; how: 'self_setup' | 'admin' | 'desk' };
+
+export async function setStudentFields(userId: string, gradeNow: number, recordedBy: CohortRecordedBy) {
   const studentId = await generateUniqueStudentId();
+  const cohortYear = cohortFromGrade(gradeNow, academicYearStartOf());
 
-  const [updated] = await db
-    .update(user)
-    .set({
-      cohortYear: cohortFromGrade(gradeNow, academicYearStartOf()),
-      studentId,
-      role: 'student',
-      updatedAt: new Date(),
-    })
-    .where(eq(user.id, userId))
-    .returning();
-
-  return updated && { ...updated, grade: gradeNow };
+  return db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(user)
+      .set({ cohortYear, studentId, role: 'student', updatedAt: new Date() })
+      .where(eq(user.id, userId))
+      .returning();
+    if (!updated) return undefined;
+    // A new student's grade is recorded with who recorded it (F0a): audited like any cohort.
+    await logAction(recordedBy.actorId, 'STUDENT_COHORT_RECORDED', 'user', userId, { cohortYear: null },
+      { cohortYear, gradeNow, how: recordedBy.how }, undefined, tx);
+    return { ...updated, grade: gradeNow };
+  });
 }
 
+export class CohortSetupError extends Error {}
+
+/** Every record of a cohort being set, cleared or left for staff: any of them makes it staff's to change. */
+const COHORT_HISTORY_ACTIONS = [
+  'USER_GRADE_CHANGED', 'STUDENT_COHORT_CORRECTED', 'STUDENT_COHORT_INFERRED', 'STUDENT_COHORT_RECORDED', 'STUDENT_COHORT_UNRECORDED',
+];
+
 /**
- * Record the cohort of a student whose grade was never recorded (the setup
- * page, called again). Changing a cohort that exists is an audited
- * correction (student.services.ts), never this.
+ * Record the cohort of a student whose grade was never recorded — only at
+ * the student's own first setup: a cohort nobody ever set (no audit row
+ * about it). A student the F0a backfill left without a grade
+ * (STUDENT_COHORT_UNRECORDED), or whose cohort anyone ever set or cleared,
+ * is corrected by staff with the audited cohort correction
+ * (student.services.ts), never here. Audited in the same transaction.
+ * Returns null when a cohort is already recorded (the page called again).
  */
 export async function recordMissingCohort(userId: string, gradeNow: number) {
-  const [updated] = await db
-    .update(user)
-    .set({
-      cohortYear: cohortFromGrade(gradeNow, academicYearStartOf()),
-      updatedAt: new Date(),
-    })
-    .where(and(eq(user.id, userId), sql`${user.cohortYear} IS NULL`))
-    .returning();
-
-  return updated && { ...updated, grade: gradeNow };
+  return db.transaction(async (tx) => {
+    const [u] = await tx.select({ id: user.id, cohortYear: user.cohortYear }).from(user).where(eq(user.id, userId)).for('update');
+    if (!u || u.cohortYear !== null) return null;
+    const [history] = await tx.select({ id: auditLog.id }).from(auditLog)
+      .where(and(eq(auditLog.entityId, userId), inArray(auditLog.action, COHORT_HISTORY_ACTIONS)))
+      .limit(1);
+    if (history) {
+      throw new CohortSetupError('The school records your grade: ask the school office to update your record');
+    }
+    const cohortYear = cohortFromGrade(gradeNow, academicYearStartOf());
+    const [updated] = await tx.update(user).set({ cohortYear, updatedAt: new Date() }).where(eq(user.id, userId)).returning();
+    await logAction(userId, 'STUDENT_COHORT_RECORDED', 'user', userId, { cohortYear: null },
+      { cohortYear, gradeNow, how: 'self_setup' }, undefined, tx);
+    return updated ? { ...updated, grade: gradeNow } : null;
+  });
 }
 
 /**

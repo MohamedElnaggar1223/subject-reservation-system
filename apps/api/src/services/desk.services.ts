@@ -45,7 +45,8 @@ import { academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, grade
 async function findOrCreatePerson(
   person: { email: string; name?: string; password?: string; phone?: string | null },
   role: 'parent' | 'student',
-  grade?: number
+  grade?: number,
+  staffId: string | null = null,
 ): Promise<{ id: string; name: string; email: string; created: boolean }> {
   const existing = await db.query.user.findFirst({
     where: (u, { eq }) => eq(u.email, person.email.toLowerCase()),
@@ -99,7 +100,7 @@ async function findOrCreatePerson(
     .where(eq(userTable.id, userId));
 
   if (role === 'student') {
-    await setStudentFields(userId, grade!);
+    await setStudentFields(userId, grade!, { actorId: staffId, how: 'desk' });
   }
 
   return { id: userId, name: result.user.name, email: result.user.email, created: true };
@@ -109,12 +110,13 @@ async function findOrCreatePerson(
  * One desk action: parent + student accounts exist (created if needed)
  * and are linked APPROVED. Idempotent for existing links.
  */
-export async function onboardFamily(data: DeskOnboardFamilyType) {
+export async function onboardFamily(data: DeskOnboardFamilyType, staffId: string | null = null) {
   const parent = await findOrCreatePerson(data.parent, 'parent');
   const student = await findOrCreatePerson(
     data.student,
     'student',
-    data.student.grade
+    data.student.grade,
+    staffId,
   );
 
   // The live link (pending or approved — the database allows one per pair).

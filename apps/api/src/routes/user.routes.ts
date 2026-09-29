@@ -182,6 +182,8 @@ export const users = new Hono<HonoEnv>()
             });
           }
         } catch (err) {
+          // A grade the backfill left for staff, or one anyone ever set, is staff's to record (F0a).
+          if (err instanceof userService.CohortSetupError) return error(c, err.message, 403);
           console.error('[student-setup] Failed to record a missing cohort:', err);
         }
         // Fetch the canonical row so grade + studentId are included even
@@ -203,7 +205,7 @@ export const users = new Hono<HonoEnv>()
       }
 
       try {
-        const updated = await userService.setStudentFields(currentUser.id, grade);
+        const updated = await userService.setStudentFields(currentUser.id, grade, { actorId: currentUser.id, how: 'self_setup' });
 
         if (!updated) {
           console.error('[student-setup] setStudentFields returned null for userId:', currentUser.id);
@@ -303,7 +305,7 @@ export const users = new Hono<HonoEnv>()
         });
 
         if (data.role === 'student' && data.grade !== undefined) {
-          await userService.setStudentFields(result.user.id, data.grade);
+          await userService.setStudentFields(result.user.id, data.grade, { actorId: user.id, how: 'admin' });
         }
         // Staff vouch for the person in front of them, as at the desk (RF-22).
         await userService.markEmailVerified(result.user.id);

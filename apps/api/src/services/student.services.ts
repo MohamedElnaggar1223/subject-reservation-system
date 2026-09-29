@@ -12,7 +12,7 @@
  *   Readmission clears it, audited; what expired stays expired.
  */
 
-import { db, user, registrationSession, academicYear, section, sectionMembership, eq, and, or, ilike, inArray, sql, gradeTodaySql } from '@repo/db';
+import { db, user, auditLog, registrationSession, academicYear, section, sectionMembership, eq, and, or, ilike, inArray, sql, gradeTodaySql } from '@repo/db';
 import {
   academicYearStartOf, academicYearShortLabel, academicYearLabel, cohortFromGrade, gradeInAcademicYear, gradeLabel,
   schoolDateString, FIRST_GRADE, LAST_GRADE,
@@ -44,6 +44,18 @@ const standingSql = sql<string>`CASE
  * section, searchable and filterable. The coordinator's way in (they have
  * no Student 360, which carries money).
  */
+/**
+ * The backfill inferred this student's graduation (a row per inference, for
+ * staff to review), and nobody has corrected the cohort since: a later
+ * STUDENT_COHORT_CORRECTED means staff reviewed it.
+ */
+const inferredSql = sql`EXISTS (
+  SELECT 1 FROM ${auditLog} a
+  WHERE a.action = 'STUDENT_COHORT_INFERRED' AND a.entity_id = ${user.id}
+    AND NOT EXISTS (
+      SELECT 1 FROM ${auditLog} c
+      WHERE c.action = 'STUDENT_COHORT_CORRECTED' AND c.entity_id = a.entity_id AND c.created_at > a.created_at))`;
+
 export async function listStudents(q: ListStudentsQueryType) {
   const current = academicYearStartOf();
   const conditions = [eq(user.role, 'student')];
@@ -64,11 +76,13 @@ export async function listStudents(q: ListStudentsQueryType) {
     ...conditions,
     q.sectionId ? sql`cur.id = ${q.sectionId}` : undefined,
     q.withoutSection === 'true' ? sql`cur.id IS NULL` : undefined,
+    q.inferred === 'true' ? sql`${inferredSql}` : undefined,
   );
   const rows = await db.execute(sql`
     SELECT ${user.id} AS id, ${user.name} AS name, ${user.email} AS email, ${user.studentId} AS "studentId",
       ${user.cohortYear} AS "cohortYear", ${gradeTodaySql(user.cohortYear)} AS grade, ${standingSql} AS standing,
       ${user.leftOn} AS "leftOn", cur.id AS "sectionId", cur.name AS "sectionName",
+      ${inferredSql} AS "cohortInferred",
       count(*) OVER () AS total
     FROM ${user} ${sectionJoin}
     WHERE ${where}
@@ -76,7 +90,7 @@ export async function listStudents(q: ListStudentsQueryType) {
     LIMIT ${q.limit} OFFSET ${q.offset}`);
   const list = (rows.rows as {
     id: string; name: string; email: string; studentId: string | null; cohortYear: number | null; grade: number | null;
-    standing: string; leftOn: string | null; sectionId: string | null; sectionName: string | null; total: string;
+    standing: string; leftOn: string | null; sectionId: string | null; sectionName: string | null; cohortInferred: boolean; total: string;
   }[]).map(({ total: _t, ...r }) => ({ ...r, gradeLabel: gradeLabel(r.grade) }));
   return {
     academicYear: academicYearLabel(current),
@@ -110,7 +124,7 @@ export async function getStudentRecord(studentId: string) {
     db.query.auditLog.findMany({
       where: (a, { and: andOp, eq: eqOp, inArray: inArr }) => andOp(
         eqOp(a.entityType, 'user'), eqOp(a.entityId, studentId),
-        inArr(a.action, ['STUDENT_COHORT_CORRECTED', 'STUDENT_LEFT', 'STUDENT_READMITTED', 'USER_GRADE_CHANGED']),
+        inArr(a.action, ['STUDENT_COHORT_CORRECTED', 'STUDENT_COHORT_INFERRED', 'STUDENT_COHORT_RECORDED', 'STUDENT_COHORT_UNRECORDED', 'STUDENT_LEFT', 'STUDENT_READMITTED', 'USER_GRADE_CHANGED']),
       ),
       with: { user: { columns: { id: true, name: true } } },
       orderBy: (a, { desc }) => [desc(a.createdAt)],

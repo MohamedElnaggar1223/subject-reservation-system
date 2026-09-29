@@ -1500,7 +1500,7 @@ export const exception = pgTable(
     value: numeric("value", { precision: 12, scale: 2, mode: "number" }),
     reason: text("reason").notNull(),
     validUntil: timestamp("valid_until", { withTimezone: true }),
-    status: text("status").notNull().default("active"), // 'active' | 'revoked'
+    status: text("status").notNull().default("active"), // 'active' | 'revoked' | 'lapsed' (a grade-10 exception past its validUntil, F0a)
     grantedBy: text("granted_by")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),

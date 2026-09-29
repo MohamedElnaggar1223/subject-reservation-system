@@ -4,7 +4,7 @@ import {
   apiResponse, academicYearStartOf, gradeInAcademicYear, gradeToday, seriesYearInAcademicYear, academicYearLabel,
 } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, futureWindow, localToday, loneStudent, signUp, signIn,
+  admin, staff, onboard, subject, session, refused, one, sql, futureWindow, localToday, loneStudent, signUp, signIn, audited,
   type Client,
 } from './helpers';
 
@@ -141,14 +141,42 @@ describe('F0a: grade and eligibility', () => {
       }
     });
 
-    it("a student whose grade was never recorded is refused until it is; the setup page records it once", async () => {
+    it("a student whose grade was never recorded is refused until it is; their own first setup records it once, audited", async () => {
       const lone = await loneStudent(adm, 'f0g-unknown');
       await sql(`update "user" set cohort_year = null where id = $1`, [lone.id]);
       expect(await elig(lone.id, S.jun2027!)).toMatchObject({ allowed: false, code: 'grade_unknown', grade: null });
-      // The student finishing their setup records it; a second call changes nothing.
-      await apiResponse(lone.api.v1.users.me['student-setup'].$post({ json: { grade: 12 } }));
-      await apiResponse(lone.api.v1.users.me['student-setup'].$post({ json: { grade: 10 } }));
-      expect((await one<{ cohort_year: number }>(`select cohort_year from "user" where id = $1`, [lone.id])).cohort_year).toBe(academicYearStartOf() - 2);
+
+      // A new account's own first setup records the grade; a second call changes nothing.
+      const email = 'f0g.firstsetup@test.local';
+      await signUp('First Setup Student', email);
+      const s = await signIn(email);
+      await apiResponse(s.api.v1.users.me['student-setup'].$post({ json: { grade: 12 } }));
+      await apiResponse(s.api.v1.users.me['student-setup'].$post({ json: { grade: 10 } }));
+      expect((await one<{ cohort_year: number }>(`select cohort_year from "user" where id = $1`, [s.id])).cohort_year).toBe(academicYearStartOf() - 2);
+      expect(await sql(`select user_id, new_data->>'cohortYear' as cohort, new_data->>'how' as how from audit_log where action = 'STUDENT_COHORT_RECORDED' and entity_id = $1`, [s.id]))
+        .toEqual([{ user_id: s.id, cohort: String(academicYearStartOf() - 2), how: 'self_setup' }]);
+
+      // The admin set this one's cohort when the account was made: the student cannot set it again themselves.
+      expect((await refused(lone.api.v1.users.me['student-setup'].$post({ json: { grade: 12 } }))).status).toBe(403);
+      expect((await one<{ cohort_year: number | null }>(`select cohort_year from "user" where id = $1`, [lone.id])).cohort_year).toBeNull();
+    });
+
+    it('a student the backfill left without a grade cannot record it at the setup page; staff record it, audited', async () => {
+      const lone = await loneStudent(adm, 'f0g-unrecorded');
+      // What migration 0035 leaves for a student with no grade and no evidence of one.
+      await sql(`update "user" set cohort_year = null where id = $1`, [lone.id]);
+      await sql(`insert into audit_log (id, user_id, action, entity_type, entity_id, new_data)
+                 values (gen_random_uuid()::text, null, 'STUDENT_COHORT_UNRECORDED', 'user', $1, '{"cohortYear": null}')`, [lone.id]);
+      const recorded = () => sql(`select 1 from audit_log where action = 'STUDENT_COHORT_RECORDED' and entity_id = $1`, [lone.id]);
+      const before = (await recorded()).length;
+      const r = await refused(lone.api.v1.users.me['student-setup'].$post({ json: { grade: 12 } }));
+      expect(r).toMatchObject({ status: 403, error: 'The school records your grade: ask the school office to update your record' });
+      expect((await one<{ cohort_year: number | null }>(`select cohort_year from "user" where id = $1`, [lone.id])).cohort_year).toBeNull();
+      expect((await recorded()).length).toBe(before);
+      // Staff record it with the audited correction.
+      await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: lone.id }, json: { gradeNow: 11, reason: 'grade confirmed by the office' } }));
+      expect((await one<{ cohort_year: number }>(`select cohort_year from "user" where id = $1`, [lone.id])).cohort_year).toBe(academicYearStartOf() - 1);
+      await audited([lone.id], ['STUDENT_COHORT_CORRECTED']);
     });
   });
 
@@ -237,13 +265,22 @@ describe('F0a: grade and eligibility', () => {
       await setCohort(g10.studentId, 2026);
       await apiResponse(adm.api.v1.students[':id'].leave.$post({ param: { id: gone.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'call-site scenario' } }));
       // Waiting rows are seeded after the change: the state a request made at
-      // the very moment of it leaves (the clean-up would have expired any made
-      // before). The guard, not the clean-up, is under test.
+      // the very moment of it would leave without the locked re-check (08g
+      // proves that cannot happen now), so each later guard is tested on its
+      // own. The guard, not the clean-up, is under test.
       seeded = {
         approval: { g10: await seed(g10.studentId, 'pending_approval'), gone: await seed(gone.studentId, 'pending_approval') },
         payment: { g10: await seed(g10.studentId, 'pending_payment'), gone: await seed(gone.studentId, 'pending_payment') },
         confirmed,
       };
+    });
+
+    afterAll(async () => {
+      // The seeded rows were written by SQL for students already refused; nothing real waits on them
+      // (09 checks that nothing waits for a series its student may not sit).
+      for (const s of [seeded.approval!, seeded.payment!]) {
+        await sql(`delete from registration where id in ($1, $2) and status in ('pending_approval', 'pending_payment')`, [s.g10, s.gone]);
+      }
     });
 
     it('1 a student request, 2 a parent direct registration, 3 an admin override, 4 the desk — nothing is registered', async () => {
@@ -437,6 +474,12 @@ describe('F0a: grade and eligibility', () => {
 
       const made = await apiResponse(adm.api.v1.users.$post({ json: { name: 'Admin Made', email: 'f0g.adminmade@test.local', password: 'TestPass1', role: 'student', grade: 12 } }));
       expect(await cohortOf(made.id)).toBe(academicYearStartOf() - 2);
+      // Each is recorded with who recorded it.
+      const how = async (id: string) => (await one<{ how: string; by: string | null }>(
+        `select new_data->>'how' as how, user_id as by from audit_log where action = 'STUDENT_COHORT_RECORDED' and entity_id = $1`, [id]));
+      expect(await how(s.id)).toEqual({ how: 'self_setup', by: s.id });
+      expect(await how(nine.studentId)).toEqual({ how: 'desk', by: officer.id });
+      expect(await how(made.id)).toEqual({ how: 'admin', by: adm.id });
     });
 
     it("the admin's cohort correction is audited with the reason and tells the family", async () => {

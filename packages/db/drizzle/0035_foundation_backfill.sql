@@ -41,12 +41,19 @@ WHERE role = 'student' AND "grade" IS NOT NULL;
 --    (grade.services.ts, GRADE-003), which a student who never finished
 --    sign-up also looks like. A graduate is told apart by evidence that they
 --    once had a grade: the audit row that set it to null (a window close or
---    an admin; its date is the academic year they were graduated in), or a
---    registration (every registration path required a grade). They become
---    past grade 12 in that year: cohort = that year - 3.
-UPDATE "user" u
-SET cohort_year = school_academic_year_start(coalesce(g.graduated_at, now())) - 3
-FROM (
+--    an admin), or a registration (every registration path required a
+--    grade). The row's date, in Cairo, says which year was their grade 12:
+--    - July to December: they had just finished grade 12, the academic year
+--      before the row's: cohort = the row's academic year - 3;
+--    - January to June: they were graduated during their grade-12 year:
+--      cohort = the row's academic year - 2.
+--    With only a registration, they are graduated as of this migration:
+--    cohort = this academic year - 3.
+--    Each inferred cohort writes a STUDENT_COHORT_INFERRED audit row (the
+--    basis and the date it read), so staff can review every inference: the
+--    Students screen filters on it, and an admin corrects a wrong one with
+--    the audited cohort correction.
+WITH g AS (
   SELECT s.id,
     (SELECT max(a.created_at) FROM audit_log a
       WHERE a.action = 'USER_GRADE_CHANGED' AND a.entity_type = 'user' AND a.entity_id = s.id
@@ -54,13 +61,41 @@ FROM (
     EXISTS (SELECT 1 FROM registration r WHERE r.student_id = s.id) AS registered
   FROM "user" s
   WHERE s.role = 'student' AND s."grade" IS NULL
-) g
-WHERE u.id = g.id AND (g.graduated_at IS NOT NULL OR g.registered);
+), inferred AS (
+  UPDATE "user" u
+  SET cohort_year = CASE
+    WHEN g.graduated_at IS NULL THEN school_academic_year_start(now()) - 3
+    WHEN extract(month FROM (g.graduated_at AT TIME ZONE 'Africa/Cairo')) >= 7 THEN school_academic_year_start(g.graduated_at) - 3
+    ELSE school_academic_year_start(g.graduated_at) - 2
+  END
+  FROM g
+  WHERE u.id = g.id AND (g.graduated_at IS NOT NULL OR g.registered)
+  RETURNING u.id, u.cohort_year, g.graduated_at
+)
+INSERT INTO audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data, created_at)
+SELECT gen_random_uuid()::text, NULL, 'STUDENT_COHORT_INFERRED', 'user', i.id,
+  jsonb_build_object('grade', NULL),
+  jsonb_build_object(
+    'cohortYear', i.cohort_year,
+    'basis', CASE WHEN i.graduated_at IS NULL THEN 'registration' ELSE 'graduation_row' END,
+    'graduatedAt', i.graduated_at,
+    'reason', 'Inferred by the F0a backfill: a graduate (no stored grade)'),
+  now()
+FROM inferred i;
 --> statement-breakpoint
 
 -- 3. Everyone else with the student role and no grade keeps a null cohort:
 --    "grade not recorded". They are refused registration (as a null grade
 --    was) until an admin records it, and the Students screen lists them.
+--    A STUDENT_COHORT_UNRECORDED row marks each: the student may not record
+--    it themselves at the setup page (that is only for a cohort never set by
+--    anyone, at the student's own first setup); staff correct it.
+INSERT INTO audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data, created_at)
+SELECT gen_random_uuid()::text, NULL, 'STUDENT_COHORT_UNRECORDED', 'user', u.id, NULL,
+  jsonb_build_object('cohortYear', NULL, 'reason', 'No grade recorded at the F0a migration: staff record it'), now()
+FROM "user" u
+WHERE u.role = 'student' AND u."grade" IS NULL AND u.cohort_year IS NULL;
+--> statement-breakpoint
 
 -- 4. Every registration window gets its series year: the year in its name
 --    ("November 2026") when there is one, otherwise the first time the

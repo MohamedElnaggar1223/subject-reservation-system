@@ -18,6 +18,7 @@ import {
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Notice } from '~/components/ui/tone';
+import { useI18n } from '~/lib/i18n';
 import { WindowSeriesPanel } from './window-series.client';
 
 // Typed by the API, never by hand (PATTERNS.md).
@@ -77,6 +78,7 @@ const emptyCreateForm = {
 
 export default function SessionsAdminClient(): React.JSX.Element {
   const queryClient = useQueryClient();
+  const { language } = useI18n();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createForm, setCreateForm] = useState(emptyCreateForm);
@@ -258,8 +260,11 @@ export default function SessionsAdminClient(): React.JSX.Element {
     return true;
   });
 
+  // Dates in the page's language (Arabic month names with Latin digits, as the rest of the app writes numbers).
+  const dateLocale = language === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB';
+
   function formatDate(d: string) {
-    return new Date(d).toLocaleDateString('en-GB', {
+    return new Date(d).toLocaleDateString(dateLocale, {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -267,7 +272,7 @@ export default function SessionsAdminClient(): React.JSX.Element {
   }
 
   function formatDateTime(d: string) {
-    return new Date(d).toLocaleString('en-GB', {
+    return new Date(d).toLocaleString(dateLocale, {
       day: '2-digit',
       month: 'short',
       year: 'numeric',

@@ -104,7 +104,8 @@ export type CreateExceptionType = z.infer<typeof CreateException>;
 
 export const ListExceptionsQuery = z.object({
   studentId: z.string().min(1).optional(),
-  status: z.enum(['active', 'revoked']).optional(),
+  // 'lapsed': a grade-10 exception whose validUntil passed (F0a's scheduler step).
+  status: z.enum(['active', 'revoked', 'lapsed']).optional(),
   type: ExceptionTypeSchema.optional(),
 });
 export type ListExceptionsQueryType = z.infer<typeof ListExceptionsQuery>;
