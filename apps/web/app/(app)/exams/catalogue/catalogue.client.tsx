@@ -22,9 +22,7 @@
  */
 
 import Link from 'next/link';
-import type { Route } from 'next';
 import { useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import { apiResponse, LEVEL_CODE_READING_LABELS, STARTER_SET_LABELS, STARTER_SETS, type LevelCodeReading, type StarterSet } from '@repo/validations';
@@ -39,20 +37,21 @@ import { RegistrableTab } from './registrable.client';
 import { QualificationsTab } from './qualifications.client';
 import { UnitsTab } from './units.client';
 
-const TABS = ['registrable', 'qualifications', 'units'] as const;
-type Tab = (typeof TABS)[number];
+export type CatalogueTab = 'registrable' | 'qualifications' | 'units';
+type Tab = CatalogueTab;
 
-export default function CatalogueClient(): React.JSX.Element {
+export default function CatalogueClient({ initialTab }: { initialTab: Tab }): React.JSX.Element {
   const { data, isLoading, isError, refetch } = useCatalogue();
-  // The tab lives in the address, so a link or the back button lands on it.
-  const params = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const tab: Tab = TABS.find((t) => t === params.get('tab')) ?? 'registrable';
+  // The tab lives in the address, so a link lands on it: the page reads it on
+  // the server (no Suspense around a server-rendered catalogue, which the page
+  // translator would touch before it hydrated) and a change rewrites the URL
+  // in place, without a round trip.
+  const [tab, setTabState] = useState<Tab>(initialTab);
   const setTab = (t: Tab) => {
-    const next = new URLSearchParams(params.toString());
-    next.set('tab', t);
-    router.replace(`${pathname}?${next.toString()}` as Route, { scroll: false });
+    setTabState(t);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', t);
+    window.history.replaceState(window.history.state, '', url);
   };
 
   return (
