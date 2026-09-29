@@ -15,7 +15,7 @@
  * (A-12 turned off expires graduates' waiting registrations).
  */
 
-import { db, schoolSetting, eq } from '@repo/db';
+import { db, schoolSetting, eq, sql } from '@repo/db';
 import { SETTINGS, SETTING_KEYS, isSettingKey, hasRole, type SettingKey, type SettingValue, type Role } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 
@@ -80,6 +80,18 @@ type ChangeHook = {
 };
 const ON_CHANGE: Partial<Record<SettingKey, ChangeHook>> = {};
 
+/**
+ * Hold a key while a transaction relies on (shared) or changes (exclusive)
+ * its value. A transaction-scoped advisory lock rather than a row lock: a
+ * key never set has no row, and its first change must still wait for, and
+ * be waited on by, the registrations that read its default.
+ */
+export async function lockSetting(tx: Tx, key: SettingKey, mode: 'shared' | 'exclusive') {
+  await tx.execute(mode === 'shared'
+    ? sql`select pg_advisory_xact_lock_shared(hashtext(${`school_setting:${key}`}))`
+    : sql`select pg_advisory_xact_lock(hashtext(${`school_setting:${key}`}))`);
+}
+
 /** Register what a key's change sets off (called once, by the service that owns the consequence). */
 export function onSettingChanged(key: SettingKey, hook: ChangeHook) {
   ON_CHANGE[key] = hook;
@@ -110,6 +122,7 @@ export async function updateSetting(
 
   const hook = ON_CHANGE[key];
   const { changed, result } = await db.transaction(async (tx) => {
+    await lockSetting(tx, key, 'exclusive');
     const [row] = await tx.select().from(schoolSetting).where(eq(schoolSetting.key, key)).for('update');
     const beforeValue = row ? row.value : def.default;
     if (JSON.stringify(beforeValue) === JSON.stringify(value)) {

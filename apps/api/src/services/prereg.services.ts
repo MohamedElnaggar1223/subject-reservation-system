@@ -23,7 +23,7 @@ import { prepareRegistrationInputs } from './registration.services';
 import { creditHeld, debitHeld, getEscrowBalance } from './escrow.services';
 import { executeReceiptGatedDrop } from './receipt.services';
 import { refundPercentage } from './refund.services';
-import { assertMayRegisterFor } from './eligibility.services';
+import { assertMayRegisterFor, assertMayRegisterForInTx } from './eligibility.services';
 import { logger } from '../lib/logger';
 import { entryDeadlineMessage } from './window.services';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
@@ -116,7 +116,11 @@ export async function createPreregistration(parentId: string, data: PreregisterR
     };
   });
 
-  return db.insert(registration).values(records).returning();
+  // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
+  return db.transaction(async (tx) => {
+    await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
+    return tx.insert(registration).values(records).returning();
+  });
 }
 
 /**

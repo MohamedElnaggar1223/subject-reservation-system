@@ -363,6 +363,40 @@ describe('object-level access between families', () => {
     expect((await apiResponse(studentA.api.v1.registrations.eligibility.$get({ query: { studentId: studentAId, sessionId } }))).allowed).toBe(true);
   });
 
+  it("F0a another class and the gate: a teacher reaches only their own teaching; the gate only the school day", async () => {
+    const coordinator = await staff(adm, 'coordinator', 'oa-class');
+    const [teacherA, teacherB, gate] = await Promise.all([staff(adm, 'teacher', 'oa-a'), staff(adm, 'teacher', 'oa-b'), staff(adm, 'gate', 'oa')]);
+    // A year of its own, far ahead, so no later suite's academic year is taken.
+    const far = new Date().getFullYear() + 8;
+    const year = await apiResponse(coordinator.api.v1.academic.years.$post({ json: { startYear: far, startsOn: `${far}-09-06`, endsOn: `${far + 1}-06-25` } }));
+    const teacherAId = (await one<{ id: string }>(`select id from teacher where user_id = $1`, [teacherA.id])).id;
+    const sectionA = (await apiResponse(coordinator.api.v1.academic.sections.$post({ json: { academicYearId: year.id, grade: 11, name: 'OA-11A', homeroomTeacherId: teacherAId } }))).id;
+
+    // Another class: teacher B reads neither teacher A's section nor any student's record.
+    await refusedAs('teacherB reads teacher A section', teacherB.api.v1.academic.sections[':id'].$get({ param: { id: sectionA } }));
+    await refusedAs('teacherB lists sections', teacherB.api.v1.academic.sections.$get({ query: {} }));
+    await refusedAs('teacherB adds to teacher A section', teacherB.api.v1.academic.sections[':id'].members.$post({ param: { id: sectionA }, json: { studentIds: [studentAId] } }));
+    await refusedAs('teacherB reads student A record', teacherB.api.v1.students[':id'].$get({ param: { id: studentAId } }));
+    await refusedAs('teacherB lists students', teacherB.api.v1.students.$get({ query: {} }));
+    await refusedAs('teacherB reads student A at the desk', teacherB.api.v1.users[':id'].summary.$get({ param: { id: studentAId } }));
+    await refusedAs('teacherB reads A family file', teacherB.api.v1.files[':id'].content.$get({ param: { id: fileA }, query: {} }));
+    const mine = await apiResponse(teacherB.api.v1.teaching.me.$get());
+    expect(mine?.teacher.id).not.toBe(teacherAId);
+    expect(mine?.homeroomSections.some((s) => s.id === sectionA)).toBe(false);
+
+    // The gate: the school day, and nothing about a family.
+    expect((await gate.api.v1.academic.calendar.day.$get({ query: {} })).status).toBe(200);
+    await refusedAs('gate reads student A record', gate.api.v1.students[':id'].$get({ param: { id: studentAId } }));
+    await refusedAs('gate lists students', gate.api.v1.students.$get({ query: {} }));
+    await refusedAs('gate reads student A at the desk', gate.api.v1.users[':id'].summary.$get({ param: { id: studentAId } }));
+    await refusedAs('gate searches people', gate.api.v1.users.search.$get({ query: { search: 'oa-a' } }));
+    await refusedAs('gate reads registrations', gate.api.v1.registrations.$get({ query: { studentId: studentAId } }));
+    await refusedAs('gate reads payments', gate.api.v1.payments.$get({ query: {} }));
+    await refusedAs('gate reads section A', gate.api.v1.academic.sections[':id'].$get({ param: { id: sectionA } }));
+    await refusedAs('gate asks student A eligibility', gate.api.v1.registrations.eligibility.$get({ query: { studentId: studentAId, sessionId } }));
+    await refusedAs('gate reads A family file', gate.api.v1.files[':id'].content.$get({ param: { id: fileA }, query: {} }));
+  });
+
   it('F0a exceptions: each type names who may grant it — a coordinator is refused a fee waiver, a finance admin the grade-10 exception', async () => {
     const coordinator = await staff(adm, 'coordinator', 'oa');
     const exceptionsOf = async () => Number((await one<{ n: string }>(`select count(*) as n from exception where student_id = $1`, [studentBId])).n);

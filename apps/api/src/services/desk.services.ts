@@ -34,7 +34,7 @@ import {
   getSchoolFeeStanding,
   studentGradeInYear,
 } from './school-fee.services';
-import { assertMayRegisterFor, mayRegisterFor, standingToday } from './eligibility.services';
+import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterFor, standingToday } from './eligibility.services';
 import { sectionOf } from './academic.services';
 import { academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, gradeLabel, academicYearStartFromLabel } from '@repo/validations';
 
@@ -242,6 +242,8 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
   // No money taken → register only; the family pays later (app or desk)
   if (!data.collectNow) {
     const created = await db.transaction(async (tx) => {
+      // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
+      await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
       const inserted = await tx.insert(registration).values(records).returning();
       await logAction(staffId, 'DESK_REGISTRATION', 'registration', data.studentId, null,
         { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), collected: 0 }, auditCtx, tx);
@@ -269,6 +271,8 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
   const payerParentId = data.collectNow ? await resolvePayerParent(data.studentId) : staffId;
 
   const created = await db.transaction(async (tx) => {
+    // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
+    await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
     const inserted = await tx.insert(registration).values(records).returning();
 
     await tx.insert(payment).values({

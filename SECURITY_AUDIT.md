@@ -104,7 +104,7 @@ undone; nine were checked by undoing them (trail, "control" rows).
 | O-2 | Remark creation and approval revert check a record's state before its ownership, so someone who already knows a record's UUID learns its state. UUIDs are unguessable, which is also why RF-13 is Low. | Engineering health |
 | O-3 | Staff accounts carry money authority on a password alone. A second factor for finance roles (better-auth's two-factor plugin) is the next strongest control. | Owner decision |
 | O-4 | Behind a proxy, `CLIENT_IP_HEADER` must name the header that proxy writes. Unset, the whole school shares one sign-in budget and can be locked out; the API now warns at boot, and session reads no longer spend the budget. | Deployment checklist, §6 |
-| O-5 | Finance cannot read a parent's uploaded screenshot or consent form, because file reads are owner-only. This becomes a gap when those uploads get a screen. | Feature work |
+| O-5 | Finance cannot read a parent's uploaded screenshot or consent form, because file reads are owner-only. This becomes a gap when those uploads get a screen. **Closed by F0a (docs/features/FOUNDATION.md, "Uploads"):** every file has a purpose that names who may upload it, its types and size, the student it concerns and who may read it (owner, the student's family, or named staff roles); `POST /v1/files/upload` and `GET /v1/files/:id/content` apply those rules, and a legacy document attached as payment or remark evidence is readable by finance. Proven in `05` (another family refused) and `08f` (wrong role and wrong family refused; finance reads the evidence). | Feature work (closed, F0a) |
 | O-6 | `next.config.js` still names the starter template's R2 bucket host. | Cleanup |
 | O-7 | Audit rows are written after the money movement commits, in a separate statement. Writing them inside the same transaction would make "no money without its audit row" absolute. | Money-correctness audit |
 | O-8 | better-auth does not origin-check sign-in itself, since no cookie exists yet: a minor login-CSRF. | Accepted |
@@ -136,9 +136,12 @@ Set these before the first deployment; each one is a control this audit relies o
   local midnight (MONEY_AUDIT.md MO-3).
 - Before each series opens, the admin enters its exam-board entry deadline on the Sessions
   page; without one, unconfirmed payments are never closed automatically (MONEY_AUDIT.md §6a).
-- Leave `AUTO_GRADE_PROGRESSION` unset (off) until the owner decides what a student's grade is:
-  with it on, a registration window's close advances grades on the wrong calendar
-  (STATE_AUDIT.md ST-13); admins adjust grades by hand meanwhile.
+- `AUTO_GRADE_PROGRESSION` no longer exists (F0a): a student's grade is derived from their
+  cohort and the academic year (1 July in Cairo), so nothing advances grades and the ST-13
+  stop-gap is gone. Remove the variable from any deployed environment.
+- Uploads: set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET_NAME`.
+  In production without them the API refuses uploads rather than writing to the local disk
+  (`LOCAL_UPLOAD_DIR` is for development and tests only).
 - Run one API process: the scheduler assumes it is the only one (STATE_AUDIT.md SO-5).
 
 ---

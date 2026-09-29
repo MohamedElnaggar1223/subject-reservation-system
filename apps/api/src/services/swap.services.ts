@@ -70,7 +70,7 @@ import {
   notifyDirectDropSwapExecuted,
   notifyEscrowBalanceChanged,
 } from './notification.services';
-import { assertMayRegisterFor, mayRegisterFor } from './eligibility.services';
+import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterFor } from './eligibility.services';
 import { logAction, type AuditContext } from './audit.services';
 
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
@@ -481,6 +481,10 @@ export async function approveChangeRequest(
   const refundAmount = round2((cr.registration.priceAtRegistration * pct) / 100);
 
   const result = await db.transaction(async (tx) => {
+    // A swap registers a new subject: asked again with the student and window
+    // held, before anything else is locked (F0a; see assertMayRegisterForInTx).
+    if (cr.type === 'swap') await assertMayRegisterForInTx(tx, cr.registration.studentId, cr.registration.sessionId);
+
     // Status guard: prevent concurrent double-approval
     const [updatedCR] = await tx
       .update(changeRequest)
@@ -777,6 +781,9 @@ export async function executeDirectSwap(
 
   // Atomic transaction (OI-009) — drop leg receipt-gated (D-D)
   const result = await db.transaction(async (tx) => {
+    // Asked again with the student and window held, before anything else is
+    // locked (F0a; see assertMayRegisterForInTx).
+    await assertMayRegisterForInTx(tx, reg.studentId, reg.sessionId);
     const dropOutcome = await executeReceiptGatedDrop(tx, {
       registrationId,
       studentId: reg.studentId,

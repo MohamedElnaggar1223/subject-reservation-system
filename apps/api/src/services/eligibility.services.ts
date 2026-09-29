@@ -42,7 +42,7 @@ import {
   academicYearLabel, academicYearShortLabel, seriesAcademicYearStart, seriesLabel, gradeInAcademicYear,
   academicYearStartOf, GRADUATE_RETAKE_SESSION_TYPES, LAST_GRADE, FIRST_GRADE,
 } from '@repo/validations';
-import { getSetting, onSettingChanged } from './settings.services';
+import { getSetting, lockSetting, onSettingChanged } from './settings.services';
 import { logActions, type ExpiryReason } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
 
@@ -202,6 +202,35 @@ export async function mayRegisterFor(studentId: string, sessionId: string, execu
 /** Refuse with the rule's own sentence unless the student may register for the series. */
 export async function assertMayRegisterFor(studentId: string, sessionId: string, executor: Executor = db): Promise<Eligibility> {
   const e = await mayRegisterFor(studentId, sessionId, executor);
+  if (!e.allowed) throw new Error(e.reason!);
+  return e;
+}
+
+/**
+ * The same judgement inside the transaction that creates a registration,
+ * with what it rests on held — a read-then-write guard takes a lock
+ * (CLAUDE.md; MONEY_AUDIT.md MA-06). The student's row and the window's
+ * row are held FOR SHARE, and so is the grade-10 exception or the A-12
+ * setting a verdict relies on. Every eligibility change takes the same row
+ * FOR UPDATE (the student: withdrawal, transfer, cohort correction; the
+ * window: series correction; the exception: its revocation; the setting:
+ * A-12 turned off) before its clean-up reads registrations, so either it
+ * commits first and this re-reads it, or it waits for this registration
+ * and then expires it. Lock order: student, window, then exception or
+ * setting — callers run this first in their transaction.
+ */
+export async function assertMayRegisterForInTx(tx: Tx, studentId: string, sessionId: string): Promise<Eligibility> {
+  await tx.select({ id: user.id }).from(user).where(eq(user.id, studentId)).for('share');
+  await tx.select({ id: registrationSession.id }).from(registrationSession).where(eq(registrationSession.id, sessionId)).for('share');
+  let e = await mayRegisterFor(studentId, sessionId, tx);
+  if (e.grade10ExceptionId) {
+    await tx.select({ id: exception.id }).from(exception).where(eq(exception.id, e.grade10ExceptionId)).for('share');
+    e = await mayRegisterFor(studentId, sessionId, tx);
+  }
+  if (e.graduateRetake || e.code === 'graduate_retakes_off') {
+    await lockSetting(tx, 'eligibility.graduateRetakes', 'shared');
+    e = await mayRegisterFor(studentId, sessionId, tx);
+  }
   if (!e.allowed) throw new Error(e.reason!);
   return e;
 }

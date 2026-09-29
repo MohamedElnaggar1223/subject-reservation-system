@@ -48,7 +48,7 @@ import {
   notifyRegistrationDecision,
   notifyDirectRegistrationCreated,
 } from './notification.services';
-import { assertMayRegisterFor, mayRegisterFor, type Eligibility } from './eligibility.services';
+import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterFor, type Eligibility } from './eligibility.services';
 import { computeRegistrationPricing } from './pricing.services';
 import { schoolFeeGateReason } from './school-fee.services';
 import { applyPricingExceptions } from './exception.services';
@@ -479,7 +479,12 @@ export async function createRegistrationRequest(
     };
   });
 
-  const inserted = await db.insert(registration).values(records).returning();
+  // Asked again with the student and window held, so a withdrawal or a
+  // correction racing this request either lands first or expires it (F0a).
+  const inserted = await db.transaction(async (tx) => {
+    await assertMayRegisterForInTx(tx, studentId, data.sessionId);
+    return tx.insert(registration).values(records).returning();
+  });
 
   // NOT-003: Notify all linked parents of the new request (fire-and-forget)
   {
@@ -590,7 +595,11 @@ export async function createDirectRegistration(
     };
   });
 
-  const created = await db.insert(registration).values(records).returning();
+  // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
+  const created = await db.transaction(async (tx) => {
+    await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
+    return tx.insert(registration).values(records).returning();
+  });
 
   // REG-003: Notify student via in-app + email that their parent registered
   // subjects for them. Fire-and-forget so registration creation never fails
@@ -1002,7 +1011,11 @@ export async function adminOverrideApproval(
     };
   });
 
-  return db.insert(registration).values(records).returning();
+  // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
+  return db.transaction(async (tx) => {
+    await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
+    return tx.insert(registration).values(records).returning();
+  });
 }
 
 /**
