@@ -21,6 +21,7 @@
  */
 
 import { Resend } from 'resend';
+import { gradeLabel } from '@repo/validations';
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
@@ -597,7 +598,7 @@ export async function sendGradeChangedEmail(to: string, data: {
   reason: string;
   isStudent: boolean;
 }): Promise<EmailResult> {
-  const gradeLabel = (g: number | null) => (g === null ? 'Graduated' : `Grade ${g}`);
+  // F0a: the shared label (above 12 graduated, null not recorded).
 
   const html = emailLayout(
     `Grade Updated: ${gradeLabel(data.newGrade)}`,

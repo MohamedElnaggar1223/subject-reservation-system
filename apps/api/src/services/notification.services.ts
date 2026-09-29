@@ -59,6 +59,7 @@ import {
   sendLinkDecisionEmail,
 } from '../integrations/email';
 import { clientMessage } from '../lib/response';
+import { gradeLabel } from '@repo/validations';
 import { schoolDate, schoolDateTime } from './window.services';
 
 // ─── Core Primitives ──────────────────────────────────────────────────────────
@@ -923,18 +924,6 @@ export async function notifyStrandedPaymentClosed(paymentId: string, escrowRetur
 }
 
 /**
- * A student graduated with a checkout open: the checkout was closed by the
- * system and any escrow it took is back (state audit ST-04).
- */
-export async function notifyPaymentClosedAtGraduation(paymentId: string, escrowReturned: number) {
-  const escrowNote = escrowReturned > 0 ? ` EGP ${escrowReturned.toFixed(2)} applied from escrow has been returned.` : '';
-  await notifyFamilyOfPayment(paymentId, 'PAYMENT_EXPIRED', 'Payment closed: student graduated', (c) =>
-    `${c.studentName} has graduated, so the payment of ${c.amount} for ${c.subjects} (${c.sessionName}) was closed before it was confirmed.${escrowNote} ` +
-    `If you did transfer the money, contact the finance desk with your bank receipt: once the transfer is found it is added to your escrow balance.`
-  );
-}
-
-/**
  * A checkout left open on subjects the student may no longer sit (they left,
  * a cohort or series was corrected, A-12 was turned off, a grade-10
  * exception was revoked; F0a) was closed by the system, any escrow it took
@@ -1316,8 +1305,7 @@ export async function notifyGradeChanged(data: {
   newGrade: number | null;
   reason: string;
 }) {
-  const gradeLabel = (g: number | null) =>
-    g === null ? 'Graduated' : `Grade ${g}`;
+  // F0a: the shared label (above 12 graduated, null not recorded).
 
   const title = `Grade updated to ${gradeLabel(data.newGrade)}`;
   const body = `${data.studentName}'s grade has been updated from ${gradeLabel(data.previousGrade)} to ${gradeLabel(data.newGrade)}. ${data.reason}`;

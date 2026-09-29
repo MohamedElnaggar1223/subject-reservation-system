@@ -334,4 +334,49 @@ describe('object-level access between families', () => {
     await expect(sql(`delete from file where id = $1`, [fileB])).rejects.toThrow();
     expect(await sql(`select 1 from file where id = $1`, [fileB])).toHaveLength(1);
   });
+
+  // ─── F0a ─────────────────────────────────────────────────────────────────
+
+  it("F0a uploads: B cannot read A's family files nor upload for A's student", async () => {
+    const pdf = new File([new TextEncoder().encode('%PDF-1.4\n%%EOF\n')], 'note.pdf', { type: 'application/pdf' });
+    const note = (await apiResponse(parentA.api.v1.files.upload.$post({ form: { file: pdf, purpose: 'supporting_document', studentId: studentAId } }))).id;
+    const shot = (await apiResponse(parentA.api.v1.files.upload.$post({ form: { file: pdf, purpose: 'payment_evidence', studentId: studentAId } }))).id;
+    for (const id of [note, shot]) {
+      await refusedAs('parentB read A family file', parentB.api.v1.files[':id'].content.$get({ param: { id }, query: {} }));
+      await refusedAs('studentB read A family file', studentB.api.v1.files[':id'].content.$get({ param: { id }, query: {} }));
+      await refusedAs('parentB file A metadata', parentB.api.v1.files[':id'].$get({ param: { id } }));
+      await refusedAs('parentB file A download', parentB.api.v1.files[':id'].download.$get({ param: { id } }));
+    }
+    // A's own student reads the family's supporting document.
+    expect((await studentA.api.v1.files[':id'].content.$get({ param: { id: note }, query: {} })).status).toBe(200);
+    const before = Number((await one<{ n: string }>(`select count(*) as n from file where student_id = $1`, [studentAId])).n);
+    await refusedAs('parentB upload for student A', parentB.api.v1.files.upload.$post({ form: { file: pdf, purpose: 'supporting_document', studentId: studentAId } }));
+    await refusedAs('studentB upload excuse for student A', studentB.api.v1.files.upload.$post({ form: { file: pdf, purpose: 'excuse_note', studentId: studentAId } }));
+    expect(Number((await one<{ n: string }>(`select count(*) as n from file where student_id = $1`, [studentAId])).n)).toBe(before);
+  });
+
+  it("F0a eligibility: B cannot ask whether A's student may register", async () => {
+    await refusedAs('parentB eligibility of student A', parentB.api.v1.registrations.eligibility.$get({ query: { studentId: studentAId, sessionId } }));
+    await refusedAs('studentB eligibility of student A', studentB.api.v1.registrations.eligibility.$get({ query: { studentId: studentAId, sessionId } }));
+    // A's own family may.
+    expect((await apiResponse(parentA.api.v1.registrations.eligibility.$get({ query: { studentId: studentAId, sessionId } }))).allowed).toBe(true);
+    expect((await apiResponse(studentA.api.v1.registrations.eligibility.$get({ query: { studentId: studentAId, sessionId } }))).allowed).toBe(true);
+  });
+
+  it('F0a exceptions: each type names who may grant it — a coordinator is refused a fee waiver, a finance admin the grade-10 exception', async () => {
+    const coordinator = await staff(adm, 'coordinator', 'oa');
+    const exceptionsOf = async () => Number((await one<{ n: string }>(`select count(*) as n from exception where student_id = $1`, [studentBId])).n);
+    const before = await exceptionsOf();
+    const waiver = coordinator.api.v1.exceptions.$post({ json: { type: 'fee_waiver', studentId: studentBId, reason: 'not the coordinator\'s to grant' } });
+    expect(await refusedAs('coordinator grants a fee waiver', waiver)).toBe(403);
+    const g10 = finadmin.api.v1.exceptions.$post({ json: { type: 'grade10_other_series', studentId: studentBId, sessionId, reason: 'not the finance admin\'s to grant' } });
+    expect(await refusedAs('finance admin grants the grade-10 exception', g10)).toBe(403);
+    expect(await exceptionsOf()).toBe(before);
+    // Nor may either revoke the other's type; each sees only its own types.
+    const w = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { type: 'fee_waiver', studentId: studentBId, reason: 'hardship case' } }));
+    expect(await refusedAs('coordinator revokes a fee waiver', coordinator.api.v1.exceptions[':id'].revoke.$post({ param: { id: w.id } }))).toBe(403);
+    expect(await statusOf('exception', w.id)).toBe('active');
+    expect((await apiResponse(coordinator.api.v1.exceptions.$get({ query: {} }))).some((e) => e.id === w.id)).toBe(false);
+    await apiResponse(finadmin.api.v1.exceptions[':id'].revoke.$post({ param: { id: w.id } }));
+  });
 });

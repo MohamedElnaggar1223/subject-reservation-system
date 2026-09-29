@@ -137,7 +137,7 @@ export async function loneStudent(adm: Client, tag: string): Promise<Client> {
 }
 
 /** Walk-in family through the desk: parent + student + approved link. */
-export async function onboard(officer: Client, tag: string, grade: 10 | 11 | 12 = 11) {
+export async function onboard(officer: Client, tag: string, grade: 9 | 10 | 11 | 12 = 11) {
   const parentEmail = `parent.${tag}@test.local`;
   const studentEmail = `student.${tag}@test.local`;
   const r = await apiResponse(

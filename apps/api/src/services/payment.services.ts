@@ -69,7 +69,6 @@ import {
   notifyPaymentClosedAtEntryDeadline,
   notifyRegistrationsExpiredAtEntryDeadline,
   notifyPreregistrationsRefundedAtDeadline,
-  notifyPaymentClosedAtGraduation,
   notifyPaymentClosedIneligible,
   notifyStrandedPaymentClosed,
   notifyEscrowBalanceChanged,
@@ -188,6 +187,14 @@ export async function initiatePayment(
     where: (s, { inArray }) => inArray(s.id, sessionIds),
     columns: { id: true, status: true, name: true, entryDeadline: true },
   });
+  // F0a: a subject the student may no longer sit cannot be paid for — they
+  // left the school, their cohort or the window's series was corrected, or
+  // the school stopped registering graduates. A registration kept through
+  // that change for a transfer being checked is released if the transfer is
+  // rejected (failOpenPayment), never paid again (state audit SO-7). Asked
+  // before the window, so the family hears the reason that matters.
+  for (const s of sessions) await assertMayRegisterFor(studentId, s.id);
+
   const wrongState: typeof sessions = [];
   for (const s of sessions) {
     // A preregistration past its series' board deadline can never be entered (MO-10).
@@ -203,12 +210,6 @@ export async function initiatePayment(
         : `Registration window is closed for: ${names}`
     );
   }
-  // F0a: a subject the student may no longer sit cannot be paid for — they
-  // left the school, their cohort or the window's series was corrected, or
-  // the school stopped registering graduates. A registration kept through
-  // that change for a transfer being checked is released if the transfer is
-  // rejected (failOpenPayment), never paid again (state audit SO-7).
-  for (const s of sessions) await assertMayRegisterFor(studentId, s.id);
 
   // Held-wallet funding is provider money only — no escrow application
   if (isPrereg && (data.escrowAmountToApply ?? 0) > 0) {
@@ -807,47 +808,11 @@ export async function failPayment(
 }
 
 /**
- * A student who graduates has their waiting registrations expired
- * (grade.services); a checkout still open on them would otherwise keep the
- * escrow it took, on registrations nothing can pay any more (state audit
- * ST-04). Each is failed by the system — escrow back, family told — after the
- * graduation has committed; a transfer that did arrive is recorded later
- * ("Transfer found").
- */
-export async function closePaymentsOfGraduatedStudents(studentIds: string[]) {
-  if (studentIds.length === 0) return 0;
-  const open = await db
-    .selectDistinct({ id: payment.id })
-    .from(payment)
-    .innerJoin(paymentRegistration, eq(paymentRegistration.paymentId, payment.id))
-    .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
-    .where(and(inArray(payment.studentId, studentIds), inArray(payment.status, [...OPEN_PAYMENT_STATUSES]), eq(registration.status, 'expired')));
-  let closed = 0;
-  for (const { id } of open) {
-    try {
-      const r = await failOpenPayment(id, {
-        from: OPEN_PAYMENT_STATUSES,
-        actorId: null,
-        action: 'PAYMENT_FAILED',
-        reason: 'The student graduated before this payment was confirmed',
-      });
-      if (!r) continue;
-      closed++;
-      await notifyPaymentClosedAtGraduation(id, r.pay.escrowAmountApplied)
-        .catch((err) => console.error(`[payment] Graduation notice for ${id} failed:`, err));
-    } catch (err) {
-      console.error(`[payment] Could not close ${id} after graduation; the sweep will retry:`, err);
-    }
-  }
-  return closed;
-}
-
-/**
  * Checkouts left open on registrations the eligibility clean-up just expired
  * (a student who left, a corrected cohort or series, A-12 turned off, a
- * revoked grade-10 exception; FEATURES_PLAN.md F0a). It replaces
+ * revoked grade-10 exception; FEATURES_PLAN.md F0a). It replaced
  * closePaymentsOfGraduatedStudents, which served the one trigger graduation
- * was (state audit ST-04). Each is failed by the system after the clean-up
+ * was (state audit ST-04), and was deleted once 08e showed nothing called it. Each is failed by the system after the clean-up
  * has committed — escrow back, audited in its own transaction, the family
  * told why; a transfer that did arrive is recorded later ("Transfer found").
  * A failure here is left to the recovery sweep (closeStrandedPayments).

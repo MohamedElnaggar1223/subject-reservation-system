@@ -32,12 +32,17 @@ const roleOf = async (id: string) => (await one<{ role: string | null }>(`select
 
 describe('auth surface', () => {
   let adm: Client, officer: Client, finadmin: Client, parent: Client, student: Client, studentId: string;
+  let coordinator: Client, teacher: Client, gate: Client;
   let econ: string, sessionId: string;
 
   beforeAll(async () => {
     adm = await admin('as');
     officer = await staff(adm, 'finance_officer', 'as');
     finadmin = await staff(adm, 'finance_admin', 'as');
+    // F0a's roles: none may hold better-auth's admin `user` permissions.
+    coordinator = await staff(adm, 'coordinator', 'as');
+    teacher = await staff(adm, 'teacher', 'as');
+    gate = await staff(adm, 'gate', 'as');
     ({ parent, student, studentId } = await onboard(officer, 'as'));
     econ = await subject(adm, 'AS-ECO', 'Economics (AS, auth surface)', { course: 1200, registration: 300 }, { qualificationLevel: 'as_level' });
     sessionId = await session(adm, 'June (AS, auth surface)', 'june', 'as_level', { ...openWindow(), activate: true });
@@ -77,7 +82,7 @@ describe('auth surface', () => {
   });
 
   it("better-auth's admin endpoints refuse everyone but an admin", async () => {
-    for (const who of [parent, student, officer, finadmin]) {
+    for (const who of [parent, student, officer, finadmin, coordinator, teacher, gate]) {
       for (const [path, json] of [
         ['/api/auth/admin/set-role', { userId: who.id, role: 'admin' }],
         ['/api/auth/admin/create-user', { email: `x.${who.id}@test.local`, password: PASSWORD, name: 'X', role: 'admin' }],
@@ -91,6 +96,7 @@ describe('auth surface', () => {
     }
     expect(await roleOf(parent.id)).toBe('parent');
     expect(await roleOf(finadmin.id)).toBe('finance_admin');
+    for (const [who, role] of [[coordinator, 'coordinator'], [teacher, 'teacher'], [gate, 'gate']] as const) expect(await roleOf(who.id)).toBe(role);
     // The admin's password still works.
     await signIn(adm.email);
   });
@@ -323,7 +329,9 @@ describe('auth surface', () => {
 
   it("families and staff see a teacher's name, never their phone or email (RF-20)", async () => {
     const t = await apiResponse(adm.api.v1.teachers.$post({ json: { name: 'Ms Teacher AS', phone: '01234567890', email: 'teacher.as@test.local' } }));
-    for (const who of [parent, student, officer, finadmin]) {
+    // F0a: the coordinator reads the teacher list too (homeroom teachers), and
+    // neither they nor anyone but the admin sees which account a record is linked to.
+    for (const who of [parent, student, officer, finadmin, coordinator]) {
       const list = await apiResponse(who.api.v1.teachers.$get({ query: {} }));
       expect(list.find((x) => x.id === t!.id)).toMatchObject({ name: 'Ms Teacher AS', phone: null, email: null });
       expect(await apiResponse(who.api.v1.teachers[':id'].$get({ param: { id: t!.id } }))).toMatchObject({ phone: null, email: null });

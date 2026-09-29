@@ -773,7 +773,7 @@ export async function sectionHistoryOf(studentId: string) {
     .innerJoin(section, eq(section.id, sectionMembership.sectionId))
     .innerJoin(academicYear, eq(academicYear.id, sectionMembership.academicYearId))
     .where(eq(sectionMembership.studentId, studentId))
-    .orderBy(sql`${academicYear.startYear} desc, ${sectionMembership.startedOn} desc`);
+    .orderBy(sql`${academicYear.startYear} desc, ${sectionMembership.startedOn} desc, ${sectionMembership.createdAt} desc`);
 }
 
 /** End a student's open section memberships (they left the school), in the caller's transaction. */

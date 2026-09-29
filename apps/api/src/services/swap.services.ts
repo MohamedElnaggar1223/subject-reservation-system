@@ -204,6 +204,21 @@ async function validateChangeEligibility(
 }
 
 /**
+ * F0a: a student's own registration, in a series they may still sit — the
+ * eligibility question asked right after ownership (a student is never told
+ * about someone else's registration).
+ */
+async function assertOwnRegistrationEligible(registrationId: string, studentId: string) {
+  const reg = await db.query.registration.findFirst({
+    where: (r, { eq: eqOp }) => eqOp(r.id, registrationId),
+    columns: { studentId: true, sessionId: true },
+  });
+  if (!reg) throw new Error('Registration not found');
+  if (reg.studentId !== studentId) throw new Error('You do not own this registration');
+  await assertMayRegisterFor(reg.studentId, reg.sessionId);
+}
+
+/**
  * Validate a new subject for a swap:
  * - Subject exists and is active
  * - Student is not already actively registered for it in the same session
@@ -261,11 +276,13 @@ export async function createDropRequest(
   data: RequestDropType,
   requestedBy: string
 ) {
-  const { reg } = await validateChangeEligibility(registrationId, requestedBy, true);
   // F0a: call site 7 of mayRegisterFor. A student who may no longer sit the
   // series does not open change requests on it (graduated students could
-  // not before F0a); a parent can still drop a paid subject directly.
-  await assertMayRegisterFor(reg.studentId, reg.sessionId);
+  // not before F0a); a parent can still drop a paid subject directly. Asked
+  // right after ownership, before the window, so the family hears the reason
+  // that matters.
+  await assertOwnRegistrationEligible(registrationId, requestedBy);
+  const { reg } = await validateChangeEligibility(registrationId, requestedBy, true);
 
   const [request] = await db
     .insert(changeRequest)
@@ -315,9 +332,9 @@ export async function createSwapRequest(
   data: RequestSwapType,
   requestedBy: string
 ) {
-  const { reg } = await validateChangeEligibility(registrationId, requestedBy, true);
   // F0a: call site 8 of mayRegisterFor — a swap registers a new subject.
-  await assertMayRegisterFor(reg.studentId, reg.sessionId);
+  await assertOwnRegistrationEligible(registrationId, requestedBy);
+  const { reg } = await validateChangeEligibility(registrationId, requestedBy, true);
 
   const newSub = await validateNewSubjectForSwap(
     reg.studentId,
@@ -419,12 +436,13 @@ export async function approveChangeRequest(
   const linked = await validateParentStudentLink(parentId, cr.registration.studentId);
   if (!linked) throw new Error('You are not linked to this student');
 
-  if (cr.registration.session.status !== 'active') {
-    throw new Error('The registration window has closed; this request can no longer be approved');
-  }
   // F0a: call site 9 of mayRegisterFor — an approved swap registers a new
   // subject, so the student must still be able to sit the series.
   if (cr.type === 'swap') await assertMayRegisterFor(cr.registration.studentId, cr.registration.sessionId);
+
+  if (cr.registration.session.status !== 'active') {
+    throw new Error('The registration window has closed; this request can no longer be approved');
+  }
 
   let newSubjectIsCore = false;
   let newPricing: Awaited<ReturnType<typeof priceSwappedInSubject>> | null = null;
@@ -729,13 +747,18 @@ export async function executeDirectSwap(
   parentId: string,
   auditCtx?: AuditContext
 ) {
-  const { reg } = await validateChangeEligibility(registrationId, '', false);
-
-  const linked = await validateParentStudentLink(parentId, reg.studentId);
-  if (!linked) throw new Error('You are not linked to this student');
   // F0a: call site 10 of mayRegisterFor — a parent's direct swap registers
-  // a new subject.
-  await assertMayRegisterFor(reg.studentId, reg.sessionId);
+  // a new subject. The link is checked first, so another family's
+  // registration tells nothing about itself.
+  const target = await db.query.registration.findFirst({
+    where: (r, { eq: eqOp }) => eqOp(r.id, registrationId),
+    columns: { studentId: true, sessionId: true },
+  });
+  if (!target) throw new Error('Registration not found');
+  if (!(await validateParentStudentLink(parentId, target.studentId))) throw new Error('You are not linked to this student');
+  await assertMayRegisterFor(target.studentId, target.sessionId);
+
+  const { reg } = await validateChangeEligibility(registrationId, '', false);
 
   const newSub = await validateNewSubjectForSwap(
     reg.studentId,
