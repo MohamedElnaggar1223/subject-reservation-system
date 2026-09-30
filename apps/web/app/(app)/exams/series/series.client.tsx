@@ -36,6 +36,7 @@ import {
   fetchBoardSeries, useCatalogue, SERIES_KEY, MONTH_LABEL, SeriesName, InstantText, DeadlineBadge, MaybeDate, SELECT_CLASS,
   type BoardSeriesRow,
 } from '../exams-shared';
+import { InferredCheck } from './inferred.client';
 
 const MONTHS = ['october', 'november', 'january', 'june'] as const;
 type Month = (typeof MONTHS)[number];
@@ -93,6 +94,8 @@ export default function SeriesClient({ viewerRole }: { viewerRole: string }): Re
           </p>
         </Notice>
       )}
+
+      <InferredCheck />
 
       <AddSeriesRow year={year} />
 

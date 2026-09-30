@@ -4,7 +4,7 @@ import {
   apiResponse, academicYearStartOf, gradeInAcademicYear, gradeToday, seriesYearInAcademicYear, academicYearLabel,
 } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, futureWindow, localToday, loneStudent, signUp, signIn, audited,
+  admin, staff, onboard, subject, session, refused, one, sql, futureWindow, schoolToday, loneStudent, signUp, signIn, audited,
   type Client,
 } from './helpers';
 
@@ -88,7 +88,7 @@ describe('F0a: grade and eligibility', () => {
       gone = await family('gone');
       await setCohort(c2026.studentId, 2026);
       await setCohort(c2024.studentId, 2024);
-      await apiResponse(adm.api.v1.students[':id'].leave.$post({ param: { id: gone.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'boundary table row 10' } }));
+      await apiResponse(adm.api.v1.students[':id'].leave.$post({ param: { id: gone.studentId }, json: { kind: 'withdrawn', leftOn: schoolToday(), reason: 'boundary table row 10' } }));
     });
 
     it('row 1 — cohort 2026/27, November 2026: grade 10, refused (grade 10 sits June only)', async () => {
@@ -263,7 +263,7 @@ describe('F0a: grade and eligibility', () => {
       // Now a grade-10 student in November 2026's year (a repeated year), and
       // a withdrawn one.
       await setCohort(g10.studentId, 2026);
-      await apiResponse(adm.api.v1.students[':id'].leave.$post({ param: { id: gone.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'call-site scenario' } }));
+      await apiResponse(adm.api.v1.students[':id'].leave.$post({ param: { id: gone.studentId }, json: { kind: 'withdrawn', leftOn: schoolToday(), reason: 'call-site scenario' } }));
       // Waiting rows are seeded after the change: the state a request made at
       // the very moment of it would leave without the locked re-check (08g
       // proves that cannot happen now), so each later guard is tested on its

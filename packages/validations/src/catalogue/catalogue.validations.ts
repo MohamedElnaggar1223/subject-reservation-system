@@ -75,6 +75,24 @@ export const ENTRY_METHOD_LABELS: Record<EntryMethod, string> = {
   syllabus_option: 'Syllabus with an option code',
 };
 
+/**
+ * A tier where the syllabus fixes it: Cambridge IGCSE Core or Extended
+ * (Paper 2 is Extended, Paper 1 Core), Pearson International GCSE Foundation
+ * or Higher. Egypt's equivalency (Mo'adala) requires Extended, so F5 reads
+ * it; F4 records the tier and the option code per entry. Null: the
+ * candidate's components or option decide it.
+ */
+export const TIERS = ['core', 'extended', 'foundation', 'higher'] as const;
+export const TierSchema = z.enum(TIERS);
+export type Tier = z.infer<typeof TierSchema>;
+
+export const TIER_LABELS: Record<Tier, string> = {
+  core: 'Core',
+  extended: 'Extended',
+  foundation: 'Foundation',
+  higher: 'Higher',
+};
+
 const code = (what: string) =>
   z.string().trim().min(1, `A ${what} needs a code`).max(20, 'Codes are short (at most 20 characters)')
     .transform((s) => s.toUpperCase());
@@ -89,6 +107,7 @@ export const CreateQualification = z.object({
   /** The subject it is in ("Mathematics"): AS and A Level of one subject share it (F5 counts them once). */
   subjectArea: z.string().trim().min(1, 'Name the subject it is in').max(100),
   entryMethod: EntryMethodSchema,
+  tier: TierSchema.nullable().optional(),
   notes: z.string().trim().max(1000).nullable().optional(),
 });
 export type CreateQualificationType = z.infer<typeof CreateQualification>;
@@ -100,6 +119,7 @@ export const UpdateQualification = z.object({
   suite: z.string().trim().max(100).optional(),
   subjectArea: z.string().trim().min(1).max(100).optional(),
   entryMethod: EntryMethodSchema.optional(),
+  tier: TierSchema.nullable().optional(),
   isActive: z.boolean().optional(),
   notes: z.string().trim().max(1000).nullable().optional(),
 });
@@ -136,6 +156,7 @@ export const CreateUnit = z.object({
   title: z.string().trim().min(1, 'A unit needs a title').max(200),
   unitLevel: UnitLevelSchema,
   kind: UnitKindSchema,
+  tier: TierSchema.nullable().optional(),
   notes: z.string().trim().max(1000).nullable().optional(),
 });
 export type CreateUnitType = z.infer<typeof CreateUnit>;
@@ -146,6 +167,7 @@ export const UpdateUnit = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   unitLevel: UnitLevelSchema.optional(),
   kind: UnitKindSchema.optional(),
+  tier: TierSchema.nullable().optional(),
   isActive: z.boolean().optional(),
   notes: z.string().trim().max(1000).nullable().optional(),
 });

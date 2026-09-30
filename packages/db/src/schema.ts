@@ -372,6 +372,11 @@ export const qualification = pgTable(
     subjectArea: text("subject_area").notNull(),
     // 'qualification' | 'units_cash_in' | 'syllabus_option'
     entryMethod: text("entry_method").notNull(),
+    // The tier where the syllabus fixes it for the whole award ('core' |
+    // 'extended' | 'foundation' | 'higher'); null when the candidate's
+    // components or option decide it. Equivalency (Mo'adala) requires
+    // Extended: F5 reads it; F4 records the tier and option code per entry.
+    tier: text("tier"),
     isActive: boolean("is_active").notNull().default(true),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -386,6 +391,7 @@ export const qualification = pgTable(
     uniqueIndex("qualification_board_code_level_idx").on(table.boardCode, table.code, table.level),
     check("qualification_level_valid", sql`${table.level} IN ('igcse', 'as_level', 'a_level')`),
     check("qualification_entry_method_valid", sql`${table.entryMethod} IN ('qualification', 'units_cash_in', 'syllabus_option')`),
+    check("qualification_tier_valid", sql`${table.tier} IS NULL OR ${table.tier} IN ('core', 'extended', 'foundation', 'higher')`),
   ]
 );
 
@@ -403,6 +409,10 @@ export const examUnit = pgTable(
     unitLevel: text("unit_level").notNull(),
     // 'unit' | 'component'
     kind: text("kind").notNull(),
+    // A component's tier where the syllabus fixes it (Cambridge IGCSE Paper 2
+    // is Extended, Paper 1 Core; Pearson 4MA1 Paper 1H Higher): 'core' |
+    // 'extended' | 'foundation' | 'higher', or null.
+    tier: text("tier"),
     isActive: boolean("is_active").notNull().default(true),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -415,6 +425,7 @@ export const examUnit = pgTable(
     uniqueIndex("examUnit_board_code_idx").on(table.boardCode, table.code),
     check("exam_unit_level_valid", sql`${table.unitLevel} IN ('igcse', 'as', 'a2')`),
     check("exam_unit_kind_valid", sql`${table.kind} IN ('unit', 'component')`),
+    check("exam_unit_tier_valid", sql`${table.tier} IS NULL OR ${table.tier} IN ('core', 'extended', 'foundation', 'higher')`),
   ]
 );
 

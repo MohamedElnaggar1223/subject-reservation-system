@@ -14,7 +14,7 @@
 
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { ROLES, IdParam, CreateBoardSeries, UpdateBoardSeries, ListBoardSeriesQuery } from '@repo/validations';
+import { ROLES, IdParam, CreateBoardSeries, UpdateBoardSeries, ListBoardSeriesQuery, MarkInferredChecked } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
 import { requireAuth, requireAcademic, requireRole } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
@@ -33,6 +33,21 @@ export const boardSeriesRoutes = new Hono<HonoEnv>()
     requireRole(ROLES.ADMIN, ROLES.COORDINATOR, ROLES.FINANCE_OFFICER, ROLES.FINANCE_ADMIN),
     zValidator('query', ListBoardSeriesQuery),
     async (c) => success(c, await series.listBoardSeries(c.req.valid('query'))))
+
+  // What the F0b migration inferred (a registration entered with the board that
+  // sits its window's month, not its subject's old board), for staff to check.
+  .get('/inferred',
+    requireRole(ROLES.ADMIN, ROLES.COORDINATOR, ROLES.FINANCE_OFFICER, ROLES.FINANCE_ADMIN),
+    async (c) => success(c, await series.listInferredRoutings()))
+
+  .post('/inferred/checked', requireAcademic(), zValidator('json', MarkInferredChecked), async (c) => {
+    try {
+      return success(c, await series.markInferredChecked(c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
+    } catch (err) {
+      const f = fail(err, 'Failed to record the check');
+      return error(c, f.message, f.status);
+    }
+  })
 
   .post('/', requireAcademic(), zValidator('json', CreateBoardSeries), async (c) => {
     const user = c.get('user')!;

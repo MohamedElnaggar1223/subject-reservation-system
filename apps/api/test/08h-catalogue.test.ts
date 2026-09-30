@@ -255,6 +255,33 @@ describe('F0b: the exam catalogue', () => {
     });
   });
 
+  describe('the tier where the syllabus fixes it (review flag 6)', () => {
+    it('an IGCSE component or award carries Core or Extended (Foundation or Higher); an AS or A2 unit has none; F5 and F4 read it', async () => {
+      const award = await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({
+        json: { boardCode: 'cambridge', code: '0580', title: 'Mathematics (IGCSE)', level: 'igcse', suite: 'Cambridge IGCSE', subjectArea: 'Mathematics', entryMethod: 'syllabus_option' },
+      }));
+      const paper = async (n: number, tier: 'core' | 'extended') => (await apiResponse(coordinator.api.v1.catalogue.units.$post({
+        json: { boardCode: 'cambridge', code: `0580/${n}`, shortCode: `Paper ${n}`, title: `Paper ${n}`, unitLevel: 'igcse', kind: 'component', tier },
+      }))).id;
+      const core = await paper(1, 'core');
+      const extended = await paper(2, 'extended');
+      await apiResponse(coordinator.api.v1.catalogue.qualifications[':id'].units.$put({
+        param: { id: award.id }, json: { units: [core, extended].map((unitId) => ({ unitId: unitId!, requirement: 'optional' as const, choiceGroup: 'One tier' })) },
+      }));
+      const cat = await fetchCatalogue();
+      expect(cat.qualifications.find((x) => x.id === award.id)!.units.map((u) => [u.code, u.tier])).toEqual([['0580/1', 'core'], ['0580/2', 'extended']]);
+      // An award the syllabus fixes to one tier carries it.
+      const higher = await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({
+        json: { boardCode: 'pearson_edexcel', code: '4MA1H', title: 'Mathematics A (Higher)', level: 'igcse', suite: 'International GCSE', subjectArea: 'Mathematics', entryMethod: 'qualification', tier: 'higher' },
+      }));
+      expect(higher.tier).toBe('higher');
+      // AS and A2 have no tier.
+      expect(await refused(coordinator.api.v1.catalogue.units.$post({
+        json: { boardCode: 'pearson_edexcel', code: 'WTX01', title: 'No tier here', unitLevel: 'as', kind: 'unit', tier: 'extended' },
+      }))).toEqual({ status: 400, error: 'Only IGCSE awards and components have a tier (Core or Extended, Foundation or Higher)' });
+    });
+  });
+
   describe('existing subjects (the migration) and the board a subject is entered with (decision 3)', () => {
     it('a new IGCSE subject is unmapped until the coordinator maps it; its board can change while nothing is entered', async () => {
       const s = await subject(adm, 'CAT-GEO', 'Geography (catalogue)', { course: 1000, registration: 500 });

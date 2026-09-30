@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, academicYearLabel } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, openWindow, audited, localToday, clientFor,
+  admin, staff, onboard, subject, session, refused, one, sql, openWindow, audited, schoolToday, clientFor,
   type Client,
 } from './helpers';
 
@@ -323,8 +323,21 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
       expect((await apiResponse(coordinator.api.v1.students.$get({ query: { search: g.student.email } }))).students[0]).toMatchObject({ cohortInferred: false });
     });
 
+    it('a move dated before the student joined their current section is refused: the new section never starts before the old one', async () => {
+      const current = await one<{ started_on: string }>(
+        `select to_char(m.started_on, 'YYYY-MM-DD') as started_on from section_membership m where m.student_id = $1 and m.ended_on is null`, [y.studentId]);
+      const dayBefore = new Date(`${current.started_on}T12:00:00Z`);
+      dayBefore.setUTCDate(dayBefore.getUTCDate() - 1);
+      const r = await refused(coordinator.api.v1.academic.sections[':id'].members.$post({
+        param: { id: s11b }, json: { studentIds: [y.studentId], startsOn: dayBefore.toISOString().slice(0, 10) },
+      }));
+      expect(r.status).toBe(409);
+      expect(r.error).toContain('A move must start on or after the day the student joined their current section');
+      expect(await sql(`select 1 from section_membership m join section s on s.id = m.section_id where m.student_id = $1 and s.id = $2`, [y.studentId, s11b])).toEqual([]);
+    });
+
     it('moving a student keeps the history; the student record and the desk show the section', async () => {
-      const moved = await apiResponse(coordinator.api.v1.academic.sections[':id'].members.$post({ param: { id: s11b }, json: { studentIds: [y.studentId], startsOn: localToday() } }));
+      const moved = await apiResponse(coordinator.api.v1.academic.sections[':id'].members.$post({ param: { id: s11b }, json: { studentIds: [y.studentId], startsOn: schoolToday() } }));
       expect(moved).toMatchObject({ added: 1, moved: 1 });
       const hist = await sql<{ name: string; ended: boolean }>(
         `select s.name, (m.ended_on is not null) as ended from section_membership m join section s on s.id = m.section_id where m.student_id = $1 order by m.created_at`, [y.studentId]);
@@ -374,7 +387,7 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
     it('the roll-over: previewed, then committed; 11A becomes 12A of next year with those still in grade 12 then; grade 12 graduates; running it again changes nothing', async () => {
       // A student who repeats grade 11 and one who left stay behind for the coordinator.
       await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: repeater.studentId }, json: { gradeNow: 10, reason: 'repeats the year' } }));
-      await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: leaver.studentId }, json: { kind: 'transferred', leftOn: localToday(), reason: 'another school' } }));
+      await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: leaver.studentId }, json: { kind: 'transferred', leftOn: schoolToday(), reason: 'another school' } }));
       expect((await apiResponse(coordinator.api.v1.students[':id'].$get({ param: { id: repeater.studentId } }))).sectionMismatch).toBe(true);
 
       const preview = await apiResponse(coordinator.api.v1.academic.sections['roll-over'].$post({ json: { fromAcademicYearId: yearId, toAcademicYearId: nextYearId, commit: false } }));

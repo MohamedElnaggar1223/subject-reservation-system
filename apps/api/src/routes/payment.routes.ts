@@ -204,7 +204,8 @@ export const payments = new Hono<HonoEnv>()
           message.includes('insufficient') ||
           message.includes('already have') ||
           message.includes('window is closed') ||
-          message.includes('window is not open') ? 422 : 400;
+          message.includes('window is not open') ||
+          message.includes('different entry deadlines') ? 422 : 400;
         return error(c, message, status);
       }
     }

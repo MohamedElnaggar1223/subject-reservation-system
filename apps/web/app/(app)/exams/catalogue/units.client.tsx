@@ -11,7 +11,7 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, UNIT_LEVELS, UNIT_KINDS, type UnitLevel, type UnitKind } from '@repo/validations';
+import { apiResponse, UNIT_LEVELS, UNIT_KINDS, TIERS, TIER_LABELS, type UnitLevel, type UnitKind, type Tier } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -84,8 +84,11 @@ function UnitLine({ u, boardName }: { u: UnitRow; boardName: string }) {
           {u.shortCode && <> <Badge tone="neutral">{u.shortCode}</Badge></>}
         </td>
         <td className="px-3 py-2.5 text-foreground"><bdi data-i18n-skip="true">{u.title}</bdi><p className="text-xs text-muted-foreground">{KIND_LABEL[u.kind as UnitKind] ?? u.kind}</p></td>
-        <td className="px-3 py-2.5 text-foreground">{boardName}</td>
-        <td className="px-3 py-2.5"><Badge tone={UNIT_LEVEL_TONE[u.unitLevel] ?? 'neutral'}>{unitLevelLabel(u.unitLevel)}</Badge></td>
+        <td className="px-3 py-2.5 text-foreground"><bdi data-i18n-skip="true">{boardName}</bdi></td>
+        <td className="px-3 py-2.5">
+          <Badge tone={UNIT_LEVEL_TONE[u.unitLevel] ?? 'neutral'}>{unitLevelLabel(u.unitLevel)}</Badge>
+          {u.tier && <> <Badge tone="info">{TIER_LABELS[u.tier as Tier] ?? u.tier}</Badge></>}
+        </td>
         <td className="px-3 py-2.5">
           {u.countsToward.length === 0 ? <span className="text-muted-foreground">—</span> : (
             <ul className="space-y-0.5 text-xs">
@@ -116,11 +119,14 @@ function AddUnit({ data }: { data: CatalogueData }) {
   const [title, setTitle] = useState('');
   const [unitLevel, setUnitLevel] = useState<UnitLevel>('as');
   const [kind, setKind] = useState<UnitKind>('unit');
+  const [tier, setTier] = useState<Tier | ''>('');
   const [error, setError] = useState('');
   const [added, setAdded] = useState<string | null>(null);
   const codeRef = useRef<HTMLInputElement>(null);
   const create = useMutation({
-    mutationFn: () => apiResponse(api.v1.catalogue.units.$post({ json: { boardCode: boardCode as 'cambridge', code, shortCode: shortCode.trim() || null, title, unitLevel, kind } })),
+    mutationFn: () => apiResponse(api.v1.catalogue.units.$post({
+      json: { boardCode: boardCode as 'cambridge', code, shortCode: shortCode.trim() || null, title, unitLevel, kind, tier: unitLevel === 'igcse' && tier ? tier : null },
+    })),
     onSuccess: (u) => {
       queryClient.invalidateQueries({ queryKey: CATALOGUE_KEY });
       // The next unit is usually like this one: keep the board, level and kind.
@@ -161,6 +167,15 @@ function AddUnit({ data }: { data: CatalogueData }) {
             {UNIT_LEVELS.map((l) => <option key={l} value={l}>{unitLevelLabel(l)}</option>)}
           </select>
         </div>
+        {unitLevel === 'igcse' && (
+          <div>
+            <Label htmlFor="u-tier" className="mb-1 text-xs text-muted-foreground">Tier (where the syllabus fixes it)</Label>
+            <select id="u-tier" value={tier} onChange={(e) => setTier(e.target.value as Tier | '')} className={cn(SELECT_CLASS, 'w-40')}>
+              <option value="">None</option>
+              {TIERS.map((t) => <option key={t} value={t}>{TIER_LABELS[t]}</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <Label htmlFor="u-kind" className="mb-1 text-xs text-muted-foreground">Kind</Label>
           <select id="u-kind" value={kind} onChange={(e) => setKind(e.target.value as UnitKind)} className={cn(SELECT_CLASS, 'w-44')}>

@@ -7,6 +7,7 @@ import { apiResponse, gradeLabel, COUNCIL_LABELS, REGISTRATION_STATUS_LABELS } f
 import { Notice } from '~/components/ui/tone';
 import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
+import { InstantText } from '../exams/exams-shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,8 @@ type Subject = {
   isRetake: boolean;
   pricing: SubjectPricing;
   outsidePricing: SubjectPricing | null;
+  // F0b: the exam board series the subject is entered in (paid for per series).
+  boardSeries: { id: string; name: string; entryDeadline: string | null } | null;
 };
 
 type SubjectChoice = {
@@ -231,6 +234,16 @@ export default function RegisterClient({ userId, userRole }: Props): React.JSX.E
     if (councilFilter === 'all') return availableSubjects;
     return availableSubjects.filter((s) => s.council === councilFilter);
   }, [availableSubjects, councilFilter]);
+
+  // F0b: subjects grouped by the exam board series they are entered in; each
+  // series is paid for on its own when their entry deadlines differ.
+  const seriesSorted = useMemo(() => {
+    // The earliest entry deadline first, as the checkout orders them.
+    const key = (x: Subject) => `${x.boardSeries?.entryDeadline ?? '9999'}|${x.boardSeries?.name ?? '~'}`;
+    return [...filteredSubjects].sort((a, b) => key(a).localeCompare(key(b)));
+  }, [filteredSubjects]);
+  const multipleSeries = new Set(filteredSubjects.map((x) => x.boardSeries?.id ?? 'none')).size > 1;
+
 
   const selectedSubjects = useMemo(
     () => availableSubjects.filter((s) => selectedSubjectIds.has(s.id)),
@@ -590,7 +603,9 @@ export default function RegisterClient({ userId, userRole }: Props): React.JSX.E
                 </div>
               )}
               <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
-                {filteredSubjects.map((subject) => {
+                {seriesSorted.map((subject, index) => {
+                  const seriesKey = subject.boardSeries?.id ?? 'none';
+                  const newSeries = multipleSeries && (index === 0 || (seriesSorted[index - 1]!.boardSeries?.id ?? 'none') !== seriesKey);
                   const choice = subjectChoices[subject.id];
                   const pricing = getEffectivePricing(subject, choice);
                   const isSelected = selectedSubjectIds.has(subject.id);
@@ -601,8 +616,20 @@ export default function RegisterClient({ userId, userRole }: Props): React.JSX.E
                     isSelected && !pricing.isOutsideSchool && subject.teachers.length > 0;
 
                   return (
+                    <div key={subject.id}>
+                    {newSeries && (
+                      <div className="mb-2 mt-3 first:mt-0 border-b border-border pb-1">
+                        <p className="text-sm font-semibold text-foreground">
+                          {subject.boardSeries ? <bdi>{subject.boardSeries.name}</bdi> : <span>No board series</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {subject.boardSeries?.entryDeadline
+                            ? <><span>Entry deadline</span> <InstantText iso={subject.boardSeries.entryDeadline} /> · <span>paid for on its own</span></>
+                            : <span>No entry deadline yet · paid for on its own</span>}
+                        </p>
+                      </div>
+                    )}
                     <div
-                      key={subject.id}
                       className={`rounded-lg border transition-colors ${
                         isSelected || isCoreLocked
                           ? 'border-primary bg-primary/5'
@@ -723,6 +750,7 @@ export default function RegisterClient({ userId, userRole }: Props): React.JSX.E
                           )}
                         </div>
                       )}
+                    </div>
                     </div>
                   );
                 })}

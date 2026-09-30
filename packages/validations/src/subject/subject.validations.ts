@@ -28,12 +28,13 @@ export const CouncilSchema = z.enum([
 export type Council = z.infer<typeof CouncilSchema>;
 
 /**
- * Human-readable labels for councils
+ * Human-readable labels for councils: the boards' own names, the same as the
+ * exam catalogue's (F0b) — proper nouns, never translated.
  */
 export const COUNCIL_LABELS: Record<Council, string> = {
   pearson_edexcel: 'Pearson Edexcel',
-  cambridge: 'Cambridge',
-  oxford: 'Oxford',
+  cambridge: 'Cambridge International',
+  oxford: 'OxfordAQA',
 };
 
 /**

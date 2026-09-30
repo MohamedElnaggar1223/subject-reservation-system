@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { apiResponse, academicYearStartOf, schoolDateString } from '@repo/validations';
+import { apiResponse, academicYearStartOf } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, lockWaiters, type Client,
+  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, lockWaiters, schoolToday, type Client,
 } from './helpers';
 
 /** Hold the year's enrolment lock (upsertEnrolments' advisory lock) from outside, so two commits queue behind it together. */
@@ -100,7 +100,7 @@ describe('F0b: course enrolment', () => {
       expect(self).toMatchObject({ mode: 'self_study', teacherId: null });
       await apiResponse(coordinator.api.v1.enrolments[':id'].$put({ param: { id: bio.id }, json: { mode: 'in_school', teacherId: tB } }));
       const ended = await apiResponse(coordinator.api.v1.enrolments[':id'].end.$post({ param: { id: bio.id }, json: { reason: 'dropped Biology in October' } }));
-      expect(ended).toMatchObject({ endReason: 'dropped Biology in October', endedOn: schoolDateString(new Date()) });
+      expect(ended).toMatchObject({ endReason: 'dropped Biology in October', endedOn: schoolToday() });
       await audited([bio.id], ['ENROLMENT_CREATED', 'ENROLMENT_UPDATED', 'ENROLMENT_UPDATED', 'ENROLMENT_ENDED']);
       expect(await refused(coordinator.api.v1.enrolments[':id'].end.$post({ param: { id: bio.id }, json: { reason: 'again' } }))).toEqual({ status: 409, error: 'This enrolment already ended' });
       const all = await apiResponse(coordinator.api.v1.enrolments.$get({ query: { academicYearId: thisYear, studentId: s.s1!.studentId, includeEnded: 'true' } }));
@@ -111,7 +111,7 @@ describe('F0b: course enrolment', () => {
     it('a student who leaves the school stops being taught: their enrolments end with the leaving, and new ones are refused', async () => {
       await apiResponse(enrol({ studentId: s.s5!.studentId, subjectId: subj.ENG!, teacherId: tA }));
       await apiResponse(coordinator.api.v1.students[':id'].leave.$post({
-        param: { id: s.s5!.studentId }, json: { kind: 'withdrawn', leftOn: schoolDateString(new Date()), reason: 'family moved abroad' },
+        param: { id: s.s5!.studentId }, json: { kind: 'withdrawn', leftOn: schoolToday(), reason: 'family moved abroad' },
       }));
       expect(await openEnrolments(s.s5!.studentId)).toEqual([]);
       expect((await one<{ reason: string }>(`select end_reason as reason from course_enrolment where student_id = $1`, [s.s5!.studentId])).reason).toBe('Left the school (withdrawn)');
@@ -283,6 +283,31 @@ describe('F0b: course enrolment', () => {
       expect(a.summary.created + b.summary.created).toBe(1);
       expect(a.summary.existing + b.summary.existing).toBe(3);
       expect((await one<{ n: string }>(`select count(*) as n from course_enrolment where student_id = $1 and subject_id = $2 and ended_on is null`, [s.s2!.studentId, subj.PHY!])).n).toBe('1');
+    });
+
+    it('rows committed while the student leaves: the leaving ends them too, never an open enrolment for a student who left', async () => {
+      const leaver = await onboard(officer, 'enr-s6', 11);
+      // The commit reads its students, then queues behind the year's lock;
+      // the leaving fires while it waits. The commit holds the student FOR
+      // SHARE, so the leaving waits for it and then ends what it made.
+      const release = await holdEnrolmentLock(thisYear);
+      let commit: Promise<{ status: number }> | undefined;
+      let leaving: Promise<{ status: number }> | undefined;
+      try {
+        commit = coordinator.api.v1.enrolments.batch.$post({ json: { academicYearId: thisYear, rows: [{ student: leaver.studentId, subject: 'EN-ENG', mode: 'in_school' }], commit: true } });
+        await lockWaiters(1);
+        leaving = coordinator.api.v1.students[':id'].leave.$post({
+          param: { id: leaver.studentId }, json: { kind: 'transferred', leftOn: schoolToday(), reason: 'moved to another school' },
+        });
+        await Promise.race([leaving, lockWaiters(2)]);
+      } finally {
+        await release();
+      }
+      const [c, l] = await Promise.all([commit!, leaving!]);
+      expect(c.status).toBe(200);
+      expect(l.status).toBe(200);
+      expect(await openEnrolments(leaver.studentId)).toEqual([]);
+      expect((await one<{ reason: string }>(`select end_reason as reason from course_enrolment where student_id = $1`, [leaver.studentId])).reason).toBe('Left the school (transferred)');
     });
 
     it('a single enrolment and a section enrolment of the same student at once: one open enrolment', async () => {

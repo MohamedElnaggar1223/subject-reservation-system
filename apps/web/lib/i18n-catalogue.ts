@@ -443,6 +443,36 @@ export const catalogueArabic: Record<string, string> = {
   'exam registration has no enrolment': 'تسجيل امتحان بلا التحاق',
   'exam registrations have no enrolment': 'تسجيلات امتحانات بلا التحاق',
 
+  // ── Review of 682907a: one checkout per series, what the migration inferred, the tier ──
+  'Pay by exam series': 'الدفع حسب دورة الامتحان',
+  'These subjects are entered in exam board series with different entry deadlines, so each series is paid for on its own. Pay for one now; the others stay waiting for payment until their own deadline.':
+    'هذه المواد مقيدة في دورات لها مواعيد قيد مختلفة، لذا تُدفع كل دورة وحدها. ادفع لإحداها الآن؛ تبقى الأخرى بانتظار الدفع حتى آخر موعد لها.',
+  'No board series': 'لا توجد دورة',
+  'Pay for this series': 'ادفع لهذه الدورة',
+  'paid for on its own': 'تُدفع وحدها',
+  'No entry deadline yet · paid for on its own': 'لا يوجد آخر موعد للقيد بعد · تُدفع وحدها',
+  "The school's January and October rows were entered with Cambridge International, which sits no January or October series. Each subject below is now entered with the board that sits it, or is not offered in those windows. If a subject is really entered with another board, change it on the Catalogue; then mark what you checked.":
+    'كانت صفوف المدرسة لشهري يناير وأكتوبر مقيدة لدى Cambridge International، وهو لا يعقد دورات في يناير أو أكتوبر. صارت كل مادة أدناه تُقيَّد لدى المجلس الذي يعقدها، أو لا تُطرح في تلك النوافذ. إن كانت المادة تُقيَّد فعلًا لدى مجلس آخر فغيّره من الدليل؛ ثم علِّم ما راجعته.',
+  'What the migration did': 'ما فعله الترحيل',
+  'Windows': 'النوافذ',
+  'Entered with another board': 'تُقيَّد لدى مجلس آخر',
+  'Entered with another board (offered only)': 'تُقيَّد لدى مجلس آخر (مطروحة فقط)',
+  'Not offered in these windows': 'غير مطروحة في هذه النوافذ',
+  'One or more of these are not waiting to be checked': 'واحد أو أكثر من هذه ليس بانتظار المراجعة',
+  'Choose all': 'اختر الكل',
+  'Window': 'النافذة',
+  'Mark the chosen as checked': 'علِّم المختار كمراجَع',
+  "Change a subject's board on the Catalogue": 'غيّر مجلس مادة من الدليل',
+  'Core': 'Core (الأساسي)',
+  'Extended': 'Extended (الموسّع)',
+  'Foundation': 'Foundation (التأسيسي)',
+  'Higher': 'Higher (المتقدم)',
+  'Tier (where the syllabus fixes it)': 'المستوى الفرعي (حيث يحدده المنهج)',
+  'Tier (only if the syllabus fixes it)': 'المستوى الفرعي (فقط إن حدده المنهج)',
+  'Chosen per entry': 'يُختار لكل قيد',
+  'Only IGCSE awards and components have a tier (Core or Extended, Foundation or Higher)':
+    'المستوى الفرعي (Core أو Extended، Foundation أو Higher) لمؤهلات IGCSE ومكوناتها فقط',
+
   // ── The API's sentences without names ──
   'Only an admin sets the exam board\'s entry deadline: past it the school closes every unconfirmed payment on the series (MO-10)':
     'يحدد المدير فقط آخر موعد للقيد لدى المجلس: بعده تُغلق المدرسة كل دفعة غير مؤكدة في الدورة (MO-10)',
@@ -483,6 +513,7 @@ export const catalogueArabic: Record<string, string> = {
  */
 export function translateCatalogueText(text: string): string | null {
   const rules: [RegExp, (m: RegExpExecArray) => string][] = [
+    [/^Check these: (\d+) things the migration inferred$/, (m) => `راجع هذه: ${m[1]} أمور استنتجها الترحيل`],
     // Counted phrases on the screens
     [/^Enrol (\d+)$/, (m) => `ألحِق ${m[1]}`],
     [/^(\d+) enrolments created$/, (m) => `أُنشئ ${m[1]} التحاق`],
@@ -502,6 +533,23 @@ export function translateCatalogueText(text: string): string | null {
     [/^(.+) \((\d{4}\/\d{2})\) \(this year\)$/, (m) => `${m[1]} (${m[2]}) (هذا العام)`],
     [/^(\d{4}\/\d{2}) \(this year\)$/, (m) => `${m[1]} (هذا العام)`],
     [/^(.+) stops being taught (.+)\. The enrolment stays on record with your reason\.$/, (m) => `يتوقف ${m[1]} عن دراسة ${m[2]}. يبقى الالتحاق في السجل مع سببك.`],
+    // The desk's answer after taking money (one payment per exam series with its own deadline)
+    [/^(Registered and collected|Collected) (EGP [\d,.]+)\. Receipts ready to hand over(?:: ([^.]+))?\.(?: In (\d+) payments, one per exam series: (.+?)\.)?(?: Not collected — hand this money back: (.+)\.)?$/,
+      (m) => [
+        `${m[1] === 'Collected' ? 'تم تحصيل' : 'تم التسجيل وتحصيل'} ${m[2]}. الإيصالات جاهزة للتسليم${m[3] ? `: ${m[3]}` : ''}.`,
+        m[4] ? ` في ${m[4]} دفعات، واحدة لكل دورة امتحان: ${m[5]}.` : '',
+        m[6] ? ` لم يُحصَّل - أعِد هذا المبلغ: ${m[6]}.` : '',
+      ].join('')],
+    // Review of 682907a: checkouts per series, board changes, what the migration inferred
+    [/^These subjects are entered in exam board series with different entry deadlines, so each series is paid for on its own: (.+)$/,
+      (m) => `هذه المواد مقيدة في دورات لها مواعيد قيد مختلفة، لذا تُدفع كل دورة وحدها: ${m[1]!.replace(/no entry deadline yet/g, 'لا يوجد آخر موعد بعد').replace(/entry deadline/g, 'آخر موعد للقيد')}`],
+    [/^(.+) is past its entry deadline \((.+)\): (.+) cannot be moved into it in (.+)$/, (m) => `انقضى آخر موعد للقيد في ${m[1]} (${m[2]}): لا يمكن نقل ${m[3]} إليها في ${m[4]}`],
+    [/^In (.+), (.+) is entered in (.+) \(entry deadline (.+)\) and would move to (.+) \(entry deadline (.+)\): a board change keeps the entry deadline — give the two series the same deadline first$/,
+      (m) => `في ${m[1]}، ${m[2]} مقيدة في ${m[3]} (آخر موعد للقيد ${m[4]}) وستنتقل إلى ${m[5]} (آخر موعد للقيد ${m[6]}): تغيير المجلس يُبقي آخر موعد القيد — اجعل للدورتين الموعد نفسه أولًا`],
+    [/^(.+) enters (.+) in (.+) and feeds no (.+) series — add one to the window first$/,
+      (m) => `${m[1]} تُقيِّد ${m[2]} في ${m[3]} ولا تغذي أي دورة لـ ${m[4]} - أضف واحدة إلى النافذة أولًا`],
+    [/^(\d+) checkouts? still open pays? for this series together with another whose entry deadline would then differ — confirm or cancel (?:it|them) first, or give the other series the same deadline$/,
+      (m) => `${m[1]} عملية دفع مفتوحة تدفع لهذه الدورة مع دورة أخرى سيختلف آخر موعد قيدها حينئذ - أكِّدها أو ألغِها أولًا، أو اجعل للدورة الأخرى الموعد نفسه`],
     // The API's refusals
     [/^(.+) has (\d+) registrations? for (.+) and feeds no (.+) series — add one to the window first$/,
       (m) => `في ${m[1]} ${m[2]} تسجيل لمادة ${m[3]} ولا تغذي أي دورة لـ ${m[4]} - أضف واحدة إلى النافذة أولًا`],

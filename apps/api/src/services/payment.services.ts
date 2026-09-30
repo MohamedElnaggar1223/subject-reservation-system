@@ -46,6 +46,7 @@ import type {
   ListPaymentsQueryType,
   SubmitInstapayReferenceType,
 } from '@repo/validations';
+import { COUNCIL_LABELS } from '@repo/validations';
 // V3 (§6.11): legacy provider integrations are disabled — only in-school and
 // InstaPay (manual verification) are active. Kept for when a PSP ships a real
 // InstaPay API (Paymob lists it "Coming Soon").
@@ -62,7 +63,7 @@ import {
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
 import { sessionOpenFor, sessionWindow, entryDeadlineMessage, schoolDateTime } from './window.services';
-import { seriesPastDeadline, seriesDisplayName, windowsOfSeries } from './series.services';
+import { seriesPastDeadline, seriesDisplayName, windowsOfSeries, seriesDeadlineGroups, mixedDeadlinesSentence } from './series.services';
 import {
   notifyPaymentConfirmed,
   notifyPaymentReversed,
@@ -171,6 +172,14 @@ export async function initiatePayment(
   const linked = await validateParentStudentLink(parentId, studentId);
   if (!linked) throw new Error('You are not linked to this student');
 
+  // F0b: one checkout per entry deadline. The deadline sweep closes a checkout
+  // at its series' deadline, so one spanning two deadlines would lose the later
+  // series' subjects at the earlier one: the family pays for each series on its
+  // own (the checkout screen offers one action per series). Asked again with
+  // the registrations and their series held, in the transaction below.
+  const deadlineGroups = await seriesDeadlineGroups(db, data.registrationIds);
+  if (deadlineGroups.length > 1) throw new Error(mixedDeadlinesSentence(deadlineGroups));
+
   // All must be in pending_payment, OR (V3 §6.8) all preregistered —
   // a prereg payment funds the held wallet for a future session.
   const isPrereg = regs.every((r) => r.status === 'preregistered');
@@ -204,7 +213,7 @@ export async function initiatePayment(
       // A preregistration past its series' board deadline can never be
       // entered (MO-10; per board series since F0b).
       for (const r of mine) {
-        const w = await sessionWindow(studentId, s.id, db, new Date(), r.boardSeriesId);
+        const w = await sessionWindow(studentId, s.id, r.boardSeriesId);
         if (w.entryDeadlinePassed) throw new Error(entryDeadlineMessage(w.entryDeadline!));
       }
       if (s.status !== 'draft') wrongState.push(s);
@@ -212,7 +221,7 @@ export async function initiatePayment(
     }
     // Each subject's own series decides (F0b): open for the student, and not past its deadline.
     let ok = true;
-    for (const r of mine) if (!(await sessionOpenFor(studentId, s.id, db, r.boardSeriesId))) ok = false;
+    for (const r of mine) if (!(await sessionOpenFor(studentId, s.id, r.boardSeriesId))) ok = false;
     if (!ok) wrongState.push(s);
   }
   if (wrongState.length > 0) {
@@ -349,6 +358,10 @@ export async function initiatePayment(
     if (existingPaymentLinksInTx.some((pl) => pl.payment.status === 'completed')) {
       throw new Error('One or more of these subjects is already paid for.');
     }
+    // One entry deadline, asked again with the series held (a move or a
+    // deadline change at the same moment waits for this checkout).
+    const groupsInTx = await seriesDeadlineGroups(tx, data.registrationIds, true);
+    if (groupsInTx.length > 1) throw new Error(mixedDeadlinesSentence(groupsInTx));
 
     // 1. Create payment record FIRST so the escrow_transaction FK can resolve.
     const [paymentRecord] = await tx
@@ -513,13 +526,13 @@ export async function confirmPayment(
         if (r.status === 'preregistered' || r.status === 'pending_payment') {
           // A preregistration is for a later series; past that series' board
           // deadline it cannot be entered either (MO-10).
-          const w = await sessionWindow(pay.studentId, r.sessionId, tx, new Date(), r.boardSeriesId);
+          const w = await sessionWindow(pay.studentId, r.sessionId, r.boardSeriesId, tx);
           if (w.entryDeadlinePassed) throw new Error(entryDeadlineMessage(w.entryDeadline!));
           continue;
         }
       } else if (r.status === 'pending_payment') {
         // F0b: its own board series' deadline decides (MO-10, per series).
-        const w = await sessionWindow(pay.studentId, r.sessionId, tx, new Date(), r.boardSeriesId);
+        const w = await sessionWindow(pay.studentId, r.sessionId, r.boardSeriesId, tx);
         if (w.open || (current.status === 'pending_verification' && !w.entryDeadlinePassed)) continue;
         if (w.entryDeadlinePassed) throw new Error(entryDeadlineMessage(w.entryDeadline!));
       }
@@ -750,7 +763,7 @@ async function failOpenPayment(
         // Still payable only while the window is open for the student, its
         // board series is not past its deadline (F0b), and they may still sit
         // the series (F0a; SO-7).
-        if (await sessionOpenFor(pay.studentId, r.sessionId, tx, r.boardSeriesId) && (await mayRegisterFor(pay.studentId, r.sessionId, tx)).allowed) continue;
+        if (await sessionOpenFor(pay.studentId, r.sessionId, r.boardSeriesId, tx) && (await mayRegisterFor(pay.studentId, r.sessionId, tx)).allowed) continue;
         expired.push(...await tx
           .update(registration)
           .set({ status: 'expired', updatedAt: new Date() })
@@ -1888,10 +1901,7 @@ export async function generatePaymentReceipt(paymentId: string): Promise<Buffer>
   lines.push(thin);
 
   for (const subj of subjects) {
-    const councilLabel =
-      subj.council === 'pearson_edexcel' ? 'Pearson Edexcel' :
-      subj.council === 'cambridge' ? 'Cambridge' :
-      subj.council === 'oxford' ? 'Oxford' : subj.council;
+    const councilLabel = COUNCIL_LABELS[subj.council as keyof typeof COUNCIL_LABELS] ?? subj.council;
     lines.push(`  ${subj.name} (${subj.code})`);
     lines.push(`    Council: ${councilLabel}`);
     lines.push(`    Price:   EGP ${subj.price.toFixed(2)}`);
@@ -2085,11 +2095,21 @@ export async function getCheckoutSummary(
   const openPayment =
     links.map((l) => l.payment).find((p) => (OPEN_PAYMENT_STATUSES as readonly string[]).includes(p.status)) ?? null;
 
+  // F0b: the subjects grouped by their series' entry deadline — one checkout per group.
+  const deadlineGroups = (await seriesDeadlineGroups(db, registrationIds)).map((g) => ({
+    entryDeadline: g.entryDeadline,
+    series: g.series,
+    registrationIds: g.registrationIds,
+    subjects: g.subjects,
+    total: Math.round(regs.filter((r) => g.registrationIds.includes(r.id)).reduce((sum, r) => sum + r.priceAtRegistration, 0) * 100) / 100,
+  }));
+
   return {
     registrations: regs,
     totalCost,
     escrowBalance,
     student: regs[0]!.student,
     openPayment,
+    deadlineGroups,
   };
 }

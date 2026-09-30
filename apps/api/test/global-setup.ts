@@ -28,6 +28,14 @@ export default async function globalSetup() {
   }
   await db.execute(sql.raw(`DROP DATABASE IF EXISTS ${TEST_DB_NAME}`));
   await db.execute(sql.raw(`CREATE DATABASE ${TEST_DB_NAME}`));
+
+  // Print how far the database's clock is from this machine's, so a failure
+  // that depends on the two (STATE_AUDIT.md ST-15) can be matched to the run.
+  const before = Date.now();
+  const clock = await db.execute(sql.raw('select extract(epoch from clock_timestamp()) * 1000 as db_ms'));
+  const after = Date.now();
+  const gap = Number((clock.rows[0] as { db_ms: string }).db_ms) - (before + after) / 2;
+  console.log(`[clock] database minus host: ${gap.toFixed(1)} ms (measured within ${after - before} ms)`);
   await (db as unknown as { $client: { end(): Promise<void> } }).$client.end();
 
   execFileSync('pnpm', ['db:migrate'], {

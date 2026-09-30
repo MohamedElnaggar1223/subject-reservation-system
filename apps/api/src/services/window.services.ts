@@ -16,7 +16,7 @@
 
 import { db, registrationSession, eq } from '@repo/db';
 import { hasDeadlineExtension } from './exception.services';
-import { seriesDeadline, windowDeadlines } from './series.services';
+import { seriesDeadline } from './series.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -29,28 +29,38 @@ export type SessionWindow = {
 };
 
 /**
- * F0b: the entry deadline is a board series' (MO-10 per series). Asked for a
- * registration, pass its `boardSeriesId`: its series' deadline decides. Asked
- * for the window as a whole (before a subject is chosen), the window is past
- * its deadline only once every series it feeds is — until then each subject
- * is checked against its own series when it is registered
- * (series.services.ts assertRoutesOpen). A window that feeds no series has
- * no deadline, as a window with none set had before.
+ * F0b: the entry deadline is a board series' (MO-10: a hard stop per board
+ * series, never per window). `boardSeriesId` is required, so no caller can
+ * leave it out by accident:
+ * - a registration's series: that series' deadline decides;
+ * - `null`, the window as a whole (a new registration, before its subjects are
+ *   routed): no deadline applies here. Every such caller then routes each
+ *   subject and checks that subject's own series before and inside its
+ *   transaction (series.services.ts routeAndCheck / assertRoutesOpen), so a
+ *   January subject is still taken after October's deadline in a window that
+ *   feeds both, and an October one is refused.
+ *
+ * Callers with `null`: the request, direct and override registrations and the
+ * desk's registration. Callers with the registration's series: approving a
+ * request, payment (checkout, preregistration payment), confirmation, a
+ * payment that fails or is cancelled (whether its subjects stay payable), desk
+ * collection. Not callers: swaps route the new subject with routeAndCheck,
+ * which checks its series' deadline; the close's grace reads the deadlines of
+ * the checkout's own series (session.services.ts, referenceDueFor), and the
+ * transfer reference is judged by the time the close set (referenceDueAt).
  */
 export async function sessionWindow(
   studentId: string,
   sessionId: string,
+  boardSeriesId: string | null,
   executor: typeof db | Tx = db,
   now: Date = new Date(),
-  boardSeriesId?: string | null,
 ): Promise<SessionWindow> {
   const [sess] = await executor
     .select({ status: registrationSession.status })
     .from(registrationSession)
     .where(eq(registrationSession.id, sessionId));
-  const entryDeadline = boardSeriesId
-    ? await seriesDeadline(boardSeriesId, executor)
-    : (await windowDeadlines(sessionId, executor)).latest;
+  const entryDeadline = boardSeriesId ? await seriesDeadline(boardSeriesId, executor) : null;
   const entryDeadlinePassed = !!entryDeadline && entryDeadline <= now;
   if (!sess || entryDeadlinePassed) {
     return { open: false, entryDeadlinePassed, entryDeadline, status: sess?.status ?? null };
@@ -60,9 +70,9 @@ export async function sessionWindow(
 }
 
 export async function sessionOpenFor(
-  studentId: string, sessionId: string, executor: typeof db | Tx = db, boardSeriesId?: string | null,
+  studentId: string, sessionId: string, boardSeriesId: string | null, executor: typeof db | Tx = db,
 ): Promise<boolean> {
-  return (await sessionWindow(studentId, sessionId, executor, new Date(), boardSeriesId)).open;
+  return (await sessionWindow(studentId, sessionId, boardSeriesId, executor)).open;
 }
 
 /** A date as the school reads it, in Cairo time. */

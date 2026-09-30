@@ -47,6 +47,22 @@ function isEarlierMonth(a: Date, b: Date): boolean {
   return a.getFullYear() * 12 + a.getMonth() < b.getFullYear() * 12 + b.getMonth();
 }
 
+/**
+ * F0b: money is taken per exam series with its own entry deadline — one
+ * payment each, so the officer sees each, and any the close took before it
+ * could be confirmed (that money goes back to the family).
+ */
+function paymentsLine(res: { payments: { series: string[]; collected: number }[]; notCollected: { series: string[]; amount: number; reason: string }[] }) {
+  const parts: string[] = [];
+  if (res.payments.length > 1) {
+    parts.push(` In ${res.payments.length} payments, one per exam series: ${res.payments.map((p) => `${p.series.join(' and ')} ${formatPrice(p.collected)}`).join('; ')}.`);
+  }
+  if (res.notCollected.length) {
+    parts.push(` Not collected — hand this money back: ${res.notCollected.map((n) => `${n.series.join(' and ')} ${formatPrice(n.amount)} (${n.reason})`).join('; ')}.`);
+  }
+  return parts.join('');
+}
+
 export default function DeskClient({ userRole }: { userRole: string }): React.JSX.Element {
   const isFinanceAdmin = userRole === 'finance_admin' || userRole === 'admin';
   const qc = useQueryClient();
@@ -101,7 +117,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
       apiResponse(api.v1.registrations.desk.collect.$post({ json: { studentId: studentId!, ...v, escrowAmountToApply: 0 } })),
     onSuccess: (d) =>
       done(
-        `Collected ${formatPrice(d.collected)}. Receipts ready to hand over${d.receipts.length ? `: ${d.receipts.map((r) => r.receiptNumber).join(', ')}` : ''}.`
+        `Collected ${formatPrice(d.collected)}. Receipts ready to hand over${d.receipts.length ? `: ${d.receipts.map((r) => r.receiptNumber).join(', ')}` : ''}.${paymentsLine(d)}`
       ),
     onError: fail,
   });
@@ -770,10 +786,9 @@ function DeskRegisterCard({
         })
       ),
     onSuccess: (d) => {
-      const res = d as unknown as { collected: number; receipts?: { receiptNumber: string }[] };
       onDone(
         collect
-          ? `Registered and collected ${formatPrice(res.collected)}. Receipts ready to hand over${res.receipts?.length ? `: ${res.receipts.map((r) => r.receiptNumber).join(', ')}` : ''}.`
+          ? `Registered and collected ${formatPrice(d.collected)}. Receipts ready to hand over${d.receipts.length ? `: ${d.receipts.map((r) => r.receiptNumber).join(', ')}` : ''}.${paymentsLine(d)}`
           : 'Registered — the family can pay later (app or desk).'
       );
     },

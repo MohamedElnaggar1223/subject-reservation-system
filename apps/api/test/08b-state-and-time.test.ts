@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, money, audited, openWindow, futureWindow, academicYearOf, loneStudent, localToday,
-  runSessionRecovery, holdRowLock, lockWaiters, notified, expireByHand, type Client,
+  admin, staff, onboard, subject, session, refused, one, sql, money, audited, openWindow, futureWindow, academicYearOf, loneStudent, schoolToday,
+  runSessionRecovery, runSessionScheduler, holdRowLock, lockWaiters, notified, expireByHand, type Client,
 } from './helpers';
 
 /**
@@ -246,7 +246,7 @@ describe('state and time', () => {
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 300 } }))).id!;
       expect(await escrowOf(f.studentId)).toBe(1200);
 
-      await apiResponse(adm.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: localToday(), reason: 'left the school early' } }));
+      await apiResponse(adm.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: schoolToday(), reason: 'left the school early' } }));
 
       expect(await statusOf('registration', reg)).toBe('expired');
       expect(await statusOf('payment', pay)).toBe('failed');
@@ -265,7 +265,7 @@ describe('state and time', () => {
       const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [subj.S13!], studentId: f.studentId } })))[0]!.id;
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
       await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: pay }, json: { reference: 'FT-ST-GR-2' } }));
-      await apiResponse(adm.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'transferred', leftOn: localToday(), reason: 'left after the November entries' } }));
+      await apiResponse(adm.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'transferred', leftOn: schoolToday(), reason: 'left after the November entries' } }));
       expect(await statusOf('registration', reg)).toBe('pending_payment');
       expect(await statusOf('payment', pay)).toBe('pending_verification');
       // SO-7, closed by F0a: finance rejects that transfer; the subject the
@@ -439,6 +439,74 @@ describe('state and time', () => {
       expect(await escrowOf(f.studentId)).toBe(1500);
       await audited([pay], ['PAYMENT_FAILED']);
       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'state and time: stranded done' } }));
+    });
+  });
+
+  describe('a close judges "before the close" by one clock (ST-15)', () => {
+    it("a checkout made just before the close is kept for its reference even when the API's clock runs behind the database's", async () => {
+      const s = await session(adm, 'January (AS, state and time, clock)', 'january', 'as_level', { ...openWindow(), activate: true });
+      const f = await family('clock');
+      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, subjectIds: [subj.S8!], studentId: f.studentId } })))[0]!.id;
+      const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
+      // The payment's time comes from Postgres; put the API's clock five seconds
+      // behind it, as a drifting host or container clock can, for the close.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() - 5_000);
+      try {
+        await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'state and time: clock' } }));
+      } finally {
+        vi.useRealTimers();
+      }
+      expect(await statusOf('payment', pay)).toBe('pending');
+      expect(await statusOf('registration', reg)).toBe('pending_payment');
+      expect((await one<{ due: string | null }>(`select reference_due_at as due from payment where id = $1`, [pay])).due).not.toBeNull();
+      // Leave nothing open for the invariants.
+      await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
+    });
+
+    it("the scheduler's close stamps the same clock: a checkout made just before it is kept for its reference", async () => {
+      const s = await session(adm, 'January (AS, state and time, clock scheduler)', 'january', 'as_level', { ...openWindow(), activate: true });
+      const f = await family('clock-sched');
+      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, subjectIds: [subj.S9!], studentId: f.studentId } })))[0]!.id;
+      const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
+      // The window's end passes (by the database's clock); the scheduler closes
+      // it on its next tick while the API's clock runs five seconds behind.
+      await sql(`update registration_session set end_date = now() - interval '1 minute' where id = $1`, [s]);
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() - 5_000);
+      try {
+        await runSessionScheduler();
+      } finally {
+        vi.useRealTimers();
+      }
+      expect((await one<{ status: string }>(`select status from registration_session where id = $1`, [s])).status).toBe('closed');
+      await runSessionRecovery();
+      expect(await statusOf('payment', pay)).toBe('pending');
+      expect((await one<{ due: string | null }>(`select reference_due_at as due from payment where id = $1`, [pay])).due).not.toBeNull();
+      await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
+    });
+
+    it("a subject swapped in just before the close expires with the window, even when the API's clock runs ahead of the database's", async () => {
+      const s = await session(adm, 'January (AS, state and time, clock swap)', 'january', 'as_level', { ...openWindow(), activate: true });
+      const f = await family('clock-swap');
+      const paid = (await apiResponse(officer.api.v1.registrations.desk.$post({
+        json: { studentId: f.studentId, sessionId: s, subjectIds: [subj.S10!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      }))).registrations[0]!.id;
+      // The swap runs while the API's clock is five seconds ahead: the new,
+      // unpaid registration must still count as made before the close.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.now() + 5_000);
+      let swappedIn: string;
+      try {
+        swappedIn = (await apiResponse(f.parent.api.v1.registrations[':id'].swap.$post({
+          param: { id: paid }, json: { newSubjectId: subj.S11!, reason: 'clock check swap' },
+        }))).newRegistrationId;
+      } finally {
+        vi.useRealTimers();
+      }
+      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'state and time: clock swap' } }));
+      expect(await statusOf('registration', swappedIn)).toBe('expired');
+      await audited([swappedIn], ['REGISTRATION_EXPIRED']);
     });
   });
 });

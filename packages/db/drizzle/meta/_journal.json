@@ -285,8 +285,15 @@
     {
       "idx": 40,
       "version": "7",
-      "when": 1790728487205,
-      "tag": "0040_scheduling",
+      "when": 1790727862029,
+      "tag": "0040_catalogue_tier",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1790735967232,
+      "tag": "0041_scheduling",
       "breakpoints": true
     }
   ]
