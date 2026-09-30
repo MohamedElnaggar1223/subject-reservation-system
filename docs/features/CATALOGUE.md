@@ -1,7 +1,8 @@
 # F0b — Exam catalogue, board series and course enrolment (as built)
 
-Branch `feature/catalogue`, started from `origin/feature/foundation` 1e8f871 (F0a) and merged
-with `origin/main` at b747d47 once F0a landed. The plan is FEATURES_PLAN.md §1 "F0b", its §2
+Branch `feature/catalogue`, started from `origin/feature/foundation` 1e8f871 (F0a), merged with
+`origin/main` at b747d47 once F0a landed and again at be058a1 (ST-15, ST-16). The Opus 5.5
+review of 682907a raised eleven flags; each is fixed below and in the trail. The plan is FEATURES_PLAN.md §1 "F0b", its §2
 row and §5's rules; the design basis is DISCOVERY_RESEARCH.md §5 (notes 1–4, 7) and
 IMPORT_SPIKE.md IS-01, IS-05, IS-14. The trail is `.audit/catalogue.tsv`; evidence (suite
 logs, control logs, migration counts, screenshots) is `.audit/catalogue-evidence/`
@@ -24,8 +25,8 @@ triggers; custom), 0039 (the window's deadline column dropped, `subject.council`
 | Table | What it holds | Rules |
 |---|---|---|
 | `exam_board` | code (= `subject.council`: `pearson_edexcel`, `cambridge`, `oxford`), name, short name, entry portal, the months it sits (`series_months`), notes | seeded by 0038; the coordinator edits names and months (a month with series on record stays) |
-| `qualification` | an award: Pearson X/Y cash-in, a Cambridge syllabus, an International GCSE; board, code, title, level (`igcse`/`as_level`/`a_level`), suite, subject area, entry method (`qualification`, `units_cash_in`, `syllabus_option`), active | unique per (board, code, level) — Cambridge 9700 is one code at AS and A Level |
-| `exam_unit` | a unit or component (paper): board, code (WMA11, 9700/41), short code (P1), title, **its own level** (`igcse`, `as`, `a2`), kind (`unit`/`component`) | unique per (board, code) |
+| `qualification` | an award: Pearson X/Y cash-in, a Cambridge syllabus, an International GCSE; board, code, title, level (`igcse`/`as_level`/`a_level`), suite, subject area, entry method (`qualification`, `units_cash_in`, `syllabus_option`), **tier** where the syllabus fixes it for the whole award (0040), active | unique per (board, code, level) — Cambridge 9700 is one code at AS and A Level; a tier on IGCSE awards only |
+| `exam_unit` | a unit or component (paper): board, code (WMA11, 9700/41), short code (P1), title, **its own level** (`igcse`, `as`, `a2`), kind (`unit`/`component`), **tier** where the syllabus fixes it (Cambridge 0580 Paper 1 Core, Paper 2 Extended; Pearson Foundation or Higher) | unique per (board, code); a tier on IGCSE components only |
 | `qualification_unit` | the unit-to-award map: which units count toward which award, required or optional, a choice group ("Applied: one of M1, S1, D1") | same board; an A2 unit never counts toward an AS award; IGCSE components only on IGCSE awards |
 | `qualification_option` / `qualification_option_unit` | Cambridge option codes: which components an option enters, whether it carries marks forward | the components must be on the award |
 | `subject.qualification_id`, `subject_unit` | what a **registrable row** enters: a whole award, or a set of units (P1; M1; Biology "Paper 3 & Paper 4") | same board as the row; an AS row enters AS units only; an A Level row may mix AS and A2 |
@@ -49,7 +50,8 @@ API turns into a sentence, `seriesRuleSentence`):
   (`registration_board_series_routed`, `registration_board_series_board`).
 
 `registration_session.entry_deadline` and its check are gone (0039); the deadline lives on each
-series. `subject.council` references `exam_board.code`.
+series. `subject.council` references `exam_board.code`. 0040 adds the tier columns with their
+checks (`core`, `extended`, `foundation`, `higher`).
 
 ## 2. What existed, migrated (0038)
 
@@ -60,16 +62,42 @@ series. `subject.council` references `exam_board.code`.
 - **AS and A Level subjects are left unmapped**: they may be whole awards, single units or
   paper sets (IS-01), which the coordinator knows and the data does not. Registration works
   either way; the Catalogue screen lists them as "to map" and exam entries (F4) need the map.
-- For every window, a board series is made for each board it has registrations or active
-  subjects in, of the window's own month and year, with the window's entry deadline carried
-  over; each is the window's default for its board. Every registration is routed to its
-  window's series of its subject's board.
+- **A board never gets a series in a month it does not sit** (review flag 5). A subject
+  registered in a window whose month its board does not sit — the school's January and October
+  rows, all "cambridge" until now, and Cambridge sits no January or October series — is entered
+  with the first board, in catalogue order, that sits every month it is registered in (Pearson
+  Edexcel for AS and A Level January and October: IS-14, DISCOVERY_RESEARCH.md §1). Its old
+  award and units are cleared, one `SUBJECT_BOARD_INFERRED` audit row says so, and each of its
+  registrations gets a `REGISTRATION_SERIES_INFERRED` row: the **Board series** screen lists
+  them under "Check these" until staff mark them checked or move them (`GET
+  /v1/board-series/inferred`, `POST /v1/board-series/inferred/checked`).
+- For every window, a board series is made for each board of the subjects it registered or
+  offers, of the window's own month and year — for a board that does not sit that month, the
+  series of the board that does — carrying the window's entry deadline; each is the window's
+  default for its board. Every registration is routed to its window's series of its subject's
+  board.
+- **A window deadline no series carries fails the migration**, naming the window (it offers no
+  subject at its level and has no registrations): the deadline is never dropped silently.
 - Proven on a copy of the template dev data (3 windows, 8 registrations, one window with a
   deadline) and on a copy of F0a's richer dev data (20 students, 8 sections), before and after:
   `.audit/catalogue-evidence/migration-dev-before-2.txt`, `migration-dev-after-2.txt`,
-  `migration-richdev-before.txt`, `migration-richdev-after.txt`: 17/17 subjects linked, each
-  window feeding its Cambridge series, the June 2027 window's deadline on its series, 8/8
-  registrations routed.
+  `migration-dev-after-3.txt`, `migration-richdev-before.txt`, `migration-richdev-after.txt`:
+  17/17 subjects linked, each window feeding its Cambridge series, the June 2027 window's deadline
+  on its series, 8/8 registrations routed.
+- Proven on **the school's shapes** in a synthetic database (made up names and codes, never the
+  school's sheet): AS and A Level windows; January, October, June and November windows;
+  Cambridge, OxfordAQA and Pearson subjects; four different deadlines — migrated to F0a's 0036
+  first, then 0037–0039 (`migration-synth-before.txt`, `migration-synth-after.txt`). P1 and M1
+  (Cambridge, registered in October and January) and Physics (OxfordAQA, registered in October)
+  were entered with Pearson, each audited, their five registrations listed to check; Chemistry
+  (OxfordAQA, January) and Biology Paper 3 (Cambridge, November) kept their board; every window
+  fed, each deadline carried; no series a board does not sit; no registration of another board
+  than its subject. A second copy whose window had a deadline and nothing at its level failed
+  the migration naming the window, and nothing changed (`migration-synth-fail.txt`).
+- `08-money-rules.test.ts` keeps its subjects entered with Pearson Edexcel (the switch from the
+  helper's default Cambridge stays): 08 builds its windows through the API, which — like the
+  backfill now — never makes a series a board does not sit, and a subject is entered only in a
+  series of its own board, so a Cambridge subject has no series in 08's January window.
 
 ## 3. The level code (IS-01)
 
@@ -102,6 +130,10 @@ registration (`entryItemsFor`).
 - **MO-10 per series.** The entry deadline is a series'. Each registration is judged by its own
   series' deadline everywhere the window's deadline was: registering, preregistering, paying,
   confirming, a reference, collecting at the desk, swaps (`sessionWindow(…, boardSeriesId)`).
+  Asked for the window as a whole (a new registration, before its subjects are routed), the
+  window's **earliest** series deadline decides (review flag 9): past it nothing new is
+  registered in the window, deadline extension or not; each existing registration goes on
+  against its own series.
   The sweep closes each series at its own deadline: its open payments fail with escrow back,
   its waiting registrations expire, a draft window's preregistrations in it are refunded
   (MO-21), and each family is told which subjects of which series were not entered. A window
@@ -116,15 +148,39 @@ registration (`entryItemsFor`).
   window's own check was): the sweep never runs inside an open window. Enforced by the route,
   by the draft update under F0a's row lock, and by the database for the open window's
   extension (08k).
+- **Money is taken per entry deadline** (review flag 3, the lead's decision). The sweep closes a
+  payment at its series' deadline, so a checkout never spans two deadlines:
+  - a family's own checkout (the app, InstaPay or pay at school) whose subjects fall in series
+    with different deadlines is refused (422), the sentence naming each series, its deadline and
+    its subjects; asked again in the transaction with the series held; the checkout summary
+    returns the groups and the **checkout screen offers one action per series** ("Pay for this
+    series"); the **register screen groups subjects by series**, earliest deadline first;
+  - the **desk splits automatically**: one registration-with-money or one collection creates one
+    payment per deadline in one transaction (escrow applied to the earliest deadline first), each
+    confirmed on its own with its receipts; the desk's `DESK_REGISTRATION` row names the first
+    payment and every other has its own `PAYMENT_INITIATED` (one creation row per payment, 09);
+    the answer lists each payment and any the close took first ("not collected — hand this money
+    back"); the officer's message says each;
+  - series with the **same deadline share** a checkout;
+  - a deadline change that would split a checkout still open is refused (409) until it is
+    settled.
 - **Locks.** Window before series. A registration's routing reads the window's series links
   `FOR SHARE`; a change to a window's series locks the window `FOR UPDATE`; either alone
   serializes the two (controls C5, C5b green; both removed, C5c red). A deadline change reads
-  the windows feeding the series `FOR SHARE`, then the series `FOR UPDATE`.
+  the windows feeding the series `FOR SHARE`, then the series `FOR UPDATE`. A registration
+  reads its **subject's board `FOR SHARE`** before routing (review flag 4), so a board change
+  (subject `FOR UPDATE`) and a registration run one after the other; a change to a window's
+  series reads its routed subjects `FOR SHARE` before its links. A checkout and the desk read the
+  series of their registrations `FOR SHARE`.
 - **The coordinator's answer (decision 3).** A subject's board is staff data (Catalogue mapping
-  or the Subjects form). Changing it moves its waiting and confirmed registrations to each
-  window's default series of the new board, audited per registration; if a window feeds no
-  series of the new board, or an entry's deadline has passed, nothing changes and the sentence
-  says which window and what to add.
+  or the Subjects form). Changing it moves its live registrations to each window's default
+  series of the new board, audited per registration, and **re-points each window's route** for
+  the subject to that default (a route to the default is removed; `SUBJECT_ROUTE_MOVED`), so
+  families are offered it and can register it (review flag 2). Refused, with nothing changed,
+  when a window feeds no series of the new board, when an entry's series is past its deadline,
+  or when the registrations or the route would land in a series **past its deadline or with
+  another deadline** than the one they are in (review flag 1: a board change never moves an
+  entry across deadlines; the sentence says which window, both series and both dates).
 - The admin moves registrations between the series of one board in a window, with a reason
   (`REGISTRATION_SERIES_MOVED`); a registration that is history stays where it was.
 
@@ -139,9 +195,10 @@ registration (`entryItemsFor`).
   registrations (the teacher each names, `registration.teacherId`; taken outside school =
   self-study); a whole section with one teacher per subject; rows pasted from a sheet (student
   ID or email, subject code or name, teacher, mode — each row resolves or is listed with its
-  reason). All go through `upsertEnrolments`, which takes the year's advisory lock and lets the
-  database's partial unique index decide: two commits of the same rows make each enrolment once
-  (08j, forced order; control C7).
+  reason). All go through `upsertEnrolments`, which reads its students `FOR SHARE` (as a single
+  enrolment does, so a leaving and a commit run one after the other: review flag 8), takes the
+  year's advisory lock and lets the database's partial unique index decide: two commits of the
+  same rows make each enrolment once (08j, forced order; controls C7, C15).
 - **Checked, never blocked** (`checkEnrolments`): registered not enrolled; enrolled not
   registered (expected before June's window opens); mode differs; teacher differs. Per year and
   per student; the family reads its own child's (another family's child is "not found").
@@ -159,7 +216,8 @@ records.
 |---|---|
 | `GET /v1/catalogue` | staff except gate; teacher |
 | `GET /v1/catalogue/entries?sessionId`, and every catalogue write (`/boards/:code`, `/qualifications…`, `/options/:id`, `/units…`, `/registrable/:subjectId`, `/starter`) | admin, coordinator |
-| `GET /v1/board-series` | admin, coordinator, finance |
+| `GET /v1/board-series`, `GET /v1/board-series/inferred` | admin, coordinator, finance |
+| `POST /v1/board-series/inferred/checked` | admin, coordinator |
 | `POST/PUT/DELETE /v1/board-series…` | admin, coordinator (the deadline: admin only, in the handler) |
 | `GET /v1/sessions/:id/board-series` | admin, coordinator |
 | `PUT /v1/sessions/:id/board-series`, `POST …/move` | admin |
@@ -173,8 +231,8 @@ records.
 | For | Contract | Where |
 |---|---|---|
 | **F1** (timetable) | `getTeachingDemand(academicYearId)`: per subject and teacher, the students taught in school (with their section); self-study forms no group; enrolments with no teacher yet form one group per subject with `teacherId` null. `GET /v1/enrolments/teaching-demand` | enrolment.services |
-| **F4** (exam entries) | `entryItemsFor(registrationIds, reading?)` / `entryItemsForWindow(sessionId)` (`GET /v1/catalogue/entries`): per registration the board, the board series with its deadline, the award, the units with their own level, the awards they count toward, the student's grade in the series' year and the derived level code. `registration.boardSeriesId`; `listBoardSeries`, `seriesDeadline`, `windowDeadlines`. `teacherOf(studentId, subjectId, academicYearStart)` — the teacher who gives the forecast grade (null: self-study, none recorded, not enrolled), with `seriesYearOf(type, year)` | catalogue, series, enrolment services |
-| **F5** (pathway advisor) | `getCatalogue()`: awards with their units (required/optional, choice groups), each unit's own level and the awards it counts toward, option codes; `listBoardSeries({ academicYear })` for the sittings ahead; `deriveLevelCode` | catalogue, series services; `@repo/validations` |
+| **F4** (exam entries) | `entryItemsFor(registrationIds, reading?)` / `entryItemsForWindow(sessionId)` (`GET /v1/catalogue/entries`): per registration the board, the board series with its deadline, the award (with its tier where the syllabus fixes it), the units with their own level and tier, the awards they count toward, the student's grade in the series' year and the derived level code. **F4 adds, per entry, the Cambridge option code and the tier (Core or Extended; Foundation or Higher)** the candidate sits — the catalogue stores the tier only where the syllabus fixes it (`exam_unit.tier`, `qualification.tier`), and the option codes with the components each enters. `registration.boardSeriesId`; `listBoardSeries`, `seriesDeadline`, `windowDeadlines`. `teacherOf(studentId, subjectId, academicYearStart)` — the teacher who gives the forecast grade (null: self-study, none recorded, not enrolled), with `seriesYearOf(type, year)` | catalogue, series, enrolment services |
+| **F5** (pathway advisor) | `getCatalogue()`: awards with their units (required/optional, choice groups), each unit's own level, **tier** and the awards it counts toward, option codes — Egypt's equivalency (Mo'adala) requires Extended, so F5 reads the tier; `listBoardSeries({ academicYear })` for the sittings ahead; `deriveLevelCode` | catalogue, series services; `@repo/validations` |
 | **F7** (day-one import) | `upsertEnrolments(tx, academicYearId, rows, actorId, { source: 'import', commit })`, or `batchEnrol(yearId, rows, commit, actorId, ctx, 'import')` for rows naming students and subjects as the sheet does; `findRegistrable(term)` (a row by name or code); `mapRegistrable` / `applyBoardChange` for the board each row is entered with; `loadStarterSet` | enrolment, catalogue services |
 
 ## 8. Screens
@@ -214,6 +272,16 @@ Each replaces a part of the coordinator's sheet (UX_AUDIT.md §4: the Excel vers
   without an enrolment enrolled in one click. **Check** — four lists of disagreements, each
   line with its fix beside it (Enrol, Make it self-study, Use the registration's teacher, End).
 - **My classes** on My Teaching: each class this year with its count, opened to its list.
+- **Check these** on Board series (shown only when there is something to check): the
+  registrations the migration entered with the board that sits their window's month, with the
+  subject's old and new board, window and series; staff tick what they checked, or change a
+  board on the Catalogue.
+- **The tier** on the Catalogue: a component's or award's tier where the syllabus fixes it
+  (IGCSE only), set when adding it and shown beside its level.
+- **The family's register and checkout screens** (F0b's money rule, review flag 3): subjects
+  grouped by series, earliest deadline first; subjects of series with different deadlines are
+  paid for one series at a time ("Pay by exam series" → "Pay for this series"). **The desk**
+  says each payment it took, one per series.
 - **Subjects this year** on the student's record, with "Change the enrolment" for the
   coordinator and the admin, and how many exam registrations have no enrolment.
 
@@ -236,20 +304,35 @@ MO-10 per series), `08j-course-enrolment.test.ts` (enrolment), `08k-catalogue-ra
 | a registration without an enrolment flagged | 08j "a registration without an enrolment is flagged, and the registration stands" |
 | a self-study enrolment excluded from teaching | 08j "a self-study enrolment is excluded from teaching: no group, no class list, no count" |
 
+The review's fixes: `08l-board-change.test.ts` (a board change refused into a passed or
+different deadline, allowed with the same deadline; routes re-pointed and refused likewise;
+what the migration inferred listed until checked), `08m-checkout-per-series.test.ts` (a mixed
+family checkout refused and the summary grouped; same-deadline series share one; a deadline
+change that would split an open checkout refused; the desk's registration and collection each
+split into one confirmed payment per deadline with takings and one creation audit row each;
+MO-21 per series: a draft window feeding October and January refunds only October's
+preregistrations at October's deadline, and January's cancelled after it is the family's own
+drop at the refund window's rate), 08h (the tier), 08j (a commit racing a leaving), 08k (a
+registration racing its subject's board change).
+
 Races (forced order with row or advisory locks held from the test): a registration against a
-change of its window's series; a window's end against its series' deadline, both orders, a
+change of its window's series; a registration against its subject's board change; bulk
+enrolment rows against a leaving; a window's end against its series' deadline, both orders, a
 draft window and an open one; two coordinators setting an award's units; two commits of the
 same enrolment rows; a single and a section enrolment at once. 09 checks over every row: each
 live registration in a window feeding series is in one of them, of its subject's board; a
 registration expired at a deadline was in a series whose deadline had passed; every window
 closes before every fed series' deadline and every series is in its academic year and kind.
-Controls C1–C14 (each guard undone once, red, restored) are rows in `.audit/catalogue.tsv`.
+Controls C1–C25 (each guard undone once, red, restored; C5 and C5b, one lock each of a pair,
+stayed green and C5c, both, went red) are rows in `.audit/catalogue.tsv`.
 
 **Changed assertions.** The MO-10 assertions in `08-money-rules.test.ts` that a deadline per
 board series changes (pre-authorised): each has its own trail row (old, new, why) and keeps its
 money outcome; 08's subjects are entered with Pearson Edexcel so its January window can feed a
 real series. 08f's settings enumeration gains `catalogue.levelCodeReading` (not money). No other
-money assertion changed.
+money assertion changed. F0b's own 08i MO-10 scenario changed with review flag 9: the student
+with a deadline extension registers for January before October's deadline, and after it both an
+October and a January subject are refused (trail row).
 
 ## 10. Decisions and why
 
@@ -272,7 +355,22 @@ money assertion changed.
   those grades; a younger or graduated student has no year to be taught in here.
 - **A named teacher is linked to the subject**, so the Subjects page and the enrolment agree.
 
+- **One payment per entry deadline** (the lead's decision on review flag 3): the family pays per
+  series (one action each on the checkout), the desk splits for the officer, so no checkout is
+  closed at a deadline that is not its own.
+- **A board change keeps the deadline** (flag 1): moving an entry into a series with another
+  deadline would change what the family was told and what the sweep does; staff align the two
+  series first.
+- **The window's earliest deadline for a new registration** (flag 9): the window closes before
+  it, so past it the window takes nothing new.
+- **Inferred boards are listed, not hidden** (flag 5): the migration enters a subject with the
+  board that sits its window's month, and staff check each one.
+
 ## 11. Deferred, and why
+
+- **A desk payment the close took between its creation and its confirmation** is reported as
+  "not collected — hand this money back", not retried: the close has already released those
+  subjects.
 
 - **Cambridge's March series** is not modelled: Egypt does not sit it (DISCOVERY_RESEARCH.md).
 - **Board late-fee tiers as money**: information only (the hard stop stays, A-08).
@@ -291,9 +389,10 @@ money assertion changed.
    every existing subject; the answer is a change on the Catalogue screen.
 3. The starter sets' codes need checking against Pearson's current specifications: XBI11/YBI11,
    WME02, WST02 and WDM11 are not all confirmed by the research.
-4. Whether an IGCSE window may feed a January series: Pearson's International GCSE sits in
-   January, but the school's windows treat January and October as A Level only (the existing
-   rule, kept).
+4. (Answered by the research, kept for the record.) An IGCSE window feeds no January or October
+   series: Pearson's last January International GCSE series was 2023 (DISCOVERY_RESEARCH.md,
+   lines 61–62), so January and October are A Level only, as the school's windows already
+   treat them.
 5. The strict order (a window closes before its earliest series deadline): if a window feeds
    October and January, it must close before October's deadline.
 6. Whether enrolment should cover grades other than 10–12, and whether a subject the school does
@@ -319,3 +418,18 @@ money assertion changed.
   1 todo); dev database recreated from the template and migrated.
 - 19:03Z — the catalogue's tab read on the server (no hydration warning) (f4c9313); this
   document; MONEY_AUDIT's MO-10 text and FEATURES_PLAN's F0b row and status updated.
+- 19:18Z — gates green at 7ae8ec7; pushed; CI green on a63cac3.
+- 2026-09-29 23:44Z — the Opus 5.5 review of 682907a: eleven flags. Merged `origin/main`
+  (ST-15, ST-16 at be058a1) (b47d123); trail rows from `scripts/trail-row.py` from here on.
+- 2026-09-30 00:12Z — flags 1–4 and 7–9: the board change keeps MO-10 and moves routes;
+  registrations hold the subject's board; money per entry deadline (family refused, desk split,
+  deadline change guarded); MO-21 per series; bulk enrolment holds its students; a window's
+  deadline is its earliest series' (1ce3fc3, 3b3d69e); tests 08j–08m; controls C15–C25.
+- 00:23Z — flag 5: the backfill never makes a series a board does not sit, lists what it
+  inferred, fails loudly on a deadline no series carries; proven on a synthetic database of the
+  school's shapes (ade9d86); dev databases recreated from the template and F0a's copy.
+- 00:29Z — flag 6: the tier (0040) (7cf16e8).
+- 00:34–00:52Z — the web for flag 3 (checkout per series, register grouped, desk message);
+  flag 10: the three board names untranslated everywhere; every screen re-shot in Arabic
+  (6c00ebd, bf3234e, 871cef1).
+- 00:55Z — flag 11: this document, the MONEY_AUDIT trail row, Q4 corrected.
