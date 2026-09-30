@@ -238,7 +238,9 @@ export default function RegisterClient({ userId, userRole }: Props): React.JSX.E
   // F0b: subjects grouped by the exam board series they are entered in; each
   // series is paid for on its own when their entry deadlines differ.
   const seriesSorted = useMemo(() => {
-    return [...filteredSubjects].sort((a, b) => (a.boardSeries?.name ?? '~').localeCompare(b.boardSeries?.name ?? '~'));
+    // The earliest entry deadline first, as the checkout orders them.
+    const key = (x: Subject) => `${x.boardSeries?.entryDeadline ?? '9999'}|${x.boardSeries?.name ?? '~'}`;
+    return [...filteredSubjects].sort((a, b) => key(a).localeCompare(key(b)));
   }, [filteredSubjects]);
   const multipleSeries = new Set(filteredSubjects.map((x) => x.boardSeries?.id ?? 'none')).size > 1;
 

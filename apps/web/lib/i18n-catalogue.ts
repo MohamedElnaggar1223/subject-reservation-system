@@ -508,6 +508,7 @@ export const catalogueArabic: Record<string, string> = {
  */
 export function translateCatalogueText(text: string): string | null {
   const rules: [RegExp, (m: RegExpExecArray) => string][] = [
+    [/^Check these: (\d+) registrations entered with another board by the migration$/, (m) => `راجع هذه: ${m[1]} تسجيلات قيّدها الترحيل لدى مجلس آخر`],
     // Counted phrases on the screens
     [/^Enrol (\d+)$/, (m) => `ألحِق ${m[1]}`],
     [/^(\d+) enrolments created$/, (m) => `أُنشئ ${m[1]} التحاق`],
@@ -527,8 +528,14 @@ export function translateCatalogueText(text: string): string | null {
     [/^(.+) \((\d{4}\/\d{2})\) \(this year\)$/, (m) => `${m[1]} (${m[2]}) (هذا العام)`],
     [/^(\d{4}\/\d{2}) \(this year\)$/, (m) => `${m[1]} (هذا العام)`],
     [/^(.+) stops being taught (.+)\. The enrolment stays on record with your reason\.$/, (m) => `يتوقف ${m[1]} عن دراسة ${m[2]}. يبقى الالتحاق في السجل مع سببك.`],
+    // The desk's answer after taking money (one payment per exam series with its own deadline)
+    [/^(Registered and collected|Collected) (EGP [\d,.]+)\. Receipts ready to hand over(?:: ([^.]+))?\.(?: In (\d+) payments, one per exam series: (.+?)\.)?(?: Not collected — hand this money back: (.+)\.)?$/,
+      (m) => [
+        `${m[1] === 'Collected' ? 'تم تحصيل' : 'تم التسجيل وتحصيل'} ${m[2]}. الإيصالات جاهزة للتسليم${m[3] ? `: ${m[3]}` : ''}.`,
+        m[4] ? ` في ${m[4]} دفعات، واحدة لكل دورة امتحان: ${m[5]}.` : '',
+        m[6] ? ` لم يُحصَّل - أعِد هذا المبلغ: ${m[6]}.` : '',
+      ].join('')],
     // Review of 682907a: checkouts per series, board changes, what the migration inferred
-    [/^Check these: (\d+) registrations entered with another board by the migration$/, (m) => `راجع هذه: ${m[1]} تسجيلات قيّدها الترحيل لدى مجلس آخر`],
     [/^These subjects are entered in exam board series with different entry deadlines, so each series is paid for on its own: (.+)$/,
       (m) => `هذه المواد مقيدة في دورات لها مواعيد قيد مختلفة، لذا تُدفع كل دورة وحدها: ${m[1]!.replace(/no entry deadline yet/g, 'لا يوجد آخر موعد بعد').replace(/entry deadline/g, 'آخر موعد للقيد')}`],
     [/^(.+) is past its entry deadline \((.+)\): (.+) cannot be moved into it in (.+)$/, (m) => `انقضى آخر موعد للقيد في ${m[1]} (${m[2]}): لا يمكن نقل ${m[3]} إليها في ${m[4]}`],
