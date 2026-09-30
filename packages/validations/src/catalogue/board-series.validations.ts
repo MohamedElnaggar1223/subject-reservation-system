@@ -136,11 +136,15 @@ export const MoveRegistrationsToSeries = z.object({
 export type MoveRegistrationsToSeriesType = z.infer<typeof MoveRegistrationsToSeries>;
 
 /**
- * Staff checked registrations the migration entered with a board it inferred
- * (their subject's board does not sit the window's month): they leave the
- * Board series screen's "check these" list.
+ * Staff checked what the migration inferred — a subject entered with the
+ * board that sits its window's month, a registration of it, a subject not
+ * offered in a window its board does not sit: they leave the Board series
+ * screen's "check these" list.
  */
-export const MarkInferredChecked = z.object({
-  registrationIds: z.array(z.string().min(1)).min(1, 'Choose the registrations you checked').max(500),
-});
+export const MarkInferredChecked = z
+  .object({
+    registrationIds: z.array(z.string().min(1)).max(500).default([]),
+    subjectIds: z.array(z.string().min(1)).max(500).default([]),
+  })
+  .refine((d) => d.registrationIds.length + d.subjectIds.length > 0, 'Choose what you checked');
 export type MarkInferredCheckedType = z.infer<typeof MarkInferredChecked>;

@@ -105,26 +105,40 @@ describe('F0b: a board change and the entry deadline', () => {
   });
 
   it("what the migration inferred is listed for staff to check, until they mark it checked (flag 5)", async () => {
-    // Migration 0038 writes these rows when a subject's board does not sit its
+    // Migration 0038 writes these rows when a subject's board does not sit a
     // window's month; the suite's database starts empty, so the rows are
-    // written here as the migration writes them (the one reach past the API).
+    // written here as the migration writes them (the one reach past the API):
+    // a re-boarded subject with a registration, a re-boarded subject only
+    // offered, and a registered subject kept on its board and not offered.
     const w = await window('inferred');
     const pea = await series('pearson_edexcel', w.year, 'BC inferred');
     await feed(w.id, [{ boardSeriesId: pea, isDefault: true }]);
     const sub = await subject(adm, 'BC-INF', 'Board change inferred', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
+    const offered = await subject(adm, 'BC-OFF', 'Board change offered only', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
+    const kept = await subject(adm, 'BC-KEPT', 'Board change kept', { course: 1000, registration: 400 }, { council: 'oxford' });
     const reg = await prereg(w.id, sub);
     await sql(`insert into audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data, created_at)
-      values (gen_random_uuid()::text, null, 'SUBJECT_BOARD_INFERRED', 'subject', $1, '{"council":"cambridge"}', '{"council":"pearson_edexcel"}', now()),
-             (gen_random_uuid()::text, null, 'REGISTRATION_SERIES_INFERRED', 'registration', $2, '{"council":"cambridge"}', '{"council":"pearson_edexcel"}', now())`, [sub, reg]);
+      values (gen_random_uuid()::text, null, 'SUBJECT_BOARD_INFERRED', 'subject', $1, '{"council":"cambridge"}', '{"council":"pearson_edexcel","windows":["October 2026 AS"],"registered":true}', now()),
+             (gen_random_uuid()::text, null, 'REGISTRATION_SERIES_INFERRED', 'registration', $2, '{"council":"cambridge"}', '{"council":"pearson_edexcel"}', now()),
+             (gen_random_uuid()::text, null, 'SUBJECT_BOARD_INFERRED', 'subject', $3, '{"council":"cambridge"}', '{"council":"pearson_edexcel","windows":["January 2027 AS"],"registered":false}', now()),
+             (gen_random_uuid()::text, null, 'SUBJECT_NOT_OFFERED_INFERRED', 'subject', $4, null, '{"council":"oxford","windows":["October 2026 AS"]}', now())`,
+      [sub, reg, offered, kept]);
     const listed = await apiResponse(coordinator.api.v1['board-series'].inferred.$get());
-    expect(listed.find((r) => r.registrationId === reg)).toMatchObject({
+    expect(listed.registrations.find((r) => r.registrationId === reg)).toMatchObject({
       subjectName: 'Board change inferred', previousBoardName: 'Cambridge International', boardName: 'Pearson Edexcel', series: expect.stringMatching(/^Pearson Edexcel November \d{4} \(BC inferred\)$/),
     });
-    await apiResponse(coordinator.api.v1['board-series'].inferred.checked.$post({ json: { registrationIds: [reg] } }));
+    const bySubject = new Map(listed.subjects.map((x) => [x.subjectId, x]));
+    expect(bySubject.get(offered)).toMatchObject({ kind: 'reboarded', previousBoardName: 'Cambridge International', boardName: 'Pearson Edexcel', windows: ['January 2027 AS'], registered: false });
+    expect(bySubject.get(sub)).toMatchObject({ kind: 'reboarded', windows: ['October 2026 AS'], registered: true });
+    expect(bySubject.get(kept)).toMatchObject({ kind: 'not_offered', boardName: 'OxfordAQA', windows: ['October 2026 AS'] });
+    await apiResponse(coordinator.api.v1['board-series'].inferred.checked.$post({ json: { registrationIds: [reg], subjectIds: [sub, offered, kept] } }));
     await audited([reg], ['REGISTRATION_SERIES_INFERENCE_CHECKED']);
-    expect((await apiResponse(coordinator.api.v1['board-series'].inferred.$get())).some((r) => r.registrationId === reg)).toBe(false);
+    await audited([offered], ['SUBJECT_BOARD_INFERENCE_CHECKED']);
+    const after = await apiResponse(coordinator.api.v1['board-series'].inferred.$get());
+    expect(after.registrations.some((r) => r.registrationId === reg)).toBe(false);
+    expect(after.subjects.some((x) => [sub, offered, kept].includes(x.subjectId))).toBe(false);
     expect(await refused(coordinator.api.v1['board-series'].inferred.checked.$post({ json: { registrationIds: [reg] } }))).toEqual({
-      status: 404, error: 'One or more of these registrations are not waiting to be checked',
+      status: 404, error: 'One or more of these are not waiting to be checked',
     });
   });
 

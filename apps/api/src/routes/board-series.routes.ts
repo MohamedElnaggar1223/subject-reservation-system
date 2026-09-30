@@ -42,7 +42,7 @@ export const boardSeriesRoutes = new Hono<HonoEnv>()
 
   .post('/inferred/checked', requireAcademic(), zValidator('json', MarkInferredChecked), async (c) => {
     try {
-      return success(c, await series.markInferredChecked(c.req.valid('json').registrationIds, c.get('user')!.id, extractAuditContext(c)));
+      return success(c, await series.markInferredChecked(c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
     } catch (err) {
       const f = fail(err, 'Failed to record the check');
       return error(c, f.message, f.status);

@@ -671,13 +671,34 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
 // ─── What the migration inferred, for staff to check ─────────────────────────
 
 /**
- * Registrations migration 0038 entered with a board it inferred: their
- * subject's board did not sit the window's month (the school's January and
- * October rows), so the subject was entered with the board that does. Each
- * stays listed until staff mark it checked, or move it to another series.
+ * What migration 0038 inferred, for staff to check on the Board series screen:
+ * - subjects entered with the board that sits a window's month (their board
+ *   did not: the school's January and October rows), registered or only
+ *   offered there, and subjects kept on their board but not offered in a
+ *   window of a month it does not sit;
+ * - the registrations of a re-boarded subject, entered in its new board's
+ *   series.
+ * A subject stays listed until staff mark it checked or map it on the
+ * Catalogue; a registration until it is marked checked or moved.
  */
 export async function listInferredRoutings() {
   const { names } = await boardNameMap();
+  const subjects = await db.execute(sql`
+    select a.entity_id as "subjectId", a.action, a.previous_data->>'council' as "previousBoard", a.new_data->'windows' as windows,
+      a.created_at as "inferredAt", s.name as "subjectName", s.code as "subjectCode", s.council as "board",
+      -- What the migration saw: registered in such a window (at any status), or only offered there.
+      coalesce((a.new_data->>'registered')::boolean, false) as registered
+    from audit_log a
+    join subject s on s.id = a.entity_id
+    where a.action in ('SUBJECT_BOARD_INFERRED', 'SUBJECT_NOT_OFFERED_INFERRED')
+      and not exists (
+        select 1 from audit_log c
+        where c.entity_id = a.entity_id and c.created_at >= a.created_at and c.id <> a.id
+          and c.action in ('SUBJECT_BOARD_INFERENCE_CHECKED', 'SUBJECT_CATALOGUE_MAPPED'))
+    order by s.name`).then((r) => r.rows as {
+      subjectId: string; action: string; previousBoard: string | null; windows: string[] | null; inferredAt: string;
+      subjectName: string; subjectCode: string; board: string; registered: boolean;
+    }[]);
   const rows = await db.execute(sql`
     select a.entity_id as "registrationId", a.previous_data->>'council' as "previousBoard", a.created_at as "inferredAt",
       r.status, r.session_id as "sessionId", w.name as "window", r.board_series_id as "boardSeriesId",
@@ -700,25 +721,41 @@ export async function listInferredRoutings() {
   const seriesIds = [...new Set(rows.map((r) => r.boardSeriesId).filter((x): x is string => !!x))];
   const series = seriesIds.length ? await db.select().from(boardSeries).where(inArray(boardSeries.id, seriesIds)) : [];
   const byId = new Map(series.map((x) => [x.id, x]));
-  return rows.map((r) => ({
-    ...r,
-    previousBoardName: r.previousBoard ? names.get(r.previousBoard) ?? r.previousBoard : null,
-    boardName: names.get(r.board) ?? r.board,
-    series: r.boardSeriesId && byId.get(r.boardSeriesId) ? boardSeriesName(names, byId.get(r.boardSeriesId)!) : null,
-  }));
+  const boardOf = (code: string | null) => (code ? names.get(code) ?? code : null);
+  return {
+    subjects: subjects.map((x) => ({
+      ...x,
+      kind: x.action === 'SUBJECT_BOARD_INFERRED' ? ('reboarded' as const) : ('not_offered' as const),
+      previousBoardName: boardOf(x.previousBoard),
+      boardName: boardOf(x.board)!,
+      windows: x.windows ?? [],
+    })),
+    registrations: rows.map((r) => ({
+      ...r,
+      previousBoardName: boardOf(r.previousBoard),
+      boardName: boardOf(r.board)!,
+      series: r.boardSeriesId && byId.get(r.boardSeriesId) ? boardSeriesName(names, byId.get(r.boardSeriesId)!) : null,
+    })),
+  };
 }
 
-/** Staff checked these inferred registrations: one audit row each, in one transaction; they leave the list. */
-export async function markInferredChecked(registrationIds: string[], actorId: string, ctx?: AuditContext) {
-  const listed = new Set((await listInferredRoutings()).map((r) => r.registrationId));
-  const unknown = registrationIds.filter((id) => !listed.has(id));
-  if (unknown.length) throw new SeriesError('One or more of these registrations are not waiting to be checked', 404);
+/** Staff checked these: one audit row each, in one transaction; they leave the list. */
+export async function markInferredChecked(data: { registrationIds: string[]; subjectIds: string[] }, actorId: string, ctx?: AuditContext) {
+  const listed = await listInferredRoutings();
+  const regs = new Set(listed.registrations.map((r) => r.registrationId));
+  const subs = new Set(listed.subjects.map((x) => x.subjectId));
+  if (data.registrationIds.some((id) => !regs.has(id)) || data.subjectIds.some((id) => !subs.has(id))) {
+    throw new SeriesError('One or more of these are not waiting to be checked', 404);
+  }
   await db.transaction(async (tx) => {
-    for (const id of registrationIds) {
+    for (const id of data.registrationIds) {
       await logAction(actorId, 'REGISTRATION_SERIES_INFERENCE_CHECKED', 'registration', id, null, { checked: true }, ctx, tx);
     }
+    for (const id of data.subjectIds) {
+      await logAction(actorId, 'SUBJECT_BOARD_INFERENCE_CHECKED', 'subject', id, null, { checked: true }, ctx, tx);
+    }
   });
-  return { checked: registrationIds.length };
+  return { checked: data.registrationIds.length + data.subjectIds.length };
 }
 
 // ─── One checkout per entry deadline ─────────────────────────────────────────

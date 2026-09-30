@@ -63,17 +63,24 @@ WHERE s.qualification_level = 'igcse' AND s.qualification_id IS NULL
 --    type and year (F0a) and its entry deadline was the window's own
 --    (MO-10). Three passes, then a check:
 --
---    a. A board never gets a series in a month it does not sit. A subject
---       registered in a window whose month its board does not sit (the
---       school's January and October rows, all "cambridge" until now:
---       Cambridge sits no January or October series) is entered with the
---       board that does — the first board, in the catalogue's order, that
---       sits every month the subject is registered in (Pearson Edexcel for
---       AS and A Level January and October: IS-14, DISCOVERY_RESEARCH.md §1).
---       Each such subject gets a SUBJECT_BOARD_INFERRED row, and each of its
---       registrations a REGISTRATION_SERIES_INFERRED row (after pass c), for
---       staff to check on the Board series screen. Its old board's award and
---       units are cleared (the Catalogue lists it to map again).
+--    a. A board never gets a series in a month it does not sit, and no
+--       subject leaves a window's offer silently.
+--       - A subject registered in a window whose month its board does not
+--         sit (the school's January and October rows, all "cambridge" until
+--         now: Cambridge sits no January or October series), or offered in
+--         one with no registration at all (an active subject at the window's
+--         level), is entered with the board that does: the first board, in
+--         the catalogue's order, that sits every month it is registered or
+--         offered in (Pearson Edexcel for AS and A Level January and
+--         October: IS-14, DISCOVERY_RESEARCH.md §1). One SUBJECT_BOARD_INFERRED
+--         row each, and one REGISTRATION_SERIES_INFERRED row per registration
+--         (after pass c); its old board's award and units are cleared.
+--       - A registered subject whose board sits the months it is registered
+--         in keeps its board (the registrations are the evidence) even where
+--         it is also offered in a window of a month its board does not sit:
+--         there it is not offered, and one SUBJECT_NOT_OFFERED_INFERRED row
+--         says which windows.
+--       Both are listed for staff on the Board series screen ("Check these").
 --    b. Each window feeds, for every board of the subjects it registered or
 --       offers (active subjects at its level), that board's series of the
 --       window's month and year — or, for a board that does not sit that
@@ -93,22 +100,38 @@ DECLARE
   months text[];
 BEGIN
   FOR s IN
+    WITH registered AS (
+      SELECT DISTINCT r.subject_id AS id, w.session_type AS month, w.name
+      FROM registration r JOIN registration_session w ON w.id = r.session_id
+    ), offered AS (
+      SELECT sub.id, w.session_type AS month, w.name
+      FROM subject sub JOIN registration_session w ON w.qualification_level = sub.qualification_level
+      WHERE sub.is_active
+    ), candidates AS (
+      -- Registered where its board does not sit the month: the months registered and offered.
+      SELECT sub.id FROM subject sub JOIN registered g ON g.id = sub.id
+      WHERE NOT EXISTS (SELECT 1 FROM exam_board b WHERE b.code = sub.council AND b.series_months ? g.month)
+      UNION
+      -- Never registered, offered where its board does not sit the month.
+      SELECT sub.id FROM subject sub JOIN offered o ON o.id = sub.id
+      WHERE NOT EXISTS (SELECT 1 FROM registered g WHERE g.id = sub.id)
+        AND NOT EXISTS (SELECT 1 FROM exam_board b WHERE b.code = sub.council AND b.series_months ? o.month)
+    ), seen AS (
+      SELECT id, month, name FROM registered UNION SELECT id, month, name FROM offered
+    )
     SELECT sub.id, sub.name, sub.council,
-           array_agg(DISTINCT w.session_type) AS months,
-           array_agg(DISTINCT w.name) AS windows
-    FROM subject sub
-    JOIN registration r ON r.subject_id = sub.id
-    JOIN registration_session w ON w.id = r.session_id
+           array_agg(DISTINCT x.month) AS months,
+           array_agg(DISTINCT x.name) AS windows,
+           EXISTS (SELECT 1 FROM registered g WHERE g.id = sub.id) AS registered
+    FROM subject sub JOIN candidates c ON c.id = sub.id JOIN seen x ON x.id = sub.id
     GROUP BY sub.id, sub.name, sub.council
-    HAVING bool_or(NOT EXISTS (
-      SELECT 1 FROM exam_board b WHERE b.code = sub.council AND b.series_months ? w.session_type))
   LOOP
     months := s.months;
     SELECT b.code INTO newb FROM exam_board b
      WHERE (SELECT bool_and(b.series_months ? m) FROM unnest(months) m)
      ORDER BY b.sort_order, b.code LIMIT 1;
     IF newb IS NULL THEN
-      RAISE EXCEPTION 'F0b backfill: subject "%" (%) is registered in % series and no board sits all of them — enter its board by hand before migrating',
+      RAISE EXCEPTION 'F0b backfill: subject "%" (%) is registered or offered in % series and no board sits all of them — enter its board by hand before migrating',
         s.name, s.id, array_to_string(months, ', ');
     END IF;
     UPDATE subject SET council = newb, qualification_id = NULL, updated_at = now() WHERE id = s.id;
@@ -117,11 +140,26 @@ BEGIN
     VALUES (gen_random_uuid()::text, NULL, 'SUBJECT_BOARD_INFERRED', 'subject', s.id,
       jsonb_build_object('council', s.council),
       jsonb_build_object('council', newb, 'windows', to_jsonb(s.windows), 'months', to_jsonb(months),
-        'reason', format('Registered in a %s series, which %s does not sit: entered with the board that sits it (F0b backfill) — check it', array_to_string(months, ' and '), s.council)),
+        'registered', s.registered,
+        'reason', format('%s in a %s series, which %s does not sit: entered with the board that sits it (F0b backfill) — check it',
+          CASE WHEN s.registered THEN 'Registered' ELSE 'Offered' END, array_to_string(months, ' and '), s.council)),
       now());
     newb := NULL;
   END LOOP;
 END $$;
+--> statement-breakpoint
+-- Registered subjects that keep their board and so are not offered in a window
+-- of a month their board does not sit: listed, never dropped silently.
+INSERT INTO audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data, created_at)
+SELECT gen_random_uuid()::text, NULL, 'SUBJECT_NOT_OFFERED_INFERRED', 'subject', sub.id, NULL,
+  jsonb_build_object('council', sub.council, 'windows', to_jsonb(array_agg(DISTINCT w.name)), 'months', to_jsonb(array_agg(DISTINCT w.session_type)),
+    'reason', format('%s sits no %s series: not offered in these windows (F0b backfill) — check it', sub.council, string_agg(DISTINCT w.session_type, ' or '))),
+  now()
+FROM subject sub
+JOIN registration_session w ON w.qualification_level = sub.qualification_level
+WHERE sub.is_active
+  AND NOT EXISTS (SELECT 1 FROM exam_board b WHERE b.code = sub.council AND b.series_months ? w.session_type)
+GROUP BY sub.id, sub.council;
 --> statement-breakpoint
 DO $$
 DECLARE

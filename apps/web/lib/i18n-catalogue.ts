@@ -451,8 +451,14 @@ export const catalogueArabic: Record<string, string> = {
   'Pay for this series': 'ادفع لهذه الدورة',
   'paid for on its own': 'تُدفع وحدها',
   'No entry deadline yet · paid for on its own': 'لا يوجد آخر موعد للقيد بعد · تُدفع وحدها',
-  "Their subject's board does not sit the window's month, so the subject is now entered with the board that does. If a subject is really entered with another board, change it on the Catalogue; then mark what you checked.":
-    'مجلس المادة لا يعقد دورة في شهر النافذة، لذا صارت المادة تُقيَّد لدى المجلس الذي يعقدها. إن كانت المادة تُقيَّد فعلًا لدى مجلس آخر فغيّره من الدليل؛ ثم علِّم ما راجعته.',
+  "The school's January and October rows were entered with Cambridge International, which sits no January or October series. Each subject below is now entered with the board that sits it, or is not offered in those windows. If a subject is really entered with another board, change it on the Catalogue; then mark what you checked.":
+    'كانت صفوف المدرسة لشهري يناير وأكتوبر مقيدة لدى Cambridge International، وهو لا يعقد دورات في يناير أو أكتوبر. صارت كل مادة أدناه تُقيَّد لدى المجلس الذي يعقدها، أو لا تُطرح في تلك النوافذ. إن كانت المادة تُقيَّد فعلًا لدى مجلس آخر فغيّره من الدليل؛ ثم علِّم ما راجعته.',
+  'What the migration did': 'ما فعله الترحيل',
+  'Windows': 'النوافذ',
+  'Entered with another board': 'تُقيَّد لدى مجلس آخر',
+  'Entered with another board (offered only)': 'تُقيَّد لدى مجلس آخر (مطروحة فقط)',
+  'Not offered in these windows': 'غير مطروحة في هذه النوافذ',
+  'One or more of these are not waiting to be checked': 'واحد أو أكثر من هذه ليس بانتظار المراجعة',
   'Choose all': 'اختر الكل',
   'Window': 'النافذة',
   'Mark the chosen as checked': 'علِّم المختار كمراجَع',
@@ -466,7 +472,6 @@ export const catalogueArabic: Record<string, string> = {
   'Chosen per entry': 'يُختار لكل قيد',
   'Only IGCSE awards and components have a tier (Core or Extended, Foundation or Higher)':
     'المستوى الفرعي (Core أو Extended، Foundation أو Higher) لمؤهلات IGCSE ومكوناتها فقط',
-  'One or more of these registrations are not waiting to be checked': 'تسجيل أو أكثر من هذه ليس بانتظار المراجعة',
 
   // ── The API's sentences without names ──
   'Only an admin sets the exam board\'s entry deadline: past it the school closes every unconfirmed payment on the series (MO-10)':
@@ -508,7 +513,7 @@ export const catalogueArabic: Record<string, string> = {
  */
 export function translateCatalogueText(text: string): string | null {
   const rules: [RegExp, (m: RegExpExecArray) => string][] = [
-    [/^Check these: (\d+) registrations entered with another board by the migration$/, (m) => `راجع هذه: ${m[1]} تسجيلات قيّدها الترحيل لدى مجلس آخر`],
+    [/^Check these: (\d+) things the migration inferred$/, (m) => `راجع هذه: ${m[1]} أمور استنتجها الترحيل`],
     // Counted phrases on the screens
     [/^Enrol (\d+)$/, (m) => `ألحِق ${m[1]}`],
     [/^(\d+) enrolments created$/, (m) => `أُنشئ ${m[1]} التحاق`],
