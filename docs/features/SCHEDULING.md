@@ -1,7 +1,7 @@
 # F1 — Scheduling: teaching groups, the timetable, cover (as built)
 
 Branch `feature/scheduling`, started from `origin/feature/catalogue` 682907a (F0b, which brings
-F0a). Not yet merged with `origin/main` (the lead says when F0b has landed; §14). The plan is
+F0a), merged with `origin/main` at e5da650 once F0b landed (§14). The plan is
 FEATURES_PLAN.md §1 "F1", its §2 row and §5's rules, with §0/§0b's "full versions" (the
 generator **and** the aSc/FET exports). The trail is `.audit/scheduling.tsv`; evidence (suite
 logs, control logs, screenshots, scratch scripts) is `.audit/scheduling-evidence/`
@@ -18,7 +18,8 @@ section; print, CSV, a phone calendar), and **cover** for an absent teacher.
 
 ## 1. Data model
 
-All in `packages/db/src/schema.ts`; one migration, `0040_scheduling.sql` (generated).
+All in `packages/db/src/schema.ts`; one migration, `0041_scheduling.sql` (generated; it was
+0040 before main's `0040_catalogue_tier` landed, §14).
 
 | Table | What it holds | Rules |
 |---|---|---|
@@ -161,7 +162,8 @@ reason, note; overlapping absences refused). The lessons it leaves are listed at
 each with its status. **Find cover** suggests teachers for one lesson: free and **qualified**
 (linked to the subject, `subject_teacher`) first, then free but not their subject, then the rest
 with why ("teaches Physics 11 then", "covers Arabic 10A then", "is away that day", "is not
-available then", "would teach more than 6 periods that day"). **Assign** refuses the lesson's own
+available then", "would teach more than 6 periods that day"); when no teacher of the subject is
+free it says so and points to cancelling. **Assign** refuses the lesson's own
 teacher, an inactive, busy, away, unavailable, over-limit or unqualified one, and a lesson that is
 not held that day or whose teacher is not recorded away; the lesson may instead be **cancelled**.
 The cover teacher is notified (link to Today) and the class is told (covered: who takes it;
@@ -370,13 +372,17 @@ red — and 08s1 gained the assertions that do.
 
 ## 14. Merging with main
 
-`origin/main` has not been merged: the lead merges F0b first and then asks for
-`git merge origin/main` here, following §3's migration protocol (delete `0040_scheduling.sql`
-and its snapshot, take main's journal, `drizzle-kit generate --name scheduling` again, prove on
-a database migrated with main's migrations and on the suite's empty one). Main brings
-`scripts/trail-row.py` (then the only way to write trail rows; until then
-`.audit/scheduling-evidence/trail.py` writes them at the real UTC time) and a `schoolToday()`
-test helper.
+Merged `origin/main` at e5da650 (F0b landed, with ST-15/ST-16 and the F8 plan update) in
+cdfd046, no rebase. FEATURES_PLAN §3's protocol: the only conflicts were drizzle's meta files;
+main's journal and snapshots were taken, `0040_scheduling.sql` and its snapshot deleted, and
+`drizzle-kit generate --name scheduling` run again on top of main's `0040_catalogue_tier`:
+`0041_scheduling.sql`, byte-identical to the old file (F0b touches none of F1's tables). F1 had
+no hand-written migration to recreate. Proven on a database that already had main's
+migrations — `igcse_scheduling_dev` recreated from the template, migrated with main's migration
+folder (41 applied, no F1 table), then at the merged head (42, the eleven F1 tables) — and on the
+suite's empty database (the full suite, local time and UTC). Trail rows are written with
+`scripts/trail-row.py` from the merge on; 21 earlier rows written in batches now carry their
+events' own times.
 
 ## 15. Progress log
 
@@ -396,3 +402,10 @@ test helper.
 - 02:22Z — controls C1–C17; two guards found untested and the tests added (d389695).
 - 02:31Z — the generator tuned after the logs showed its result varying with the seed (4406433).
 - 02:35Z — the student's week on the student record (d47886a); this document.
+- 02:42Z — merged `origin/main` (e5da650); the migration regenerated as 0041 (cdfd046); the
+  batch-written trail rows retimed.
+- 02:44Z — 0041 proven on the dev database at main's migrations, then at the merged head.
+- 02:48Z — suite green at cdfd046 in local time and UTC (27 files, 348 passed, 1 todo).
+- 02:53Z — the dev school rebuilt at the merged head and re-driven (a first timetable made,
+  generated and published from the screens, cover, a parent, a teacher); cover says when no
+  teacher of the subject is free (d45ee44). FEATURES_PLAN's F1 row and status updated.
