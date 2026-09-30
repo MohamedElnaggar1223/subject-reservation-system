@@ -437,6 +437,7 @@ branch.
 | F4 | candidates, entries, results per unit and award, `getSittings(studentId)`, `getExamsFor(studentId, date)` | F2, F3, F5 |
 | F2 | leave requests and states; `getLeaveCoverage(studentId, date)` | F3 |
 | F3 | attendance; `getAttendanceSummary(studentId, range)` | Student 360, F6 |
+| F7 | what a student sat before the system: `registration_history` (student, subject or the sheet's words, series, outcome, mode, teacher, source line), read by `getRetakeSubjectIds` only when its series is earlier than the window's (`seriesOrder(type, year)`, `@repo/validations`); money before the system as `money_history` (history, never balances); the settings `import.selfStudyOnTaught` and `import.carryForward`; `addSectionMembersInTx(tx, …)`. Details: docs/features/IMPORT.md §14 | F4 (sittings), F5 (the advisor), finance history |
 
 ---
 
@@ -578,7 +579,7 @@ API and web ports):
 | F2 Campus leave | | | | |
 | F5 Pathway advisor | | | | |
 | F3 Attendance | | | | |
-| F7 Day-one import | | | | |
+| F7 Day-one import | yes — docs/features/IMPORT.md (`feature/import`) | | | owner questions in IMPORT §13; proven on the real sheet privately (counts in §10) |
 | F6 UI audit | | | | |
 | F8 Demo school and walkthrough | | | | owner's request, 30 Sep 2026; after F6 |
 
