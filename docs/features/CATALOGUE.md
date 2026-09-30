@@ -66,17 +66,23 @@ checks (`core`, `extended`, `foundation`, `higher`).
   offer silently** (review flag 5, re-review flag 3). A subject registered in a window whose
   month its board does not sit — the school's January and October rows, all "cambridge" until
   now, and Cambridge sits no January or October series — **or offered in one with no
-  registration at all** (an active subject at the window's level) is entered with the first
-  board, in catalogue order, that sits every month it is registered or offered in (Pearson
+  registration at all** (an active subject at the level of a **draft or active** window) is
+  entered with the first board, in catalogue order, that sits every month it is registered or
+  offered in (Pearson
   Edexcel for AS and A Level January and October: IS-14, DISCOVERY_RESEARCH.md §1). Its old
   award and units are cleared, one `SUBJECT_BOARD_INFERRED` audit row says so (with the
   windows, the months, and whether it was registered or only offered), and each of its
   registrations gets a `REGISTRATION_SERIES_INFERRED` row. A **registered subject whose board
   sits the months it is registered in keeps its board** (its registrations are the evidence)
-  even where it is also offered in a window of a month its board does not sit: there it is not
-  offered, and one `SUBJECT_NOT_OFFERED_INFERRED` row names those windows. The **Board series**
-  screen lists all three under "Check these" — subjects until staff mark them checked or map
-  them on the Catalogue, registrations until marked checked or moved (`GET
+  even where it is also offered in a draft or active window of a month its board does not sit:
+  there it is not offered, and one `SUBJECT_NOT_OFFERED_INFERRED` row names those windows.
+  **A closed window offers nothing** (the confirmation review of 1ead61b, item 1): it is
+  history, so a January or October window closed years ago neither moves a never-registered
+  subject nor is listed as not offering one; registrations count in every window, closed or
+  not, because they are entries that must be routed. The **Board series** screen lists all
+  three under "Check these" — subjects until staff mark them checked, map them on the Catalogue
+  or change their board on the Subjects form (`SUBJECT_BOARD_CHANGED`, written in the board
+  change's transaction by either screen), registrations until marked checked or moved (`GET
   /v1/board-series/inferred`, `POST /v1/board-series/inferred/checked` with `subjectIds` and
   `registrationIds`).
 - For every window, a board series is made for each board of the subjects it registered or
@@ -111,14 +117,27 @@ checks (`core`, `extended`, `foundation`, `higher`).
   January) as not offered in October 2026 AS; "every active subject offered in every window at
   its level" lists exactly those two. The panel was driven on that copy in English and Arabic:
   a subject marked checked left the list with its audit row (`screens/review3-inferred-*.png`).
-- **0038 was edited in place** after it had run (review flag 5, then re-review flag 3), so
+- **Closed windows, proven on the same shapes** (confirmation item 1). With the previous 0038,
+  six inferred rows cited a closed window the subject is not registered in: Geography and M1
+  the closed October and June 2026 AS windows, Physics June 2026 AS, and Chemistry listed as
+  not offered in the closed October 2026 AS (`migration-synth-after-3-before-fix.txt`). Now
+  (`migration-synth-before-3.txt`, `migration-synth-after-3.txt`, 37 migrations before and 41
+  after): none; Geography is entered with Pearson citing only January 2027 AS (draft);
+  Chemistry's row is gone; Biology Paper 3 is still listed for January 2027 A Level (draft);
+  every window fed and every registration routed exactly as before. A copy with January 2027 AS
+  closed as well (`migration-synth-closed-*.txt`) leaves Geography with no open January or
+  October window: it stays on Cambridge with no row.
+- **0038 was edited in place** after it had run (review flag 5, re-review flag 3, confirmation
+  item 1), so
   **every database that ran an earlier 0038 must be recreated** from its source and migrated
   again: drizzle records a migration as applied by its hash and never re-runs it, so such a
-  copy keeps the earlier outcome silently. Recreated on 30 Sep: `igcse_catalogue_dev` (from
-  `igcse_template_dev`), `igcse_catalogue_rich_dev` (from `igcse_foundation_dev`) and
-  `igcse_catalogue_synth` (from the synthetic state before 0037); `igcse_catalogue_synth_fail`
-  dropped; the suite recreates its own database every run. Not mine, left to their owners
-  (`db-0038-inventory.txt`): `igcse_leadf0b_dev` and `igcse_test` ran 0038 as at 2fda35a;
+  copy keeps the earlier outcome silently. The final 0038 is recorded with the hash beginning
+  `b91808ee2042`. Recreated with it on 30 Sep (02:14Z): `igcse_catalogue_dev` (from
+  `igcse_template_dev`), `igcse_catalogue_rich_dev` (from `igcse_foundation_dev`),
+  `igcse_catalogue_synth` and `igcse_catalogue_synth_closed` (from the synthetic state before
+  0037); `igcse_catalogue_synth_fail` dropped; the suite recreates its own database every run.
+  Not mine, left to their owners (`db-0038-inventory.txt`): `igcse_leadf0b_dev` and `igcse_test`
+  ran 0038 as at 2fda35a;
   `igcse_scheduling_dev` and `igcse_scheduling_test` ran it as at 682907a, the base of
   `feature/scheduling`. The branch has not been merged, so nothing migrated from `main` has run
   any 0038.
@@ -213,8 +232,9 @@ registration (`entryItemsFor`).
   series reads its routed subjects `FOR SHARE` before its links. A checkout and the desk read the
   series of their registrations `FOR SHARE`.
 - **The coordinator's answer (decision 3).** A subject's board is staff data (Catalogue mapping
-  or the Subjects form). Changing it moves its live registrations to each window's default
-  series of the new board, audited per registration, and **re-points each window's route** for
+  or the Subjects form). Changing it is audited once in its transaction
+  (`SUBJECT_BOARD_CHANGED`, from either screen), moves its live registrations to each window's
+  default series of the new board, audited per registration, and **re-points each window's route** for
   the subject to that default (a route to the default is removed; `SUBJECT_ROUTE_MOVED`), so
   families are offered it and can register it (review flag 2). Refused, with nothing changed,
   when a window feeds no series of the new board, when an entry's series is past its deadline,
@@ -316,7 +336,8 @@ Each replaces a part of the coordinator's sheet (UX_AUDIT.md §4: the Excel vers
   the migration entered with another board (old board struck through, "offered only" when it
   saw no registration) or left not offered in some windows, with those windows; and the
   registrations it entered with the new board, with window and series. Staff tick what they
-  checked, or change a board on the Catalogue.
+  checked, or change a board on the Catalogue or the Subjects form (the subject then leaves the
+  list by itself).
 - **The tier** on the Catalogue: a component's or award's tier where the syllabus fixes it
   (IGCSE only), set when adding it and shown beside its level.
 - **The family's register and checkout screens** (F0b's money rule, review flag 3): subjects
@@ -348,7 +369,8 @@ MO-10 per series), `08j-course-enrolment.test.ts` (enrolment), `08k-catalogue-ra
 The review's fixes: `08l-board-change.test.ts` (a board change refused into a passed or
 different deadline, allowed with the same deadline; routes re-pointed and refused likewise;
 what the migration inferred — re-boarded subjects registered or only offered, subjects not
-offered, registrations — listed until checked), `08m-checkout-per-series.test.ts` (a mixed
+offered, registrations — listed until checked; a board chosen on the Subjects form takes the
+subject off the list, another change on the form does not), `08m-checkout-per-series.test.ts` (a mixed
 family checkout refused and the summary grouped; same-deadline series share one; a deadline
 change, the admin's move and a window's first series that would split an open checkout each
 refused with nothing changed — the deadline change and the window's series go through once the
@@ -371,10 +393,11 @@ live registration in a window feeding series is in one of them, of its subject's
 registration expired at a deadline was in a series whose deadline had passed; every window
 closes before every fed series' deadline and every series is in its academic year and kind;
 every open payment's registrations share one entry deadline.
-Controls C1–C29 (each guard undone once, red, restored; C5 and C5b, one lock each of a pair,
+Controls C1–C30 (each guard undone once, red, restored; C5 and C5b, one lock each of a pair,
 stayed green and C5c, both, went red) are rows in `.audit/catalogue.tsv`; C26 puts the
 window-wide earliest deadline back (08i red), C27–C29 remove the move's, the window series' and
-the deadline change's checkout guards (08m and 09 red).
+the deadline change's checkout guards (08m and 09 red), C30 stops a board change clearing
+"Check these" (08l red).
 
 **Changed assertions.** The MO-10 assertions in `08-money-rules.test.ts` that a deadline per
 board series changes (pre-authorised): each has its own trail row (old, new, why) and keeps its
@@ -509,4 +532,9 @@ and 08i goes red).
   recreated; the other databases on the container inventoried (b19c7f2).
 - 01:54Z — items 5 and 6: this document (0038 edited in place and what to recreate; the
   `sessionWindow` callers, swaps route with `routeAndCheck`), the docstring's callers corrected,
-  MONEY_AUDIT's MO-10 text.
+  MONEY_AUDIT's MO-10 text (90a599c); gates green at 90a599c; CI green on 8f272b2.
+- After 02:02Z — the Opus 5.5 confirmation of 1ead61b says merge, with two small items.
+- 02:13Z — item 1: 0038 counts only draft or active windows as offering; proven on the
+  synthetic copy and a copy with January closed; dev copies recreated.
+- 02:16Z — item 2: a board change on either screen writes `SUBJECT_BOARD_CHANGED` in its
+  transaction and takes the subject off "Check these"; 08l; control C30.

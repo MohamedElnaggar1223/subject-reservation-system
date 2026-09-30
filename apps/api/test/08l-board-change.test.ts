@@ -142,6 +142,32 @@ describe('F0b: a board change and the entry deadline', () => {
     });
   });
 
+  it("a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not", async () => {
+    const chosen = await subject(adm, 'BC-SFC', 'Board change Subjects form chosen', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
+    const other = await subject(adm, 'BC-SFO', 'Board change Subjects form other', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
+    // As migration 0038 writes them (see the test above).
+    await sql(`insert into audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data, created_at)
+      values (gen_random_uuid()::text, null, 'SUBJECT_BOARD_INFERRED', 'subject', $1, '{"council":"cambridge"}', '{"council":"pearson_edexcel","windows":["January 2027 AS"],"registered":false}', now()),
+             (gen_random_uuid()::text, null, 'SUBJECT_BOARD_INFERRED', 'subject', $2, '{"council":"cambridge"}', '{"council":"pearson_edexcel","windows":["January 2027 AS"],"registered":false}', now())`,
+      [chosen, other]);
+    const listedIds = async () => (await apiResponse(coordinator.api.v1['board-series'].inferred.$get())).subjects.map((x) => x.subjectId);
+    expect(await listedIds()).toEqual(expect.arrayContaining([chosen, other]));
+
+    // A change that is not the board leaves it to check.
+    await apiResponse(adm.api.v1.subjects[':id'].$put({ param: { id: other }, json: { name: 'Board change Subjects form other (renamed)' } }));
+    // The board chosen on the Subjects form: the admin has answered the question.
+    await apiResponse(adm.api.v1.subjects[':id'].$put({ param: { id: chosen }, json: { council: 'cambridge' } }));
+    expect(await councilOf(chosen)).toBe('cambridge');
+    await audited([chosen], ['SUBJECT_BOARD_INFERRED', 'SUBJECT_BOARD_CHANGED']);
+    expect(await one<{ was: string; now: string }>(
+      `select previous_data->>'council' as was, new_data->>'council' as now from audit_log where action = 'SUBJECT_BOARD_CHANGED' and entity_id = $1`, [chosen],
+    )).toEqual({ was: 'pearson_edexcel', now: 'cambridge' });
+
+    const after = await listedIds();
+    expect(after).not.toContain(chosen);
+    expect(after).toContain(other);
+  });
+
   describe("a window's route for the subject moves with it (flag 2)", () => {
     it("the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there", async () => {
       const w = await window('route');

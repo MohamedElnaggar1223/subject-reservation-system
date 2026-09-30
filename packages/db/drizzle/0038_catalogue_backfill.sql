@@ -68,8 +68,10 @@ WHERE s.qualification_level = 'igcse' AND s.qualification_id IS NULL
 --       - A subject registered in a window whose month its board does not
 --         sit (the school's January and October rows, all "cambridge" until
 --         now: Cambridge sits no January or October series), or offered in
---         one with no registration at all (an active subject at the window's
---         level), is entered with the board that does: the first board, in
+--         one with no registration at all (an active subject at the level of
+--         a draft or active window: a closed window offers nothing any more,
+--         so a window closed years ago moves no subject), is entered with the
+--         board that does: the first board, in
 --         the catalogue's order, that sits every month it is registered or
 --         offered in (Pearson Edexcel for AS and A Level January and
 --         October: IS-14, DISCOVERY_RESEARCH.md §1). One SUBJECT_BOARD_INFERRED
@@ -77,9 +79,10 @@ WHERE s.qualification_level = 'igcse' AND s.qualification_id IS NULL
 --         (after pass c); its old board's award and units are cleared.
 --       - A registered subject whose board sits the months it is registered
 --         in keeps its board (the registrations are the evidence) even where
---         it is also offered in a window of a month its board does not sit:
---         there it is not offered, and one SUBJECT_NOT_OFFERED_INFERRED row
---         says which windows.
+--         it is also offered in a draft or active window of a month its board
+--         does not sit: there it is not offered, and one
+--         SUBJECT_NOT_OFFERED_INFERRED row says which windows (closed ones are
+--         history, not listed).
 --       Both are listed for staff on the Board series screen ("Check these").
 --    b. Each window feeds, for every board of the subjects it registered or
 --       offers (active subjects at its level), that board's series of the
@@ -104,9 +107,11 @@ BEGIN
       SELECT DISTINCT r.subject_id AS id, w.session_type AS month, w.name
       FROM registration r JOIN registration_session w ON w.id = r.session_id
     ), offered AS (
+      -- Offered: an active subject at the level of a window still to come or
+      -- open (draft or active). A closed window offers nothing any more.
       SELECT sub.id, w.session_type AS month, w.name
       FROM subject sub JOIN registration_session w ON w.qualification_level = sub.qualification_level
-      WHERE sub.is_active
+      WHERE sub.is_active AND w.status IN ('draft', 'active')
     ), candidates AS (
       -- Registered where its board does not sit the month: the months registered and offered.
       SELECT sub.id FROM subject sub JOIN registered g ON g.id = sub.id
@@ -157,7 +162,7 @@ SELECT gen_random_uuid()::text, NULL, 'SUBJECT_NOT_OFFERED_INFERRED', 'subject',
   now()
 FROM subject sub
 JOIN registration_session w ON w.qualification_level = sub.qualification_level
-WHERE sub.is_active
+WHERE sub.is_active AND w.status IN ('draft', 'active')
   AND NOT EXISTS (SELECT 1 FROM exam_board b WHERE b.code = sub.council AND b.series_months ? w.session_type)
 GROUP BY sub.id, sub.council;
 --> statement-breakpoint

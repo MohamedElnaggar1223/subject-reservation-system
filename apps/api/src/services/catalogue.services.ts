@@ -467,6 +467,11 @@ export async function applyBoardChange(
   await tx.update(subject).set({ council: newBoard, qualificationId: null, updatedAt: new Date() }).where(eq(subject.id, s.id));
   await tx.delete(subjectUnit).where(eq(subjectUnit.subjectId, s.id));
   const why = `The subject's board changed to ${boardName(boardNamesNow, newBoard)}`;
+  // One row for the change itself, in its transaction, whichever screen made
+  // it (the Catalogue's mapping or the Subjects form): a subject the
+  // migration re-boarded leaves "Check these" once staff choose its board.
+  await logAction(actorId, 'SUBJECT_BOARD_CHANGED', 'subject', s.id, { council: s.council },
+    { council: newBoard, registrationsMoved: moved.length, routesMoved: routes.length }, undefined, tx);
   if (moved.length) {
     for (const m of moved) {
       await tx.update(registration).set({ boardSeriesId: m.to, updatedAt: new Date() }).where(eq(registration.id, m.id));

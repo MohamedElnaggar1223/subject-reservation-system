@@ -678,8 +678,9 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
  *   window of a month it does not sit;
  * - the registrations of a re-boarded subject, entered in its new board's
  *   series.
- * A subject stays listed until staff mark it checked or map it on the
- * Catalogue; a registration until it is marked checked or moved.
+ * A subject stays listed until staff mark it checked, map it on the
+ * Catalogue, or change its board (either screen: SUBJECT_BOARD_CHANGED); a
+ * registration until it is marked checked or moved.
  */
 export async function listInferredRoutings() {
   const { names } = await boardNameMap();
@@ -694,7 +695,7 @@ export async function listInferredRoutings() {
       and not exists (
         select 1 from audit_log c
         where c.entity_id = a.entity_id and c.created_at >= a.created_at and c.id <> a.id
-          and c.action in ('SUBJECT_BOARD_INFERENCE_CHECKED', 'SUBJECT_CATALOGUE_MAPPED'))
+          and c.action in ('SUBJECT_BOARD_INFERENCE_CHECKED', 'SUBJECT_CATALOGUE_MAPPED', 'SUBJECT_BOARD_CHANGED'))
     order by s.name`).then((r) => r.rows as {
       subjectId: string; action: string; previousBoard: string | null; windows: string[] | null; inferredAt: string;
       subjectName: string; subjectCode: string; board: string; registered: boolean;
