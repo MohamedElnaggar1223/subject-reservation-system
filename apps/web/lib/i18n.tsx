@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { foundationArabic } from './i18n-foundation';
 import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
+import { examsArabic, translateExamsText } from './i18n-exams';
 
 export type Language = 'en' | 'ar';
 
@@ -84,6 +85,17 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.exams': 'Exams',
     'nav.catalogue': 'Exam Catalogue',
     'nav.boardSeries': 'Board Series',
+    'nav.examDeadlines': 'Exam Deadlines',
+    'nav.candidates': 'Candidates',
+    'nav.entries': 'Exam Entries',
+    'nav.entryLists': 'Entry Lists',
+    'nav.examTimetable': 'Exam Timetable',
+    'nav.examDays': 'Exam Days',
+    'nav.examResults': 'Exam Results',
+    'nav.certificates': 'Certificates',
+    'nav.forecasts': 'Forecast Grades',
+    'nav.invigilation': 'Invigilation',
+    'nav.myExams': 'My Exams',
     'reports.title': 'Reports',
     'reports.description': 'Generate and export data reports. All reports support CSV download.',
     'reports.pendingApprovals': 'Pending Approvals',
@@ -183,6 +195,17 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.exams': 'الامتحانات',
     'nav.catalogue': 'دليل الامتحانات',
     'nav.boardSeries': 'دورات المجالس',
+    'nav.examDeadlines': 'مواعيد الامتحانات',
+    'nav.candidates': 'المرشحون',
+    'nav.entries': 'قيود الامتحانات',
+    'nav.entryLists': 'قوائم القيد',
+    'nav.examTimetable': 'جدول الامتحانات',
+    'nav.examDays': 'أيام الامتحانات',
+    'nav.examResults': 'نتائج الامتحانات',
+    'nav.certificates': 'الشهادات',
+    'nav.forecasts': 'الدرجات المتوقعة',
+    'nav.invigilation': 'المراقبة',
+    'nav.myExams': 'امتحاناتي',
     'app.subjectReservation': 'حجز المواد',
     'common.user': 'مستخدم',
     'common.signOut': 'تسجيل الخروج',
@@ -1493,6 +1516,8 @@ Object.assign(autoArabicText, foundationArabic);
 // F0b screens (lib/i18n-catalogue.ts): only words the app does not already
 // translate, so a shared word keeps the Arabic the other screens use.
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// F4 screens (lib/i18n-exams/): likewise only words not already translated.
+for (const [en, ar] of Object.entries(examsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1571,6 +1596,9 @@ function translateDynamicText(text: string): string | null {
   // F0b: the catalogue's, the series' and the enrolment's sentences with names in them.
   const f0bText = translateCatalogueText(text);
   if (f0bText) return f0bText;
+  // F4: exam entries' sentences with names, codes and dates in them.
+  const f4Text = translateExamsText(text);
+  if (f4Text) return f4Text;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

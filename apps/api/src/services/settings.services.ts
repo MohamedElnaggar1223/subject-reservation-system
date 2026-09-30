@@ -52,6 +52,10 @@ export async function listSettings(role: string | null | undefined) {
       source: def.source ?? null,
       input: def.input,
       choices: 'choices' in def ? (def.choices as readonly { value: string; label: string }[]) : [],
+      // F4: a number's bounds and unit, for the screen.
+      min: 'min' in def ? (def.min as number) : null,
+      max: 'max' in def ? (def.max as number) : null,
+      unit: 'unit' in def ? (def.unit as string) : null,
       editableBy: [...def.editableBy] as string[],
       canEdit: hasRole(role, ...def.editableBy),
       value: (parsed?.success ? parsed.data : def.default) as unknown,
