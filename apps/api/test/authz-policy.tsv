@@ -237,3 +237,55 @@ POST	/v1/enrolments/:id/end	D	D	D	D	D	A	A	D	D
 POST	/v1/enrolments/bulk	D	D	D	D	D	A	A	D	D
 POST	/v1/enrolments/section	D	D	D	D	D	A	A	D	D
 POST	/v1/enrolments/batch	D	D	D	D	D	A	A	D	D
+# F1 (FEATURES_PLAN.md): scheduling. Groups, the year's rules, timetables, the generator, publishing,
+# exports and cover are the coordinator's and the admin's. The views decide in the handler who may read
+# which student, teacher, room or section (05: another family, another class, a cover teacher outside
+# the covered lesson and date, the gate). The calendar feed is anonymous: its token is the key, and a
+# wrong or revoked token gets a bare 404 (05).
+GET	/v1/scheduling/groups	D	D	D	D	D	A	A	D	D
+GET	/v1/scheduling/groups/:id	D	D	D	D	D	A	A	D	D
+POST	/v1/scheduling/groups/form	D	D	D	D	D	A	A	D	D
+POST	/v1/scheduling/groups/sections	D	D	D	D	D	A	A	D	D
+POST	/v1/scheduling/groups/merge	D	D	D	D	D	A	A	D	D
+POST	/v1/scheduling/groups	D	D	D	D	D	A	A	D	D
+PUT	/v1/scheduling/groups/:id	D	D	D	D	D	A	A	D	D
+POST	/v1/scheduling/groups/:id/members	D	D	D	D	D	A	A	D	D
+POST	/v1/scheduling/groups/:id/members/end	D	D	D	D	D	A	A	D	D
+POST	/v1/scheduling/groups/:id/split	D	D	D	D	D	A	A	D	D
+POST	/v1/scheduling/groups/:id/archive	D	D	D	D	D	A	A	D	D
+GET	/v1/scheduling/rules	D	D	D	D	D	A	A	D	D
+PUT	/v1/scheduling/rules/teachers/:teacherId	D	D	D	D	D	A	A	D	D
+PUT	/v1/scheduling/rules/rooms/:roomId	D	D	D	D	D	A	A	D	D
+POST	/v1/scheduling/rules/day-rules	D	D	D	D	D	A	A	D	D
+DELETE	/v1/scheduling/rules/day-rules/:id	D	D	D	D	D	A	A	D	D
+GET	/v1/timetables	D	D	D	D	D	A	A	D	D
+POST	/v1/timetables	D	D	D	D	D	A	A	D	D
+GET	/v1/timetables/:id	D	D	D	D	D	A	A	D	D
+PUT	/v1/timetables/:id	D	D	D	D	D	A	A	D	D
+DELETE	/v1/timetables/:id	D	D	D	D	D	A	A	D	D
+POST	/v1/timetables/:id/lessons/:lessonId/move	D	D	D	D	D	A	A	D	D
+POST	/v1/timetables/:id/lessons/:lessonId/unplace	D	D	D	D	D	A	A	D	D
+POST	/v1/timetables/:id/lessons/:lessonId/lock	D	D	D	D	D	A	A	D	D
+POST	/v1/timetables/:id/generate	D	D	D	D	D	A	A	D	D
+POST	/v1/timetables/:id/publish	D	D	D	D	D	A	A	D	D
+GET	/v1/timetables/:id/export/fet	D	D	D	D	D	A	A	D	D
+GET	/v1/timetables/:id/export/asc	D	D	D	D	D	A	A	D	D
+GET	/v1/timetables/:id/export/csv	D	D	D	D	D	A	A	D	D
+GET	/v1/cover/absences	D	D	D	D	D	A	A	D	D
+POST	/v1/cover/absences	D	D	D	D	D	A	A	D	D
+GET	/v1/cover/absences/:id	D	D	D	D	D	A	A	D	D
+POST	/v1/cover/absences/:id/cancel	D	D	D	D	D	A	A	D	D
+GET	/v1/cover/suggestions	D	D	D	D	D	A	A	D	D
+POST	/v1/cover/assignments	D	D	D	D	D	A	A	D	D
+POST	/v1/cover/assignments/:id/remove	D	D	D	D	D	A	A	D	D
+GET	/v1/cover/log	D	D	D	D	D	A	A	D	D
+GET	/v1/cover/report	D	D	D	D	D	A	A	D	D
+GET	/v1/schedule/day	D	A	A	A	A	A	A	A	D
+GET	/v1/schedule/week	D	A	A	A	A	A	A	A	D
+GET	/v1/schedule/me/day	D	A	A	A	A	A	A	A	A
+GET	/v1/schedule/me/week	D	A	A	A	A	A	A	A	A
+GET	/v1/schedule/lesson	D	D	D	A	A	A	A	A	D
+GET	/v1/schedule/feed	D	A	A	A	A	A	A	A	A
+POST	/v1/schedule/feed	D	A	A	A	A	A	A	A	A
+DELETE	/v1/schedule/feed	D	A	A	A	A	A	A	A	A
+GET	/v1/ical/:token	A	A	A	A	A	A	A	A	A

@@ -2542,7 +2542,9 @@ export const teachingGroupMember = pgTable(
     // The enrolment it came from (formed or refreshed from the course enrolment).
     enrolmentId: text("enrolment_id").references(() => courseEnrolment.id, { onDelete: "set null" }),
     startedOn: date("started_on", { mode: "string" }).notNull(),
-    // The last day in the group (inclusive), null while open.
+    // The last day in the group (inclusive), null while open. The day before
+    // started_on means it was withdrawn before its first day (an empty stay:
+    // the history is kept without a day the student was never there).
     endedOn: date("ended_on", { mode: "string" }),
     endReason: text("end_reason"),
     addedBy: text("added_by").references(() => user.id, { onDelete: "set null" }),
@@ -2556,7 +2558,7 @@ export const teachingGroupMember = pgTable(
     uniqueIndex("teachingGroupMember_one_subject_idx")
       .on(table.studentId, table.subjectId, table.academicYearId)
       .where(sql`ended_on IS NULL AND subject_id IS NOT NULL`),
-    check("teaching_group_member_dates_ordered", sql`${table.endedOn} IS NULL OR ${table.endedOn} >= ${table.startedOn}`),
+    check("teaching_group_member_dates_ordered", sql`${table.endedOn} IS NULL OR ${table.endedOn} >= ${table.startedOn} - 1`),
   ]
 );
 

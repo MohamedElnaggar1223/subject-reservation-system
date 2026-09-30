@@ -36,6 +36,14 @@ import {
   SchedulingError, isUniqueViolation, addDays, readableDate, groupMembersBetween, peakSize, type Tx, type Executor,
 } from './scheduling-shared.services';
 
+/**
+ * The last day of a membership that ends on `lastDay`: a membership that has
+ * not begun by then ends the day before its first day — an empty stay, kept as
+ * history, with no day the student was never there (unlike a clamp to the
+ * start day: STATE_AUDIT SO-9).
+ */
+const lastDayOf = (startedOn: string, lastDay: string) => (lastDay < startedOn ? addDays(startedOn, -1) : lastDay);
+
 async function yearOrThrow(id: string, executor: Executor = db) {
   const [y] = await executor.select().from(academicYear).where(eq(academicYear.id, id));
   if (!y) throw new SchedulingError('Academic year not found — set the year up on the Academic year screen first', 404);
@@ -270,7 +278,7 @@ export async function formGroups(data: FormGroupsType, actorId: string, ctx?: Au
         }
         for (const r of p.removing) {
           const [m] = await tx.select({ startedOn: teachingGroupMember.startedOn }).from(teachingGroupMember).where(eq(teachingGroupMember.id, r.memberId));
-          const endedOn = m!.startedOn > addDays(startsOn, -1) ? m!.startedOn : addDays(startsOn, -1);
+          const endedOn = lastDayOf(m!.startedOn, addDays(startsOn, -1));
           await tx.update(teachingGroupMember).set({ endedOn, endReason: 'No longer enrolled in school in this subject', endedBy: actorId }).where(eq(teachingGroupMember.id, r.memberId));
           removed++;
         }
@@ -441,7 +449,8 @@ async function addMembersTx(tx: Tx, groupId: string, studentIds: string[], start
     const c = current.find((x) => x.studentId === id);
     if (c && c.groupId === g.id) continue;
     if (c) {
-      const endedOn = c.startedOn >= startsOn ? c.startedOn : addDays(startsOn, -1);
+      // A move on the day they joined replaces that membership (it ends the day before it began).
+      const endedOn = lastDayOf(c.startedOn, addDays(startsOn, -1));
       await tx.update(teachingGroupMember).set({ endedOn, endReason: `Moved to ${g.name}`, endedBy: actorId }).where(eq(teachingGroupMember.id, c.id));
       moved++;
     }
@@ -568,7 +577,7 @@ async function archiveTx(tx: Tx, groupId: string, archivedOn: string, reason: st
   const members = await tx.select({ id: teachingGroupMember.id, startedOn: teachingGroupMember.startedOn }).from(teachingGroupMember)
     .where(and(eq(teachingGroupMember.groupId, groupId), isNull(teachingGroupMember.endedOn))).for('update');
   for (const m of members) {
-    const endedOn = m.startedOn > addDays(archivedOn, -1) ? m.startedOn : addDays(archivedOn, -1);
+    const endedOn = lastDayOf(m.startedOn, addDays(archivedOn, -1));
     await tx.update(teachingGroupMember).set({ endedOn, endReason: reason, endedBy: actorId }).where(eq(teachingGroupMember.id, m.id));
   }
   await tx.update(teachingGroup).set({ archivedOn, archivedReason: reason, updatedAt: new Date() }).where(eq(teachingGroup.id, groupId));
@@ -595,7 +604,7 @@ export async function endGroupMembershipsOnLeaving(tx: Tx, studentId: string, le
     .where(and(eq(teachingGroupMember.studentId, studentId), isNull(teachingGroupMember.endedOn))).for('update');
   for (const m of open) {
     await tx.update(teachingGroupMember)
-      .set({ endedOn: leftOn < m.startedOn ? m.startedOn : leftOn, endReason: reason, endedBy: actorId })
+      .set({ endedOn: lastDayOf(m.startedOn, leftOn), endReason: reason, endedBy: actorId })
       .where(eq(teachingGroupMember.id, m.id));
   }
   return open.length;
@@ -612,7 +621,7 @@ export async function endGroupMembershipsForSubject(tx: Tx, studentId: string, s
     .for('update');
   for (const m of open) {
     await tx.update(teachingGroupMember)
-      .set({ endedOn: lastDay < m.startedOn ? m.startedOn : lastDay, endReason: reason, endedBy: actorId })
+      .set({ endedOn: lastDayOf(m.startedOn, lastDay), endReason: reason, endedBy: actorId })
       .where(eq(teachingGroupMember.id, m.id));
   }
   return open.length;

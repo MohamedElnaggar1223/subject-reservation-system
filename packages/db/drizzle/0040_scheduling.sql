@@ -119,7 +119,7 @@ CREATE TABLE "teaching_group_member" (
 	"added_by" text,
 	"ended_by" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "teaching_group_member_dates_ordered" CHECK ("teaching_group_member"."ended_on" IS NULL OR "teaching_group_member"."ended_on" >= "teaching_group_member"."started_on")
+	CONSTRAINT "teaching_group_member_dates_ordered" CHECK ("teaching_group_member"."ended_on" IS NULL OR "teaching_group_member"."ended_on" >= "teaching_group_member"."started_on" - 1)
 );
 --> statement-breakpoint
 CREATE TABLE "timetable" (

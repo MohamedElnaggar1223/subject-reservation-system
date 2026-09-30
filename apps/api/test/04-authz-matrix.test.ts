@@ -140,8 +140,10 @@ describe('authorization matrix', () => {
     for (const key of policy.keys()) if (!observed.has(key)) problems.push(`${key}: in authz-policy.tsv but no longer registered`);
     expect(problems).toEqual([]);
 
-    // No endpoint may answer an anonymous caller except the health probes.
+    // No endpoint may answer an anonymous caller except the health probes and
+    // F1's calendar feed, whose token is the key (a wrong token gets a bare 404: 05).
     const anonymous = [...observed].filter(([, row]) => row.anon !== 401).map(([key]) => key);
-    expect(anonymous.sort()).toEqual(['GET /v1/health', 'GET /v1/health/ready']);
+    expect(anonymous.sort()).toEqual(['GET /v1/health', 'GET /v1/health/ready', 'GET /v1/ical/:token']);
+    expect(observed.get('GET /v1/ical/:token')!.anon).toBe(404);
   }, 300_000);
 });

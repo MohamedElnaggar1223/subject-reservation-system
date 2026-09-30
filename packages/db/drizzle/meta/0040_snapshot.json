@@ -1,5 +1,5 @@
 {
-  "id": "e09d52e8-d533-4b7d-9f6b-5df07d4d5894",
+  "id": "b6c14416-7140-4a9b-8d10-3c3c9bd7670b",
   "prevId": "a5b478a1-4326-4449-8fe7-d24db549c1f5",
   "version": "7",
   "dialect": "postgresql",
@@ -8375,7 +8375,7 @@
       "checkConstraints": {
         "teaching_group_member_dates_ordered": {
           "name": "teaching_group_member_dates_ordered",
-          "value": "\"teaching_group_member\".\"ended_on\" IS NULL OR \"teaching_group_member\".\"ended_on\" >= \"teaching_group_member\".\"started_on\""
+          "value": "\"teaching_group_member\".\"ended_on\" IS NULL OR \"teaching_group_member\".\"ended_on\" >= \"teaching_group_member\".\"started_on\" - 1"
         }
       },
       "isRLSEnabled": false

@@ -506,8 +506,13 @@ function bestFreeRoom(ix: Index, l: EngineLesson, g: EngineGroup, weekday: numbe
   const free = (r: EngineRoom) => !busy.has(r.id) && !at.periods.some((q) => isOff(ix.roomOff, r.id, weekday, q));
   const own = l.roomId ? ix.room.get(l.roomId) : undefined;
   if (own && roomMisfit(ix, g, own) === null && free(own)) return own.id;
-  const pick = suitableRoomsIx(ix, g).find(free);
+  const suitable = suitableRoomsIx(ix, g);
+  const pick = suitable.find(free);
   if (pick) return pick.id;
+  // No suitable room is free: keep the one that best suits, so the clash names
+  // the real cause (it is taken, or unavailable) rather than "no room".
+  if (own && roomMisfit(ix, g, own) === null) return own.id;
+  if (suitable[0]) return suitable[0].id;
   return ix.input.roomsRequired ? (own?.id ?? null) : null;
 }
 
