@@ -121,6 +121,20 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
     if (!intervalsOf.has(m.groupId)) intervalsOf.set(m.groupId, []);
     intervalsOf.get(m.groupId)!.push(m);
   }
+  // A group drawn from several sections prefers the homeroom most of its students come from.
+  const sectionRooms = new Map(
+    (studentIds.length ? await executor.select({ id: section.id, name: section.name, roomId: section.roomId }).from(section).where(eq(section.academicYearId, tt.academicYearId)) : [])
+      .map((s) => [s.id, s]),
+  );
+  const homeroomOf = (groupId: string) => {
+    const count = new Map<string, number>();
+    for (const s of new Set((intervalsOf.get(groupId) ?? []).map((i) => i.studentId))) {
+      const sec = sectionOf.get(s);
+      if (sec) count.set(sec.id, (count.get(sec.id) ?? 0) + 1);
+    }
+    const best = [...count.entries()].sort((a, b) => b[1] - a[1] || (sectionRooms.get(a[0])?.name ?? '').localeCompare(sectionRooms.get(b[0])?.name ?? '', 'en', { numeric: true }))[0];
+    return best ? sectionRooms.get(best[0])?.roomId ?? null : null;
+  };
   const input: EngineInput = {
     days: grid.days,
     groups: groups.map(({ g, sectionRoomId }) => {
@@ -134,7 +148,7 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
         roomType: g.roomType,
         roomFeatures: g.roomFeatures,
         roomId: g.roomId,
-        preferredRoomId: sectionRoomId ?? null,
+        preferredRoomId: sectionRoomId ?? homeroomOf(g.id),
       };
     }).sort((a, b) => a.id.localeCompare(b.id)),
     lessons: lessons.map((l) => ({ id: l.id, groupId: l.groupId, seq: l.seq, length: l.length, weekday: l.weekday, period: l.period, roomId: l.roomId, locked: l.locked })),

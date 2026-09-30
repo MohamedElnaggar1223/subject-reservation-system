@@ -26,7 +26,7 @@
 
 import {
   type EngineInput, type EngineLesson, type EngineGroup, type EngineRoom, type TimetableMeasures,
-  WEEKDAY_NAMES, measure, roomTypeWords, featureWords,
+  WEEKDAY_NAMES, measure, roomTypeWords, featureWords, compareRoomsFor,
 } from './engine';
 
 export type GenerateOptions = {
@@ -216,16 +216,14 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     && (!g.roomType || r.type === g.roomType)
     && g.roomFeatures.every((f) => r.features.includes(f))
     && (r.capacity === null || g.size <= r.capacity);
-  const roomsOf: number[][] = groups.map((g) => rooms
-    .map((r, i) => ({ r, i }))
-    .filter(({ r }) => fits(g, r))
-    .sort((a, b) =>
-      Number(b.r.id === g.roomId) - Number(a.r.id === g.roomId)
-      || Number(b.r.id === g.preferredRoomId) - Number(a.r.id === g.preferredRoomId)
-      || (a.r.capacity ?? 1e9) - (b.r.capacity ?? 1e9)
-      || a.r.name.localeCompare(b.r.name, 'en', { numeric: true })
-      || a.r.id.localeCompare(b.r.id))
-    .map(({ i }) => i));
+  const roomsOf: number[][] = groups.map((g) => {
+    const order = compareRoomsFor(g);
+    return rooms
+      .map((r, i) => ({ r, i }))
+      .filter(({ r }) => fits(g, r))
+      .sort((a, b) => order(a.r, b.r))
+      .map(({ i }) => i);
+  });
   const needsRoom = input.roomsRequired;
 
   // Lesson facts.

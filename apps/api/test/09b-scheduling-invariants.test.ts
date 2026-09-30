@@ -61,7 +61,8 @@ describe('F1: scheduling invariants over the whole database', () => {
       select t.name as timetable, g.name as group_name, g.weekly_periods, g.double_periods,
              coalesce(sum(l.length), 0) as periods, count(l.id) filter (where l.length = 2) as doubles
         from timetable t join academic_term term on term.id = t.term_id
-        join teaching_group g on g.academic_year_id = t.academic_year_id and (g.archived_on is null or g.archived_on > term.starts_on)
+        join teaching_group g on g.academic_year_id = t.academic_year_id
+          and (g.archived_on is null or g.archived_on > greatest(term.starts_on, (now() at time zone 'Africa/Cairo')::date))
         left join timetable_lesson l on l.timetable_id = t.id and l.group_id = g.id
        where t.status = 'draft'
        group by t.name, g.name, g.weekly_periods, g.double_periods
@@ -69,7 +70,7 @@ describe('F1: scheduling invariants over the whole database', () => {
     expect(await sql(`
       select t.name, g.name from timetable_lesson l join timetable t on t.id = l.timetable_id and t.status = 'draft'
       join academic_term term on term.id = t.term_id join teaching_group g on g.id = l.group_id
-      where g.archived_on is not null and g.archived_on <= term.starts_on`)).toEqual([]);
+      where g.archived_on is not null and g.archived_on <= greatest(term.starts_on, (now() at time zone 'Africa/Cairo')::date)`)).toEqual([]);
   });
 
   it("a member's subject is its group's; nobody is in a group after leaving the school; one open group per subject", async () => {

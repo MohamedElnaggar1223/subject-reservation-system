@@ -24,9 +24,16 @@ export default async function TodayPage(): Promise<React.JSX.Element> {
     queryKey: ['academic', 'day', 'today'],
     queryFn: () => apiResponse(api.v1.academic.calendar.day.$get({ query: {} })),
   });
+  // F1: an account linked to a teacher record sees its lessons today.
+  let teaches = false;
+  try {
+    teaches = !!(await apiResponse(api.v1.users.me.$get())).teachingAs;
+  } catch {
+    // Today still renders without them.
+  }
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <TodayClient manages={hasRole(session.user.role, ...ACADEMIC_ROLES)} />
+      <TodayClient manages={hasRole(session.user.role, ...ACADEMIC_ROLES)} teaches={teaches} />
     </HydrationBoundary>
   );
 }

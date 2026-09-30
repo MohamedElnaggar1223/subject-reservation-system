@@ -275,7 +275,13 @@ function roomMisfit(ix: Index, g: EngineGroup, r: EngineRoom): { kind: ClashKind
   return null;
 }
 
-/** The rooms that suit a group, best first: its fixed room, its preferred room, then the smallest that fits, by name. */
+/**
+ * The rooms that suit a group, best first: its fixed room; its preferred room
+ * (a section's homeroom, or the homeroom most of its students come from); a
+ * group that needs no particular type takes a classroom before a lab or a
+ * hall (so the special rooms stay free for the groups that need them); then
+ * the smallest that fits; then by name.
+ */
 export function suitableRooms(input: EngineInput, groupId: string): EngineRoom[] {
   const ix = indexOf(input);
   const g = ix.group.get(groupId);
@@ -283,15 +289,18 @@ export function suitableRooms(input: EngineInput, groupId: string): EngineRoom[]
   return suitableRoomsIx(ix, g);
 }
 
+export function compareRoomsFor(g: EngineGroup) {
+  return (a: EngineRoom, b: EngineRoom) =>
+    Number(b.id === g.roomId) - Number(a.id === g.roomId)
+    || Number(b.id === g.preferredRoomId) - Number(a.id === g.preferredRoomId)
+    || (g.roomType ? 0 : Number(b.type === 'classroom') - Number(a.type === 'classroom'))
+    || (a.capacity ?? 1e9) - (b.capacity ?? 1e9)
+    || a.name.localeCompare(b.name, 'en', { numeric: true })
+    || a.id.localeCompare(b.id);
+}
+
 function suitableRoomsIx(ix: Index, g: EngineGroup): EngineRoom[] {
-  return ix.input.rooms
-    .filter((r) => roomMisfit(ix, g, r) === null)
-    .sort((a, b) =>
-      Number(b.id === g.roomId) - Number(a.id === g.roomId)
-      || Number(b.id === g.preferredRoomId) - Number(a.id === g.preferredRoomId)
-      || (a.capacity ?? 1e9) - (b.capacity ?? 1e9)
-      || a.name.localeCompare(b.name, 'en', { numeric: true })
-      || a.id.localeCompare(b.id));
+  return ix.input.rooms.filter((r) => roomMisfit(ix, g, r) === null).sort(compareRoomsFor(g));
 }
 
 // ─── Evaluation ──────────────────────────────────────────────────────────────
@@ -468,11 +477,13 @@ export type SlotOption = {
  * it while a lesson is dragged; the API refuses a move whose target is not ok.
  */
 export function optionsFor(input: EngineInput, lessonId: string, opts: { roomId?: string | null } = {}): SlotOption[] {
-  const base = input.lessons.find((l) => l.id === lessonId);
-  if (!base) return [];
+  const ix = indexOf(input);
+  const l = ix.lesson.get(lessonId);
+  if (!l) return [];
+  const others = placedOthers(ix, lessonId);
   const out: SlotOption[] = [];
   for (const d of input.days) for (const p of d.periods) {
-    out.push(judgeMove(input, lessonId, d.weekday, p.period, opts.roomId));
+    out.push(judgeAt(ix, l, d.weekday, p.period, opts.roomId, others));
   }
   return out;
 }
@@ -481,15 +492,119 @@ export function optionsFor(input: EngineInput, lessonId: string, opts: { roomId?
 export function judgeMove(input: EngineInput, lessonId: string, weekday: number, period: number, roomId?: string | null): SlotOption {
   const ix = indexOf(input);
   const l = ix.lesson.get(lessonId);
-  const g = l ? ix.group.get(l.groupId) : undefined;
-  if (!l || !g) return { weekday, period, ok: false, roomId: null, reasons: [] };
-  let chosen: string | null;
-  if (roomId !== undefined) chosen = roomId;
-  else chosen = bestFreeRoom(ix, l, g, weekday, period);
-  const moved: EngineLesson = { ...l, weekday, period, roomId: chosen };
-  const trial: EngineInput = { ...input, lessons: input.lessons.map((x) => (x.id === lessonId ? moved : x)) };
-  const { byLesson } = evaluate(trial);
-  const reasons = (byLesson[lessonId] ?? []);
+  if (!l) return { weekday, period, ok: false, roomId: null, reasons: [] };
+  return judgeAt(ix, l, weekday, period, roomId, placedOthers(ix, lessonId));
+}
+
+/** Every other lesson that has a place, with the periods it takes (in the order evaluate() reads them). */
+function placedOthers(ix: Index, lessonId: string): Placed[] {
+  const out: Placed[] = [];
+  for (const o of [...ix.input.lessons].sort(lessonOrder(ix))) {
+    if (o.id === lessonId || o.weekday === null || o.period === null) continue;
+    const g = ix.group.get(o.groupId);
+    if (!g) continue;
+    const at = periodsAt(ix, o.length, o.weekday, o.period);
+    if ('problem' in at) continue;
+    out.push({ lesson: o, group: g, weekday: o.weekday, periods: at.periods });
+  }
+  return out;
+}
+
+/**
+ * What evaluate() would report for this one lesson if it stood at a start —
+ * only the clashes it is part of, worked out from it alone (a pick-up in the
+ * grid asks this for every cell, so it must not re-read the whole timetable),
+ * with the same sentences in the same order.
+ */
+function judgeAt(ix: Index, base: EngineLesson, weekday: number, period: number, roomId: string | null | undefined, others: Placed[]): SlotOption {
+  const g = ix.group.get(base.groupId);
+  if (!g) return { weekday, period, ok: false, roomId: null, reasons: [] };
+  const chosen = roomId !== undefined ? roomId : bestFreeRoom(ix, base, g, weekday, period);
+  const l: EngineLesson = { ...base, weekday, period, roomId: chosen };
+  const days = ix.input.days;
+  const reasons: Clash[] = [];
+  const at = periodsAt(ix, l.length, weekday, period);
+  if ('problem' in at) {
+    reasons.push({
+      kind: at.problem, lessonIds: [l.id], weekday, period,
+      message: at.problem === 'double_split'
+        ? `${g.name}'s double at ${slotName(days, weekday, period)} is split by a break`
+        : `${g.name} is at ${WEEKDAY_NAMES[weekday] ?? 'a day'} period ${period}${l.length > 1 ? '–' + (period + 1) : ''}, which the bell schedule does not have`,
+    });
+    return { weekday, period, ok: false, roomId: chosen, reasons };
+  }
+  const where = slotName(days, weekday, at.periods[0]!);
+  if (g.teacherId && at.periods.some((q) => isOff(ix.teacherOff, g.teacherId!, weekday, q))) {
+    reasons.push({ kind: 'teacher_unavailable', lessonIds: [l.id], weekday, period: at.periods[0]!, message: `${teacherName(ix, g.teacherId)} is unavailable at ${where} (${g.name})` });
+  }
+  if (l.roomId) {
+    const r = ix.room.get(l.roomId);
+    if (r) {
+      const misfit = roomMisfit(ix, g, r);
+      if (misfit) reasons.push({ kind: misfit.kind, lessonIds: [l.id], weekday, period: at.periods[0]!, message: misfit.message });
+      if (at.periods.some((q) => isOff(ix.roomOff, r.id, weekday, q))) {
+        reasons.push({ kind: 'room_unavailable', lessonIds: [l.id], weekday, period: at.periods[0]!, message: `${r.name} is unavailable at ${where} (${g.name})` });
+      }
+    }
+  } else if (ix.input.roomsRequired) {
+    reasons.push({ kind: 'no_room', lessonIds: [l.id], weekday, period: at.periods[0]!, message: `${g.name} at ${where} has no room` });
+  }
+  // Pairs, at the first period both take, named in the order evaluate() lists a period's lessons.
+  const me: Placed = { lesson: l, group: g, weekday, periods: at.periods };
+  const order = lessonOrder(ix);
+  const pairs: { cell: number; at: number; kindRank: number; clash: Clash }[] = [];
+  for (const [oi, o] of others.entries()) {
+    if (o.weekday !== weekday) continue;
+    const common = o.periods.filter((q) => at.periods.includes(q));
+    if (!common.length) continue;
+    const cell = Math.min(...common);
+    const [a, b] = order(me.lesson, o.lesson) <= 0 ? [me, o] : [o, me];
+    const w = slotName(days, weekday, cell);
+    if (g.teacherId && g.teacherId === o.group.teacherId) {
+      pairs.push({ cell, at: oi, kindRank: 0, clash: { kind: 'teacher_busy', lessonIds: [a.lesson.id, b.lesson.id], weekday, period: cell, message: `${teacherName(ix, g.teacherId)} teaches ${a.group.name} and ${b.group.name} at ${w}` } });
+    }
+    const shared = g.id === o.group.id ? g.size : ix.overlap.get(g.id)?.get(o.group.id);
+    if (shared) {
+      pairs.push({
+        cell, at: oi, kindRank: 1, clash: {
+          kind: 'students_busy', lessonIds: [a.lesson.id, b.lesson.id], weekday, period: cell,
+          message: g.id === o.group.id ? `${a.group.name} has two lessons at ${w}` : `${shared} ${shared === 1 ? 'student is' : 'students are'} in both ${a.group.name} and ${b.group.name} at ${w}`,
+        },
+      });
+    }
+    if (l.roomId && l.roomId === o.lesson.roomId) {
+      pairs.push({ cell, at: oi, kindRank: 2, clash: { kind: 'room_busy', lessonIds: [a.lesson.id, b.lesson.id], weekday, period: cell, message: `${roomName(ix, l.roomId)} holds ${a.group.name} and ${b.group.name} at ${w}` } });
+    }
+  }
+  pairs.sort((x, y) => x.cell - y.cell || x.at - y.at || x.kindRank - y.kindRank);
+  reasons.push(...pairs.map((p) => p.clash));
+  // The teacher's day and week.
+  const t = g.teacherId ? ix.teacher.get(g.teacherId) : undefined;
+  if (t) {
+    const mine = others.filter((o) => o.group.teacherId === t.id);
+    if (t.maxPerDay !== null) {
+      const n = mine.filter((o) => o.weekday === weekday).reduce((s, o) => s + o.periods.length, 0) + at.periods.length;
+      if (n > t.maxPerDay) reasons.push({ kind: 'teacher_day_limit', lessonIds: [l.id], weekday, period: null, message: `${t.name} teaches ${n} periods on ${WEEKDAY_NAMES[weekday]}; the most is ${t.maxPerDay}` });
+    }
+    if (t.maxPerWeek !== null) {
+      const n = mine.reduce((s, o) => s + o.periods.length, 0) + at.periods.length;
+      if (n > t.maxPerWeek) reasons.push({ kind: 'teacher_week_limit', lessonIds: [l.id], weekday: null, period: null, message: `${t.name} teaches ${n} periods a week; the most is ${t.maxPerWeek}` });
+    }
+  }
+  // Lessons kept off the same day.
+  for (const r of [...ix.input.dayRules].sort((x, y) => (x.a + x.b).localeCompare(y.a + y.b))) {
+    if (r.a !== g.id && r.b !== g.id) continue;
+    const that = others.filter((o) => o.weekday === weekday);
+    if (r.a === r.b) {
+      const n = that.filter((o) => o.group.id === g.id).length + 1;
+      if (n > 1) reasons.push({ kind: 'same_day', lessonIds: [l.id], weekday, period: null, message: `${groupName(ix, r.a)} has ${n} lessons on ${WEEKDAY_NAMES[weekday]}; its lessons are kept on different days` });
+    } else {
+      const partner = r.a === g.id ? r.b : r.a;
+      if (that.some((o) => o.group.id === partner)) {
+        reasons.push({ kind: 'same_day', lessonIds: [l.id], weekday, period: null, message: `${groupName(ix, r.a)} and ${groupName(ix, r.b)} are both on ${WEEKDAY_NAMES[weekday]}; they are kept on different days` });
+      }
+    }
+  }
   return { weekday, period, ok: reasons.length === 0, roomId: chosen, reasons };
 }
 

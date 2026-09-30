@@ -217,7 +217,7 @@ function TermVersions({ year, term, rows, all }: { year: AcademicYearRow; term: 
                     <td className="px-3 py-3 text-muted-foreground">{v.publishedByName ? <bdi>{v.publishedByName}</bdi> : '—'}</td>
                     <td className="px-5 py-3">
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="outline" asChild><Link href={`/timetable/versions/${v.id}` as Route}>{v.status === 'draft' ? 'Edit' : 'Open'}</Link></Button>
+                        <Button size="sm" variant="outline" asChild><Link href={`/timetable/versions/${v.id}` as Route}>{v.status === 'draft' ? 'Edit' : 'View'}</Link></Button>
                         <Button size="sm" variant="outline" onClick={() => openCreate(v)}>Copy to a draft</Button>
                         {v.status === 'draft' && (
                           <Button size="sm" variant="ghost" disabled={remove.isPending} onClick={() => { if (window.confirm(`Delete the draft “${v.name}”? Its placements are lost; published versions are not touched.`)) remove.mutate(v.id); }}>

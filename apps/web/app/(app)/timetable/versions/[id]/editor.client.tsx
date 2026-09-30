@@ -203,7 +203,7 @@ function EditorBody({ tt }: { tt: Editor }) {
         </div>
         <div className="flex flex-wrap items-center gap-2 print:hidden">
           {draft && <GenerateButton tt={tt} onDone={() => qc.invalidateQueries({ queryKey: key })} />}
-          {draft && <PublishButton tt={tt} />}
+          <PublishButton tt={tt} />
           <ExportMenu tt={tt} />
           <Button variant="outline" asChild>
             <Link href={`/timetable/versions/${id}/print?view=${view === 'school' ? 'section' : view}` as Route}>Print</Link>
@@ -770,9 +770,12 @@ function PublishButton({ tt }: { tt: Editor }) {
   const unplaced = tt.unplaced.length;
   const pub = useMutation({
     mutationFn: async () => apiResponse(api.v1.timetables[':id'].publish.$post({ param: { id: tt.timetable.id }, json: { effectiveFrom: date, note: note.trim() || null, acceptUnplaced } })),
-    onSuccess: () => qc.invalidateQueries({ queryKey: TT_KEY }),
   });
+  // The editor turns read-only once published, which would take this dialog away: refresh when it is closed.
+  const close = () => { setOpen(false); if (pub.isSuccess) qc.invalidateQueries({ queryKey: TT_KEY }); };
   const blocked = tt.clashes.length > 0 || (unplaced > 0 && !acceptUnplaced);
+  // Once published it stays mounted only to show its confirmation.
+  if (tt.timetable.status !== 'draft' && !open) return null;
   return (
     <>
       <Button variant="outline" onClick={() => setOpen(true)}>Publish</Button>
@@ -787,7 +790,7 @@ function PublishButton({ tt }: { tt: Editor }) {
                   <span>Told:</span> <bdi className="tabular-nums">{pub.data.notified.students}</bdi> <span>students,</span>{' '}
                   <bdi className="tabular-nums">{pub.data.notified.parents}</bdi> <span>parents,</span> <bdi className="tabular-nums">{pub.data.notified.teachers}</bdi> <span>teachers.</span>
                 </Notice>
-                <div className="mt-5 flex justify-end"><Button onClick={() => setOpen(false)}>Close</Button></div>
+                <div className="mt-5 flex justify-end"><Button onClick={close}>Close</Button></div>
               </>
             ) : (
               <>

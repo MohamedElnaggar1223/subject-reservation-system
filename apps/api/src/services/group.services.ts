@@ -637,6 +637,7 @@ export async function endGroupMembershipsForSubject(tx: Tx, studentId: string, s
  * Published timetables are never touched.
  */
 export async function syncDraftCards(tx: Tx, groupIds: string[]) {
+  const today = schoolDateString(new Date());
   if (!groupIds.length) return { drafts: 0, added: 0, removed: 0 };
   const groups = await tx.select().from(teachingGroup).where(inArray(teachingGroup.id, groupIds));
   const years = [...new Set(groups.map((g) => g.academicYearId))];
@@ -650,7 +651,8 @@ export async function syncDraftCards(tx: Tx, groupIds: string[]) {
   for (const d of drafts) {
     for (const g of groups.filter((x) => x.academicYearId === d.academicYearId)) {
       const cards = await tx.select().from(timetableLesson).where(and(eq(timetableLesson.timetableId, d.id), eq(timetableLesson.groupId, g.id)));
-      const retired = !!g.archivedOn && g.archivedOn <= d.termStart;
+      // A draft takes effect today or later (inside its term): a group retired by then is never taught under it.
+      const retired = !!g.archivedOn && g.archivedOn <= (d.termStart > today ? d.termStart : today);
       const want = retired ? [] : cardsFor(g.weeklyPeriods, g.doublePeriods);
       const keep = new Set<string>();
       const pool = [...cards];
@@ -682,10 +684,15 @@ export async function syncDraftCards(tx: Tx, groupIds: string[]) {
   return { drafts: changed.size, added, removed };
 }
 
-/** The groups of a year that are taught in a term (not retired before it starts). */
+/**
+ * The groups a new draft of a term holds: those not retired by the day it can
+ * first take effect (the term's start, or today once the term has begun).
+ */
 export async function groupsForTerm(tx: Executor, academicYearId: string, termStart: string) {
+  const today = schoolDateString(new Date());
+  const from = termStart > today ? termStart : today;
   return tx.select().from(teachingGroup)
-    .where(and(eq(teachingGroup.academicYearId, academicYearId), sql`(${teachingGroup.archivedOn} IS NULL OR ${teachingGroup.archivedOn} > ${termStart})`));
+    .where(and(eq(teachingGroup.academicYearId, academicYearId), sql`(${teachingGroup.archivedOn} IS NULL OR ${teachingGroup.archivedOn} > ${from})`));
 }
 
 export { peakSize };

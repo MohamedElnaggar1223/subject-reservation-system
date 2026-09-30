@@ -126,7 +126,7 @@ function YearGroups({ year }: { year: AcademicYearRow }) {
                   <th className="px-3 py-2 text-start font-medium">Periods a week</th>
                   <th className="px-3 py-2 text-start font-medium">Of them doubles</th>
                   <th className="px-3 py-2 text-start font-medium">Room</th>
-                  <th className="px-5 py-2"><span className="sr-only">Open</span></th>
+                  <th className="px-5 py-2"><span className="sr-only">Details</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -391,7 +391,7 @@ function GroupRowView({ g, teachers, rooms, open, onToggle, onDone, all, year }:
         <td className="px-3 py-2">{g.archived ? g.weeklyPeriods : <NumberCell id={`w-${g.id}`} label={`Periods a week for ${g.name}`} value={g.weeklyPeriods} max={30} onSave={(n) => update.mutate({ weeklyPeriods: n, doublePeriods: Math.min(g.doublePeriods, Math.floor(n / 2)) })} />}</td>
         <td className="px-3 py-2">{g.archived ? g.doublePeriods : <NumberCell id={`d-${g.id}`} label={`Doubles for ${g.name}`} value={g.doublePeriods} max={15} onSave={(n) => update.mutate({ doublePeriods: n })} />}</td>
         <td className="px-3 py-2 text-xs text-muted-foreground"><bdi>{roomLabel}</bdi>{g.roomFeatures.length > 0 && <span>{` + ${g.roomFeatures.map((f) => FEATURE_LABEL[f] ?? f).join(', ')}`}</span>}</td>
-        <td className="px-5 py-2 text-end"><Button size="sm" variant="ghost" onClick={onToggle}>{open ? 'Close' : 'Open'}</Button></td>
+        <td className="px-5 py-2 text-end"><Button size="sm" variant="ghost" onClick={onToggle}>{open ? 'Close' : 'Details'}</Button></td>
       </tr>
       {open && (
         <tr className="border-b border-border bg-muted/30">

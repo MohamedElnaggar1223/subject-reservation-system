@@ -55,7 +55,7 @@ function useSchoolClock() {
   return now;
 }
 
-export default function TodayClient({ manages }: { manages: boolean }): React.JSX.Element {
+export default function TodayClient({ manages, teaches = false }: { manages: boolean; teaches?: boolean }): React.JSX.Element {
   const { data: day, isLoading, isError, refetch } = useQuery({
     queryKey: ['academic', 'day', 'today'],
     queryFn: () => fetchSchoolDay(),
@@ -75,7 +75,7 @@ export default function TodayClient({ manages }: { manages: boolean }): React.JS
         <div className="space-y-6">
           <Headline day={day} now={now} manages={manages} />
           {/* F1: a teacher's lessons today (nothing for an account that does not teach). */}
-          <MyLessonsToday />
+          {teaches && <MyLessonsToday />}
           {day.isSchoolDay && <Bells day={day} now={now} manages={manages} />}
         </div>
       )}

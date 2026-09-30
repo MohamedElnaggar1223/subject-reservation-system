@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { foundationArabic } from './i18n-foundation';
 import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
+import { schedulingArabic, translateSchedulingText } from './i18n-scheduling';
 
 export type Language = 'en' | 'ar';
 
@@ -1511,6 +1512,8 @@ Object.assign(autoArabicText, foundationArabic);
 // F0b screens (lib/i18n-catalogue.ts): only words the app does not already
 // translate, so a shared word keeps the Arabic the other screens use.
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// F1: the timetable screens (their own words never replace a phrase already translated).
+for (const [en, ar] of Object.entries(schedulingArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1589,6 +1592,9 @@ function translateDynamicText(text: string): string | null {
   // F0b: the catalogue's, the series' and the enrolment's sentences with names in them.
   const f0bText = translateCatalogueText(text);
   if (f0bText) return f0bText;
+  // F1: the grid's clashes, the generator's explanations, cover's reasons, counted phrases.
+  const f1Text = translateSchedulingText(text);
+  if (f1Text) return f1Text;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

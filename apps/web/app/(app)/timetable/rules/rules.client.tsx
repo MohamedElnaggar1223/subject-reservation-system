@@ -74,7 +74,7 @@ function YearRules({ year }: { year: AcademicYearRow }) {
               <th className="px-3 py-2 text-end font-medium">Available</th>
               <th className="px-3 py-2 text-end font-medium">Most a day</th>
               <th className="px-3 py-2 text-end font-medium">Most a week</th>
-              <th className="px-5 py-2"><span className="sr-only">Open</span></th>
+              <th className="px-5 py-2"><span className="sr-only">Details</span></th>
             </tr>
           </thead>
           <tbody>
