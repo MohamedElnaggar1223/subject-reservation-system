@@ -11,7 +11,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, ENTRY_METHODS, ENTRY_METHOD_LABELS, QUALIFICATION_LEVELS, type EntryMethod, type QualificationLevel } from '@repo/validations';
+import { apiResponse, ENTRY_METHODS, ENTRY_METHOD_LABELS, QUALIFICATION_LEVELS, TIERS, TIER_LABELS, type EntryMethod, type QualificationLevel, type Tier } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -33,7 +33,7 @@ export function QualificationsTab({ data }: { data: CatalogueData }) {
         const quals = data.qualifications.filter((q) => q.boardCode === b.code);
         return (
           <section key={b.code} aria-label={b.name}>
-            <h2 className="mb-2 font-display text-lg font-bold text-foreground">{b.name}</h2>
+            <h2 className="mb-2 font-display text-lg font-bold text-foreground"><bdi data-i18n-skip="true">{b.name}</bdi></h2>
             {quals.length === 0 ? (
               <p className="text-sm text-muted-foreground">No award of this board yet.</p>
             ) : (
@@ -57,10 +57,11 @@ function AddQualification({ data }: { data: CatalogueData }) {
   const [suite, setSuite] = useState('');
   const [subjectArea, setSubjectArea] = useState('');
   const [entryMethod, setEntryMethod] = useState<EntryMethod>('units_cash_in');
+  const [tier, setTier] = useState<Tier | ''>('');
   const [error, setError] = useState('');
   const create = useMutation({
     mutationFn: () => apiResponse(api.v1.catalogue.qualifications.$post({
-      json: { boardCode: boardCode as 'cambridge', code, title, level, suite, subjectArea: subjectArea || title, entryMethod },
+      json: { boardCode: boardCode as 'cambridge', code, title, level, suite, subjectArea: subjectArea || title, entryMethod, tier: level === 'igcse' && tier ? tier : null },
     })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CATALOGUE_KEY });
@@ -106,12 +107,21 @@ function AddQualification({ data }: { data: CatalogueData }) {
           <Label htmlFor="q-area" className="mb-1 text-xs text-muted-foreground">Subject (AS and A Level share it)</Label>
           <Input id="q-area" value={subjectArea} onChange={(e) => setSubjectArea(e.target.value)} maxLength={100} placeholder="Mathematics" />
         </div>
-        <div className="lg:col-span-2">
+        <div className={level === 'igcse' ? '' : 'lg:col-span-2'}>
           <Label htmlFor="q-method" className="mb-1 text-xs text-muted-foreground">How the board takes the entry</Label>
           <select id="q-method" value={entryMethod} onChange={(e) => setEntryMethod(e.target.value as EntryMethod)} className={SELECT_CLASS}>
             {ENTRY_METHODS.map((m) => <option key={m} value={m}>{ENTRY_METHOD_LABELS[m]}</option>)}
           </select>
         </div>
+        {level === 'igcse' && (
+          <div>
+            <Label htmlFor="q-tier" className="mb-1 text-xs text-muted-foreground">Tier (only if the syllabus fixes it)</Label>
+            <select id="q-tier" value={tier} onChange={(e) => setTier(e.target.value as Tier | '')} className={SELECT_CLASS}>
+              <option value="">Chosen per entry</option>
+              {TIERS.map((t) => <option key={t} value={t}>{TIER_LABELS[t]}</option>)}
+            </select>
+          </div>
+        )}
       </div>
       {error && <Notice tone="danger" className="mt-3">{error}</Notice>}
       <div className="mt-3 flex justify-end"><Button type="submit" disabled={create.isPending}>{create.isPending ? 'Adding…' : 'Add the award'}</Button></div>
@@ -156,6 +166,7 @@ function QualificationCard({ q, data }: { q: QualificationRow; data: CatalogueDa
           <p className="text-xs text-muted-foreground">
             <span>{levelLabel(q.level)}</span>
             {q.suite && <> · <span>{q.suite}</span></>}
+            {q.tier && <> · <span>{TIER_LABELS[q.tier as Tier] ?? q.tier}</span></>}
             {' · '}<span>{ENTRY_METHOD_LABELS[q.entryMethod as EntryMethod] ?? q.entryMethod}</span>
             {' · '}<span className="tabular-nums">{q.registrableCount}</span> <span>subjects enter it</span>
           </p>
@@ -184,7 +195,10 @@ function QualificationCard({ q, data }: { q: QualificationRow; data: CatalogueDa
                   <td className="py-1.5">
                     <span className="font-mono text-xs">{u.code}</span>{u.shortCode && <> <Badge tone="neutral">{u.shortCode}</Badge></>} <bdi data-i18n-skip="true" className="text-foreground">{u.title}</bdi>
                   </td>
-                  <td className="py-1.5"><Badge tone={UNIT_LEVEL_TONE[u.unitLevel] ?? 'neutral'}>{unitLevelLabel(u.unitLevel)}</Badge></td>
+                  <td className="py-1.5">
+                    <Badge tone={UNIT_LEVEL_TONE[u.unitLevel] ?? 'neutral'}>{unitLevelLabel(u.unitLevel)}</Badge>
+                    {u.tier && <> <Badge tone="info">{TIER_LABELS[u.tier as Tier] ?? u.tier}</Badge></>}
+                  </td>
                   <td className="py-1.5 text-xs text-foreground">
                     {u.requirement === 'required' ? <span>Required</span> : <><span>Optional</span>{u.choiceGroup && <>: <bdi data-i18n-skip="true" className="text-muted-foreground">{u.choiceGroup}</bdi></>}</>}
                   </td>

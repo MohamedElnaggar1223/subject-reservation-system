@@ -110,8 +110,8 @@ export async function getCatalogue() {
     return {
       ...s,
       mapped: !!q || rowUnits.length > 0,
-      qualification: q ? { id: q.id, code: q.code, title: q.title, level: q.level, boardCode: q.boardCode } : null,
-      units: rowUnits.map((u) => ({ id: u.id, code: u.code, shortCode: u.shortCode, title: u.title, unitLevel: u.unitLevel })),
+      qualification: q ? { id: q.id, code: q.code, title: q.title, level: q.level, boardCode: q.boardCode, tier: q.tier } : null,
+      units: rowUnits.map((u) => ({ id: u.id, code: u.code, shortCode: u.shortCode, title: u.title, unitLevel: u.unitLevel, tier: u.tier })),
       countsToward: [...new Map(rowUnits.flatMap((u) => awardsOfUnit(u.id)).map((a) => [a.id, { id: a.id, code: a.code, title: a.title, level: a.level }])).values()],
       // How the school's code reads for this row: a grade-11 student sitting
       // only AS units, and a grade-12 student who also sits A2 units.
@@ -133,7 +133,7 @@ export async function getCatalogue() {
         .filter((m) => m.qualificationId === q.id)
         .map((m) => {
           const u = unitById.get(m.unitId)!;
-          return { unitId: u.id, code: u.code, shortCode: u.shortCode, title: u.title, unitLevel: u.unitLevel, requirement: m.requirement, choiceGroup: m.choiceGroup };
+          return { unitId: u.id, code: u.code, shortCode: u.shortCode, title: u.title, unitLevel: u.unitLevel, tier: u.tier, requirement: m.requirement, choiceGroup: m.choiceGroup };
         }),
       options: options
         .filter((o) => o.qualificationId === q.id)
@@ -183,13 +183,19 @@ export async function updateBoard(code: string, data: UpdateBoardType, actorId: 
 
 // ─── Qualifications ──────────────────────────────────────────────────────────
 
+/** A tier (Core/Extended, Foundation/Higher) belongs to an IGCSE award or component only. */
+function assertTierFits(tier: string | null | undefined, igcse: boolean) {
+  if (tier && !igcse) throw new CatalogueError('Only IGCSE awards and components have a tier (Core or Extended, Foundation or Higher)');
+}
+
 export async function createQualification(data: CreateQualificationType, actorId: string, ctx?: AuditContext) {
   await boardOrThrow(data.boardCode);
+  assertTierFits(data.tier, data.level === 'igcse');
   try {
     return await db.transaction(async (tx) => {
       const [created] = await tx.insert(qualification).values({
         id: randomUUID(), boardCode: data.boardCode, code: data.code, title: data.title, level: data.level,
-        suite: data.suite, subjectArea: data.subjectArea, entryMethod: data.entryMethod, notes: data.notes ?? null,
+        suite: data.suite, subjectArea: data.subjectArea, entryMethod: data.entryMethod, tier: data.tier ?? null, notes: data.notes ?? null,
       }).returning();
       await logAction(actorId, 'QUALIFICATION_CREATED', 'qualification', created!.id, null, created as Record<string, unknown>, ctx, tx);
       return created!;
@@ -205,6 +211,7 @@ export async function updateQualification(id: string, data: UpdateQualificationT
     return await db.transaction(async (tx) => {
       const [q] = await tx.select().from(qualification).where(eq(qualification.id, id)).for('update');
       if (!q) throw new CatalogueError('Qualification not found', 404);
+      assertTierFits(data.tier !== undefined ? data.tier : q.tier, (data.level ?? q.level) === 'igcse');
       if (data.level && data.level !== q.level) {
         const [linked] = await tx.select({ name: subject.name }).from(subject).where(eq(subject.qualificationId, id)).limit(1);
         if (linked) throw new CatalogueError(`${linked.name} enters this qualification at its level — change the subject first`, 409);
@@ -269,11 +276,12 @@ export async function setQualificationUnits(id: string, data: SetQualificationUn
 
 export async function createUnit(data: CreateUnitType, actorId: string, ctx?: AuditContext) {
   await boardOrThrow(data.boardCode);
+  assertTierFits(data.tier, data.unitLevel === 'igcse');
   try {
     return await db.transaction(async (tx) => {
       const [created] = await tx.insert(examUnit).values({
         id: randomUUID(), boardCode: data.boardCode, code: data.code, shortCode: data.shortCode ?? null, title: data.title,
-        unitLevel: data.unitLevel, kind: data.kind, notes: data.notes ?? null,
+        unitLevel: data.unitLevel, kind: data.kind, tier: data.tier ?? null, notes: data.notes ?? null,
       }).returning();
       await logAction(actorId, 'EXAM_UNIT_CREATED', 'exam_unit', created!.id, null, created as Record<string, unknown>, ctx, tx);
       return created!;
@@ -289,6 +297,7 @@ export async function updateUnit(id: string, data: UpdateUnitType, actorId: stri
     return await db.transaction(async (tx) => {
       const [u] = await tx.select().from(examUnit).where(eq(examUnit.id, id)).for('update');
       if (!u) throw new CatalogueError('Unit not found', 404);
+      assertTierFits(data.tier !== undefined ? data.tier : u.tier, (data.unitLevel ?? u.unitLevel) === 'igcse');
       if (data.unitLevel && data.unitLevel !== u.unitLevel) {
         // Its level decides which awards it may count toward.
         const awards = await tx.select({ code: qualification.code, level: qualification.level })
@@ -644,8 +653,8 @@ export async function entryItemsFor(registrationIds: string[], readingOverride?:
       subject: {
         columns: { id: true, name: true, code: true, council: true, qualificationLevel: true },
         with: {
-          qualification: { columns: { id: true, code: true, title: true, level: true, entryMethod: true } },
-          units: { with: { unit: { columns: { id: true, code: true, shortCode: true, title: true, unitLevel: true } } } },
+          qualification: { columns: { id: true, code: true, title: true, level: true, entryMethod: true, tier: true } },
+          units: { with: { unit: { columns: { id: true, code: true, shortCode: true, title: true, unitLevel: true, tier: true } } } },
         },
       },
       boardSeries: { columns: { id: true, boardCode: true, month: true, year: true, label: true, entryDeadline: true } },
