@@ -154,6 +154,7 @@ export const IMPORT_PROBLEMS = {
   duplicate_parent: { severity: 'warning', finding: 'IS-06', title: 'The same parent under two emails?', meaning: 'Two parent emails share a phone number or a name and children. Merge them, or say they are different people.' },
   student_two_parents: { severity: 'info', finding: 'IS-06', title: 'A child with two parents', meaning: 'The child’s rows give two parent emails: both parents are linked to the child.' },
   name_variants: { severity: 'info', finding: 'IS-06', title: 'Several spellings of one name', meaning: 'The most used spelling is taken; choose another on the person.' },
+  link_to_existing_account: { severity: 'error', finding: 'IS-06', title: 'A new link to an account already in the system', meaning: 'The line would make a parent and a student family where one of them is an account the school already has (made at the desk, by sign-up or by another file). An email in a sheet is not proof: check it is the same person, then confirm the link on the line; otherwise give the line another email or skip it.' },
   email_taken: { severity: 'error', finding: 'IS-06', title: 'The email belongs to another kind of account', meaning: 'An account with this email exists as staff, or as a parent where a student is expected (or the other way round). Use another email.' },
   // Money (IS-07, IS-08)
   fee_note: { severity: 'info', finding: 'IS-08', title: 'A fee note', meaning: 'Kept as money history (a percentage, never a payment).' },
@@ -221,6 +222,8 @@ export const ImportRowEdits = z.object({
   teacher: Text().optional(),
   series: z.object({ type: z.enum(['january', 'june', 'october', 'november']), year: z.number().int().min(2000).max(2100) }).optional(),
   selfStudy: z.boolean().optional(),
+  /** Staff checked that this line's family is the account already in the system: make the new link (review flag 6). */
+  confirmLink: z.boolean().optional(),
   /** Self-study on a taught subject, first attempt: what this row does (IS-03). */
   selfStudyChoice: z.enum(['in_school', 'enrol_only']).nullable().optional(),
   // Money record rows

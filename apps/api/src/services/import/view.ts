@@ -655,7 +655,17 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     for (const pk of w.parentKeys) {
       const p = personViews.get(`parent|${pk}`);
       plan.parents.push(p?.matched ? 'match' : 'create');
-      plan.links.push(sid && p?.matched && linkSet.has(`${p.matched.id}|${sid}`) ? 'exists' : 'create');
+      const link = sid && p?.matched && linkSet.has(`${p.matched.id}|${sid}`) ? 'exists' : 'create';
+      plan.links.push(link);
+      // A new link that touches an account already in the system is never made silently (review flag 6):
+      // staff confirm on the line that the sheet's email is that person.
+      const existing = [s?.matched?.role === 'student' ? s : null, p?.matched?.role === 'parent' ? p : null].filter((x): x is NonNullable<typeof x> => !!x);
+      if (link === 'create' && existing.length && !(w.r.edits as ImportRowEditsType | null)?.confirmLink) {
+        w.problems.push({
+          code: 'link_to_existing_account', severity: 'error',
+          detail: `Link ${p?.name || pk} to ${s?.name || w.studentKey}? Already in the system: ${existing.map((x) => `${x.matched!.name} (${x.email})`).join(', ')}`,
+        });
+      }
     }
     // The section (the class year's; SCL: the year the student is in grade 10).
     const sectionYear = d.kind === 'scl' ? s?.cohortYear ?? null : w.classYear;

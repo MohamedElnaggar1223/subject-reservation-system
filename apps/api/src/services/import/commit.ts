@@ -334,7 +334,7 @@ async function commitFamily(
   const studentIdOf = (r: ImportRowView) => (r.studentKey ? userIdOf.get(`student|${r.studentKey}`) ?? null : null);
 
   // Links: parent and child, approved (staff vouch for the family, as at the desk).
-  const pairs = new Map<string, { parentId: string; studentId: string; rowIds: string[] }>();
+  const pairs = new Map<string, { parentId: string; studentId: string; rowIds: string[]; confirmedBy: string[] }>();
   for (const r of rows) {
     const sid = studentIdOf(r);
     if (!sid) continue;
@@ -342,8 +342,10 @@ async function commitFamily(
       const pid = userIdOf.get(`parent|${pk}`);
       if (!pid) continue;
       const k = `${pid}|${sid}`;
-      const pair = pairs.get(k) ?? { parentId: pid, studentId: sid, rowIds: [] };
+      const pair = pairs.get(k) ?? { parentId: pid, studentId: sid, rowIds: [], confirmedBy: [] };
       pair.rowIds.push(r.id);
+      // A link to an account already in the system was confirmed on its line (the review holds it until then).
+      if ((r.edits as { confirmLink?: boolean } | null)?.confirmLink) pair.confirmedBy.push(`${r.tab}!${r.rowNumber}`);
       pairs.set(k, pair);
     }
   }
@@ -364,7 +366,7 @@ async function commitFamily(
       created.links++;
       createdIds.links!.push(linkId);
       await logAction(actor.id, 'LINK_APPROVED', 'link', linkId, live ? { status: 'pending' } : null,
-        { status: 'approved', parentId: pair.parentId, studentId: pair.studentId, via: 'import', batchId: batch.id }, ctx, tx);
+        { status: 'approved', parentId: pair.parentId, studentId: pair.studentId, via: 'import', batchId: batch.id, ...(pair.confirmedBy.length ? { confirmedExistingAccountOn: pair.confirmedBy } : {}) }, ctx, tx);
     }
     for (const id of pair.rowIds) note(id, 'link', linkId ? 'created' : 'exists');
   }

@@ -309,6 +309,8 @@ export function RowEditor({ id, v, row, editable, onClose }: { id: string; v: Im
   const changed = Object.fromEntries(fields.filter((f) => values[f.key] !== f.value).map((f) => [f.key, values[f.key]]));
   const seriesChanged = row.data.kind === 'sheet' && series && (series.type !== row.data.series?.type || series.year !== row.data.series?.year);
   const onTaught = row.problems.find((p) => p.code === 'self_study_on_taught');
+  const toExisting = row.problems.find((p) => p.code === 'link_to_existing_account');
+  const linkConfirmed = edits.confirmLink === true;
   const choice = row.data.kind === 'sheet' ? row.data.selfStudyChoice : null;
   const person = row.studentKey ? v.people.find((p) => p.role === 'student' && p.key === row.studentKey) : undefined;
   const boxRef = useRef<HTMLDivElement>(null);
@@ -351,6 +353,25 @@ export function RowEditor({ id, v, row, editable, onClose }: { id: string; v: Im
                 ))}
               </ul>
             </section>
+          )}
+
+          {(toExisting || linkConfirmed) && editable && (
+            <fieldset className="rounded-lg border border-border p-3">
+              <legend className="px-1 text-sm font-semibold text-foreground">A new link to an account already in the system</legend>
+              {toExisting ? (
+                <>
+                  <p className="text-sm text-muted-foreground">Check with the family that the account named above is this line’s student or parent before linking them.</p>
+                  <Button className="mt-2" size="sm" disabled={save.isPending} onClick={() => save.mutate({ rowIds: [row.id], edits: { confirmLink: true } })}>
+                    It is the same person: link them
+                  </Button>
+                </>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone="success">Link confirmed</Badge>
+                  <Button size="sm" variant="outline" disabled={save.isPending} onClick={() => save.mutate({ rowIds: [row.id], clear: ['confirmLink'] })}>Undo</Button>
+                </div>
+              )}
+            </fieldset>
           )}
 
           {onTaught && editable && (

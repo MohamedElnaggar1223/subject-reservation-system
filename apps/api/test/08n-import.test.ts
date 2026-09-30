@@ -202,9 +202,15 @@ describe('F7: the day-one import', () => {
       expect(codes(person(v, 'student', `bassem${D}`))).toEqual(['student_two_parents']);
       expect(person(v, 'student', `bassem${D}`).matched).toMatchObject({ role: 'student' });
       expect(codes(person(v, 'parent', `ezz${D}`))).toEqual(['email_taken']);
+      // Bassem is already in the system (onboarded at the desk): the sheet's second parent is a new link to his
+      // account, never made silently — the line names the account and waits for staff (review flag 6).
+      expect(codes(rowAt(v, '2024', 6))).toEqual([]);
+      expect(rowAt(v, '2024', 7).problems.find((p) => p.code === 'link_to_existing_account')).toMatchObject({
+        severity: 'error', detail: `Link Tarek Nour to Bassem Nour? Already in the system: Bassem Nour (bassem${D})`,
+      });
       // A family with an error is held back; the rest are ready.
       const held = v.families.filter((f) => f.status === 'held').map((f) => f.students).flat().sort();
-      expect(held).toEqual([`mostafa.kids${D}`, `nader${D}`, `row:${rowAt(v, '2024', 13).id}`, `said.family${D}`]);
+      expect(held).toEqual([`bassem${D}`, `mostafa.kids${D}`, `nader${D}`, `row:${rowAt(v, '2024', 13).id}`, `said.family${D}`]);
     });
 
     it('IS-07 no money, IS-08 fee notes, drops and "I will drop the course"', () => {
@@ -246,7 +252,7 @@ describe('F7: the day-one import', () => {
       expect(v.mapping.teachers.map((t) => [t.name, t.teacherId, t.create])).toEqual([
         ['Mr Karim', null, true], ['Mr Wael', null, true], ['Ms Mona', null, true], ['Ms Salma', null, true],
       ]);
-      expect(v.summary).toMatchObject({ rows: 24, importing: 23, skipped: 1, families: 12, heldFamilies: 4, readyFamilies: 8 });
+      expect(v.summary).toMatchObject({ rows: 24, importing: 23, skipped: 1, families: 12, heldFamilies: 5, readyFamilies: 7 });
     });
 
     it('staging changes nothing in the school: no account, link, section, enrolment, history, registration or money', async () => {
@@ -288,6 +294,14 @@ describe('F7: the day-one import', () => {
       expect(v.people.some((p) => p.key === `mona${D}`)).toBe(false);
       // A person cannot be merged into someone who is merged: no chain turns back on itself.
       expect((await refused(coordinator.api.v1.imports[':id'].people.$put({ param: { id: firstBatch }, json: { role: 'student', key: `karim.lotfy${D}`, mergedInto: `karim.l${D}` } }))).status).toBe(404);
+    });
+
+    it('confirm: a new parent for a child already in the system, once staff have checked it is him', async () => {
+      await putRows(coordinator, firstBatch, { rowIds: [rowAt(v, '2024', 7).id], edits: { confirmLink: true } });
+      v = await fetchView(coordinator, firstBatch);
+      expect(codes(rowAt(v, '2024', 7))).toEqual([]);
+      expect(rowAt(v, '2024', 7).plan).toMatchObject({ student: 'match', parents: ['create'], links: ['create'] });
+      expect(v.families.find((f) => f.students.includes(`bassem${D}`))!.status).toBe('ready');
     });
 
     it("the coordinator's pending answers are mapping settings: carry forward read as an AS result", async () => {
@@ -353,6 +367,9 @@ describe('F7: the day-one import', () => {
       ]);
       const created = await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'IMPORT_ACCOUNT_CREATED' and new_data->>'batchId' = $1`, [firstBatch]);
       expect(Number(created[0]!.n)).toBe(22);
+      // The link to Bassem's existing account says which line staff confirmed it on.
+      expect(await one(`select new_data->'confirmedExistingAccountOn' as confirmed from audit_log where action = 'LINK_APPROVED' and new_data->>'batchId' = $1
+        and new_data->>'parentId' = (select id from "user" where email = $2)`, [firstBatch, `tarek${D}`])).toEqual({ confirmed: ['2024!7'] });
     });
 
     it('an imported parent signs in once they set a password through "Forgot password" (the link goes to their email)', async () => {
