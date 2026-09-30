@@ -56,6 +56,19 @@ export const NOTIFICATION_TYPES = [
   'COVER_ASSIGNED',
   'LESSON_COVERED',
   'LESSON_CANCELLED',
+  // F2: campus leave
+  'LEAVE_REQUESTED',
+  'LEAVE_APPROVED',
+  'LEAVE_REJECTED',
+  'LEAVE_CANCELLED',
+  'LEAVE_CHECKED_OUT',
+  'LEAVE_RETURNED',
+  'LEAVE_NO_SHOW',
+  'LEAVE_LATE_RETURN',
+  'LEAVE_LESSON_MISSED',
+  'LEAVE_COLLECTOR_REQUESTED',
+  'LEAVE_COLLECTOR_DECIDED',
+  'LEAVE_CUSTODY_ALERT',
 ] as const;
 
 export const NotificationTypeSchema = z.enum(NOTIFICATION_TYPES);
@@ -87,6 +100,18 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   COVER_ASSIGNED:                   'Cover Lesson for You',
   LESSON_COVERED:                   'A Lesson Is Covered',
   LESSON_CANCELLED:                 'A Lesson Is Cancelled',
+  LEAVE_REQUESTED:                  'Leave Requested',
+  LEAVE_APPROVED:                   'Leave Approved',
+  LEAVE_REJECTED:                   'Leave Not Approved',
+  LEAVE_CANCELLED:                  'Leave Cancelled',
+  LEAVE_CHECKED_OUT:                'Left School',
+  LEAVE_RETURNED:                   'Back at School',
+  LEAVE_NO_SHOW:                    'Leave Not Taken',
+  LEAVE_LATE_RETURN:                'Not Back from Leave',
+  LEAVE_LESSON_MISSED:              'A Student Leaves During Your Lesson',
+  LEAVE_COLLECTOR_REQUESTED:        'Collector to Approve',
+  LEAVE_COLLECTOR_DECIDED:          'Collector Decision',
+  LEAVE_CUSTODY_ALERT:              'Custody Alert at the Gate',
 };
 
 // Icons mapped per type (used in the notification center UI)
@@ -116,6 +141,18 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   COVER_ASSIGNED:                   '🧑‍🏫',
   LESSON_COVERED:                   '🔁',
   LESSON_CANCELLED:                 '🚫',
+  LEAVE_REQUESTED:                  '🚪',
+  LEAVE_APPROVED:                   '✅',
+  LEAVE_REJECTED:                   '❌',
+  LEAVE_CANCELLED:                  '↩️',
+  LEAVE_CHECKED_OUT:                '🚶',
+  LEAVE_RETURNED:                   '🏫',
+  LEAVE_NO_SHOW:                    '⏰',
+  LEAVE_LATE_RETURN:                '⏰',
+  LEAVE_LESSON_MISSED:              '🚪',
+  LEAVE_COLLECTOR_REQUESTED:        '🪪',
+  LEAVE_COLLECTOR_DECIDED:          '🪪',
+  LEAVE_CUSTODY_ALERT:              '⚠️',
 };
 
 // ─── Admin bulk announcement recipient groups ─────────────────────────────────

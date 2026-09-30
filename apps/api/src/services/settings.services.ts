@@ -52,6 +52,8 @@ export async function listSettings(role: string | null | undefined) {
       source: def.source ?? null,
       input: def.input,
       choices: 'choices' in def ? (def.choices as readonly { value: string; label: string }[]) : [],
+      nullable: 'nullable' in def ? def.nullable === true : false,
+      noneLabel: 'noneLabel' in def ? (def.noneLabel as string) : null,
       editableBy: [...def.editableBy] as string[],
       canEdit: hasRole(role, ...def.editableBy),
       value: (parsed?.success ? parsed.data : def.default) as unknown,

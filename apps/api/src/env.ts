@@ -21,6 +21,10 @@ const envSchema = z.object({
   CLIENT_IP_HEADER: z.string().trim().toLowerCase().optional(),
 
   BETTER_AUTH_SECRET: z.string().min(32, 'BETTER_AUTH_SECRET must be at least 32 characters'),
+  // F2: the key campus-leave passes are signed with. Optional: without it the
+  // pass key is derived from BETTER_AUTH_SECRET under a label of its own.
+  // Changing it makes every pass already shown refused (families reopen it).
+  LEAVE_PASS_SECRET: z.string().min(32, 'LEAVE_PASS_SECRET must be at least 32 characters').optional(),
 
   RESEND_API_KEY: z.string().optional(),
 

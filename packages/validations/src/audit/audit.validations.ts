@@ -66,6 +66,11 @@ export const AUDIT_ENTITY_TYPES = [
   'teacher_absence',
   'cover_assignment',
   'calendar_feed',
+  // F2
+  'leave_request',
+  'leave_series',
+  'leave_collector',
+  'custody_restriction',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -109,6 +114,10 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   teacher_absence: 'Teacher Absence',
   cover_assignment: 'Cover',
   calendar_feed:  'Calendar Feed',
+  leave_request:  'Leave Request',
+  leave_series:   'Recurring Leave',
+  leave_collector: 'Authorised Collector',
+  custody_restriction: 'Custody Restriction',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -285,6 +294,24 @@ export const AUDIT_ACTIONS = [
   'COVER_REMOVED',
   'CALENDAR_FEED_CREATED',
   'CALENDAR_FEED_REVOKED',
+  // F2: campus leave
+  'LEAVE_REQUESTED',
+  'LEAVE_APPROVED',
+  'LEAVE_REJECTED',
+  'LEAVE_CANCELLED',
+  'LEAVE_PASS_REISSUED',
+  'LEAVE_PASS_REFUSED',
+  'LEAVE_CHECKED_OUT',
+  'LEAVE_CHECKOUT_REFUSED',
+  'LEAVE_RETURNED',
+  'LEAVE_NO_SHOW_FLAGGED',
+  'LEAVE_LATE_RETURN_FLAGGED',
+  'LEAVE_COLLECTOR_ADDED',
+  'LEAVE_COLLECTOR_APPROVED',
+  'LEAVE_COLLECTOR_REJECTED',
+  'LEAVE_COLLECTOR_WITHDRAWN',
+  'CUSTODY_RESTRICTION_RECORDED',
+  'CUSTODY_RESTRICTION_ENDED',
   // Parent-student links (security audit RF-14: access to a child's money
   // and records hangs on these, so every change is recorded)
   'LINK_REQUESTED',
@@ -468,6 +495,23 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   COVER_REMOVED:              'Cover Removed',
   CALENDAR_FEED_CREATED:      'Calendar Feed Link Made',
   CALENDAR_FEED_REVOKED:      'Calendar Feed Link Revoked',
+  LEAVE_REQUESTED:            'Leave Requested',
+  LEAVE_APPROVED:             'Leave Approved',
+  LEAVE_REJECTED:             'Leave Not Approved',
+  LEAVE_CANCELLED:            'Leave Cancelled',
+  LEAVE_PASS_REISSUED:        'Leave Pass Replaced',
+  LEAVE_PASS_REFUSED:         'Leave Pass Refused at the Gate',
+  LEAVE_CHECKED_OUT:          'Student Checked Out at the Gate',
+  LEAVE_CHECKOUT_REFUSED:     'Check-out Refused at the Gate',
+  LEAVE_RETURNED:             'Student Back at School',
+  LEAVE_NO_SHOW_FLAGGED:      'Leave Not Taken (No-show)',
+  LEAVE_LATE_RETURN_FLAGGED:  'Student Late Back from Leave',
+  LEAVE_COLLECTOR_ADDED:      'Authorised Collector Added',
+  LEAVE_COLLECTOR_APPROVED:   'Authorised Collector Approved',
+  LEAVE_COLLECTOR_REJECTED:   'Authorised Collector Not Approved',
+  LEAVE_COLLECTOR_WITHDRAWN:  'Authorised Collector Withdrawn',
+  CUSTODY_RESTRICTION_RECORDED: 'Custody Restriction Recorded',
+  CUSTODY_RESTRICTION_ENDED:  'Custody Restriction Ended',
 };
 
 // ─── Query Filters ────────────────────────────────────────────────────────────

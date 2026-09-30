@@ -43,6 +43,7 @@ import { schedulingRoutes } from './routes/scheduling.routes';
 import { timetableRoutes } from './routes/timetable.routes';
 import { scheduleRoutes, icalRoutes } from './routes/schedule.routes';
 import { coverRoutes } from './routes/cover.routes';
+import { leaveRoutes } from './routes/leave.routes';
 import { isGrantedRole, isGranted } from './lib/role-grants';
 import { reports } from './routes/report.routes';
 import { teachers } from './routes/teacher.routes';
@@ -367,6 +368,11 @@ const v1 = new Hono<HonoEnv>()
    * - /v1/cover          absences, cover, the log and the report
    * - /v1/ical/:token    the calendar feed (anonymous: the token is the key)
    *
+   * F2 — campus leave:
+   * - /v1/leave          requests, approval, the family's collectors, custody
+   *                      restrictions, the gate (today's list, the pass,
+   *                      check-out, return), history and reports
+   *
    * Reports routes mounted at /v1/reports (admin only):
    * - GET    /v1/reports/dashboard                - Admin dashboard metrics (REP-008)
    * - GET    /v1/reports/registrations            - Registration report per session (REP-001)
@@ -422,7 +428,9 @@ const v1 = new Hono<HonoEnv>()
   .route('/timetables', timetableRoutes)
   .route('/schedule', scheduleRoutes)
   .route('/cover', coverRoutes)
-  .route('/ical', icalRoutes);
+  .route('/ical', icalRoutes)
+  // F2: campus leave
+  .route('/leave', leaveRoutes);
 
 // Mount v1 under /v1 (keep chaining for proper RPC typing)
 // Exported for in-process tests (app.request) and for index.ts to serve.

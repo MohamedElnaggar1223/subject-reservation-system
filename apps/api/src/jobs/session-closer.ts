@@ -19,6 +19,7 @@ import { failPayment, enforcePaymentDeadlines } from '../services/payment.servic
 import { notifySessionOpened, notifySessionClosingSoon, notifySessionClosed, processScheduledAnnouncements, getStudentAndParentBroadcastIds } from '../services/notification.services';
 import { capturePreregistrationsForSession } from '../services/prereg.services';
 import { lapseGrade10Exceptions } from '../services/exception-lapse.services';
+import { flagLeaveExceptions } from '../services/leave-jobs.services';
 import { logAction } from '../services/audit.services';
 import { logger } from '../lib/logger';
 
@@ -210,6 +211,17 @@ export function startSessionScheduler(): void {
         }
       } catch (err) {
         logger.error('[session-closer] Grade-10 exception lapse failed:', err);
+      }
+
+      // F2: campus leave — no-shows and late returns, each flagged once
+      // (claimed by a guarded update; audit row and notices in its transaction).
+      try {
+        const f = await flagLeaveExceptions();
+        if (f.noShows + f.lateReturns > 0) {
+          logger.info(`[session-closer] Campus leave: ${f.noShows} no-show(s), ${f.lateReturns} late return(s) flagged.`);
+        }
+      } catch (err) {
+        logger.error('[session-closer] Campus-leave flags failed:', err);
       }
 
       // Process scheduled announcements whose time has arrived

@@ -19,8 +19,9 @@
 import { z } from 'zod';
 import { ROLES, type Role } from '../roles';
 import { LevelCodeReadingSchema, LEVEL_CODE_READINGS, LEVEL_CODE_READING_LABELS } from '../catalogue/level-code';
+import { DEFAULT_LEAVE_REASONS } from '../leave/leave.validations';
 
-export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar' | 'catalogue';
+export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar' | 'catalogue' | 'leave';
 
 export type SettingDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   schema: S;
@@ -32,9 +33,17 @@ export type SettingDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   editableBy: readonly Role[];
   /** The register entry the setting answers, when it stands in for an owner decision. */
   source?: string;
-  /** How the screen offers it. */
-  input: 'boolean' | 'choice' | 'weekdays';
+  /**
+   * How the screen offers it. F2 added: 'time' (HH:MM), 'minutes' and 'count'
+   * (a whole number), 'grades' (some of 10, 11, 12), 'roles' (some of the
+   * choices), 'categories' (a list of named reasons).
+   */
+  input: 'boolean' | 'choice' | 'weekdays' | 'time' | 'minutes' | 'count' | 'grades' | 'roles' | 'categories';
   choices?: readonly { value: string; label: string }[];
+  /** The value may be empty (null): "no cut-off", "no limit". */
+  nullable?: boolean;
+  /** Words for the empty value. */
+  noneLabel?: string;
 };
 
 function defineSetting<S extends z.ZodTypeAny>(d: SettingDefinition<S>): SettingDefinition<S> {
@@ -107,6 +116,128 @@ export const SETTINGS = {
     source: 'IS-01',
     input: 'choice',
     choices: LEVEL_CODE_READINGS.map((r) => ({ value: r, label: LEVEL_CODE_READING_LABELS[r] })),
+  }),
+  // F2: campus leave. The coordinator and the admin set the school's leave
+  // policy; each rule is shown to the approver as a warning on a request that
+  // breaks it, and to families before they send one.
+  'leave.sameDayCutoff': defineSetting({
+    schema: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a time like 10:00').nullable(),
+    default: '10:00' as string | null,
+    group: 'leave',
+    label: 'Same-day requests by',
+    description:
+      'A request for leave today made after this time is flagged to the approver ("after the cut-off"). Families see the time before they send a request. None: no cut-off.',
+    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    input: 'time',
+    nullable: true,
+    noneLabel: 'No cut-off',
+  }),
+  'leave.noticeMinutes': defineSetting({
+    schema: z.number().int().min(0).max(24 * 60),
+    default: 60,
+    group: 'leave',
+    label: 'Notice required',
+    description:
+      'The least time, in minutes, between sending a request and the leave itself. A request with less notice is flagged to the approver ("short notice"). 0: no notice needed.',
+    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    input: 'minutes',
+  }),
+  'leave.aloneGrades': defineSetting({
+    schema: z.array(z.number().int().min(10).max(12)).max(3)
+      .refine((g) => new Set(g).size === g.length, 'Each grade once'),
+    default: [] as number[],
+    group: 'leave',
+    label: 'Grades that may leave alone',
+    description:
+      "Students in these grades (their grade on the day of the leave) may leave without anyone collecting them, when their family's request says so. Everyone else is collected by a parent or an approved collector.",
+    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    input: 'grades',
+  }),
+  'leave.reasonCategories': defineSetting({
+    schema: z.array(z.object({
+      key: z.string().trim().regex(/^[a-z0-9_]{1,40}$/, 'A key is lower-case letters, digits and _'),
+      label: z.string().trim().min(2).max(60),
+    })).min(1, 'Keep at least one reason').max(20)
+      .refine((cs) => new Set(cs.map((c) => c.key)).size === cs.length, 'Each reason once'),
+    default: DEFAULT_LEAVE_REASONS.map((r) => ({ ...r })) as { key: string; label: string }[],
+    group: 'leave',
+    label: 'Reasons for leave',
+    description:
+      'The reasons a family or staff choose from; reports count leave by them. A reason taken off the list stays on the requests that used it.',
+    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    input: 'categories',
+  }),
+  'leave.limitPerTerm': defineSetting({
+    schema: z.number().int().min(1).max(200).nullable(),
+    default: null as number | null,
+    group: 'leave',
+    label: 'Family requests per student per term',
+    description:
+      "A family's requests for one student in a term beyond this number are flagged to the approver (the school's own leaves, such as a student sent home ill, do not count). None: no limit.",
+    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    input: 'count',
+    nullable: true,
+    noneLabel: 'No limit',
+  }),
+  'leave.familyRules': defineSetting({
+    schema: z.enum(['warn', 'refuse']),
+    default: 'warn' as const,
+    group: 'leave',
+    label: 'A family request that breaks a rule',
+    description:
+      'What happens to a request sent in the app after the cut-off, with too little notice, or beyond the limit per term: sent to the approver with a warning, or refused with the reason (the family can still phone the school). Staff requests are never refused for these.',
+    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    input: 'choice',
+    choices: [
+      { value: 'warn', label: 'Send it with a warning' },
+      { value: 'refuse', label: 'Refuse it with the reason' },
+    ],
+  }),
+  'leave.approverRoles': defineSetting({
+    schema: z.array(z.enum([ROLES.COORDINATOR, ROLES.ADMIN])).min(1).max(2)
+      .refine((r) => r.includes(ROLES.ADMIN), 'The admin always approves')
+      .refine((r) => new Set(r).size === r.length, 'Each role once'),
+    default: [ROLES.COORDINATOR, ROLES.ADMIN] as ('coordinator' | 'admin')[],
+    group: 'leave',
+    label: 'Who approves leave',
+    description:
+      'The roles that approve or refuse requests and authorised collectors, and are told when one arrives. The admin always can.',
+    editableBy: [ROLES.ADMIN],
+    input: 'roles',
+    choices: [
+      { value: ROLES.COORDINATOR, label: 'Coordinator' },
+      { value: ROLES.ADMIN, label: 'Admin' },
+    ],
+  }),
+  'leave.autoApprove': defineSetting({
+    schema: z.boolean(),
+    default: false,
+    group: 'leave',
+    label: 'Approve requests that break no rule',
+    description:
+      'On: a family request with no warning (inside the cut-off, the notice and the limit, no exam that day, no custody note, collected by a parent or an approved collector) is approved at once; the approver still sees it in the day. Off: every request waits for a person.',
+    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    input: 'boolean',
+  }),
+  'leave.noShowGraceMinutes': defineSetting({
+    schema: z.number().int().min(0).max(240),
+    default: 30,
+    group: 'leave',
+    label: 'No-show after',
+    description:
+      'Minutes after the leave time with nobody checked out at the gate before the leave is flagged as a no-show and the family and the approvers are told.',
+    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    input: 'minutes',
+  }),
+  'leave.lateReturnGraceMinutes': defineSetting({
+    schema: z.number().int().min(0).max(240),
+    default: 15,
+    group: 'leave',
+    label: 'Late back after',
+    description:
+      'Minutes after the expected return time before a student who is not back is flagged as late and the family and the approvers are told.',
+    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    input: 'minutes',
   }),
 } as const;
 

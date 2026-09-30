@@ -2831,3 +2831,225 @@ export const timetableLessonRelations = relations(timetableLesson, ({ one }) => 
   group: one(teachingGroup, { fields: [timetableLesson.groupId], references: [teachingGroup.id] }),
   room: one(room, { fields: [timetableLesson.roomId], references: [room.id] }),
 }));
+
+/**
+ * ============================================
+ * F2 — CAMPUS LEAVE
+ * ============================================
+ *
+ * A student leaving school during the day (FEATURES_PLAN.md F2;
+ * docs/features/CAMPUS_LEAVE.md): the request (a parent's, the desk's on a
+ * family's behalf, or the school's own — a sick student sent home), its
+ * approval, the pass the family shows at the gate, the check-out with who
+ * collected, the return, and the no-show and late-return flags the scheduler
+ * sets once. Authorised collectors belong to a family (the children they may
+ * collect); custody restrictions name people who may not collect a child.
+ *
+ * Times of day are the school's (Africa/Cairo) as "HH:MM"; instants are UTC.
+ */
+
+/** A recurring request: one row per pattern, one leave_request per date it produced. */
+export const leaveSeries = pgTable(
+  "leave_series",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    startsOn: date("starts_on", { mode: "string" }).notNull(),
+    endsOn: date("ends_on", { mode: "string" }).notNull(),
+    // The weekdays it repeats on (0 = Sunday).
+    weekdays: jsonb("weekdays").$type<number[]>().notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("leaveSeries_studentId_idx").on(table.studentId),
+    check("leave_series_dates_ordered", sql`${table.startsOn} <= ${table.endsOn}`),
+  ]
+);
+
+/**
+ * Someone a family authorises to collect its children: approved by staff
+ * before the gate accepts them. The ID number is sensitive: the API shows it
+ * whole only to the roles that check it (coordinator, admin, and the gate for
+ * the day's list), masked to everyone else.
+ */
+export const leaveCollector = pgTable(
+  "leave_collector",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    relation: text("relation").notNull(),
+    phone: text("phone").notNull(),
+    idNumber: text("id_number").notNull(),
+    photoFileId: text("photo_file_id").references(() => file.id, { onDelete: "set null" }),
+    // 'pending' | 'approved' | 'rejected' | 'withdrawn'
+    status: text("status").notNull().default("pending"),
+    note: text("note"),
+    addedBy: text("added_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    decidedBy: text("decided_by").references(() => user.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decisionReason: text("decision_reason"),
+    withdrawnBy: text("withdrawn_by").references(() => user.id, { onDelete: "set null" }),
+    withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+    withdrawnReason: text("withdrawn_reason"),
+  },
+  (table) => [
+    index("leaveCollector_status_idx").on(table.status),
+    check("leave_collector_status_valid", sql`${table.status} IN ('pending', 'approved', 'rejected', 'withdrawn')`),
+    check("leave_collector_decided", sql`${table.status} NOT IN ('approved', 'rejected') OR (${table.decidedAt} IS NOT NULL)`),
+    check("leave_collector_rejected_reason", sql`${table.status} <> 'rejected' OR ${table.decisionReason} IS NOT NULL`),
+    check("leave_collector_withdrawn", sql`${table.status} <> 'withdrawn' OR ${table.withdrawnAt} IS NOT NULL`),
+  ]
+);
+
+/** The children a collector may collect. */
+export const leaveCollectorStudent = pgTable(
+  "leave_collector_student",
+  {
+    collectorId: text("collector_id").notNull().references(() => leaveCollector.id, { onDelete: "cascade" }),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.collectorId, table.studentId] }),
+    index("leaveCollectorStudent_studentId_idx").on(table.studentId),
+  ]
+);
+
+/**
+ * A person who may not collect a student (a court order, a family's written
+ * instruction): recorded by the coordinator or the admin, checked at every
+ * check-out and at a collector's approval, shown to the gate for the day's
+ * list and never to a family. It may name a linked parent's account.
+ */
+export const leaveCustodyRestriction = pgTable(
+  "leave_custody_restriction",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    personName: text("person_name").notNull(),
+    relation: text("relation"),
+    idNumber: text("id_number"),
+    // A parent's account the restriction names (they may be linked to the child).
+    restrictedUserId: text("restricted_user_id").references(() => user.id, { onDelete: "set null" }),
+    photoFileId: text("photo_file_id").references(() => file.id, { onDelete: "set null" }),
+    documentFileId: text("document_file_id").references(() => file.id, { onDelete: "set null" }),
+    note: text("note").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    endedBy: text("ended_by").references(() => user.id, { onDelete: "set null" }),
+    endReason: text("end_reason"),
+  },
+  (table) => [
+    index("leaveCustodyRestriction_studentId_idx").on(table.studentId),
+    check("leave_custody_restriction_ended", sql`(${table.endedAt} IS NULL) = (${table.endReason} IS NULL)`),
+  ]
+);
+
+/**
+ * One leave: a student out of school on a date from a time, back at a time
+ * or not that day.
+ *
+ * status: 'pending' → 'approved' | 'rejected' | 'cancelled';
+ *         'approved' → 'checked_out' | 'cancelled';
+ *         'checked_out' → 'returned' (when returning).
+ * The scheduler's flags never change the status: `noShowAt` (approved and
+ * not checked out by the leave time and its grace) and `lateReturnAt`
+ * (checked out, returning, not back by the return time and its grace) are
+ * set once, by a guarded update, with their audit row.
+ */
+export const leaveRequest = pgTable(
+  "leave_request",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    seriesId: text("series_id").references(() => leaveSeries.id, { onDelete: "set null" }),
+    date: date("date", { mode: "string" }).notNull(),
+    leaveTime: text("leave_time").notNull(),
+    returning: boolean("returning").notNull().default(false),
+    returnTime: text("return_time"),
+    // A key of the leave.reasonCategories setting, and its label then.
+    reasonCategory: text("reason_category").notNull(),
+    reasonLabel: text("reason_label").notNull(),
+    note: text("note"),
+    documentFileId: text("document_file_id").references(() => file.id, { onDelete: "set null" }),
+    // Who the family says will collect: 'parent' | 'collector' | 'alone'.
+    collectorKind: text("collector_kind").notNull(),
+    collectorParentId: text("collector_parent_id").references(() => user.id, { onDelete: "set null" }),
+    collectorId: text("collector_id").references(() => leaveCollector.id, { onDelete: "set null" }),
+    // 'parent' (a parent in the app), 'desk' (staff for a family), 'school' (the school's own initiative).
+    origin: text("origin").notNull(),
+    // The parent a desk or staff request was made for, when one asked.
+    onBehalfOf: text("on_behalf_of").references(() => user.id, { onDelete: "set null" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    status: text("status").notNull().default("pending"),
+    decidedBy: text("decided_by").references(() => user.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decisionNote: text("decision_note"),
+    cancelledBy: text("cancelled_by").references(() => user.id, { onDelete: "set null" }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelReason: text("cancel_reason"),
+    // The pass (a signed QR token) carries this; reissuing a pass bumps it, so an older one is refused.
+    passVersion: integer("pass_version").notNull().default(1),
+    checkedOutAt: timestamp("checked_out_at", { withTimezone: true }),
+    checkedOutBy: text("checked_out_by").references(() => user.id, { onDelete: "set null" }),
+    // Who actually collected: 'parent' | 'collector' | 'alone'.
+    collectedByKind: text("collected_by_kind"),
+    collectedByParentId: text("collected_by_parent_id").references(() => user.id, { onDelete: "set null" }),
+    collectedByCollectorId: text("collected_by_collector_id").references(() => leaveCollector.id, { onDelete: "set null" }),
+    collectedByName: text("collected_by_name"),
+    idChecked: boolean("id_checked"),
+    // 'pass' (scanned) or 'lookup' (found on the list).
+    checkedOutVia: text("checked_out_via"),
+    checkoutNote: text("checkout_note"),
+    returnedAt: timestamp("returned_at", { withTimezone: true }),
+    returnRecordedBy: text("return_recorded_by").references(() => user.id, { onDelete: "set null" }),
+    noShowAt: timestamp("no_show_at", { withTimezone: true }),
+    lateReturnAt: timestamp("late_return_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("leaveRequest_student_date_idx").on(table.studentId, table.date),
+    index("leaveRequest_date_status_idx").on(table.date, table.status),
+    index("leaveRequest_seriesId_idx").on(table.seriesId),
+    index("leaveRequest_status_idx").on(table.status),
+    check("leave_request_status_valid", sql`${table.status} IN ('pending', 'approved', 'rejected', 'cancelled', 'checked_out', 'returned')`),
+    check("leave_request_origin_valid", sql`${table.origin} IN ('parent', 'desk', 'school')`),
+    check("leave_request_times", sql`${table.leaveTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' AND (${table.returnTime} IS NULL OR ${table.returnTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')`),
+    check("leave_request_return", sql`(${table.returning} AND ${table.returnTime} IS NOT NULL AND ${table.returnTime} > ${table.leaveTime}) OR (NOT ${table.returning} AND ${table.returnTime} IS NULL)`),
+    check("leave_request_collector_kind", sql`${table.collectorKind} IN ('parent', 'collector', 'alone')`),
+    // A named parent or collector only with its kind (the service always names one; a
+    // deleted account or collector leaves the kind with its id cleared).
+    check("leave_request_collector_whole", sql`(${table.collectorKind} = 'parent' OR ${table.collectorParentId} IS NULL) AND (${table.collectorKind} = 'collector' OR ${table.collectorId} IS NULL)`),
+    check("leave_request_decided", sql`${table.status} NOT IN ('approved', 'rejected', 'checked_out', 'returned') OR ${table.decidedAt} IS NOT NULL`),
+    check("leave_request_rejected_reason", sql`${table.status} <> 'rejected' OR ${table.decisionNote} IS NOT NULL`),
+    check("leave_request_cancelled", sql`(${table.status} = 'cancelled') = (${table.cancelledAt} IS NOT NULL)`),
+    check("leave_request_checked_out", sql`(${table.status} IN ('checked_out', 'returned')) = (${table.checkedOutAt} IS NOT NULL AND ${table.collectedByKind} IS NOT NULL)`),
+    check("leave_request_collected_kind", sql`${table.collectedByKind} IS NULL OR ${table.collectedByKind} IN ('parent', 'collector', 'alone')`),
+    check("leave_request_returned", sql`(${table.status} = 'returned') = (${table.returnedAt} IS NOT NULL) AND (${table.status} <> 'returned' OR ${table.returning})`),
+    check("leave_request_via", sql`${table.checkedOutVia} IS NULL OR ${table.checkedOutVia} IN ('pass', 'lookup')`),
+    check("leave_request_late_return_flag", sql`${table.lateReturnAt} IS NULL OR (${table.returning} AND ${table.checkedOutAt} IS NOT NULL)`),
+    check("leave_request_pass_version", sql`${table.passVersion} >= 1`),
+  ]
+);
+
+export const leaveRequestRelations = relations(leaveRequest, ({ one }) => ({
+  student: one(user, { fields: [leaveRequest.studentId], references: [user.id] }),
+  collector: one(leaveCollector, { fields: [leaveRequest.collectorId], references: [leaveCollector.id] }),
+  series: one(leaveSeries, { fields: [leaveRequest.seriesId], references: [leaveSeries.id] }),
+}));
+
+export const leaveCollectorRelations = relations(leaveCollector, ({ many }) => ({
+  students: many(leaveCollectorStudent),
+}));
+
+export const leaveCollectorStudentRelations = relations(leaveCollectorStudent, ({ one }) => ({
+  collector: one(leaveCollector, { fields: [leaveCollectorStudent.collectorId], references: [leaveCollector.id] }),
+  student: one(user, { fields: [leaveCollectorStudent.studentId], references: [user.id] }),
+}));

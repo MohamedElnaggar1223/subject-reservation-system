@@ -20,11 +20,11 @@
  * Evidence is never deleted while attached (RF-13, migration 0027).
  */
 
-import { db, file, fileVariant, eq, and, count } from '@repo/db'
+import { db, file, fileVariant, eq, and, count, sql } from '@repo/db'
 import { randomUUID } from 'crypto'
 import { createStorageClient, type StorageClient } from '@repo/storage'
 import {
-  UPLOAD_PURPOSES, ROLES, hasRole,
+  UPLOAD_PURPOSES, ROLES, hasRole, schoolDateString,
   type UploadPurpose, type ReadRule, type Role,
 } from '@repo/validations'
 import { env } from '../env.js'
@@ -157,6 +157,25 @@ async function attachedAsEvidence(fileId: string): Promise<boolean> {
   return !!p || !!r
 }
 
+/**
+ * Is this photo a collector's or a restricted person's of a student with a
+ * leave on today's gate list (approved, out, back, or cancelled after
+ * approval)?
+ */
+async function gateNeedsPhoto(fileId: string): Promise<boolean> {
+  const today = schoolDateString(new Date())
+  const res = await db.execute(sql`
+    select 1 from leave_request r
+    where r.date = ${today} and (r.status in ('approved', 'checked_out', 'returned') or (r.status = 'cancelled' and r.decided_at is not null))
+      and (
+        exists (select 1 from leave_collector_student cs join leave_collector c on c.id = cs.collector_id
+                where cs.student_id = r.student_id and c.photo_file_id = ${fileId})
+        or exists (select 1 from leave_custody_restriction x where x.student_id = r.student_id and x.photo_file_id = ${fileId} and x.ended_at is null)
+      )
+    limit 1`)
+  return res.rows.length > 0
+}
+
 /** May this account read this file? (Its purpose's rule; see the header.) */
 export async function mayRead(
   f: { userId: string; purpose: string; studentId: string | null; id: string },
@@ -166,6 +185,11 @@ export async function mayRead(
   const def = UPLOAD_PURPOSES[f.purpose as UploadPurpose]
   if (!def) return false
   const rules = def.read as readonly ReadRule[]
+  // F2: the gate sees a collector's or a restricted person's photo only for a
+  // student on today's leave list (FEATURES_PLAN §5: only what check-out needs).
+  if (viewer.role === ROLES.GATE && (f.purpose === 'collector_photo' || f.purpose === 'custody_photo')) {
+    return gateNeedsPhoto(f.id)
+  }
   if (rules.some((r) => r !== 'owner' && r !== 'family' && r === viewer.role)) return true
   if (rules.includes('family') && f.studentId) {
     if (viewer.role === ROLES.STUDENT && viewer.id === f.studentId) return true

@@ -62,6 +62,8 @@ const SCHOOL_INFO: Grant[] = [
   'POST /v1/schedule/feed',
   'DELETE /v1/schedule/feed',
   'GET /v1/ical/:token',
+  // F2: the students leaving during one's own lessons (a linked teacher record).
+  'GET /v1/leave/teaching',
 ];
 
 export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
@@ -106,6 +108,11 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     '* /v1/timetables/*',
     '* /v1/schedule/*',
     '* /v1/cover/*',
+    // F2: campus leave — requests (the school's own and a family's), the
+    // approval queue, collectors, custody restrictions, the gate (standing
+    // in), a student's leave record, reports; and the student search the
+    // screens use.
+    '* /v1/leave/*',
   ],
   teacher: [
     ...SELF_SERVICE,
@@ -119,7 +126,16 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     'GET /v1/schedule/week',
     'GET /v1/schedule/lesson',
   ],
-  gate: [...SELF_SERVICE, ...SCHOOL_INFO],
+  gate: [
+    ...SELF_SERVICE,
+    ...SCHOOL_INFO,
+    // F2: today's leave list, a pass scanned, a check-out, a return — only
+    // today's (the handlers refuse any other day's leave).
+    'GET /v1/leave/gate/today',
+    'POST /v1/leave/gate/scan',
+    'POST /v1/leave/gate/:id/check-out',
+    'POST /v1/leave/gate/:id/return',
+  ],
 };
 
 function toRegex(grant: Grant): { method: string; path: RegExp } {

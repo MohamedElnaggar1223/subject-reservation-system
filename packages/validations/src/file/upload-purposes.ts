@@ -116,13 +116,38 @@ export const UPLOAD_PURPOSES = {
     usedBy: 'Leave requests, exceptions, withdrawals',
   },
   collector_photo: {
+    // F2: the desk records a family's collector on its behalf (pending the
+    // coordinator's approval), so it uploads the photo too. The gate reads a
+    // photo only of a collector of a student on the day's leave list (the
+    // file service checks it).
     label: 'Authorised collector photo',
     mimeTypes: IMAGES,
     maxBytes: 5 * MB,
-    uploadRoles: [ROLES.PARENT, ROLES.COORDINATOR, ROLES.ADMIN],
+    uploadRoles: [ROLES.PARENT, ROLES.COORDINATOR, ROLES.ADMIN, ROLES.FINANCE_OFFICER, ROLES.FINANCE_ADMIN],
     concernsStudent: 'required',
     read: ['owner', 'family', ROLES.COORDINATOR, ROLES.ADMIN, ROLES.GATE],
     usedBy: 'Campus leave (F2)',
+  },
+  // F2: a person who may not collect a student. Never a family's to read: a
+  // restricted parent is often linked to the child. The gate reads it only for
+  // a student on the day's leave list (the file service checks it).
+  custody_photo: {
+    label: 'Photo of a person who may not collect',
+    mimeTypes: IMAGES,
+    maxBytes: 5 * MB,
+    uploadRoles: [ROLES.COORDINATOR, ROLES.ADMIN],
+    concernsStudent: 'required',
+    read: [ROLES.COORDINATOR, ROLES.ADMIN, ROLES.GATE],
+    usedBy: 'Campus leave (F2): custody restrictions',
+  },
+  custody_document: {
+    label: 'Custody document (court order, written instruction)',
+    mimeTypes: [PDF, DOCX, ...IMAGES],
+    maxBytes: 10 * MB,
+    uploadRoles: [ROLES.COORDINATOR, ROLES.ADMIN],
+    concernsStudent: 'required',
+    read: [ROLES.COORDINATOR, ROLES.ADMIN],
+    usedBy: 'Campus leave (F2): custody restrictions',
   },
   excuse_note: {
     label: 'Absence excuse note',
