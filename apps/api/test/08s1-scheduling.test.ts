@@ -541,6 +541,35 @@ describe('F1: scheduling', () => {
     await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: g.studentId }, json: { kind: 'withdrawn', leftOn: schoolDateString(new Date()), reason: 'moved abroad' } }));
     expect(await one(`select started_on, ended_on from section_membership where student_id = $1`, [g.studentId])).toEqual({ started_on: starts, ended_on: starts });
     expect(await day(coordinator, g.studentId, starts)).toMatchObject({ note: 'left', lessons: [] });
+    // Nor is the student on the class list of 11B's Arabic that day, though the clamped row covers it.
+    const arabic11b = (await day(coordinator, f.c!.studentId, starts)).lessons.find((l) => l.groupName === 'Arabic F1S1-11B')!;
+    const cls = await apiResponse(coordinator.api.v1.schedule.lesson.$get({ query: { lessonId: arabic11b.lessonId, date: starts } }));
+    expect(cls.students.map((s) => s.id)).toContain(f.c!.studentId);
+    expect(cls.students.map((s) => s.id)).not.toContain(g.studentId);
+  });
+
+  it('a student who leaves the school leaves their teaching groups with it: the rows end, the class lists drop them, the audit row counts them', async () => {
+    const h = await onboard(officer, 'sch-h', 11);
+    await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: h.studentId }, json: { cohortYear: Y - 1, reason: 'F1 scenario year' } }));
+    await apiResponse(coordinator.api.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: h.studentId, subjectId: phys, teacherId: tPhys, mode: 'in_school' } }));
+    const physics = groupOf(await load(ttId), 'Physics S1');
+    await apiResponse(coordinator.api.v1.scheduling.groups[':id'].members.$post({ param: { id: physics.id }, json: { studentIds: [h.studentId], startsOn: `${Y}-09-06` } }));
+    // Physics S1's lesson on a school day in November: H is on its class list.
+    const date = onOrAfter(`${Y}-11-22`, 0);
+    const lessonDay = (await apiResponse(coordinator.api.v1.schedule.week.$get({ query: { studentId: f.a!.studentId, date } }))).days
+      .find((d) => d.lessons.some((l) => l.groupName === 'Physics S1'))!;
+    const lesson = lessonDay.lessons.find((l) => l.groupName === 'Physics S1')!;
+    const classOf = async () => (await apiResponse(coordinator.api.v1.schedule.lesson.$get({ query: { lessonId: lesson.lessonId, date: lessonDay.date } }))).students.map((s) => s.id);
+    expect(await classOf()).toContain(h.studentId);
+
+    // H leaves today: the school year of this suite has not begun, so the stay in the group is empty.
+    const today = schoolDateString(new Date());
+    await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: h.studentId }, json: { kind: 'withdrawn', leftOn: today, reason: 'moved abroad' } }));
+    expect(await sql(`select started_on, ended_on, end_reason from teaching_group_member where student_id = $1`, [h.studentId]))
+      .toEqual([{ started_on: `${Y}-09-06`, ended_on: `${Y}-09-05`, end_reason: 'Left the school (withdrawn)' }]);
+    expect(await classOf()).not.toContain(h.studentId);
+    expect(await day(coordinator, h.studentId, lessonDay.date)).toMatchObject({ note: 'left', lessons: [] });
+    expect(await one(`select new_data->'groupsEnded' as n from audit_log where action = 'STUDENT_LEFT' and entity_id = $1`, [h.studentId])).toEqual({ n: 1 });
   });
 
   // ─── Output ────────────────────────────────────────────────────────────────
