@@ -125,7 +125,9 @@ export async function getSittingPlan(k: SittingKeyType) {
     db.select({ roomId: examInvigilation.roomId, teacherId: examInvigilation.teacherId, isLead: examInvigilation.isLead, name: teacher.name })
       .from(examInvigilation).innerJoin(teacher, eq(teacher.id, examInvigilation.teacherId))
       .where(and(eq(examInvigilation.examDate, k.examDate), eq(examInvigilation.session, k.session))),
-    studentIds.length ? db.select({ id: user.id, name: user.name }).from(user).where(inArray(user.id, studentIds)) : [],
+    // Everyone the sitting's candidates and seats name (a seat can outlive its paper: a withdrawn entry).
+    db.select({ id: user.id, name: user.name }).from(user).where(inArray(user.id, [...studentIds, ...(await db.select({ s: examSeat.studentId }).from(examSeat)
+      .where(and(eq(examSeat.examDate, k.examDate), eq(examSeat.session, k.session)))).map((r) => r.s), '__none__'])),
   ]);
   const cands = await candidatesOf(studentIds);
   const numbers = await candidateNumbersFor(papers.flatMap((p) => (sitters.get(p.id) ?? []).map((s) => ({ studentId: s, boardSeriesId: p.boardSeriesId }))));
@@ -220,9 +222,12 @@ export async function autoSeat(k: SittingKeyType, commit: boolean, actorId: stri
     const numbers = await candidateNumbersFor(papers.flatMap((p) => (sitters.get(p.id) ?? []).map((s) => ({ studentId: s, boardSeriesId: p.boardSeriesId }))));
     const names = new Map((await executor.select({ id: user.id, name: user.name }).from(user)
       .where(inArray(user.id, [...new Set([...sitters.values()].flat()), '__none__']))).map((u) => [u.id, u.name]));
+    // A candidate the board allows a separate room is never placed among the others: listed to seat by hand.
+    const cands = await candidatesOf([...new Set([...sitters.values()].flat())], executor);
+    const ownRoom = new Set([...cands.values()].filter((c) => c.accessArrangements.includes('separate_room')).map((c) => c.studentId));
     const order: { studentId: string; paperCode: string; number: string | null }[] = [];
     for (const p of [...papers].sort((a, b) => a.code.localeCompare(b.code))) {
-      const people = (sitters.get(p.id) ?? []).filter((s) => !seated.has(s) && !order.some((o) => o.studentId === s))
+      const people = (sitters.get(p.id) ?? []).filter((s) => !seated.has(s) && !ownRoom.has(s) && !order.some((o) => o.studentId === s))
         .map((s) => ({ studentId: s, paperCode: p.code, number: numbers.get(`${s}|${p.boardSeriesId}`) ?? null }))
         .sort((a, b) => (a.number ?? '9999').localeCompare(b.number ?? '9999') || (names.get(a.studentId) ?? '').localeCompare(names.get(b.studentId) ?? ''));
       order.push(...people);
@@ -238,7 +243,11 @@ export async function autoSeat(k: SittingKeyType, commit: boolean, actorId: stri
     }
     const assigned = order.slice(0, free.length).map((o, i) => ({ ...o, name: names.get(o.studentId) ?? '', ...free[i]! }));
     const unseated = order.slice(free.length).map((o) => ({ ...o, name: names.get(o.studentId) ?? '' }));
-    return { alreadySeated: seats.length, assigned, unseated };
+    const separateRoom = [...ownRoom].filter((s) => !seated.has(s)).map((s) => {
+      const p = papers.find((x) => sitters.get(x.id)?.includes(s))!;
+      return { studentId: s, name: names.get(s) ?? '', paperCode: p.code, number: numbers.get(`${s}|${p.boardSeriesId}`) ?? null };
+    });
+    return { alreadySeated: seats.length, assigned, unseated, separateRoom };
   };
   if (!commit) return { committed: false, ...(await plan(db)) };
   try {

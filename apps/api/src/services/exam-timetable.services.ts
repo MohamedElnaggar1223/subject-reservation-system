@@ -208,13 +208,14 @@ export async function updatePaper(id: string, data: UpdatePaperType, actorId: st
       throw err;
     }
   });
-  let familiesTold = 0;
+  let candidatesTold = 0;
   if (out.timeChanged) {
     const r = out.row;
-    familiesTold = await notifyTimetableChanged([r.id], r.boardSeriesId,
+    candidatesTold = await notifyTimetableChanged([r.id], r.boardSeriesId,
       `${r.code} ${r.title} is now on ${r.examDate}, ${EXAM_SESSION_LABELS[r.session as ExamSession].toLowerCase()}, from ${r.startTime} (${r.durationMinutes} minutes).`);
   }
-  return { paper: out.row, familiesTold };
+  // The candidates whose families (the candidate and linked parents) were told.
+  return { paper: out.row, candidatesTold };
 }
 
 export async function deletePaper(id: string, actorId: string, ctx?: AuditContext) {
@@ -246,7 +247,8 @@ function mappingFor(header: string[], chosen: Partial<Record<TimetableField, str
   const out: Partial<Record<TimetableField, string>> = { ...(chosen ?? {}) };
   // Specific fields first, so "Start time" is not taken as the session or "Paper code" as the title.
   for (const f of ['duration', 'date', 'session', 'startTime', 'code', 'title'] as TimetableField[]) {
-    if (out[f]) continue;
+    // Chosen, or chosen as "not in the paste" (an empty heading): never guessed over.
+    if (out[f] !== undefined) continue;
     const h = header.find((x) => !used.has(x) && HEADER_GUESSES[f].test(x));
     if (h) { out[f] = h; used.add(h); }
   }

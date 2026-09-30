@@ -71,6 +71,10 @@ describe('F4: exam days, results and certificates', () => {
         ['XD97/33', d2, 'am', '09:00', 120, 'new', true],
       ]);
       expect(await sql(`select 1 from exam_paper where board_series_id = $1`, [w.series.cambridgeNov])).toHaveLength(0);
+      // A column chosen as "not in the paste" is never guessed back: the titles come from the catalogue.
+      const noTitle = await apiResponse(coord.api.v1.exams.papers.import.$post({ json: { boardSeriesId: w.series.cambridgeNov, text: cambridgeText(), mapping: { title: '' }, commit: false } }));
+      expect(noTitle.mapping.title).toBe('');
+      expect(noTitle.lines.map((l) => l.title)).toEqual(['Paper 1', 'Paper 2', 'Paper 3']);
       await apiResponse(coord.api.v1.exams.papers.import.$post({ json: { boardSeriesId: w.series.cambridgeNov, text: cambridgeText(), commit: true } }));
       // The same paste again changes nothing; a line that moved is a change.
       expect((await apiResponse(coord.api.v1.exams.papers.import.$post({ json: { boardSeriesId: w.series.cambridgeNov, text: cambridgeText(), commit: false } }))).summary)
@@ -140,7 +144,7 @@ describe('F4: exam days, results and certificates', () => {
       expect(await apiResponse(coord.api.v1.exams.students[':studentId'].exams.$get({ param: { studentId: a }, query: { date: dayFromNow(40) } }))).toEqual([]);
       // A paper moved after publication: its candidates' families are told.
       const moved = await apiResponse(coord.api.v1.exams.papers[':id'].$put({ param: { id: await paperId('XD97/33') }, json: { startTime: '10:00', reason: 'the board moved it' } }));
-      expect(moved.familiesTold).toBe(2);
+      expect(moved.candidatesTold).toBe(2);
       await notified('parent.x-xd-b@test.local', 'EXAM_TIMETABLE_CHANGED', 1);
     });
   });
@@ -174,6 +178,23 @@ describe('F4: exam days, results and certificates', () => {
       expect((await refused(coord.api.v1.exams.sittings.rooms.$put({ json: { ...am(), rooms: [{ roomId: hall, seatRows: 2, seatColumns: 2 }] } }))).status).toBe(409);
       expect(await refused(coord.api.v1.exams.sittings.rooms.$put({ json: { ...am(), rooms: [{ roomId: hall, seatRows: 1, seatColumns: 1 }, { roomId: room2, seatRows: 1, seatColumns: 2 }] } })))
         .toEqual({ status: 409, error: "XD Hall's smaller grid would leave 1 candidate(s) without a seat: move them first" });
+    });
+
+    it('a candidate the board allows a separate room is never seated among the others: listed to seat by hand', async () => {
+      const pm2 = { examDate: d2, session: 'am' as const };
+      await apiResponse(coord.api.v1.exams.candidates[':studentId'].$put({ param: { studentId: b }, json: { accessArrangements: ['separate_room'], accessArrangementsRef: 'AA-SR-1' } }));
+      await apiResponse(coord.api.v1.exams.sittings.rooms.$put({ json: { ...pm2, rooms: [{ roomId: hall, seatRows: 1, seatColumns: 2 }] } }));
+      const preview = await apiResponse(coord.api.v1.exams.sittings.seat.$post({ json: { ...pm2, commit: false } }));
+      expect(preview.assigned.map((s) => s.studentId)).toEqual([a]);
+      expect(preview.separateRoom.map((s) => [s.studentId, s.paperCode, s.number])).toEqual([[b, 'XD97/33', '0001']]);
+      await apiResponse(coord.api.v1.exams.candidates[':studentId'].$put({ param: { studentId: b }, json: { accessArrangements: [], accessArrangementsRef: null } }));
+      // A seat whose candidate no longer sits a paper there still says whose it is.
+      await apiResponse(coord.api.v1.exams.seats.$put({ json: { ...pm2, studentId: b, roomId: hall, seatLabel: 'A2' } }));
+      const [eb] = await sql<{ id: string }>(`select id from exam_entry where student_id = $1 and board_series_id = $2`, [b, w.series.cambridgeNov]);
+      await sql(`update exam_entry set status = 'withdrawn', withdrawn_at = now() where id = $1`, [eb!.id]);
+      const plan = await apiResponse(coord.api.v1.exams.sittings.plan.$get({ query: pm2 }));
+      expect(plan.rooms[0]!.seats.find((s) => s.seatLabel === 'A2')).toMatchObject({ studentId: b, name: 'Student x-xd-b', papers: [] });
+      await sql(`update exam_entry set status = 'submitted', withdrawn_at = null where id = $1`, [eb!.id]);
     });
 
     it('invigilators: one room each per sitting; a teacher keeps only the register of their own room', async () => {
