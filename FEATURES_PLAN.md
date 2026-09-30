@@ -413,7 +413,14 @@ every feature once.
   pathway; an import staged for review). No real school data.
 - **The walkthrough**, ordered as one complete tour, every step driven in headless Chrome against
   the demo school so each instruction is proven to work, with a screenshot per step.
-- Produced only after F6 has landed; its format is settled with the owner then.
+- **Format (owner, 30 Sep 2026): a self-contained HTML page** — one file with the steps and
+  embedded screenshots, opened in any browser, for presenting on a screen.
+- **Timing (owner, 30 Sep 2026):** a first version as soon as F1, F2, F4 and F7 have finished
+  implementing — before their reviews — then updated as each review lands, as F5, F3 and F6
+  land, and finally after F6. Each version is driven against one running system holding every
+  feature: the merged features on `main`, and the not-yet-merged ones on a preview branch that
+  merges their branches (migrations renumbered per §3), never on `main` itself.
+- The demo school is rebuilt from its script for every version, so the page's steps stay true.
 
 ---
 
@@ -442,7 +449,7 @@ branch.
 4. **F2 (campus leave) and F5 (pathway advisor)** in parallel.
 5. **F3 (attendance).**
 6. **F6 (UI audit).**
-7. **F8 (the demo school and the walkthrough).**
+7. **F8 (the demo school and the walkthrough)** — first version after step 3's implementers finish, updated at each later step.
 
 **Every branch that lands after a parallel branch added migrations** (in step 3, possibly the
 third, after two merges):
