@@ -388,7 +388,13 @@ async function confirmDeskPayments(payments: DeskPayment[], staffId: string, not
       confirmed.push(p);
     } catch (err) {
       firstError ??= err;
-      notCollected.push({ paymentId: p.id, series: p.series, amount: p.amount, reason: err instanceof Error ? err.message : 'Not confirmed' });
+      // Closed in between (the close, a parent): say so in the officer's words.
+      const [now] = await db.select({ status: payment.status }).from(payment).where(eq(payment.id, p.id));
+      const closed = now && now.status !== 'pending' && now.status !== 'completed';
+      notCollected.push({
+        paymentId: p.id, series: p.series, amount: p.amount,
+        reason: closed ? 'It was closed before it could be confirmed — nothing was collected for it' : err instanceof Error ? err.message : 'Not confirmed',
+      });
     }
   }
   if (!confirmed.length) throw firstError;

@@ -169,6 +169,130 @@ describe('F0b: one checkout per entry deadline', () => {
     }
     expect(takingsDelta(before, await takings(officer)).byInstrument.card).toBe(3000);
   });
+
+  it('escrow shared across the desk\'s split payments goes to the earliest deadline first; the ledger has a debit per payment', async () => {
+    const f5 = await onboard(officer, 'ckd-5', 12);
+    // 3000 in the wallet: two subjects paid at the desk, then dropped (no refund window: all back).
+    const funded = await apiResponse(officer.api.v1.registrations.desk.$post({
+      json: { studentId: f5.studentId, sessionId: windowId, subjectIds: [subj.PO!, subj.PJ!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+    }));
+    for (const reg of funded.registrations) {
+      await apiResponse(f5.parent.api.v1.registrations[':id'].drop.$post({ param: { id: reg.id }, json: { reason: 'fund the wallet for the split' } }));
+    }
+    const balance = async () => money((await one<{ balance: string }>(`select balance from escrow where student_id = $1`, [f5.studentId])).balance);
+    expect(await balance()).toBe(3000);
+    const before = await takings(officer);
+    // A (earlier deadline) and B (later): 2000 from the wallet covers A in full and 500 of B.
+    const r = await apiResponse(officer.api.v1.registrations.desk.$post({
+      json: { studentId: f5.studentId, sessionId: windowId, subjectIds: [subj.A!, subj.B!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 2000 } },
+    }));
+    expect(r.collected).toBe(1000);
+    const byFirst = r.payments.map((p) => [p.escrowApplied, p.collected]);
+    expect(byFirst).toEqual([[1500, 0], [500, 1000]]);
+    for (const p of r.payments) {
+      const row = await one<{ amount: string; escrow: string; status: string }>(`select amount, escrow_amount_applied as escrow, status from payment where id = $1`, [p.id]);
+      expect([money(row.amount), money(row.escrow), row.status]).toEqual([p.collected, p.escrowApplied, 'completed']);
+      const ledger = await sql<{ type: string; reason: string; amount: string }>(`select type, reason, amount from escrow_transaction where related_payment_id = $1 order by created_at`, [p.id]);
+      expect(ledger.map((d) => [d.type, d.reason, money(d.amount)])).toEqual([['debit', 'payment', p.escrowApplied]]);
+    }
+    expect(await balance()).toBe(1000);
+    const delta = takingsDelta(before, await takings(officer));
+    expect([delta.moneyIn, delta.escrowApplied, delta.byInstrument.cash]).toEqual([1000, 2000, 1000]);
+  });
+
+  it('one payment confirmed while the other was closed first: the desk says which it took and which to hand back', async () => {
+    const f6 = await onboard(officer, 'ckd-6', 12);
+    const [regEarly, regLate] = await direct(f6, [subj.C!, subj.E!]);
+    // The close reaching the later series' payment first, as the scheduler's
+    // close would (payment failed, its audit row written): a test trigger fires
+    // when that payment is linked to its subject, inside the desk's own
+    // transaction (the one reach past the API here).
+    await sql(`
+      create or replace function f0b_test_close_first() returns trigger language plpgsql as $$
+      begin
+        update payment set status = 'failed', updated_at = now() where id = new.payment_id;
+        insert into audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data, created_at)
+        values (gen_random_uuid()::text, null, 'PAYMENT_FAILED', 'payment', new.payment_id, '{"status":"pending"}', '{"status":"failed","reason":"Registration window closed before payment"}', now());
+        return new;
+      end $$`);
+    await sql(`create trigger f0b_test_close_first after insert on payment_registration for each row when (new.registration_id = '${regLate}') execute function f0b_test_close_first()`);
+    const before = await takings(officer);
+    let r;
+    try {
+      r = await apiResponse(officer.api.v1.registrations.desk.collect.$post({
+        json: { studentId: f6.studentId, registrationIds: [regEarly!, regLate!], instrumentUsed: 'cash', escrowAmountToApply: 0 },
+      }));
+    } finally {
+      await sql(`drop trigger f0b_test_close_first on payment_registration`);
+      await sql(`drop function f0b_test_close_first()`);
+    }
+    expect(r.collected).toBe(1500);
+    expect(r.payments.map((p) => p.registrationIds)).toEqual([[regEarly]]);
+    expect(r.notCollected).toEqual([{
+      paymentId: expect.any(String), series: [expect.stringMatching(/^Pearson Edexcel \w+ \d{4} \(deadlines later\)$/)], amount: 1500,
+      reason: 'It was closed before it could be confirmed — nothing was collected for it',
+    }]);
+    expect([await statusOf('registration', regEarly!), await statusOf('registration', regLate!)]).toEqual(['confirmed', 'pending_payment']);
+    expect([await statusOf('payment', r.payments[0]!.id), await statusOf('payment', r.notCollected[0]!.paymentId)]).toEqual(['completed', 'failed']);
+    // Only what was confirmed is in the takings; no escrow moved for either.
+    expect(takingsDelta(before, await takings(officer)).moneyIn).toBe(1500);
+    expect(await sql(`select id from escrow_transaction where related_payment_id in ($1, $2)`, [r.payments[0]!.id, r.notCollected[0]!.paymentId])).toEqual([]);
+  });
+
+  it("the admin's move may not split an open checkout across deadlines", async () => {
+    const f4 = await onboard(officer, 'ckd-4', 12);
+    const [a, c] = await direct(f4, [subj.A!, subj.C!]);
+    const pay = (await apiResponse(checkout(f4, [a!, c!]))).id!;
+    const moved = await refused(adm.api.v1.sessions[':id']['board-series'].move.$post({
+      param: { id: windowId }, json: { registrationIds: [c!], boardSeriesId: later, reason: 'C is sat in the later series' },
+    }));
+    expect(moved).toEqual({
+      status: 409,
+      error: '1 checkout still open pays for these registrations together with others whose entry deadline would then differ — confirm or cancel it first, or move them together',
+    });
+    expect((await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [c!])).s).toBe(z);
+    // Moving both together keeps one deadline.
+    await apiResponse(adm.api.v1.sessions[':id']['board-series'].move.$post({
+      param: { id: windowId }, json: { registrationIds: [a!, c!], boardSeriesId: later, reason: 'both are sat in the later series' },
+    }));
+    expect(await statusOf('payment', pay)).toBe('pending');
+  });
+});
+
+describe("F0b: a window's first series may not split an open checkout across deadlines", () => {
+  it('refused, nothing entered, until the checkout is settled', async () => {
+    const adm = await admin('ckw');
+    const officer = await staff(adm, 'finance_officer', 'ckw');
+    const Y = academicYearStartOf();
+    const one1 = await subject(adm, 'CKW-1', 'Window guard 1', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    const two = await subject(adm, 'CKW-2', 'Window guard 2', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    const w = await session(adm, 'October (AS, window guard)', 'october', 'as_level', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('october', Y) });
+    const end = new Date((await one<{ end: string }>(`select end_date as "end" from registration_session where id = $1`, [w])).end);
+    const f = await onboard(officer, 'ckw-1', 12);
+    // The window feeds no series yet: both preregistrations carry none, and share one checkout.
+    const ids = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, subjectIds: [one1, two], studentId: f.studentId } }))).map((r) => r.id);
+    const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: ids, paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
+    const mk = async (month: 'october' | 'january', days: number) => {
+      const id = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month, year: seriesYearInAcademicYear(month, Y), label: 'window guard' } }))).id;
+      await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id }, json: { entryDeadline: new Date(end.getTime() + days * 24 * 60 * 60 * 1000), reason: 'board key dates published' } }));
+      return id;
+    };
+    const oct = await mk('october', 5);
+    const jan = await mk('january', 10);
+    const feed = () => adm.api.v1.sessions[':id']['board-series'].$put({
+      param: { id: w }, json: { series: [{ boardSeriesId: oct, isDefault: true }, { boardSeriesId: jan, isDefault: false }], routes: [{ subjectId: two, boardSeriesId: jan }] },
+    });
+    expect(await refused(feed())).toEqual({
+      status: 409,
+      error: "1 checkout still open pays for this window's registrations, which these series would enter with different deadlines — confirm or cancel it first, or route the subjects to series with the same deadline",
+    });
+    expect(await sql(`select board_series_id from registration where id in ($1, $2)`, ids)).toEqual([{ board_series_id: null }, { board_series_id: null }]);
+    expect(await sql(`select id from session_board_series where session_id = $1`, [w])).toEqual([]);
+    // Settled, the same change goes through.
+    await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
+    await apiResponse(feed());
+    expect((await sql<{ s: string }>(`select board_series_id as s from registration where id in ($1, $2) order by board_series_id`, ids)).map((x) => x.s).sort()).toEqual([oct, jan].sort());
+  });
 });
 
 describe('F0b: MO-21 per series — a draft window feeding October and January', () => {

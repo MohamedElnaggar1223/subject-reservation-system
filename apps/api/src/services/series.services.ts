@@ -215,6 +215,39 @@ export async function createBoardSeries(data: CreateBoardSeriesType, actorId: st
  * — the order a window's own change takes — so a window moved at the same
  * moment is either seen or refused.
  */
+/**
+ * One entry deadline per open checkout (F0b, MO-10 per series): the deadline
+ * sweep closes a payment at its series' deadline, so a checkout paying for
+ * series with different deadlines would lose the later series' subjects at
+ * the earlier one. Asked after a change, inside its transaction: how many
+ * checkouts still open, among those holding a registration in `scope`, now
+ * pay for registrations whose series have different deadlines (no series and
+ * no deadline count as one "none"). Every path that changes a registration's
+ * series or a series' deadline asks it: a deadline change, the admin's move,
+ * a window's first series entering its registrations.
+ */
+async function openCheckoutsSpanningDeadlines(tx: Tx, scope: { boardSeriesId: string } | { registrationIds: string[] }): Promise<number> {
+  const inScope = 'boardSeriesId' in scope
+    ? sql`r0.board_series_id = ${scope.boardSeriesId}`
+    : scope.registrationIds.length
+      ? sql`r0.id in (${sql.join(scope.registrationIds.map((id) => sql`${id}`), sql`, `)})`
+      : sql`false`;
+  const r = await tx.execute(sql`
+    select count(*)::int as n from (
+      select p.id from payment p
+      join payment_registration pr on pr.payment_id = p.id
+      join registration r on r.id = pr.registration_id
+      left join board_series b on b.id = r.board_series_id
+      where p.status in ('pending', 'pending_verification')
+        and p.id in (select pr0.payment_id from payment_registration pr0 join registration r0 on r0.id = pr0.registration_id where ${inScope})
+      group by p.id
+      having count(distinct coalesce(b.entry_deadline::text, 'none')) > 1) spanning`);
+  return Number((r.rows[0] as { n: number } | undefined)?.n ?? 0);
+}
+
+const checkouts = (n: number) => `${n} checkout${n === 1 ? '' : 's'} still open pay${n === 1 ? 's' : ''}`;
+const settleFirst = (n: number) => `confirm or cancel ${n === 1 ? 'it' : 'them'} first`;
+
 export async function updateBoardSeries(
   id: string, data: UpdateBoardSeriesType, actorId: string, actorRole: string | null | undefined, ctx?: AuditContext,
 ) {
@@ -241,32 +274,22 @@ export async function updateBoardSeries(
           if (late) throw new SeriesError("The board's entry deadline must be after the registration window closes");
           if (entryDeadline <= new Date()) throw new SeriesError("The board's entry deadline must be in the future");
         }
-        // A checkout still open that pays for this series together with
-        // another series would span two deadlines after the change, and the
-        // sweep would close all of it at the earlier one: refused until it
-        // is settled (series with the same deadline may share a checkout).
-        const spanning = await tx.execute(sql`
-          select count(distinct p.id)::int as n from payment p
-          join payment_registration pr on pr.payment_id = p.id
-          join registration r on r.id = pr.registration_id
-          where p.status in ('pending', 'pending_verification') and r.board_series_id = ${id}
-            and exists (
-              select 1 from payment_registration pr2
-              join registration r2 on r2.id = pr2.registration_id
-              join board_series b2 on b2.id = r2.board_series_id
-              where pr2.payment_id = p.id and b2.id <> ${id}
-                and b2.entry_deadline is distinct from ${entryDeadline ?? null}::timestamptz)`)
-          .then((r) => Number((r.rows[0] as { n: number } | undefined)?.n ?? 0));
-        if (spanning > 0) {
-          throw new SeriesError(
-            `${spanning} checkout${spanning === 1 ? '' : 's'} still open pay${spanning === 1 ? 's' : ''} for this series together with another whose entry deadline would then differ — confirm or cancel ${spanning === 1 ? 'it' : 'them'} first, or give the other series the same deadline`,
-            409,
-          );
-        }
       }
       for (const f of BOARD_SERIES_DATE_FIELDS) if (dates[f] === undefined) delete dates[f];
       const next = { ...dates, ...(deadlineChanges ? { entryDeadline: entryDeadline ?? null } : {}) };
       const [updated] = await tx.update(boardSeries).set({ ...next, updatedAt: new Date() }).where(eq(boardSeries.id, id)).returning();
+      if (deadlineChanges) {
+        // A checkout still open that pays for this series together with
+        // another would span two deadlines after the change: refused until it
+        // is settled (series with the same deadline may share a checkout).
+        const spanning = await openCheckoutsSpanningDeadlines(tx, { boardSeriesId: id });
+        if (spanning > 0) {
+          throw new SeriesError(
+            `${checkouts(spanning)} for this series together with another whose entry deadline would then differ — ${settleFirst(spanning)}, or give the other series the same deadline`,
+            409,
+          );
+        }
+      }
       if (deadlineChanges) {
         await logAction(actorId, 'BOARD_SERIES_DEADLINE_SET', 'board_series', id,
           { entryDeadline: s.entryDeadline?.toISOString() ?? null },
@@ -527,13 +550,21 @@ async function writeWindowSeries(
             where l.session_id = r.session_id and l.board_code = s.council and l.is_default)
         ), updated_at = now()
         where r.session_id = ${w.id} and r.board_series_id is null and r.status not in ('rejected', 'expired', 'dropped')
-        returning r.id`).then((r) => r.rows.length)
-    : 0;
+        returning r.id`).then((r) => (r.rows as { id: string }[]).map((x) => x.id))
+    : [];
+  // Entering them must not leave an open checkout paying for two deadlines.
+  const spanning = await openCheckoutsSpanningDeadlines(tx, { registrationIds: routed });
+  if (spanning > 0) {
+    throw new SeriesError(
+      `${checkouts(spanning)} for this window's registrations, which these series would enter with different deadlines — ${settleFirst(spanning)}, or route the subjects to series with the same deadline`,
+      409,
+    );
+  }
   return {
     before: current.map((c) => ({ boardSeriesId: c.boardSeriesId, isDefault: c.isDefault })),
     after: rows.map((r) => ({ boardSeriesId: r.id, isDefault: defaults.get(r.boardCode) === r.id })),
     routes: kept,
-    registrationsRouted: routed,
+    registrationsRouted: routed.length,
   };
 }
 
@@ -614,6 +645,15 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
       const moving = regs.filter((r) => r.boardSeriesId !== target.id);
       for (const r of moving) {
         await tx.update(registration).set({ boardSeriesId: target.id, updatedAt: now }).where(eq(registration.id, r.id));
+      }
+      // A registration paid for with another in an open checkout may not move
+      // to a series with another deadline: the checkout would span two.
+      const spanning = await openCheckoutsSpanningDeadlines(tx, { registrationIds: moving.map((r) => r.id) });
+      if (spanning > 0) {
+        throw new SeriesError(
+          `${checkouts(spanning)} for these registrations together with others whose entry deadline would then differ — ${settleFirst(spanning)}, or move them together`,
+          409,
+        );
       }
       await logActions(moving.map((r) => ({
         userId: actorId, action: 'REGISTRATION_SERIES_MOVED' as const, entityType: 'registration' as const, entityId: r.id,

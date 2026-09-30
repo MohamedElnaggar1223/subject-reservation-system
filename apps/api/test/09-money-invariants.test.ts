@@ -411,6 +411,19 @@ describe('money invariants over the whole database', () => {
     expect(broken).toEqual([]);
   });
 
+  it("every open payment's registrations share one entry deadline (F0b: the sweep closes a payment at its series' deadline)", async () => {
+    const broken = await sql(`
+      select p.id, count(distinct coalesce(b.entry_deadline::text, 'none')) as deadlines
+      from payment p
+      join payment_registration pr on pr.payment_id = p.id
+      join registration r on r.id = pr.registration_id
+      left join board_series b on b.id = r.board_series_id
+      where p.status in ('pending', 'pending_verification')
+      group by p.id having count(distinct coalesce(b.entry_deadline::text, 'none')) > 1
+    `);
+    expect(broken).toEqual([]);
+  });
+
   it('every window closes before the entry deadline of every series it feeds, and every series is in its academic year and kind (F0b)', async () => {
     const broken = await sql(`
       select l.session_id, l.board_series_id, w.end_date, b.entry_deadline, w.session_type, w.series_year, b.month, b.year
