@@ -444,9 +444,22 @@ staff would:
 4. stage the same file again and commit it.
 
 It runs on a throwaway database (`igcse_import_real_test`), dropped at the end together with the
-uploaded copy, even on failure. The report holds counts and row numbers only; staff appear as a
-count. It was run twice: on 9f8bd13 (`real-sheet-run.md`) and on c0a70a3 after the retake fix
-(`real-sheet-run-2.md`).
+uploaded copy, even on failure. The uploaded copy goes to a directory the script makes itself
+under a fixed scratch root, and only that directory is deleted.
+
+**Data-rule incident.** The first run (on 9f8bd13) was not counts only. It wrote the eight real
+teacher names, and the run admin's id, into `real-sheet-run.md`, in the commit block's list of
+teachers created. The implementer then printed that file into the session before redacting it.
+- The names were replaced in the file by a count.
+- `counts.ts` now redacts before it writes: staff as a count, ids hidden, an error's emails
+  masked.
+- The file is ignored by the repository and was never committed, but the names remain in the
+  session transcript.
+- The trail's `incident` row records it.
+
+Later runs' reports hold counts and row numbers only. The runs were:
+- on 9f8bd13 (`real-sheet-run.md`, redacted afterwards);
+- on c0a70a3, after the retake fix (`real-sheet-run-2.md`).
 
 **Staged**
 - 654 lines, from tabs "2024" (220 lines, November 2026) and "Sheet1" (434 lines, June 2023);

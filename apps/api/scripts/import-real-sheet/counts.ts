@@ -10,12 +10,16 @@
  * The sheet holds real families. It is read from wherever the owner keeps it
  * and never copied into the repository; the report cites counts and sheet row
  * numbers only — never a name, an email or a phone — and is written outside
- * the repository's tracked files. The database (`igcse_import_real_test`) and
- * the uploaded copy are dropped at the end, even when the run fails.
+ * the repository's tracked files. Staff appear as a count; ids are hidden; an
+ * error's emails are masked — all before anything is written. The database
+ * (`igcse_import_real_test`) and the uploaded copy (in a directory the run
+ * makes itself) are dropped at the end, even when the run fails.
  *
  *   pnpm --filter @repo/api exec tsx scripts/import-real-sheet/counts.ts <sheet.xlsx> [--out <report.md>]
  */
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type { AppType } from '../../src/app';
 
 const args = process.argv.slice(2);
@@ -25,6 +29,12 @@ if (!file) throw new Error('Usage: counts.ts <sheet.xlsx> [--out <report.md>]');
 const outPath = option('--out') ?? '/tmp/import-real-sheet-report.md';
 
 process.env.TEST_DB_NAME = 'igcse_import_real_test';
+// The uploaded copy goes to a directory this script makes under a fixed scratch root, and only that
+// directory is deleted at the end: never $LOCAL_UPLOAD_DIR as the shell has it (a shell exporting the
+// dev value would otherwise lose the dev upload store).
+const SCRATCH_ROOT = path.join(realpathSync(tmpdir()), 'igcse-import-real-sheet-');
+const uploadDir = mkdtempSync(SCRATCH_ROOT);
+process.env.LOCAL_UPLOAD_DIR = uploadDir;
 const { TEST_DB_NAME, TEST_DATABASE_URL, TEST_PG_ADMIN_URL } = await import('../../test/env');
 {
   const { default: pg } = await import('pg');
@@ -146,7 +156,10 @@ try {
   await m.connect();
   await m.query(`DROP DATABASE IF EXISTS ${TEST_DB_NAME} WITH (FORCE)`);
   await m.end();
-  rmSync(process.env.LOCAL_UPLOAD_DIR!, { recursive: true, force: true });
+  if (!uploadDir.startsWith(SCRATCH_ROOT) || process.env.LOCAL_UPLOAD_DIR !== uploadDir) {
+    throw new Error('[real-sheet] the upload directory is not the one this run made: not deleting it');
+  }
+  rmSync(uploadDir, { recursive: true, force: true });
   console.log(`[real-sheet] dropped ${TEST_DB_NAME} and the uploaded copy`);
 }
 process.exit(0);
