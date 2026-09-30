@@ -396,6 +396,25 @@ error states that say what to do; sentences, not codes; tables with sorting, fil
 and export; print layouts; performance (no screen waits on an unnecessary request). Before-and-
 after screenshots of every screen changed; a written checklist per screen.
 
+### F8 — The demo school and the walkthrough (last, after F6)
+
+The owner's request of 30 Sep 2026: once every feature and the UI audit are finished, an artifact
+that walks a first-time user through the **whole program — every feature, the existing ones
+included** — used to present the system to the school. For each feature it says which account to
+sign in with, where to navigate and what to click, purely through the UI, and explains what the
+feature does and how it works (its functionality, not its benefits), so that following it tries
+every feature once.
+- **A demo school**, built by a reproducible script through the API (not SQL), with an account
+  for every role (admin, coordinator, teacher, gate, finance officer, finance admin, parents,
+  students) and data in every state the walkthrough shows (sessions open, closed and in draft;
+  registrations, payments, receipts, escrow, refunds, remarks, results; the academic year,
+  calendar, bells, rooms, sections; the catalogue and board series; enrolments; a published
+  timetable and a cover; leave requests at each stage; attendance; exam entries and results; the
+  pathway; an import staged for review). No real school data.
+- **The walkthrough**, ordered as one complete tour, every step driven in headless Chrome against
+  the demo school so each instruction is proven to work, with a screenshot per step.
+- Produced only after F6 has landed; its format is settled with the owner then.
+
 ---
 
 ## 2. Contracts between features
@@ -423,6 +442,7 @@ branch.
 4. **F2 (campus leave) and F5 (pathway advisor)** in parallel.
 5. **F3 (attendance).**
 6. **F6 (UI audit).**
+7. **F8 (the demo school and the walkthrough).**
 
 **Every branch that lands after a parallel branch added migrations** (in step 3, possibly the
 third, after two merges):
@@ -545,14 +565,15 @@ API and web ports):
 | Feature | Implemented | Reviewed | Merged | Notes |
 |---|---|---|---|---|
 | F0a Core foundation | yes — docs/features/FOUNDATION.md | Opus 5.5, three rounds; lead review | 29 Sep 2026, `b747d47`, main CI 36613182503 green | owner questions in FOUNDATION §12; A-12/13/14 as settings |
-| F0b Catalogue, series, enrolment | yes — `feature/catalogue`, docs/features/CATALOGUE.md | Opus 5.5 review of 682907a: eleven flags, being fixed | | |
-| F1 Scheduling | | | | |
+| F0b Catalogue, series, enrolment | yes — docs/features/CATALOGUE.md | Opus 5.5, three rounds (eleven flags, then six, then two); lead review | 30 Sep 2026, see the trail | owner questions in CATALOGUE §12; F1's 0040 collides with F0b's 0040 |
+| F1 Scheduling | in progress (`feature/scheduling`, from F0b's branch before it merged) | | | |
 | F4 Exam entries | | | | |
 | F2 Campus leave | | | | |
 | F5 Pathway advisor | | | | |
 | F3 Attendance | | | | |
 | F7 Day-one import | | | | |
 | F6 UI audit | | | | |
+| F8 Demo school and walkthrough | | | | owner's request, 30 Sep 2026; after F6 |
 
 **F0a narrowings** (as built; details in docs/features/FOUNDATION.md §3 and §11) — each is held
 for the owner or the lead, not decided by the implementer:
