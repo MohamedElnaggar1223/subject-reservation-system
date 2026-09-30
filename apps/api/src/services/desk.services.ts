@@ -257,7 +257,7 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
         { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), collected: 0 }, auditCtx, tx);
       return inserted;
     });
-    return { registrations: created, payment: null, totalCost, collected: 0 };
+    return { registrations: created, payment: null, payments: [], notCollected: [], totalCost, collected: 0, receipts: [] };
   }
 
   const escrowToApply = data.collectNow.escrowAmountToApply ?? 0;

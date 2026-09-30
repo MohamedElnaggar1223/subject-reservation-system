@@ -91,9 +91,9 @@ describe('F0b: one checkout per entry deadline', () => {
 
   it("a family's checkout spanning two deadlines is refused, naming each series to pay separately; the summary groups them", async () => {
     f1 = await onboard(officer, 'ckd-1', 12);
-    [regA] = await direct(f1, [subj.A!]);
-    const [regB] = await direct(f1, [subj.B!]);
-    [regC] = await direct(f1, [subj.C!]);
+    regA = (await direct(f1, [subj.A!]))[0]!;
+    const regB = (await direct(f1, [subj.B!]))[0]!;
+    regC = (await direct(f1, [subj.C!]))[0]!;
     const r = await refused(checkout(f1, [regA!, regB!]));
     expect(r.status).toBe(422);
     expect(r.error).toMatch(/^These subjects are entered in exam board series with different entry deadlines, so each series is paid for on its own: Pearson Edexcel \w+ \d{4} \(deadlines X\) \(entry deadline .+\): Deadlines A; Pearson Edexcel \w+ \d{4} \(deadlines later\) \(entry deadline .+\): Deadlines B$/);
@@ -129,7 +129,7 @@ describe('F0b: one checkout per entry deadline', () => {
     }));
     expect(r.collected).toBe(3000);
     expect(r.notCollected).toEqual([]);
-    expect(r.payments!.map((p) => p.collected)).toEqual([1500, 1500]);
+    expect(r.payments.map((p) => p.collected)).toEqual([1500, 1500]);
     const ids = r.registrations.map((x) => x.id);
     const pays = await paymentsOf(ids);
     expect(pays).toHaveLength(2);
@@ -160,7 +160,7 @@ describe('F0b: one checkout per entry deadline', () => {
       json: { studentId: f3.studentId, registrationIds: ids, instrumentUsed: 'card', escrowAmountToApply: 0 },
     }));
     expect(r.collected).toBe(3000);
-    expect(r.payments!.map((p) => p.collected)).toEqual([1500, 1500]);
+    expect(r.payments.map((p) => p.collected)).toEqual([1500, 1500]);
     const pays = await paymentsOf(ids);
     expect(pays).toHaveLength(2);
     for (const p of pays) {
