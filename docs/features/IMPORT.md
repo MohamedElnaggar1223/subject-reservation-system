@@ -607,4 +607,6 @@ re-run reads as the first staging.
   fixed (c0a70a3); the real sheet run again (ddccc18); 08n proves an imported account's first
   sign-in (3b3ce38).
 - Merged origin/main 20d87c8 (332ef18).
-- Next: the gates in local time and UTC, push, CI.
+- 05:10–05:14Z — gates green on b6d57d0: API and web check-types; the suite on
+  `igcse_import_test` in local time and with TZ=UTC (23 files, 345 passed, 1 todo).
+- Next: push, CI; then the Opus 5.5 review.
