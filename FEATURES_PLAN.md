@@ -567,7 +567,7 @@ API and web ports):
 | F0a Core foundation | yes — docs/features/FOUNDATION.md | Opus 5.5, three rounds; lead review | 29 Sep 2026, `b747d47`, main CI 36613182503 green | owner questions in FOUNDATION §12; A-12/13/14 as settings |
 | F0b Catalogue, series, enrolment | yes — docs/features/CATALOGUE.md | Opus 5.5, three rounds (eleven flags, then six, then two); lead review | 30 Sep 2026, see the trail | owner questions in CATALOGUE §12; F1's 0040 collides with F0b's 0040 |
 | F1 Scheduling | in progress (`feature/scheduling`, from F0b's branch before it merged) | | | |
-| F4 Exam entries | in progress (`feature/exam-entries`, from origin/main e5da650) — docs/features/EXAM_ENTRIES.md | | | running system on API 3043 (3041 is held by another project's server); migrations 0041–0042 collide with F1's 0041 (§3's protocol for whoever lands second) |
+| F4 Exam entries | yes, ready for review (`feature/exam-entries`, from origin/main e5da650; gates green at 5d338a5, 25 files, 353 passed, local time and UTC) — docs/features/EXAM_ENTRIES.md | | | running system on API 3043 (3041 is held by another project's server); migrations 0041–0042 collide with F1's 0041_scheduling and F2's 0042_campus_leave (§3's protocol for whoever lands second; 0042 is a custom migration to recreate) |
 | F2 Campus leave | | | | |
 | F5 Pathway advisor | | | | |
 | F3 Attendance | | | | |

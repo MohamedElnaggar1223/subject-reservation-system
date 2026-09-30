@@ -378,3 +378,5 @@ rooms; no national ID in an audit row.
 - 06:00Z — the lead's drive of every screen as each role in English and Arabic (family at phone
   size); the translator's English hydration mismatch on Suspense pages fixed; screens and
   dictionaries committed (bf17f59); §8 and §11 written.
+- 06:05Z — gates green at 5d338a5: api and web check-types; the suite in local time and in UTC
+  (25 files, 353 passed, 1 todo; `.audit/exams-evidence/suite-{local,utc}-5d338a5.log`).
