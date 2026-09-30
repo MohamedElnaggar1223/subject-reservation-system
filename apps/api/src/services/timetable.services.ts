@@ -495,7 +495,7 @@ async function notifyPublished(id: string, term: { name: string; startsOn: strin
     : [];
   const when = readableDate(effectiveFrom);
   const title = replaces ? `Timetable changes for ${term.name}` : `Timetable for ${term.name}`;
-  const data = { timetableId: id, effectiveFrom, link: '/timetable/mine' };
+  const data = { timetableId: id, effectiveFrom, link: '/my-timetable' };
   if (studentIds.length) {
     await createBulkNotifications(studentIds, 'TIMETABLE_PUBLISHED', title,
       replaces ? `Your timetable changes from ${when}. Open Timetable to see it.` : `Your timetable from ${when} is ready. Open Timetable to see it.`, data);

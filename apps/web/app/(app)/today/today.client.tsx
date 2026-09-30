@@ -26,6 +26,7 @@ import { Button } from '~/components/ui/button';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { Badge, Notice, TONE_CLASSES } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
+import { MyLessonsToday } from '~/components/teacher-day';
 import {
   DAY_KIND, DateText, fetchSchoolDay, periodBadge, schoolClock, toMinutes,
   type DayKind, type SchoolDay,
@@ -73,6 +74,8 @@ export default function TodayClient({ manages }: { manages: boolean }): React.JS
       ) : (
         <div className="space-y-6">
           <Headline day={day} now={now} manages={manages} />
+          {/* F1: a teacher's lessons today (nothing for an account that does not teach). */}
+          <MyLessonsToday />
           {day.isSchoolDay && <Bells day={day} now={now} manages={manages} />}
         </div>
       )}

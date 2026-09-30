@@ -19,6 +19,7 @@ import { apiResponse, academicYearShortLabel, academicYearStartOf, gradeLabel, R
 import { api } from '~/lib/hono';
 import { Badge, Notice } from '~/components/ui/tone';
 import { EmptyState, ErrorState, LoadingState } from '~/components/ui/query-state';
+import { MyTeachingWeek } from '~/components/teacher-day';
 
 /** The account's teaching, or null when it is not linked to a teacher record (the API's 404). */
 const fetchTeaching = async () => {
@@ -67,6 +68,8 @@ export default function TeachingClient({ viewerRole }: { viewerRole: string }): 
         </Notice>
       ) : (
         <div className="space-y-6">
+          {/* F1: the week they teach, each lesson opening its class. */}
+          <MyTeachingWeek />
           <section className="rounded-xl border border-border bg-card p-5 shadow-sm" aria-labelledby="teaching-as">
             <div className="flex flex-wrap items-center gap-2">
               <h2 id="teaching-as" className="text-sm text-muted-foreground">

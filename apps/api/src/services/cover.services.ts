@@ -256,9 +256,9 @@ async function notifyCover(n: { coverTeacherUserId: string | null; coverTeacherN
   const students = [...new Set(members.map((m) => m.studentId))];
   if (!students.length) return;
   if (n.cancelled) {
-    await createBulkNotifications(students, 'LESSON_CANCELLED', `${n.groupName} is cancelled`, `${n.groupName} on ${when} does not take place.`, { date: n.date, link: '/timetable/mine' });
+    await createBulkNotifications(students, 'LESSON_CANCELLED', `${n.groupName} is cancelled`, `${n.groupName} on ${when} does not take place.`, { date: n.date, link: '/my-timetable' });
   } else {
-    await createBulkNotifications(students, 'LESSON_COVERED', `${n.groupName}: cover teacher`, `${n.coverTeacherName} takes ${n.groupName} on ${when}.`, { date: n.date, link: '/timetable/mine' });
+    await createBulkNotifications(students, 'LESSON_COVERED', `${n.groupName}: cover teacher`, `${n.coverTeacherName} takes ${n.groupName} on ${when}.`, { date: n.date, link: '/my-timetable' });
   }
 }
 
