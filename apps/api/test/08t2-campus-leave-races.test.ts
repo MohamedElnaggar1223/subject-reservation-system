@@ -13,7 +13,8 @@ import {
  * - approve and cancel at the same moment, in both orders (forced with the
  *   leave's row lock held from the test), and unforced;
  * - check-out and cancel at the same moment, in both orders;
- * - two gate staff checking one student out; two approvers approving one request;
+ * - two gate staff checking one student out; two approvers approving one request; two
+ *   requests for one student at once (the second, overlapping, refused);
  * - a no-show flagged once, and a late return flagged once, by two scheduler
  *   instances at the same tick; a later tick does nothing; the family is told once.
  *
@@ -68,7 +69,7 @@ describe('F2: races and the scheduler', () => {
     gate1 = await staff(adm, 'gate', 'lvr1');
     gate2 = await staff(adm, 'gate', 'lvr2');
     const officer = await staff(adm, 'finance_officer', 'lvr');
-    for (const k of ['a1', 'a2', 'sw', 'c1', 'c2', 'g2', 'ap', 'ns', 'lr']) fams[k] = await onboard(officer, `lvr-${k}`, 11);
+    for (const k of ['a1', 'a2', 'sw', 'c1', 'c2', 'g2', 'ap', 'ns', 'lr', 'ov']) fams[k] = await onboard(officer, `lvr-${k}`, 11);
     await makeTodayASchoolDay(coordinator);
     ({ flagLeaveExceptions: flag } = await import('../src/services/leave-jobs.services'));
     ({ cairoInstant: cairo } = await import('../src/services/scheduling-shared.services'));
@@ -150,6 +151,29 @@ describe('F2: races and the scheduler', () => {
     expect((await actions(id)).filter((a) => a === 'LEAVE_CHECKED_OUT')).toHaveLength(1);
     expect(await one(`select checked_out_by from leave_request where id = $1`, [id])).toEqual({ checked_out_by: gate1.id });
     expect(await notified(f.parent.email, 'LEAVE_CHECKED_OUT', 1)).toHaveLength(1);
+  });
+
+  it("two requests for one student at the same moment: they are made one after the other, so the overlapping second is refused", async () => {
+    const f = fams.ov!;
+    // Hold the student's request lock from a connection of its own, queue both requests behind it, then let them go.
+    const { default: pg } = await import('pg');
+    const holder = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await holder.connect();
+    await holder.query('BEGIN');
+    await holder.query(`select pg_advisory_xact_lock(hashtext($1))`, [`leave:student:${f.studentId}`]);
+    const ask = (leaveTime: string) => f.parent.api.v1.leave.requests.$post({ json: {
+      studentId: f.studentId, date: FAR, leaveTime, returning: false, reasonCategory: 'family', collector: { kind: 'parent', parentId: f.parent.id },
+    } });
+    const first = ask('09:00');
+    await lockWaiters(1);
+    const second = ask('10:00');
+    await lockWaiters(2);
+    await holder.query('COMMIT');
+    await holder.end();
+    const [a, b] = await Promise.all([first, second]);
+    expect([a.status, b.status]).toEqual([201, 409]);
+    expect(((await b.json()) as { error: string }).error).toBe('Student lvr-ov already has a leave that day from 09:00 (waiting for approval)');
+    expect((await sql(`select leave_time from leave_request where student_id = $1`, [f.studentId])).map((r) => r.leave_time)).toEqual(['09:00']);
   });
 
   it('two approvers approve one request at once: one approval, the other told it is already approved', async () => {
