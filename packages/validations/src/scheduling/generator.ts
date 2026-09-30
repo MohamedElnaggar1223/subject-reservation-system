@@ -83,13 +83,17 @@ function mulberry32(seed: number) {
   };
 }
 
-/** The input with every list in a fixed order, so equal inputs hash equally. */
+/**
+ * The input with every list in a fixed order, so equal inputs hash equally.
+ * Lessons are named by their group and number, not their row id: two drafts
+ * of one term with the same groups and rules are the same input.
+ */
 export function canonicalInput(input: EngineInput): string {
   const byId = <T extends { id: string }>(xs: T[]) => [...xs].sort((a, b) => a.id.localeCompare(b.id));
   return JSON.stringify({
     days: [...input.days].sort((a, b) => a.weekday - b.weekday),
     groups: byId(input.groups).map((g) => ({ ...g, students: [...g.students].sort(), roomFeatures: [...g.roomFeatures].sort() })),
-    lessons: byId(input.lessons),
+    lessons: [...input.lessons].sort(byCard).map(({ id: _id, ...l }) => l),
     rooms: byId(input.rooms).map((r) => ({ ...r, features: [...r.features].sort() })),
     teachers: byId(input.teachers),
     unavailable: [...input.unavailable].map((u) => `${u.teacherId}|${u.roomId}|${u.weekday}|${u.period}`).sort(),
@@ -98,6 +102,9 @@ export function canonicalInput(input: EngineInput): string {
     roomsRequired: input.roomsRequired,
   });
 }
+
+/** Lessons in a fixed order that does not depend on their row ids: group, then number. */
+const byCard = (a: EngineLesson, b: EngineLesson) => a.groupId.localeCompare(b.groupId) || a.seq - b.seq || a.length - b.length || a.id.localeCompare(b.id);
 
 // ─── The search state ────────────────────────────────────────────────────────
 
@@ -150,7 +157,7 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
   const rooms = [...input.rooms].sort((a, b) => a.id.localeCompare(b.id));
   const R = rooms.length;
   const ri = new Map(rooms.map((r, i) => [r.id, i]));
-  const lessons = [...input.lessons].filter((l) => gi.has(l.groupId)).sort((a, b) => a.id.localeCompare(b.id));
+  const lessons = [...input.lessons].filter((l) => gi.has(l.groupId)).sort(byCard);
   const L = lessons.length;
 
   const groupTeacher = new Int32Array(G).fill(-1);
@@ -438,7 +445,7 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
       || groups[lGroup[b]!]!.size - groups[lGroup[a]!]!.size
       || groups[lGroup[a]!]!.name.localeCompare(groups[lGroup[b]!]!.name, 'en', { numeric: true })
       || lessons[a]!.seq - lessons[b]!.seq
-      || lessons[a]!.id.localeCompare(lessons[b]!.id));
+      || byCard(lessons[a]!, lessons[b]!));
 
   const placeBest = (l: number, candidates: number[]): boolean => {
     let best = -1, bestRoom = -1, bestCost = Infinity;
@@ -668,7 +675,12 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     placements.push({ lessonId: lessons[l]!.id, weekday: days[Math.floor(c / P)]!.weekday, period: (c % P) + 1, roomId: lRoom[l]! >= 0 ? rooms[lRoom[l]!]!.id : null });
   }
   placements.sort((a, b) => a.lessonId.localeCompare(b.lessonId));
-  const outputHash = fnv1a(JSON.stringify({ placements, unplaced: unplaced.map((u) => u.lessonId) })).toString(16).padStart(8, '0');
+  // The result named by group and number, so two drafts given the same input hash the same.
+  const cardOf = new Map(lessons.map((l) => [l.id, `${l.groupId}#${l.seq}`]));
+  const outputHash = fnv1a(JSON.stringify({
+    placements: placements.map((p) => [cardOf.get(p.lessonId), p.weekday, p.period, p.roomId]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+    unplaced: unplaced.map((u) => cardOf.get(u.lessonId)).sort(),
+  })).toString(16).padStart(8, '0');
 
   return {
     placements,
