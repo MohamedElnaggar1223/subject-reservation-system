@@ -428,7 +428,7 @@ branch.
 | F0b | the catalogue: `exam_board`, `qualification`, `exam_unit` (own level), `qualification_unit` (the unit-to-award map), option codes, `subject.qualificationId` / `subject_unit` (what a registrable row enters), `getCatalogue()`, `findRegistrable(term)`, `deriveLevelCode(input, reading)` with the setting `catalogue.levelCodeReading`; board series (`board_series` with the entry deadline and the board's dates, `listBoardSeries`, `seriesDeadline`, `windowDeadlines`), the series a window feeds (`session_board_series`, `session_subject_series`) and `registration.boardSeriesId`; F4's `entryItemsFor(registrationIds)` / `entryItemsForWindow(sessionId)` and `teacherOf(studentId, subjectId, academicYearStart)`; F1's `getTeachingDemand(academicYearId)`; F7's `upsertEnrolments(tx, academicYearId, rows, actorId, { source: 'import', commit })` / `batchEnrol(…, 'import')`; course enrolment (`course_enrolment`, `checkEnrolments`). Details: docs/features/CATALOGUE.md §7 | F1, F4, F5, F7 |
 | F1 | teaching groups and dated membership (`groupMembersBetween(groupIds, from, to)`: section groups follow the section, the later membership wins a shared day, leaving wins); published timetable versions; `getScheduleFor({ studentId } \| { teacherId }, date)` → `DaySchedule` (lessons with period, times, group, subject, teacher with cover applied, room, status; why a day has none; lessons a short or exam-only day drops) and `getScheduleRange(target, from, to)`; `lessonAccess(viewer, lessonId, date)` and `classListFor(viewer, lessonId, date)` (who may act on a lesson that date, and its students); F0a's calendar for a range, `getSchoolDays(from, to)`. Details: docs/features/SCHEDULING.md §8 | F2, F3 |
 | F4 | candidates, entries, results per unit and award, `getSittings(studentId)`, `getExamsFor(studentId, date)` | F2, F3, F5 |
-| F2 | leave requests and states; `getLeaveCoverage(studentId, date)` | F3 |
+| F2 | leave requests and states (`leave_request`: pending → approved/rejected/cancelled → checked_out → returned; the flags `no_show_at`, `late_return_at`); `getLeaveCoverage(studentId, date)` → the ranges a student was out on approved leave (`left`: the gate's check-out to the return, `excusedTo` the approved return; `planned`: approved, not gone yet), in `leave.services.ts`; F2 reads F4's exams through `examsFor(studentId, date)` (`leave-exams.services.ts`, none until F4's `getExamsFor` is wired there). Details: docs/features/CAMPUS_LEAVE.md §9 | F3 |
 | F3 | attendance; `getAttendanceSummary(studentId, range)` | Student 360, F6 |
 
 ---
@@ -568,7 +568,7 @@ API and web ports):
 | F0b Catalogue, series, enrolment | yes — docs/features/CATALOGUE.md | Opus 5.5, three rounds (eleven flags, then six, then two); lead review | 30 Sep 2026, see the trail | owner questions in CATALOGUE §12; F1's 0040 collides with F0b's 0040 |
 | F1 Scheduling | yes — `feature/scheduling`, docs/features/SCHEDULING.md; main merged at e5da650, migration 0041 | | | awaiting review; owner questions in SCHEDULING §13 |
 | F4 Exam entries | | | | |
-| F2 Campus leave | | | | |
+| F2 Campus leave | yes — `feature/campus-leave`, docs/features/CAMPUS_LEAVE.md; on F1's branch (9569dd9), migration 0042 | | | awaiting review; owner questions in CAMPUS_LEAVE §15 |
 | F5 Pathway advisor | | | | |
 | F3 Attendance | | | | |
 | F7 Day-one import | | | | |

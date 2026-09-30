@@ -832,7 +832,8 @@ async function pendingCollectorsForQueue() {
   if (rows.length === 0) return [];
   const links = await db.select({ collectorId: leaveCollectorStudent.collectorId, studentId: leaveCollectorStudent.studentId, name: user.name })
     .from(leaveCollectorStudent).innerJoin(user, eq(user.id, leaveCollectorStudent.studentId))
-    .where(inArray(leaveCollectorStudent.collectorId, rows.map((r) => r.id)));
+    .where(inArray(leaveCollectorStudent.collectorId, rows.map((r) => r.id)))
+    .orderBy(asc(user.name), asc(user.id));
   const names = await namesOf(rows.map((r) => r.addedBy));
   const restrictions = await activeRestrictions([...new Set(links.map((l) => l.studentId))]);
   return rows.map((c) => {
@@ -935,7 +936,8 @@ export async function collectorsOfStudents(studentIds: string[], viewer: Viewer,
     opts.includeClosed ? sql`true` : inArray(leaveCollector.status, ['pending', 'approved', 'rejected']),
   )).orderBy(asc(leaveCollector.name));
   const allLinks = await db.select({ collectorId: leaveCollectorStudent.collectorId, studentId: leaveCollectorStudent.studentId, name: user.name })
-    .from(leaveCollectorStudent).innerJoin(user, eq(user.id, leaveCollectorStudent.studentId)).where(inArray(leaveCollectorStudent.collectorId, ids));
+    .from(leaveCollectorStudent).innerJoin(user, eq(user.id, leaveCollectorStudent.studentId)).where(inArray(leaveCollectorStudent.collectorId, ids))
+    .orderBy(asc(user.name), asc(user.id));
   const names = await namesOf(rows.flatMap((r) => [r.addedBy, r.decidedBy]));
   const whole = seesIdNumbers(viewer);
   const visible = isFamily(viewer) ? new Set(studentIds) : null;
