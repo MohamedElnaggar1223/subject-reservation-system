@@ -1808,7 +1808,11 @@ function localizeDom(language: Language) {
       // source. Keeping the first one forever put stale names back.
       if (original === null || (current !== original && current !== translatePreservingWhitespace(original))) {
         original = current;
-        element.setAttribute(originalAttr, current);
+        // English translates nothing, so a source not yet recorded waits for
+        // Arabic. Recording it here wrote into server HTML React had not yet
+        // hydrated (a page under Suspense): a hydration mismatch on every
+        // such page with an aria-label, in English.
+        if (language === 'ar' || element.hasAttribute(originalAttr)) element.setAttribute(originalAttr, current);
       }
       const nextValue = language === 'ar' ? translatePreservingWhitespace(original) : original;
       if (element.getAttribute(attr) !== nextValue) element.setAttribute(attr, nextValue);
