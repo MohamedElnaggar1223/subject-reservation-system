@@ -29,6 +29,7 @@ import {
   type ActivePaymentMethod,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { InstantText } from '../exams/exams-shared';
 
 interface CheckoutClientProps {
   registrationIds: string[];
@@ -202,6 +203,45 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             Back to Registrations
           </Button>
         </div>
+      </div>
+    );
+  }
+
+  // F0b: subjects in exam board series with different entry deadlines are
+  // paid for separately — one checkout per series (the school closes a
+  // checkout at its series' deadline). The family chooses one to pay now.
+  if (!result && !summary.openPayment && summary.deadlineGroups.length > 1) {
+    return (
+      <div className="px-6 py-8 max-w-3xl mx-auto animate-fade-up">
+        <h1 className="text-2xl font-bold font-display text-foreground">Pay by exam series</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          These subjects are entered in exam board series with different entry deadlines, so each series is paid for on its own. Pay for one now; the others stay waiting for payment until their own deadline.
+        </p>
+        <ul className="mt-6 space-y-3">
+          {summary.deadlineGroups.map((g) => (
+            <li key={g.registrationIds.join(',')} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-foreground">
+                    {g.series.length ? g.series.map((x) => <bdi key={x.id} className="me-2">{x.name}</bdi>) : <span>No board series</span>}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {g.entryDeadline ? <><span>Entry deadline</span> <InstantText iso={String(g.entryDeadline)} /></> : <span>No entry deadline yet</span>}
+                  </p>
+                  <p className="mt-2 text-sm text-foreground">
+                    {g.subjects.map((name, i) => <span key={`${name}-${i}`}>{i > 0 && ', '}<bdi data-i18n-skip="true">{name}</bdi></span>)}
+                  </p>
+                </div>
+                <div className="text-end">
+                  <p className="text-lg font-bold text-foreground tabular-nums" dir="ltr">{g.total.toFixed(2)} EGP</p>
+                  <Button className="mt-2" onClick={() => router.push(`/checkout?ids=${g.registrationIds.join(',')}` as never)}>
+                    Pay for this series
+                  </Button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
       </div>
     );
   }
