@@ -311,7 +311,7 @@ export function RequestLeaveForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <Label htmlFor="lv-time" className="mb-1.5">Leaves at</Label>
-          <Input id="lv-time" inputMode="numeric" placeholder="10:30" value={leaveTime} onChange={(e) => setLeaveTime(e.target.value)} onBlur={() => setLeaveTime(normalizeTime(leaveTime))} dir="ltr" className="text-lg tabular-nums" required />
+          <Input id="lv-time" inputMode="numeric" placeholder="e.g. 10:30" value={leaveTime} onChange={(e) => setLeaveTime(e.target.value)} onBlur={() => setLeaveTime(normalizeTime(leaveTime))} dir="ltr" className="text-lg tabular-nums" required />
         </div>
         <div>
           <span className="mb-1.5 block text-sm font-medium text-foreground">Coming back?</span>
@@ -324,7 +324,7 @@ export function RequestLeaveForm({
             </label>
           </div>
           {returning && (
-            <Input aria-label="Back by" inputMode="numeric" placeholder="12:00" value={returnTime} onChange={(e) => setReturnTime(e.target.value)} onBlur={() => setReturnTime(normalizeTime(returnTime))} dir="ltr" className="mt-2 tabular-nums" />
+            <Input aria-label="Back by" inputMode="numeric" placeholder="e.g. 12:00" value={returnTime} onChange={(e) => setReturnTime(e.target.value)} onBlur={() => setReturnTime(normalizeTime(returnTime))} dir="ltr" className="mt-2 tabular-nums" />
           )}
         </div>
       </div>

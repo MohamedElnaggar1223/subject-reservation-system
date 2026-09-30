@@ -189,7 +189,8 @@ export const leaveArabic: Record<string, string> = {
   'Custody note': 'قيد حضانة',
   'Keys: J / K move · A approves · R refuses.': 'المفاتيح: J / K للتنقل · A للاعتماد · R للرفض.',
   'The school has set the admin to decide leave; you see the requests read-only.': 'جعلت المدرسة قرار الاستئذان للإدارة؛ ترى الطلبات للاطلاع فقط.',
-  'Asked by': 'الطالب',
+  'Asked by': 'مقدّم الطلب',
+  ID: 'الهوية',
   for: 'نيابة عن',
   "The family's note": 'ملاحظة الأسرة',
   Document: 'المستند',
@@ -424,9 +425,11 @@ function translateInner(text: string): string | null {
   const rules: [RegExp, (m: RegExpExecArray) => string | null][] = [
     // ── Counts and small templates on the screens ──
     [/^(\d+) dates requested$/, (x) => `طُلبت ${x[1]} تواريخ`],
+    [/^Every week: (\d+) dates$/, (x) => `كل أسبوع: ${x[1]} تواريخ`],
+    [/^e\.g\. (\d\d:\d\d)$/, (x) => `مثلًا ${x[1]}`],
     [/^(\d+) dates$/, (x) => `${x[1]} تواريخ`],
     [/^(\d+) to check$/, (x) => `${x[1]} للمراجعة`],
-    [/^(\d+) lessons missed$/, (x) => `${x[1]} حصص فائتة`],
+    [/^(\d+) lessons? missed$/, (x) => (x[1] === '1' ? 'حصة فائتة واحدة' : `${x[1]} حصص فائتة`)],
     [/^(\d+) not collected$/, (x) => `${x[1]} لم يُستلم`],
     [/^(\d+) late back$/, (x) => `${x[1]} تأخر في العودة`],
     [/^(\d+) waiting$/, (x) => `${x[1]} بالانتظار`],
@@ -540,8 +543,8 @@ function translateInner(text: string): string | null {
 
     // ── Notifications ──
     [/^Leave to approve: (.+)$/, (x) => `استئذان للاعتماد: ${x[1]}`],
-    [/^(.+) asks to leave (today|tomorrow|on .+?|on (\d+) days from .+?) at (\d\d:\d\d)(?: \(back by (\d\d:\d\d)\))? — (.+)\.$/,
-      (x) => `يطلب ${x[1]} الخروج ${x[3] ? `في ${x[3]} أيام بدءًا من ${day(x[2]!.replace(/^on \d+ days from /, ''))}` : when(x[2]!)} الساعة ${x[4]}${x[5] ? ` (يعود بحلول ${x[5]})` : ''} — ${reason(x[6]!)}.`],
+    [/^(.+) asks to leave (?:(today|tomorrow)|on (\d+) days from (.+?)|on (.+?)) at (\d\d:\d\d)(?: \(back by (\d\d:\d\d)\))? — (.+)\.$/,
+      (x) => `يطلب ${x[1]} الخروج ${x[2] ? when(x[2]) : x[3] ? `في ${x[3]} أيام بدءًا من ${day(x[4]!)}` : `يوم ${day(x[5]!)}`} الساعة ${x[6]}${x[7] ? ` (يعود بحلول ${x[7]})` : ''} — ${reason(x[8]!)}.`],
     [/^Leave requested for (.+)$/, (x) => `طُلب استئذان لـ${x[1]}`],
     [/^The school recorded a request for (.+) to leave (.+) at (\d\d:\d\d)(?: \(back by (\d\d:\d\d)\))?\. It waits for approval\.$/, (x) => `سجلت المدرسة طلبًا لخروج ${x[1]} ${when(x[2]!)} الساعة ${x[3]}${x[4] ? ` (يعود بحلول ${x[4]})` : ''}. ينتظر الاعتماد.`],
     [/^Leave approved for (.+)$/, (x) => `اعتُمد استئذان ${x[1]}`],

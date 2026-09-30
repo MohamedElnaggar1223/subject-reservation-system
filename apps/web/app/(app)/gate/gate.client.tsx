@@ -71,13 +71,13 @@ export default function GateClient(): React.JSX.Element {
 
   return (
     <div className="mx-auto max-w-3xl px-3 py-4 sm:px-6 sm:py-6">
-      <header className="mb-3 flex items-center justify-between gap-3">
+      <header className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Gate</h1>
           {data && <p className="text-sm text-muted-foreground"><DateText date={data.date} weekday long /></p>}
         </div>
         {data && (
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid w-full grid-cols-3 gap-2 text-center sm:w-auto">
             <Count n={data.counts.toLeave} label="To leave" />
             <Count n={data.counts.out} label="Out" />
             <Count n={data.counts.noShows + data.counts.lateReturns} label="Alerts" alert />
@@ -119,6 +119,13 @@ export default function GateClient(): React.JSX.Element {
                     <span>{l.student.gradeLabel}</span>{l.student.section && <> · <span>{l.student.section}</span></>}
                     {' · '}{l.named.kind === 'alone' ? <span>Leaves alone</span> : <bdi>{l.named.name}</bdi>}
                   </span>
+                  {l.checkout && (
+                    <span className="block truncate text-sm text-foreground">
+                      <span>Left at</span> <span dir="ltr">{l.checkout.time}</span>{l.checkout.name && <> <span>with</span> <bdi>{l.checkout.name}</bdi></>}
+                      {l.returnedTime && <> · <span>back at</span> <span dir="ltr">{l.returnedTime}</span></>}
+                      {l.status === 'checked_out' && l.returning && l.returnTime && <> · <span>back by</span> <span dir="ltr">{l.returnTime}</span></>}
+                    </span>
+                  )}
                   <span className="mt-1 flex flex-wrap gap-1">
                     <StatusBadge status={l.status} noShow={l.noShow} late={l.lateReturn} />
                     {l.custody.length > 0 && <Badge tone="danger">Custody alert</Badge>}
@@ -138,7 +145,7 @@ export default function GateClient(): React.JSX.Element {
 
 function Count({ n, label, alert = false }: { n: number; label: string; alert?: boolean }) {
   return (
-    <div className={cn('min-w-16 rounded-lg border px-2 py-1', alert && n > 0 ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400' : 'border-border bg-card')}>
+    <div className={cn('min-w-0 rounded-lg border px-2 py-1 sm:min-w-20', alert && n > 0 ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400' : 'border-border bg-card')}>
       <p className="text-lg font-bold tabular-nums">{n}</p>
       <p className="text-[11px] text-muted-foreground">{label}</p>
     </div>

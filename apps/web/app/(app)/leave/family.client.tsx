@@ -93,8 +93,12 @@ function LeaveList({ data, parent, onPass, onRequest }: { data: FamilyView; pare
       apiResponse(api.v1.leave.requests[':id'].cancel.$post({ param: { id }, json: { reason: reason || null, series } })),
     onSuccess: () => { setCancelling(null); qc.invalidateQueries({ queryKey: LEAVE_KEY }); },
   });
-  const upcoming = data.leaves.filter((l) => l.date >= data.today && l.status !== 'rejected' && l.status !== 'cancelled').sort((a, b) => a.date.localeCompare(b.date) || a.leaveTime.localeCompare(b.leaveTime));
-  const past = data.leaves.filter((l) => !upcoming.includes(l));
+  const standing = data.leaves.filter((l) => l.date >= data.today && l.status !== 'rejected' && l.status !== 'cancelled').sort((a, b) => a.date.localeCompare(b.date) || a.leaveTime.localeCompare(b.leaveTime));
+  // A weekly request shows once, at its next date, with the rest of its dates under it.
+  const seriesDates = new Map<string, LeaveRow[]>();
+  for (const l of standing) if (l.seriesId) seriesDates.set(l.seriesId, [...(seriesDates.get(l.seriesId) ?? []), l]);
+  const upcoming = standing.filter((l) => !l.seriesId || seriesDates.get(l.seriesId)![0] === l);
+  const past = data.leaves.filter((l) => !standing.includes(l));
   return (
     <div className="space-y-6">
       {upcoming.length === 0 ? (
@@ -115,6 +119,14 @@ function LeaveList({ data, parent, onPass, onRequest }: { data: FamilyView; pare
                 </div>
                 <StatusBadge status={l.status} noShow={!!l.noShowAt && !l.checkout} late={!!l.lateReturnAt} />
               </div>
+              {l.seriesId && (seriesDates.get(l.seriesId)?.length ?? 0) > 1 && (
+                <details className="mt-2 text-sm">
+                  <summary className="cursor-pointer text-foreground">{`Every week: ${seriesDates.get(l.seriesId)!.length} dates`}</summary>
+                  <ul className="mt-1 space-y-1 text-muted-foreground">
+                    {seriesDates.get(l.seriesId)!.map((x) => <li key={x.id} className="flex items-center gap-2"><DateText date={x.date} weekday /><StatusBadge status={x.status} /></li>)}
+                  </ul>
+                </details>
+              )}
               {l.status === 'rejected' || l.decisionNote ? <p className="mt-2 text-sm text-muted-foreground"><span>School&apos;s note:</span> <bdi>{l.decisionNote}</bdi></p> : null}
               {l.checkout && <p className="mt-2 text-sm text-foreground"><span>Left at</span> <span dir="ltr">{l.checkout.time}</span>{l.checkout.name && <> <span>with</span> <bdi>{l.checkout.name}</bdi></>}{l.returnedTime && <> · <span>back at</span> <span dir="ltr">{l.returnedTime}</span></>}</p>}
               <div className="mt-3 flex flex-wrap gap-2">
@@ -188,7 +200,7 @@ function PassSheet({ leaveId, parent, onClose }: { leaveId: string; parent: bool
             <p className="text-sm text-muted-foreground"><span>Collected by</span> <CollectorText c={p.leave.collector} /></p>
             <p className="mt-2 text-xs text-muted-foreground">Show this at the gate. The gate also checks the collector&apos;s ID. It works until the end of the day.</p>
             {parent && (
-              <Button variant="link" size="sm" className="mt-2" disabled={replace.isPending} onClick={() => replace.mutate()}>
+              <Button variant="link" size="sm" className="mt-2 h-auto whitespace-normal" disabled={replace.isPending} onClick={() => replace.mutate()}>
                 Shared it by mistake? Make a new pass (the old one stops working)
               </Button>
             )}

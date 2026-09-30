@@ -158,14 +158,14 @@ function Queue({ items, canDecide }: { items: QueueItem[]; canDecide: boolean })
                         <span className="text-sm tabular-nums text-foreground" dir="ltr">{i.leaveTime}</span>
                       </span>
                       <span className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                        {g === 'Later' || g === 'Too late to decide' ? <DateText date={i.date} weekday /> : null}
+                        {g === 'Later' || g === 'Too late to decide' ? <><DateText date={i.date} weekday /><span>·</span></> : null}
                         <span>{i.gradeLabel}</span>{i.section && <span>· {i.section}</span>}<span>· {i.reason.label}</span>
                       </span>
                       <span className="mt-1 flex flex-wrap gap-1">
                         {i.seriesDates.length > 1 && <Badge tone="info">{`${i.seriesDates.length} dates`}</Badge>}
                         {i.warnings.length > 0 && <Badge tone="warning">{`${i.warnings.length} to check`}</Badge>}
                         {i.custody.length > 0 && <Badge tone="danger">Custody note</Badge>}
-                        {i.lessons.length > 0 && <Badge tone="neutral">{`${i.lessons.length} lessons missed`}</Badge>}
+                        {i.lessons.length > 0 && <Badge tone="neutral">{i.lessons.length === 1 ? '1 lesson missed' : `${i.lessons.length} lessons missed`}</Badge>}
                       </span>
                     </button>
                   </li>
