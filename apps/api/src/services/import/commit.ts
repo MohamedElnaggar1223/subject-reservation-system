@@ -190,7 +190,7 @@ async function createReferenceData(batch: typeof importBatch.$inferSelect, view:
     if (madeTeachers.length || madeSections.length) {
       await logAction(actor.id, 'IMPORT_REFERENCE_DATA_CREATED', 'import', batch.id, null, { teachers: madeTeachers, sections: madeSections }, ctx, tx);
     }
-    return { teachers: madeTeachers, sections: madeSections, changedSettings: true };
+    return { teachers: madeTeachers.sort(), sections: madeSections.sort(), changedSettings: true };
   });
 }
 

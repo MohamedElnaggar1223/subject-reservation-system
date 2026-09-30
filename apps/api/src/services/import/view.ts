@@ -265,15 +265,19 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     const bare = lower(text.replace(/\s*\([^)]*\)\s*$/, ''));
     const paren = /\(([^)]+)\)\s*$/.exec(text)?.[1]?.toLowerCase().trim() ?? null;
     const unitParen = !!paren && /^(p|m|s|d|fp)\d$/.test(paren);
-    const hits = catalogue.filter((s) =>
-      lower(s.name) === t || s.code.toLowerCase() === t
-      || (!unitParen && bare !== t && (lower(s.name) === bare || lower(s.name) === `${bare} (${paren})`))
-      || (unitParen && s.unitShortCodes.length === 1 && s.unitShortCodes.includes(paren!))
-      || (!!paren && s.code.toLowerCase() === paren));
+    // How close a row is: its own name or code first, then the name without "(…)", a unit's short code, a code in "(…)".
+    const score = (s: CatalogueRow) =>
+      lower(s.name) === t || s.code.toLowerCase() === t ? 0
+      : !unitParen && bare !== t && lower(s.name) === bare ? 1
+      : unitParen && s.unitShortCodes.length === 1 && s.unitShortCodes.includes(paren!) ? 2
+      : !!paren && s.code.toLowerCase() === paren ? 3
+      : 9;
     const prefs = family ? LEVEL_OF[family] : [];
-    return hits
-      .filter((s) => !family || prefs.includes(s.qualificationLevel))
-      .sort((a, b) => prefs.indexOf(a.qualificationLevel) - prefs.indexOf(b.qualificationLevel) || Number(b.isActive) - Number(a.isActive));
+    return catalogue
+      .map((s) => ({ s, score: score(s) }))
+      .filter((x) => x.score < 9 && (!family || prefs.includes(x.s.qualificationLevel)))
+      .sort((a, b) => a.score - b.score || prefs.indexOf(a.s.qualificationLevel) - prefs.indexOf(b.s.qualificationLevel) || Number(b.s.isActive) - Number(a.s.isActive))
+      .map((x) => x.s);
   };
   const subjectKeys = new Map<string, { subject: string; levelCode: string | null; family: LevelFamily | null }>();
   const teacherNames = new Map<string, string>();
@@ -827,7 +831,8 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       const open = matching.filter((w) => w.status === 'active');
       const boards = [...(levelBoards.get(g.key) ?? [])];
       return {
-        key: g.key, label: seriesLabel(g.series.type, g.series.year), type: g.series.type, year: g.series.year, level: g.level, rows: g.rows,
+        key: g.key, label: seriesLabel(g.series.type, g.series.year), type: g.series.type, year: g.series.year, level: g.level,
+        rows: work.filter((w) => w.seriesKey === g.key && w.decision === 'import').length,
         mode: st.mode, sessionId: st.sessionId,
         windows: matching.map((w) => ({ id: w.id, name: w.name, status: w.status })),
         suggestedWindowId: open.length === 1 ? open[0]!.id : null,

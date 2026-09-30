@@ -98,20 +98,39 @@ export async function stageImport(data: CreateImportType, actor: Actor, ctx?: Au
   const fileHash = createHash('sha256').update(content.body).digest('hex');
   const id = randomUUID();
   await db.transaction(async (tx) => {
+    // The same file staged before: its review is carried over (the mapping, the fixes, the merges
+    // and skips), so running it again asks nothing new and makes nothing new.
+    const [earlier] = await tx.select().from(importBatch)
+      .where(and(eq(importBatch.fileHash, fileHash), eq(importBatch.kind, data.kind), sql`${importBatch.status} <> 'discarded'`))
+      .orderBy(desc(importBatch.createdAt)).limit(1);
+    const before = earlier ? await tx.select().from(importRow).where(eq(importRow.batchId, earlier.id)) : [];
+    const beforeAt = new Map(before.map((r) => [`${r.tab}|${r.rowNumber}`, r]));
     await tx.insert(importBatch).values({
       id, kind: data.kind, fileId: data.fileId, fileName: content.name, fileHash, status: 'staged',
-      source: { tabs: source.tabs } as Record<string, unknown>, createdBy: actor.id,
+      source: { tabs: source.tabs } as Record<string, unknown>, settings: earlier?.settings ?? {}, createdBy: actor.id,
     });
     for (let i = 0; i < source.lines.length; i += 500) {
-      await tx.insert(importRow).values(source.lines.slice(i, i + 500).map((l) => ({
-        id: randomUUID(), batchId: id, tab: l.tab, rowNumber: l.rowNumber, raw: l.raw,
-      })));
+      await tx.insert(importRow).values(source.lines.slice(i, i + 500).map((l) => {
+        const was = beforeAt.get(`${l.tab}|${l.rowNumber}`);
+        return {
+          id: randomUUID(), batchId: id, tab: l.tab, rowNumber: l.rowNumber, raw: l.raw,
+          edits: was?.edits ?? {}, decision: was?.decision ?? null, decisionNote: was?.decisionNote ?? null, decidedBy: was?.decidedBy ?? null,
+        };
+      }));
     }
-    const before = await tx.select({ id: importBatch.id }).from(importBatch)
-      .where(and(eq(importBatch.fileHash, fileHash), sql`${importBatch.id} <> ${id}`));
+    if (earlier) {
+      const people = await tx.select().from(importPerson).where(eq(importPerson.batchId, earlier.id));
+      const decided = people.filter((p) => Object.keys(p.edits ?? {}).length || p.mergedInto || p.distinct || p.oneChild || p.decision === 'skip');
+      if (decided.length) {
+        await tx.insert(importPerson).values(decided.map((p) => ({
+          id: randomUUID(), batchId: id, role: p.role, key: p.key, edits: p.edits, mergedInto: p.mergedInto, distinct: p.distinct,
+          oneChild: p.oneChild, decision: p.decision, updatedBy: actor.id,
+        })));
+      }
+    }
     await logAction(actor.id, 'IMPORT_STAGED', 'import', id, null, {
       kind: data.kind, fileId: data.fileId, fileName: content.name, lines: source.lines.length,
-      tabs: source.tabs.map((t) => ({ name: t.name, kind: t.kind, lines: t.lines })), sameFileAs: before.map((b) => b.id),
+      tabs: source.tabs.map((t) => ({ name: t.name, kind: t.kind, lines: t.lines })), reviewCarriedFrom: earlier?.id ?? null,
     }, ctx, tx);
   });
   await refreshSummary(id);

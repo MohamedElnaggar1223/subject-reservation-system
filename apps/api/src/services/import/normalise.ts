@@ -252,15 +252,19 @@ export function readSheetLine(line: SourceLine, roles: Roles, edits: ImportRowEd
   const parentName = edits.parentName ?? cleaned(cell(roles.parentName), 'parent');
   const studentEmail = normEmail(edits.studentEmail ?? named('student email'));
   const parentEmail = normEmail(edits.parentEmail ?? named('parent email'));
+  const restored: string[] = [];
+  const unusable: string[] = [];
   const phoneOf = (edited: string | undefined, raw: string, who: string) => {
     if (edited !== undefined) return readPhone(edited).phone;
     const p = readPhone(raw);
-    if (p.restored) local.push({ code: 'phone_restored', detail: who });
-    else if (raw.trim() && !p.phone) local.push({ code: 'phone_unusable', detail: who });
+    if (p.restored) restored.push(who);
+    else if (raw.trim() && !p.phone) unusable.push(who);
     return p.phone;
   };
   const studentPhone = phoneOf(edits.studentPhone, named('student no.', 'student phone', 'student no'), 'student');
   const parentPhone = phoneOf(edits.parentPhone, named('parent no.', 'parent phone', 'parent no'), 'parent');
+  if (restored.length) local.push({ code: 'phone_restored', detail: restored.join(' and ') });
+  if (unusable.length) local.push({ code: 'phone_unusable', detail: unusable.join(' and ') });
 
   // Class, level, subject, series.
   const classText = edits.classGrade ?? cleanText(named('class & grade', 'class', 'grade'));
@@ -340,11 +344,13 @@ export function readSclLine(line: SourceLine, edits: ImportRowEditsType): SclLin
   const cell = (k: string) => cleanText(line.raw.find(([h]) => h === k)?.[1]);
   const studentName = edits.studentName ?? cell('student_name');
   const studentEmail = normEmail(edits.studentEmail ?? cell('student_email'));
+  const restored: string[] = [];
+  const unusable: string[] = [];
   const phone = (edited: string | undefined, raw: string, who: string) => {
     if (edited !== undefined) return readPhone(edited).phone;
     const p = readPhone(raw);
-    if (p.restored) local.push({ code: 'phone_restored', detail: who });
-    else if (raw && !p.phone) local.push({ code: 'phone_unusable', detail: who });
+    if (p.restored) restored.push(who);
+    else if (raw && !p.phone) unusable.push(who);
     return p.phone;
   };
   const gradeText = edits.classGrade ?? cell('grade');
@@ -359,12 +365,15 @@ export function readSclLine(line: SourceLine, edits: ImportRowEditsType): SclLin
   if (!noParent) parents.push({ ...first, emailOk: emailOk(first.email) });
   const second = { name: cell('second_parent_name'), email: normEmail(cell('second_parent_email')), phone: phone(undefined, cell('second_parent_phone'), 'second parent') };
   if (!noParent && second.email) parents.push({ ...second, emailOk: emailOk(second.email) });
+  const studentPhone = phone(edits.studentPhone, cell('student_phone'), 'student');
+  if (restored.length) local.push({ code: 'phone_restored', detail: restored.join(' and ') });
+  if (unusable.length) local.push({ code: 'phone_unusable', detail: unusable.join(' and ') });
   const studentEmailOk = emailOk(studentEmail);
   if (!studentEmailOk) local.push({ code: 'email_student_missing', detail: studentEmail ? 'not an email' : 'empty' });
   if (!noParent && !parents[0]?.emailOk) local.push({ code: 'email_parent_missing', detail: first.email ? 'not an email' : 'empty' });
   if (parents.some((p) => p.email && p.email === studentEmail)) local.push({ code: 'email_student_is_parent', detail: 'on this row' });
   return {
-    kind: 'scl', studentName, studentEmail, studentEmailOk, studentPhone: phone(edits.studentPhone, cell('student_phone'), 'student'),
+    kind: 'scl', studentName, studentEmail, studentEmailOk, studentPhone,
     sclId: cell('scl_student_id') || null, grade, section, parents, noParent, local,
   };
 }
