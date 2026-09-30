@@ -409,3 +409,7 @@ events' own times.
 - 02:53Z — the dev school rebuilt at the merged head and re-driven (a first timetable made,
   generated and published from the screens, cover, a parent, a teacher); cover says when no
   teacher of the subject is free (d45ee44). FEATURES_PLAN's F1 row and status updated.
+- 03:00Z — the cover log ordered a lesson's arrangements on one date by when they were made
+  (the local suite caught the tie once) (963779a).
+- 03:05Z — gates at 963779a: suite green in local time and UTC (27 files, 348 passed, 1 todo),
+  api and web check-types clean; pushed.
