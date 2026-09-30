@@ -31,7 +31,7 @@ import { randomUUID } from 'crypto';
 import {
   gridFromBells, evaluate, measure, judgeMove, generate, canonicalInput, cardsFor, slotName, WEEKDAY_NAMES,
   type EngineInput, type GridDay, type CreateTimetableType, type UpdateTimetableType, type MoveLessonType, type UnplaceLessonType,
-  type LockLessonType, type GenerateTimetableType, type PublishTimetableType, type ExportCsvQueryType,
+  type LockLessonType, type GenerateTimetableType, type PublishTimetableType, type ExportCsvQueryType, type UnplacedLesson,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { getSetting } from './settings.services';
@@ -315,7 +315,8 @@ export async function getTimetable(id: string) {
     unplaced,
     measures: measure(model.input),
     problems,
-    runs: runs.map((r) => ({ ...r, explanations: r.explanations as { lessonId: string; groupName: string; seq: number; length: number; reasons: string[]; summary: string }[] })),
+    // Runs before the review round have no cause: the screen shows none for them.
+    runs: runs.map((r) => ({ ...r, explanations: r.explanations as (Omit<UnplacedLesson, 'cause' | 'groupId'> & { cause?: UnplacedLesson['cause'] })[] })),
   };
 }
 

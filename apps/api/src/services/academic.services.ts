@@ -662,7 +662,9 @@ export async function addSectionMembers(sectionId: string, data: AddSectionMembe
         { added: toAdd, moved, startsOn, alreadyIn: ids.filter((id) => !toAdd.includes(id)), clashesAccepted }, ctx, tx);
     }
     // F0a's answer is unchanged unless the coordinator went ahead with a clash.
-    return { added: toAdd.length, moved: moved.length, alreadyIn: ids.length - toAdd.length, ...(clashesAccepted.length ? { clashesAccepted } : {}) };
+    const answer: { added: number; moved: number; alreadyIn: number; clashesAccepted?: string[] } = { added: toAdd.length, moved: moved.length, alreadyIn: ids.length - toAdd.length };
+    if (clashesAccepted.length) answer.clashesAccepted = clashesAccepted;
+    return answer;
   });
 }
 
