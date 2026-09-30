@@ -91,13 +91,20 @@ export const coverRoutes = new Hono<HonoEnv>()
   .get('/report', zValidator('query', CoverReportQuery), async (c) => {
     const q = c.req.valid('query');
     try {
+      return success(c, await cover.coverReport(q.from, q.to));
+    } catch (err) {
+      const f = fail(err, 'Failed to build the cover report');
+      return error(c, f.message, f.status);
+    }
+  })
+  /** GET /report/csv — the same report for a spreadsheet. */
+  .get('/report/csv', zValidator('query', CoverReportQuery), async (c) => {
+    const q = c.req.valid('query');
+    try {
       const report = await cover.coverReport(q.from, q.to);
-      if (q.format === 'csv') {
-        return new Response(cover.coverReportCsv(report), {
-          headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="cover-${q.from}-${q.to}.csv"` },
-        });
-      }
-      return success(c, report);
+      return new Response(cover.coverReportCsv(report), {
+        headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="cover-${q.from}-${q.to}.csv"` },
+      });
     } catch (err) {
       const f = fail(err, 'Failed to build the cover report');
       return error(c, f.message, f.status);

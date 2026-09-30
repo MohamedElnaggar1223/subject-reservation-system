@@ -216,7 +216,7 @@ export type AbsenceReason = z.infer<typeof AbsenceReasonSchema>;
 export const RangeQuery = z.object({ from: DateOnlySchema.optional(), to: DateOnlySchema.optional() });
 export type RangeQueryType = z.infer<typeof RangeQuery>;
 
-export const CoverReportQuery = z.object({ from: DateOnlySchema, to: DateOnlySchema, format: z.enum(['json', 'csv']).optional() });
+export const CoverReportQuery = z.object({ from: DateOnlySchema, to: DateOnlySchema });
 export type CoverReportQueryType = z.infer<typeof CoverReportQuery>;
 
 export const CreateAbsence = z
