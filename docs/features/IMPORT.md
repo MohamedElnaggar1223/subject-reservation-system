@@ -609,4 +609,5 @@ re-run reads as the first staging.
 - Merged origin/main 20d87c8 (332ef18).
 - 05:10–05:14Z — gates green on b6d57d0: API and web check-types; the suite on
   `igcse_import_test` in local time and with TZ=UTC (23 files, 345 passed, 1 todo).
-- Next: push, CI; then the Opus 5.5 review.
+- 05:16–05:20Z — pushed `feature/import` (0036d64); CI run 36672632642 green.
+- Next: the Opus 5.5 review, then the lead's.
