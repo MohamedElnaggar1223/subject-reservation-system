@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, academicYearShortLabel, seriesYearInAcademicYear } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, feedSeries, refused, one, sql, audited, openWindow, holdRowLock, lockWaiters, type Client,
+  app, admin, staff, onboard, subject, session, feedSeries, refused, one, sql, audited, openWindow, holdRowLock, lockWaiters, type Client,
 } from './helpers';
 import { schoolSheet, sclRoster, moneyRecord, workbook, serial, years, D, type Cell } from './import-fixtures';
 
@@ -353,6 +353,20 @@ describe('F7: the day-one import', () => {
       ]);
       const created = await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'IMPORT_ACCOUNT_CREATED' and new_data->>'batchId' = $1`, [firstBatch]);
       expect(Number(created[0]!.n)).toBe(22);
+    });
+
+    it('an imported parent signs in once they set a password through "Forgot password" (the link goes to their email)', async () => {
+      // better-auth's own endpoints, as the web's sign-in and reset pages call them through better-auth's client.
+      const a = await app();
+      const post = (path: string, json: Record<string, unknown>) =>
+        a.request(path, { method: 'POST', headers: { Origin: 'http://localhost:3000', 'Content-Type': 'application/json' }, body: JSON.stringify(json) });
+      expect((await post('/api/auth/sign-in/email', { email: `hany${D}`, password: 'TestPass1' })).status).toBe(401);
+      expect((await post('/api/auth/request-password-reset', { email: `hany${D}`, redirectTo: 'http://localhost:3000/reset-password' })).status).toBe(200);
+      const { identifier } = await one<{ identifier: string }>(
+        `select identifier from verification where identifier like 'reset-password:%' and value = (select id from "user" where email = $1)`, [`hany${D}`]);
+      expect((await post('/api/auth/reset-password', { token: identifier.slice('reset-password:'.length), newPassword: 'Imported1' })).status).toBe(200);
+      expect((await post('/api/auth/sign-in/email', { email: `hany${D}`, password: 'Imported1' })).status).toBe(200);
+      expect((await one<{ n: string }>(`select count(*) as n from account where user_id = (select id from "user" where email = $1)`, [`hany${D}`])).n).toBe('1');
     });
 
     it('sections, enrolments, history and money history: each traceable to its line', async () => {
