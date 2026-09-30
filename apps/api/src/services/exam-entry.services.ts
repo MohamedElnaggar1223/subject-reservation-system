@@ -32,7 +32,7 @@ import {
 import { randomUUID } from 'crypto';
 import {
   ACADEMIC_ROLES, ACCESS_ARRANGEMENT_LABELS, ENTRY_LIST_COLUMNS, GENERIC_ENTRY_LIST_COLUMNS, ENTRY_PROBLEMS, hasRole,
-  feeTierOn, schoolDateString, seriesLabel, seriesAcademicYearStart,
+  feeTierOn, forecastGradeProblem, schoolDateString, seriesLabel, seriesAcademicYearStart,
   type AccessArrangement, type CreateEntryType, type DeriveEntriesType, type EntryProblem, type ListEntriesQueryType,
   type SubmitEntriesType, type UpdateBoardRuleType, type UpdateEntryType,
 } from '@repo/validations';
@@ -107,9 +107,11 @@ type DeriveRow = {
   studentName: string;
   subject: { id: string; name: string; code: string };
   levelCode: string;
-  outcome: 'ready' | 'entered' | 'not_mapped';
+  outcome: 'ready' | 'entered' | 'withdrawn' | 'not_mapped';
   note: string | null;
-  entries: (PlannedEntry & { state: 'new' | 'exists' | 'elsewhere'; existingEntryId: string | null })[];
+  // 'withdrawn': the coordinator withdrew this entry and the registration is still confirmed —
+  // a derivation never makes it again; adding it back is a deliberate entry by hand.
+  entries: (PlannedEntry & { state: 'new' | 'exists' | 'elsewhere' | 'withdrawn'; existingEntryId: string | null })[];
 };
 
 /** The catalogue pieces derivation reads: each award's options (with components) and unit map. */
@@ -130,10 +132,14 @@ async function catalogueFor(qualificationIds: string[], executor: Executor) {
   return { options, optionUnits, qualUnits };
 }
 
-/** The tier the units of an option share, if they share one. */
+/**
+ * The tier an option's tiered components share, if they share one: Cambridge
+ * 0610's Extended option enters Papers 2 and 4 (Extended) and Paper 6 (no
+ * tier), and is Extended.
+ */
 function sharedTier(tiers: (string | null)[]): string | null {
   const t = [...new Set(tiers.filter(Boolean))];
-  return t.length === 1 && tiers.every(Boolean) ? t[0]! : null;
+  return t.length === 1 ? t[0]! : null;
 }
 
 /**
@@ -148,9 +154,9 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
   if (!regs.length) return [] as DeriveRow[];
   const items = await entryItemsFor(regs.map((r) => r.id));
   const studentIds = [...new Set(regs.map((r) => r.studentId))];
-  const [students, existing, cat, history, numbers, cfSetting] = await Promise.all([
+  const [students, inSeries, cat, history, numbers, cfSetting] = await Promise.all([
     executor.select({ id: user.id, name: user.name }).from(user).where(inArray(user.id, studentIds)),
-    executor.select().from(examEntry).where(and(eq(examEntry.boardSeriesId, series.id), inArray(examEntry.studentId, studentIds), sql`${examEntry.status} <> 'withdrawn'`)),
+    executor.select().from(examEntry).where(and(eq(examEntry.boardSeriesId, series.id), inArray(examEntry.studentId, studentIds))),
     catalogueFor(items.map((i) => i.qualification?.id).filter((x): x is string => !!x), executor),
     // Every earlier entry and result of these students (retakes; an AS entry to carry forward).
     executor.execute(sql`
@@ -169,6 +175,8 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
     `).then((r) => r.rows as { studentId: string; seriesId: string; number: string; centreNumber: string | null }[]),
     getSetting('exams.carryForward', executor),
   ]);
+  const existing = inSeries.filter((e) => e.status !== 'withdrawn');
+  const withdrawn = inSeries.filter((e) => e.status === 'withdrawn');
   const rules = await boardRulesFor(series.boardCode, executor);
   const centre = await centreFor(series.boardCode);
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
@@ -247,9 +255,12 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
     if (planned && retakeFrom.get(reg.id)) {
       for (const p of planned) if (!p.isRetake) Object.assign(p, { isRetake: true, retakeSource: 'registration' });
     }
+    const same = (e: typeof inSeries[number], p: PlannedEntry) => e.studentId === reg.studentId && (p.kind === 'unit' ? e.unitId === p.unitId : e.qualificationId === p.qualificationId);
     const entries = (planned ?? []).map((p) => {
-      const found = existing.find((e) => e.studentId === reg.studentId && (p.kind === 'unit' ? e.unitId === p.unitId : e.qualificationId === p.qualificationId));
-      return { ...p, state: !found ? 'new' as const : found.registrationId === reg.id || !found.registrationId ? 'exists' as const : 'elsewhere' as const, existingEntryId: found?.id ?? null };
+      const found = existing.find((e) => same(e, p));
+      const gone = !found ? withdrawn.find((e) => same(e, p) && e.registrationId === reg.id) : undefined;
+      const state = found ? (found.registrationId === reg.id || !found.registrationId ? 'exists' as const : 'elsewhere' as const) : gone ? 'withdrawn' as const : 'new' as const;
+      return { ...p, state, existingEntryId: found?.id ?? gone?.id ?? null };
     });
     rows.push({
       registrationId: reg.id,
@@ -257,7 +268,7 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
       studentName: nameOf.get(reg.studentId) ?? '',
       subject: { id: item.subject.id, name: item.subject.name, code: item.subject.code },
       levelCode: item.levelCode,
-      outcome: !planned ? 'not_mapped' : entries.every((e) => e.state !== 'new') ? 'entered' : 'ready',
+      outcome: !planned ? 'not_mapped' : entries.some((e) => e.state === 'new') ? 'ready' : entries.some((e) => e.state === 'withdrawn') ? 'withdrawn' : 'entered',
       note: !planned ? `${item.subject.name} is not mapped on the Catalogue: say what it enters with ${series.boardName} first` : note,
       entries,
     });
@@ -505,6 +516,15 @@ export async function setForecast(entryId: string, grade: string | null, actor: 
     if (e.forecastLockedAt && rules.forecastLockedOnSubmit) {
       throw new ExamError('This forecast grade has gone to the board, which does not accept a change to it', 409);
     }
+    if (grade) {
+      // The grade must fit what is entered (an IGCSE takes no lower-case AS grade).
+      const [lv] = e.kind === 'award'
+        ? await tx.select({ level: qualification.level }).from(qualification).where(eq(qualification.id, e.qualificationId!))
+        : await tx.select({ level: examUnit.unitLevel }).from(examUnit).where(eq(examUnit.id, e.unitId!));
+      const level = !lv ? null : lv.level === 'igcse' ? 'igcse' : lv.level === 'as' || lv.level === 'as_level' ? 'as' : 'a_level';
+      const problem = forecastGradeProblem(level, grade);
+      if (problem) throw new ExamError(problem, 400);
+    }
     if ((e.forecastGrade ?? null) === grade) return e;
     const [row] = await tx.update(examEntry).set({ forecastGrade: grade, forecastBy: actor.id, forecastAt: new Date(), updatedAt: new Date() })
       .where(eq(examEntry.id, entryId)).returning();
@@ -526,6 +546,7 @@ export async function listForecasts(actor: { id: string; role?: string | null },
   const rows = (await db.execute(sql`
     select e.id as "entryId", e.student_id as "studentId", u.name as "studentName", e.entry_code as "entryCode", e.title,
       e.forecast_grade as "forecastGrade", e.forecast_locked_at as "forecastLockedAt", e.status, e.board_code as "boardCode",
+      fb.name as "forecastByName", e.forecast_at as "forecastAt",
       s.id as "boardSeriesId", s.month, s.year, s.label, s.forecast_grades_due::text as "forecastGradesDue",
       sub.id as "subjectId", sub.name as "subjectName", ce.mode, ce.teacher_id as "teacherId", tt.name as "teacherName",
       coalesce(r.taken_outside_school, false) as "takenOutsideSchool"
@@ -538,6 +559,7 @@ export async function listForecasts(actor: { id: string; role?: string | null },
     left join course_enrolment ce on ce.student_id = e.student_id and ce.subject_id = r.subject_id and ce.academic_year_id = ay.id and ce.ended_on is null
     left join teacher tt on tt.id = ce.teacher_id
     left join exam_board_rule br on br.board_code = e.board_code
+    left join "user" fb on fb.id = e.forecast_by
     where e.status <> 'withdrawn' and coalesce(br.forecast_required, false)
       ${boardSeriesId ? sql`and e.board_series_id = ${boardSeriesId}` : sql`and (s.exams_end is null or s.exams_end >= current_date)`}
       ${academic ? sql`` : sql`and ce.teacher_id = ${t!.id} and ce.mode = 'in_school'`}
@@ -545,7 +567,7 @@ export async function listForecasts(actor: { id: string; role?: string | null },
   `)).rows as {
     entryId: string; studentId: string; studentName: string; entryCode: string; title: string; forecastGrade: string | null;
     forecastLockedAt: string | null; status: string; boardCode: string; boardSeriesId: string; month: string; year: number; label: string;
-    forecastGradesDue: string | null; subjectId: string | null; subjectName: string | null; mode: string | null; teacherId: string | null;
+    forecastGradesDue: string | null; forecastByName: string | null; forecastAt: string | null; subjectId: string | null; subjectName: string | null; mode: string | null; teacherId: string | null;
     teacherName: string | null; takenOutsideSchool: boolean;
   }[];
   const names = await boardNameMap();
@@ -747,11 +769,12 @@ export async function getEntryList(boardSeriesId: string) {
   // Confirmed registrations of the series with no live entry: derive them, or map the subject first.
   const unentered = (await db.execute(sql`
     select r.id as "registrationId", r.student_id as "studentId", u.name as "studentName", sub.name as "subjectName", sub.code as "subjectCode",
-      (sub.qualification_id is not null or exists (select 1 from subject_unit su where su.subject_id = sub.id)) as mapped
+      (sub.qualification_id is not null or exists (select 1 from subject_unit su where su.subject_id = sub.id)) as mapped,
+      (select max(e.withdrawn_at) from exam_entry e where e.registration_id = r.id and e.status = 'withdrawn') as "withdrawnAt"
     from registration r join "user" u on u.id = r.student_id join subject sub on sub.id = r.subject_id
     where r.board_series_id = ${series.id} and r.status = 'confirmed'
       and not exists (select 1 from exam_entry e where e.registration_id = r.id and e.status <> 'withdrawn')
-    order by u.name, sub.name`)).rows as { registrationId: string; studentId: string; studentName: string; subjectName: string; subjectCode: string; mapped: boolean }[];
+    order by u.name, sub.name`)).rows as { registrationId: string; studentId: string; studentName: string; subjectName: string; subjectCode: string; mapped: boolean; withdrawnAt: string | null }[];
   const summary = Object.fromEntries(ENTRY_PROBLEMS.map((p) => [p, rows.filter((r) => r.problems.includes(p)).length])) as Record<EntryProblem, number>;
   return {
     series: {

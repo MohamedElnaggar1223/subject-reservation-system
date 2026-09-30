@@ -225,6 +225,18 @@ export function normalizeForecastGrade(v: string): string {
   const t = v.trim();
   return /^[a-e]$/.test(t) ? t : t.toUpperCase();
 }
+/**
+ * Whether a forecast grade fits what is entered: an IGCSE takes A*–G or U, or
+ * 9–1; an AS a–e (Cambridge writes AS grades in lower case) or A–E, or U; an A
+ * Level (or an A2 unit) A*–E or U. Null when it fits.
+ */
+export function forecastGradeProblem(level: 'igcse' | 'as' | 'a_level' | null, grade: string): string | null {
+  if (!level) return null;
+  if (level === 'igcse') return /^(A\*|[A-G]|U|[1-9])$/.test(grade) ? null : 'An IGCSE forecast grade is A*–G or U, or 9–1';
+  if (level === 'as') return /^([a-e]|[A-E]|U)$/.test(grade) ? null : 'An AS forecast grade is a–e (or A–E) or U';
+  return /^(A\*|[A-E]|U)$/.test(grade) ? null : 'An A Level forecast grade is A*–E or U';
+}
+
 export const ForecastGradeSchema = z
   .string()
   .transform(normalizeForecastGrade)
@@ -348,7 +360,8 @@ export const ENTRY_PROBLEM_LABELS: Record<EntryProblem, string> = {
  * The columns of each board's entry list, one to one with its portal's
  * fields. The boards' own files are not in hand (DISCOVERY.md F-07), so every
  * column is marked assumed until the coordinator checks it against the
- * board's template; the export says so in its first line.
+ * board's template; the Entry lists screen says so (the CSV itself holds only the portal's
+ * columns, so it can be uploaded as it is).
  */
 export type EntryListColumn = { key: string; label: string; assumed: boolean };
 const col = (key: string, label: string): EntryListColumn => ({ key, label, assumed: true });

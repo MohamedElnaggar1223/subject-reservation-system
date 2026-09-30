@@ -92,6 +92,7 @@ const EXAMS_SECTION: NavSection = {
     { labelKey: 'nav.candidates', href: '/exams/candidates', icon: 'students' },
     { labelKey: 'nav.entries', href: '/exams/entries', icon: 'registrations' },
     { labelKey: 'nav.entryLists', href: '/exams/entry-lists', icon: 'approvals' },
+    { labelKey: 'nav.forecasts', href: '/exams/forecasts', icon: 'reports' },
     { labelKey: 'nav.examTimetable', href: '/exams/timetable', icon: 'calendar' },
     { labelKey: 'nav.examDays', href: '/exams/days', icon: 'rooms' },
     { labelKey: 'nav.examResults', href: '/exams/results', icon: 'reports' },

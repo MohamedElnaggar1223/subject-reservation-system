@@ -100,7 +100,7 @@ export const sharedArabic: Record<string, string> = {
     'تحتاج قاعة الامتحان مراقبًا لكل هذا العدد من المرشحين (إرشاد المجالس مراقب لكل 30 في الأوراق التحريرية)؛ وتُعلَّم القاعة التي بها أقل على شاشة الجلوس.',
   'Remind staff of exam deadlines': 'تذكير الموظفين بمواعيد الامتحانات',
   'The coordinator and the admin are told this many days before each board date that needs the school (entry deadline, forecast grades, access arrangements, coursework marks), and again the day before, with what is still outstanding.':
-    'يُبلَّغ المنسق والمدير قبل كل موعد للمجلس يحتاج المدرسة بهذا العدد من الأيام (آخر موعد للقيد، الدرجات المتوقعة، ترتيبات الوصول، درجات الأعمال)، ومرة أخرى قبله بيوم، بما لم يُنجز بعد.',
+    'يُبلَّغ المنسق والمدير قبل كل موعد للمجلس يحتاج المدرسة بهذا العدد من الأيام (آخر موعد للقيد، الدرجات المتوقعة، ترتيبات الإتاحة، درجات الأعمال)، ومرة أخرى قبله بيوم، بما لم يُنجز بعد.',
   'months': 'أشهر',
   'candidates': 'مرشحين',
   'days before': 'أيام قبل',

@@ -162,7 +162,7 @@ describe('F4: candidates and entries', () => {
       expect((await refused(w.teacher.api.v1.exams.entries[':id'].forecast.$put({ param: { id: ea!.id }, json: { grade: 'Z' } }))).status).toBe(400);
       // The teacher's own list holds only their candidates.
       const mine = await apiResponse(w.teacher.api.v1.exams.forecasts.$get({ query: { boardSeriesId: w.series.cambridgeNov } }));
-      expect(mine.map((m) => m.studentId)).toEqual([a]);
+      expect(mine.map((m) => [m.studentId, m.forecastGrade, m.forecastByName])).toEqual([[a, 'b', 'teacher x-xe']]);
       await apiResponse(w.teacher2.api.v1.exams.entries[':id'].forecast.$put({ param: { id: eb!.id }, json: { grade: 'C' } }));
       await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param: { id: eb!.id }, json: { optionCode: w.catalogue.optTwo } }));
       await audited([ea!.id], ['FORECAST_GRADE_SET']);
@@ -206,6 +206,23 @@ describe('F4: candidates and entries', () => {
       const list = await apiResponse(coord.api.v1.exams['entry-lists'].$get({ query: { boardSeriesId: w.series.cambridgeNov } }));
       expect(list.rows.filter((r) => r.studentId === a).map((r) => r.values.syllabusCode)).toEqual([`${w.T}97`, `${w.T}97/12`]);
       await apiResponse(coord.api.v1.exams.entries[':id'].withdraw.$post({ param: { id: extra.id }, json: { reason: 'added for the scenario' } }));
+    });
+
+    it("an option's tier is the one its tiered components share (an untiered paper does not stop it); a forecast must fit the level", async () => {
+      const cat = coord.api.v1.catalogue;
+      const ig = await apiResponse(cat.qualifications.$post({ json: { boardCode: 'cambridge', code: `${w.T}0610`, title: 'Biology (IGCSE)', level: 'igcse', suite: 'Cambridge IGCSE', subjectArea: `Biology ${w.T}`, entryMethod: 'syllabus_option' } }));
+      const comp = async (n: string, tier: 'extended' | null) => (await apiResponse(cat.units.$post({ json: { boardCode: 'cambridge', code: `${w.T}0610/${n}`, shortCode: `Paper ${n}`, title: `Paper ${n}`, unitLevel: 'igcse', kind: 'component', tier } }))).id;
+      const [p22, p62] = [await comp('22', 'extended'), await comp('62', null)];
+      await apiResponse(cat.qualifications[':id'].units.$put({ param: { id: ig.id }, json: { units: [p22, p62].map((unitId) => ({ unitId, requirement: 'optional' as const })) } }));
+      await apiResponse(cat.qualifications[':id'].options.$post({ param: { id: ig.id }, json: { code: 'BX', label: 'Extended: Papers 2 and 6', unitIds: [p22, p62] } }));
+      const e = await apiResponse(coord.api.v1.exams.entries.$post({ json: { studentId: a, boardSeriesId: w.series.cambridgeNov, qualificationId: ig.id } }));
+      const r = await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param: { id: e.id }, json: { optionCode: 'BX' } }));
+      expect(r.entry).toMatchObject({ optionCode: 'BX', tier: 'extended' });
+      // An IGCSE forecast is A*–G, U or 9–1: a lower-case AS grade is refused.
+      expect(await refused(coord.api.v1.exams.entries[':id'].forecast.$put({ param: { id: e.id }, json: { grade: 'b' } })))
+        .toEqual({ status: 400, error: 'An IGCSE forecast grade is A*–G or U, or 9–1' });
+      expect(await apiResponse(coord.api.v1.exams.entries[':id'].forecast.$put({ param: { id: e.id }, json: { grade: '7' } }))).toMatchObject({ forecastGrade: '7' });
+      await apiResponse(coord.api.v1.exams.entries[':id'].withdraw.$post({ param: { id: e.id }, json: { reason: 'added for the scenario' } }));
     });
   });
 
@@ -284,6 +301,12 @@ describe('F4: candidates and entries', () => {
       const cEntries = await entriesOf(w.series.pearsonJan, c);
       const draft = await apiResponse(coord.api.v1.exams.entries[':id'].withdraw.$post({ param: { id: cEntries[0]!.id }, json: { reason: 'dropping P1' } }));
       expect(draft.charge).toEqual({ refunded: null, sentence: 'Never submitted to the board: nothing to pay and nothing to refund.' });
+      // C's registration is still confirmed: a derivation does not make the withdrawn entry again.
+      const again = await apiResponse(coord.api.v1.exams.entries.derive.$post({ json: { boardSeriesId: w.series.pearsonJan, studentId: c, commit: true } }));
+      expect(again.created).toBe(0);
+      expect(again.rows.map((r) => [r.outcome, r.entries.map((e) => e.state)])).toEqual([['withdrawn', ['withdrawn']]]);
+      const list = await apiResponse(coord.api.v1.exams['entry-lists'].$get({ query: { boardSeriesId: w.series.pearsonJan } }));
+      expect(list.unentered.find((u) => u.studentId === c)?.withdrawnAt).toBeTruthy();
       const aEntries = await entriesOf(w.series.pearsonJan, a);
       await apiResponse(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: aEntries.map((e) => e.id) } }));
       const sent = await apiResponse(coord.api.v1.exams.entries[':id'].withdraw.$post({ param: { id: aEntries[0]!.id }, json: { reason: 'sitting it in June' } }));

@@ -1593,12 +1593,13 @@ function translateDynamicText(text: string): string | null {
   // F0a: the API's refusal sentences that carry a name, a date or a year.
   const f0aRefusal = translateFoundationRefusal(text);
   if (f0aRefusal) return f0aRefusal;
+  // F4: exam entries' sentences with names, codes and dates in them — before
+  // F0b's, whose broad "X: Y with Z" rule would take F4's sentences.
+  const f4Text = translateExamsText(text);
+  if (f4Text) return f4Text;
   // F0b: the catalogue's, the series' and the enrolment's sentences with names in them.
   const f0bText = translateCatalogueText(text);
   if (f0bText) return f0bText;
-  // F4: exam entries' sentences with names, codes and dates in them.
-  const f4Text = translateExamsText(text);
-  if (f4Text) return f4Text;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);
