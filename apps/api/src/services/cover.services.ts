@@ -30,7 +30,7 @@ import {
 import { logAction, type AuditContext } from './audit.services';
 import { createBulkNotifications } from './notification.services';
 import { getScheduleRange, getScheduleFor, lessonOnDate, type LessonOnDay } from './schedule.services';
-import { SchedulingError, isUniqueViolation, addDays, readableDate, groupMembersBetween, type Tx } from './scheduling-shared.services';
+import { SchedulingError, isUniqueViolation, addDays, readableDate, groupMembersBetween, csvCell, type Tx } from './scheduling-shared.services';
 
 // ─── Absences ────────────────────────────────────────────────────────────────
 
@@ -320,9 +320,8 @@ export async function coverReport(from: string, to: string) {
 }
 
 export function coverReportCsv(report: Awaited<ReturnType<typeof coverReport>>) {
-  const cell = (v: string | number) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
   const lines = [['Teacher', 'Absences', 'Days away', 'Lessons missed', 'Covered', 'Cancelled', 'Uncovered', 'Covers given'].join(',')];
-  for (const r of report.rows) lines.push([r.name, r.absences, r.daysAway, r.lessonsMissed, r.covered, r.cancelled, r.uncovered, r.coversGiven].map(cell).join(','));
+  for (const r of report.rows) lines.push([r.name, r.absences, r.daysAway, r.lessonsMissed, r.covered, r.cancelled, r.uncovered, r.coversGiven].map(csvCell).join(','));
   return lines.join('\n') + '\n';
 }
 

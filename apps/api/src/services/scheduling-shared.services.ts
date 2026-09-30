@@ -37,6 +37,17 @@ export class SchedulingError extends Error {
 export const isUniqueViolation = (err: unknown) =>
   (err as { code?: string } | null)?.code === '23505' || (err as { cause?: { code?: string } } | null)?.cause?.code === '23505';
 
+/**
+ * One CSV cell: a value a spreadsheet would run as a formula (= + - @, a tab
+ * or return first) is kept as text with a leading quote, as the reports do;
+ * then quoted when it holds a comma, a quote or a line break.
+ */
+export function csvCell(v: string | number | null | undefined): string {
+  let s = v === null || v === undefined ? '' : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 // ─── Dates ───────────────────────────────────────────────────────────────────
 
 export function addDays(date: string, n: number): string {

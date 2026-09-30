@@ -38,7 +38,7 @@ import { getSetting } from './settings.services';
 import { createBulkNotifications } from './notification.services';
 import { groupsForTerm, syncDraftCards } from './group.services';
 import {
-  SchedulingError, readableDate, groupMembersBetween, peakSize, overlapsOf, type Tx, type Executor,
+  SchedulingError, readableDate, groupMembersBetween, peakSize, overlapsOf, csvCell, type Tx, type Executor,
 } from './scheduling-shared.services';
 
 // ─── Loading ─────────────────────────────────────────────────────────────────
@@ -673,10 +673,6 @@ export async function exportAsc(id: string) {
   return { filename: `${fileSafe(model.timetable.name)}.xml`, body: L.join('\n') + '\n' };
 }
 
-const csvCell = (v: string | number | null | undefined) => {
-  const s = String(v ?? '');
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
 
 /** One row per placed lesson (and each unplaced one), for a spreadsheet — the whole timetable, or one section, teacher, room or student. */
 export async function exportCsv(id: string, q: ExportCsvQueryType) {

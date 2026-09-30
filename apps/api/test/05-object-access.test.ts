@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, one, sql, notified, money,
+  admin, staff, onboard, subject, session, one, sql, notified, money, clientFor,
   openWindow, futureWindow, type Client,
 } from './helpers';
 
@@ -431,6 +431,99 @@ describe('object-level access between families', () => {
     await refusedAs('teacherB enrols student A', teacherB.api.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: studentAId, subjectId: chem, mode: 'in_school' } }));
     expect((await apiResponse(teacherA.api.v1.enrolments.class.$get({ query: { subjectId: phys, academicYearId: yearId } }))).students.map((x) => x.studentId)).toEqual([studentAId]);
     expect(await snapshot()).toEqual(before);
+  });
+
+  // ─── F1 ──────────────────────────────────────────────────────────────────
+
+  it("F1 timetables: another family's child, another class's lesson, a cover teacher outside the covered lesson and date, the gate, and a wrong or revoked feed link", async () => {
+    // A year of its own far ahead, two families of its own (grade 11 then), two teachers each with a group, a cover teacher.
+    const Y = academicYearStartOf() + 24;
+    const coordinator = await staff(adm, 'coordinator', 'oa-tt');
+    const gate = await staff(adm, 'gate', 'oa-tt');
+    const [ta, tb, tc] = [await staff(adm, 'teacher', 'oa-tt-a'), await staff(adm, 'teacher', 'oa-tt-b'), await staff(adm, 'teacher', 'oa-tt-c')];
+    const tid = async (c: Client) => (await one<{ id: string }>(`select id from teacher where user_id = $1`, [c.id])).id;
+    const [taId, tbId, tcId] = [await tid(ta), await tid(tb), await tid(tc)];
+    const year = (await apiResponse(coordinator.api.v1.academic.years.$post({ json: { startYear: Y, startsOn: `${Y}-09-06`, endsOn: `${Y + 1}-06-25` } }))).id;
+    const term = (await apiResponse(coordinator.api.v1.academic.terms.$post({ json: { academicYearId: year, name: 'Term 1', startsOn: `${Y}-09-06`, endsOn: `${Y}-12-20` } }))).id;
+    const bells = await apiResponse(coordinator.api.v1.academic['bell-schedules'].$post({ json: { academicYearId: year, name: 'Regular', isDefault: true } }));
+    await apiResponse(coordinator.api.v1.academic['bell-schedules'][':id'].periods.$put({ param: { id: bells.id }, json: { periods: [
+      { weekday: null, label: 'P1', kind: 'lesson', startsAt: '08:00', endsAt: '08:45' }, { weekday: null, label: 'P2', kind: 'lesson', startsAt: '08:45', endsAt: '09:30' },
+    ] } }));
+    const fa = await onboard(officer, 'oa-tt-a', 11);
+    const fb = await onboard(officer, 'oa-tt-b', 11);
+    for (const f of [fa, fb]) await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: f.studentId }, json: { cohortYear: Y - 1, reason: 'F1 object access year' } }));
+    const physTT = await subject(adm, 'OA-TT-PHY', 'Physics (timetable)', { course: 1000, registration: 300 });
+    const ga = await apiResponse(coordinator.api.v1.scheduling.groups.$post({ json: { academicYearId: year, name: 'OA Physics A', subjectId: physTT, teacherId: taId, weeklyPeriods: 1, doublePeriods: 0, studentIds: [fa.studentId], startsOn: `${Y}-09-06` } }));
+    const gb = await apiResponse(coordinator.api.v1.scheduling.groups.$post({ json: { academicYearId: year, name: 'OA Physics B', subjectId: physTT, teacherId: tbId, weeklyPeriods: 1, doublePeriods: 0, studentIds: [fb.studentId], startsOn: `${Y}-09-06` } }));
+    await apiResponse(coordinator.api.v1.scheduling.groups.$post({ json: { academicYearId: year, name: 'OA Physics C', subjectId: physTT, teacherId: tcId, weeklyPeriods: 0, doublePeriods: 0 } }));
+    const tt = (await apiResponse(coordinator.api.v1.timetables.$post({ json: { termId: term, name: 'OA' } }))).id;
+    const editor = await apiResponse(coordinator.api.v1.timetables[':id'].$get({ param: { id: tt } }));
+    const la = editor.engine.lessons.find((l) => l.groupId === ga.id)!.id;
+    const lb = editor.engine.lessons.find((l) => l.groupId === gb.id)!.id;
+    for (const [lessonId, period] of [[la, 1], [lb, 2]] as const) {
+      await apiResponse(coordinator.api.v1.timetables[':id'].lessons[':lessonId'].move.$post({ param: { id: tt, lessonId }, json: { weekday: 0, period, from: { weekday: null, period: null } } }));
+    }
+    await apiResponse(coordinator.api.v1.timetables[':id'].publish.$post({ param: { id: tt }, json: { effectiveFrom: `${Y}-09-06` } }));
+    const sunday = (() => { const d = new Date(`${Y}-10-04T12:00:00Z`); while (d.getUTCDay() !== 0) d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); })();
+    const nextSunday = new Date(new Date(`${sunday}T12:00:00Z`).getTime() + 7 * 86_400_000).toISOString().slice(0, 10);
+    await apiResponse(coordinator.api.v1.cover.absences.$post({ json: { teacherId: taId, startsOn: sunday, endsOn: sunday, reason: 'sick' } }));
+    await apiResponse(coordinator.api.v1.cover.assignments.$post({ json: { lessonId: la, date: sunday, coverTeacherId: tcId } }));
+    const covers = () => sql(`select id, status, cover_teacher_id from cover_assignment where lesson_id in ($1, $2) order by id`, [la, lb]);
+    const before = await covers();
+
+    // Another family: nothing about the other child, as "not found".
+    expect(await refusedAs('parentB reads A timetable (day)', fb.parent.api.v1.schedule.day.$get({ query: { studentId: fa.studentId, date: sunday } }))).toBe(404);
+    expect(await refusedAs('parentB reads A timetable (week)', fb.parent.api.v1.schedule.week.$get({ query: { studentId: fa.studentId, date: sunday } }))).toBe(404);
+    expect(await refusedAs('studentB reads A timetable', fb.student.api.v1.schedule.week.$get({ query: { studentId: fa.studentId, date: sunday } }))).toBe(404);
+    await refusedAs('parentB reads a teacher timetable', fb.parent.api.v1.schedule.week.$get({ query: { teacherId: taId, date: sunday } }));
+    await refusedAs('parentB reads a lesson class', fb.parent.api.v1.schedule.lesson.$get({ query: { lessonId: la, date: sunday } }));
+    // Their own family reads it.
+    expect((await apiResponse(fa.parent.api.v1.schedule.day.$get({ query: { studentId: fa.studentId, date: sunday } }))).lessons.map((l) => l.lessonId)).toEqual([la]);
+
+    // Another class: teacher B reads neither teacher A's timetable nor A's lesson, nor arranges its cover.
+    expect(await refusedAs('teacherB reads teacher A timetable', tb.api.v1.schedule.week.$get({ query: { teacherId: taId, date: sunday } }))).toBe(404);
+    expect(await refusedAs('teacherB reads A lesson class', tb.api.v1.schedule.lesson.$get({ query: { lessonId: la, date: nextSunday } }))).toBe(404);
+    await refusedAs('teacherB reads A student timetable', tb.api.v1.schedule.day.$get({ query: { studentId: fa.studentId, date: sunday } }));
+    await refusedAs('teacherB arranges cover', tb.api.v1.cover.assignments.$post({ json: { lessonId: lb, date: sunday, coverTeacherId: tbId } }));
+    await refusedAs('teacherB edits the timetable', tb.api.v1.timetables[':id'].$get({ param: { id: tt } }));
+    // The cover teacher: the covered lesson on its date, and nothing else.
+    expect((await apiResponse(tc.api.v1.schedule.lesson.$get({ query: { lessonId: la, date: sunday } }))).students.map((s) => s.id)).toEqual([fa.studentId]);
+    expect(await refusedAs('cover teacher reads the lesson another date', tc.api.v1.schedule.lesson.$get({ query: { lessonId: la, date: nextSunday } }))).toBe(404);
+    expect(await refusedAs('cover teacher reads another lesson that date', tc.api.v1.schedule.lesson.$get({ query: { lessonId: lb, date: sunday } }))).toBe(404);
+    expect(await refusedAs('cover teacher reads teacher A timetable', tc.api.v1.schedule.week.$get({ query: { teacherId: taId, date: sunday } }))).toBe(404);
+    // A's own teacher reads their lesson on any date it takes place.
+    expect((await apiResponse(ta.api.v1.schedule.lesson.$get({ query: { lessonId: la, date: nextSunday } }))).access).toBe('teacher');
+
+    // The gate: nothing of the timetable (its own is empty: not linked to a teacher record).
+    await refusedAs('gate reads A timetable', gate.api.v1.schedule.day.$get({ query: { studentId: fa.studentId, date: sunday } }));
+    await refusedAs('gate reads a lesson class', gate.api.v1.schedule.lesson.$get({ query: { lessonId: la, date: sunday } }));
+    await refusedAs('gate lists timetables', gate.api.v1.timetables.$get({ query: {} }));
+    await refusedAs('gate reads groups', gate.api.v1.scheduling.groups.$get({ query: { academicYearId: year } }));
+    await refusedAs('gate reads absences', gate.api.v1.cover.absences.$get({ query: {} }));
+    await refusedAs('gate own timetable (not a teacher)', gate.api.v1.schedule.me.day.$get({ query: { date: sunday } }));
+
+    // The calendar feed: a wrong token and a revoked one get nothing.
+    const link = await apiResponse(fa.parent.api.v1.schedule.feed.$post());
+    const token = link.path.split('/').pop()!;
+    const anon = await clientFor();
+    const good = await anon.v1.ical[':token'].$get({ param: { token } });
+    expect(good.status).toBe(200);
+    expect(await good.text()).toContain('SUMMARY:Student oa-tt-a: OA Physics A');
+    const wrong = await anon.v1.ical[':token'].$get({ param: { token: token.slice(0, -4) + (token.endsWith('AAAA') ? 'BBBB' : 'AAAA') } });
+    expect(wrong.status).toBe(404);
+    expect(await wrong.text()).not.toContain('VEVENT');
+    attempts.push(['wrong calendar feed token', String(wrong.status), ''].join('\t'));
+    await apiResponse(fa.parent.api.v1.schedule.feed.$delete());
+    const revoked = await anon.v1.ical[':token'].$get({ param: { token } });
+    expect(revoked.status).toBe(404);
+    expect(await revoked.text()).not.toContain('VEVENT');
+    attempts.push(['revoked calendar feed token', String(revoked.status), ''].join('\t'));
+    // B's own link shows B's child only.
+    const bLink = await apiResponse(fb.parent.api.v1.schedule.feed.$post());
+    const bFeed = await (await anon.v1.ical[':token'].$get({ param: { token: bLink.path.split('/').pop()! } })).text();
+    expect(bFeed).toContain('OA Physics B');
+    expect(bFeed).not.toContain('OA Physics A');
+    expect(await covers()).toEqual(before);
   });
 
   it('F0a exceptions: each type names who may grant it — a coordinator is refused a fee waiver, a finance admin the grade-10 exception', async () => {

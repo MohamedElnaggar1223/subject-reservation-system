@@ -262,8 +262,10 @@ describe('F1: the timetable generator at the school’s size', () => {
   it('the generator refuses a published timetable and a year with no bell schedule', async () => {
     await apiResponse(coordinator.api.v1.timetables[':id'].publish.$post({ param: { id: draftA }, json: { effectiveFrom: `${Y}-09-06` } }));
     expect((await refused(generate(draftA))).error).toBe('A published timetable does not change — make a new draft from it');
-    const bare = (await apiResponse(coordinator.api.v1.academic.years.$post({ json: { startYear: Y + 1, startsOn: `${Y + 1}-09-06`, endsOn: `${Y + 2}-06-25` } }))).id;
-    const bareTerm = (await apiResponse(coordinator.api.v1.academic.terms.$post({ json: { academicYearId: bare, name: 'Term 1', startsOn: `${Y + 1}-09-06`, endsOn: `${Y + 1}-12-20` } }))).id;
+    // A year of its own with no bell schedule (the F1 suites hold +20 to +24 from this year; this one +30).
+    const B = academicYearStartOf() + 30;
+    const bare = (await apiResponse(coordinator.api.v1.academic.years.$post({ json: { startYear: B, startsOn: `${B}-09-06`, endsOn: `${B + 1}-06-25` } }))).id;
+    const bareTerm = (await apiResponse(coordinator.api.v1.academic.terms.$post({ json: { academicYearId: bare, name: 'Term 1', startsOn: `${B}-09-06`, endsOn: `${B}-12-20` } }))).id;
     const empty = (await apiResponse(coordinator.api.v1.timetables.$post({ json: { termId: bareTerm, name: 'No bells' } }))).id;
     expect((await load(empty)).problems).toEqual(['This year has no default bell schedule — set one up on the Bell schedules screen']);
     expect((await refused(generate(empty))).error).toBe('This year has no lesson periods to place lessons in — set up the default bell schedule first');
