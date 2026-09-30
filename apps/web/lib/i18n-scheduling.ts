@@ -114,6 +114,8 @@ export const schedulingArabic: Record<string, string> = {
   'Now at:': 'الآن في:',
   'Point at a cell to see whether it fits, and why not.': 'أشِر إلى خانة لترى هل تناسب، ولماذا لا.',
   'Here it would clash:': 'هنا تتعارض مع:',
+  Moving: 'نقل',
+  ': green fits, red clashes. Click a cell or drop it there; Escape puts it back.': ': الأخضر يناسب والأحمر يتعارض. انقر خانة أو أفلتها فيها؛ ومفتاح Escape يعيدها.',
   'Lock here': 'تثبيت هنا',
   Unlock: 'إلغاء التثبيت',
   'Take off the grid': 'إخراجها من الجدول',
@@ -317,7 +319,7 @@ export const schedulingArabic: Record<string, string> = {
   'Not an exam subject: any free teacher may take it.': 'ليست مادة امتحان: يمكن لأي معلم متاح أن يأخذها.',
   'Teaches it': 'يدرّسها',
   'Not their subject': 'ليست مادته',
-  Free: 'متاح',
+  'Free then': 'متاح حينها',
   Assign: 'تكليف',
   'Cancel the lesson': 'إلغاء الحصة',
   'Change the cover': 'تغيير البديل',
@@ -396,9 +398,21 @@ export const schedulingArabic: Record<string, string> = {
 };
 
 /** Sentences with names, numbers, days or dates. */
+/**
+ * The Arabic sentence with every English run in it (a person's, a group's or a room's name,
+ * a period's label) wrapped in Unicode isolates, so "Biology 10" stays one left-to-right unit
+ * inside a right-to-left sentence instead of its number jumping to the other end.
+ */
 export function translateSchedulingText(text: string): string | null {
+  const arabic = translateInner(text);
+  return arabic === null ? null : arabic.replace(LATIN_RUN, (run) => `\u2068${run}\u2069`);
+}
+
+const LATIN_RUN = /[A-Za-z](?:[A-Za-z0-9'’.&/+\-–]|\([^()\u0600-\u06FF]*\)| (?=[A-Za-z0-9(]))*/g;
+
+function translateInner(text: string): string | null {
   // A refusal that lists clashes: "It would clash: a; b" and "Resolve the clashes before publishing (n): a; b".
-  const list = (s: string) => s.split('; ').map((p) => translateSchedulingText(p) ?? p).join('؛ ');
+  const list = (s: string) => s.split('; ').map((p) => translateInner(p) ?? p).join('؛ ');
   let m: RegExpExecArray | null;
   if ((m = /^It would clash: (.+)$/.exec(text))) return `ستتعارض: ${list(m[1]!)}`;
   if ((m = /^Resolve the clashes before publishing \((\d+)\): (.+)$/.exec(text))) return `احلّ التعارضات قبل النشر (${m[1]}): ${list(m[2]!)}`;
@@ -414,17 +428,17 @@ export function translateSchedulingText(text: string): string | null {
     [/^(.+) is unavailable at (.+) \((.+)\)$/, (x) => `${x[1]} غير متاح في ${day(x[2]!)} (${x[3]})`],
     [/^(.+) needs (.+); (.+) is not one$/, (x) => `${x[1]} تحتاج ${need(x[2]!)}؛ و${x[3]} ليست كذلك`],
     [/^(.+) needs (.+); (.+) has none$/, (x) => `${x[1]} تحتاج ${need(x[2]!)}؛ و${x[3]} لا يتوفر فيها ذلك`],
-    [/^(.+) has (\d+) students; (.+) seats (\d+)$/, (x) => `في ${x[1]} ${x[2]} طالبًا؛ وتسع ${x[3]} ${x[4]}`],
+    [/^(.+) has (\d+) students; (.+) seats (\d+)$/, (x) => `في ${x[1]}: ${x[2]} طالبًا؛ و${x[3]} تسع ${x[4]}`],
     [/^(.+) is out of use$/, (x) => `${x[1]} خارج الخدمة`],
     [/^(.+) is always in (.+), not (.+)$/, (x) => `${x[1]} دائمًا في ${x[2]}، لا في ${x[3]}`],
     [/^(.+) at (.+) has no room$/, (x) => `${x[1]} في ${day(x[2]!)} بلا قاعة`],
     [/^(.+) and (.+) are both on (\w+); they are kept on different days$/, (x) => `${x[1]} و${x[2]} كلتاهما يوم ${day(x[3]!)}؛ وتُفصلان على أيام مختلفة`],
-    [/^(.+) has (\d+) lessons on (\w+); its lessons are kept on different days$/, (x) => `لـ${x[1]} ${x[2]} حصص يوم ${day(x[3]!)}؛ وحصصها على أيام مختلفة`],
+    [/^(.+) has (\d+) lessons on (\w+); its lessons are kept on different days$/, (x) => `لـ${x[1]}: ${x[2]} حصص يوم ${day(x[3]!)}؛ وحصصها على أيام مختلفة`],
     [/^(.+) is at (\w+) period (\d+(?:–\d+)?), which the bell schedule does not have$/, (x) => `${x[1]} في الحصة ${x[3]} يوم ${day(x[2]!)}، وهي غير موجودة في جدول الأجراس`],
     [/^(.+)'s double at (.+) is split by a break$/, (x) => `الحصة المزدوجة لـ${x[1]} في ${day(x[2]!)} تفصلها استراحة`],
     [/^(.+) has two lessons at (.+)$/, (x) => `لـ${x[1]} حصتان في ${day(x[2]!)}`],
     // The generator's explanations.
-    [/^(.+?)(?: \(double\))?, lesson (\d+) could not be placed: (.+)$/, (x) => `تعذر وضع ${x[1]}، الحصة ${x[2]}: ${translateSchedulingText(x[3]!.charAt(0).toUpperCase() + x[3]!.slice(1)) ?? x[3]}`],
+    [/^(.+?)(?: \(double\))?, lesson (\d+) could not be placed: (.+)$/, (x) => `تعذر وضع ${x[1]}، الحصة ${x[2]}: ${translateInner(x[3]!.charAt(0).toUpperCase() + x[3]!.slice(1)) ?? x[3]}`],
     [/^(.+), lesson (\d+) is locked at a period the bell schedule does not have$/, (x) => `${x[1]}، الحصة ${x[2]} مثبتة في حصة غير موجودة في جدول الأجراس`],
     [/^(.+) is unavailable at every period$/i, (x) => `${x[1]} غير متاح في كل الحصص`],
     [/^(.+) is unavailable at (\d+) of the (\d+) periods$/i, (x) => `${x[1]} غير متاح في ${x[2]} من ${x[3]} حصة`],
@@ -437,8 +451,8 @@ export function translateSchedulingText(text: string): string | null {
     [/^The only suitable rooms are unavailable at (\d+)$/i, (x) => `القاعات المناسبة الوحيدة غير متاحة في ${x[1]}`],
     [/^A double cannot start at (\d+) \(the next period is missing or after a break\)$/i, (x) => `لا يمكن أن تبدأ حصة مزدوجة في ${x[1]} (الحصة التالية غير موجودة أو بعد استراحة)`],
     [/^No room in use is (.+?) seating (\d+)$/, (x) => `لا توجد قاعة في الخدمة هي ${x[1]!.split(' with ').map((p) => ROOM_NEEDS[p] ?? p).join(' مع ')} تسع ${x[2]}`],
-    [/^(.+) has (\d+) periods to teach but is available for (\d+)$/, (x) => `لدى ${x[1]} ${x[2]} حصة لتدريسها لكنه متاح لـ${x[3]} فقط`],
-    [/^(.+) has (\d+) periods to teach but a limit of (\d+) a week$/, (x) => `لدى ${x[1]} ${x[2]} حصة لتدريسها لكن حده ${x[3]} أسبوعيًا`],
+    [/^(.+) has (\d+) periods to teach but is available for (\d+)$/, (x) => `لدى ${x[1]}: ${x[2]} حصة لتدريسها لكنه متاح لـ${x[3]} فقط`],
+    [/^(.+) has (\d+) periods to teach but a limit of (\d+) a week$/, (x) => `لدى ${x[1]}: ${x[2]} حصة لتدريسها لكن حده ${x[3]} أسبوعيًا`],
     [/^A double needs two lesson periods in a row with no break between them, and the bell schedule has none$/, () => 'تحتاج الحصة المزدوجة إلى حصتين متتاليتين بلا استراحة بينهما، ولا يوجد ذلك في جدول الأجراس'],
     [/^The bell schedule has no lesson periods on the school days$/, () => 'لا حصص في جدول الأجراس في أيام الدراسة'],
     [/^It is locked at a period the bell schedule does not have: unlock it or move it$/, () => 'مثبتة في حصة غير موجودة في جدول الأجراس: ألغِ تثبيتها أو انقلها'],
@@ -452,7 +466,7 @@ export function translateSchedulingText(text: string): string | null {
     [/^is away that day$/, () => 'غائب في ذلك اليوم'],
     [/^is not available then$/, () => 'غير متاح حينها'],
     [/^would teach more than (\d+) periods that day$/, (x) => `سيدرّس أكثر من ${x[1]} حصص في ذلك اليوم`],
-    [/^(.+) (teaches .+ then|covers .+ then|is away that day|is not available then|would teach more than \d+ periods that day)$/, (x) => `${x[1]} ${translateSchedulingText(x[2]!) ?? x[2]}`],
+    [/^(.+) (teaches .+ then|covers .+ then|is away that day|is not available then|would teach more than \d+ periods that day)$/, (x) => `${x[1]} ${translateInner(x[2]!) ?? x[2]}`],
     [/^(\d+) lessons that day · (\d+) covers this term$/, (x) => `${x[1]} حصص في ذلك اليوم · ${x[2]} حصص بديلة هذا الفصل`],
     [/^(\d+) lessons$/, (x) => `${x[1]} حصص`],
     [/^(\d+) to cover$/, (x) => `${x[1]} تحتاج بديلًا`],

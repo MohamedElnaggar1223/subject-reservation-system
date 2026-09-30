@@ -366,18 +366,22 @@ function LessonCard({
         highlighted && 'ring-2 ring-amber-400',
       )}
     >
-      <span className="block truncate font-semibold text-foreground"><bdi>{g.name}</bdi></span>
+      <span className="flex items-center gap-1">
+        <span dir="auto" className="min-w-0 flex-1 truncate text-start font-semibold text-foreground">{g.name}</span>
+        {(lesson.length === 2 || lesson.locked || clashes.length > 0) && (
+          <span className="flex shrink-0 gap-0.5">
+            {lesson.length === 2 && <span className="rounded bg-muted px-1 text-[10px] font-semibold text-muted-foreground">{part === 'second' ? '2/2' : '1/2'}</span>}
+            {lesson.locked && <span aria-hidden="true" className="text-[11px]">🔒</span>}
+            {clashes.length > 0 && <span aria-hidden="true" className="rounded bg-destructive px-1 text-[10px] font-bold text-white">!</span>}
+          </span>
+        )}
+      </span>
       <span className="block truncate text-muted-foreground">
-        {g.teacherName ? <bdi>{g.teacherName}</bdi> : <span className="italic">No teacher yet</span>}
+        {g.teacherName ? <span dir="auto">{g.teacherName}</span> : <span className="italic">No teacher yet</span>}
       </span>
       <span className="flex items-center gap-1 truncate text-muted-foreground">
         {lesson.roomId ? <bdi>{roomName(lesson.roomId)}</bdi> : <span className="italic">No room</span>}
         {inSection && <span className="ms-auto shrink-0 tabular-nums"><bdi>{inSection.count}</bdi>/<bdi>{g.memberIds.length}</bdi></span>}
-      </span>
-      <span className="absolute end-1 top-1 flex gap-0.5">
-        {lesson.length === 2 && <span className="rounded bg-muted px-1 text-[10px] font-semibold text-muted-foreground">{part === 'second' ? '2/2' : '1/2'}</span>}
-        {lesson.locked && <span aria-hidden="true" className="text-[11px]">🔒</span>}
-        {clashes.length > 0 && <span aria-hidden="true" className="rounded bg-destructive px-1 text-[10px] font-bold text-white">!</span>}
       </span>
     </button>
   );
@@ -549,7 +553,7 @@ function PickedPanel({
   roomName: (id: string | null) => string; onRoom: (roomId: string | null) => void; onLock: (locked: boolean) => void; onUnplace: () => void; onClose: () => void; pending: boolean;
 }) {
   const g = tt.groups.find((x) => x.id === lesson.groupId)!;
-  const slot = lesson.weekday !== null ? `${WEEKDAY_NAMES[lesson.weekday]} ${tt.engine.days.find((d) => d.weekday === lesson.weekday)?.periods.find((p) => p.period === lesson.period)?.label ?? lesson.period}` : null;
+  const slotLabel = lesson.weekday !== null ? tt.engine.days.find((d) => d.weekday === lesson.weekday)?.periods.find((p) => p.period === lesson.period)?.label ?? String(lesson.period) : null;
   const now = tt.clashes.filter((c) => c.lessonIds.includes(lesson.id));
   const eg = tt.engine.groups.find((x) => x.id === g.id)!;
   const rooms = tt.engine.rooms.filter((r) => r.isActive && (!eg.roomType || r.type === eg.roomType) && eg.roomFeatures.every((f) => r.features.includes(f)) && (r.capacity === null || r.capacity >= eg.size) && (!eg.roomId || eg.roomId === r.id));
@@ -563,7 +567,7 @@ function PickedPanel({
         <div className="flex gap-2"><dt className="text-muted-foreground">Teacher:</dt><dd>{g.teacherName ? <bdi>{g.teacherName}</bdi> : 'No teacher yet'}</dd></div>
         <div className="flex gap-2"><dt className="text-muted-foreground">Students:</dt><dd className="tabular-nums">{eg.size}</dd></div>
         <div className="flex gap-2"><dt className="text-muted-foreground">Lesson:</dt><dd><bdi>{lesson.seq}</bdi> <span>of</span> <bdi>{tt.engine.lessons.filter((l) => l.groupId === g.id).length}</bdi>{lesson.length === 2 && <span> (double)</span>}</dd></div>
-        <div className="flex gap-2"><dt className="text-muted-foreground">Now at:</dt><dd>{slot ? <bdi>{slot}</bdi> : 'Not on the grid'}</dd></div>
+        <div className="flex gap-2"><dt className="text-muted-foreground">Now at:</dt><dd>{slotLabel && lesson.weekday !== null ? <><span>{WEEKDAY_NAMES[lesson.weekday]}</span> <bdi>{slotLabel}</bdi></> : 'Not on the grid'}</dd></div>
       </dl>
       {draft && lesson.weekday !== null && (
         <div className="mt-3">
