@@ -823,16 +823,16 @@ export async function routeAndCheck(
   return assertRoutesOpen(routing, current, new Date(), names);
 }
 
-/**
- * The entry deadlines of the series a window feeds: the earliest (the window
- * must close before it) and — when every series has one — the latest (past
- * it, nothing in the window can be entered at all).
- */
 /** The refusal when a window would close on or after a fed series' entry deadline (MO-10). */
 export function windowPastDeadlineSentence(earliest: Date) {
   return `The window cannot close on or after the exam board's entry deadline (${schoolDate(earliest)}) — move the board deadline first`;
 }
 
+/**
+ * The entry deadlines of the series a window feeds: the earliest is the one
+ * the window must close before (strict order). Not a deadline for the window's
+ * registrations: each is judged by its own series (sessionWindow).
+ */
 export async function windowDeadlines(sessionId: string, executor: Executor = db) {
   const rows = await executor
     .select({ entryDeadline: boardSeries.entryDeadline })
@@ -842,7 +842,6 @@ export async function windowDeadlines(sessionId: string, executor: Executor = db
   return {
     feedsSeries: rows.length > 0,
     earliest: set.length ? new Date(Math.min(...set.map((d) => d.getTime()))) : null,
-    latest: rows.length && set.length === rows.length ? new Date(Math.max(...set.map((d) => d.getTime()))) : null,
   };
 }
 

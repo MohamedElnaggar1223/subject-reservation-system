@@ -213,7 +213,7 @@ export async function initiatePayment(
       // A preregistration past its series' board deadline can never be
       // entered (MO-10; per board series since F0b).
       for (const r of mine) {
-        const w = await sessionWindow(studentId, s.id, db, new Date(), r.boardSeriesId);
+        const w = await sessionWindow(studentId, s.id, r.boardSeriesId);
         if (w.entryDeadlinePassed) throw new Error(entryDeadlineMessage(w.entryDeadline!));
       }
       if (s.status !== 'draft') wrongState.push(s);
@@ -221,7 +221,7 @@ export async function initiatePayment(
     }
     // Each subject's own series decides (F0b): open for the student, and not past its deadline.
     let ok = true;
-    for (const r of mine) if (!(await sessionOpenFor(studentId, s.id, db, r.boardSeriesId))) ok = false;
+    for (const r of mine) if (!(await sessionOpenFor(studentId, s.id, r.boardSeriesId))) ok = false;
     if (!ok) wrongState.push(s);
   }
   if (wrongState.length > 0) {
@@ -526,13 +526,13 @@ export async function confirmPayment(
         if (r.status === 'preregistered' || r.status === 'pending_payment') {
           // A preregistration is for a later series; past that series' board
           // deadline it cannot be entered either (MO-10).
-          const w = await sessionWindow(pay.studentId, r.sessionId, tx, new Date(), r.boardSeriesId);
+          const w = await sessionWindow(pay.studentId, r.sessionId, r.boardSeriesId, tx);
           if (w.entryDeadlinePassed) throw new Error(entryDeadlineMessage(w.entryDeadline!));
           continue;
         }
       } else if (r.status === 'pending_payment') {
         // F0b: its own board series' deadline decides (MO-10, per series).
-        const w = await sessionWindow(pay.studentId, r.sessionId, tx, new Date(), r.boardSeriesId);
+        const w = await sessionWindow(pay.studentId, r.sessionId, r.boardSeriesId, tx);
         if (w.open || (current.status === 'pending_verification' && !w.entryDeadlinePassed)) continue;
         if (w.entryDeadlinePassed) throw new Error(entryDeadlineMessage(w.entryDeadline!));
       }
@@ -763,7 +763,7 @@ async function failOpenPayment(
         // Still payable only while the window is open for the student, its
         // board series is not past its deadline (F0b), and they may still sit
         // the series (F0a; SO-7).
-        if (await sessionOpenFor(pay.studentId, r.sessionId, tx, r.boardSeriesId) && (await mayRegisterFor(pay.studentId, r.sessionId, tx)).allowed) continue;
+        if (await sessionOpenFor(pay.studentId, r.sessionId, r.boardSeriesId, tx) && (await mayRegisterFor(pay.studentId, r.sessionId, tx)).allowed) continue;
         expired.push(...await tx
           .update(registration)
           .set({ status: 'expired', updatedAt: new Date() })

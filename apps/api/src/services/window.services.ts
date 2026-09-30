@@ -16,7 +16,7 @@
 
 import { db, registrationSession, eq } from '@repo/db';
 import { hasDeadlineExtension } from './exception.services';
-import { seriesDeadline, windowDeadlines } from './series.services';
+import { seriesDeadline } from './series.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -29,35 +29,35 @@ export type SessionWindow = {
 };
 
 /**
- * F0b: the entry deadline is a board series' (MO-10 per series). Asked for a
- * registration, pass its `boardSeriesId`: its series' deadline decides. Asked
- * for the window as a whole (a new registration, before its subjects are
- * routed), the window's **earliest** series deadline decides: the window
- * closes before it (the strict order), so past it nothing new is registered
- * in the window, even by a student with a deadline extension, and each
- * existing registration goes on against its own series. A window that feeds
- * no series has no deadline, as a window with none set had before.
+ * F0b: the entry deadline is a board series' (MO-10: a hard stop per board
+ * series, never per window). `boardSeriesId` is required, so no caller can
+ * leave it out by accident:
+ * - a registration's series: that series' deadline decides;
+ * - `null`, the window as a whole (a new registration, before its subjects are
+ *   routed): no deadline applies here. Every such caller then routes each
+ *   subject and checks that subject's own series before and inside its
+ *   transaction (series.services.ts routeAndCheck / assertRoutesOpen), so a
+ *   January subject is still taken after October's deadline in a window that
+ *   feeds both, and an October one is refused.
  *
- * Callers without a series id (all new registrations, each then routed and
- * checked per series by assertRoutesOpen): the request, direct and override
- * registrations and the desk's registration. Every caller acting on an
- * existing registration passes its series: payment, confirmation, reference,
- * desk collection, swaps, preregistration payment.
+ * Callers with `null`: the request, direct and override registrations and the
+ * desk's registration. Callers with the registration's series: payment
+ * (checkout, preregistration payment), confirmation, the transfer reference,
+ * the close's grace, desk collection. Swaps do not call this: they route the
+ * new subject with routeAndCheck, which checks its series' deadline.
  */
 export async function sessionWindow(
   studentId: string,
   sessionId: string,
+  boardSeriesId: string | null,
   executor: typeof db | Tx = db,
   now: Date = new Date(),
-  boardSeriesId?: string | null,
 ): Promise<SessionWindow> {
   const [sess] = await executor
     .select({ status: registrationSession.status })
     .from(registrationSession)
     .where(eq(registrationSession.id, sessionId));
-  const entryDeadline = boardSeriesId
-    ? await seriesDeadline(boardSeriesId, executor)
-    : (await windowDeadlines(sessionId, executor)).earliest;
+  const entryDeadline = boardSeriesId ? await seriesDeadline(boardSeriesId, executor) : null;
   const entryDeadlinePassed = !!entryDeadline && entryDeadline <= now;
   if (!sess || entryDeadlinePassed) {
     return { open: false, entryDeadlinePassed, entryDeadline, status: sess?.status ?? null };
@@ -67,9 +67,9 @@ export async function sessionWindow(
 }
 
 export async function sessionOpenFor(
-  studentId: string, sessionId: string, executor: typeof db | Tx = db, boardSeriesId?: string | null,
+  studentId: string, sessionId: string, boardSeriesId: string | null, executor: typeof db | Tx = db,
 ): Promise<boolean> {
-  return (await sessionWindow(studentId, sessionId, executor, new Date(), boardSeriesId)).open;
+  return (await sessionWindow(studentId, sessionId, boardSeriesId, executor)).open;
 }
 
 /** A date as the school reads it, in Cairo time. */

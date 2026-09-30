@@ -169,7 +169,7 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     where: (s, { eq }) => eq(s.id, data.sessionId),
   });
   if (!sess) throw new Error('Session not found');
-  const w = await sessionWindow(data.studentId, sess.id);
+  const w = await sessionWindow(data.studentId, sess.id, null);
   if (!w.open) {
     throw new Error(
       w.entryDeadlinePassed
@@ -456,7 +456,7 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
   // F0b: each subject's own board series decides its deadline (MO-10).
   for (const key of new Set(regs.map((r) => `${r.sessionId}|${r.boardSeriesId ?? ''}`))) {
     const [sessionId, boardSeriesId] = key.split('|') as [string, string];
-    const w = await sessionWindow(data.studentId, sessionId, db, new Date(), boardSeriesId || null);
+    const w = await sessionWindow(data.studentId, sessionId, boardSeriesId || null);
     if (!w.open) {
       throw new Error(
         w.entryDeadlinePassed

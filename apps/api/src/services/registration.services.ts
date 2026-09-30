@@ -62,8 +62,8 @@ import type { SubjectRegistrationOptionsType } from '@repo/validations';
  * Refuse unless the series is open for this student (window.services.ts):
  * for a registration, its own board series' deadline decides (F0b).
  */
-async function assertWindowOpen(studentId: string, sessionId: string, boardSeriesId?: string | null) {
-  const w = await sessionWindow(studentId, sessionId, db, new Date(), boardSeriesId);
+async function assertWindowOpen(studentId: string, sessionId: string, boardSeriesId: string | null) {
+  const w = await sessionWindow(studentId, sessionId, boardSeriesId);
   if (w.open) return;
   throw new Error(w.entryDeadlinePassed ? entryDeadlineMessage(w.entryDeadline!) : 'Registration window is not open');
 }
@@ -462,7 +462,7 @@ export async function createRegistrationRequest(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past the board's entry deadline (MO-10)
-  await assertWindowOpen(studentId, sess.id);
+  await assertWindowOpen(studentId, sess.id, null);
 
   const subjects = await db.query.subject.findMany({
     where: (s, { eq, and, inArray }) =>
@@ -577,7 +577,7 @@ export async function createDirectRegistration(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past the board's entry deadline (MO-10)
-  await assertWindowOpen(data.studentId, sess.id);
+  await assertWindowOpen(data.studentId, sess.id, null);
 
   const subjects = await db.query.subject.findMany({
     where: (s, { eq, and, inArray }) =>
@@ -987,7 +987,7 @@ export async function adminOverrideApproval(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past the board's entry deadline (MO-10)
-  await assertWindowOpen(data.studentId, sess.id);
+  await assertWindowOpen(data.studentId, sess.id, null);
 
   const subjects = await db.query.subject.findMany({
     where: (s, { eq, and, inArray }) =>

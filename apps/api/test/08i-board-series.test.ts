@@ -183,7 +183,7 @@ describe('F0b: board series', () => {
   describe('a window feeding two board series with different deadlines, each enforced (MO-10 per series)', () => {
     let b: Family, d: Family, e: Family, f: Family, x: Family;
     let bPay: string, dPay: string, ePay: string, fPay: string, bReg: string, dReg: string, eReg: string, fReg: string;
-    let octDeadline: Date, janDeadline: Date, xJan: string;
+    let octDeadline: Date, janDeadline: Date;
 
     it('only the admin sets an entry deadline, after the window closes and in the future; the late-fee dates are information', async () => {
       // Families with money in flight in each series before the close.
@@ -246,13 +246,6 @@ describe('F0b: board series', () => {
       expect(Math.abs((await due(ePay)) - octDeadline.getTime())).toBeLessThan(1000);
       expect(Math.abs((await due(fPay)) - (Date.now() + 24 * 60 * 60 * 1000))).toBeLessThan(60 * 1000);
       expect([await statusOf('payment', bPay), await statusOf('payment', dPay)]).toEqual(['pending_verification', 'pending_verification']);
-
-      // A student with a deadline extension registers for January after the close, before any deadline.
-      await apiResponse(finadmin.api.v1.exceptions.$post({
-        json: { type: 'deadline_extension', studentId: x.studentId, sessionId: windowId, validUntil: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), reason: 'late family, approved by the head' },
-      }));
-      xJan = (await direct(x, [subj.BI5!]))[0]!.id;
-      expect(await seriesOfRegistration(xJan)).toBe(jan);
     });
 
     it("past October's deadline, before the sweep: October's entries are refused, January's go on", async () => {
@@ -270,15 +263,15 @@ describe('F0b: board series', () => {
       // F can still send the reference for January.
       await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: fPay }, json: { reference: 'FT-BS-F' } }));
 
-      // Past the window's earliest deadline nothing new is registered in it,
-      // deadline extension or not — October's subject and January's alike;
-      // X's January registration made before goes on against January's own.
-      for (const subjectId of [subj.MA4!, subj.BI4!]) {
-        const late = await refused(x.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, subjectIds: [subjectId], studentId: x.studentId } }));
-        expect(late.status).toBe(422);
-        expect(late.error).toMatch(deadlineSentence);
-      }
-      expect(await statusOf('registration', xJan)).toBe('pending_payment');
+      // A student with a deadline extension registers for January, never October.
+      await apiResponse(finadmin.api.v1.exceptions.$post({
+        json: { type: 'deadline_extension', studentId: x.studentId, sessionId: windowId, validUntil: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), reason: 'late family, approved by the head' },
+      }));
+      const lateOct = await refused(x.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, subjectIds: [subj.MA4!], studentId: x.studentId } }));
+      expect(lateOct.status).toBe(422);
+      expect(lateOct.error).toMatch(deadlineSentence);
+      const xJan = (await direct(x, [subj.BI5!]))[0]!.id;
+      expect(await seriesOfRegistration(xJan)).toBe(jan);
     });
 
     it("the sweep closes October only: its open payments fail with escrow back, its waiting entries expire, families told; January's stay", async () => {
