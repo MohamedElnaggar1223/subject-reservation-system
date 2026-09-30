@@ -257,14 +257,19 @@ function CoverLine({ item, onChanged }: { item: AffectedLesson; onChanged: () =>
           {suggestions.isLoading ? <LoadingState label="Checking who is free…" /> : suggestions.isError || !suggestions.data ? <ErrorState onRetry={() => suggestions.refetch()} /> : (
             <>
               {suggestions.data.supervisionOnly && <p className="mb-2 text-xs text-muted-foreground">Not an exam subject: any free teacher may take it.</p>}
+              {!suggestions.data.supervisionOnly && !suggestions.data.candidates.some((c) => c.available && c.qualified) && (
+                <Notice tone="warning" className="mb-2">{`Nobody who teaches ${suggestions.data.lesson.subject ?? l.groupName} is free then: cancel the lesson below, or free a teacher by changing another cover first.`}</Notice>
+              )}
               <ul className="space-y-1">
                 {suggestions.data.candidates.slice(0, 12).map((c) => (
                   <li key={c.teacherId} className="flex flex-wrap items-center gap-2 rounded-md bg-card px-3 py-1.5 text-sm">
                     <bdi className="font-medium text-foreground">{c.name}</bdi>
                     {c.qualified ? <Badge tone="success">Teaches it</Badge> : <Badge tone="neutral">Not their subject</Badge>}
                     {c.available ? <Badge tone="info">Free then</Badge> : <span className="text-xs text-muted-foreground"><bdi>{c.reasons.filter((r) => !r.startsWith('does not teach')).join('; ')}</bdi></span>}
-                    <span className="ms-auto text-xs text-muted-foreground">{`${c.lessonsThatDay} lessons that day · ${c.coversThisTerm} covers this term`}</span>
-                    <Button size="sm" disabled={!c.available || !c.qualified || assign.isPending} onClick={() => assign.mutate({ coverTeacherId: c.teacherId })}>Assign</Button>
+                    <span className="ms-auto flex shrink-0 items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{`${c.lessonsThatDay} ${c.lessonsThatDay === 1 ? 'lesson' : 'lessons'} that day · ${c.coversThisTerm} ${c.coversThisTerm === 1 ? 'cover' : 'covers'} this term`}</span>
+                      <Button size="sm" disabled={!c.available || !c.qualified || assign.isPending} onClick={() => assign.mutate({ coverTeacherId: c.teacherId })}>Assign</Button>
+                    </span>
                   </li>
                 ))}
               </ul>
