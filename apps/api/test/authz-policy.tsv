@@ -239,3 +239,12 @@ POST	/v1/enrolments/:id/end	D	D	D	D	D	A	A	D	D
 POST	/v1/enrolments/bulk	D	D	D	D	D	A	A	D	D
 POST	/v1/enrolments/section	D	D	D	D	D	A	A	D	D
 POST	/v1/enrolments/batch	D	D	D	D	D	A	A	D	D
+GET	/v1/imports	D	D	D	D	D	A	A	D	D
+POST	/v1/imports	D	D	D	D	D	A	A	D	D
+GET	/v1/imports/:id	D	D	D	D	D	A	A	D	D
+PUT	/v1/imports/:id/settings	D	D	D	D	D	A	A	D	D
+PUT	/v1/imports/:id/rows	D	D	D	D	D	A	A	D	D
+PUT	/v1/imports/:id/people	D	D	D	D	D	A	A	D	D
+POST	/v1/imports/:id/subjects	D	D	D	D	D	A	D	D	D
+POST	/v1/imports/:id/commit	D	D	D	D	D	A	A	D	D
+POST	/v1/imports/:id/discard	D	D	D	D	D	A	A	D	D

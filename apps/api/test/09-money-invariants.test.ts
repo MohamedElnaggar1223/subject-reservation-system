@@ -511,4 +511,26 @@ describe('money invariants over the whole database', () => {
     // There was something to check: 08e holds preregistrations of a student who left.
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'PREREG_HELD_INELIGIBLE'`))[0]?.n)).toBeGreaterThan(0);
   });
+
+  it('F7: money from before the system is history only — traced to a committed import line, and never written with a payment, a ledger entry or a receipt', async () => {
+    // There is money history to check: 08n imports the sheet's fee notes and a money record.
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from money_history`))[0]?.n)).toBeGreaterThan(0);
+    // Every row points to the line it came from, and that line was committed.
+    const untraced = await sql(`
+      select m.id from money_history m left join import_row r on r.id = m.import_row_id
+      where r.id is null or r.status <> 'committed' or r.batch_id <> m.import_batch_id or m.source_ref = ''
+    `);
+    expect(untraced).toEqual([]);
+    // No transaction that wrote money history also wrote a payment, a payment's registrations,
+    // an escrow ledger entry or a receipt (rows a transaction inserts carry its id in xmin; the
+    // ledger and the payment links are never updated, so theirs is always the inserting one).
+    const moved = await sql(`
+      select m.id from money_history m
+      where exists (select 1 from escrow_transaction t where t.xmin = m.xmin)
+         or exists (select 1 from payment_registration pr where pr.xmin = m.xmin)
+         or exists (select 1 from payment p where p.xmin = m.xmin)
+         or exists (select 1 from receipt rc where rc.xmin = m.xmin)
+    `);
+    expect(moved).toEqual([]);
+  });
 });

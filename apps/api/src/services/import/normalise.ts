@@ -297,7 +297,7 @@ export function readSheetLine(line: SourceLine, roles: Roles, edits: ImportRowEd
 
   const teacherText = edits.teacher ?? cleanText(named('teacher'));
   const teacher = teacherText || null;
-  if (roles.byName.has('teacher') && !teacher) local.push({ code: 'teacher_missing' });
+  if (roles.byName.has('teacher') && !teacher && !selfStudy) local.push({ code: 'teacher_missing' });
   if (teacher && selfStudy) local.push({ code: 'teacher_on_self_study' });
 
   // The staff column (June 2023's Signature): carry forward, or a staff name (IS-02, IS-12).

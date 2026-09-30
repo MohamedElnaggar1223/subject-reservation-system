@@ -60,6 +60,9 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
         'calendar.schoolWeekdays': true,
         // F0b: what "A.S./A.2." marks is the coordinator's answer (IS-01).
         'catalogue.levelCodeReading': true,
+        // F7: two more of the coordinator's pending answers, the import's defaults (IS-02, IS-03).
+        'import.selfStudyOnTaught': true,
+        'import.carryForward': true,
       });
     });
 
