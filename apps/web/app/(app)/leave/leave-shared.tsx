@@ -54,7 +54,7 @@ export type LeaveReport = Awaited<ReturnType<typeof fetchReport>>;
 export const fetchTeachingLeave = (date?: string) => apiResponse(api.v1.leave.teaching.$get({ query: date ? { date } : {} }));
 
 type StudentsQuery = Parameters<typeof api.v1.students.$get>[0]['query'];
-export const searchStudents = (search: string) => apiResponse(api.v1.students.$get({ query: { search, limit: 8 } as StudentsQuery }));
+export const searchStudents = (search: string) => apiResponse(api.v1.students.$get({ query: { search, limit: '8' } satisfies StudentsQuery }));
 
 /** A file uploaded for a purpose through the one upload path (F0a). */
 export async function uploadFor(file: File, purpose: 'collector_photo' | 'supporting_document' | 'custody_photo' | 'custody_document', studentId: string) {

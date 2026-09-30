@@ -56,6 +56,9 @@ const icons = {
   // F1
   timetable: 'M3.375 19.5h17.25M3.375 19.5A1.125 1.125 0 012.25 18.375V5.625c0-.621.504-1.125 1.125-1.125h17.25c.621 0 1.125.504 1.125 1.125v12.75c0 .621-.504 1.125-1.125 1.125M2.25 9h19.5M2.25 13.5h19.5M8.25 4.5v15m7.5-15v15',
   cover: 'M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 019.374 21c-2.331 0-4.512-.645-6.374-1.766z',
+  // F2
+  leave: 'M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H2.25',
+  gate: 'M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5zM6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z',
 } as const;
 
 /* ─── Navigation Config ─────────────────────────────────────────────────────── */
@@ -102,6 +105,17 @@ const TIMETABLE_SECTION: NavSection = {
   ],
 };
 
+/** Campus leave (F2): run by the coordinator and the admin. */
+const LEAVE_SECTION: NavSection = {
+  titleKey: 'nav.campusLeave',
+  items: [
+    { labelKey: 'nav.leaveRequests', href: '/leave/manage', icon: 'leave' },
+    { labelKey: 'nav.gate', href: '/gate', icon: 'gate' },
+    { labelKey: 'nav.leaveReports', href: '/leave/reports', icon: 'reports' },
+    { labelKey: 'nav.leavePolicy', href: '/leave/policy', icon: 'settings' },
+  ],
+};
+
 const ACCOUNT_SECTION: NavSection = {
   titleKey: 'nav.account',
   items: [
@@ -119,6 +133,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
   if (role === 'coordinator') {
     return [
       { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, ...teaching] },
+      LEAVE_SECTION,
       TIMETABLE_SECTION,
       { titleKey: 'nav.academic', items: ACADEMIC_ITEMS },
       EXAMS_SECTION,
@@ -136,7 +151,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
 
   if (role === 'gate') {
     return [
-      { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, ...teaching] },
+      { items: [{ labelKey: 'nav.gate', href: '/gate', icon: 'gate' }, { labelKey: 'nav.today', href: '/today', icon: 'today' }, ...teaching] },
       ACCOUNT_SECTION,
     ];
   }
@@ -150,6 +165,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
           ...teaching,
         ],
       },
+      LEAVE_SECTION,
       TIMETABLE_SECTION,
       { titleKey: 'nav.academic', items: ACADEMIC_ITEMS },
       EXAMS_SECTION,
@@ -195,6 +211,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
         items: [
           { labelKey: 'nav.desk', href: '/desk', icon: 'home' },
           { labelKey: 'nav.students', href: '/students', icon: 'students' },
+          { labelKey: 'nav.campusLeave', href: '/leave/manage', icon: 'leave' },
           ...teaching,
           { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'payments' },
           { labelKey: 'nav.dailyTakings', href: '/takings', icon: 'escrow' },
@@ -229,6 +246,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
       {
         items: [
           { labelKey: 'nav.home', href: '/', icon: 'home' },
+          { labelKey: 'nav.campusLeave', href: '/leave', icon: 'leave' },
           { labelKey: 'nav.timetables', href: '/my-timetable', icon: 'timetable' },
         ],
       },
@@ -265,6 +283,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
     {
       items: [
         { labelKey: 'nav.home', href: '/', icon: 'home' },
+        { labelKey: 'nav.campusLeave', href: '/leave', icon: 'leave' },
         { labelKey: 'nav.myTimetable', href: '/my-timetable', icon: 'timetable' },
       ],
     },

@@ -11,6 +11,7 @@ import {
 import { foundationArabic } from './i18n-foundation';
 import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
 import { schedulingArabic, translateSchedulingText } from './i18n-scheduling';
+import { leaveArabic, translateLeaveText } from './i18n-leave';
 
 export type Language = 'en' | 'ar';
 
@@ -90,6 +91,11 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.teachingGroups': 'Teaching Groups',
     'nav.timetableRules': 'Timetable Rules',
     'nav.cover': 'Cover',
+    'nav.campusLeave': 'Campus Leave',
+    'nav.leaveRequests': 'Leave Requests',
+    'nav.gate': 'Gate',
+    'nav.leaveReports': 'Leave Reports',
+    'nav.leavePolicy': 'Leave Policy',
     'nav.myTimetable': 'My Timetable',
     'reports.title': 'Reports',
     'reports.description': 'Generate and export data reports. All reports support CSV download.',
@@ -195,6 +201,11 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.teachingGroups': 'مجموعات التدريس',
     'nav.timetableRules': 'قواعد الجدول',
     'nav.cover': 'الحصص البديلة',
+    'nav.campusLeave': 'الاستئذان',
+    'nav.leaveRequests': 'طلبات الاستئذان',
+    'nav.gate': 'البوابة',
+    'nav.leaveReports': 'تقارير الاستئذان',
+    'nav.leavePolicy': 'سياسة الاستئذان',
     'nav.myTimetable': 'جدولي',
     'app.subjectReservation': 'حجز المواد',
     'common.user': 'مستخدم',
@@ -1508,6 +1519,8 @@ Object.assign(autoArabicText, foundationArabic);
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // F1: the timetable screens (their own words never replace a phrase already translated).
 for (const [en, ar] of Object.entries(schedulingArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// F2: campus leave (its own words never replace a phrase already translated).
+for (const [en, ar] of Object.entries(leaveArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1589,6 +1602,9 @@ function translateDynamicText(text: string): string | null {
   // F1: the grid's clashes, the generator's explanations, cover's reasons, counted phrases.
   const f1Text = translateSchedulingText(text);
   if (f1Text) return f1Text;
+  // F2: campus leave's sentences with names, times and dates in them.
+  const f2Text = translateLeaveText(text);
+  if (f2Text) return f2Text;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

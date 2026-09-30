@@ -27,6 +27,7 @@ import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { Badge, Notice, TONE_CLASSES } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
 import { MyLessonsToday } from '~/components/teacher-day';
+import { LeaveInMyLessons } from '~/components/leave-in-my-lessons';
 import {
   DAY_KIND, DateText, fetchSchoolDay, periodBadge, schoolClock, toMinutes,
   type DayKind, type SchoolDay,
@@ -76,6 +77,8 @@ export default function TodayClient({ manages, teaches = false }: { manages: boo
           <Headline day={day} now={now} manages={manages} />
           {/* F1: a teacher's lessons today (nothing for an account that does not teach). */}
           {teaches && <MyLessonsToday />}
+          {/* F2: the students leaving during those lessons. */}
+          {teaches && <LeaveInMyLessons />}
           {day.isSchoolDay && <Bells day={day} now={now} manages={manages} />}
         </div>
       )}

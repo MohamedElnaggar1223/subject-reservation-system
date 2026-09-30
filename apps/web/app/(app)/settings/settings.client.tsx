@@ -19,23 +19,40 @@ import { Badge, Notice } from '~/components/ui/tone';
 import { useI18n } from '~/lib/i18n';
 
 // Typed by the API, never by hand (CLAUDE.md: Hono RPC everywhere).
-const fetchSettings = () => apiResponse(api.v1.settings.$get());
-type Setting = Awaited<ReturnType<typeof fetchSettings>>[number];
+export const fetchSettings = () => apiResponse(api.v1.settings.$get());
+export type Setting = Awaited<ReturnType<typeof fetchSettings>>[number];
 
 const GROUPS: { id: string; title: string; hint: string }[] = [
   { id: 'eligibility', title: 'Who may register', hint: 'Which students may register for which exam series.' },
   { id: 'school_fee', title: 'School fee', hint: 'When the annual school fee gates registration.' },
   { id: 'calendar', title: 'Calendar', hint: 'The school week the calendar and the day’s lists build on.' },
+  { id: 'leave', title: 'Campus leave', hint: 'The rules for leave requests, the approvers and the gate.' },
 ];
 
 /** The value as a person reads it. */
-function describeValue(s: Setting, value: unknown): string {
+export function describeValue(s: Setting, value: unknown): string {
+  if (value === null) return s.noneLabel ?? 'None';
   if (s.input === 'boolean') return value === true ? 'On' : 'Off';
   if (s.input === 'choice') return s.choices.find((c) => c.value === value)?.label ?? String(value);
   if (s.input === 'weekdays' && Array.isArray(value)) {
     return [...(value as number[])].sort((a, b) => a - b).map((d) => WEEKDAY_LABELS[d] ?? String(d)).join(', ');
   }
+  // F2's inputs.
+  if (s.input === 'time') return String(value);
+  if (s.input === 'minutes') return `${value} minutes`;
+  if (s.input === 'count') return String(value);
+  if (s.input === 'grades' && Array.isArray(value)) return value.length ? [...(value as number[])].sort().map((g) => `Grade ${g}`).join(', ') : 'None';
+  if (s.input === 'roles' && Array.isArray(value)) return (value as string[]).map((r) => s.choices.find((c) => c.value === r)?.label ?? r).join(', ');
+  if (s.input === 'categories' && Array.isArray(value)) return (value as { label: string }[]).map((c) => c.label).join(', ');
   return JSON.stringify(value);
+}
+
+/** A key for a new reason: its words in lower case, joined by _. */
+function keyFor(label: string, taken: string[]): string {
+  const base = label.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 30) || 'reason';
+  let k = base;
+  for (let i = 2; taken.includes(k); i++) k = `${base}_${i}`;
+  return k;
 }
 
 /** A moment in the page's language (Arabic month names with Latin digits, as the rest of the app writes numbers). */
@@ -97,13 +114,14 @@ export default function SettingsClient(): React.JSX.Element {
   );
 }
 
-function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (saved: { label: string; value: string }) => void }): React.JSX.Element {
+export function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (saved: { label: string; value: string }) => void }): React.JSX.Element {
   const queryClient = useQueryClient();
   const { language } = useI18n();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<unknown>(s.value);
   const [reason, setReason] = useState('');
   const [formError, setFormError] = useState('');
+  const [newReason, setNewReason] = useState('');
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -202,6 +220,89 @@ function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (save
                     </label>
                   );
                 })}
+              </div>
+            )}
+            {/* F2: a time, a number of minutes or a count (each may be "none"), grades, roles, a list of reasons. */}
+            {(s.input === 'time' || s.input === 'minutes' || s.input === 'count') && (
+              <div className="flex flex-wrap items-center gap-3">
+                {s.nullable && (
+                  <label className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                    <input type="radio" name={`${s.key}-none`} checked={draft === null} onChange={() => setDraft(null)} />
+                    <span>{s.noneLabel ?? 'None'}</span>
+                  </label>
+                )}
+                <label className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                  {s.nullable && <input type="radio" name={`${s.key}-none`} checked={draft !== null} onChange={() => setDraft(s.input === 'time' ? '10:00' : typeof s.value === 'number' ? s.value : 1)} />}
+                  <input
+                    aria-label={s.label}
+                    type={s.input === 'time' ? 'time' : 'number'}
+                    min={s.input === 'time' ? undefined : s.input === 'count' ? 1 : 0}
+                    value={draft === null ? '' : String(draft)}
+                    disabled={draft === null}
+                    onChange={(e) => setDraft(s.input === 'time' ? e.target.value : e.target.value === '' ? 0 : Number(e.target.value))}
+                    className="w-28 rounded-md border border-border bg-background px-2 py-1 text-sm tabular-nums"
+                  />
+                  {s.input === 'minutes' && <span className="text-muted-foreground">minutes</span>}
+                </label>
+              </div>
+            )}
+            {s.input === 'grades' && Array.isArray(draft) && (
+              <div className="flex flex-wrap gap-2">
+                {[10, 11, 12].map((g) => {
+                  const grades = draft as number[];
+                  const on = grades.includes(g);
+                  return (
+                    <label key={g} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                      <input type="checkbox" checked={on} onChange={() => setDraft(on ? grades.filter((x) => x !== g) : [...grades, g].sort())} />
+                      <span>{`Grade ${g}`}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {s.input === 'roles' && Array.isArray(draft) && (
+              <div className="flex flex-wrap gap-2">
+                {s.choices.map((c) => {
+                  const roles = draft as string[];
+                  const on = roles.includes(c.value);
+                  const locked = s.key === 'leave.approverRoles' && c.value === 'admin';
+                  return (
+                    <label key={c.value} className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-foreground cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                      <input type="checkbox" checked={on || locked} disabled={locked} onChange={() => setDraft(on ? roles.filter((x) => x !== c.value) : [...roles, c.value])} />
+                      <span>{c.label}</span>
+                      {locked && <span className="text-xs text-muted-foreground">always</span>}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            {s.input === 'categories' && Array.isArray(draft) && (
+              <div className="space-y-2">
+                {(draft as { key: string; label: string }[]).map((c, i, all) => (
+                  <div key={c.key} className="flex items-center gap-2">
+                    <input
+                      aria-label={`Reason ${i + 1}`}
+                      value={c.label}
+                      onChange={(e) => setDraft(all.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
+                      className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    />
+                    <Button type="button" variant="ghost" size="sm" disabled={all.length === 1} onClick={() => setDraft(all.filter((_, j) => j !== i))}>Remove</Button>
+                  </div>
+                ))}
+                <div className="flex items-center gap-2">
+                  <input
+                    aria-label="A new reason"
+                    placeholder="A new reason, as families will read it"
+                    value={newReason}
+                    onChange={(e) => setNewReason(e.target.value)}
+                    className="flex-1 rounded-lg border border-dashed border-border bg-background px-3 py-2 text-sm"
+                  />
+                  <Button type="button" variant="outline" size="sm" disabled={newReason.trim().length < 2} onClick={() => {
+                    const all = draft as { key: string; label: string }[];
+                    setDraft([...all, { key: keyFor(newReason, all.map((x) => x.key)), label: newReason.trim() }]);
+                    setNewReason('');
+                  }}>Add</Button>
+                </div>
               </div>
             )}
           </fieldset>

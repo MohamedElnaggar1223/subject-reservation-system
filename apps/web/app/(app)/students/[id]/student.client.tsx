@@ -21,6 +21,7 @@ import { api } from '~/lib/hono';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { StudentAcademicPanel, studentRecordKey } from '~/components/student-academic-panel';
 import { WeekTimetable, schoolTodayDate } from '~/components/week-timetable';
+import { StudentLeaveCard } from '~/components/student-leave-card';
 
 // The panel's own fetcher, under the panel's key: one request serves both.
 const fetchStudentRecord = (id: string) => apiResponse(api.v1.students[':id'].$get({ param: { id } }));
@@ -88,6 +89,8 @@ export default function StudentClient({ studentId, viewerRole }: { studentId: st
 
           <StudentAcademicPanel studentId={studentId} viewerRole={viewerRole} />
           <StudentWeek studentId={studentId} />
+          {/* F2: campus leave — coming up, this term, and a request made here. */}
+          <div className="mt-6"><StudentLeaveCard studentId={studentId} viewerRole={viewerRole} /></div>
         </>
       )}
     </div>

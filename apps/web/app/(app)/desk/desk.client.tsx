@@ -26,6 +26,7 @@ import { Button } from '~/components/ui/button';
 import { ReasonModal } from '~/components/ui/reason-modal';
 import { Badge, StandingBadge } from '~/components/ui/tone';
 import { StudentAcademicPanel } from '~/components/student-academic-panel';
+import { StudentLeaveCard } from '~/components/student-leave-card';
 
 // ─── Types, derived from their fetchers (CLAUDE.md: Hono RPC everywhere) ──────
 
@@ -361,6 +362,9 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
               onError={fail}
             />
           )}
+
+          {/* F2: campus leave for this student — what is coming up, and a request for the family made here. */}
+          <StudentLeaveCard studentId={summary.student.id} viewerRole={userRole} />
 
           {/* Subjects registered and waiting for payment (MA-18): after a
               reversal, a rejected transfer, a cancelled checkout or a
