@@ -51,6 +51,11 @@ export const NOTIFICATION_TYPES = [
   'LINK_DECISION',
   // Staff: a preregistration held at its series' opening (F0a)
   'PREREGISTRATION_HELD',
+  // F1: the timetable and cover
+  'TIMETABLE_PUBLISHED',
+  'COVER_ASSIGNED',
+  'LESSON_COVERED',
+  'LESSON_CANCELLED',
 ] as const;
 
 export const NotificationTypeSchema = z.enum(NOTIFICATION_TYPES);
@@ -78,6 +83,10 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   LINK_REQUEST_RECEIVED:            'New Parent Link Request',
   LINK_DECISION:                    'Link Request Decision',
   PREREGISTRATION_HELD:             'Preregistration Held',
+  TIMETABLE_PUBLISHED:              'Timetable Published',
+  COVER_ASSIGNED:                   'Cover Lesson for You',
+  LESSON_COVERED:                   'A Lesson Is Covered',
+  LESSON_CANCELLED:                 'A Lesson Is Cancelled',
 };
 
 // Icons mapped per type (used in the notification center UI)
@@ -103,6 +112,10 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   LINK_REQUEST_RECEIVED:            '🔗',
   LINK_DECISION:                    '🔗',
   PREREGISTRATION_HELD:             '⏸️',
+  TIMETABLE_PUBLISHED:              '🗓️',
+  COVER_ASSIGNED:                   '🧑‍🏫',
+  LESSON_COVERED:                   '🔁',
+  LESSON_CANCELLED:                 '🚫',
 };
 
 // ─── Admin bulk announcement recipient groups ─────────────────────────────────

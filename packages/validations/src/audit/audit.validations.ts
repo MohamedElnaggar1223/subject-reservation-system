@@ -59,6 +59,13 @@ export const AUDIT_ENTITY_TYPES = [
   'qualification_option',
   'board_series',
   'enrolment',
+  // F1
+  'teaching_group',
+  'timetable',
+  'schedule_rules',
+  'teacher_absence',
+  'cover_assignment',
+  'calendar_feed',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -96,6 +103,12 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   qualification_option: 'Option Code',
   board_series:   'Board Series',
   enrolment:      'Course Enrolment',
+  teaching_group: 'Teaching Group',
+  timetable:      'Timetable',
+  schedule_rules: 'Timetable Rules',
+  teacher_absence: 'Teacher Absence',
+  cover_assignment: 'Cover',
+  calendar_feed:  'Calendar Feed',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -241,6 +254,30 @@ export const AUDIT_ACTIONS = [
   'ENROLMENT_UPDATED',
   'ENROLMENT_ENDED',
   'ENROLMENTS_BULK_CREATED',
+  // F1: scheduling
+  'TEACHING_GROUPS_FORMED',
+  'TEACHING_GROUP_CREATED',
+  'TEACHING_GROUP_UPDATED',
+  'TEACHING_GROUP_MEMBERS_ADDED',
+  'TEACHING_GROUP_MEMBERS_ENDED',
+  'TEACHING_GROUP_SPLIT',
+  'TEACHING_GROUPS_MERGED',
+  'TEACHING_GROUP_ARCHIVED',
+  'SCHEDULE_RULES_SET',
+  'TIMETABLE_CREATED',
+  'TIMETABLE_UPDATED',
+  'TIMETABLE_DELETED',
+  'TIMETABLE_LESSON_MOVED',
+  'TIMETABLE_LESSON_LOCKED',
+  'TIMETABLE_GENERATED',
+  'TIMETABLE_PUBLISHED',
+  'TEACHER_ABSENCE_RECORDED',
+  'TEACHER_ABSENCE_CANCELLED',
+  'COVER_ASSIGNED',
+  'LESSON_CANCELLED',
+  'COVER_REMOVED',
+  'CALENDAR_FEED_CREATED',
+  'CALENDAR_FEED_REVOKED',
   // Parent-student links (security audit RF-14: access to a child's money
   // and records hangs on these, so every change is recorded)
   'LINK_REQUESTED',
@@ -394,6 +431,29 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   ENROLMENT_UPDATED:          'Course Enrolment Changed',
   ENROLMENT_ENDED:            'Course Enrolment Ended',
   ENROLMENTS_BULK_CREATED:    'Course Enrolments Created in Bulk',
+  TEACHING_GROUPS_FORMED:     'Teaching Groups Formed from Enrolment',
+  TEACHING_GROUP_CREATED:     'Teaching Group Added',
+  TEACHING_GROUP_UPDATED:     'Teaching Group Changed',
+  TEACHING_GROUP_MEMBERS_ADDED: 'Students Added to a Teaching Group',
+  TEACHING_GROUP_MEMBERS_ENDED: 'Students Taken out of a Teaching Group',
+  TEACHING_GROUP_SPLIT:       'Teaching Group Split',
+  TEACHING_GROUPS_MERGED:     'Teaching Groups Merged',
+  TEACHING_GROUP_ARCHIVED:    'Teaching Group Retired',
+  SCHEDULE_RULES_SET:         'Timetable Rules Set',
+  TIMETABLE_CREATED:          'Timetable Draft Created',
+  TIMETABLE_UPDATED:          'Timetable Renamed',
+  TIMETABLE_DELETED:          'Timetable Draft Deleted',
+  TIMETABLE_LESSON_MOVED:     'Lesson Moved',
+  TIMETABLE_LESSON_LOCKED:    'Lesson Locked or Unlocked',
+  TIMETABLE_GENERATED:        'Timetable Generated',
+  TIMETABLE_PUBLISHED:        'Timetable Published',
+  TEACHER_ABSENCE_RECORDED:   'Teacher Absence Recorded',
+  TEACHER_ABSENCE_CANCELLED:  'Teacher Absence Cancelled',
+  COVER_ASSIGNED:             'Cover Assigned',
+  LESSON_CANCELLED:           'Lesson Cancelled',
+  COVER_REMOVED:              'Cover Removed',
+  CALENDAR_FEED_CREATED:      'Calendar Feed Link Made',
+  CALENDAR_FEED_REVOKED:      'Calendar Feed Link Revoked',
 };
 
 // ─── Query Filters ────────────────────────────────────────────────────────────

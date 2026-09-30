@@ -34,6 +34,7 @@ import {
   type BatchEnrolRowType, type ListEnrolmentsQueryType, type EnrolmentMode, type EnrolmentSource,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
+import { endGroupMembershipsForSubject } from './group.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -231,7 +232,11 @@ export async function updateEnrolment(id: string, data: UpdateEnrolmentType, act
       linked = await linkTeacher(tx, teacherId, e.subjectId);
     }
     const [updated] = await tx.update(courseEnrolment).set({ mode, teacherId, updatedAt: new Date() }).where(eq(courseEnrolment.id, id)).returning();
-    await logAction(actorId, 'ENROLMENT_UPDATED', 'enrolment', id, { mode: e.mode, teacherId: e.teacherId }, { mode, teacherId, teacherLinkedToSubject: linked }, ctx, tx);
+    // F1: studied alone from now on — they leave the subject's teaching group after today.
+    const groupsLeft = mode === 'self_study' && e.mode !== 'self_study'
+      ? await endGroupMembershipsForSubject(tx, e.studentId, e.subjectId, e.academicYearId, schoolDateString(new Date()), 'Now studies this subject alone', actorId)
+      : 0;
+    await logAction(actorId, 'ENROLMENT_UPDATED', 'enrolment', id, { mode: e.mode, teacherId: e.teacherId }, { mode, teacherId, teacherLinkedToSubject: linked, ...(groupsLeft ? { groupsLeft } : {}) }, ctx, tx);
     return updated!;
   });
 }
@@ -246,7 +251,9 @@ export async function endEnrolment(id: string, data: EndEnrolmentType, actorId: 
     if (endedOn < e.startedOn) throw new EnrolmentError('An enrolment cannot end before it started');
     const [updated] = await tx.update(courseEnrolment).set({ endedOn, endReason: data.reason, endedBy: actorId, updatedAt: new Date() })
       .where(eq(courseEnrolment.id, id)).returning();
-    await logAction(actorId, 'ENROLMENT_ENDED', 'enrolment', id, { endedOn: null }, { endedOn, reason: data.reason }, ctx, tx);
+    // F1: no longer taught — they leave the subject's teaching group with the enrolment.
+    const groupsLeft = await endGroupMembershipsForSubject(tx, e.studentId, e.subjectId, e.academicYearId, endedOn, data.reason, actorId);
+    await logAction(actorId, 'ENROLMENT_ENDED', 'enrolment', id, { endedOn: null }, { endedOn, reason: data.reason, ...(groupsLeft ? { groupsLeft } : {}) }, ctx, tx);
     return updated!;
   });
 }

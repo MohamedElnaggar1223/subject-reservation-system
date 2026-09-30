@@ -281,6 +281,13 @@
       "when": 1790699633399,
       "tag": "0039_catalogue_deadline_to_series",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1790726901458,
+      "tag": "0040_scheduling",
+      "breakpoints": true
     }
   ]
 }

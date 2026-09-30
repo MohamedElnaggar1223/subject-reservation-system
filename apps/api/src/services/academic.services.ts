@@ -246,52 +246,82 @@ export async function deleteCalendarEntry(id: string, actorId: string, ctx?: Aud
  * (between terms or outside the year), 'no_academic_year'.
  */
 export async function getSchoolDay(date: string) {
-  const [y] = await db.select().from(academicYear).where(sql`${academicYear.startsOn} <= ${date} AND ${academicYear.endsOn} >= ${date}`);
-  const weekday = weekdayOf(date);
-  if (!y) {
-    return { date, weekday, academicYear: null, term: null, kind: 'no_academic_year' as const, isSchoolDay: false, entry: null, bellSchedule: null, periods: [] };
-  }
-  const [term] = await db.select().from(academicTerm)
-    .where(and(eq(academicTerm.academicYearId, y.id), sql`${academicTerm.startsOn} <= ${date} AND ${academicTerm.endsOn} >= ${date}`));
-  const [entry] = await db.select().from(calendarEntry)
-    .where(and(eq(calendarEntry.academicYearId, y.id), sql`${calendarEntry.startsOn} <= ${date} AND ${calendarEntry.endsOn} >= ${date}`));
+  return (await getSchoolDays(date, date))[0]!;
+}
+
+/** The day after a YYYY-MM-DD date. */
+function dayAfter(date: string): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * What each date from `from` to `to` is (inclusive, at most 400 days), read in
+ * a handful of queries — the range form of getSchoolDay, which reads through
+ * it, so a day has one rule. F1 reads a week or a term at a time with it.
+ */
+export async function getSchoolDays(from: string, to: string) {
+  if (to < from) return [];
+  const years = await db.select().from(academicYear).where(sql`${academicYear.startsOn} <= ${to} AND ${academicYear.endsOn} >= ${from}`);
+  const yearIds = years.map((y) => y.id).concat('__none__');
+  const terms = await db.select().from(academicTerm)
+    .where(and(inArray(academicTerm.academicYearId, yearIds), sql`${academicTerm.startsOn} <= ${to} AND ${academicTerm.endsOn} >= ${from}`));
+  const entries = await db.select().from(calendarEntry)
+    .where(and(inArray(calendarEntry.academicYearId, yearIds), sql`${calendarEntry.startsOn} <= ${to} AND ${calendarEntry.endsOn} >= ${from}`));
+  const schedules = await db.select().from(bellSchedule).where(inArray(bellSchedule.academicYearId, yearIds));
+  const allPeriods = schedules.length
+    ? await db.select().from(bellPeriod).where(inArray(bellPeriod.bellScheduleId, schedules.map((s) => s.id))).orderBy(asc(bellPeriod.position))
+    : [];
   const schoolWeekdays = await getSetting('calendar.schoolWeekdays');
-  const usualDay = schoolWeekdays.includes(weekday);
 
-  let kind: 'school_day' | 'extra_school_day' | 'early_dismissal' | 'exam_only' | 'holiday' | 'weekend' | 'out_of_term';
-  if (entry?.kind === 'holiday') kind = 'holiday';
-  else if (entry?.kind === 'school_day') kind = usualDay ? 'school_day' : 'extra_school_day';
-  else if (!term) kind = 'out_of_term';
-  else if (!usualDay) kind = 'weekend';
-  else if (entry?.kind === 'early_dismissal') kind = 'early_dismissal';
-  else if (entry?.kind === 'exam_only') kind = 'exam_only';
-  else kind = 'school_day';
-  const isSchoolDay = ['school_day', 'extra_school_day', 'early_dismissal', 'exam_only'].includes(kind);
-
-  let schedule: typeof bellSchedule.$inferSelect | undefined;
-  if (isSchoolDay) {
-    if (entry?.bellScheduleId) {
-      [schedule] = await db.select().from(bellSchedule).where(eq(bellSchedule.id, entry.bellScheduleId));
+  const out = [];
+  let guard = 0;
+  for (let date = from; date <= to && guard < 400; date = dayAfter(date), guard++) {
+    const weekday = weekdayOf(date);
+    const y = years.find((x) => x.startsOn <= date && x.endsOn >= date);
+    if (!y) {
+      out.push({ date, weekday, academicYear: null, term: null, kind: 'no_academic_year' as const, isSchoolDay: false, entry: null, bellSchedule: null, periods: [] });
+      continue;
     }
-    schedule ??= (await db.select().from(bellSchedule).where(and(eq(bellSchedule.academicYearId, y.id), eq(bellSchedule.isDefault, true))))[0];
+    const term = terms.find((t) => t.academicYearId === y.id && t.startsOn <= date && t.endsOn >= date);
+    const entry = entries.find((e) => e.academicYearId === y.id && e.startsOn <= date && e.endsOn >= date);
+    const usualDay = schoolWeekdays.includes(weekday);
+
+    let kind: 'school_day' | 'extra_school_day' | 'early_dismissal' | 'exam_only' | 'holiday' | 'weekend' | 'out_of_term';
+    if (entry?.kind === 'holiday') kind = 'holiday';
+    else if (entry?.kind === 'school_day') kind = usualDay ? 'school_day' : 'extra_school_day';
+    else if (!term) kind = 'out_of_term';
+    else if (!usualDay) kind = 'weekend';
+    else if (entry?.kind === 'early_dismissal') kind = 'early_dismissal';
+    else if (entry?.kind === 'exam_only') kind = 'exam_only';
+    else kind = 'school_day';
+    const isSchoolDay = ['school_day', 'extra_school_day', 'early_dismissal', 'exam_only'].includes(kind);
+
+    let schedule: typeof bellSchedule.$inferSelect | undefined;
+    if (isSchoolDay) {
+      if (entry?.bellScheduleId) schedule = schedules.find((s) => s.id === entry.bellScheduleId);
+      schedule ??= schedules.find((s) => s.academicYearId === y.id && s.isDefault);
+    }
+    let periods: (typeof bellPeriod.$inferSelect)[] = [];
+    if (schedule) {
+      const all = allPeriods.filter((p) => p.bellScheduleId === schedule!.id);
+      const today = all.filter((p) => p.weekday === weekday);
+      periods = today.length ? today : all.filter((p) => p.weekday === null);
+    }
+    out.push({
+      date,
+      weekday,
+      academicYear: { id: y.id, startYear: y.startYear, label: academicYearLabel(y.startYear) },
+      term: term ? { id: term.id, name: term.name } : null,
+      kind,
+      isSchoolDay,
+      entry: entry ? { id: entry.id, kind: entry.kind, name: entry.name } : null,
+      bellSchedule: schedule ? { id: schedule.id, name: schedule.name } : null,
+      periods: periods.map((p) => ({ label: p.label, kind: p.kind, startsAt: p.startsAt, endsAt: p.endsAt })),
+    });
   }
-  let periods: (typeof bellPeriod.$inferSelect)[] = [];
-  if (schedule) {
-    const all = await db.select().from(bellPeriod).where(eq(bellPeriod.bellScheduleId, schedule.id)).orderBy(asc(bellPeriod.position));
-    const today = all.filter((p) => p.weekday === weekday);
-    periods = today.length ? today : all.filter((p) => p.weekday === null);
-  }
-  return {
-    date,
-    weekday,
-    academicYear: { id: y.id, startYear: y.startYear, label: academicYearLabel(y.startYear) },
-    term: term ? { id: term.id, name: term.name } : null,
-    kind,
-    isSchoolDay,
-    entry: entry ? { id: entry.id, kind: entry.kind, name: entry.name } : null,
-    bellSchedule: schedule ? { id: schedule.id, name: schedule.name } : null,
-    periods: periods.map((p) => ({ label: p.label, kind: p.kind, startsAt: p.startsAt, endsAt: p.endsAt })),
-  };
+  return out;
 }
 
 /** Today's school day, in Cairo time. */

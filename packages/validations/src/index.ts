@@ -56,3 +56,10 @@ export * from './catalogue/catalogue.validations'
 export * from './catalogue/level-code'
 export * from './catalogue/board-series.validations'
 export * from './enrolment/enrolment.validations'
+/**
+ * F1 — scheduling: the timetable's rules and generator (pure, shared by the
+ * API and the grid editor), and the inputs of its endpoints.
+ */
+export * from './scheduling/engine'
+export * from './scheduling/generator'
+export * from './scheduling/scheduling.validations'

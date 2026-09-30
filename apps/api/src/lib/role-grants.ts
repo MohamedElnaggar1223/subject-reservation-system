@@ -54,6 +54,14 @@ const SCHOOL_INFO: Grant[] = [
   // Teaching is a capability: answered only for an account linked to a
   // teacher record, whatever its role.
   'GET /v1/teaching/me',
+  // F1: one's own timetable (a linked teacher record's teaching), the
+  // calendar feed link, and the feed itself (the token is the key).
+  'GET /v1/schedule/me/day',
+  'GET /v1/schedule/me/week',
+  'GET /v1/schedule/feed',
+  'POST /v1/schedule/feed',
+  'DELETE /v1/schedule/feed',
+  'GET /v1/ical/:token',
 ];
 
 export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
@@ -90,6 +98,14 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     'GET /v1/enrolments',
     'POST /v1/enrolments',
     '* /v1/enrolments/*',
+    // F1: the timetable — groups, rules, versions, the grid, the generator,
+    // publishing, exports, every view, and cover.
+    '* /v1/scheduling/*',
+    'GET /v1/timetables',
+    'POST /v1/timetables',
+    '* /v1/timetables/*',
+    '* /v1/schedule/*',
+    '* /v1/cover/*',
   ],
   teacher: [
     ...SELF_SERVICE,
@@ -97,6 +113,11 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     // F0b: what they teach — the catalogue, and their own class lists.
     'GET /v1/catalogue',
     'GET /v1/enrolments/class',
+    // F1: their own teaching's timetable (the handler refuses anyone else's)
+    // and a lesson's class on a date they teach or cover it.
+    'GET /v1/schedule/day',
+    'GET /v1/schedule/week',
+    'GET /v1/schedule/lesson',
   ],
   gate: [...SELF_SERVICE, ...SCHOOL_INFO],
 };

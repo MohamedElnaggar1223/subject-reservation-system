@@ -24,6 +24,7 @@ import { closePaymentsOfExpiredRegistrations } from './payment.services';
 import { notifyGradeChanged } from './notification.services';
 import { endOpenMemberships, sectionOf, sectionHistoryOf } from './academic.services';
 import { endOpenEnrolments } from './enrolment.services';
+import { endGroupMembershipsOnLeaving } from './group.services';
 
 export class StudentError extends Error {
   constructor(message: string, public readonly status: 400 | 404 | 409 = 400) {
@@ -219,8 +220,10 @@ export async function recordLeaving(studentId: string, data: RecordLeavingType, 
     const sectionsEnded = await endOpenMemberships(tx, studentId, data.leftOn, `Left the school (${data.kind})`, actorId);
     // F0b: they are no longer taught — their course enrolments end with the leaving (history kept).
     const enrolmentsEnded = await endOpenEnrolments(tx, studentId, data.leftOn, `Left the school (${data.kind})`, actorId);
+    // F1: and they leave their teaching groups (a section's group follows the section).
+    const groupsEnded = await endGroupMembershipsOnLeaving(tx, studentId, data.leftOn, `Left the school (${data.kind})`, actorId);
     await logAction(actorId, 'STUDENT_LEFT', 'user', studentId, { leftOn: null },
-      { leftOn: data.leftOn, kind: data.kind, reason: data.reason, sectionsEnded, enrolmentsEnded }, ctx, tx);
+      { leftOn: data.leftOn, kind: data.kind, reason: data.reason, sectionsEnded, enrolmentsEnded, groupsEnded }, ctx, tx);
     const expired = await expireIneligibleRegistrations(tx, { studentIds: [studentId] }, data.kind, now);
     return { expired, sectionsEnded };
   });

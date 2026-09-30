@@ -2464,3 +2464,357 @@ export const courseEnrolmentRelations = relations(courseEnrolment, ({ one }) => 
   subject: one(subject, { fields: [courseEnrolment.subjectId], references: [subject.id] }),
   teacher: one(teacher, { fields: [courseEnrolment.teacherId], references: [teacher.id] }),
 }));
+
+/**
+ * ============================================
+ * F1 — SCHEDULING (the timetable)
+ * ============================================
+ *
+ * Teaching groups per academic year — formed from the course enrolment (one
+ * per subject and teacher, self-study excluded) or from a homeroom section
+ * (a subject the whole section is taught together) — with a membership that
+ * keeps its history. The school's rules for the year: when a teacher or a
+ * room cannot be used, a teacher's periods per day and per week, and groups
+ * whose lessons must not fall on the same day. Timetables per term: drafts,
+ * and published versions with the date each takes effect (published versions
+ * are never changed or deleted). Each lesson card of a timetable sits at a
+ * (weekday, lesson period) of the default bell schedule, or is unplaced.
+ * Teachers' absences and the cover given for each lesson, and a per-user
+ * token for the calendar feed. docs/features/SCHEDULING.md.
+ */
+export const teachingGroup = pgTable(
+  "teaching_group",
+  {
+    id: text("id").primaryKey(),
+    academicYearId: text("academic_year_id").notNull().references(() => academicYear.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    // What is taught: a registrable subject, or null for a course the school
+    // teaches outside the exam catalogue (a national subject, PE). Fixed once
+    // the group exists (members carry it: one open group per subject).
+    subjectId: text("subject_id").references(() => subject.id, { onDelete: "restrict" }),
+    teacherId: text("teacher_id").references(() => teacher.id, { onDelete: "set null" }),
+    // 'enrolment' (formed from the course enrolment), 'section' (a homeroom
+    // section taught together: its students are the section's on each date),
+    // 'manual' (made by hand, or by a split).
+    kind: text("kind").notNull(),
+    sectionId: text("section_id").references(() => section.id, { onDelete: "restrict" }),
+    weeklyPeriods: integer("weekly_periods").notNull().default(4),
+    // How many of the weekly periods come as double lessons (each double is two periods).
+    doublePeriods: integer("double_periods").notNull().default(0),
+    // What its room must be: a type, features, or one fixed room.
+    roomType: text("room_type"),
+    roomFeatures: jsonb("room_features").$type<string[]>().notNull().default([]),
+    roomId: text("room_id").references(() => room.id, { onDelete: "set null" }),
+    // The group a split took these students from.
+    splitFromGroupId: text("split_from_group_id").references((): AnyPgColumn => teachingGroup.id, { onDelete: "set null" }),
+    // From this day on the group is not taught (merged into another, or retired).
+    archivedOn: date("archived_on", { mode: "string" }),
+    archivedReason: text("archived_reason"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("teachingGroup_yearId_idx").on(table.academicYearId),
+    index("teachingGroup_subjectId_idx").on(table.subjectId),
+    index("teachingGroup_teacherId_idx").on(table.teacherId),
+    index("teachingGroup_sectionId_idx").on(table.sectionId),
+    uniqueIndex("teachingGroup_year_name_idx").on(table.academicYearId, sql`lower(${table.name})`).where(sql`archived_on IS NULL`),
+    check("teaching_group_kind_valid", sql`${table.kind} IN ('enrolment', 'section', 'manual')`),
+    check("teaching_group_section_kind", sql`(${table.kind} = 'section') = (${table.sectionId} IS NOT NULL)`),
+    check("teaching_group_periods", sql`${table.weeklyPeriods} BETWEEN 0 AND 30 AND ${table.doublePeriods} >= 0 AND ${table.doublePeriods} * 2 <= ${table.weeklyPeriods}`),
+  ]
+);
+
+export const teachingGroupMember = pgTable(
+  "teaching_group_member",
+  {
+    id: text("id").primaryKey(),
+    groupId: text("group_id").notNull().references(() => teachingGroup.id, { onDelete: "restrict" }),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    academicYearId: text("academic_year_id").notNull().references(() => academicYear.id, { onDelete: "restrict" }),
+    // The group's subject, kept here so the database holds the rule: one open
+    // group per student per subject and year.
+    subjectId: text("subject_id").references(() => subject.id, { onDelete: "restrict" }),
+    // The enrolment it came from (formed or refreshed from the course enrolment).
+    enrolmentId: text("enrolment_id").references(() => courseEnrolment.id, { onDelete: "set null" }),
+    startedOn: date("started_on", { mode: "string" }).notNull(),
+    // The last day in the group (inclusive), null while open.
+    endedOn: date("ended_on", { mode: "string" }),
+    endReason: text("end_reason"),
+    addedBy: text("added_by").references(() => user.id, { onDelete: "set null" }),
+    endedBy: text("ended_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("teachingGroupMember_groupId_idx").on(table.groupId),
+    index("teachingGroupMember_studentId_idx").on(table.studentId),
+    uniqueIndex("teachingGroupMember_one_open_idx").on(table.groupId, table.studentId).where(sql`ended_on IS NULL`),
+    uniqueIndex("teachingGroupMember_one_subject_idx")
+      .on(table.studentId, table.subjectId, table.academicYearId)
+      .where(sql`ended_on IS NULL AND subject_id IS NOT NULL`),
+    check("teaching_group_member_dates_ordered", sql`${table.endedOn} IS NULL OR ${table.endedOn} >= ${table.startedOn}`),
+  ]
+);
+
+/** A teacher or a room that cannot be used at a period (or a whole day) of the week, for a year. */
+export const scheduleUnavailability = pgTable(
+  "schedule_unavailability",
+  {
+    id: text("id").primaryKey(),
+    academicYearId: text("academic_year_id").notNull().references(() => academicYear.id, { onDelete: "cascade" }),
+    teacherId: text("teacher_id").references(() => teacher.id, { onDelete: "cascade" }),
+    roomId: text("room_id").references(() => room.id, { onDelete: "cascade" }),
+    weekday: integer("weekday").notNull(),
+    // A lesson period (1 = the day's first); null = the whole day.
+    period: integer("period"),
+    note: text("note"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("scheduleUnavailability_yearId_idx").on(table.academicYearId),
+    check("schedule_unavailability_one_resource", sql`(${table.teacherId} IS NULL) <> (${table.roomId} IS NULL)`),
+    check("schedule_unavailability_weekday", sql`${table.weekday} BETWEEN 0 AND 6`),
+    check("schedule_unavailability_period", sql`${table.period} IS NULL OR ${table.period} >= 1`),
+  ]
+);
+
+/** A teacher's most periods in a day and in a week, for a year. */
+export const teacherLoadLimit = pgTable(
+  "teacher_load_limit",
+  {
+    id: text("id").primaryKey(),
+    academicYearId: text("academic_year_id").notNull().references(() => academicYear.id, { onDelete: "cascade" }),
+    teacherId: text("teacher_id").notNull().references(() => teacher.id, { onDelete: "cascade" }),
+    maxPerDay: integer("max_per_day"),
+    maxPerWeek: integer("max_per_week"),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("teacherLoadLimit_year_teacher_idx").on(table.academicYearId, table.teacherId),
+    check("teacher_load_limit_positive", sql`(${table.maxPerDay} IS NULL OR ${table.maxPerDay} >= 1) AND (${table.maxPerWeek} IS NULL OR ${table.maxPerWeek} >= 1)`),
+  ]
+);
+
+/** Lessons of these two groups never fall on the same day (a group with itself: its own lessons on different days). */
+export const groupDayRule = pgTable(
+  "group_day_rule",
+  {
+    id: text("id").primaryKey(),
+    academicYearId: text("academic_year_id").notNull().references(() => academicYear.id, { onDelete: "cascade" }),
+    groupAId: text("group_a_id").notNull().references(() => teachingGroup.id, { onDelete: "cascade" }),
+    groupBId: text("group_b_id").notNull().references(() => teachingGroup.id, { onDelete: "cascade" }),
+    note: text("note"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("groupDayRule_pair_idx").on(table.groupAId, table.groupBId),
+    check("group_day_rule_ordered", sql`${table.groupAId} <= ${table.groupBId}`),
+  ]
+);
+
+/**
+ * A timetable of a term. A draft is edited and generated; publishing gives it
+ * the date it takes effect and freezes it. On a date, the timetable in force
+ * is the term's published one with the latest effective date on or before it
+ * (the later publication wins a tie).
+ */
+export const timetable = pgTable(
+  "timetable",
+  {
+    id: text("id").primaryKey(),
+    termId: text("term_id").notNull().references(() => academicTerm.id, { onDelete: "restrict" }),
+    academicYearId: text("academic_year_id").notNull().references(() => academicYear.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    // 'draft' | 'published'
+    status: text("status").notNull().default("draft"),
+    effectiveFrom: date("effective_from", { mode: "string" }),
+    // The version it was copied from.
+    basedOnId: text("based_on_id").references((): AnyPgColumn => timetable.id, { onDelete: "set null" }),
+    // Bumped by every change, so an editor knows its picture is stale.
+    revision: integer("revision").notNull().default(0),
+    notes: text("notes"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+    publishedBy: text("published_by").references(() => user.id, { onDelete: "set null" }),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    publishNote: text("publish_note"),
+  },
+  (table) => [
+    index("timetable_termId_idx").on(table.termId),
+    check("timetable_status_valid", sql`${table.status} IN ('draft', 'published')`),
+    check("timetable_published_whole", sql`(${table.status} = 'published') = (${table.effectiveFrom} IS NOT NULL AND ${table.publishedAt} IS NOT NULL)`),
+  ]
+);
+
+export const timetableLesson = pgTable(
+  "timetable_lesson",
+  {
+    id: text("id").primaryKey(),
+    timetableId: text("timetable_id").notNull().references(() => timetable.id, { onDelete: "cascade" }),
+    groupId: text("group_id").notNull().references(() => teachingGroup.id, { onDelete: "restrict" }),
+    // Its number among the group's lessons of the week (doubles first).
+    seq: integer("seq").notNull(),
+    // 1 = one period, 2 = a double.
+    length: integer("length").notNull().default(1),
+    weekday: integer("weekday"),
+    // The lesson period it starts at (1 = the day's first); null with weekday = unplaced.
+    period: integer("period"),
+    roomId: text("room_id").references(() => room.id, { onDelete: "set null" }),
+    locked: boolean("locked").notNull().default(false),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("timetableLesson_timetableId_idx").on(table.timetableId),
+    index("timetableLesson_groupId_idx").on(table.groupId),
+    uniqueIndex("timetableLesson_group_seq_idx").on(table.timetableId, table.groupId, table.seq),
+    check("timetable_lesson_length", sql`${table.length} IN (1, 2)`),
+    check("timetable_lesson_slot_whole", sql`(${table.weekday} IS NULL) = (${table.period} IS NULL)`),
+    check("timetable_lesson_slot_range", sql`(${table.weekday} IS NULL OR ${table.weekday} BETWEEN 0 AND 6) AND (${table.period} IS NULL OR ${table.period} >= 1)`),
+    check("timetable_lesson_locked_placed", sql`NOT ${table.locked} OR ${table.weekday} IS NOT NULL`),
+  ]
+);
+
+/** Each run of the generator on a draft: what it was given, what it did, and why a lesson stayed unplaced. */
+export const timetableGenerationRun = pgTable(
+  "timetable_generation_run",
+  {
+    id: text("id").primaryKey(),
+    timetableId: text("timetable_id").notNull().references(() => timetable.id, { onDelete: "cascade" }),
+    startedBy: text("started_by").references(() => user.id, { onDelete: "set null" }),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    durationMs: integer("duration_ms").notNull(),
+    // 'applied' | 'stale' (the draft changed while it ran; nothing written)
+    outcome: text("outcome").notNull(),
+    inputHash: text("input_hash").notNull(),
+    outputHash: text("output_hash").notNull(),
+    seed: text("seed").notNull(),
+    iterations: integer("iterations").notNull(),
+    lessons: integer("lessons").notNull(),
+    placed: integer("placed").notNull(),
+    unplaced: integer("unplaced").notNull(),
+    locked: integer("locked").notNull(),
+    measures: jsonb("measures").$type<Record<string, unknown>>().notNull(),
+    explanations: jsonb("explanations").$type<unknown[]>().notNull(),
+  },
+  (table) => [
+    index("timetableGenerationRun_timetableId_idx").on(table.timetableId),
+    check("timetable_generation_run_outcome", sql`${table.outcome} IN ('applied', 'stale')`),
+  ]
+);
+
+/** A teacher away for a day or a range of days (or some periods of one day). */
+export const teacherAbsence = pgTable(
+  "teacher_absence",
+  {
+    id: text("id").primaryKey(),
+    teacherId: text("teacher_id").notNull().references(() => teacher.id, { onDelete: "restrict" }),
+    startsOn: date("starts_on", { mode: "string" }).notNull(),
+    endsOn: date("ends_on", { mode: "string" }).notNull(),
+    // Only these lesson periods (one day only); null = the whole of each day.
+    periods: jsonb("periods").$type<number[] | null>(),
+    // 'sick' | 'personal' | 'training' | 'school_business' | 'other'
+    reason: text("reason").notNull(),
+    note: text("note"),
+    recordedBy: text("recorded_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: text("cancelled_by").references(() => user.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    index("teacherAbsence_teacherId_idx").on(table.teacherId),
+    index("teacherAbsence_dates_idx").on(table.startsOn, table.endsOn),
+    check("teacher_absence_dates_ordered", sql`${table.startsOn} <= ${table.endsOn}`),
+    check("teacher_absence_periods_one_day", sql`${table.periods} IS NULL OR ${table.startsOn} = ${table.endsOn}`),
+    check("teacher_absence_reason_valid", sql`${table.reason} IN ('sick', 'personal', 'training', 'school_business', 'other')`),
+  ]
+);
+
+/**
+ * What happens to one lesson on one date when its teacher is away: another
+ * teacher covers it, or it is cancelled. History is kept: a change removes the
+ * row (status 'removed') and adds a new one.
+ */
+export const coverAssignment = pgTable(
+  "cover_assignment",
+  {
+    id: text("id").primaryKey(),
+    absenceId: text("absence_id").references(() => teacherAbsence.id, { onDelete: "restrict" }),
+    date: date("date", { mode: "string" }).notNull(),
+    timetableId: text("timetable_id").notNull().references(() => timetable.id, { onDelete: "restrict" }),
+    lessonId: text("lesson_id").notNull().references(() => timetableLesson.id, { onDelete: "restrict" }),
+    groupId: text("group_id").notNull().references(() => teachingGroup.id, { onDelete: "restrict" }),
+    originalTeacherId: text("original_teacher_id").references(() => teacher.id, { onDelete: "set null" }),
+    coverTeacherId: text("cover_teacher_id").references(() => teacher.id, { onDelete: "restrict" }),
+    // 'assigned' | 'cancelled' | 'removed'
+    status: text("status").notNull(),
+    note: text("note"),
+    assignedBy: text("assigned_by").references(() => user.id, { onDelete: "set null" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).defaultNow().notNull(),
+    removedBy: text("removed_by").references(() => user.id, { onDelete: "set null" }),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("coverAssignment_date_idx").on(table.date),
+    index("coverAssignment_coverTeacherId_idx").on(table.coverTeacherId),
+    uniqueIndex("coverAssignment_one_live_idx").on(table.lessonId, table.date).where(sql`status <> 'removed'`),
+    check("cover_assignment_status_valid", sql`${table.status} IN ('assigned', 'cancelled', 'removed')`),
+    check("cover_assignment_teacher", sql`${table.status} <> 'assigned' OR ${table.coverTeacherId} IS NOT NULL`),
+    check("cover_assignment_cancelled_no_teacher", sql`${table.status} <> 'cancelled' OR ${table.coverTeacherId} IS NULL`),
+  ]
+);
+
+/** A user's calendar feed: only the hash of its secret is kept; revoking it ends the feed. */
+export const calendarFeedToken = pgTable(
+  "calendar_feed_token",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("calendarFeedToken_one_live_idx").on(table.userId).where(sql`revoked_at IS NULL`),
+  ]
+);
+
+export const teachingGroupRelations = relations(teachingGroup, ({ one, many }) => ({
+  academicYear: one(academicYear, { fields: [teachingGroup.academicYearId], references: [academicYear.id] }),
+  subject: one(subject, { fields: [teachingGroup.subjectId], references: [subject.id] }),
+  teacher: one(teacher, { fields: [teachingGroup.teacherId], references: [teacher.id] }),
+  section: one(section, { fields: [teachingGroup.sectionId], references: [section.id] }),
+  room: one(room, { fields: [teachingGroup.roomId], references: [room.id] }),
+  members: many(teachingGroupMember),
+}));
+
+export const teachingGroupMemberRelations = relations(teachingGroupMember, ({ one }) => ({
+  group: one(teachingGroup, { fields: [teachingGroupMember.groupId], references: [teachingGroup.id] }),
+  student: one(user, { fields: [teachingGroupMember.studentId], references: [user.id] }),
+}));
+
+export const timetableRelations = relations(timetable, ({ one, many }) => ({
+  term: one(academicTerm, { fields: [timetable.termId], references: [academicTerm.id] }),
+  academicYear: one(academicYear, { fields: [timetable.academicYearId], references: [academicYear.id] }),
+  lessons: many(timetableLesson),
+}));
+
+export const timetableLessonRelations = relations(timetableLesson, ({ one }) => ({
+  timetable: one(timetable, { fields: [timetableLesson.timetableId], references: [timetable.id] }),
+  group: one(teachingGroup, { fields: [timetableLesson.groupId], references: [teachingGroup.id] }),
+  room: one(room, { fields: [timetableLesson.roomId], references: [room.id] }),
+}));
