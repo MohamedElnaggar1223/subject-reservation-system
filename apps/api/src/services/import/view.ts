@@ -25,7 +25,7 @@ import {
 } from '@repo/db';
 import {
   IMPORT_PROBLEMS, academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, gradeToday, seriesAcademicYearStart,
-  seriesLabel, deriveLevelCode, LEVEL_CODE_READINGS,
+  seriesLabel, seriesOrder, deriveLevelCode, LEVEL_CODE_READINGS,
   type ImportProblemCode, type ImportSeverity, type ImportNoteCode, type ImportRowEditsType, type ImportSettingsType,
   type SelfStudyRule, type CarryForwardReading, type SeriesMode, type LevelCodeReading, type HistoryOutcome,
   type UnitLevel, type ImportRowPlan, type ImportViewProblem, type ImportLineView,
@@ -578,13 +578,16 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       .where(and(inArray(sectionMembership.studentId, knownIds), inArray(sectionMembership.academicYearId, yearIds), isNull(sectionMembership.endedOn))) : [],
     knownIds.length && yearIds.length ? db.select({ studentId: courseEnrolment.studentId, subjectId: courseEnrolment.subjectId, yearId: courseEnrolment.academicYearId })
       .from(courseEnrolment).where(and(inArray(courseEnrolment.studentId, knownIds), inArray(courseEnrolment.academicYearId, yearIds), isNull(courseEnrolment.endedOn))) : [],
-    knownIds.length ? db.select({ studentId: registrationHistory.studentId, fingerprint: registrationHistory.fingerprint, subjectId: registrationHistory.subjectId, outcome: registrationHistory.outcome })
+    knownIds.length ? db.select({
+      studentId: registrationHistory.studentId, fingerprint: registrationHistory.fingerprint, subjectId: registrationHistory.subjectId, outcome: registrationHistory.outcome,
+      sessionType: registrationHistory.sessionType, seriesYear: registrationHistory.seriesYear,
+    })
       .from(registrationHistory).where(inArray(registrationHistory.studentId, knownIds)) : [],
     knownIds.length ? db.select({ studentId: registration.studentId, sessionId: registration.sessionId, subjectId: registration.subjectId })
       .from(registration).where(and(inArray(registration.studentId, knownIds), notInArray(registration.status, ['dropped', 'rejected', 'expired']))) : [],
     knownIds.length ? db.select({ studentId: moneyHistory.studentId, fingerprint: moneyHistory.fingerprint }).from(moneyHistory).where(inArray(moneyHistory.studentId, knownIds)) : [],
     yearIds.length ? db.select({ id: section.id, name: section.name, grade: section.grade, yearId: section.academicYearId }).from(section).where(inArray(section.academicYearId, yearIds)) : [],
-    knownIds.length ? db.select({ studentId: registration.studentId, subjectId: registration.subjectId }).from(registration)
+    knownIds.length ? db.select({ studentId: registration.studentId, subjectId: registration.subjectId, sessionId: registration.sessionId }).from(registration)
       .where(and(inArray(registration.studentId, knownIds), inArray(registration.status, ['confirmed', 'dropped']))) : [],
   ]);
   const linkSet = new Set(links.map((l) => `${l.parentId}|${l.studentId}`));
@@ -593,11 +596,17 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
   const historySet = new Set(historyRows.map((h) => `${h.studentId}|${h.fingerprint}`));
   const liveSet = new Set(liveRegs.map((r) => `${r.studentId}|${r.sessionId}|${r.subjectId}`));
   const moneySet = new Set(moneyRows.map((m) => `${m.studentId}|${m.fingerprint}`));
-  // A subject sat before (V3 §6.9): a confirmed or dropped registration, or a history row that was not only meant.
-  const satBefore = new Set([
-    ...historyRows.filter((h) => h.subjectId && h.outcome !== 'drop_intended').map((h) => `${h.studentId}|${h.subjectId}`),
-    ...priorRegs.map((r) => `${r.studentId}|${r.subjectId}`),
-  ]);
+  // A subject sat before (V3 §6.9), as getRetakeSubjectIds judges it at the commit: a confirmed or dropped
+  // registration in another window, or a history row that was not only meant, of a series before this one.
+  const earliestHistory = new Map<string, number>();
+  for (const h of historyRows) {
+    if (!h.subjectId || h.outcome === 'drop_intended') continue;
+    const k = `${h.studentId}|${h.subjectId}`;
+    earliestHistory.set(k, Math.min(earliestHistory.get(k) ?? Infinity, seriesOrder(h.sessionType, h.seriesYear)));
+  }
+  const satBefore = (studentId: string, subjectId: string, order: number, windowId: string | null) =>
+    (earliestHistory.get(`${studentId}|${subjectId}`) ?? Infinity) < order
+    || priorRegs.some((r) => r.studentId === studentId && r.subjectId === subjectId && r.sessionId !== windowId);
   const sectionByName = new Map(sections.map((s) => [`${s.yearId}|${s.name.toLowerCase()}`, s]));
 
   // 8. Row by row: the mapping's problems and what a commit would do.
@@ -605,11 +614,13 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     const d = w.d as SheetLine;
     return !w.seriesKey || settings.series[w.seriesKey]?.mode !== 'window' || neverLive(d);
   };
-  // In this file: a history row of the same subject makes a live one a retake (it is committed first, in the same transaction).
-  const historyInFile = new Set<string>();
+  // In this file: a history row of the same subject in an earlier series makes a live one a retake (it is
+  // committed first, in the same transaction).
+  const historyInFile = new Map<string, number>();
   for (const w of work) {
-    if (w.decision === 'import' && w.d.kind === 'sheet' && w.studentKey && w.subjectId && isHistory(w) && historyOutcome(w.d) !== 'drop_intended') {
-      historyInFile.add(`${w.studentKey}|${w.subjectId}`);
+    if (w.decision === 'import' && w.d.kind === 'sheet' && w.studentKey && w.subjectId && w.d.series && isHistory(w) && historyOutcome(w.d) !== 'drop_intended') {
+      const k = `${w.studentKey}|${w.subjectId}`;
+      historyInFile.set(k, Math.min(historyInFile.get(k) ?? Infinity, seriesOrder(w.d.series.type, w.d.series.year)));
     }
   }
   const levelBoards = new Map<string, Set<string>>();
@@ -679,7 +690,11 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       mode = 'self_study';
       if (d.selfStudy) w.problems.push({ code: 'self_study_not_taught', severity: 'info', detail: null });
     } else if (d.selfStudy && sub) {
-      const retake = (!!sid && satBefore.has(`${sid}|${sub.id}`)) || (!history && historyInFile.has(`${w.studentKey}|${sub.id}`));
+      // Before which series: the window's for a registration, the row's own for history.
+      const win = history ? undefined : windows.find((x) => x.id === settings.series[w.seriesKey!]?.sessionId);
+      const order = win ? seriesOrder(win.sessionType, win.seriesYear) : d.series ? seriesOrder(d.series.type, d.series.year) : Infinity;
+      const retake = (!!sid && satBefore(sid, sub.id, order, win?.id ?? null))
+        || (!history && (historyInFile.get(`${w.studentKey}|${sub.id}`) ?? Infinity) < order);
       if (retake) w.problems.push({ code: 'self_study_retake', severity: 'info', detail: null });
       else {
         const rule = d.selfStudyChoice ?? (settings.selfStudyOnTaught === 'retake_only' ? null : settings.selfStudyOnTaught);

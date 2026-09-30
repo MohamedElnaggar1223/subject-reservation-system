@@ -559,6 +559,42 @@ describe('F7: the day-one import', () => {
       const made = await apiResponse(desk(two.id));
       expect(made.registrations.map((r) => [Number(r.priceAtRegistration), r.isRetake, r.takenOutsideSchool])).toEqual([[750, true, true]]);
     });
+
+    it('history of the window\'s own series, or of a later one, is not a sitting before it: no retake at the desk or in the review', async () => {
+      const month = type[0]!.toUpperCase() + type.slice(1);
+      const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
+      const three = (cls: string, subject: string, self: 'Yes' | 'No'): Cell[] =>
+        ['Live Three', cls, code(), subject, self === 'Yes' ? '' : 'Mr Live', '01046464646', `live.three${D}`, 'Live Parent Three', `live.parent.three${D}`, '01047474747', 'I confirm my registration', self];
+      // Recorded before the system, as history (the coordinator's default): Subject C in this window's own
+      // series, Subject A in the same month a year later.
+      const past = await stage(coordinator, workbook([
+        { name: 'Same', rows: [[`${month} ${seriesYear} Session`], header, three('11K', 'Live Subject C', 'No')] },
+        { name: 'Later', rows: [[`${month} ${seriesYear + 1} Session`], header, three('12K', 'Live Subject A', 'No')] },
+      ]), 'three.xlsx', 'school_sheet');
+      expect((await putSettings(coordinator, past, { enrol: false, createSections: false })).status).toBe(200);
+      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: past } }));
+      expect(out.result.created).toMatchObject({ students: 1, parents: 1, history: 2, registrations: 0 });
+      // The desk: neither subject was sat before this window's series, so outside school is refused.
+      const st = await one<{ id: string }>(`select id from "user" where email = $1`, [`live.three${D}`]);
+      for (const s of [L.C!, L.A!]) {
+        expect(await refused(officer.api.v1.registrations.desk.$post({
+          json: { studentId: st.id, sessionId: windowId, subjectIds: [s], subjectOptions: { [s]: { takeOutsideSchool: true } } },
+        }))).toEqual({ status: 400, error: 'Subjects can only be taken outside school when retaking or when the school does not offer them' });
+      }
+      // The review agrees, so the commit is not refused where the review said yes: self-study in this window
+      // on C or A (their history is this series or later) and on B (the file's only other row of it is a
+      // later series) is a first attempt.
+      const again = await stage(adm, workbook([
+        { name: 'Again', rows: [[`${month} ${seriesYear} Session`], header, three('11K', 'Live Subject C', 'Yes'), three('11K', 'Live Subject A', 'Yes'), three('11K', 'Live Subject B', 'Yes')] },
+        { name: 'Later', rows: [[`${month} ${seriesYear + 1} Session`], header, three('12K', 'Live Subject B', 'No')] },
+      ]), 'three-again.xlsx', 'school_sheet');
+      expect((await putSettings(adm, again, { series: { [`${type}-${seriesYear}-${level}`]: { mode: 'window', sessionId: windowId } } })).status).toBe(200);
+      const v = await fetchView(adm, again);
+      for (const n of [3, 4, 5]) {
+        expect(rowAt(v, 'Again', n).problems.find((p) => p.code.startsWith('self_study'))).toMatchObject({ code: 'self_study_on_taught', severity: 'error', detail: 'a first attempt' });
+      }
+      await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id: again } }));
+    });
   });
 
   describe("SCL's grade-9 roster at the 9→10 boundary (the CSV template)", () => {

@@ -99,6 +99,18 @@ export function seriesLabel(sessionType: string, seriesYear: number): string {
   return `${SERIES_MONTH[sessionType] ?? sessionType} ${seriesYear}`;
 }
 
+const SERIES_MONTH_INDEX: Record<string, number> = { january: 0, june: 5, october: 9, november: 10 };
+
+/**
+ * A series' place in time: an earlier series has a smaller number. F7: a
+ * subject recorded before the system is a sitting before a window only when
+ * its series is earlier than the window's (the same series is the same
+ * sitting; a later one has not happened yet).
+ */
+export function seriesOrder(sessionType: string, seriesYear: number): number {
+  return seriesYear * 12 + (SERIES_MONTH_INDEX[sessionType] ?? 11);
+}
+
 /**
  * Series a student who has finished grade 12 may still sit (A-12): the
  * October, November and January series of the academic year right after
