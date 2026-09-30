@@ -523,6 +523,30 @@ describe('object-level access between families', () => {
     const bFeed = await (await anon.v1.ical[':token'].$get({ param: { token: bLink.path.split('/').pop()! } })).text();
     expect(bFeed).toContain('OA Physics B');
     expect(bFeed).not.toContain('OA Physics A');
+    // A banned account's link gets nothing, and the admin's ban revokes it (lifting the ban does not bring it back).
+    const bToken = bLink.path.split('/').pop()!;
+    await apiResponse(adm.api.v1.users[':id'].$put({ param: { id: fb.parent.id }, json: { banned: true } }));
+    const bannedFeed = await anon.v1.ical[':token'].$get({ param: { token: bToken } });
+    expect(bannedFeed.status).toBe(404);
+    expect(await bannedFeed.text()).not.toContain('VEVENT');
+    attempts.push(['banned account calendar feed token', String(bannedFeed.status), ''].join('\t'));
+    expect(await one(`select count(*)::int as n from calendar_feed_token where user_id = $1 and revoked_at is null`, [fb.parent.id])).toEqual({ n: 0 });
+    await apiResponse(adm.api.v1.users[':id'].$put({ param: { id: fb.parent.id }, json: { banned: false } }));
+    expect((await anon.v1.ical[':token'].$get({ param: { token: bToken } })).status).toBe(404);
+    // A ban written another way (better-auth's own admin endpoints) is refused on the request itself.
+    const aLink = await apiResponse(fa.student.api.v1.schedule.feed.$post());
+    const aToken = aLink.path.split('/').pop()!;
+    expect((await anon.v1.ical[':token'].$get({ param: { token: aToken } })).status).toBe(200);
+    await sql(`update "user" set banned = true, ban_expires = null where id = $1`, [fa.studentId]);
+    const bannedByAuth = await anon.v1.ical[':token'].$get({ param: { token: aToken } });
+    expect(bannedByAuth.status).toBe(404);
+    attempts.push(['account banned outside the admin form: calendar feed', String(bannedByAuth.status), ''].join('\t'));
+    await sql(`update "user" set banned = false where id = $1`, [fa.studentId]);
+    // A deactivated teacher record: its teacher's link follows no teaching.
+    const cLink = await apiResponse(tc.api.v1.schedule.feed.$post());
+    await apiResponse(adm.api.v1.teachers[':id'].$delete({ param: { id: tcId } }));
+    expect((await anon.v1.ical[':token'].$get({ param: { token: cLink.path.split('/').pop()! } })).status).toBe(404);
+    await sql(`update teacher set is_active = true where id = $1`, [tcId]);
     expect(await covers()).toEqual(before);
   });
 

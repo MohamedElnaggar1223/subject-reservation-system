@@ -117,7 +117,9 @@ export async function publishedClashesFor(executor: Executor, persons: { student
           if (la.period! > lb.period! + lb.length - 1 || lb.period! > la.period! + la.length - 1) continue;
           const days = weekdayDates(wa, wb, la.weekday!);
           if (!days) continue;
+          // The key by lesson id; the sentence names the groups in alphabetical order.
           const [x, y] = [la, lb].sort((m, n) => m.id.localeCompare(n.id)) as [typeof la, typeof lb];
+          const [first, second] = [la, lb].sort((m, n) => m.groupName.localeCompare(n.groupName, 'en', { numeric: true }) || m.id.localeCompare(n.id)) as [typeof la, typeof lb];
           const key = `${kind}|${personId}|${w.id}|${x.id}|${y.id}`;
           const prev = found.get(key);
           if (prev && prev.fromDate <= days[0]) continue;
@@ -128,8 +130,8 @@ export async function publishedClashesFor(executor: Executor, persons: { student
             lessonAId: x.id, lessonBId: y.id, groupA: x.groupName, groupB: y.groupName, weekday: la.weekday!, period: Math.max(la.period!, lb.period!),
             fromDate: days[0], toDate: days[1],
             message: kind === 'students_busy'
-              ? `${person} would be in ${x.groupName} and ${y.groupName} at ${slot} from ${readableDate(days[0])} (${w.name})`
-              : `${person} would teach ${x.groupName} and ${y.groupName} at ${slot} from ${readableDate(days[0])} (${w.name})`,
+              ? `${person} would be in ${first.groupName} and ${second.groupName} at ${slot} from ${readableDate(days[0])} (${w.name})`
+              : `${person} would teach ${first.groupName} and ${second.groupName} at ${slot} from ${readableDate(days[0])} (${w.name})`,
           });
         }
       }

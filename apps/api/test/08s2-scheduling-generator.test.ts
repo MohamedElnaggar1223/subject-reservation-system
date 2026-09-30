@@ -261,6 +261,45 @@ describe('F1: the timetable generator at the school’s size', () => {
     expect((await load(draftD)).engine.lessons).toHaveLength(96);
   }, 60_000);
 
+  it('an infeasible school-sized input on the full budget: within 30 seconds, on a worker thread — the API answers while it searches — and what cannot go is explained', async () => {
+    // The Maths teacher away four days of five: fifteen lessons for the seven periods of a Thursday (six at most a day).
+    const maths = teacherIds[2]!;
+    const rules = (unavailable: { weekday: number; period: null }[]) => apiResponse(coordinator.api.v1.scheduling.rules.teachers[':teacherId'].$put({
+      param: { teacherId: maths }, json: { academicYearId: yearId, maxPerDay: 6, maxPerWeek: 25, unavailable },
+    }));
+    await rules([0, 1, 2, 3].map((weekday) => ({ weekday, period: null })));
+    const draft = (await apiResponse(coordinator.api.v1.timetables.$post({ json: { termId, name: 'Generated, infeasible' } }))).id;
+    try {
+      const started = Date.now();
+      let done = false;
+      const running = generate(draft).then((r) => { done = true; return r; });
+      // While it searches, the API answers other requests.
+      const pings: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const t0 = Date.now();
+        expect((await coordinator.api.v1.timetables.$get({ query: { termId } })).status).toBe(200);
+        pings.push(Date.now() - t0);
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const stillRunning = !done;
+      const run = await apiResponse(running);
+      const elapsed = Date.now() - started;
+      console.info(`[08s2] infeasible: ${run.stats.placed} placed, ${run.stats.unplaced} unplaced in ${run.durationMs} ms (request ${elapsed} ms); the API answered in ${pings.join(', ')} ms meanwhile`);
+      expect(stillRunning).toBe(true);
+      expect(Math.max(...pings)).toBeLessThan(1000);
+      expect(run.stats.iterations).toBe(Math.min(4_000_000, Math.max(400_000, run.stats.lessons * 40_000)));
+      expect(elapsed).toBeLessThan(30_000);
+      // Seven periods on Thursday, six of them at most (the teacher's daily limit): nine of the fifteen cannot go.
+      expect(run.stats.unplaced).toBe(9);
+      expect(run.unplaced.every((u) => u.groupName.startsWith('Maths') && u.cause === 'impossible')).toBe(true);
+      expect(run.unplaced[0]!.reasons).toContainEqual(expect.stringMatching(/ has 15 periods to teach but is available for 7$/));
+      expect(run.unplaced[0]!.summary).toMatch(/^Maths \d+, lesson \d+ cannot be placed: /);
+    } finally {
+      await rules([]);
+      await apiResponse(coordinator.api.v1.timetables[':id'].$delete({ param: { id: draft } }));
+    }
+  }, 60_000);
+
   it('the generator refuses a published timetable and a year with no bell schedule', async () => {
     await apiResponse(coordinator.api.v1.timetables[':id'].publish.$post({ param: { id: draftA }, json: { effectiveFrom: `${Y}-09-06` } }));
     expect((await refused(generate(draftA))).error).toBe('A published timetable does not change — make a new draft from it');

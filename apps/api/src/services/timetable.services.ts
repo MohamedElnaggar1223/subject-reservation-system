@@ -73,7 +73,7 @@ export async function gridOfYear(academicYearId: string, executor: Executor = db
  * shows: groups with their subject, teacher, students and sections; the
  * teachers' and rooms' rules; the students.
  */
-export async function loadTimetableModel(timetableId: string, executor: Executor = db) {
+export async function loadTimetableModel(timetableId: string, executor: Executor = db, opts: { from?: string } = {}) {
   const tt = await timetableOrThrow(timetableId, executor);
   const term = await termOf(tt.termId, executor);
   const [year] = await executor.select().from(academicYear).where(eq(academicYear.id, tt.academicYearId));
@@ -84,7 +84,7 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
   // that takes effect later, from that day. Each group's teacher is the one teaching it then.
   const today = todayAtSchool();
   const inTerm = today < term.startsOn ? term.startsOn : today > term.endsOn ? term.endsOn : today;
-  const asOf = tt.effectiveFrom && tt.effectiveFrom > inTerm ? tt.effectiveFrom : inTerm;
+  const asOf = opts.from ?? (tt.effectiveFrom && tt.effectiveFrom > inTerm ? tt.effectiveFrom : inTerm);
   const teacherOn = await teachersOn(groupIds, asOf, executor);
   const rawGroups = groupIds.length
     ? await executor.select({
@@ -102,14 +102,16 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
     const teacherId = teacherOn.has(x.g.id) ? teacherOn.get(x.g.id)! : null;
     return { ...x, g: { ...x.g, teacherId }, teacherName: teachers.find((t) => t.id === teacherId)?.name ?? null };
   });
-  const members = await groupMembersBetween(groupIds, term.startsOn, term.endsOn, executor);
+  // Who is in each group from that day to the end of the term: a student who left a group
+  // before the version can take effect is no longer in it (nor in the clashes it is judged by).
+  const members = await groupMembersBetween(groupIds, asOf, term.endsOn, executor);
   const studentIds = [...new Set(members.map((m) => m.studentId))];
   const students = studentIds.length
     ? await executor.select({ id: user.id, name: user.name, studentCode: user.studentId }).from(user).where(inArray(user.id, studentIds)).orderBy(asc(user.name))
     : [];
   // Each student's section during the term: the last one they are in (F0a's single reading, sectionsBetween).
   const sectionOf = new Map<string, { id: string; name: string }>();
-  for (const r of await sectionsBetween(studentIds, term.startsOn, term.endsOn, executor)) {
+  for (const r of await sectionsBetween(studentIds, asOf, term.endsOn, executor)) {
     if (r.academicYearId === tt.academicYearId) sectionOf.set(r.studentId, { id: r.sectionId, name: r.sectionName });
   }
   const limits = teacherIds.length
@@ -469,7 +471,8 @@ export async function publishTimetable(id: string, data: PublishTimetableType, a
     if (data.effectiveFrom < today) {
       throw new SchedulingError(`A timetable takes effect today or later (today is ${readableDate(today)}): what has been taught is not rewritten`);
     }
-    const model = await loadTimetableModel(id, tx);
+    // Judged from the day it takes effect: who is in each group then and after.
+    const model = await loadTimetableModel(id, tx, { from: data.effectiveFrom });
     const { clashes, unplaced } = evaluate(model.input);
     if (clashes.length) {
       throw new SchedulingError(`Resolve the clashes before publishing (${clashes.length}): ${clashes.slice(0, 3).map((c) => c.message).join('; ')}${clashes.length > 3 ? '; …' : ''}`, 409);
