@@ -60,6 +60,17 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
         'calendar.schoolWeekdays': true,
         // F0b: what "A.S./A.2." marks is the coordinator's answer (IS-01).
         'catalogue.levelCodeReading': true,
+        // F2: the leave policy is the coordinator's, except who approves (the admin's).
+        'leave.sameDayCutoff': true,
+        'leave.noticeMinutes': true,
+        'leave.aloneGrades': true,
+        'leave.reasonCategories': true,
+        'leave.limitPerTerm': true,
+        'leave.familyRules': true,
+        'leave.approverRoles': false,
+        'leave.autoApprove': true,
+        'leave.noShowGraceMinutes': true,
+        'leave.lateReturnGraceMinutes': true,
       });
     });
 

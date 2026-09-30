@@ -906,6 +906,9 @@ export async function studentLeaveRecord(studentId: string, viewer: Viewer) {
     // Every restriction, ended ones included (the record keeps them), for the coordinator and the admin.
     restrictions: custody ? await shapeRestrictions(allRestrictions) : [],
     canDecide: isApprover(viewer.role, policy),
+    // What a staff request form needs.
+    policy: { reasons: policy.reasons, aloneGrades: policy.aloneGrades, cutoff: policy.cutoff, noticeMinutes: policy.noticeMinutes },
+    today,
   };
 }
 
