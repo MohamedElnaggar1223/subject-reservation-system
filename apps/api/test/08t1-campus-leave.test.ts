@@ -360,7 +360,8 @@ describe('F2: campus leave', () => {
     const onSami = await apiResponse(coordinator.api.v1.leave.restrictions.$post({ json: { studentId: H.studentId, personName: 'Sami Uncle', relation: 'Uncle', idNumber: '28501011111111', note: 'Family court order 12/2026' } }));
     expect(onSami.matchingCollectors).toEqual([{ id: sami.id, name: 'Sami Uncle', relation: 'Uncle', status: 'approved' }]);
     await apiResponse(coordinator.api.v1.leave.restrictions.$post({ json: { studentId: H.studentId, personName: 'Karim Neighbour', note: "The mother's written instruction" } }));
-    await apiResponse(coordinator.api.v1.leave.restrictions.$post({ json: { studentId: H.studentId, personName: 'Parent lv-hf', relation: 'Father', restrictedUserId: F.parent.id, note: 'Court order: the mother has sole custody' } }));
+    // The father's legal name differs from his account's: only the account ties him to it.
+    await apiResponse(coordinator.api.v1.leave.restrictions.$post({ json: { studentId: H.studentId, personName: 'Hisham Fawzy', relation: 'Father', restrictedUserId: F.parent.id, note: 'Court order: the mother has sole custody' } }));
     await audited([onSami.restriction.id], ['CUSTODY_RESTRICTION_RECORDED']);
 
     // A pending collector the restriction names cannot be approved; the family cannot add one it names.
@@ -381,14 +382,14 @@ describe('F2: campus leave', () => {
     expect(pending.warnings).toEqual([]);
     const item = (await apiResponse(coordinator.api.v1.leave.queue.$get())).requests.find((r) => r.id === pending.leaves[0]!.id)!;
     expect(item.warnings.map((w) => w.code)).toEqual(['custody_on_file']);
-    expect(item.custody.map((c) => c.personName).sort()).toEqual(['Karim Neighbour', 'Parent lv-hf', 'Sami Uncle']);
+    expect(item.custody.map((c) => c.personName).sort()).toEqual(['Hisham Fawzy', 'Karim Neighbour', 'Sami Uncle']);
     expect((await apiResponse(H.parent.api.v1.leave.requests[':id'].$get({ param: { id: pending.leaves[0]!.id } }))).warnings).toEqual([]);
 
     // Today at the gate: the list shows who may not collect; each such attempt is refused and alerted.
     const today = await apiResponse(request(coordinator, { studentId: H.studentId, date: TODAY, leaveTime: '08:00', returning: false, reasonCategory: 'family', collector: { kind: 'parent', parentId: H.parent.id }, approveNow: true }));
     const hLeave = today.leaves[0]!.id;
     const onList = (await apiResponse(gate.api.v1.leave.gate.today.$get())).leaves.find((l) => l.id === hLeave)!;
-    expect(onList.custody.map((c) => [c.personName, c.idNumber]).sort()).toEqual([['Karim Neighbour', null], ['Parent lv-hf', null], ['Sami Uncle', '28501011111111']]);
+    expect(onList.custody.map((c) => [c.personName, c.idNumber]).sort()).toEqual([['Hisham Fawzy', null], ['Karim Neighbour', null], ['Sami Uncle', '28501011111111']]);
     expect(onList.authorised.parents.map((p) => p.name)).toEqual(['Parent lv-h']);
     const alertsBefore = (await notificationsFor('coordinator.lv@test.local', 'LEAVE_CUSTODY_ALERT')).length;
     const checkOut = (collectedBy: Parameters<Client['api']['v1']['leave']['gate'][':id']['check-out']['$post']>[0]['json']['collectedBy']) =>
@@ -414,7 +415,7 @@ describe('F2: campus leave', () => {
     const ended = await apiResponse(coordinator.api.v1.leave.restrictions[':id'].end.$post({ param: { id: onSami.restriction.id }, json: { reason: 'Order lifted on appeal' } }));
     expect(ended).toMatchObject({ endReason: 'Order lifted on appeal', endedBy: 'coordinator lv' });
     expect((await apiResponse(coordinator.api.v1.leave.restrictions.$get({ query: { studentId: H.studentId } }))).map((r) => [r.personName, !!r.endedAt]))
-      .toEqual([['Sami Uncle', true], ['Karim Neighbour', false], ['Parent lv-hf', false]]);
+      .toEqual([['Sami Uncle', true], ['Karim Neighbour', false], ['Hisham Fawzy', false]]);
   });
 
   // ─── The gate ──────────────────────────────────────────────────────────────

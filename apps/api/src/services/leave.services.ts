@@ -545,6 +545,17 @@ async function requireApprover(viewer: Viewer) {
   return policy;
 }
 
+/**
+ * A decision on a whole series takes the series' row first, so two people
+ * acting on two dates of one series at once queue there instead of each
+ * holding one date and waiting for the other's (a deadlock).
+ */
+async function lockSeriesFirst(tx: Tx, id: string, series: boolean | undefined) {
+  if (!series) return;
+  const [r] = await tx.select({ seriesId: leaveRequest.seriesId }).from(leaveRequest).where(eq(leaveRequest.id, id));
+  if (r?.seriesId) await tx.select({ id: leaveSeries.id }).from(leaveSeries).where(eq(leaveSeries.id, r.seriesId)).for('update');
+}
+
 /** The requests a decision applies to: this one, or every one of its series still waiting from today on. */
 async function targetsOf(tx: Tx, r: LeaveRow, series: boolean | undefined, statuses: LeaveStatus[]): Promise<LeaveRow[]> {
   if (!series || !r.seriesId) return [r];
@@ -561,6 +572,7 @@ export async function approveLeave(id: string, input: ApproveLeaveType, viewer: 
   const now = new Date();
   const today = schoolNow(now).date;
   const done = await db.transaction(async (tx) => {
+    await lockSeriesFirst(tx, id, input.series);
     const [r] = await tx.select().from(leaveRequest).where(eq(leaveRequest.id, id)).for('update');
     if (!r) throw new LeaveError('Leave request not found', 404);
     if (r.status !== 'pending') throw new LeaveError(notWaiting(r, await namesOf([r.cancelledBy])), 409);
@@ -605,6 +617,7 @@ export async function rejectLeave(id: string, input: RejectLeaveType, viewer: Vi
   await leaveForViewer(id, viewer);
   const now = new Date();
   const done = await db.transaction(async (tx) => {
+    await lockSeriesFirst(tx, id, input.series);
     const [r] = await tx.select().from(leaveRequest).where(eq(leaveRequest.id, id)).for('update');
     if (!r) throw new LeaveError('Leave request not found', 404);
     if (r.status !== 'pending') throw new LeaveError(notWaiting(r, await namesOf([r.cancelledBy])), 409);
@@ -642,6 +655,7 @@ export async function cancelLeave(id: string, input: CancelLeaveType, viewer: Vi
   const now = new Date();
   const today = schoolNow(now).date;
   const done = await db.transaction(async (tx) => {
+    await lockSeriesFirst(tx, r0.id, input.series);
     const [r] = await tx.select().from(leaveRequest).where(eq(leaveRequest.id, r0.id)).for('update');
     if (!r) throw new LeaveError('Leave request not found', 404);
     if (r.status !== 'pending' && r.status !== 'approved') {

@@ -14,7 +14,8 @@ import {
  *   leave's row lock held from the test), and unforced;
  * - check-out and cancel at the same moment, in both orders;
  * - two gate staff checking one student out; two approvers approving one request; two
- *   requests for one student at once (the second, overlapping, refused);
+ *   requests for one student at once (the second, overlapping, refused); two approvers
+ *   approving one weekly request from two of its dates (they queue on the series);
  * - a no-show flagged once, and a late return flagged once, by two scheduler
  *   instances at the same tick; a later tick does nothing; the family is told once.
  *
@@ -69,7 +70,7 @@ describe('F2: races and the scheduler', () => {
     gate1 = await staff(adm, 'gate', 'lvr1');
     gate2 = await staff(adm, 'gate', 'lvr2');
     const officer = await staff(adm, 'finance_officer', 'lvr');
-    for (const k of ['a1', 'a2', 'sw', 'c1', 'c2', 'g2', 'ap', 'ns', 'lr', 'ov']) fams[k] = await onboard(officer, `lvr-${k}`, 11);
+    for (const k of ['a1', 'a2', 'sw', 'c1', 'c2', 'g2', 'ap', 'ns', 'lr', 'ov', 'sr']) fams[k] = await onboard(officer, `lvr-${k}`, 11);
     await makeTodayASchoolDay(coordinator);
     ({ flagLeaveExceptions: flag } = await import('../src/services/leave-jobs.services'));
     ({ cairoInstant: cairo } = await import('../src/services/scheduling-shared.services'));
@@ -174,6 +175,28 @@ describe('F2: races and the scheduler', () => {
     expect([a.status, b.status]).toEqual([201, 409]);
     expect(((await b.json()) as { error: string }).error).toBe('Student lvr-ov already has a leave that day from 09:00 (waiting for approval)');
     expect((await sql(`select leave_time from leave_request where student_id = $1`, [f.studentId])).map((r) => r.leave_time)).toEqual(['09:00']);
+  });
+
+  it('two approvers approve one weekly request from two of its dates at once: they queue on the series, one approves every date, the other is told', async () => {
+    const f = fams.sr!;
+    const made = await apiResponse(f.parent.api.v1.leave.requests.$post({ json: {
+      studentId: f.studentId, date: FAR, leaveTime: '09:00', returning: false, reasonCategory: 'family', collector: { kind: 'parent', parentId: f.parent.id },
+      repeat: { until: new Date(new Date(`${FAR}T12:00:00Z`).getTime() + 28 * 86_400_000).toISOString().slice(0, 10), weekdays: [new Date(`${FAR}T12:00:00Z`).getUTCDay()] },
+    } }));
+    expect(made.leaves).toHaveLength(5);
+    const seriesId = made.leaves[0]!.seriesId!;
+    const whole = (who: Client, id: string) => who.api.v1.leave.requests[':id'].approve.$post({ param: { id }, json: { series: true } });
+    const release = await holdRowLock('leave_series', seriesId);
+    const a = whole(coordinator, made.leaves[0]!.id);
+    await lockWaiters(1);
+    const b = whole(coordinator2, made.leaves[3]!.id);
+    await lockWaiters(2);
+    await release();
+    const [x, y] = await Promise.all([a, b]);
+    expect([x.status, y.status]).toEqual([200, 409]);
+    expect(((await x.json()) as { data: { approved: number } }).data.approved).toBe(5);
+    expect(((await y.json()) as { error: string }).error).toBe('This request is already approved');
+    expect((await sql(`select distinct status from leave_request where series_id = $1`, [seriesId])).map((r) => r.status)).toEqual(['approved']);
   });
 
   it('two approvers approve one request at once: one approval, the other told it is already approved', async () => {
