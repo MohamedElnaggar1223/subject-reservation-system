@@ -143,7 +143,10 @@ export default function ReviewClient({ id, isAdmin }: { id: string; isAdmin: boo
         {v.notes.length > 0 && (
           <details className="rounded-xl border border-border bg-card px-4 py-2 text-sm">
             <summary className="cursor-pointer font-medium text-foreground">
-              <span>About this file</span>: <span className="font-normal text-muted-foreground">{v.notes.map((n) => noteTitle(n.code)).join(' · ')}</span>
+              <span>About this file</span>:{' '}
+              {v.notes.map((n, i) => (
+                <span key={`${n.code}-${i}`} className="font-normal text-muted-foreground">{i > 0 && ' · '}<span>{noteTitle(n.code)}</span></span>
+              ))}
             </summary>
             <ul className="mt-2 space-y-2">
               {v.notes.map((n, i) => (

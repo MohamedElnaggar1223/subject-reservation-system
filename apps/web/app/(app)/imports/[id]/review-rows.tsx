@@ -134,7 +134,7 @@ export function RowsTab({ id, v, editable, onEdit }: { id: string; v: ImportView
             <span role="columnheader">Series</span>
             <span role="columnheader">Will make</span>
             <span role="columnheader">Problems</span>
-            <span role="columnheader"><span className="sr-only">Open</span></span>
+            <span role="columnheader"><span className="sr-only">Open line</span></span>
           </div>
           <VirtualList
             count={rows.length}
@@ -175,13 +175,13 @@ export function RowsTab({ id, v, editable, onEdit }: { id: string; v: ImportView
                     {visible.slice(0, 2).map((p) => <ProblemChip key={p.code} p={p} compact />)}
                     {visible.length > 2 && <span className="text-xs text-muted-foreground">+<span className="tabular-nums">{visible.length - 2}</span></span>}
                   </span>
-                  <span role="cell"><Button size="sm" variant="ghost" onClick={() => onEdit(r.id)}>Open</Button></span>
+                  <span role="cell"><Button size="sm" variant="ghost" onClick={() => onEdit(r.id)}>Open line</Button></span>
                 </div>
               );
             }}
           />
           <p className="px-3 py-2 text-xs text-muted-foreground">
-            <span className="tabular-nums">{rows.length}</span> <span>rows</span> · <span>arrow keys move, Enter opens</span>
+            <span className="tabular-nums">{rows.length}</span> <span>lines</span> · <span>arrow keys move, Enter opens</span>
           </p>
         </div>
       )}

@@ -187,7 +187,7 @@ function PersonCard({ id, v, p, editable, onEdit }: { id: string; v: ImportView;
 
       {myRows.length > 0 && (
         <details className="mt-2 text-sm">
-          <summary className="cursor-pointer text-muted-foreground"><span className="tabular-nums">{myRows.length}</span> <span>{myRows.length === 1 ? 'row' : 'rows'}</span></summary>
+          <summary className="cursor-pointer text-muted-foreground"><span className="tabular-nums">{myRows.length}</span> <span>{myRows.length === 1 ? 'line' : 'lines'}</span></summary>
           <ul className="mt-1 divide-y divide-border">
             {myRows.map((r) => {
               const s = rowSummary(r);
@@ -196,7 +196,7 @@ function PersonCard({ id, v, p, editable, onEdit }: { id: string; v: ImportView;
                   <span className="w-28"><LineRef r={r} /></span>
                   <bdi data-i18n-skip="true" className="w-48 truncate">{s.student}</bdi>
                   <bdi data-i18n-skip="true" className="flex-1 truncate text-muted-foreground">{[s.subject, s.code, s.cls].filter(Boolean).join(' · ')}</bdi>
-                  <Button size="sm" variant="ghost" onClick={() => onEdit(r.id)}>Open</Button>
+                  <Button size="sm" variant="ghost" onClick={() => onEdit(r.id)}>Open line</Button>
                 </li>
               );
             })}
@@ -212,7 +212,7 @@ function SplitRow({ name, count, busy, onSplit }: { name: string; count: number;
   return (
     <li className="flex flex-wrap items-center gap-2">
       <bdi data-i18n-skip="true" className="w-44 truncate font-medium">{name}</bdi>
-      <span className="text-muted-foreground">(<span className="tabular-nums">{count}</span> <span>{count === 1 ? 'row' : 'rows'}</span>)</span>
+      <span className="text-muted-foreground">(<span className="tabular-nums">{count}</span> <span>{count === 1 ? 'line' : 'lines'}</span>)</span>
       <input aria-label={`Own email for ${name}`} dir="ltr" data-i18n-skip="true" className={cn(INPUT, 'w-64')} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
       <Button size="sm" variant="outline" disabled={busy || !email.includes('@')} onClick={() => onSplit(email)}>Give them this email</Button>
     </li>

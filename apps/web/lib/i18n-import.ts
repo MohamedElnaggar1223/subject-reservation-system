@@ -81,7 +81,8 @@ export const importArabic: Record<string, string> = {
   'Subject': 'المادة',
   'Series': 'الدورة',
   'Line': 'السطر',
-  'Open': 'افتح',
+  'Open line': 'افتح السطر',
+  'line': 'سطر',
   'Fix': 'صحّح',
   'Close': 'إغلاق',
   'Cancel': 'إلغاء',
@@ -149,7 +150,7 @@ export const importArabic: Record<string, string> = {
   'No problems': 'لا توجد مشكلات',
   'Every row reads cleanly. Check the mapping, then commit.': 'كل الأسطر مقروءة بلا مشكلات. راجع المطابقة ثم اعتمد.',
   'Show all': 'اعرض الكل',
-  'Show these rows': 'اعرض هذه الأسطر',
+  'Show these lines': 'اعرض هذه الأسطر',
   'Settle these on the People and conflicts tab.': 'عالج هذه في تبويب الأشخاص والتعارضات.',
 
   // ── Rows tab ──

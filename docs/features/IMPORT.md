@@ -19,3 +19,12 @@ final.
 
 - 2026-09-30 02:47Z — started on `feature/import` from origin/main e5da650; baseline suite green
   on `igcse_import_test` (22 files, 308 passed, 1 todo).
+- 03:14Z — schema (0041), validations, reader, staging, review, commit, routes (86a524b).
+- 03:24Z — 08n: the three named scenarios and the race (82a2e35).
+- 03:30Z — registrations in a window, SCL roster, money record, authz rows, 05, 09; suite green
+  in local time (23 files, 343 passed) (ea1f744).
+- 03:45Z — the screens: /imports and /imports/:id (7f154bf); driven once end to end in headless
+  Chrome on synthetic data as the coordinator (upload, fixes, split, merge, skip, commit).
+- After a spend-limit stop — Arabic dictionary, compact summary, editor focus (2b25624).
+- Next: tall and Arabic screenshots, a 400+ row check, controls, the real-sheet run, this
+  document in full, gates in local time and UTC, push.

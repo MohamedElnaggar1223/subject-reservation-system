@@ -49,7 +49,7 @@ export function ProblemsTab({ v, onOpenRows, onEdit }: { v: ImportView; onOpenRo
         const isOpen = open === g.code;
         const finding = problemFinding(g.code);
         const count = g.rows.length || g.people.length || g.series.length;
-        const unit = g.rows.length ? (count === 1 ? 'row' : 'rows') : g.people.length ? (count === 1 ? 'person' : 'people') : count === 1 ? 'series' : 'series';
+        const unit = g.rows.length ? (count === 1 ? 'line' : 'lines') : g.people.length ? (count === 1 ? 'person' : 'people') : count === 1 ? 'series' : 'series';
         return (
           <section key={g.code} className="rounded-xl border border-border bg-card shadow-sm">
             <button
@@ -86,7 +86,7 @@ export function ProblemsTab({ v, onOpenRows, onEdit }: { v: ImportView; onOpenRo
                     </ul>
                     <div className="mt-2 flex items-center gap-3">
                       <Button size="sm" variant="ghost" onClick={() => onOpenRows(g.code)}>
-                        {g.rows.length > 8 ? <><span>Show all</span> <span className="tabular-nums">{g.rows.length}</span> <span>rows</span></> : 'Show these rows'}
+                        {g.rows.length > 8 ? <><span>Show all</span> <span className="tabular-nums">{g.rows.length}</span> <span>lines</span></> : 'Show these lines'}
                       </Button>
                     </div>
                   </>

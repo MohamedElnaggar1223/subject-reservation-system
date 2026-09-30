@@ -87,7 +87,7 @@ export function MappingTab({ id, v, editable, isAdmin }: { id: string; v: Import
               <li key={g.key} className="flex flex-wrap items-center gap-3 py-2 text-sm">
                 <span className="w-56">
                   <span className="font-medium text-foreground">{g.label}</span> <span className="text-muted-foreground">·</span> <span>{LEVEL_LABEL[g.level] ?? g.level}</span>
-                  <span className="block text-xs text-muted-foreground"><span>academic year</span> <span>{g.academicYear}</span> · <span className="tabular-nums">{g.rows}</span> <span>rows</span></span>
+                  <span className="block text-xs text-muted-foreground"><span>academic year</span> <span>{g.academicYear}</span> · <span className="tabular-nums">{g.rows}</span> <span>lines</span></span>
                 </span>
                 <select
                   aria-label={`What ${g.label} becomes`}

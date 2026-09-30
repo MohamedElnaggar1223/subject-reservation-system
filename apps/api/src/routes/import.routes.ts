@@ -9,6 +9,7 @@
  */
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { compress } from 'hono/compress';
 import {
   IdParam, CreateImport, ImportSettings, UpdateImportRows, UpdateImportPerson, CreateImportSubjects,
 } from '@repo/validations';
@@ -31,6 +32,8 @@ const actorOf = (c: { get: (k: 'user') => { id: string; role?: string | null } |
 export const importRoutes = new Hono<HonoEnv>()
   .use('*', requireAuth())
   .use('*', requireAcademic())
+  // The review of a school-sized file is about a megabyte of JSON (460 lines: 1.1 MB); gzip takes it to a tenth.
+  .use('*', compress())
 
   /** GET /imports — every import, newest first, with its counts. */
   .get('/', async (c) => {
