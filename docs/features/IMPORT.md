@@ -281,7 +281,17 @@ and control C4 makes it red.
     series has not happened yet.
   - The first version counted any history. The real sheet's re-run showed it: 30 self-study
     lines were called retakes of the history just written for their own series. At the desk that
-    was a half-price retake, reproduced red in 08n first (§8, C13 and C14).
+    was a half-price retake, reproduced red in 08n first (§9, C13 and C14).
+  - **Interim rule (the lead's decision on the review, flag 2): history counts only when its
+    series had already ended when the file was committed.** A series is over once its month is
+    (`seriesEndsOn` / `seriesEndedBy`, the school's day): every board's January, June, October
+    and November papers end within that month, so this is never earlier than the board's last
+    paper. The time is the history row's own creation, which is the family's commit.
+  - The rule applies at the desk, in the commit and in the review alike. November Y history
+    committed on 15 November is not a sitting before a June Y+1 window; committed on 1 December,
+    it is (08n "the interim retake rule", controls C21 and C22).
+  - Whether sheet history, with no payment behind it, may unlock the outside-school price at
+    all is the owner's (§13, question 9; MONEY_AUDIT.md MO-25).
 - `prepareRegistrationInputs(..., executor)`. The import reads inside its family's transaction,
   which holds the teacher links and the history it has just written. Every other caller reads
   committed data, as before.
@@ -398,7 +408,7 @@ minimal xlsx writer, and synthetic sheets with the real sheet's shapes.
 | a sheet with the spike's known problems staged with every problem flagged | "a sheet with the spike's known problems…": tabs read by their headers; one test per IS finding (IS-01 … IS-14); the mapping's suggestions and plan counts; staging changes nothing in the school |
 | a commit creating exactly the reviewed rows | "the review, then a commit…": fix (a typed email, a split, a parent's own email, a class), merge and skip, carry forward read as an AS result, then the commit's exact users, links, sections, enrolments, history, money history and audit counts, each traceable to its line; an imported parent signs in after "Forgot password" |
 | a re-run changing nothing | "a re-run of the same file changes nothing": staged again, the review carries over, everything is found, the commit makes nothing |
-| registrations (the admin's) | an open window suggested; each line checked as the desk would (level, price, board series, eligibility, the school-fee gate for a new family, grade-10 June core subjects); the coordinator refused; the admin's commit makes `pending_payment` registrations in their board series, never paid; a retake of imported history at the outside rate; **history of the window's own series or a later one is not a retake**, at the desk or in the review |
+| registrations (the admin's) | an open window suggested; each line checked as the desk would (level, price, board series, eligibility, the school-fee gate for a new family, grade-10 June core subjects); the coordinator refused; the admin's commit makes `pending_payment` registrations in their board series, never paid; a retake of imported history at the outside rate; **history of the window's own series or a later one is not a retake**, at the desk or in the review; **the interim rule**: November Y history committed before November ended is not a sitting before a June Y+1 window, committed after it is |
 | SCL template | a CSV missing columns refused with what is missing; the cohort that starts grade 10 next year, two parents, the grade-10 section in that year; the SCL id in the audit row |
 | money record | history only; no payment, receipt or balance moves; the same file again adds nothing; the structural check that the commit touches no payment, escrow or receipt table |
 | the race | two staff commit the same staged file while the claim row is held: [200, 409], each family made once (8 users, 4 `IMPORT_FAMILY_COMMITTED`, 1 `IMPORT_COMMITTED`) |
@@ -592,6 +602,10 @@ re-run reads as the first staging.
 7. **The SCL id:** store it on the student as an identifier?
 8. **Invitations:** email every imported family at go-live, or let the desk hand out "Forgot
    password"?
+9. **A retake from sheet history** (a pricing decision; MONEY_AUDIT.md MO-25): may a subject the
+   school's sheet says was sat before the system unlock the outside-school price of a retake,
+   with no payment for that sitting in the system? Until the owner answers, the lead's interim
+   rule holds: only history of a series that had ended when the file was committed counts (§6).
 
 ## 14. Contracts for later features
 

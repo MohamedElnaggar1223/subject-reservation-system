@@ -25,7 +25,7 @@ import {
 } from '@repo/db';
 import {
   IMPORT_PROBLEMS, academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, gradeToday, seriesAcademicYearStart,
-  seriesLabel, seriesOrder, deriveLevelCode, LEVEL_CODE_READINGS,
+  seriesLabel, seriesOrder, seriesEndedBy, deriveLevelCode, LEVEL_CODE_READINGS,
   type ImportProblemCode, type ImportSeverity, type ImportNoteCode, type ImportRowEditsType, type ImportSettingsType,
   type SelfStudyRule, type CarryForwardReading, type SeriesMode, type LevelCodeReading, type HistoryOutcome,
   type UnitLevel, type ImportRowPlan, type ImportViewProblem, type ImportLineView,
@@ -580,7 +580,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       .from(courseEnrolment).where(and(inArray(courseEnrolment.studentId, knownIds), inArray(courseEnrolment.academicYearId, yearIds), isNull(courseEnrolment.endedOn))) : [],
     knownIds.length ? db.select({
       studentId: registrationHistory.studentId, fingerprint: registrationHistory.fingerprint, subjectId: registrationHistory.subjectId, outcome: registrationHistory.outcome,
-      sessionType: registrationHistory.sessionType, seriesYear: registrationHistory.seriesYear,
+      sessionType: registrationHistory.sessionType, seriesYear: registrationHistory.seriesYear, committedAt: registrationHistory.createdAt,
     })
       .from(registrationHistory).where(inArray(registrationHistory.studentId, knownIds)) : [],
     knownIds.length ? db.select({ studentId: registration.studentId, sessionId: registration.sessionId, subjectId: registration.subjectId })
@@ -597,10 +597,11 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
   const liveSet = new Set(liveRegs.map((r) => `${r.studentId}|${r.sessionId}|${r.subjectId}`));
   const moneySet = new Set(moneyRows.map((m) => `${m.studentId}|${m.fingerprint}`));
   // A subject sat before (V3 §6.9), as getRetakeSubjectIds judges it at the commit: a confirmed or dropped
-  // registration in another window, or a history row that was not only meant, of a series before this one.
+  // registration in another window, or a history row that was not only meant, of a series before this one
+  // that had ended when it was committed (the interim rule, review flag 2).
   const earliestHistory = new Map<string, number>();
   for (const h of historyRows) {
-    if (!h.subjectId || h.outcome === 'drop_intended') continue;
+    if (!h.subjectId || h.outcome === 'drop_intended' || !seriesEndedBy(h.sessionType, h.seriesYear, h.committedAt)) continue;
     const k = `${h.studentId}|${h.subjectId}`;
     earliestHistory.set(k, Math.min(earliestHistory.get(k) ?? Infinity, seriesOrder(h.sessionType, h.seriesYear)));
   }
@@ -614,11 +615,13 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     const d = w.d as SheetLine;
     return !w.seriesKey || settings.series[w.seriesKey]?.mode !== 'window' || neverLive(d);
   };
-  // In this file: a history row of the same subject in an earlier series makes a live one a retake (it is
-  // committed first, in the same transaction).
+  // In this file: a history row of the same subject in an earlier series, over by now, makes a live one a
+  // retake (it is committed first, in the same transaction, so it is committed now).
   const historyInFile = new Map<string, number>();
+  const now = new Date();
   for (const w of work) {
-    if (w.decision === 'import' && w.d.kind === 'sheet' && w.studentKey && w.subjectId && w.d.series && isHistory(w) && historyOutcome(w.d) !== 'drop_intended') {
+    if (w.decision === 'import' && w.d.kind === 'sheet' && w.studentKey && w.subjectId && w.d.series && isHistory(w) && historyOutcome(w.d) !== 'drop_intended'
+      && seriesEndedBy(w.d.series.type, w.d.series.year, now)) {
       const k = `${w.studentKey}|${w.subjectId}`;
       historyInFile.set(k, Math.min(historyInFile.get(k) ?? Infinity, seriesOrder(w.d.series.type, w.d.series.year)));
     }

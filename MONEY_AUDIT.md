@@ -272,6 +272,7 @@ The fourth review, of that response (fc1a101), again said "don't merge yet", on 
 | MO-22 | The checkout card, the workbench and the takings times are shown in the browser's local time; the API's sentences use Cairo time. Identical while staff and families are in Egypt. | Accepted |
 | MO-23 | The escrow page's transaction rows and the desk's student summary are hand-typed instead of derived from their fetchers (CLAUDE.md, Hono RPC); this work added fields to the desk's. | Engineering health |
 | MO-24 | A "Transfer found" had no undo. It is the finance admin's alone, asks for the statement's reference and an amount typed from the statement (never more than the payment was for), and a family reference it sets aside cannot be submitted again; a record whose money never arrived had no correction inside the system. | **Decided 28 Sep: a same-day undo while its escrow is unspent — §6b.** Later than that it still needs a database fix |
+| MO-25 | **A retake from imported history (F7).** A subject the day-one import recorded as sat before the system unlocks the outside-school price of a retake (V3 §6.9) with no payment behind it in the system. Interim rule, the lead's decision on the F7 review (30 Sep): an imported history row counts only when its series is earlier than the window's and had already ended when the file was committed (a past sitting, not a current or future one); docs/features/IMPORT.md §6, 08n "the interim retake rule". Whether sheet history may unlock that price at all is asked (IMPORT.md §13). | Owner decision |
 
 ---
 

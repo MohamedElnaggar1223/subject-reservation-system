@@ -611,6 +611,57 @@ describe('F7: the day-one import', () => {
     });
   });
 
+  describe('the interim retake rule: imported history is a sitting only if its series had ended when it was committed', () => {
+    let juneWindow: string, subjectN: string, level: 'igcse' | 'as_level' | 'a_level';
+    const code = () => (level === 'igcse' ? 'O.L.' : level === 'as_level' ? 'A.S.' : 'A.2.');
+    const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
+    const row = (self: 'Yes' | 'No'): Cell[] => ['Nov Hist', '11K', code(), 'Interim Subject N', self === 'Yes' ? '' : 'Mr Live', '01048484848', `nov.hist${D}`, 'Nov Hist Parent', `nov.hist.parent${D}`, '01049494949', 'I confirm my registration', self];
+
+    beforeAll(async () => {
+      // A June window of the academic year Y (the June Y+1 series), at a level no earlier suite holds open.
+      const taken = new Set((await sql<{ k: string }>(`select qualification_level as k from registration_session where status = 'active' and session_type = 'june'`)).map((r) => r.k));
+      const free = (['igcse', 'as_level', 'a_level'] as const).find((l) => !taken.has(l));
+      if (!free) throw new Error('08n needs one level with no open June window');
+      level = free;
+      subjectN = await subject(adm, 'IMP-INT-N', 'Interim Subject N', { course: 1000, registration: 500 }, { qualificationLevel: level });
+      juneWindow = await session(adm, 'June window (interim rule)', 'june', level, { ...openWindow(), activate: true, seriesYear: Y + 1 });
+      // November Y, imported as history by the coordinator.
+      const id = await stage(coordinator, workbook([{ name: 'Nov', rows: [[`Nov. ${Y} Session`], header, row('No')] }]), 'nov-history.xlsx', 'school_sheet');
+      expect((await putSettings(coordinator, id, { enrol: false, createSections: false })).status).toBe(200);
+      expect((await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }))).result.created).toMatchObject({ students: 1, history: 1 });
+    });
+    afterAll(async () => {
+      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: juneWindow }, json: { reason: 'interim rule scenario done: free the pair' } }));
+    });
+
+    /** When the file was committed: the history row's own time. */
+    const committedOn = (at: string) => sql(`update registration_history set created_at = $1 where student_id = (select id from "user" where email = $2)`, [at, `nov.hist${D}`]);
+    const deskOutside = async () => {
+      const st = await one<{ id: string }>(`select id from "user" where email = $1`, [`nov.hist${D}`]);
+      return officer.api.v1.registrations.desk.$post({ json: { studentId: st.id, sessionId: juneWindow, subjectIds: [subjectN], subjectOptions: { [subjectN]: { takeOutsideSchool: true } } } });
+    };
+    const reviewSays = async () => {
+      const id = await stage(adm, workbook([{ name: 'June', rows: [[`June ${Y + 1} Session`], header, row('Yes')] }]), 'june-self.xlsx', 'school_sheet');
+      expect((await putSettings(adm, id, { series: { [`june-${Y + 1}-${level}`]: { mode: 'window', sessionId: juneWindow } }, enrol: false, createSections: false })).status).toBe(200);
+      const code = rowAt(await fetchView(adm, id), 'June', 3).problems.find((p) => p.code.startsWith('self_study'))!.code;
+      await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
+      return code;
+    };
+
+    it('committed while November was still running: not a sitting before June, at the desk or in the review', async () => {
+      await committedOn(`${Y}-11-15T10:00:00Z`);
+      expect(await refused(deskOutside())).toEqual({ status: 400, error: 'Subjects can only be taken outside school when retaking or when the school does not offer them' });
+      expect(await reviewSays()).toBe('self_study_on_taught');
+    });
+
+    it('committed after November had ended: a past sitting, so June is a retake outside school at the outside rate', async () => {
+      await committedOn(`${Y}-12-01T10:00:00Z`);
+      expect(await reviewSays()).toBe('self_study_retake');
+      const made = await apiResponse(deskOutside());
+      expect(made.registrations.map((r) => [Number(r.priceAtRegistration), r.isRetake, r.takenOutsideSchool])).toEqual([[750, true, true]]);
+    });
+  });
+
   describe("SCL's grade-9 roster at the 9→10 boundary (the CSV template)", () => {
     it('a CSV without the template\'s columns is refused with what is missing', async () => {
       const f = await apiResponse(coordinator.api.v1.files.upload.$post({ form: { file: new File([new TextEncoder().encode('name,grade\nA,9\n')], 'wrong.csv', { type: 'text/csv' }), purpose: 'import_file' } }));

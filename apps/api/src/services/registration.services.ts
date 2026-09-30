@@ -47,7 +47,7 @@ import type {
   AdminOverrideApprovalType,
   ListRegistrationsQueryType,
 } from '@repo/validations';
-import { seriesOrder } from '@repo/validations';
+import { seriesOrder, seriesEndedBy } from '@repo/validations';
 import {
   notifyRegistrationRequestReceived,
   notifyRegistrationDecision,
@@ -100,10 +100,14 @@ export async function insertRoutedRegistrations(
  * Subject IDs the student has previously sat (confirmed) or dropped in
  * OTHER sessions — registering one of these again is a retake (V3 §6.9).
  * F7: a registration the school recorded before the system (the day-one
- * import's history, registered or dropped) counts the same way when its
- * series is earlier than this window's — the student sat the subject before,
- * whether or not the system saw it. History of the window's own series is
- * the same sitting, and a later series has not happened yet.
+ * import's history, registered or dropped) counts the same way when it is a
+ * past sitting: its series is earlier than this window's (the window's own
+ * series is the same sitting) AND that series had already ended when the file
+ * was committed (the history row's creation). The second part is the lead's
+ * interim rule (review flag 2) until the owner decides whether history with no
+ * payment behind it may unlock the outside-school price at all: a row for a
+ * series still running or still to come when it was imported is what the
+ * school planned, not what the student sat.
  */
 async function getRetakeSubjectIds(
   studentId: string,
@@ -116,7 +120,10 @@ async function getRetakeSubjectIds(
       ne(registration.sessionId, excludeSessionId),
       inArray(registration.status, ['confirmed', 'dropped']),
     )),
-    executor.select({ subjectId: registrationHistory.subjectId, sessionType: registrationHistory.sessionType, seriesYear: registrationHistory.seriesYear })
+    executor.select({
+      subjectId: registrationHistory.subjectId, sessionType: registrationHistory.sessionType, seriesYear: registrationHistory.seriesYear,
+      committedAt: registrationHistory.createdAt,
+    })
       .from(registrationHistory).where(and(
         eq(registrationHistory.studentId, studentId),
         inArray(registrationHistory.outcome, ['registered', 'dropped']),
@@ -126,7 +133,8 @@ async function getRetakeSubjectIds(
       .from(registrationSession).where(eq(registrationSession.id, excludeSessionId)),
   ]);
   const windowOrder = win ? seriesOrder(win.sessionType, win.seriesYear) : -Infinity;
-  const satBefore = history.filter((h) => seriesOrder(h.sessionType, h.seriesYear) < windowOrder);
+  const satBefore = history.filter((h) =>
+    seriesOrder(h.sessionType, h.seriesYear) < windowOrder && seriesEndedBy(h.sessionType, h.seriesYear, h.committedAt));
   return new Set([...prior.map((r) => r.subjectId), ...satBefore.map((h) => h.subjectId!)]);
 }
 
