@@ -21,6 +21,7 @@ import { getSetting } from './settings.services';
 import { logAction } from './audit.services';
 import { boardNameMap } from './exam-shared';
 import { boardSeriesName } from './series.services';
+import { logger } from '../lib/logger';
 
 const DAY = 86_400_000;
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
@@ -145,6 +146,7 @@ export async function sendDeadlineReminders(now: Date = new Date()) {
   const staff = (await db.select({ id: user.id }).from(user)
     .where(and(inArray(user.role, ['coordinator', 'admin']), or(eq(user.banned, false), isNull(user.banned))))).map((u) => u.id);
   let sent = 0;
+  let failed = 0;
   for (const s of series) {
     for (const field of REMINDED) {
       const date = field === 'entryDeadline' ? (s.entryDeadline ? schoolDateString(s.entryDeadline) : null) : (s[field] as string | null);
@@ -157,22 +159,29 @@ export async function sendDeadlineReminders(now: Date = new Date()) {
       const todo = outstanding(field, stats.get(s.id) ?? {});
       const title = `${LABEL[field]}: ${name} in ${left} day${left === 1 ? '' : 's'}`;
       const body = `${LABEL[field]} for ${name} is on ${date}. ${todo.length ? `Still to do: ${todo.join('; ')}.` : 'Nothing is outstanding.'}`;
-      const claimed = await db.transaction(async (tx) => {
-        const [row] = await tx.insert(examDeadlineReminder).values({ boardSeriesId: s.id, dateField: field, dueOn: date, daysBefore: tier, recipients: staff.length })
-          .onConflictDoNothing().returning({ id: examDeadlineReminder.boardSeriesId });
-        if (!row) return false;
-        if (staff.length) {
-          await tx.insert(notification).values(staff.map((userId) => ({
-            id: randomUUID(), userId, type: 'EXAM_DEADLINE_REMINDER', title, body, data: { boardSeriesId: s.id, field, date, url: '/exams/deadlines' },
-          })));
-        }
-        await logAction(null, 'EXAM_DEADLINE_REMINDED', 'board_series', s.id, null, { field, date, daysBefore: tier, recipients: staff.length, outstanding: todo }, undefined, tx);
-        return true;
-      });
-      if (claimed) sent++;
+      try {
+        const claimed = await db.transaction(async (tx) => {
+          const [row] = await tx.insert(examDeadlineReminder).values({ boardSeriesId: s.id, dateField: field, dueOn: date, daysBefore: tier, recipients: staff.length })
+            .onConflictDoNothing().returning({ id: examDeadlineReminder.boardSeriesId });
+          if (!row) return false;
+          if (staff.length) {
+            await tx.insert(notification).values(staff.map((userId) => ({
+              id: randomUUID(), userId, type: 'EXAM_DEADLINE_REMINDER', title, body, data: { boardSeriesId: s.id, field, date, url: '/exams/deadlines' },
+            })));
+          }
+          await logAction(null, 'EXAM_DEADLINE_REMINDED', 'board_series', s.id, null, { field, date, daysBefore: tier, recipients: staff.length, outstanding: todo }, undefined, tx);
+          return true;
+        });
+        if (claimed) sent++;
+      } catch (err) {
+        // The claim rolled back with its notices: the next tick tries again. One
+        // series' failure does not stop the others.
+        failed++;
+        logger.error(`[exam-deadlines] reminder for ${s.id} ${field} failed:`, err instanceof Error ? err.message : err);
+      }
     }
   }
-  return { sent };
+  return { sent, failed };
 }
 
 
