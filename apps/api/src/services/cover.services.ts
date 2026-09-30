@@ -286,7 +286,8 @@ export async function coverLog(from: string, to: string) {
     .innerJoin(teachingGroup, eq(teachingGroup.id, coverAssignment.groupId))
     .innerJoin(timetableLesson, eq(timetableLesson.id, coverAssignment.lessonId))
     .where(and(gte(coverAssignment.date, from), lte(coverAssignment.date, to)))
-    .orderBy(asc(coverAssignment.date), asc(timetableLesson.period));
+    // A lesson's arrangements on one date in the order they were made (removed, then given again).
+    .orderBy(asc(coverAssignment.date), asc(timetableLesson.period), asc(teachingGroup.name), asc(coverAssignment.assignedAt), asc(coverAssignment.id));
   return rows.map((r) => ({ ...r.c, groupName: r.groupName, period: r.period, length: r.length, originalTeacher: r.original, coverTeacher: r.cover, assignedByName: r.assignedByName }));
 }
 
