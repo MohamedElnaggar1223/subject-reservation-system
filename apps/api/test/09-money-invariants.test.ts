@@ -511,4 +511,53 @@ describe('money invariants over the whole database', () => {
     // There was something to check: 08e holds preregistrations of a student who left.
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'PREREG_HELD_INELIGIBLE'`))[0]?.n)).toBeGreaterThan(0);
   });
+
+  // ─── F4: exam entries (not money, but the hard stop is MO-10's) ─────────────
+
+  it("F4: no entry was made, or sent to the board, after its series' entry deadline (MO-10, A-08)", async () => {
+    const late = await sql(`
+      select e.id, e.created_at, e.submitted_at, s.entry_deadline
+      from exam_entry e join board_series s on s.id = e.board_series_id
+      where s.entry_deadline is not null and (e.created_at > s.entry_deadline or e.submitted_at > s.entry_deadline)`);
+    expect(late).toEqual([]);
+    // There was something to check: 08x1 withdrew an entry after its series' deadline.
+    expect((await sql(`
+      select 1 from exam_entry e join board_series s on s.id = e.board_series_id
+      where e.status = 'withdrawn' and e.withdrawn_at > s.entry_deadline`)).length).toBeGreaterThan(0);
+  });
+
+  it("F4: an entry from a registration is that registration's student's, in its series; a result from an entry is that entry's candidate's, in its series", async () => {
+    expect(await sql(`
+      select e.id from exam_entry e join registration r on r.id = e.registration_id
+      where e.student_id <> r.student_id or e.board_series_id is distinct from r.board_series_id`)).toEqual([]);
+    expect(await sql(`
+      select x.id from exam_result x join exam_entry e on e.id = x.entry_id
+      where x.student_id <> e.student_id or x.board_series_id <> e.board_series_id`)).toEqual([]);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from exam_result where entry_id is not null`))[0]?.n)).toBeGreaterThan(0);
+  });
+
+  it('F4: every withdrawal and every certificate hand-over has exactly one audit row; a certificate is collected once', async () => {
+    expect(await sql(`
+      select e.id from exam_entry e
+      where e.status = 'withdrawn'
+        and (select count(*) from audit_log a where a.entity_id = e.id and a.action = 'EXAM_ENTRY_WITHDRAWN') <> 1`)).toEqual([]);
+    expect(await sql(`
+      select c.id from exam_certificate c
+      where (select count(*) from audit_log a where a.entity_id = c.id and a.action = 'EXAM_CERTIFICATE_COLLECTED') <> (case when c.status = 'collected' then 1 else 0 end)`)).toEqual([]);
+  });
+
+  it('F4: no seat holds two candidates and no candidate has two seats in a sitting; no invigilator is in two rooms of one', async () => {
+    expect(await sql(`select exam_date, session, room_id, seat_label from exam_seat group by 1, 2, 3, 4 having count(*) > 1`)).toEqual([]);
+    expect(await sql(`select exam_date, session, student_id from exam_seat group by 1, 2, 3 having count(*) > 1`)).toEqual([]);
+    expect(await sql(`select exam_date, session, teacher_id from exam_invigilation group by 1, 2, 3 having count(*) > 1`)).toEqual([]);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from exam_seat`))[0]?.n)).toBeGreaterThan(0);
+  });
+
+  it('F4: a national ID or passport number appears in no audit row', async () => {
+    const ids = await sql<{ n: string }>(`select document_number as n from exam_candidate_identity`);
+    expect(ids.length).toBeGreaterThan(0);
+    for (const { n } of ids) {
+      expect(await sql(`select id from audit_log where coalesce(previous_data::text, '') || coalesce(new_data::text, '') like $1`, [`%${n}%`])).toEqual([]);
+    }
+  });
 });

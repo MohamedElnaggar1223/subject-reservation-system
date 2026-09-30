@@ -28,7 +28,11 @@ export async function freeAsPair(): Promise<{ type: 'january' | 'october' | 'nov
   return { type, level };
 }
 
-export async function examWorld(tag: string) {
+/**
+ * `enrol: false` leaves course enrolment (and so this year's academic year)
+ * alone: 05 runs before 08f, which creates this year's academic year itself.
+ */
+export async function examWorld(tag: string, opts: { enrol?: boolean } = {}) {
   const T = tag.toUpperCase();
   const Y = academicYearStartOf();
   const adm = await admin(`x-${tag}`);
@@ -120,11 +124,14 @@ export async function examWorld(tag: string) {
   }
 
   // ─── Who teaches them this year (the forecast grades' teachers) ──────────
-  const years = await apiResponse(coordinator.api.v1.academic.years.$get());
-  const yearId = years.find((y) => y.startYear === Y)?.id
-    ?? (await apiResponse(coordinator.api.v1.academic.years.$post({ json: { startYear: Y, startsOn: `${Y}-09-06`, endsOn: `${Y + 1}-06-25` } }))).id;
-  await apiResponse(coordinator.api.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: families.a.studentId, subjectId: sc, teacherId } }));
-  await apiResponse(coordinator.api.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: families.b.studentId, subjectId: sc, teacherId: teacher2Id } }));
+  let yearId: string | null = null;
+  if (opts.enrol !== false) {
+    const years = await apiResponse(coordinator.api.v1.academic.years.$get());
+    yearId = years.find((y) => y.startYear === Y)?.id
+      ?? (await apiResponse(coordinator.api.v1.academic.years.$post({ json: { startYear: Y, startsOn: `${Y}-09-06`, endsOn: `${Y + 1}-06-25` } }))).id;
+    await apiResponse(coordinator.api.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: families.a.studentId, subjectId: sc, teacherId } }));
+    await apiResponse(coordinator.api.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: families.b.studentId, subjectId: sc, teacherId: teacher2Id } }));
+  }
 
   const close = () => apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: windowId }, json: { reason: `exams ${tag} suite done: free the pair` } }));
 

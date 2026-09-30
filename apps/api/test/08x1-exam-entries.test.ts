@@ -215,9 +215,10 @@ describe('F4: candidates and entries', () => {
     });
 
     it('past the deadline a new entry is refused, and a draft cannot be sent; a withdrawal is allowed with the board\'s fee shown', async () => {
-      // The window closed and the Cambridge deadline passed (as 08i moves them).
+      // The window closed and the Cambridge deadline passed (as 08i moves them) — just
+      // after the last entry was made and sent, as it would in time (09 checks it).
       await sql(`update registration_session set end_date = now() - interval '1 day' where id = $1`, [w.windowId]);
-      await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [w.series.cambridgeNov]);
+      await sql(`update board_series set entry_deadline = (select max(greatest(created_at, coalesce(submitted_at, created_at))) + interval '1 millisecond' from exam_entry where board_series_id = $1) where id = $2`, [w.series.cambridgeNov, w.series.cambridgeNov]);
       const deadline = await one<{ d: string }>(`select entry_deadline as d from board_series where id = $1`, [w.series.cambridgeNov]);
       const when = new Date(deadline.d).toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Cairo' });
       const stop = `The entry deadline for Cambridge International November ${w.Y} (exams xe) (${when}) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)`;
@@ -233,7 +234,7 @@ describe('F4: candidates and entries', () => {
       await sql(`update exam_entry set status = 'draft', withdrawn_at = null, withdrawal_reason = null where id = $1`, [manualDraft]);
       expect(await refused(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [manualDraft] } }))).toEqual({ status: 409, error: stop });
       // …unless it truly went before the deadline: the time it went is recorded.
-      const before = new Date(new Date(deadline.d).getTime() - 60 * 60 * 1000);
+      const before = new Date(new Date(deadline.d).getTime() - 1);
       expect(await apiResponse(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [manualDraft], submittedAt: before } }))).toEqual({ submitted: 1, skipped: 0 });
 
       // A withdrawal after the deadline is allowed, and says what Cambridge does with its fee.
