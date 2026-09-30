@@ -118,10 +118,15 @@ left ("The student already left school at 11:05 — it can no longer be cancelle
 leave's teachers are told the student stays; a waiting one's approvers are told there is nothing to
 approve.
 
+A decision on a whole series (`series: true`) takes the series' row first, so two people acting on
+two dates of one weekly request queue there instead of each holding one date and waiting for the
+other's.
+
 **Races** (08t2): approve and cancel at the same moment, both orders forced by the row lock and ten
 times unforced — always cancelled, and the audit rows say exactly what each response said;
 check-out and cancel, both orders; two gate staff checking one student out; two approvers approving
-one request.
+one request; two approvers approving one weekly request from two of its dates; two requests for one
+student at once (queued on the student's lock: the overlapping second refused).
 
 ## 4. The pass
 
@@ -294,7 +299,7 @@ Screenshots: `.audit/leave-evidence/screens/` (English and `-ar`).
 | File | Proves |
 |---|---|
 | `08t1-campus-leave` | each request path (parent, desk for a family, the school sending a student home) and what is refused (a student, a teacher, the gate; another family's child; a past day; a holiday; a time passed; after the last bell; an unknown reason; an unlinked parent; alone in grade 11; an overlap; the desk's "school" origin); approval with the queue's lessons, teachers, history (and a teacher of an untouched lesson not told), the approver-roles setting, a refusal's reason; a recurring request skipping a holiday, approved as one, cancelled date by date and as one; the warnings (cut-off, notice, limit, exam-only day), refuse mode, auto-approval, alone grades; collectors (waiting, masked, approval before the leave's, a sibling's other parent withdrawing for their child only, desk and coordinator entries, refusal); custody (a matching collector not approved, a family's add refused, a restricted father out of the family, the approver told and the family not, three custody refusals at the gate alerted, an unknown person refused without an alert, the mother collecting, a restriction ended); the gate and the pass (only today's, only what check-out needs, scan, check-out by pass, repeats refused, a student alone back later); passes refused (forged twice, expired, malformed, another day's, replaced, cancelled, each recorded); cancelling (teachers told); history and reports and CSV; `getLeaveCoverage`; a teacher's lessons |
-| `08t2-campus-leave-races` | approve/cancel both orders and ten unforced; check-out/cancel both orders; two gate staff; two approvers; a no-show and a late return each flagged once by two scheduler instances, a later tick nothing, the late family still collecting, the return recorded and F3's late part |
+| `08t2-campus-leave-races` | approve/cancel both orders and ten unforced; check-out/cancel both orders; two gate staff; two approvers; two approvers on one weekly request; two requests for one student; a no-show and a late return each flagged once by two scheduler instances, a later tick nothing, the late family still collecting, the return recorded and F3's late part |
 | `05` F2 case | another family: 404 on the leave, pass, lists, collectors, photos, cancel, request, add, withdraw, and nothing changed; another class: a teacher reads nothing; the gate: today's list only, another day's leave 404 at check-out and return, its pass refused, collectors, restrictions, a student's record, reports, the queue and approval 403, photos only for today's students, never the custody document |
 | `04` | the 26 endpoints for the nine principals |
 | `09c-leave-invariants` | over every row the suite leaves: an audit row per step (requested once; approved, refused, cancelled, out, back, each flag exactly once; a pass version counting its replacements); approved before taken, out before back, never cancelled once taken; no two standing leaves overlapping; whoever collected was entitled then (a linked parent, an approved collector of that student, never a person an active restriction named); a series' dates its own; collectors and restrictions on record |
@@ -303,6 +308,17 @@ Screenshots: `.audit/leave-evidence/screens/` (English and `-ar`).
 Tests reach past the API in three places, each an honest boundary: the scheduler step
 (`flagLeaveExceptions`, as `runPaymentDeadlines` does), `getLeaveCoverage` (F3's in-process
 contract), and `signLeavePass` to make a genuinely signed but expired pass.
+
+**Controls** (`.audit/leave-evidence/controls.py`, logs in `controls/`, one trail row each): every
+guard undone once, its tests red, restored — C1 approval's lock, status check and guarded update; C2
+cancellation's; C3 check-out's state check and guarded update; C4 the no-show claim; C5 the
+late-return claim; C6 custody read at check-out; C7 the pass's signature; C8 its expiry; C9 its
+version; C10 the gate's today-only; C11 a family's own children; C12 a restricted parent outside the
+family; C13 the approver check; C14 a collector approved before the leave; C15 the overlap check; C16
+the gate's photos for today's students only; C17 a collector a custody note matches refused approval;
+C18 refuse mode; C19 the student's request lock; C20 the restriction's account match (first green —
+the father's restriction also matched him by name — so 08t1 now names him by his legal name, and
+red); C21 the series lock.
 
 **Time:** today's scenarios make today a school day whose bells run 00:00–23:59 (`makeTodayASchoolDay`
 in `helpers.ts`), so they run on any day; the one same-day family request is for 23:58 and cannot run
@@ -334,6 +350,8 @@ in the last two minutes before midnight in Cairo. Far dates run in academic year
   grade of that academic year for a later one).
 - **Notices inside the transaction** for every step and every flag, so a flag's notice is sent
   exactly once with its claim.
+- **A series decision locks the series first**, one lock order for everyone who decides a weekly
+  request, so two approvers cannot deadlock on two of its dates.
 
 ## 14. Deferred, and why
 
@@ -381,3 +399,9 @@ in the last two minutes before midnight in Cairo. Far dates run in academic year
 - 04:54Z — the web screens (49ae596).
 - 05:05–05:20Z — the running system built and every screen driven in English and Arabic, phone and
   tablet widths for the gate and the family; fixes committed (56298eb).
+- 05:24Z — suite green in local time at 56298eb (30 files, 376 passed); with `TZ=UTC` red once: a
+  collector's children came back unordered (order fixed in the query, 87fb997).
+- 05:28–05:34Z — controls C1–C21 (C20 first green: 08t1 made to catch it); a series decision locks
+  the series first, with its race (62dd523).
+- 05:40Z — gates green at 62dd523: api and web check-types clean; the suite in local time and with
+  `TZ=UTC`, 30 files, 378 passed, 1 todo each. Pushed `feature/campus-leave`.
