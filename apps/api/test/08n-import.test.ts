@@ -717,24 +717,37 @@ describe('F7: the day-one import', () => {
   });
 
   describe('the catalogue from the review, and a file put aside', () => {
-    it('the admin adds the sheet\'s missing subjects in one step (they carry prices); the coordinator may not', async () => {
+    it('the admin adds the sheet\'s missing subjects in one step (they carry prices; one with no price is added inactive); the coordinator may not', async () => {
       const sheet = workbook([{ name: 'Extra', rows: [
         [`Nov. ${Y} Session`],
         ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Student Email', '', 'Parent Email'],
         ['Extra Child', '11G', 'O.L.', 'Astronomy', `extra${D}`, 'Extra Parent', `extra.parent${D}`],
+        ['Extra Child', '11G', 'O.L.', 'Cosmology', `extra${D}`, 'Extra Parent', `extra.parent${D}`],
       ] }]);
       const id = await stage(adm, sheet, 'extra.xlsx', 'school_sheet');
       let v = await fetchView(adm, id);
-      const s = v.mapping.subjects[0]!;
+      const s = v.mapping.subjects.find((x) => x.subject === 'Astronomy')!;
+      const c = v.mapping.subjects.find((x) => x.subject === 'Cosmology')!;
       expect(s).toMatchObject({ subject: 'Astronomy', levelCode: 'O.L.', subjectId: null, levelSuggested: 'igcse', taughtInSchool: true });
-      const body = { subjects: [{ key: s.key, name: 'Astronomy', code: 'imp-ast', qualificationLevel: 'igcse' as const, council: 'cambridge' as const, isOfferedAtSchool: true, courseFee: 900, registrationFee: 300 }] };
+      const body = { subjects: [
+        { key: s.key, name: 'Astronomy', code: 'imp-ast', qualificationLevel: 'igcse' as const, council: 'cambridge' as const, isOfferedAtSchool: true, courseFee: 900, registrationFee: 300 },
+        { key: c.key, name: 'Cosmology', code: 'imp-cos', qualificationLevel: 'igcse' as const, council: 'cambridge' as const, isOfferedAtSchool: true, courseFee: 0, registrationFee: 0 },
+      ] };
       expect((await refused(coordinator.api.v1.imports[':id'].subjects.$post({ param: { id }, json: body }))).status).toBe(403);
       await apiResponse(adm.api.v1.imports[':id'].subjects.$post({ param: { id }, json: body }));
       v = await fetchView(adm, id);
-      const made = await one<{ id: string; code: string; price: string }>(`select id, code, price_in_school as price from subject where code = 'IMP-AST'`);
-      expect(v.mapping.subjects[0]!.subjectId).toBe(made.id);
-      expect(Number(made.price)).toBe(1200);
+      const made = await one<{ id: string; code: string; price: string; active: boolean }>(`select id, code, price_in_school as price, is_active as active from subject where code = 'IMP-AST'`);
+      const unpriced = await one<{ id: string; price: string; active: boolean }>(`select id, price_in_school as price, is_active as active from subject where code = 'IMP-COS'`);
+      expect(v.mapping.subjects.find((x) => x.subject === 'Astronomy')!.subjectId).toBe(made.id);
+      expect(v.mapping.subjects.find((x) => x.subject === 'Cosmology')!.subjectId).toBe(unpriced.id);
+      expect([Number(made.price), made.active]).toEqual([1200, true]);
+      // No price: added inactive. Its row keeps it as history; no enrolment is made for it, and the review says why.
+      expect([Number(unpriced.price), unpriced.active]).toEqual([0, false]);
+      expect(rowAt(v, 'Extra', 3).plan.enrolment).toBe('create');
+      expect(rowAt(v, 'Extra', 4).plan.enrolment).toBe('none');
+      expect(rowAt(v, 'Extra', 4).problems.find((p) => p.code === 'subject_inactive')).toMatchObject({ severity: 'warning', detail: 'Cosmology: no enrolment until its fees are set and it is turned on' });
       await audited([made.id], ['SUBJECT_CREATED']);
+      await audited([unpriced.id], ['SUBJECT_CREATED']);
       expect(await refused(adm.api.v1.imports[':id'].subjects.$post({ param: { id }, json: body }))).toEqual({
         status: 409, error: 'A subject with the code IMP-AST exists already — map "Astronomy" to it, or choose another code',
       });

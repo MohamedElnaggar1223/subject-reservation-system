@@ -327,7 +327,7 @@ function AddSubjects({ id, v, rows, onDone }: { id: string; v: ImportView; rows:
   return (
     <div className="mt-3 rounded-lg border border-border p-3">
       <p className="mb-2 text-sm text-muted-foreground">
-        Each becomes a registrable row of the catalogue. The board is today's assumption (units and paper sets: Pearson Edexcel IAL; the rest: Cambridge) — change it here or later on the Catalogue. A subject with no price cannot take registrations until its fees are set.
+        Each becomes a registrable row of the catalogue. The board is today's assumption (units and paper sets: Pearson Edexcel IAL; the rest: Cambridge) — change it here or later on the Catalogue. A subject with no price is added inactive: the rows keep it as history, and no one can enrol in it or register for it until the admin sets its fees and turns it on, on Subjects.
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -367,7 +367,7 @@ function AddSubjects({ id, v, rows, onDone }: { id: string; v: ImportView; rows:
           </tbody>
         </table>
       </div>
-      {noPrice > 0 && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400"><span className="tabular-nums">{noPrice}</span> <span>of them have no price yet.</span></p>}
+      {noPrice > 0 && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400"><span className="tabular-nums">{noPrice}</span> <span>of them have no price yet: they are added inactive.</span></p>}
       {add.error && <Notice tone="danger" className="mt-2">{add.error}</Notice>}
       <div className="mt-3 flex gap-2">
         <Button disabled={add.isPending || !items.some((x) => x.include)} onClick={() => add.mutate(undefined, { onSuccess: onDone })}>

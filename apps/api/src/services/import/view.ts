@@ -713,8 +713,9 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     if (settings.enrol && y && sub && seriesYearStart === w.classYear && !neverLive(d)) {
       const cohort = s?.matched?.role === 'student' ? s.matched.cohortYear : s?.cohortYear ?? null;
       const g = gradeInAcademicYear(cohort, y.startYear);
-      if (g !== null && g >= 10 && g <= 12 && !s?.matched?.leftOn && (sub.isActive) && (mode === 'self_study' || sub.isOfferedAtSchool)) {
-        plan.enrolment = sid && enrolSet.has(`${sid}|${sub.id}|${y.id}`) ? 'exists' : 'create';
+      if (g !== null && g >= 10 && g <= 12 && !s?.matched?.leftOn && (mode === 'self_study' || sub.isOfferedAtSchool)) {
+        if (sub.isActive) plan.enrolment = sid && enrolSet.has(`${sid}|${sub.id}|${y.id}`) ? 'exists' : 'create';
+        else w.problems.push({ code: 'subject_inactive', severity: 'warning', detail: `${sub.name}: no enrolment until its fees are set and it is turned on` });
       }
     }
     // The exam registration: history, or awaiting payment in an open window.
@@ -730,7 +731,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
         else {
           if (win.status !== 'active') refusals.push(`${win.name} is not open`);
           if (sub.qualificationLevel !== win.qualificationLevel) refusals.push(`${sub.name} is not at ${win.name}'s level`);
-          if (!sub.isActive) refusals.push(`${sub.name} is no longer offered`);
+          if (!sub.isActive) refusals.push(`${sub.name} is inactive on Subjects`);
           if (sub.courseFee + sub.registrationFee <= 0) refusals.push(`${sub.name} has no price yet — set its fees on Subjects first`);
           if (!refusals.length) {
             const route = await routeRefusal(win.id, sub);

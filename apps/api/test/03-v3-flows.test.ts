@@ -186,5 +186,19 @@ describe('V3 flows', () => {
     expect(money((await one<{ balance: string }>(`select balance from escrow where student_id = $1`, [studentId])).balance)).toBe(1600);
   });
 
+  it('a subject with no price cannot be registered on any path: the student\'s request, the parent\'s direct registration, the desk', async () => {
+    const unpriced = await subject(adm, 'T0000', 'Unpriced (AS)', { course: 0, registration: 0 }, { qualificationLevel: 'a_level' });
+    const sentence = 'Unpriced (AS) has no price yet: the admin sets the fees on Subjects before anyone can register';
+    const before = await sql(`select id from registration where subject_id = $1`, [unpriced]);
+    expect(await refused(student.api.v1.registrations.request.$post({ json: { sessionId: juneA, subjectIds: [unpriced] } }))).toEqual({ status: 400, error: sentence });
+    expect(await refused(parent.api.v1.registrations.direct.$post({ json: { sessionId: juneA, subjectIds: [unpriced], studentId } }))).toEqual({ status: 400, error: sentence });
+    expect(await refused(officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: juneA, subjectIds: [unpriced] } }))).toEqual({ status: 400, error: sentence });
+    expect(await sql(`select id from registration where subject_id = $1`, [unpriced])).toEqual(before);
+    // Once the admin sets its fees, the same request goes through at that price.
+    await apiResponse(adm.api.v1.subjects[':id'].$put({ param: { id: unpriced }, json: { courseFee: 500, registrationFee: 100 } }));
+    const made = await apiResponse(parent.api.v1.registrations.direct.$post({ json: { sessionId: juneA, subjectIds: [unpriced], studentId } }));
+    expect(made.map((r) => [r.status, Number(r.priceAtRegistration)])).toEqual([['pending_payment', 600]]);
+  });
+
   it.todo('RF-09: the registration grade of record updates after a successful remark (currently stays at the pre-remark grade)');
 });

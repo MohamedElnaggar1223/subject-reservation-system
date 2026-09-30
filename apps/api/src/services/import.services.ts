@@ -257,7 +257,11 @@ export async function updateImportPerson(batchId: string, data: UpdateImportPers
   return refreshSummary(batchId);
 }
 
-/** Catalogue rows for the sheet's subjects, mapped at once (the admin's: a subject carries its prices). */
+/**
+ * Catalogue rows for the sheet's subjects, mapped at once (the admin's: a subject carries its prices).
+ * A subject added with no price is added inactive (review flag 1): the rows keep it as history, but
+ * no one can enrol in it or register for it until the admin sets its fees and turns it on.
+ */
 export async function createImportSubjects(batchId: string, data: CreateImportSubjectsType, actor: Actor, ctx?: AuditContext) {
   await db.transaction(async (tx) => {
     const [batch] = await tx.select().from(importBatch).where(eq(importBatch.id, batchId)).for('update');
@@ -275,7 +279,7 @@ export async function createImportSubjects(batchId: string, data: CreateImportSu
       const [made] = await tx.insert(subject).values({
         id, name: s.name.trim(), code, council: s.council, qualificationLevel: s.qualificationLevel,
         courseFee: s.courseFee, registrationFee: s.registrationFee, priceInSchool: s.courseFee + s.registrationFee,
-        isOfferedAtSchool: s.isOfferedAtSchool, isCore: false, isActive: true,
+        isOfferedAtSchool: s.isOfferedAtSchool, isCore: false, isActive: s.courseFee + s.registrationFee > 0,
       }).returning();
       await logAction(actor.id, 'SUBJECT_CREATED', 'subject', id, null, { ...made, via: 'import', batchId }, ctx, tx);
       subjects[s.key] = { subjectId: id };

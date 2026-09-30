@@ -171,6 +171,7 @@ export const IMPORT_PROBLEMS = {
   class_unreadable: { severity: 'error', finding: 'IS-04', title: 'Class & Grade not in the form "11A"', meaning: 'The grade and section cannot be read. Fix it on the row.' },
   grade_out_of_range: { severity: 'error', title: 'Grade outside 9–12', meaning: 'The school’s grades are 10–12 (9: starts grade 10 next year). Fix it on the row.' },
   // Mapping
+  subject_inactive: { severity: 'warning', title: 'The subject is not active', meaning: 'A subject added with no price stays inactive until the admin sets its fees and turns it on, on Subjects: history keeps it, but no enrolment or registration is made for it until then.' },
   subject_unmapped: { severity: 'warning', title: 'Subject not in the catalogue', meaning: 'Map it to a catalogue row (or add it): until then history keeps the sheet’s words, and no enrolment or registration is made for it.' },
   teacher_missing: { severity: 'info', title: 'No teacher named', meaning: 'Enrolled with no teacher yet.' },
   teacher_on_self_study: { severity: 'info', title: 'A teacher named on a self-study row', meaning: 'Self-study is not taught: the teacher is not recorded on it.' },

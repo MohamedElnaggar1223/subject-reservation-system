@@ -164,6 +164,18 @@ export async function prepareRegistrationInputs(
     );
   }
 
+  // A subject with no price is not yet for sale (F7 review flag 1): every path
+  // that registers — the family's request, the parent's direct registration,
+  // the desk, a preregistration, an admin override, the import — stops here.
+  // The catalogue price is what counts: a pricing exception may still bring a
+  // priced subject down to nothing (a scholarship).
+  const unpriced = subjects.filter((s) => s.courseFee + s.registrationFee <= 0);
+  if (unpriced.length > 0) {
+    throw new Error(
+      `${unpriced.map((s) => s.name).join(', ')} ${unpriced.length === 1 ? 'has' : 'have'} no price yet: the admin sets the fees on Subjects before anyone can register`
+    );
+  }
+
   // School-fee gate (D-H): unpaid school fee blocks registration — the fee
   // of the series' academic year at the student's grade in it (F0a).
   const gate = await schoolFeeGateReason(studentId, eligibility);
