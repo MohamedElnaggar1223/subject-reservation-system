@@ -141,7 +141,9 @@ export function withdrawalCharge(
   if (!until) {
     return { refunded: null, sentence: `${board}'s refund date for ${s.name} is not recorded — check the board's rules on the Board series screen.${note}` };
   }
-  if (today <= until) {
+  // The entry deadline is an instant (the hard stop); the board's other dates are whole days.
+  const inTime = rules.withdrawalRefundUntil === 'entry_deadline' ? !pastEntryDeadline(s, at) : today <= until;
+  if (inTime) {
     return { refunded: true, sentence: `Withdrawn on or before ${dateWords(until)}: ${board} refunds the entry fee.${note}` };
   }
   return { refunded: false, sentence: `Withdrawn after ${dateWords(until)}: ${board} keeps the entry fee.${note}` };
