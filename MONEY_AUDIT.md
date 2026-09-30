@@ -294,8 +294,10 @@ The fourth review, of that response (fc1a101), again said "don't merge yet", on 
   (docs/features/CATALOGUE.md). A checkout never spans two deadlines: a family's own checkout
   across series with different deadlines is refused, naming each series to pay separately; the
   desk splits one action into one payment per deadline, each confirmed with its receipts; a
-  deadline change that would split an open checkout is refused (the lead's decision on the F0b
-  review, 30 Sep). When it passes, the sweep closes every payment still open on the series — a transfer
+  deadline change, the admin's move of registrations between series, or a window's first
+  series that would split an open checkout is refused, and the invariant suite checks every
+  open payment's registrations share one deadline (the lead's decisions on the F0b review and
+  re-review, 30 Sep). When it passes, the sweep closes every payment still open on the series — a transfer
   finance never verified included — as a system failure, not a rejection (nobody judged the
   transfer), returns escrow, and tells the family ("Payment Not Completed": if you did
   transfer, bring the bank receipt to the finance desk). It expires every registration still

@@ -41,10 +41,13 @@ export type SessionWindow = {
  *   feeds both, and an October one is refused.
  *
  * Callers with `null`: the request, direct and override registrations and the
- * desk's registration. Callers with the registration's series: payment
- * (checkout, preregistration payment), confirmation, the transfer reference,
- * the close's grace, desk collection. Swaps do not call this: they route the
- * new subject with routeAndCheck, which checks its series' deadline.
+ * desk's registration. Callers with the registration's series: approving a
+ * request, payment (checkout, preregistration payment), confirmation, a
+ * payment that fails or is cancelled (whether its subjects stay payable), desk
+ * collection. Not callers: swaps route the new subject with routeAndCheck,
+ * which checks its series' deadline; the close's grace reads the deadlines of
+ * the checkout's own series (session.services.ts, referenceDueFor), and the
+ * transfer reference is judged by the time the close set (referenceDueAt).
  */
 export async function sessionWindow(
   studentId: string,
