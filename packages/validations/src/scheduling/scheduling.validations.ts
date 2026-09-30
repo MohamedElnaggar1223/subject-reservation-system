@@ -171,7 +171,7 @@ export type LockLessonType = z.infer<typeof LockLesson>;
 
 export const GenerateTimetable = z.object({
   /** Improvement steps; the default suits the school's size. */
-  iterations: z.number().int().min(0).max(2_000_000).optional(),
+  iterations: z.number().int().min(0).max(4_000_000).optional(),
 });
 export type GenerateTimetableType = z.infer<typeof GenerateTimetable>;
 

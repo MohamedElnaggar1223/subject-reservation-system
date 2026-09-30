@@ -30,7 +30,7 @@ import {
 } from './engine';
 
 export type GenerateOptions = {
-  /** Improvement steps (default: 10 000 per lesson, at least 200 000, at most 2 000 000). */
+  /** Improvement steps (default: 40 000 per lesson, at least 400 000, at most 4 000 000). */
   iterations?: number;
   /** The search's seed (default: a hash of the input). */
   seed?: number;
@@ -525,12 +525,15 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
   const construction = measure(toInput(lCell, lRoom));
 
   // ── Improvement ──
-  const iterations = opts.iterations ?? Math.min(2_000_000, Math.max(200_000, L * 10_000));
+  const iterations = opts.iterations ?? Math.min(4_000_000, Math.max(400_000, L * 40_000));
   const movable = [...Array(L).keys()].filter((l) => !lLocked[l]);
   let best = snapshot();
   let bestCost = cost();
   let accepted = 0;
-  const T0 = 30;
+  // Measured on a school-sized input over eight seeds (docs/features/SCHEDULING.md §3): starting
+  // at 10 with 40 000 steps a lesson cut the soft cost by about 38% against 30 and 10 000 (teacher
+  // gaps 7.4 to 2.4 on average), for about four times the time (0.8 s to 3.3 s).
+  const T0 = 10;
   if (movable.length) {
     for (let it = 0; it < iterations; it++) {
       const temp = T0 * (1 - it / iterations) + 0.01;
