@@ -88,7 +88,7 @@ export async function receiveCertificates(data: ReceiveCertificatesType, actorId
     const listed = [...new Map([...awards, ...entries].filter((a) => a.studentId === s).map((a) => [a.code, `${a.code} ${a.title ?? ''}`.trim()])).values()];
     return { studentId: s, name: users.find((u) => u.id === s)!.name, description: listed.length ? `${series.name}: ${listed.join('; ')}` : `${series.name} certificate` };
   });
-  if (!data.commit) return { committed: false, already: existing.length, toReceive: plan };
+  if (!data.commit) return { committed: false, already: existing.length, toReceive: plan, created: 0 };
   const created = await db.transaction(async (tx) => {
     const rows = plan.length
       ? await tx.insert(examCertificate).values(plan.map((p) => ({

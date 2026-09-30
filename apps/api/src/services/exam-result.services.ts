@@ -221,9 +221,10 @@ export async function importResults(data: ImportResultsType, actor: Actor, ctx?:
     candidates: new Set(lines.filter((l) => l.studentId).map((l) => l.studentId)).size,
   });
   const preview = (rows: string[][]) => rows.slice(0, Math.max(mapping.headerRow + 5, 8));
+  const mappingFrom = data.mapping ? 'yours' : saved ? `saved: ${saved.name}` : 'guessed';
   if (!data.commit) {
     const { header, lines } = await planImport(series, source.rows, mapping, db);
-    return { series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom: data.mapping ? 'yours' : saved ? `saved: ${saved.name}` : 'guessed', header, sample: preview(source.rows), lines, summary: summarize(lines), committed: false, importId: null };
+    return { series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom, header, sample: preview(source.rows), lines, summary: summarize(lines), committed: false, importId: null };
   }
   return db.transaction(async (tx) => {
     await advisoryLock(tx, `exam:results:${series.id}`);
@@ -246,7 +247,7 @@ export async function importResults(data: ImportResultsType, actor: Actor, ctx?:
         .onConflictDoUpdate({ target: [examResultMapping.boardCode, examResultMapping.name], set: { mapping, updatedBy: actor.id, updatedAt: new Date() } });
     }
     await logAction(actor.id, 'EXAM_RESULTS_IMPORTED', 'board_series', series.id, null, { importId, sourceName: source.name, ...summary }, ctx, tx);
-    return { series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom: 'yours', header, sample: preview(source.rows), lines, summary, committed: true, importId };
+    return { series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom, header, sample: preview(source.rows), lines, summary, committed: true, importId };
   });
 }
 
