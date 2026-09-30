@@ -10,7 +10,8 @@ import { getQueryClient } from '~/lib/query-client';
 import { getServerApi } from '~/lib/hono-server';
 import { requireStaff } from '~/lib/auth/session';
 import { ACADEMIC_ROLES, apiResponse, hasRole } from '@repo/validations';
-import TodayClient, { TEACHES_KEY } from './today.client';
+import TodayClient from './today.client';
+import { TEACHES_KEY } from './today-keys';
 
 export const metadata = {
   title: 'Today — IGCSE',

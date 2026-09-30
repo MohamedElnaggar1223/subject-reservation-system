@@ -28,6 +28,7 @@ import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { Badge, Notice, TONE_CLASSES } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
 import { MyLessonsToday } from '~/components/teacher-day';
+import { TEACHES_KEY } from './today-keys';
 import {
   DAY_KIND, DateText, fetchSchoolDay, periodBadge, schoolClock, toMinutes,
   type DayKind, type SchoolDay,
@@ -56,8 +57,6 @@ function useSchoolClock() {
   return now;
 }
 
-/** Whether the signed-in account teaches (is linked to a teacher record). */
-export const TEACHES_KEY = ['account', 'teaches'] as const;
 const fetchTeaches = async () => !!(await apiResponse(api.v1.users.me.$get())).teachingAs;
 
 export default function TodayClient({ manages }: { manages: boolean }): React.JSX.Element {

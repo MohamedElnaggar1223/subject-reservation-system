@@ -488,6 +488,13 @@ function translateInner(text: string): string | null {
     [/^(.+) would teach (.+) and (.+) at (Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday) period (\d+) from (.+) \((.+)\)$/,
       (x) => `${x[1]} سيدرّس ${x[2]} و${x[3]} يوم ${DAYS[x[4]!]} في الحصة ${x[5]} بدءًا من ${day(x[6]!)} (${x[7]})`],
     [/^The new teacher's first day must be on or after (.+), when the current teacher began$/, (x) => `يجب أن يكون أول يوم للمعلم الجديد في ${day(x[1]!)} أو بعده، حين بدأ المعلم الحالي`],
+    // What caused a clash gone ahead with.
+    [/^Added to (.+)$/, (x) => `أُضيف إلى ${x[1]}`],
+    [/^Moved to (.+)$/, (x) => `نُقل إلى ${x[1]}`],
+    [/^Merged into (.+)$/, (x) => `دُمج في ${x[1]}`],
+    [/^Split from (.+)$/, (x) => `فُصل من ${x[1]}`],
+    [/^(.+): teacher changed to (.+)$/, (x) => `${x[1]}: تغيّر المعلم إلى ${x[2] === 'nobody' ? 'لا أحد' : x[2]}`],
+    [/^Groups formed from the course enrolment$/, () => 'مجموعات مكوّنة من التسجيل في المقررات'],
     // An arrangement, as the cover and publish notices list it.
     [/^(.+) on (.+), period (\d+) \(was cancelled\)$/, (x) => `${x[1]} في ${day(x[2]!)}، الحصة ${x[3]} (كانت ملغاة)`],
     [/^(.+) on (.+), period (\d+) \(was (.+)\)$/, (x) => `${x[1]} في ${day(x[2]!)}، الحصة ${x[3]} (كان البديل ${x[4]})`],

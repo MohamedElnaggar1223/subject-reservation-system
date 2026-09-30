@@ -53,7 +53,7 @@ export default function PrintClient({ id }: { id: string }): React.JSX.Element {
         <section key={p.id} className={cn('print-block mb-8', i < pages.length - 1 && 'break-after-page')} aria-label={p.title}>
           <div className="mb-2 flex items-baseline justify-between">
             <h2 className="font-display text-xl font-bold text-foreground"><bdi>{p.title}</bdi></h2>
-            <p className="text-sm text-muted-foreground"><bdi>{tt.timetable.name}</bdi> · <bdi>{tt.term.name}</bdi>{tt.timetable.effectiveFrom && <> · <span>from</span> <span>{tt.timetable.effectiveFrom}</span></>}</p>
+            <p className="text-sm text-muted-foreground"><bdi data-i18n-skip="true">{tt.timetable.name}</bdi> · <bdi>{tt.term.name}</bdi>{tt.timetable.effectiveFrom && <> · <span>from</span> <span>{tt.timetable.effectiveFrom}</span></>}</p>
           </div>
           <PrintGrid tt={tt} lessons={p.lessons} kind={kind} />
         </section>

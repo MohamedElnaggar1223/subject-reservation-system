@@ -210,7 +210,7 @@ function TermVersions({ year, term, rows, all }: { year: AcademicYearRow; term: 
                 return (
                   <tr key={v.id} className="border-b border-border last:border-0">
                     <td className="px-5 py-3">
-                      <Link href={`/timetable/versions/${v.id}` as Route} className="font-semibold text-foreground hover:underline"><bdi>{v.name}</bdi></Link>
+                      <Link href={`/timetable/versions/${v.id}` as Route} className="font-semibold text-foreground hover:underline"><bdi data-i18n-skip="true">{v.name}</bdi></Link>
                       {v.publishNote && <span className="block text-xs text-muted-foreground"><bdi>{v.publishNote}</bdi></span>}
                     </td>
                     <td className="px-3 py-3"><Badge tone={state.tone}>{state.label}</Badge></td>

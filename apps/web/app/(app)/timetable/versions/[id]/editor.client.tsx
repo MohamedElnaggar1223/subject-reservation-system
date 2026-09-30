@@ -182,7 +182,7 @@ function EditorBody({ tt }: { tt: Editor }) {
         <div>
           <Link href={`/timetable/versions?year=${tt.academicYear.startYear}` as Route} className="text-sm text-muted-foreground hover:text-foreground print:hidden">← Timetables</Link>
           <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-foreground">
-            <bdi>{tt.timetable.name}</bdi>
+            <bdi data-i18n-skip="true">{tt.timetable.name}</bdi>
           </h1>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <bdi>{tt.term.name}</bdi>
