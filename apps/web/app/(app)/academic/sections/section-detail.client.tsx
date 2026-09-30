@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PublishedClashNotice, isPublishedClash, clashMessage } from '~/components/published-clash';
 import { apiResponse, academicYearShortLabel, academicYearStartOf, gradeLabel, gradeStanding, schoolDateString } from '@repo/validations';
 import { api } from '~/lib/hono';
 import { cn } from '~/lib/utils';
@@ -352,7 +353,7 @@ function AddStudents({ section: s, full, onAdded }: { section: SectionDetailData
   const [includeOthers, setIncludeOthers] = useState(false);
   const [selected, setSelected] = useState<Map<string, string>>(new Map());
   const [startsOn, setStartsOn] = useState('');
-  const [result, setResult] = useState<{ added: number; moved: number; alreadyIn: number } | null>(null);
+  const [result, setResult] = useState<{ added: number; moved: number; alreadyIn: number; clashesAccepted?: string[] } | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -378,22 +379,27 @@ function AddStudents({ section: s, full, onAdded }: { section: SectionDetailData
   const candidates = (data?.students ?? []).filter((c) => !memberIds.has(c.id));
   const placesLeft = s.capacity === null ? null : s.capacity - s.members.length;
 
+  // F1: a move that would put a student in two lessons at once in a published timetable is refused
+  // with the clash; the coordinator may go ahead anyway.
+  const [clash, setClash] = useState<string | null>(null);
   const add = useMutation({
-    mutationFn: () =>
+    mutationFn: (vars: { anyway?: boolean } = {}) =>
       apiResponse(
         api.v1.academic.sections[':id'].members.$post({
           param: { id: s.id },
-          json: { studentIds: [...selected.keys()], ...(startsOn ? { startsOn } : {}) },
+          json: { studentIds: [...selected.keys()], ...(startsOn ? { startsOn } : {}), ...(vars.anyway ? { anyway: true } : {}) },
         }),
       ),
     onSuccess: (d) => {
       setResult(d);
       setError('');
+      setClash(null);
       setSelected(new Map());
       onAdded();
     },
     onError: (err: Error) => {
-      setError(err.message);
+      if (isPublishedClash(err)) setClash(clashMessage(err));
+      else setError(err.message);
       setResult(null);
     },
   });
@@ -444,8 +450,17 @@ function AddStudents({ section: s, full, onAdded }: { section: SectionDetailData
                 <span>Already in this section:</span> <span className="font-semibold">{result.alreadyIn}</span>
               </li>
             )}
+            {!!result.clashesAccepted?.length && (
+              <li>
+                <span>Clashes in the published timetable, gone ahead with:</span> <span className="font-semibold">{result.clashesAccepted.length}</span>
+              </li>
+            )}
           </ul>
         </Notice>
+      )}
+      {clash && (
+        <PublishedClashNotice className="mt-3" message={clash} pending={add.isPending}
+          onAnyway={() => add.mutate({ anyway: true })} onCancel={() => setClash(null)} />
       )}
       {error && (
         <Notice tone="danger" className="mt-3">
@@ -575,7 +590,7 @@ function AddStudents({ section: s, full, onAdded }: { section: SectionDetailData
             <p className="mt-3 text-xs text-muted-foreground">This section is full: raise its capacity with Edit to add more.</p>
           )}
 
-          <Button className="mt-3 h-11 w-full" disabled={n === 0 || add.isPending} onClick={() => add.mutate()}>
+          <Button className="mt-3 h-11 w-full" disabled={n === 0 || add.isPending} onClick={() => add.mutate({})}>
             {add.isPending ? (
               'Adding…'
             ) : n === 0 ? (

@@ -37,6 +37,7 @@ const NOTE: Record<string, string> = {
   exam_only: 'Exams only: no lessons',
   no_timetable: 'No timetable published yet',
   left: 'Has left the school',
+  extra_day: 'Extra school day: the timetable has no lessons on this weekday',
 };
 
 const STATUS: Record<string, { label: string; tone: 'info' | 'warning' | 'danger' | 'neutral' }> = {

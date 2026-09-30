@@ -694,7 +694,10 @@ function RunSummary({ run }: { run: Run }) {
           <ul className="mt-1 space-y-2 text-sm">
             {run.explanations.map((e) => (
               <li key={e.lessonId} className="rounded-lg bg-muted px-3 py-2">
-                <p className="font-medium text-foreground"><bdi>{e.groupName}</bdi>, <span>lesson</span> <bdi>{e.seq}</bdi>{e.length === 2 && <span> (double)</span>}</p>
+                <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
+                  {e.cause === 'impossible' ? <Badge tone="danger">Cannot be placed</Badge> : e.cause === 'not_fitted' ? <Badge tone="warning">Not fitted in</Badge> : null}
+                  <span><bdi>{e.groupName}</bdi>, <span>lesson</span> <bdi>{e.seq}</bdi>{e.length === 2 && <span> (double)</span>}</span>
+                </p>
                 <ul className="mt-1 list-disc ps-4 text-muted-foreground">
                   {e.reasons.map((r, i) => <li key={i}>{r}</li>)}
                 </ul>
@@ -739,7 +742,10 @@ function GenerateButton({ tt, onDone }: { tt: Editor; onDone: () => void }) {
                   <ul className="mt-2 space-y-2 text-sm">
                     {gen.data.unplaced.map((u) => (
                       <li key={u.lessonId} className="rounded-lg bg-muted px-3 py-2">
-                        <p className="font-medium text-foreground">{u.summary}</p>
+                        <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
+                          {u.cause === 'impossible' ? <Badge tone="danger">Cannot be placed</Badge> : <Badge tone="warning">Not fitted in</Badge>}
+                          <span>{u.summary}</span>
+                        </p>
                         {u.reasons.length > 1 && (
                           <ul className="mt-1 list-disc ps-4 text-muted-foreground">
                             {u.reasons.slice(1).map((r, i) => <li key={i}>{r}</li>)}
@@ -794,6 +800,18 @@ function PublishButton({ tt }: { tt: Editor }) {
                   <span>Told:</span> <bdi className="tabular-nums">{pub.data.notified.students}</bdi> <span>students,</span>{' '}
                   <bdi className="tabular-nums">{pub.data.notified.parents}</bdi> <span>parents,</span> <bdi className="tabular-nums">{pub.data.notified.teachers}</bdi> <span>teachers.</span>
                 </Notice>
+                {pub.data.coversMoved.length > 0 && (
+                  <Notice tone="info" className="mt-3" title="Cover carried over">
+                    <p className="text-sm">Arranged on the timetable this one replaces, and moved to the same lesson here:</p>
+                    <ul className="mt-1 list-disc ps-4 text-sm">{pub.data.coversMoved.map((c) => <li key={c.id}><bdi>{c.summary}</bdi></li>)}</ul>
+                  </Notice>
+                )}
+                {pub.data.coversRemoved.length > 0 && (
+                  <Notice tone="warning" className="mt-3" title="Cover removed">
+                    <p className="text-sm">These lessons are not in this timetable on those days, so their cover was removed; the cover teachers and the classes were told:</p>
+                    <ul className="mt-1 list-disc ps-4 text-sm">{pub.data.coversRemoved.map((c) => <li key={c.id}><bdi>{c.summary}</bdi></li>)}</ul>
+                  </Notice>
+                )}
                 <div className="mt-5 flex justify-end"><Button onClick={close}>Close</Button></div>
               </>
             ) : (

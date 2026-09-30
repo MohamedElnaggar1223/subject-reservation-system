@@ -29,7 +29,7 @@ import { EmptyState, ErrorState, LoadingState } from '~/components/ui/query-stat
 import { Badge, Notice } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
 import { DateText, NoYearYet, SELECT_CLASS, YearPicker, useAcademicYears, useBellSchedules, useChosenYear, type AcademicYearRow } from '../../academic/calendar/academic-shared';
-import { TT_KEY, TimetableTabs, fetchGroups, fetchTimetables, schoolToday, type TimetableRow } from '../timetable-shared';
+import { TT_KEY, TimetableTabs, fetchGroups, fetchTimetables, fetchPublishedClashes, schoolToday, type TimetableRow } from '../timetable-shared';
 
 export default function VersionsClient(): React.JSX.Element {
   const { data: years, isLoading, isError, refetch } = useAcademicYears();
@@ -78,6 +78,8 @@ function YearVersions({ year }: { year: AcademicYearRow }) {
           <Step done href={`/timetable/rules?year=${year.startYear}`} label="Rules (optional)" detail="When teachers and rooms cannot be used" />
         </ul>
       </section>
+
+      <PublishedClashes year={year} />
 
       {versions.isLoading ? (
         <LoadingState label="Loading the timetables…" />
@@ -238,3 +240,37 @@ function TermVersions({ year, term, rows, all }: { year: AcademicYearRow; term: 
 }
 
 export { versionState };
+
+/**
+ * Clashes in the published timetable: a change after publishing that put
+ * someone in two lessons at once, which the coordinator went ahead with. Each
+ * stays listed (marked "over" once it no longer happens) until a new version.
+ */
+function PublishedClashes({ year }: { year: AcademicYearRow }) {
+  const clashes = useQuery({ queryKey: [...TT_KEY, 'published-clashes', year.id], queryFn: () => fetchPublishedClashes(year.id) });
+  if (clashes.isLoading || (clashes.data && clashes.data.length === 0)) return null;
+  if (clashes.isError || !clashes.data) return <ErrorState title="The clashes did not load" onRetry={() => clashes.refetch()} />;
+  const live = clashes.data.filter((c) => c.stillHappens).length;
+  return (
+    <section aria-labelledby="clashes-title" className="rounded-xl border border-amber-300 bg-card p-5 shadow-sm dark:border-amber-700">
+      <h2 id="clashes-title" className="font-display text-base font-bold text-foreground">Clashes in the published timetable</h2>
+      <p className="mt-0.5 text-sm text-muted-foreground">
+        <span>Changes made after publishing that put someone in two lessons at once, gone ahead with. Publish a new version to resolve them.</span>{' '}
+        <bdi className="tabular-nums">{live}</bdi> <span>still happen</span>
+      </p>
+      <ul className="mt-3 divide-y divide-border">
+        {clashes.data.map((c) => (
+          <li key={c.id} className="flex flex-wrap items-start justify-between gap-2 py-2 text-sm">
+            <div className="min-w-0">
+              <p className="text-foreground"><bdi>{c.message}</bdi></p>
+              <p className="text-xs text-muted-foreground">
+                <bdi>{c.cause}</bdi>{c.acceptedBy && <>{' · '}<span>gone ahead with by</span> <bdi>{c.acceptedBy}</bdi></>}
+              </p>
+            </div>
+            {c.stillHappens ? <Badge tone="warning">Still happens</Badge> : <Badge tone="neutral">Over</Badge>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}

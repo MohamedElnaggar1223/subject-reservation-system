@@ -10,7 +10,7 @@ import { getQueryClient } from '~/lib/query-client';
 import { getServerApi } from '~/lib/hono-server';
 import { requireStaff } from '~/lib/auth/session';
 import { ACADEMIC_ROLES, apiResponse, hasRole } from '@repo/validations';
-import TodayClient from './today.client';
+import TodayClient, { TEACHES_KEY } from './today.client';
 
 export const metadata = {
   title: 'Today — IGCSE',
@@ -24,16 +24,15 @@ export default async function TodayPage(): Promise<React.JSX.Element> {
     queryKey: ['academic', 'day', 'today'],
     queryFn: () => apiResponse(api.v1.academic.calendar.day.$get({ query: {} })),
   });
-  // F1: an account linked to a teacher record sees its lessons today.
-  let teaches = false;
-  try {
-    teaches = !!(await apiResponse(api.v1.users.me.$get())).teachingAs;
-  } catch {
-    // Today still renders without them.
-  }
+  // F1: whether the account teaches (is linked to a teacher record) — read with the day; a failure
+  // shows on the page as a failure (the client asks again), not as "no lessons".
+  await queryClient.prefetchQuery({
+    queryKey: TEACHES_KEY,
+    queryFn: async () => !!(await apiResponse(api.v1.users.me.$get())).teachingAs,
+  });
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <TodayClient manages={hasRole(session.user.role, ...ACADEMIC_ROLES)} teaches={teaches} />
+      <TodayClient manages={hasRole(session.user.role, ...ACADEMIC_ROLES)} />
     </HydrationBoundary>
   );
 }

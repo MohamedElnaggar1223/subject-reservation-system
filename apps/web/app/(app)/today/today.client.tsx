@@ -21,7 +21,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { academicYearShortLabel } from '@repo/validations';
+import { academicYearShortLabel, apiResponse } from '@repo/validations';
+import { api } from '~/lib/hono';
 import { Button } from '~/components/ui/button';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { Badge, Notice, TONE_CLASSES } from '~/components/ui/tone';
@@ -55,7 +56,12 @@ function useSchoolClock() {
   return now;
 }
 
-export default function TodayClient({ manages, teaches = false }: { manages: boolean; teaches?: boolean }): React.JSX.Element {
+/** Whether the signed-in account teaches (is linked to a teacher record). */
+export const TEACHES_KEY = ['account', 'teaches'] as const;
+const fetchTeaches = async () => !!(await apiResponse(api.v1.users.me.$get())).teachingAs;
+
+export default function TodayClient({ manages }: { manages: boolean }): React.JSX.Element {
+  const teaches = useQuery({ queryKey: TEACHES_KEY, queryFn: fetchTeaches });
   const { data: day, isLoading, isError, refetch } = useQuery({
     queryKey: ['academic', 'day', 'today'],
     queryFn: () => fetchSchoolDay(),
@@ -75,7 +81,9 @@ export default function TodayClient({ manages, teaches = false }: { manages: boo
         <div className="space-y-6">
           <Headline day={day} now={now} manages={manages} />
           {/* F1: a teacher's lessons today (nothing for an account that does not teach). */}
-          {teaches && <MyLessonsToday />}
+          {teaches.isError ? (
+            <ErrorState title="Your lessons did not load" message="This is a connection problem, not a day without lessons." onRetry={() => teaches.refetch()} />
+          ) : teaches.data ? <MyLessonsToday /> : null}
           {day.isSchoolDay && <Bells day={day} now={now} manages={manages} />}
         </div>
       )}

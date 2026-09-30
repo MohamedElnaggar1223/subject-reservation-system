@@ -182,6 +182,12 @@ function RecordAbsence({ date, periods, onDone }: { date: string; periods: { lab
         <Button type="submit" className="w-full" disabled={!teacherId || record.isPending}>{record.isPending ? 'Recording…' : 'Record the absence'}</Button>
         {record.isError && <Notice tone="danger">{record.error instanceof Error ? record.error.message : 'Not recorded'}</Notice>}
         {record.data && <Notice tone="success">{`Recorded: ${record.data.lessons.length} lessons to cover.`}</Notice>}
+        {record.data && record.data.coversLost.length > 0 && (
+          <Notice tone="warning" title="Their cover lessons need new cover">
+            <p className="text-sm">They were covering these; each lesson is waiting for cover again and its class was told:</p>
+            <ul className="mt-1 list-disc ps-4 text-sm">{record.data.coversLost.map((c) => <li key={c.id}><bdi>{c.summary}</bdi></li>)}</ul>
+          </Notice>
+        )}
       </div>
     </form>
   );
@@ -248,6 +254,7 @@ function CoverLine({ item, onChanged }: { item: AffectedLesson; onChanged: () =>
         <span className="w-24 shrink-0 text-sm tabular-nums text-muted-foreground"><bdi>{l.label}</bdi> <span dir="ltr">{l.startsAt}</span></span>
         <span className="flex-1 font-semibold text-foreground"><bdi>{l.groupName}</bdi>{l.room && <span className="font-normal text-muted-foreground"> · <bdi>{l.room.name}</bdi></span>}</span>
         <StatusBadge status={l.status} />
+        {l.needsNewCover && <Badge tone="warning">Needs new cover</Badge>}
         {l.status === 'covered' && l.cover?.teacher && <span className="text-sm"><span className="text-muted-foreground">Cover:</span> <bdi className="font-semibold">{l.cover.teacher.name}</bdi></span>}
         {l.status === 'uncovered' && !finding && <Button size="sm" onClick={() => setFinding(true)}>Find cover</Button>}
         {(l.status === 'covered' || l.status === 'cancelled') && <Button size="sm" variant="ghost" onClick={() => setRemoving(true)}>Change</Button>}

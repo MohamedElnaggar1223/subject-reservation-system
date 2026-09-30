@@ -53,6 +53,9 @@ export const fetchClass = (lessonId: string, date: string) => apiResponse(api.v1
 
 export const fetchFeed = () => apiResponse(api.v1.schedule.feed.$get());
 
+/** The clashes in a year's published timetables the coordinator went ahead with. */
+export const fetchPublishedClashes = (academicYearId: string) => apiResponse(api.v1.timetables.clashes.$get({ query: { academicYearId } }));
+
 // ─── Words ───────────────────────────────────────────────────────────────────
 
 export const DAY_NAMES = WEEKDAY_NAMES;

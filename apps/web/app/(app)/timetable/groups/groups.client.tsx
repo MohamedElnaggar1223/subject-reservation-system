@@ -22,6 +22,7 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PublishedClashNotice, isPublishedClash, clashMessage } from '~/components/published-clash';
 import { api } from '~/lib/hono';
 import { apiResponse, ROOM_TYPES, ROOM_FEATURES } from '@repo/validations';
 import { Button } from '~/components/ui/button';
@@ -32,7 +33,7 @@ import { Badge, Notice } from '~/components/ui/tone';
 import { ReasonModal } from '~/components/ui/reason-modal';
 import { cn } from '~/lib/utils';
 import { NoYearYet, SELECT_CLASS, YearPicker, useAcademicYears, useChosenYear, type AcademicYearRow } from '../../academic/calendar/academic-shared';
-import { TT_KEY, TimetableTabs, fetchGroups, fetchGroup, fetchTeachers, ROOM_TYPE_LABEL, FEATURE_LABEL, type GroupRow } from '../timetable-shared';
+import { TT_KEY, TimetableTabs, fetchGroups, fetchGroup, fetchTeachers, schoolToday, ROOM_TYPE_LABEL, FEATURE_LABEL, type GroupRow } from '../timetable-shared';
 
 const fetchCatalogue = () => apiResponse(api.v1.catalogue.$get());
 const fetchSections = (academicYearId: string) => apiResponse(api.v1.academic.sections.$get({ query: { academicYearId } }));
@@ -151,7 +152,7 @@ function FormFromEnrolment({ year, onDone }: { year: AcademicYearRow; onDone: ()
   const [weekly, setWeekly] = useState('4');
   const preview = useMutation({ mutationFn: async () => apiResponse(api.v1.scheduling.groups.form.$post({ json: { academicYearId: year.id, commit: false, weeklyPeriods: Number(weekly) || 4 } })) });
   const commit = useMutation({
-    mutationFn: async () => apiResponse(api.v1.scheduling.groups.form.$post({ json: { academicYearId: year.id, commit: true, weeklyPeriods: Number(weekly) || 4 } })),
+    mutationFn: async (vars: { anyway?: boolean } = {}) => apiResponse(api.v1.scheduling.groups.form.$post({ json: { academicYearId: year.id, commit: true, weeklyPeriods: Number(weekly) || 4, ...(vars.anyway ? { anyway: true } : {}) } })),
     onSuccess: () => { preview.reset(); onDone(); },
   });
   const plan = preview.data;
@@ -209,11 +210,13 @@ function FormFromEnrolment({ year, onDone }: { year: AcademicYearRow; onDone: ()
           )}
           {changes.length > 0 && (
             <div className="flex gap-2">
-              <Button onClick={() => commit.mutate()} disabled={commit.isPending}>{commit.isPending ? 'Forming…' : 'Form the groups'}</Button>
+              <Button onClick={() => commit.mutate({})} disabled={commit.isPending}>{commit.isPending ? 'Forming…' : 'Form the groups'}</Button>
               <Button variant="outline" onClick={() => preview.reset()}>Cancel</Button>
             </div>
           )}
-          {commit.isError && <Notice tone="danger">{commit.error instanceof Error ? commit.error.message : 'The groups were not formed'}</Notice>}
+          {commit.isError && (isPublishedClash(commit.error)
+            ? <PublishedClashNotice message={clashMessage(commit.error)} pending={commit.isPending} onAnyway={() => commit.mutate({ anyway: true })} onCancel={() => commit.reset()} />
+            : <Notice tone="danger">{commit.error instanceof Error ? commit.error.message : 'The groups were not formed'}</Notice>)}
         </div>
       )}
     </section>
@@ -357,13 +360,25 @@ function NumberCell({ id, value, onSave, label, max }: { id: string; value: numb
   );
 }
 
+type GroupChange = {
+  teacherId?: string | null; teacherFrom?: string; anyway?: boolean; weeklyPeriods?: number; doublePeriods?: number;
+  roomType?: (typeof ROOM_TYPES)[number] | null; roomFeatures?: (typeof ROOM_FEATURES)[number][]; roomId?: string | null; name?: string;
+};
+
 function GroupRowView({ g, teachers, rooms, open, onToggle, onDone, all, year }: { g: GroupRow; teachers: Teacher[]; rooms: Room[]; open: boolean; onToggle: () => void; onDone: () => void; all: GroupRow[]; year: AcademicYearRow }) {
   const [error, setError] = useState<string | null>(null);
+  const [clash, setClash] = useState<{ message: string; retry: GroupChange } | null>(null);
+  // A new teacher takes the group from a day: the weeks before keep the teacher they had.
+  const today = schoolToday();
+  const firstDay = today < year.startsOn ? year.startsOn : today > year.endsOn ? year.startsOn : today;
+  const [newTeacher, setNewTeacher] = useState<{ teacherId: string | null; from: string } | null>(null);
   const update = useMutation({
-    mutationFn: async (json: { teacherId?: string | null; weeklyPeriods?: number; doublePeriods?: number; roomType?: (typeof ROOM_TYPES)[number] | null; roomFeatures?: (typeof ROOM_FEATURES)[number][]; roomId?: string | null; name?: string }) =>
-      apiResponse(api.v1.scheduling.groups[':id'].$put({ param: { id: g.id }, json })),
-    onSuccess: () => { setError(null); onDone(); },
-    onError: (e) => setError(e instanceof Error ? e.message : 'Not saved'),
+    mutationFn: async (json: GroupChange) => apiResponse(api.v1.scheduling.groups[':id'].$put({ param: { id: g.id }, json })),
+    onSuccess: () => { setError(null); setClash(null); setNewTeacher(null); onDone(); },
+    onError: (e, vars) => {
+      if (isPublishedClash(e)) setClash({ message: clashMessage(e), retry: { ...vars, anyway: true } });
+      else setError(e instanceof Error ? e.message : 'Not saved');
+    },
   });
   const kind = KIND[g.kind] ?? KIND.manual!;
   const roomLabel = g.room ? g.room.name : g.roomType ? ROOM_TYPE_LABEL[g.roomType] : g.kind === 'section' ? 'Its section’s room first' : 'Any that fits';
@@ -382,10 +397,19 @@ function GroupRowView({ g, teachers, rooms, open, onToggle, onDone, all, year }:
           {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
         </td>
         <td className="px-3 py-2">
-          <select aria-label={`Teacher for ${g.name}`} className={cn(SELECT_CLASS, 'h-8 w-44')} value={g.teacherId ?? ''} disabled={g.archived || update.isPending} onChange={(e) => update.mutate({ teacherId: e.target.value || null })}>
+          <select aria-label={`Teacher for ${g.name}`} className={cn(SELECT_CLASS, 'h-8 w-44')} value={newTeacher ? newTeacher.teacherId ?? '' : g.teacherId ?? ''} disabled={g.archived || update.isPending}
+            onChange={(e) => setNewTeacher({ teacherId: e.target.value || null, from: newTeacher?.from ?? firstDay })}>
             <option value="">No teacher yet</option>
             {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
+          {newTeacher && (
+            <form className="mt-1.5 flex flex-wrap items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); update.mutate({ teacherId: newTeacher.teacherId, teacherFrom: newTeacher.from }); }}>
+              <Label htmlFor={`from-${g.id}`} className="text-xs text-muted-foreground">From</Label>
+              <Input id={`from-${g.id}`} type="date" className="h-8 w-36" min={year.startsOn} max={year.endsOn} value={newTeacher.from} onChange={(e) => setNewTeacher({ ...newTeacher, from: e.target.value })} required />
+              <Button size="sm" type="submit" disabled={update.isPending}>{update.isPending ? 'Saving…' : 'Change'}</Button>
+              <Button size="sm" type="button" variant="ghost" onClick={() => { setNewTeacher(null); setClash(null); }}>Cancel</Button>
+            </form>
+          )}
         </td>
         <td className="px-3 py-2 text-end tabular-nums">{g.size}</td>
         <td className="px-3 py-2">{g.archived ? g.weeklyPeriods : <NumberCell id={`w-${g.id}`} label={`Periods a week for ${g.name}`} value={g.weeklyPeriods} max={30} onSave={(n) => update.mutate({ weeklyPeriods: n, doublePeriods: Math.min(g.doublePeriods, Math.floor(n / 2)) })} />}</td>
@@ -393,6 +417,13 @@ function GroupRowView({ g, teachers, rooms, open, onToggle, onDone, all, year }:
         <td className="px-3 py-2 text-xs text-muted-foreground"><bdi>{roomLabel}</bdi>{g.roomFeatures.length > 0 && <span>{` + ${g.roomFeatures.map((f) => FEATURE_LABEL[f] ?? f).join(', ')}`}</span>}</td>
         <td className="px-5 py-2 text-end"><Button size="sm" variant="ghost" onClick={onToggle}>{open ? 'Close' : 'Details'}</Button></td>
       </tr>
+      {clash && (
+        <tr className="border-b border-border">
+          <td colSpan={7} className="px-5 py-3">
+            <PublishedClashNotice message={clash.message} pending={update.isPending} onAnyway={() => update.mutate(clash.retry)} onCancel={() => { setClash(null); setNewTeacher(null); }} />
+          </td>
+        </tr>
+      )}
       {open && (
         <tr className="border-b border-border bg-muted/30">
           <td colSpan={7} className="px-5 py-4">
@@ -419,18 +450,33 @@ function GroupDetail({
   const [mergeIds, setMergeIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const done = () => { setSelected([]); setModal(null); setError(null); qc.invalidateQueries({ queryKey: TT_KEY }); onDone(); };
-  const fail = (e: unknown) => setError(e instanceof Error ? e.message : 'That did not work');
+  const [clash, setClash] = useState<{ message: string; retry: () => void } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const done = () => { setSelected([]); setModal(null); setError(null); setClash(null); qc.invalidateQueries({ queryKey: TT_KEY }); onDone(); };
+  const fail = (e: unknown, retry?: () => void) => {
+    if (retry && isPublishedClash(e)) { setModal(null); setClash({ message: clashMessage(e), retry }); return; }
+    setError(e instanceof Error ? e.message : 'That did not work');
+  };
   const candidates = useQuery({
     queryKey: ['enrolable', year.id, search],
     queryFn: () => apiResponse(api.v1.enrolments.students.$get({ query: { academicYearId: year.id, search: search.trim() || undefined } })),
     enabled: search.trim().length >= 2 && g.kind !== 'section',
   });
-  const add = useMutation({ mutationFn: async (studentId: string) => apiResponse(api.v1.scheduling.groups[':id'].members.$post({ param: { id: g.id }, json: { studentIds: [studentId] } })), onSuccess: done, onError: fail });
-  const end = useMutation({ mutationFn: async (reason: string) => apiResponse(api.v1.scheduling.groups[':id'].members.end.$post({ param: { id: g.id }, json: { studentIds: selected, reason } })), onSuccess: done, onError: fail });
-  const split = useMutation({ mutationFn: async () => apiResponse(api.v1.scheduling.groups[':id'].split.$post({ param: { id: g.id }, json: { parts: [{ name: splitName.trim(), teacherId: splitTeacher || null, studentIds: selected }] } })), onSuccess: done, onError: fail });
-  const merge = useMutation({ mutationFn: async () => apiResponse(api.v1.scheduling.groups.merge.$post({ json: { intoGroupId: g.id, groupIds: mergeIds } })), onSuccess: done, onError: fail });
-  const retire = useMutation({ mutationFn: async (reason: string) => apiResponse(api.v1.scheduling.groups[':id'].archive.$post({ param: { id: g.id }, json: { reason } })), onSuccess: done, onError: fail });
+  const add = useMutation({
+    mutationFn: async (v: { studentId: string; anyway?: boolean }) => apiResponse(api.v1.scheduling.groups[':id'].members.$post({ param: { id: g.id }, json: { studentIds: [v.studentId], ...(v.anyway ? { anyway: true } : {}) } })),
+    onSuccess: done, onError: (e, v) => fail(e, () => add.mutate({ ...v, anyway: true })),
+  });
+  const end = useMutation({ mutationFn: async (reason: string) => apiResponse(api.v1.scheduling.groups[':id'].members.end.$post({ param: { id: g.id }, json: { studentIds: selected, reason } })), onSuccess: done, onError: (e) => fail(e) });
+  const split = useMutation({
+    mutationFn: async (v: { anyway?: boolean } = {}) => apiResponse(api.v1.scheduling.groups[':id'].split.$post({ param: { id: g.id }, json: { parts: [{ name: splitName.trim(), teacherId: splitTeacher || null, studentIds: selected }], ...(v.anyway ? { anyway: true } : {}) } })),
+    onSuccess: (r) => { done(); if (r.notInPublishedTimetable) setNotice('The new group has no lessons in the published timetable: its students have none for this subject until a new version with it is published.'); },
+    onError: (e) => fail(e, () => split.mutate({ anyway: true })),
+  });
+  const merge = useMutation({
+    mutationFn: async (v: { anyway?: boolean } = {}) => apiResponse(api.v1.scheduling.groups.merge.$post({ json: { intoGroupId: g.id, groupIds: mergeIds, ...(v.anyway ? { anyway: true } : {}) } })),
+    onSuccess: done, onError: (e) => fail(e, () => merge.mutate({ anyway: true })),
+  });
+  const retire = useMutation({ mutationFn: async (reason: string) => apiResponse(api.v1.scheduling.groups[':id'].archive.$post({ param: { id: g.id }, json: { reason } })), onSuccess: done, onError: (e) => fail(e) });
   const mergeable = useMemo(() => all.filter((x) => x.id !== g.id && x.kind !== 'section' && (x.subject?.id ?? null) === (g.subject?.id ?? null)), [all, g]);
   const students = detail.data?.students ?? [];
   const explicit = g.kind !== 'section';
@@ -474,7 +520,7 @@ function GroupDetail({
                 {candidates.data.filter((c) => !students.some((s) => s.id === c.id)).slice(0, 8).map((c) => (
                   <li key={c.id} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
                     <span><bdi>{c.name}</bdi> <span className="text-xs text-muted-foreground">{c.gradeThatYear !== null ? `Grade ${c.gradeThatYear}` : ''}</span></span>
-                    <Button size="sm" variant="outline" disabled={add.isPending} onClick={() => add.mutate(c.id)}>Add</Button>
+                    <Button size="sm" variant="outline" disabled={add.isPending} onClick={() => add.mutate({ studentId: c.id })}>Add</Button>
                   </li>
                 ))}
               </ul>
@@ -492,6 +538,11 @@ function GroupDetail({
           </details>
         )}
         {error && <Notice tone="danger" className="mt-3">{error}</Notice>}
+        {clash && (
+          <PublishedClashNotice className="mt-3" message={clash.message} pending={add.isPending || split.isPending || merge.isPending}
+            onAnyway={() => { const retry = clash.retry; setClash(null); retry(); }} onCancel={() => setClash(null)} />
+        )}
+        {notice && <Notice tone="info" className="mt-3">{notice}</Notice>}
       </div>
 
       <div className="space-y-4">
@@ -544,7 +595,7 @@ function GroupDetail({
       )}
       {modal === 'split' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="split-title">
-          <form className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onSubmit={(e) => { e.preventDefault(); if (splitName.trim()) split.mutate(); }}>
+          <form className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onSubmit={(e) => { e.preventDefault(); if (splitName.trim()) split.mutate({}); }}>
             <h2 id="split-title" className="font-display text-lg font-bold text-foreground">{`Move ${selected.length} students to a new group`}</h2>
             <p className="mt-1 text-sm text-muted-foreground">The new group teaches the same subject for the same periods; the others stay in {g.name}.</p>
             <div className="mt-4 space-y-3">
@@ -567,7 +618,7 @@ function GroupDetail({
       )}
       {modal === 'merge' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="merge-title">
-          <form className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onSubmit={(e) => { e.preventDefault(); if (mergeIds.length) merge.mutate(); }}>
+          <form className="w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl" onSubmit={(e) => { e.preventDefault(); if (mergeIds.length) merge.mutate({}); }}>
             <h2 id="merge-title" className="font-display text-lg font-bold text-foreground">{`Merge into ${g.name}`}</h2>
             <p className="mt-1 text-sm text-muted-foreground">Their students move here from today and the merged groups are retired.</p>
             <ul className="mt-3 space-y-1">

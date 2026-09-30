@@ -68,7 +68,7 @@ export function MyLessonsToday() {
         <span className="text-sm text-muted-foreground">{lessons.filter((l) => l.status !== 'covered_by_other' && l.status !== 'cancelled').length} <span>to teach</span></span>
       </div>
       {lessons.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">{data.note === 'no_timetable' ? 'No timetable is published for today yet.' : data.isSchoolDay ? 'No lessons for you today.' : 'No lessons today.'}</p>
+        <p className="mt-2 text-sm text-muted-foreground">{data.note === 'no_timetable' ? 'No timetable is published for today yet.' : data.note === 'extra_day' ? 'An extra school day: the timetable has no lessons on this weekday.' : data.isSchoolDay ? 'No lessons for you today.' : 'No lessons today.'}</p>
       ) : (
         <ol className="mt-3 space-y-2">
           {lessons.map((l) => {
