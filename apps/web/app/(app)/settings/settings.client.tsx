@@ -26,6 +26,8 @@ const GROUPS: { id: string; title: string; hint: string }[] = [
   { id: 'eligibility', title: 'Who may register', hint: 'Which students may register for which exam series.' },
   { id: 'school_fee', title: 'School fee', hint: 'When the annual school fee gates registration.' },
   { id: 'calendar', title: 'Calendar', hint: 'The school week the calendar and the day’s lists build on.' },
+  { id: 'catalogue', title: 'Exam catalogue', hint: 'How the school’s level codes are read from the units each entry covers.' },
+  { id: 'import', title: 'Day-one import', hint: 'The coordinator’s answers every import’s review starts from.' },
 ];
 
 /** The value as a person reads it. */

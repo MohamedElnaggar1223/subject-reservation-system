@@ -60,3 +60,4 @@ export * from './enrolment/enrolment.validations'
  * F7 — the day-one import.
  */
 export * from './import/import.validations'
+export * from './import/import-types'

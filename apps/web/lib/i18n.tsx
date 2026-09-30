@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { foundationArabic } from './i18n-foundation';
 import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
+import { importArabic, translateImportText } from './i18n-import';
 
 export type Language = 'en' | 'ar';
 
@@ -84,6 +85,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.exams': 'Exams',
     'nav.catalogue': 'Exam Catalogue',
     'nav.boardSeries': 'Board Series',
+    'nav.import': 'Day-one Import',
     'reports.title': 'Reports',
     'reports.description': 'Generate and export data reports. All reports support CSV download.',
     'reports.pendingApprovals': 'Pending Approvals',
@@ -183,6 +185,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.exams': 'الامتحانات',
     'nav.catalogue': 'دليل الامتحانات',
     'nav.boardSeries': 'دورات المجالس',
+    'nav.import': 'الاستيراد الأول',
     'app.subjectReservation': 'حجز المواد',
     'common.user': 'مستخدم',
     'common.signOut': 'تسجيل الخروج',
@@ -1493,6 +1496,8 @@ Object.assign(autoArabicText, foundationArabic);
 // F0b screens (lib/i18n-catalogue.ts): only words the app does not already
 // translate, so a shared word keeps the Arabic the other screens use.
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// F7 screens (lib/i18n-import.ts), the same way.
+for (const [en, ar] of Object.entries(importArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1571,6 +1576,9 @@ function translateDynamicText(text: string): string | null {
   // F0b: the catalogue's, the series' and the enrolment's sentences with names in them.
   const f0bText = translateCatalogueText(text);
   if (f0bText) return f0bText;
+  // F7: the import's sentences with a name, a number or a year in them.
+  const f7Text = translateImportText(text);
+  if (f7Text) return f7Text;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

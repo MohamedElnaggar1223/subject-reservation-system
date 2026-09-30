@@ -28,7 +28,7 @@ import {
   seriesLabel, deriveLevelCode, LEVEL_CODE_READINGS,
   type ImportProblemCode, type ImportSeverity, type ImportNoteCode, type ImportRowEditsType, type ImportSettingsType,
   type SelfStudyRule, type CarryForwardReading, type SeriesMode, type LevelCodeReading, type HistoryOutcome,
-  type UnitLevel,
+  type UnitLevel, type ImportRowPlan, type ImportViewProblem, type ImportLineView,
 } from '@repo/validations';
 import { getSetting } from '../settings.services';
 import { judgeEligibility, mayRegisterFor, type Eligibility } from '../eligibility.services';
@@ -62,19 +62,11 @@ export type ResolvedSettings = {
 
 // ─── What a commit would do with a row ───────────────────────────────────────
 
-export type RowPlan = {
-  student: 'create' | 'match' | 'none';
-  parents: ('create' | 'match')[];
-  links: ('create' | 'exists')[];
-  section: 'add' | 'exists' | 'keep' | 'none';
-  enrolment: 'create' | 'exists' | 'none';
-  registration: 'live' | 'live_exists' | 'history' | 'history_exists' | 'none';
-  money: 'create' | 'exists' | 'none';
-};
+export type RowPlan = ImportRowPlan;
 
 const noPlan = (): RowPlan => ({ student: 'none', parents: [], links: [], section: 'none', enrolment: 'none', registration: 'none', money: 'none' });
 
-export type ViewProblem = { code: ImportProblemCode; severity: ImportSeverity; detail: string | null };
+export type ViewProblem = ImportViewProblem;
 
 const problem = (p: Problem): ViewProblem => ({ code: p.code, severity: p.severity ?? IMPORT_PROBLEMS[p.code].severity, detail: p.detail ?? null });
 
@@ -949,7 +941,7 @@ export type ImportView = Awaited<ReturnType<typeof computeView>>;
 export type ImportRowView = ImportView['rows'][number];
 export type ImportPersonView = ImportView['people'][number];
 
-function stripLocal(d: LineData) {
+function stripLocal(d: LineData): ImportLineView {
   const { local: _local, ...rest } = d;
   return rest;
 }

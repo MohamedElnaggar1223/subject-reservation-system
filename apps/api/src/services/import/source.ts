@@ -7,7 +7,7 @@
  *
  * Nothing here interprets a value: normalise.ts reads the lines.
  */
-import { MONEY_RECORD_TEMPLATE, SCL_ROSTER_TEMPLATE, type ImportKind } from '@repo/validations';
+import { MONEY_RECORD_TEMPLATE, SCL_ROSTER_TEMPLATE, type ImportKind, type ImportSourceTab, type ImportSourceTabKind } from '@repo/validations';
 import { readWorkbook, WorkbookError } from '../../lib/xlsx';
 import { readCsv } from '../../lib/csv';
 
@@ -16,19 +16,9 @@ export class SourceError extends Error {}
 /** A line of the file: where it is, and its cells labelled by their headers. */
 export type SourceLine = { tab: string; rowNumber: number; raw: [string, string][] };
 
-export type SourceTabKind = 'session' | 'roster' | 'other';
-
-export type SourceTab = {
-  name: string;
-  kind: SourceTabKind;
-  /** The title above the header ("Nov.  2026 Session"), if any. */
-  title: string;
-  /** The sheet row the headers are on (1-based). */
-  headerRow: number;
-  /** The labels, in column order (a blank header is "(column F)"). */
-  columns: string[];
-  lines: number;
-};
+/** A tab: its title ("Nov.  2026 Session"), its header row (1-based), its labels in column order ("(column F)" for a blank header). */
+export type SourceTabKind = ImportSourceTabKind;
+export type SourceTab = ImportSourceTab;
 
 export type Source = { tabs: SourceTab[]; lines: SourceLine[] };
 

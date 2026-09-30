@@ -6,80 +6,21 @@
  * IS-11 columns that drift, IS-12 the Signature column). Pure: no database.
  * Staff fixes (ImportRowEdits) are applied over what was read.
  */
-import type { ImportProblemCode, ImportSeverity, MoneyHistoryKind, ImportRowEditsType } from '@repo/validations';
+import type {
+  MoneyHistoryKind, ImportRowEditsType, ImportSeriesType, ImportSeries, ImportLevelFamily, ImportLineProblem, ImportSheetLine,
+  ImportSclParent, ImportSclLine, ImportMoneyLine, ImportLineData,
+} from '@repo/validations';
 import { isUnlabeled, type SourceLine, type SourceTab } from './source';
 
-export type SeriesType = 'january' | 'june' | 'october' | 'november';
-export type Series = { type: SeriesType; year: number };
-export type LevelFamily = 'igcse' | 'as' | 'a2' | 'al' | 'combined';
-
-export type Problem = { code: ImportProblemCode; severity?: ImportSeverity; detail?: string };
-
-export type SheetLine = {
-  kind: 'sheet';
-  studentName: string;
-  studentEmail: string;
-  studentEmailOk: boolean;
-  studentPhone: string | null;
-  parentName: string;
-  parentEmail: string;
-  parentEmailOk: boolean;
-  parentPhone: string | null;
-  noParent: boolean;
-  classText: string;
-  grade: number | null;
-  section: string | null;
-  levelText: string;
-  levelCode: string | null;
-  levelFamily: LevelFamily | null;
-  subject: string;
-  isUnit: boolean;
-  teacher: string | null;
-  series: Series | null;
-  seriesSource: 'column' | 'title' | 'edit' | null;
-  confirm: 'confirm' | 'drop_intent' | null;
-  selfStudy: boolean;
-  selfStudyChoice: 'in_school' | 'enrol_only' | null;
-  feeNote: string | null;
-  feeKind: MoneyHistoryKind | null;
-  feePercent: number | null;
-  carryForwardFrom: string | null;
-  carryForwardNote: string | null;
-  local: Problem[];
-};
-
-export type SclParent = { name: string; email: string; emailOk: boolean; phone: string | null };
-export type SclLine = {
-  kind: 'scl';
-  studentName: string;
-  studentEmail: string;
-  studentEmailOk: boolean;
-  studentPhone: string | null;
-  sclId: string | null;
-  grade: number | null;
-  section: string | null;
-  parents: SclParent[];
-  noParent: boolean;
-  local: Problem[];
-};
-
-export type MoneyLine = {
-  kind: 'money';
-  studentRef: string;
-  happenedOn: string | null;
-  amount: number | null;
-  direction: 'in' | 'out' | null;
-  moneyKind: MoneyHistoryKind;
-  percent: number | null;
-  method: string | null;
-  receiptNumber: string | null;
-  seriesLabel: string | null;
-  subject: string | null;
-  note: string | null;
-  local: Problem[];
-};
-
-export type LineData = SheetLine | SclLine | MoneyLine;
+export type SeriesType = ImportSeriesType;
+export type Series = ImportSeries;
+export type LevelFamily = ImportLevelFamily;
+export type Problem = ImportLineProblem;
+export type SheetLine = ImportSheetLine;
+export type SclParent = ImportSclParent;
+export type SclLine = ImportSclLine;
+export type MoneyLine = ImportMoneyLine;
+export type LineData = ImportLineData;
 
 // ─── Small readers ───────────────────────────────────────────────────────────
 
