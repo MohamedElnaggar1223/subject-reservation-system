@@ -291,7 +291,11 @@ The fourth review, of that response (fc1a101), again said "don't merge yet", on 
   audited with a reason). Since F0b a window feeds one or more board series and each
   registration is entered in one of them, so the deadline is the series', not the window's:
   a window feeding IAL October and IAL January enforces each at its own time
-  (docs/features/CATALOGUE.md). When it passes, the sweep closes every payment still open on the series — a transfer
+  (docs/features/CATALOGUE.md). A checkout never spans two deadlines: a family's own checkout
+  across series with different deadlines is refused, naming each series to pay separately; the
+  desk splits one action into one payment per deadline, each confirmed with its receipts; a
+  deadline change that would split an open checkout is refused (the lead's decision on the F0b
+  review, 30 Sep). When it passes, the sweep closes every payment still open on the series — a transfer
   finance never verified included — as a system failure, not a rejection (nobody judged the
   transfer), returns escrow, and tells the family ("Payment Not Completed": if you did
   transfer, bring the bank receipt to the finance desk). It expires every registration still
