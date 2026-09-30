@@ -214,7 +214,33 @@ through a duplicate and 09 checks that no audit row holds any recorded number.
 
 ## 8. Screens
 
-(Written as each is built and driven; see the progress log.)
+All under `/exams`, in the nav of the roles that use them (`components/nav-shell.tsx`); each page
+guards its own roles on the server. Strings are English in the code and Arabic through
+`lib/i18n-exams/` (one dictionary per area, rules before F0b's broad ones); board names, codes,
+candidate numbers and people's names are marked `data-i18n-skip` and stay as written. Each file's
+header comment gives its spreadsheet version in full; the short form is below. Every screen was
+driven in headless Chrome as its role in English and Arabic (`.audit/exams-evidence/screens/`,
+`lead-*` for the lead's pass; the family's at 390 px). The only English left on an Arabic page is
+"UCI", the board's own term.
+
+| Screen | Who | The spreadsheet version | Here |
+|---|---|---|---|
+| **Deadlines** `/exams/deadlines` | coordinator, admin | each board's key-dates PDF pinned by the desk; to know what is left, count blanks in three sheets and ask finance | every board's dates in order, today marked, days left; each date counts what is outstanding live and links to the screen that fixes it; the entry deadline carries its time (the hard stop) |
+| **Candidates** `/exams/candidates` | coordinator, admin | a candidates sheet with names retyped from ID photocopies, one column of numbers per series, national IDs readable by anyone with the file; blanks found by filtering each column | one searchable table; each gap a board refuses is one filter with its count; a row opens in place; a UCI changes only with a reason; the national ID shows its last four, the full number for 30 s on request (audited); "Assign candidate numbers" keeps last series' numbers and previews before saving |
+| **Entries** `/exams/entries` | coordinator, admin | a sheet per series typed from the confirmed registrations; option codes looked up in the syllabus PDF; a "sent?" column; fees for withdrawals looked up in the handbook | derived from the registrations in one click with a preview; option and tier chosen from the syllabus's own; what the board would refuse beside each row; sent or withdrawn in bulk, with the board's fee shown before and after; a change after sending asks why; past the deadline the screen says nothing new is made |
+| **Entry lists** `/exams/entry-lists` | coordinator, admin | the entry sheet copied into the board's template column by column; problems learnt from the portal's rejection report | rows already in the portal's columns (marked assumed), each with what the board would refuse and a link to fix it; download of the ready rows; confirmed registrations with no entry listed with the fix; the board's rules on the same page, changed with a reason |
+| **Forecast grades** `/exams/forecasts` | teacher (own candidates), coordinator, admin | grades emailed back by teachers and retyped into the portal; chasing by memory | the teacher's own candidates by series and subject, due date and days left, saved on leaving the box; a grade the level does not use refused at once; the coordinator sees who gave each and marks a series sent |
+| **Timetable** `/exams/timetable` | coordinator, admin | the board's PDF copied by hand; clashes found with a ruler, extra time forgotten; families phoned when a paper moves | the board's table pasted as it is, columns recognised; each line new / changed / unchanged / wrong before saving; clashes for every candidate across boards with extra time, each with how it is handled; Publish tells families, a moved paper tells only those who sit it |
+| **Exam days** `/exams/days` | coordinator, admin | the hall drawn on squared paper, registers copied per room, a rota on the wall, consideration requests in an email folder | a card per sitting with candidates, seated and invigilators per room; "Seat everyone" with a preview (separate-room candidates listed to seat by hand); a desk for two refused by the database, naming who sits there; registers print per paper and room; special consideration per candidate and paper with its evidence |
+| **Invigilation** `/exams/invigilation` | teacher | the rota on the wall, the register ticked on paper and typed up hours later | the teacher's own duties; the register of their room per paper; "All present", then a tap for absent or late; saved at once; another room refused by the API |
+| **Results** `/exams/results` | coordinator, admin | each grade found by candidate number in the broadsheet and typed across; a remark overwrites the first grade | the file uploaded or pasted, read through a mapping saved per board (guessed the first time, shown beside the first rows); every line says what it will do before saving; nothing overwritten; one Publish per series |
+| **Certificates** `/exams/certificates` | desk (finance officer, finance admin), coordinator, admin | envelopes in a box, a notebook of who took which; two officers can hand the same one twice | name or student ID then Enter opens the certificate ready to hand over; collector, relation and the ID seen (a choice); a printable slip to sign, its scan attachable later; a second desk is told who took it; unclaimed past retention listed to return or destroy with a reason |
+| **My exams** `/exams/my` | student, parent (published only); the desk and coordinator with `?student=` | the statement of entry handed out in class and lost; papers highlighted on the board's PDF; the seat on a list at the hall door; results as a photo in a group chat | on the phone: the next exams first with end times counting extra time, room and seat, clashes with how they are handled; the statement of entry as sent, with one line to check it; results once published, a changed grade beside the earlier one |
+
+The Settings screen shows the exam settings (centre numbers and entry route per board, carry
+forward, self-study forecasts, certificate retention, candidates per invigilator, reminder days)
+in their own group. The student record links to the student's exams, and for the coordinator and
+the admin to their candidate details.
 
 ## 9. Tests
 
@@ -263,6 +289,7 @@ rooms; no national ID in an audit row.
 | C14 | a reminder's notices sent before its claim, outside the transaction | 08x3 |
 | C15 | a parent's link to the child (family endpoints) | 05 |
 | C16 | a teacher's register limited to the room they invigilate | 08x2, 05 |
+| C17 | the entry list sorted by the entry's own code (put back: a column Cambridge's list lacks) | 08x1 |
 
 ## 10. Decisions and why
 
@@ -287,7 +314,33 @@ rooms; no national ID in an audit row.
 
 ## 11. Deferred, and why
 
-(Kept current as the work goes; see §13.)
+- **Each board's real formats.** The entry-list columns, the results files and the broadsheet
+  mapping are assumed from the boards' public documents (every screen and file says so) until the
+  coordinator shares a portal template and a past results file (§12 q4, F-07). Mappings are data,
+  so the correction is a saved mapping or a column list, not a rewrite.
+- **Submitting to the portals.** The boards take entries through their own portals (Direct,
+  Edexcel Online or Pearson's EDI files); the app sends nothing to them, so the entry list is a
+  file and "sent" is recorded by the coordinator.
+- **Money.** Nothing here takes or moves a family's money (the plan's rule): the board's fees are
+  shown as sentences; a family's refund for a withdrawal stays with the drop and refund flows.
+- **The grade of record after a remark** (RF-09): every report is kept and `gradeOfRecord` is
+  null; nothing decides until the owner answers.
+- **The Arabic hydration error on every page.** The nav shell renders English on the server and
+  Arabic on the client (its language comes from local storage), so React reports a mismatch on
+  every Arabic page, the exam pages included (also `/notifications`, untouched here). It predates
+  F4 and is the app shell's; the pages render correctly after it. The English mismatch the
+  translator caused on Suspense pages was fixed here (`localizeDom` records an attribute's source
+  in English only once Arabic needs it).
+- **Word collisions in the Arabic dictionaries.** A few words ("Session", "Withdrawn", "Grade")
+  are already translated by earlier features' dictionaries in their own sense; the exam pages use
+  longer phrases where it matters, and the single word keeps the first translation.
+- **The published count** after a revised report counts each report row, so a series with a
+  remark says one more than its candidates' grades. The families see the latest grade either way.
+- **The entry-list CSV carries no "assumed" line** (a portal import would reject it); the screen and
+  this document say the columns are assumed.
+- **The Entries screen after a deadline** was photographed with the series' responses changed in
+  the browser (`entries-after-deadline-MOCKED-*.png`, named so); no demo series has passed its
+  deadline yet. The refusal itself is the API's and is proven by 08x1 and control C1.
 
 ## 12. Questions for the owner (through the coordinator)
 
@@ -315,3 +368,13 @@ rooms; no national ID in an audit row.
 - 03:55Z — web foundation (a2c1151): exam pages guard their own roles; shared fetchers; nav for
   staff, the desk, teachers and families; Arabic plumbing; Settings shows the exam settings (and
   F0b's catalogue setting, which had no group on the screen).
+- 03:49Z–04:22Z — this document, FEATURES_PLAN §2 and §7, the test README; controls C1–C16 red
+  once each and restored (bb7b45b); the student record's links (5f88fc5). Screens built by three
+  helpers (Opus 5.5) in parallel, each driving its screens against the running system.
+- 05:09Z–05:46Z — the helpers' reports fixed in the API with a test each: the entry list's sort
+  (733678e, control C17), seating, timetable paste and moved-paper counts (6999b82), tiers,
+  withdrawn re-derivation, forecasts (3d71097), statements, result titles, the slip after the
+  hand-over, the collector's ID as a choice, certificates received for award results (7c75112).
+- 06:00Z — the lead's drive of every screen as each role in English and Arabic (family at phone
+  size); the translator's English hydration mismatch on Suspense pages fixed; screens and
+  dictionaries committed (bf17f59); §8 and §11 written.
