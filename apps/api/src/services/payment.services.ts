@@ -46,6 +46,7 @@ import type {
   ListPaymentsQueryType,
   SubmitInstapayReferenceType,
 } from '@repo/validations';
+import { COUNCIL_LABELS } from '@repo/validations';
 // V3 (§6.11): legacy provider integrations are disabled — only in-school and
 // InstaPay (manual verification) are active. Kept for when a PSP ships a real
 // InstaPay API (Paymob lists it "Coming Soon").
@@ -1900,10 +1901,7 @@ export async function generatePaymentReceipt(paymentId: string): Promise<Buffer>
   lines.push(thin);
 
   for (const subj of subjects) {
-    const councilLabel =
-      subj.council === 'pearson_edexcel' ? 'Pearson Edexcel' :
-      subj.council === 'cambridge' ? 'Cambridge' :
-      subj.council === 'oxford' ? 'Oxford' : subj.council;
+    const councilLabel = COUNCIL_LABELS[subj.council as keyof typeof COUNCIL_LABELS] ?? subj.council;
     lines.push(`  ${subj.name} (${subj.code})`);
     lines.push(`    Council: ${councilLabel}`);
     lines.push(`    Price:   EGP ${subj.price.toFixed(2)}`);

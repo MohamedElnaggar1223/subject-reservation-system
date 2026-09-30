@@ -24,8 +24,8 @@ type Subject = {
 const COUNCIL_OPTIONS = [
   { value: '', label: 'All Councils' },
   { value: 'pearson_edexcel', label: 'Pearson Edexcel' },
-  { value: 'cambridge', label: 'Cambridge' },
-  { value: 'oxford', label: 'Oxford' },
+  { value: 'cambridge', label: 'Cambridge International' },
+  { value: 'oxford', label: 'OxfordAQA' },
 ];
 
 interface Props {

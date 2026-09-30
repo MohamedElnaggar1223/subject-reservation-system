@@ -32,8 +32,8 @@ type ReceiptDetail = {
 
 const COUNCILS: Record<string, string> = {
   pearson_edexcel: 'Pearson Edexcel',
-  cambridge: 'Cambridge',
-  oxford: 'Oxford',
+  cambridge: 'Cambridge International',
+  oxford: 'OxfordAQA',
 };
 
 export default async function ReceiptPrintPage({
