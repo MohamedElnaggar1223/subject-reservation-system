@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, academicYearShortLabel, seriesYearInAcademicYear, seriesOrder } from '@repo/validations';
 import {
-  app, admin, staff, onboard, subject, session, feedSeries, refused, one, sql, audited, openWindow, holdRowLock, lockWaiters, type Client,
+  app, admin, staff, onboard, subject, session, feedSeries, refused, one, sql, audited, openWindow, holdRowLock, lockWaiters, waitFor, type Client,
 } from './helpers';
 import { schoolSheet, sclRoster, moneyRecord, workbook, zip, serial, years, D, type Cell } from './import-fixtures';
 
@@ -836,13 +836,149 @@ describe('F7: the day-one import', () => {
       await lockWaiters(2);
       await release();
       const results = await Promise.all([first, second].map((p) => refused(p)));
-      expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
-      expect(results.find((r) => r.status === 409)!.error).toMatch(/^Admin imp2? is committing this import now — wait for it to finish, then look again$/);
+      // Each family made once — checked before who was refused, so a control that lets both commits run
+      // fails here if a family is made twice, and only on the answers if the families still hold.
       expect(Number((await one<{ n: string }>(`select count(*) as n from "user" where email like 'race%'`)).n)).toBe(8);
       expect(await sql(`select 1 from audit_log where action = 'IMPORT_FAMILY_COMMITTED' and entity_id = $1`, [id])).toHaveLength(4);
-      expect(await sql(`select 1 from audit_log where action = 'IMPORT_COMMITTED' and entity_id = $1`, [id])).toHaveLength(1);
       expect(await sql(`select 1 from course_enrolment e join "user" u on u.id = e.student_id where u.email like 'race%'`)).toHaveLength(4);
+      expect(await sql(`select 1 from audit_log where action = 'IMPORT_COMMITTED' and entity_id = $1`, [id])).toHaveLength(1);
+      expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+      expect(results.find((r) => r.status === 409)!.error).toMatch(/^Admin imp2? is committing this import now — wait for it to finish, then look again$/);
       expect((await one<{ status: string; started: string | null }>(`select status, commit_started_by as started from import_batch where id = $1`, [id]))).toEqual({ status: 'committed', started: null });
+    });
+  });
+
+  describe('a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder', () => {
+    const sheet = (tag: string, teacher: string) => workbook([{
+      name: 'Stale', rows: [
+        [`Nov. ${Y} Session`],
+        ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', '', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''],
+        ...[1, 2].map((i): Cell[] => [`${tag} Child ${i}`, '11G', 'O.L.', 'Computer Science', teacher, serial(Y, 11), `010000001${i}0`, `${tag}${i}${D}`, `${tag} Parent ${i}`, `${tag}.parent${i}${D}`, `011000001${i}0`, 'I confirm my registration', 'No']),
+      ],
+    }]);
+    const batch = (id: string) => one<{ status: string; by: string | null; committed_by: string | null }>(
+      `select status, commit_started_by as by, committed_by from import_batch where id = $1`, [id]);
+
+    it('a claim under 15 minutes old is refused, naming who holds it; an older one is taken over and the commit runs', async () => {
+      const id = await stage(adm, sheet('stale', 'Mr Karim'), 'stale.xlsx', 'school_sheet');
+      // A commit that stopped part-way (its process gone): the batch still says it is being committed.
+      await sql(`update import_batch set status = 'committing', commit_started_by = $1, commit_started_at = now() - interval '14 minutes' where id = $2`, [coordinator.id, id]);
+      expect(await refused(adm.api.v1.imports[':id'].commit.$post({ param: { id } }))).toEqual({
+        status: 409, error: 'coordinator imp is committing this import now — wait for it to finish, then look again',
+      });
+      await sql(`update import_batch set commit_started_at = now() - interval '16 minutes' where id = $1`, [id]);
+      const out = await apiResponse(adm.api.v1.imports[':id'].commit.$post({ param: { id } }));
+      expect(out.result.created).toMatchObject({ students: 2, parents: 2 });
+      expect(await batch(id)).toEqual({ status: 'committed', by: null, committed_by: adm.id });
+      expect(await sql(`select 1 from audit_log where action = 'IMPORT_COMMITTED' and entity_id = $1`, [id])).toHaveLength(1);
+    });
+
+    it('a commit still running when its claim is taken over stops without resetting the new holder\'s claim', async () => {
+      const id = await stage(adm, sheet('overtaken', 'Ms Overtaken'), 'overtaken.xlsx', 'school_sheet');
+      // Hold the lock the commit takes to make reference data (a new teacher), so each commit waits there.
+      const { default: pg } = await import('pg');
+      const holder = new pg.Client({ connectionString: process.env.DATABASE_URL });
+      await holder.connect();
+      await holder.query(`select pg_advisory_lock(hashtext('import:reference'))`);
+      let released = false;
+      const release = async () => { if (!released) { released = true; await holder.query(`select pg_advisory_unlock(hashtext('import:reference'))`); await holder.end(); } };
+      try {
+        const first = coordinator.api.v1.imports[':id'].commit.$post({ param: { id } });
+        await lockWaiters(1);
+        expect(await batch(id)).toMatchObject({ status: 'committing', by: coordinator.id });
+        // Fifteen minutes on, the first commit looks stopped: the admin takes the claim over.
+        await sql(`update import_batch set commit_started_at = now() - interval '16 minutes' where id = $1`, [id]);
+        const second = adm.api.v1.imports[':id'].commit.$post({ param: { id } });
+        await lockWaiters(2);
+        expect(await batch(id)).toMatchObject({ status: 'committing', by: adm.id });
+        // The first commit was not stopped after all: it fails now, while the second holds the claim.
+        const [waiting] = await sql<{ pid: number }>(
+          `select pid from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query like '%pg_advisory_xact_lock%' order by query_start limit 1`);
+        await sql(`select pg_cancel_backend($1)`, [waiting!.pid]);
+        expect(await refused(first)).toEqual({ status: 400, error: 'Failed to commit the import' });
+        expect(await batch(id)).toMatchObject({ status: 'committing', by: adm.id });
+        await release();
+        const out = await apiResponse(second);
+        expect(out.result.created).toMatchObject({ students: 2, parents: 2 });
+        expect(await batch(id)).toEqual({ status: 'committed', by: null, committed_by: adm.id });
+        expect(await sql(`select 1 from audit_log where action = 'IMPORT_COMMITTED' and entity_id = $1`, [id])).toHaveLength(1);
+        expect(await sql(`select 1 from teacher where name = 'Ms Overtaken'`)).toHaveLength(1);
+      } finally {
+        await release();
+      }
+    });
+
+    it('a commit taken over that runs on to the end leaves the batch to the new holder: its families once, one IMPORT_COMMITTED', async () => {
+      const id = await stage(adm, sheet('runon', 'Ms Runon'), 'runon.xlsx', 'school_sheet');
+      const { default: pg } = await import('pg');
+      const holder = new pg.Client({ connectionString: process.env.DATABASE_URL });
+      await holder.connect();
+      await holder.query(`select pg_advisory_lock(hashtext('import:reference'))`);
+      let released = false;
+      const release = async () => { if (!released) { released = true; await holder.query(`select pg_advisory_unlock(hashtext('import:reference'))`); await holder.end(); } };
+      try {
+        const first = coordinator.api.v1.imports[':id'].commit.$post({ param: { id } });
+        await lockWaiters(1);
+        await sql(`update import_batch set commit_started_at = now() - interval '16 minutes' where id = $1`, [id]);
+        const second = adm.api.v1.imports[':id'].commit.$post({ param: { id } });
+        await lockWaiters(2);
+        // Both run on: the first (queued first) makes the teacher and the families; the second finds them made.
+        await release();
+        const [a, b] = await Promise.all([refused(first), refused(second)]);
+        expect(Number((await one<{ n: string }>(`select count(*) as n from "user" where email like 'runon%'`)).n)).toBe(4);
+        expect(await sql(`select 1 from audit_log where action = 'IMPORT_FAMILY_COMMITTED' and entity_id = $1`, [id])).toHaveLength(2);
+        expect(await sql(`select 1 from audit_log where action = 'IMPORT_COMMITTED' and entity_id = $1`, [id])).toHaveLength(1);
+        expect(a).toEqual({ status: 409, error: 'Another commit took this import over while this one was running: look at the import again to see what each made' });
+        expect(b.status).toBe(200);
+        expect(await batch(id)).toEqual({ status: 'committed', by: null, committed_by: adm.id });
+      } finally {
+        await release();
+      }
+    });
+
+    it('the re-read under the lock: a family the other commit made while this one waited for its rows is not made again', async () => {
+      // A family already in the system (Amir and his father, from the first file) with one new line: nothing
+      // in it is a new account, so only the family's own re-read can tell that the other commit made it.
+      const id = await stage(adm, workbook([{ name: 'Reread', rows: [
+        [`Nov. ${Y} Session`],
+        ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', '', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''],
+        ['Amir Fahmy', '11F', 'O.L.', 'Geology', 'Ms Reread', serial(Y, 11), 1011111111, `amir${D}`, 'Hany Fahmy', `hany${D}`, 1022222222, 'I confirm my registration', 'No'],
+      ] }]), 'reread.xlsx', 'school_sheet');
+      const [line] = await sql<{ id: string }>(`select id from import_row where batch_id = $1`, [id]);
+      const { default: pg } = await import('pg');
+      const holder = new pg.Client({ connectionString: process.env.DATABASE_URL });
+      await holder.connect();
+      await holder.query(`select pg_advisory_lock(hashtext('import:reference'))`);
+      let refReleased = false;
+      const releaseRef = async () => { if (!refReleased) { refReleased = true; await holder.query(`select pg_advisory_unlock(hashtext('import:reference'))`); await holder.end(); } };
+      let releaseRow: (() => Promise<void>) | null = null;
+      const rowWaiters = (n: number) => waitFor(async () => Number((await one<{ n: string }>(
+        `select count(*) as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock' and query ilike '%from "import_row"%for update%'`)).n) >= n || null);
+      try {
+        const first = coordinator.api.v1.imports[':id'].commit.$post({ param: { id } });
+        await lockWaiters(1);
+        await sql(`update import_batch set commit_started_at = now() - interval '16 minutes' where id = $1`, [id]);
+        const second = adm.api.v1.imports[':id'].commit.$post({ param: { id } });
+        await lockWaiters(2);
+        // Hold the family's line, then let both through the reference step: each works the family out
+        // (ready, nothing made yet) and waits for its line.
+        releaseRow = await holdRowLock('import_row', line!.id);
+        await releaseRef();
+        await rowWaiters(2);
+        await releaseRow();
+        releaseRow = null;
+        const [a, b] = await Promise.all([refused(first), refused(second)]);
+        expect(await sql(`select 1 from audit_log where action = 'IMPORT_FAMILY_COMMITTED' and entity_id = $1`, [id])).toHaveLength(1);
+        // The line still says what the first commit made for it (the history row), not "exists" written over it.
+        const made = await sql<{ id: string }>(`select id from registration_history where subject_label = 'Geology' and student_id = (select id from "user" where email = $1)`, [`amir${D}`]);
+        expect(made).toHaveLength(1);
+        expect(await one(`select status, outcome->>'history' as history from import_row where id = $1`, [line!.id])).toEqual({ status: 'committed', history: made[0]!.id });
+        expect(a).toEqual({ status: 409, error: 'Another commit took this import over while this one was running: look at the import again to see what each made' });
+        expect(b.status).toBe(200);
+      } finally {
+        if (releaseRow) await releaseRow();
+        await releaseRef();
+      }
     });
   });
 });

@@ -85,6 +85,13 @@ export async function commitImport(batchId: string, actor: Actor, ctx?: AuditCon
     throw new ImportError('This import was discarded', 409);
   }
   const previous = (claimed.committedAt ? 'partial' : 'staged') as 'staged' | 'partial';
+  // This commit's own claim. A claim older than STALE_CLAIM_MINUTES may be taken over by another commit
+  // while this one is still running (a process that only looked stopped): from then on this one writes
+  // nothing to the batch — neither its final status nor, on an error, a reset of the new holder's claim.
+  const ours = and(
+    eq(importBatch.id, batchId), eq(importBatch.status, 'committing'),
+    eq(importBatch.commitStartedBy, actor.id), eq(importBatch.commitStartedAt, claimed.commitStartedAt!),
+  );
   try {
     let input = await loadInput(batchId);
     let view = await computeView(input);
@@ -120,17 +127,19 @@ export async function commitImport(batchId: string, actor: Actor, ctx?: AuditCon
       created, teachersCreated: reference.teachers, sectionsCreated: reference.sections,
     };
     const status = left === 0 ? 'committed' : 'partial';
-    await db.transaction(async (tx) => {
-      await tx.update(importBatch).set({
+    const finished = await db.transaction(async (tx) => {
+      const [mine] = await tx.update(importBatch).set({
         status, result, commitStartedBy: null, commitStartedAt: null, committedBy: actor.id, committedAt: new Date(),
         summary: finalView.summary as unknown as Record<string, unknown>,
-      }).where(eq(importBatch.id, batchId));
+      }).where(ours).returning({ id: importBatch.id });
+      if (!mine) return false;
       await logAction(actor.id, 'IMPORT_COMMITTED', 'import', batchId, { status: previous }, { status, ...result }, ctx, tx);
+      return true;
     });
+    if (!finished) throw new ImportError('Another commit took this import over while this one was running: look at the import again to see what each made', 409);
     return { status, result, view: finalView };
   } catch (err) {
-    await db.update(importBatch).set({ status: previous, commitStartedBy: null, commitStartedAt: null })
-      .where(and(eq(importBatch.id, batchId), eq(importBatch.status, 'committing')));
+    await db.update(importBatch).set({ status: previous, commitStartedBy: null, commitStartedAt: null }).where(ours);
     throw err;
   }
 }
