@@ -18,8 +18,11 @@ section; print, CSV, a phone calendar), and **cover** for an absent teacher.
 
 ## 1. Data model
 
-All in `packages/db/src/schema.ts`; one migration, `0041_scheduling.sql` (generated; it was
-0040 before main's `0040_catalogue_tier` landed, §14).
+All in `packages/db/src/schema.ts`; migrations `0041_scheduling.sql` (generated; it was 0040
+before main's `0040_catalogue_tier` landed, §14), `0042_scheduling_review.sql` (generated: the
+review round's tables and columns, §16) and `0043_scheduling_review_backfill.sql` (custom,
+idempotent: the teachers groups already had, dated from their year's first day; the leavings of
+students away now; removed covers marked removed by hand).
 
 | Table | What it holds | Rules |
 |---|---|---|
@@ -34,6 +37,12 @@ All in `packages/db/src/schema.ts`; one migration, `0041_scheduling.sql` (genera
 | `teacher_absence` | a teacher away from a date to a date (or some periods of one day), a reason (`sick`, `personal`, `training`, `school_business`, `other`), a note, cancelled | periods only on a one-day absence |
 | `cover_assignment` | one lesson on one date: `assigned` to a cover teacher, `cancelled` (the lesson does not take place), or `removed` (history), the absence it rests on, the original teacher | **one live arrangement per (lesson, date)** (unique partial index); assigned has a teacher, cancelled has none |
 | `calendar_feed_token` | a user's private calendar link: the token's SHA-256 (never the token), created, last used, revoked | **one live link per user** |
+| `teaching_group_teacher` | who teaches a group from a date to a date (a row with no teacher: none from then), why, who set it | **one open row per group**; `ended_on ≥ started_on − 1`; `teaching_group.teacher_id` is the latest row's teacher |
+| `student_leaving` | each time a student left (last day, kind, reason, when recorded) and came back (first day back, who, why) | one open leaving per student; `readmitted_on ≥ left_on` |
+| `published_clash` | a clash in a published timetable a change after publishing caused and the coordinator went ahead with: version, student or teacher, the two lessons, from and to, the sentence, the cause, who and when | one person (student xor teacher) |
+
+`cover_assignment` also keeps why a removed arrangement was removed (`removal`: `by_hand`,
+`absence_withdrawn`, `cover_teacher_away`, `timetable_changed`) and the reason given.
 
 A lesson's slot is (weekday, *n*-th lesson period of the year's **default** bell schedule). On a
 date with another bell schedule (a short day), the *n*-th lesson period of that day's bells gives
@@ -41,7 +50,10 @@ its times; a lesson beyond the day's last lesson period is *not held* that day.
 
 ## 2. Who is in a group on a date (ST-16, SO-9)
 
-`groupMembersBetween(groupIds, from, to)` (`scheduling-shared.services.ts`) is the one reader:
+`groupMembersBetween(groupIds, from, to)` (`scheduling-shared.services.ts`) is the one reader of
+groups; for sections it reads F0a's module, where `sectionsBetween` / `sectionOn(studentId, date)`
+/ `sectionsOn` (`academic.services.ts`, next to `sectionOf`) are the one reading of "which section
+on a date" — the class list and the editor use them too, so F2 and F3 cannot diverge:
 
 - **Enrolment and manual groups** read their member rows. **Section groups** read the section's
   membership (F0a), so moving a student between sections moves their section-taught lessons.
@@ -49,8 +61,11 @@ its times; a lesson beyond the day's last lesson period is *not held* that day.
   covering the day of a same-day move (`[joined, joined]` in 11A, `[joined, …)` in 11B); the
   reader gives that day to the one that started later (on the same start day, the one recorded
   later). The same rule holds for two groups of one subject. F0a's rows are not changed.
-- **Leaving wins (SO-9).** Nobody is in a group after `left_on`, even where F0a clamped a
-  section's end to its start; the student's own schedule says `left` for every later date.
+- **Leaving wins (SO-9).** Nobody is in a group on a day they were away from the school — after
+  their last day until the day they came back — and a membership they had been given before the
+  leaving was recorded, starting after their last day, never begins (F0a clamps it to one day).
+  Every leaving is kept (`student_leaving`), so readmission (which clears F0a's `left_on`) does
+  not undo either; the student's own schedule says `left` for each day away.
 - Writes keep the rows honest too: leaving the school ends every open group row in the same
   transaction (`endGroupMembershipsOnLeaving`); an enrolment ended or made self-study ends that
   subject's group row (`endGroupMembershipsForSubject`); a row that would end before it began
@@ -178,9 +193,11 @@ The coordinator and the admin own groups, rules, timetables and cover (`/v1/sche
 in reaches `/v1/schedule/me/day|week` and the feed; students, parents, the desk, the coordinator,
 the admin and teachers reach `/v1/schedule/day|week` and the handler decides whose (§5);
 `/v1/schedule/lesson` (a class list) is staff-only at the gate and the handler decides which
-staff; `/v1/ical/:token` is anonymous. 47 new endpoints, each with a policy row; 05 has one F1
-case covering another family's child, another class's lesson, a cover teacher outside the
-covered lesson and date, the gate, and a wrong or revoked feed link. `role-grants.ts` gives the
+staff; `/v1/ical/:token` is anonymous. 49 endpoints (48 in the first round, then
+`GET /v1/timetables/clashes`), each with a policy row; 05 has one F1 case covering another
+family's child, another class's lesson, a cover teacher outside the covered lesson and date, the
+gate, a wrong or revoked feed link, a banned account's link (revoked by the ban, and refused on
+the request for a ban written outside the admin form) and a deactivated teacher record's link. `role-grants.ts` gives the
 coordinator the F1 prefixes and teachers the read endpoints.
 
 ## 8. Contracts for later features (F2, F3)
@@ -193,15 +210,32 @@ From `apps/api/src/services/schedule.services.ts` unless noted; types in
   student's and a teacher's ids cannot be confused. Lessons with period(s), label, times, group,
   subject, room, teacher (cover applied), scheduled teacher, status and cover; `note` says why a
   day has none (`holiday`, `weekend`, `out_of_term`, `no_academic_year`, `exam_only`,
-  `no_timetable`, `left`); `notHeld` lists lessons a short or exam-only day drops.
+  `no_timetable`, `left`, and since the review round `extra_day`: an extra school day on a weekday
+  the timetable has no lessons); `notHeld` lists lessons a short or exam-only day drops. The
+  teacher of a lesson is the group's teacher **on that date** (a change of teacher does not reach
+  back); a lesson is someone's to cover only on the version in force that date. New in the review
+  round and additive: `LessonOnDay.needsNewCover` (true when the lesson is `uncovered` because the
+  teacher given its cover is away themselves).
   *F2 (campus leave):* the lessons between the leave time and the return are the ones whose
   `startsAt`–`endsAt` overlap it. *F3 (attendance):* expected presence is the student's
   lessons that day; an `uncovered` lesson has nobody to take its register.
 - **`getScheduleRange(target, from, to)`** — the same for a range (≤ 400 days), also for
   `{ roomId }` and `{ sectionId }`.
 - **`lessonAccess(viewer, lessonId, date)`** → `'staff' | 'teacher' | 'cover' | null` — who may
-  act on a lesson that date (F3: take its register). **`classListFor(viewer, lessonId, date)`** —
-  the lesson's students that date with their section (404 for anyone else).
+  act on a lesson that date (F3: take its register); `'teacher'` means the group's teacher **on
+  that date**. **`classListFor(viewer, lessonId, date)`** — the lesson's students that date with
+  their section (`sectionOn`; 404 for anyone else). `lessonOnDate(lessonId, date)` now also
+  returns `teacherId`, the teacher that date.
+- **Who is where** (`academic.services.ts`): `sectionOn(studentId, date)`, `sectionsOn(ids, date)`,
+  `sectionsBetween(ids, from, to)`; `leavingPeriodsOf(ids)` and `awayOn(periods, id, date)`.
+- **Who teaches** (`scheduling-shared.services.ts`): `groupTeachersBetween(groupIds, from, to)`,
+  `teachersOn(groupIds, date)`, `groupsTaughtBetween(teacherId, from, to)`.
+- **Today** (`apps/api/src/lib/clock.ts`): `todayAtSchool()` and `now()` — the school's today for
+  every date rule (a test run may move it; nothing over HTTP can). F2 and F3 should read today
+  from it so their scenarios can stand inside a term too.
+- **A change after publishing** (`timetable-clash.services.ts`): `guardPublishedTimetable(tx,
+  { studentIds, teacherIds }, from, { anyway, cause, actorId }, change)` — wrap any new path
+  that moves students or teachers between lessons (F2 does not; F7's import will).
 - **`groupMembersBetween(groupIds, from, to)`** (`scheduling-shared.services.ts`) — membership
   as date intervals with §2's rules.
 - **`getSchoolDays(from, to)`** (`academic.services.ts`, extended from F0a's `getSchoolDay`) —
@@ -275,9 +309,13 @@ added (32 in the app).
 `apps/api/test/08s1-scheduling.test.ts` (groups, clashes, publishing, versions, the calendar,
 views, sections on a date, leaving, the feed, exports), `08s2-scheduling-generator.test.ts`
 (the generator at the school's size), `08s3-scheduling-cover.test.ts`,
-`08s4-scheduling-races.test.ts`, one F1 case in `05-object-access.test.ts`, and
-`09b-scheduling-invariants.test.ts` over every row the suite leaves. Each suite takes an
-academic year 20–30 years ahead so no other suite's calendar can move its lessons.
+`08s4-scheduling-races.test.ts`, `08s0-scheduling-engine.test.ts` (pure: the editor's per-cell
+judgement equals the full evaluation; the generator's two kinds of unplaced lesson),
+`08s5-scheduling-review.test.ts` (the review round, §16), one F1 case in
+`05-object-access.test.ts`, and `09b-scheduling-invariants.test.ts` over every row the suite
+leaves. Each suite takes an academic year 20–30 years ahead so no other suite's calendar can move
+its lessons; where a rule depends on today, the test clock puts the school on a day inside one of
+its terms (`setClockForTests`).
 
 | Scenario (plan) | Test |
 |---|---|
@@ -341,8 +379,15 @@ red — and 08s1 gained the assertions that do.
 
 ## 12. Deferred, and why
 
-- **A group's teacher is not dated.** Changing it changes the group's past weeks in the views
-  (not the cover log or audit). A mid-term change can be made by splitting the group on the day.
+- **A split after publishing**: the new groups are in no published timetable, so their students
+  have no lessons for that subject until a new version is published (the split says so on the
+  screen). Keeping them in the parent group's lessons until then would need the version to
+  follow the split.
+- **Leavings before the review round**: 0043 keeps the leavings of students away when it ran;
+  a leaving already undone by a readmission before then is in the audit log only.
+- **The editor judges a draft from today** (or its term's first day): a clash that ends before
+  the date the draft will take effect still shows in the editor, and publishing (judged from its
+  own date) is what decides.
 - **Subject-less groups** (study skills, a manual group without a subject) may be covered by any
   free teacher: there is no subject to be qualified in.
 - **aSc and FET files** follow the tools' published formats and are tested for their structure,
@@ -367,8 +412,13 @@ red — and 08s1 gained the assertions that do.
    only as good as this list.
 5. **Cover limits**: should a teacher's cover lessons count against their daily maximum (they do
    today), and is there a weekly cap on cover?
-6. **Mid-term teacher changes**: how often a group changes teacher during a term (§12).
+6. **Mid-term teacher changes** are dated now (§16, flag 7); how often do they happen, and
+   should the students be told when their teacher changes?
 7. **What families see**: the cover teacher's name is shown to students and parents today.
+8. **A split after publishing**: should the students moved into a new group keep the old group's
+   lessons until a new version is published (today they have none for that subject; §12)?
+9. **Going ahead with a clash**: the lead decided a change after publishing may go ahead with a
+   clash on the coordinator's confirmation. Should the admin be told, or only the list kept?
 
 ## 14. Merging with main
 
@@ -413,3 +463,67 @@ events' own times.
   (the local suite caught the tie once) (963779a).
 - 03:05Z — gates at 963779a: suite green in local time and UTC (27 files, 348 passed, 1 todo),
   api and web check-types clean; pushed.
+- 03:11Z — CI green on 80c60b4. The Opus 5.5 review of 9569dd9: twelve flags, don't merge yet.
+- 04:46Z — review round 1, the code: shared readers, dated teachers, the published-timetable
+  guard, cover carried over or lost, the worker thread, the clock, the explanations (085bd2c);
+  migrations 0042 and 0043.
+- 05:13Z — the scenarios for every flag; a version judged from its own date (56fe9a8).
+- 05:17–05:27Z — controls R1–R12 (e82617d); claims corrected in the trail.
+- 05:40–06:03Z — the web: go ahead anyway, a teacher from a date, published clashes, cover
+  carried or lost, the unplaced kinds, Today; driven on the dev school in English and Arabic,
+  three fixes found (0f42f60, 7a32ba2).
+
+## 16. The review round (Opus 5.5 review of 9569dd9; the lead's decisions applied)
+
+Each flag, what was done, and the proof (scenario, control):
+
+1. **Publishing left cover behind.** Publishing now moves each live arrangement dated on or
+   after its date, on another version of the term, to its own same lesson (group, number, slot)
+   or removes it (`timetable_changed`) and tells the cover teacher and the class; the
+   confirmation lists both. A teacher's `covering` needs the version in force. 09b: a live
+   arrangement's lesson is the one held that date. 08s5; controls R1 (red), R1b (red), R1c (the
+   view rule alone: green, redundant while carry-over holds).
+2. **A cover teacher later recorded away kept the duty.** Recording an absence removes the
+   covers that teacher gives in it (`cover_teacher_away`); the lesson shows `uncovered` with
+   `needsNewCover`, the class is told, the coordinator sees the list. 09b: nobody gives cover on a
+   day they are away. 08s5; R2.
+3. **Changes after publishing could put someone in two lessons.** Adding a student, merging,
+   splitting, forming, changing a group's teacher and F0a's section move are checked from their
+   date against the versions in force and scheduled: refused with the clashes, or — with
+   "anyway" — recorded (`published_clash`) and listed on the Timetables screen with whether each
+   still happens. 09b's student and teacher rules allow only recorded clashes (and read dated
+   teachers). 08s5 (each path); R3 (the shared guard: red, and 09b red), R3b (the section path's
+   wiring: red).
+4. **The generator ran on the API's thread.** It runs on a worker thread
+   (`generator-runner.ts`); the same input gives the same result. Measured on an infeasible
+   school-sized input on the full 3.84M-step budget: 13 s (87 placed, 9 explained as impossible),
+   the API answering in 3–10 ms meanwhile (08s2); scratch runs of three infeasible kinds 4.7–10.8 s.
+   Under 30 s, so the budget stays. R4 (red: the pings waited).
+5. **No scenario had today inside a term.** `src/lib/clock.ts` (test runs only); F0a's leaving and
+   readmission and F1's date rules read it. 08s5: "today or later", a leaving part-way through a
+   membership, a group retired by today, the version in force today. R5a–R5d (each red).
+6. **Explanations.** "Cannot be placed" (no room of the kind, the teacher never free or over their
+   week, students with more lessons than the week has periods) apart from "was not fitted in by
+   the search" (places exist; each was taken), and every count "at N of the M periods". 08s0,
+   08s2; R6; Arabic: `screens/ar-r6-cannot-be-placed.png`.
+7. **A group's teacher is dated** (`teaching_group_teacher`); earlier weeks keep their teacher;
+   the views, `lessonAccess`, the class list, cover and the publish notices read the teacher on
+   the date; the Teaching groups screen asks from which day. 08s5; R7.
+8. **Withdrawing an absence or removing a cover told nobody.** Both now tell the cover teacher
+   and the class (`COVER_CHANGED`). 08s5; R8.
+9. **The feed served banned or deactivated accounts.** Refused on the request for a banned
+   account and for a deactivated teacher record's teaching; the admin's ban revokes the links.
+   05; R9a–R9c.
+10. **Claims corrected**: the five room kinds are now shown listed after a forced move (08s1);
+    the 03:00:03Z row's evidence kept (`suite-3eea725-local-failure.txt`, from the transcript);
+    C3 and C6 said to go red by the harness timeout, with what holds named; §7 counts 49; the
+    editor's per-cell judgement is a test (08s0: 3 360 cells equal to the full evaluation; R10e).
+11. **One "which section on a date"**: `sectionsBetween` / `sectionOn` / `sectionsOn` next to F0a's
+    `sectionOf`, used by the groups, the class list and the editor. R11.
+12. **Smaller gaps**: leavings kept through readmission (R12a, R12b); an extra school day says
+    `extra_day` (R12c); Today reads whether the account teaches through a query and shows a
+    failure as one instead of an empty `catch`.
+
+Found on the way: publishing judged a version by who was in its groups over the whole term, so a
+student who left a group before the version's date made it clash; a version is now judged from
+the day it takes effect.
