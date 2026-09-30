@@ -186,7 +186,7 @@ export function MappingTab({ id, v, editable, isAdmin }: { id: string; v: Import
           <Choice
             legend="Students who have finished grade 12 by now"
             value={s.graduates}
-            options={[['import', 'Import them with their history'], ['skip', 'Leave them out']]}
+            options={[['import', 'Import them with their history'], ['skip', 'Leave the graduates out']]}
             disabled={disabled}
             onChange={(val) => set.mutate({ graduates: val as 'import' | 'skip' })}
           />

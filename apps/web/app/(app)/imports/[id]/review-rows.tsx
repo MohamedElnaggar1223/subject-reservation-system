@@ -284,6 +284,14 @@ function fieldsOf(r: ImportRow): Field[] {
   ];
 }
 
+/** The field a problem is about, so the editor marks it and puts the cursor there. */
+const PROBLEM_FIELDS: Record<string, string[]> = {
+  email_student_missing: ['studentEmail'], email_parent_missing: ['parentEmail'], email_student_is_parent: ['studentEmail', 'parentEmail'],
+  student_email_shared: ['studentEmail'], email_taken: ['studentEmail', 'parentEmail'], class_unreadable: ['classGrade'], grade_out_of_range: ['classGrade'],
+  level_code_unknown: ['levelCode'], phone_unusable: ['studentPhone', 'parentPhone'], subject_unmapped: ['subject'], student_not_found: ['studentRef'],
+  amount_unreadable: ['amount'], date_unreadable: ['date'],
+};
+
 const OUTCOME_WORDS: Record<string, string> = {
   studentId: 'Student account', link: 'Parent link', section: 'Section', enrolment: 'Course enrolment', history: 'History row',
   registration: 'Registration', money: 'Money history',
@@ -304,7 +312,10 @@ export function RowEditor({ id, v, row, editable, onClose }: { id: string; v: Im
   const choice = row.data.kind === 'sheet' ? row.data.selfStudyChoice : null;
   const person = row.studentKey ? v.people.find((p) => p.role === 'student' && p.key === row.studentKey) : undefined;
   const boxRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { boxRef.current?.focus(); }, []);
+  const flagged = new Set(row.problems.filter((p) => p.severity !== 'info').flatMap((p) => PROBLEM_FIELDS[p.code] ?? []));
+  const firstFlagged = fields.find((f) => flagged.has(f.key))?.key ?? null;
+  useEffect(() => { if (!firstFlagged || !editable) boxRef.current?.focus(); }, [firstFlagged, editable]);
+  const submit = () => save.mutate({ rowIds: [row.id], edits: { ...changed, ...(seriesChanged ? { series: series! } : {}) } });
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" role="dialog" aria-modal="true" aria-labelledby="row-editor-title"
@@ -333,7 +344,7 @@ export function RowEditor({ id, v, row, editable, onClose }: { id: string; v: Im
                     <SeverityDot severity={p.severity} />
                     <span>
                       <span className="font-medium text-foreground">{problemTitle(p.code)}</span>
-                      {p.detail && <> <span className="text-muted-foreground">—</span> <bdi data-i18n-skip="true" className="text-muted-foreground">{p.detail}</bdi></>}
+                      {p.detail && <> <span className="text-muted-foreground">—</span> <bdi className="text-muted-foreground">{p.detail}</bdi></>}
                       <span className="block text-xs text-muted-foreground">{problemMeaning(p.code)}</span>
                     </span>
                   </li>
@@ -356,8 +367,8 @@ export function RowEditor({ id, v, row, editable, onClose }: { id: string; v: Im
             </fieldset>
           )}
 
-          <section aria-labelledby="row-fields">
-            <h3 id="row-fields" className="mb-2 text-sm font-semibold text-foreground">As read {editable && <span className="font-normal text-muted-foreground">— fix any field</span>}</h3>
+          <form aria-labelledby="row-fields" onSubmit={(e) => { e.preventDefault(); if (Object.keys(changed).length || seriesChanged) submit(); }}>
+            <h3 id="row-fields" className="mb-2 text-sm font-semibold text-foreground">As read {editable && <span className="font-normal text-muted-foreground">— fix any field, Enter saves</span>}</h3>
             <div className="grid gap-3 sm:grid-cols-2">
               {fields.map((f) => (
                 <label key={f.key} className={cn('block text-sm', f.type === 'text' && f.wide && 'sm:col-span-2')}>
@@ -368,7 +379,11 @@ export function RowEditor({ id, v, row, editable, onClose }: { id: string; v: Im
                   {f.type === 'check' ? (
                     <input type="checkbox" disabled={!editable} checked={values[f.key] === true} onChange={(e) => setValues({ ...values, [f.key]: e.target.checked })} />
                   ) : (
-                    <input dir="auto" data-i18n-skip="true" disabled={!editable} className={INPUT} value={String(values[f.key] ?? '')} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })} />
+                    <input
+                      dir="auto" data-i18n-skip="true" disabled={!editable} aria-invalid={flagged.has(f.key) || undefined} autoFocus={editable && f.key === firstFlagged}
+                      className={cn(INPUT, flagged.has(f.key) && 'border-destructive ring-[3px] ring-destructive/20')}
+                      value={String(values[f.key] ?? '')} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+                    />
                   )}
                 </label>
               ))}
@@ -387,16 +402,15 @@ export function RowEditor({ id, v, row, editable, onClose }: { id: string; v: Im
             </div>
             {editable && (
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button disabled={save.isPending || (!Object.keys(changed).length && !seriesChanged)}
-                  onClick={() => save.mutate({ rowIds: [row.id], edits: { ...changed, ...(seriesChanged ? { series: series! } : {}) } })}>
+                <Button type="submit" disabled={save.isPending || (!Object.keys(changed).length && !seriesChanged)}>
                   {save.isPending ? 'Saving…' : 'Save the fixes'}
                 </Button>
                 {Object.keys(edits).length > 0 && (
-                  <Button variant="outline" disabled={save.isPending} onClick={() => save.mutate({ rowIds: [row.id], clear: Object.keys(edits) })}>Back to what the sheet says</Button>
+                  <Button type="button" variant="outline" disabled={save.isPending} onClick={() => save.mutate({ rowIds: [row.id], clear: Object.keys(edits) })}>Back to what the sheet says</Button>
                 )}
               </div>
             )}
-          </section>
+          </form>
 
           {editable && (
             <section aria-labelledby="row-decision" className="rounded-lg border border-border p-3">

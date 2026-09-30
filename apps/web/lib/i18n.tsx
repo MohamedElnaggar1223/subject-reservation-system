@@ -185,7 +185,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.exams': 'الامتحانات',
     'nav.catalogue': 'دليل الامتحانات',
     'nav.boardSeries': 'دورات المجالس',
-    'nav.import': 'الاستيراد الأول',
+    'nav.import': 'استيراد بدء التشغيل',
     'app.subjectReservation': 'حجز المواد',
     'common.user': 'مستخدم',
     'common.signOut': 'تسجيل الخروج',

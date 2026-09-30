@@ -140,15 +140,22 @@ export default function ReviewClient({ id, isAdmin }: { id: string; isAdmin: boo
             <span>Its review — fixes, merges, skips and the mapping — was carried over. Anything already committed is found and left as it is: committing again changes nothing.</span>
           </Notice>
         )}
-        {v.notes.map((n, i) => (
-          <details key={`${n.code}-${i}`} className="rounded-xl border border-border bg-card px-4 py-2 text-sm">
+        {v.notes.length > 0 && (
+          <details className="rounded-xl border border-border bg-card px-4 py-2 text-sm">
             <summary className="cursor-pointer font-medium text-foreground">
-              <span>{noteTitle(n.code)}</span>
-              {n.detail && <> <span className="text-muted-foreground">—</span> <bdi data-i18n-skip="true" className="text-muted-foreground">{n.detail}</bdi></>}
+              <span>About this file</span>: <span className="font-normal text-muted-foreground">{v.notes.map((n) => noteTitle(n.code)).join(' · ')}</span>
             </summary>
-            <p className="mt-1 text-muted-foreground">{noteMeaning(n.code)}</p>
+            <ul className="mt-2 space-y-2">
+              {v.notes.map((n, i) => (
+                <li key={`${n.code}-${i}`}>
+                  <span className="font-medium text-foreground">{noteTitle(n.code)}</span>
+                  {n.detail && <> <span className="text-muted-foreground">—</span> <bdi data-i18n-skip="true" className="text-muted-foreground">{n.detail}</bdi></>}
+                  <span className="block text-muted-foreground">{noteMeaning(n.code)}</span>
+                </li>
+              ))}
+            </ul>
           </details>
-        ))}
+        )}
       </div>
 
       <div role="tablist" aria-label="Review" className="mb-4 flex flex-wrap gap-1 border-b border-border">
@@ -213,15 +220,15 @@ export default function ReviewClient({ id, isAdmin }: { id: string; isAdmin: boo
   );
 }
 
-/** What a commit would do now, in the school's words. */
+/** What a commit would do now, in the school's words: one strip, so the rows stay near the top. */
 function SummaryPanel({ v }: { v: ImportView }) {
   const s = v.summary;
   return (
-    <section aria-label="What a commit would do" className="mb-5 grid gap-3 md:grid-cols-4">
+    <section aria-label="What a commit would do" className="mb-4 flex flex-wrap items-start gap-x-8 gap-y-3 rounded-xl border border-border bg-card p-4 shadow-sm">
       <Stat label="Rows" value={s.rows} hint={<><span className="tabular-nums">{s.importing}</span> <span>to import</span> · <span className="tabular-nums">{s.skipped}</span> <span>left out</span></>} />
       <Stat label="Families ready" value={s.readyFamilies} tone="info" hint={<><span className="tabular-nums">{s.committedFamilies}</span> <span>committed</span></>} />
       <Stat label="Families held back" value={s.heldFamilies} tone={s.heldFamilies ? 'danger' : 'neutral'} hint={<><span className="tabular-nums">{s.rowsWithErrors}</span> <span>rows to fix</span></>} />
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className="min-w-64 flex-1">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">A commit would make</p>
         <PlanList v={v} compact />
       </div>
@@ -231,10 +238,10 @@ function SummaryPanel({ v }: { v: ImportView }) {
 
 function Stat({ label, value, hint, tone = 'neutral' }: { label: string; value: number; hint: React.ReactNode; tone?: 'neutral' | 'info' | 'danger' }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+    <div>
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={cn('mt-1 font-display text-2xl font-bold tabular-nums', tone === 'danger' && value ? 'text-red-600 dark:text-red-400' : tone === 'info' ? 'text-primary' : 'text-foreground')}>{value}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
+      <p className={cn('font-display text-2xl font-bold tabular-nums leading-tight', tone === 'danger' && value ? 'text-red-600 dark:text-red-400' : tone === 'info' ? 'text-primary' : 'text-foreground')}>{value}</p>
+      <p className="text-xs text-muted-foreground">{hint}</p>
     </div>
   );
 }
@@ -256,7 +263,7 @@ export function PlanList({ v, compact = false }: { v: ImportView; compact?: bool
   const shown = items.filter(([n]) => n > 0);
   const matched = p.students.match + p.parents.match;
   return (
-    <ul className={cn('mt-1 text-sm', compact ? 'space-y-0' : 'space-y-0.5')}>
+    <ul className={cn('mt-1 text-sm', compact ? 'flex flex-wrap gap-x-4 gap-y-0.5' : 'space-y-0.5')}>
       {shown.length === 0 && <li className="text-muted-foreground">Nothing new</li>}
       {shown.map(([n, label]) => (
         <li key={label}><span className="font-semibold tabular-nums text-foreground">{n}</span> <span className="text-muted-foreground">{label}</span></li>

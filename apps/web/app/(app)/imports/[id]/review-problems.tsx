@@ -8,6 +8,7 @@
  */
 
 import { useMemo, useState } from 'react';
+import { COUNCIL_LABELS, type Council } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { EmptyState } from '~/components/ui/query-state';
@@ -77,7 +78,7 @@ export function ProblemsTab({ v, onOpenRows, onEdit }: { v: ImportView; onOpenRo
                             <span className="w-28 shrink-0"><LineRef r={r} /></span>
                             <span className="w-56 min-w-0"><Who name={s.student} email={s.email} /></span>
                             <bdi data-i18n-skip="true" className="min-w-0 flex-1 truncate text-muted-foreground">{[s.subject, s.code].filter(Boolean).join(' · ')}</bdi>
-                            {p?.detail && <bdi data-i18n-skip="true" className="text-xs text-muted-foreground">{p.detail}</bdi>}
+                            {p?.detail && <bdi className="text-xs text-muted-foreground">{p.detail}</bdi>}
                             <Button size="sm" variant="outline" onClick={() => onEdit(r.id)}>Fix</Button>
                           </li>
                         );
@@ -96,7 +97,7 @@ export function ProblemsTab({ v, onOpenRows, onEdit }: { v: ImportView; onOpenRo
                       <li key={`${p.role}|${p.key}`} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
                         <Badge tone="neutral">{p.role === 'student' ? 'Student' : 'Parent'}</Badge>
                         <span className="w-64 min-w-0"><Who name={p.name} email={p.email} /></span>
-                        <bdi data-i18n-skip="true" className="text-xs text-muted-foreground">{p.problems.find((x) => x.code === g.code)?.detail}</bdi>
+                        <bdi className="text-xs text-muted-foreground">{p.problems.find((x) => x.code === g.code)?.detail}</bdi>
                       </li>
                     ))}
                     <li className="px-3 py-2 text-xs text-muted-foreground">Settle these on the People and conflicts tab.</li>
@@ -105,7 +106,7 @@ export function ProblemsTab({ v, onOpenRows, onEdit }: { v: ImportView; onOpenRo
                 {g.series.length > 0 && (
                   <ul className="mt-3 space-y-1 text-sm">
                     {g.series.map((s) => (
-                      <li key={s.key}><bdi data-i18n-skip="true">{s.label}</bdi> <span className="text-muted-foreground">·</span> <span>{s.level === 'igcse' ? 'IGCSE' : s.level === 'as_level' ? 'AS Level' : 'A Level'}</span> <span className="text-muted-foreground">—</span> <bdi data-i18n-skip="true" className="text-muted-foreground">{s.boards.join(', ')}</bdi></li>
+                      <li key={s.key}><bdi data-i18n-skip="true">{s.label}</bdi> <span className="text-muted-foreground">·</span> <span>{s.level === 'igcse' ? 'IGCSE' : s.level === 'as_level' ? 'AS Level' : 'A Level'}</span> <span className="text-muted-foreground">—</span> <bdi data-i18n-skip="true" className="text-muted-foreground">{s.boards.map((b) => COUNCIL_LABELS[b as Council] ?? b).join(', ')}</bdi></li>
                     ))}
                   </ul>
                 )}
