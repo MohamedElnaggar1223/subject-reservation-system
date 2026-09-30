@@ -134,3 +134,13 @@ export const MoveRegistrationsToSeries = z.object({
   reason: z.string().trim().min(5, 'Say why (at least 5 characters)').max(500),
 });
 export type MoveRegistrationsToSeriesType = z.infer<typeof MoveRegistrationsToSeries>;
+
+/**
+ * Staff checked registrations the migration entered with a board it inferred
+ * (their subject's board does not sit the window's month): they leave the
+ * Board series screen's "check these" list.
+ */
+export const MarkInferredChecked = z.object({
+  registrationIds: z.array(z.string().min(1)).min(1, 'Choose the registrations you checked').max(500),
+});
+export type MarkInferredCheckedType = z.infer<typeof MarkInferredChecked>;

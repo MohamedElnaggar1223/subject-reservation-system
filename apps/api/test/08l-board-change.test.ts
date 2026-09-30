@@ -54,7 +54,6 @@ describe('F0b: a board change and the entry deadline', () => {
       subj[tag] = await subject(adm, `BC-${tag}`, `Board change ${tag}`, { course: 1000, registration: 400 });
     }
     fam = await onboard(officer, 'bc', 11);
-    void coordinator;
   });
 
   it("refused when the new board's series is past its entry deadline: nothing moves (MO-10)", async () => {
@@ -103,6 +102,30 @@ describe('F0b: a board change and the entry deadline', () => {
     expect(await councilOf(subj.SAM!)).toBe('pearson_edexcel');
     expect(await seriesOf(reg)).toBe(pea);
     await audited([reg], ['REGISTRATION_SERIES_MOVED']);
+  });
+
+  it("what the migration inferred is listed for staff to check, until they mark it checked (flag 5)", async () => {
+    // Migration 0038 writes these rows when a subject's board does not sit its
+    // window's month; the suite's database starts empty, so the rows are
+    // written here as the migration writes them (the one reach past the API).
+    const w = await window('inferred');
+    const pea = await series('pearson_edexcel', w.year, 'BC inferred');
+    await feed(w.id, [{ boardSeriesId: pea, isDefault: true }]);
+    const sub = await subject(adm, 'BC-INF', 'Board change inferred', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
+    const reg = await prereg(w.id, sub);
+    await sql(`insert into audit_log (id, user_id, action, entity_type, entity_id, previous_data, new_data, created_at)
+      values (gen_random_uuid()::text, null, 'SUBJECT_BOARD_INFERRED', 'subject', $1, '{"council":"cambridge"}', '{"council":"pearson_edexcel"}', now()),
+             (gen_random_uuid()::text, null, 'REGISTRATION_SERIES_INFERRED', 'registration', $2, '{"council":"cambridge"}', '{"council":"pearson_edexcel"}', now())`, [sub, reg]);
+    const listed = await apiResponse(coordinator.api.v1['board-series'].inferred.$get());
+    expect(listed.find((r) => r.registrationId === reg)).toMatchObject({
+      subjectName: 'Board change inferred', previousBoardName: 'Cambridge International', boardName: 'Pearson Edexcel', series: expect.stringMatching(/^Pearson Edexcel November \d{4} \(BC inferred\)$/),
+    });
+    await apiResponse(coordinator.api.v1['board-series'].inferred.checked.$post({ json: { registrationIds: [reg] } }));
+    await audited([reg], ['REGISTRATION_SERIES_INFERENCE_CHECKED']);
+    expect((await apiResponse(coordinator.api.v1['board-series'].inferred.$get())).some((r) => r.registrationId === reg)).toBe(false);
+    expect(await refused(coordinator.api.v1['board-series'].inferred.checked.$post({ json: { registrationIds: [reg] } }))).toEqual({
+      status: 404, error: 'One or more of these registrations are not waiting to be checked',
+    });
   });
 
   describe("a window's route for the subject moves with it (flag 2)", () => {
