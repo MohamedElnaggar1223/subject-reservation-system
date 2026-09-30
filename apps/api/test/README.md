@@ -56,6 +56,10 @@ merged; a red run on `main` is fixed before anything else lands.
 | `05-object-access.test.ts` | one family's parent and student against another family's records of every kind; each attempt refused, nothing changed |
 | `06-auth-surface.test.ts` | privilege escalation through better-auth, session token exposure, cookie flags, cross-site writes, body limit, rate-limit keying, security headers, teacher contact details |
 | `07-audit-trail.test.ts` | the actions that move money, grant access to a child or change fees leave an audit row before the response |
+| `08x1-exam-entries.test.ts` | F4: candidates (UCI, numbers per series), entries derived per component, the entry list's check, MO-10's hard stop with withdrawal fees and amendments, forecasts, national IDs hidden (docs/features/EXAM_ENTRIES.md) |
+| `08x2-exam-days-results.test.ts` | F4: the timetable pasted with a mapping, clashes, publication and the statement, seating without double-booked seats, invigilators and registers, special consideration, results keeping every attempt, publication, certificates, the deadlines dashboard |
+| `08x3-exam-races.test.ts` | F4: two people (or scheduler instances) at once — derivation, numbering, withdraw against amend, one seat, a results import, a certificate at two desks, reminders |
+| `exam-helpers.ts` | F4's school for those suites: staff, a catalogue per suite tag, an open window on the free (type, level) pair, families registered at the desk |
 
 **Adding an endpoint?** Add its row to `authz-policy.tsv` (A = may get past the role gate,
 D = refused, one column per principal). The matrix test fails on an endpoint without a row, so
