@@ -25,17 +25,18 @@ import {
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  schoolDateString, type CreateAbsenceType, type CancelAbsenceType, type AssignCoverType, type RemoveCoverType, type RangeQueryType,
+  type CreateAbsenceType, type CancelAbsenceType, type AssignCoverType, type RemoveCoverType, type RangeQueryType,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { createBulkNotifications } from './notification.services';
 import { getScheduleRange, getScheduleFor, lessonOnDate, type LessonOnDay } from './schedule.services';
 import { SchedulingError, isUniqueViolation, addDays, readableDate, groupMembersBetween, csvCell, type Tx } from './scheduling-shared.services';
+import { todayAtSchool } from '../lib/clock';
 
 // ─── Absences ────────────────────────────────────────────────────────────────
 
 export async function listAbsences(q: RangeQueryType) {
-  const today = schoolDateString(new Date());
+  const today = todayAtSchool();
   const from = q.from ?? addDays(today, -14);
   const to = q.to ?? addDays(today, 60);
   const rows = await db.select({ a: teacherAbsence, teacherName: teacher.name, recordedByName: user.name })
@@ -90,9 +91,23 @@ export async function recordAbsence(data: CreateAbsenceType, actorId: string, ct
     await tx.insert(teacherAbsence).values({
       id, teacherId: t.id, startsOn: data.startsOn, endsOn: data.endsOn, periods: data.periods ?? null, reason: data.reason, note: data.note ?? null, recordedBy: actorId,
     });
-    await logAction(actorId, 'TEACHER_ABSENCE_RECORDED', 'teacher_absence', id, null, { teacherId: t.id, startsOn: data.startsOn, endsOn: data.endsOn, periods: data.periods ?? null, reason: data.reason }, ctx, tx);
-    return { id };
-  }).then(async (r) => ({ ...r, ...(await getAbsence(r.id)) }));
+    // The covers this teacher was giving in that time are lost: each lesson goes back to needing cover.
+    const giving = await tx.select({ c: coverAssignment, period: timetableLesson.period, length: timetableLesson.length })
+      .from(coverAssignment).innerJoin(timetableLesson, eq(timetableLesson.id, coverAssignment.lessonId))
+      .where(and(eq(coverAssignment.coverTeacherId, t.id), eq(coverAssignment.status, 'assigned'), gte(coverAssignment.date, data.startsOn), lte(coverAssignment.date, data.endsOn)))
+      .for('update', { of: coverAssignment });
+    const lost = giving.filter((x) => !data.periods || Array.from({ length: x.length }, (_, k) => x.period! + k).some((p) => data.periods!.includes(p)));
+    for (const x of lost) {
+      await tx.update(coverAssignment).set({ status: 'removed', removal: 'cover_teacher_away', removeReason: `${t.name} is away`, removedAt: new Date(), removedBy: actorId })
+        .where(eq(coverAssignment.id, x.c.id));
+    }
+    await logAction(actorId, 'TEACHER_ABSENCE_RECORDED', 'teacher_absence', id, null,
+      { teacherId: t.id, startsOn: data.startsOn, endsOn: data.endsOn, periods: data.periods ?? null, reason: data.reason, coversLost: lost.map((x) => x.c.id) }, ctx, tx);
+    return { id, lostIds: lost.map((x) => x.c.id) };
+  }).then(async ({ lostIds, ...r }) => {
+    await coverChangeNotices(lostIds, 'cover_teacher_away').catch((err) => console.error('[cover] notices failed:', err));
+    return { ...r, ...(await getAbsence(r.id)), coversLost: await describeCovers(lostIds) };
+  });
 }
 
 /** The teacher is not away after all: the absence and its covers are withdrawn (kept as history). */
@@ -102,10 +117,13 @@ export async function cancelAbsence(id: string, data: CancelAbsenceType, actorId
     if (!a) throw new SchedulingError('Absence not found', 404);
     if (a.cancelledAt) throw new SchedulingError('This absence was already withdrawn', 409);
     await tx.update(teacherAbsence).set({ cancelledAt: new Date(), cancelledBy: actorId }).where(eq(teacherAbsence.id, id));
-    const live = await tx.update(coverAssignment).set({ status: 'removed', removedAt: new Date(), removedBy: actorId })
+    const live = await tx.update(coverAssignment).set({ status: 'removed', removal: 'absence_withdrawn', removeReason: data.reason, removedAt: new Date(), removedBy: actorId })
       .where(and(eq(coverAssignment.absenceId, id), ne(coverAssignment.status, 'removed'))).returning({ id: coverAssignment.id });
     await logAction(actorId, 'TEACHER_ABSENCE_CANCELLED', 'teacher_absence', id, null, { reason: data.reason, coversRemoved: live.length }, ctx, tx);
-    return { id, coversRemoved: live.length };
+    return { id, coversRemoved: live.length, removedIds: live.map((l) => l.id) };
+  }).then(async ({ removedIds, ...r }) => {
+    await coverChangeNotices(removedIds, 'absence_withdrawn').catch((err) => console.error('[cover] notices failed:', err));
+    return r;
   });
 }
 
@@ -141,7 +159,7 @@ export async function suggestCover(lessonId: string, date: string) {
   const termStart = held.day.term ? (await db.execute(sql`select starts_on from academic_term where id = ${held.day.term.id}`)).rows[0] as { starts_on: string } | undefined : undefined;
   const out: Candidate[] = [];
   for (const t of teachers) {
-    if (t.id === g.teacherId) continue;
+    if (t.id === held.teacherId) continue;
     const c = await judgeCandidate(t.id, t.name, date, periods, held.lesson.weekday!, g.academicYearId, qualifiedIds, subj?.name ?? null, termStart?.starts_on ?? date);
     out.push(c);
   }
@@ -200,12 +218,13 @@ export async function assignCover(data: AssignCoverType, actorId: string, ctx?: 
     const [existing] = await tx.select().from(coverAssignment)
       .where(and(eq(coverAssignment.lessonId, data.lessonId), eq(coverAssignment.date, data.date), ne(coverAssignment.status, 'removed')));
     if (existing) throw new SchedulingError('This lesson already has cover arranged — remove it first to change it', 409);
-    const [owner] = g.teacherId ? await tx.select().from(teacher).where(eq(teacher.id, g.teacherId)) : [];
-    const absences = g.teacherId
-      ? await tx.select().from(teacherAbsence).where(and(eq(teacherAbsence.teacherId, g.teacherId), isNull(teacherAbsence.cancelledAt), lte(teacherAbsence.startsOn, data.date), gte(teacherAbsence.endsOn, data.date)))
+    const ownerId = held.teacherId;
+    const [owner] = ownerId ? await tx.select().from(teacher).where(eq(teacher.id, ownerId)) : [];
+    const absences = ownerId
+      ? await tx.select().from(teacherAbsence).where(and(eq(teacherAbsence.teacherId, ownerId), isNull(teacherAbsence.cancelledAt), lte(teacherAbsence.startsOn, data.date), gte(teacherAbsence.endsOn, data.date)))
       : [];
     const absence = absences.find((a) => !a.periods || a.periods.some((p) => periods.includes(p))) ?? null;
-    if (g.teacherId && !absence) {
+    if (ownerId && !absence) {
       throw new SchedulingError(`${owner?.name ?? 'The teacher'} is not recorded as away then — record the absence first`, 409);
     }
     let coverTeacher: typeof teacher.$inferSelect | null = null;
@@ -213,7 +232,7 @@ export async function assignCover(data: AssignCoverType, actorId: string, ctx?: 
       coverTeacher = (await tx.select().from(teacher).where(eq(teacher.id, data.coverTeacherId!)).for('update'))[0] ?? null;
       if (!coverTeacher) throw new SchedulingError('Teacher not found', 404);
       if (!coverTeacher.isActive) throw new SchedulingError(`${coverTeacher.name} is inactive`, 409);
-      if (coverTeacher.id === g.teacherId) throw new SchedulingError(`${coverTeacher.name} is the lesson's own teacher`, 409);
+      if (coverTeacher.id === ownerId) throw new SchedulingError(`${coverTeacher.name} is the lesson's own teacher`, 409);
       const qualifiedIds = g.subjectId
         ? new Set((await tx.select({ teacherId: subjectTeacher.teacherId }).from(subjectTeacher).where(eq(subjectTeacher.subjectId, g.subjectId))).map((r) => r.teacherId))
         : null;
@@ -233,10 +252,10 @@ export async function assignCover(data: AssignCoverType, actorId: string, ctx?: 
     const id = randomUUID();
     await tx.insert(coverAssignment).values({
       id, absenceId: absence?.id ?? null, date: data.date, timetableId: held.timetable.id, lessonId: data.lessonId, groupId: g.id,
-      originalTeacherId: g.teacherId, coverTeacherId: coverTeacher?.id ?? null, status: data.cancel ? 'cancelled' : 'assigned', note: data.note ?? null, assignedBy: actorId,
+      originalTeacherId: ownerId, coverTeacherId: coverTeacher?.id ?? null, status: data.cancel ? 'cancelled' : 'assigned', note: data.note ?? null, assignedBy: actorId,
     });
     await logAction(actorId, data.cancel ? 'LESSON_CANCELLED' : 'COVER_ASSIGNED', 'cover_assignment', id, null,
-      { lessonId: data.lessonId, date: data.date, group: g.name, originalTeacherId: g.teacherId, coverTeacherId: coverTeacher?.id ?? null, note: data.note ?? null }, ctx, tx);
+      { lessonId: data.lessonId, date: data.date, group: g.name, originalTeacherId: ownerId, coverTeacherId: coverTeacher?.id ?? null, note: data.note ?? null }, ctx, tx);
     notice = { coverTeacherUserId: coverTeacher?.userId ?? null, coverTeacherName: coverTeacher?.name ?? null, groupId: g.id, groupName: g.name, label, date: data.date, cancelled: !!data.cancel };
     return { id, status: data.cancel ? 'cancelled' as const : 'assigned' as const, coverTeacherId: coverTeacher?.id ?? null };
   }).catch((err) => {
@@ -267,10 +286,67 @@ export async function removeCover(id: string, data: RemoveCoverType, actorId: st
     const [c] = await tx.select().from(coverAssignment).where(eq(coverAssignment.id, id)).for('update');
     if (!c) throw new SchedulingError('Cover not found', 404);
     if (c.status === 'removed') throw new SchedulingError('This cover was already removed', 409);
-    await tx.update(coverAssignment).set({ status: 'removed', removedAt: new Date(), removedBy: actorId }).where(eq(coverAssignment.id, id));
+    await tx.update(coverAssignment).set({ status: 'removed', removal: 'by_hand', removeReason: data.reason, removedAt: new Date(), removedBy: actorId }).where(eq(coverAssignment.id, id));
     await logAction(actorId, 'COVER_REMOVED', 'cover_assignment', id, { status: c.status, coverTeacherId: c.coverTeacherId }, { status: 'removed', reason: data.reason }, ctx, tx);
     return { id };
+  }).then(async (r) => {
+    await coverChangeNotices([r.id], 'by_hand').catch((err) => console.error('[cover] notices failed:', err));
+    return r;
   });
+}
+
+// ─── Telling people an arrangement is gone ───────────────────────────────────
+
+type Removal = 'by_hand' | 'absence_withdrawn' | 'cover_teacher_away' | 'timetable_changed';
+
+/** The removed arrangements, as the screens list them. */
+export async function describeCovers(ids: string[]) {
+  if (!ids.length) return [];
+  const rows = await db.select({
+    id: coverAssignment.id, date: coverAssignment.date, groupName: teachingGroup.name, period: timetableLesson.period,
+    cover: sql<string | null>`(select name from ${teacher} t where t.id = ${coverAssignment.coverTeacherId})`,
+  }).from(coverAssignment)
+    .innerJoin(teachingGroup, eq(teachingGroup.id, coverAssignment.groupId))
+    .innerJoin(timetableLesson, eq(timetableLesson.id, coverAssignment.lessonId))
+    .where(inArray(coverAssignment.id, ids))
+    .orderBy(asc(coverAssignment.date), asc(timetableLesson.period));
+  return rows.map((r) => ({ ...r, summary: `${r.groupName} on ${readableDate(r.date)}, period ${r.period}${r.cover ? ` (was ${r.cover})` : ' (was cancelled)'}` }));
+}
+
+/**
+ * After arrangements are removed: the cover teacher is told they no longer
+ * cover the lesson, and its students what happens now — their own teacher
+ * after all, a new cover being arranged, or the timetable changed.
+ */
+export async function coverChangeNotices(ids: string[], removal: Removal, extra?: { effectiveFrom?: string }) {
+  if (!ids.length) return;
+  const rows = await db.select({
+    c: coverAssignment, groupName: teachingGroup.name, period: timetableLesson.period, length: timetableLesson.length,
+    coverName: sql<string | null>`(select name from ${teacher} t where t.id = ${coverAssignment.coverTeacherId})`,
+    coverUserId: sql<string | null>`(select user_id from ${teacher} t where t.id = ${coverAssignment.coverTeacherId})`,
+    originalName: sql<string | null>`(select name from ${teacher} t where t.id = ${coverAssignment.originalTeacherId})`,
+  }).from(coverAssignment)
+    .innerJoin(teachingGroup, eq(teachingGroup.id, coverAssignment.groupId))
+    .innerJoin(timetableLesson, eq(timetableLesson.id, coverAssignment.lessonId))
+    .where(inArray(coverAssignment.id, ids));
+  for (const r of rows) {
+    const periodLabel = r.length > 1 ? `periods ${r.period}–${r.period! + r.length - 1}` : `period ${r.period}`;
+    const when = `${readableDate(r.c.date)}, ${periodLabel}`;
+    if (r.coverUserId && r.c.status !== 'cancelled' && r.c.coverTeacherId) {
+      const why = removal === 'absence_withdrawn' ? `${r.originalName ?? 'Its teacher'} is not away after all`
+        : removal === 'cover_teacher_away' ? 'you are recorded as away then'
+        : removal === 'timetable_changed' ? `the timetable changes from ${readableDate(extra?.effectiveFrom ?? r.c.date)}`
+        : 'the arrangement was changed';
+      await createBulkNotifications([r.coverUserId], 'COVER_CHANGED', `No longer covering ${r.groupName}`, `You no longer cover ${r.groupName} on ${when}: ${why}.`, { date: r.c.date, link: '/today' });
+    }
+    const students = [...new Set((await groupMembersBetween([r.c.groupId], r.c.date, r.c.date)).map((m) => m.studentId))];
+    if (!students.length) continue;
+    const body = removal === 'absence_withdrawn' ? `${r.groupName} on ${when} takes place with ${r.originalName ?? 'its own teacher'} after all.`
+      : removal === 'cover_teacher_away' ? `${r.groupName} on ${when}: ${r.coverName ?? 'the cover teacher'} cannot take it after all; new cover is being arranged.`
+      : removal === 'timetable_changed' ? `${r.groupName} on ${when}: the timetable changes from ${readableDate(extra?.effectiveFrom ?? r.c.date)}, so the arrangement made for this lesson no longer applies. Look at your timetable for that day.`
+      : `${r.groupName} on ${when}: the arrangement made for this lesson was changed. Look at your timetable for that day.`;
+    await createBulkNotifications(students, 'COVER_CHANGED', `${r.groupName}: cover changed`, body, { date: r.c.date, link: '/my-timetable' });
+  }
 }
 
 // ─── The log and the report ──────────────────────────────────────────────────

@@ -35,6 +35,8 @@ export type LessonOnDay = {
   scheduledTeacher: SchedulePerson | null;
   status: LessonStatus;
   cover: { assignmentId: string; status: 'assigned' | 'cancelled'; teacher: SchedulePerson | null } | null;
+  /** Uncovered because the teacher given the cover is away themselves: it needs new cover. */
+  needsNewCover?: boolean;
   /** How many of the section's students are in it (section view). */
   sectionStudents?: number;
 };
@@ -51,7 +53,9 @@ export type DaySchedule = {
   bellSchedule: { id: string; name: string } | null;
   timetable: { id: string; name: string; effectiveFrom: string } | null;
   /** Why the day has no lessons, when it has none. */
-  note: 'holiday' | 'weekend' | 'out_of_term' | 'no_academic_year' | 'exam_only' | 'no_timetable' | 'left' | null;
+  note: 'holiday' | 'weekend' | 'out_of_term' | 'no_academic_year' | 'exam_only' | 'no_timetable' | 'left'
+    // An extra school day (a Saturday made a school day) on a weekday the weekly timetable has no lessons.
+    | 'extra_day' | null;
   lessons: LessonOnDay[];
   notHeld: NotHeld[];
 };

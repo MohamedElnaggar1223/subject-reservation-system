@@ -44,6 +44,12 @@ export type UnplacedLesson = {
   groupName: string;
   seq: number;
   length: number;
+  /**
+   * 'impossible': something no arrangement could fix (no room of the kind it
+   * needs, its teacher never free, its students with more lessons than the week
+   * has periods); 'not_fitted': places exist, but the search did not free one.
+   */
+  cause: 'impossible' | 'not_fitted';
   /** What stopped it, most common first: one sentence each. */
   reasons: string[];
   /** One sentence for the whole lesson. */
@@ -592,6 +598,11 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
   const unplaced: UnplacedLesson[] = [];
   const teacherNeeds = new Map<number, number>();
   for (let l = 0; l < L; l++) { const t = groupTeacher[lGroup[l]!]!; if (t >= 0) teacherNeeds.set(t, (teacherNeeds.get(t) ?? 0) + lLen[l]!); }
+  // Each student's periods of lessons in the week, over all their groups.
+  const groupPeriods = new Map<number, number>();
+  for (let l = 0; l < L; l++) groupPeriods.set(lGroup[l]!, (groupPeriods.get(lGroup[l]!) ?? 0) + lLen[l]!);
+  const studentNeeds = new Map<string, number>();
+  groups.forEach((grp, gi) => { for (const st of grp.students) studentNeeds.set(st, (studentNeeds.get(st) ?? 0) + (groupPeriods.get(gi) ?? 0)); });
   for (let l = 0; l < L; l++) {
     if (lCell[l]! >= 0) continue;
     const g = lGroup[l]!;
@@ -603,6 +614,7 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     if (lLocked[l]) {
       unplaced.push({
         lessonId: lesson0.id, groupId: grp.id, groupName: grp.name, seq: lesson0.seq, length: lLen[l]!,
+        cause: 'impossible',
         reasons: ['It is locked at a period the bell schedule does not have: unlock it or move it'],
         summary: `${grp.name}, lesson ${lesson0.seq} is locked at a period the bell schedule does not have`,
       });
@@ -624,6 +636,11 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
         reasons.push(`${tName} has ${teacherNeeds.get(t)} periods to teach but ${maxWeek[t]! < open ? `a limit of ${maxWeek[t]} a week` : `is available for ${open}`}`);
       }
     }
+    const busiest = Math.max(0, ...grp.students.map((st) => studentNeeds.get(st) ?? 0));
+    if (starts.length && busiest > starts.length) {
+      reasons.push(`Some of its students have ${busiest} periods of lessons a week in all, and the week has ${starts.length}`);
+    }
+    const impossible = reasons.length > 0;
     // Slot by slot.
     const count = new Map<string, number>();
     const others = new Map<string, Map<number, number>>();
@@ -643,28 +660,40 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
       .map(([og, n]) => `${groups[og]!.name} (${n})`)
       .join(', ');
     const n = (k: string) => count.get(k) ?? 0;
+    const of = (k: string) => `${n(k)} of the ${starts.length} periods`;
     const sentences: [string, number][] = [];
-    if (n('teacher_off')) sentences.push([`${tName} is unavailable at ${n('teacher_off')} of the ${starts.length} periods`, n('teacher_off')]);
-    if (n('teacher_busy')) sentences.push([`${tName} already teaches at ${n('teacher_busy')}: ${top('teacher_busy')}`, n('teacher_busy')]);
-    if (n('students_busy')) sentences.push([`its students have another lesson at ${n('students_busy')}: ${top('students_busy')}`, n('students_busy')]);
-    if (n('same_day')) sentences.push([`a rule keeps it off the day at ${n('same_day')}: ${top('same_day')}`, n('same_day')]);
-    if (n('day_limit')) sentences.push([`${tName} would pass their periods per day at ${n('day_limit')}`, n('day_limit')]);
-    if (n('week_limit')) sentences.push([`${tName} would pass their periods per week at ${n('week_limit')}`, n('week_limit')]);
-    if (n('no_room')) sentences.push([`no suitable room is free at ${n('no_room')}`, n('no_room')]);
-    if (n('room_off')) sentences.push([`the only suitable rooms are unavailable at ${n('room_off')}`, n('room_off')]);
-    if (n('shape') && lLen[l] === 2) sentences.push([`a double cannot start at ${n('shape')} (the next period is missing or after a break)`, n('shape')]);
+    if (n('teacher_off')) sentences.push([`${tName} is unavailable at ${of('teacher_off')}`, n('teacher_off')]);
+    if (n('teacher_busy')) sentences.push([`${tName} already teaches at ${of('teacher_busy')}: ${top('teacher_busy')}`, n('teacher_busy')]);
+    if (n('students_busy')) sentences.push([`its students have another lesson at ${of('students_busy')}: ${top('students_busy')}`, n('students_busy')]);
+    if (n('same_day')) sentences.push([`a rule keeps it off the day at ${of('same_day')}: ${top('same_day')}`, n('same_day')]);
+    if (n('day_limit')) sentences.push([`${tName} would pass their periods per day at ${of('day_limit')}`, n('day_limit')]);
+    if (n('week_limit')) sentences.push([`${tName} would pass their periods per week at ${of('week_limit')}`, n('week_limit')]);
+    if (n('no_room')) sentences.push([`no suitable room is free at ${of('no_room')}`, n('no_room')]);
+    if (n('room_off')) sentences.push([`the only suitable rooms are unavailable at ${of('room_off')}`, n('room_off')]);
+    if (n('shape') && lLen[l] === 2) sentences.push([`a double cannot start at ${of('shape')} (the next period is missing or after a break)`, n('shape')]);
     sentences.sort((a, b) => b[1] - a[1]);
-    for (const [text] of sentences) reasons.push(text.charAt(0).toUpperCase() + text.slice(1));
     const lesson = lessons[l]!;
     const what = `${grp.name}${lLen[l] === 2 ? ' (double)' : ''}, lesson ${lesson.seq}`;
+    const lower = (x: string) => x.charAt(0).toLowerCase() + x.slice(1);
+    let summary: string;
+    if (impossible) {
+      for (const [text] of sentences) reasons.push(text.charAt(0).toUpperCase() + text.slice(1));
+      summary = `${what} cannot be placed: ${lower(reasons[0]!)}`;
+    } else {
+      // Places exist for it; each was taken when the search ended.
+      reasons.push('The search did not fit it: there are periods it could take, but each was taken by another lesson or held by a rule when the search ended. Moving, unlocking or removing a lesson it meets may make room; then generate again');
+      for (const [text] of sentences) reasons.push(text.charAt(0).toUpperCase() + text.slice(1));
+      summary = sentences.length ? `${what} was not fitted in by the search: ${lower(sentences[0]![0])}` : `${what} was not fitted in by the search`;
+    }
     unplaced.push({
       lessonId: lesson.id,
       groupId: grp.id,
       groupName: grp.name,
       seq: lesson.seq,
       length: lLen[l]!,
+      cause: impossible ? 'impossible' : 'not_fitted',
       reasons,
-      summary: reasons.length ? `${what} could not be placed: ${reasons[0]!.charAt(0).toLowerCase()}${reasons[0]!.slice(1)}` : `${what} could not be placed`,
+      summary,
     });
   }
   unplaced.sort((a, b) => a.groupName.localeCompare(b.groupName, 'en', { numeric: true }) || a.seq - b.seq);

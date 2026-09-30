@@ -8,8 +8,9 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   IdParam, TimetablesQuery, CreateTimetable, UpdateTimetable, LessonParam, MoveLesson, UnplaceLesson, LockLesson, GenerateTimetable,
-  PublishTimetable, ExportCsvQuery,
+  PublishTimetable, ExportCsvQuery, YearQuery,
 } from '@repo/validations';
+import { listPublishedClashes } from '../services/timetable-clash.services';
 import { success, error } from '../lib/response';
 import { requireAuth, requireAcademic } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
@@ -38,6 +39,15 @@ export const timetableRoutes = new Hono<HonoEnv>()
       return success(c, await timetables.createTimetable(c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)), 201);
     } catch (err) {
       const f = fail(err, 'Failed to create the timetable');
+      return error(c, f.message, f.status);
+    }
+  })
+  /** GET /clashes — the clashes in the year's published timetables the coordinator went ahead with, and whether each still happens. */
+  .get('/clashes', zValidator('query', YearQuery), async (c) => {
+    try {
+      return success(c, await listPublishedClashes(c.req.valid('query').academicYearId));
+    } catch (err) {
+      const f = fail(err, 'Failed to load the clashes');
       return error(c, f.message, f.status);
     }
   })

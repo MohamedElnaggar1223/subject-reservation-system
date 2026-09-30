@@ -56,6 +56,7 @@ export const NOTIFICATION_TYPES = [
   'COVER_ASSIGNED',
   'LESSON_COVERED',
   'LESSON_CANCELLED',
+  'COVER_CHANGED',
 ] as const;
 
 export const NotificationTypeSchema = z.enum(NOTIFICATION_TYPES);
@@ -87,6 +88,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   COVER_ASSIGNED:                   'Cover Lesson for You',
   LESSON_COVERED:                   'A Lesson Is Covered',
   LESSON_CANCELLED:                 'A Lesson Is Cancelled',
+  COVER_CHANGED:                    'Cover Changed',
 };
 
 // Icons mapped per type (used in the notification center UI)
@@ -116,6 +118,7 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   COVER_ASSIGNED:                   '🧑‍🏫',
   LESSON_COVERED:                   '🔁',
   LESSON_CANCELLED:                 '🚫',
+  COVER_CHANGED:                    '↩️',
 };
 
 // ─── Admin bulk announcement recipient groups ─────────────────────────────────

@@ -37,6 +37,8 @@ export const FormGroups = z.object({
   startsOn: DateOnlySchema.optional(),
   /** Weekly periods for a group formed now (each can be changed afterwards). */
   weeklyPeriods: z.number().int().min(0).max(30).optional(),
+  /** Go ahead although it puts someone in two lessons at once in a published timetable (the clash is recorded and listed). */
+  anyway: z.boolean().optional(),
 });
 export type FormGroupsType = z.infer<typeof FormGroups>;
 
@@ -72,6 +74,10 @@ export type CreateGroupType = z.infer<typeof CreateGroup>;
 export const UpdateGroup = z.object({
   name: GroupName.optional(),
   teacherId: Id.nullable().optional(),
+  /** The first day the new teacher teaches the group (default: the year's first day, or today once it has begun); earlier weeks keep their teacher. */
+  teacherFrom: DateOnlySchema.optional(),
+  /** Go ahead although it puts someone in two lessons at once in a published timetable (the clash is recorded and listed). */
+  anyway: z.boolean().optional(),
   weeklyPeriods: z.number().int().min(0).max(30).optional(),
   doublePeriods: z.number().int().min(0).max(15).optional(),
   ...RoomNeeds,
@@ -81,6 +87,8 @@ export type UpdateGroupType = z.infer<typeof UpdateGroup>;
 export const AddGroupMembers = z.object({
   studentIds: z.array(Id).min(1, 'Choose at least one student').max(500),
   startsOn: DateOnlySchema.optional(),
+  /** Go ahead although it puts someone in two lessons at once in a published timetable (the clash is recorded and listed). */
+  anyway: z.boolean().optional(),
 });
 export type AddGroupMembersType = z.infer<typeof AddGroupMembers>;
 
@@ -98,6 +106,8 @@ export const SplitGroup = z.object({
     .min(1, 'Name at least one new group')
     .max(10),
   startsOn: DateOnlySchema.optional(),
+  /** Go ahead although it puts someone in two lessons at once in a published timetable (the clash is recorded and listed). */
+  anyway: z.boolean().optional(),
 });
 export type SplitGroupType = z.infer<typeof SplitGroup>;
 
@@ -106,6 +116,8 @@ export const MergeGroups = z.object({
   intoGroupId: Id,
   groupIds: z.array(Id).min(1, 'Choose the groups to merge in').max(20),
   startsOn: DateOnlySchema.optional(),
+  /** Go ahead although it puts someone in two lessons at once in a published timetable (the clash is recorded and listed). */
+  anyway: z.boolean().optional(),
 });
 export type MergeGroupsType = z.infer<typeof MergeGroups>;
 

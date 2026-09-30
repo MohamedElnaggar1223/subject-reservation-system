@@ -2779,6 +2779,13 @@ export const coverAssignment = pgTable(
     assignedAt: timestamp("assigned_at", { withTimezone: true }).defaultNow().notNull(),
     removedBy: text("removed_by").references(() => user.id, { onDelete: "set null" }),
     removedAt: timestamp("removed_at", { withTimezone: true }),
+    // Why a removed arrangement was removed: 'by_hand' (the coordinator),
+    // 'absence_withdrawn' (the teacher was not away after all),
+    // 'cover_teacher_away' (the cover teacher is away themselves: the lesson
+    // needs new cover), 'timetable_changed' (a new version took effect and has
+    // no such lesson then). Null while live.
+    removal: text("removal"),
+    removeReason: text("remove_reason"),
   },
   (table) => [
     index("coverAssignment_date_idx").on(table.date),
@@ -2803,6 +2810,101 @@ export const calendarFeedToken = pgTable(
   },
   (table) => [
     uniqueIndex("calendarFeedToken_one_live_idx").on(table.userId).where(sql`revoked_at IS NULL`),
+  ]
+);
+
+/**
+ * Who teaches a group from a date. A change of teacher mid-term ends the last
+ * row the day before and starts a new one, so past weeks keep the teacher they
+ * had (the views, the class list and cover read the teacher on the lesson's
+ * date). `teaching_group.teacher_id` is the teacher of the latest row, the one
+ * the lists show. A row with no teacher: the group has none from that day.
+ */
+export const teachingGroupTeacher = pgTable(
+  "teaching_group_teacher",
+  {
+    id: text("id").primaryKey(),
+    groupId: text("group_id").notNull().references(() => teachingGroup.id, { onDelete: "cascade" }),
+    teacherId: text("teacher_id").references(() => teacher.id, { onDelete: "set null" }),
+    startedOn: date("started_on", { mode: "string" }).notNull(),
+    // The last day (inclusive), null while open; the day before started_on is an empty stay.
+    endedOn: date("ended_on", { mode: "string" }),
+    reason: text("reason"),
+    setBy: text("set_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("teachingGroupTeacher_groupId_idx").on(table.groupId),
+    index("teachingGroupTeacher_teacherId_idx").on(table.teacherId),
+    uniqueIndex("teachingGroupTeacher_one_open_idx").on(table.groupId).where(sql`ended_on IS NULL`),
+    check("teaching_group_teacher_dates_ordered", sql`${table.endedOn} IS NULL OR ${table.endedOn} >= ${table.startedOn} - 1`),
+  ]
+);
+
+/**
+ * Each time a student left the school, and when they came back. F0a keeps the
+ * current leaving on the user (cleared at readmission); this keeps them all,
+ * so "leaving wins" still holds for the days a student was away after they
+ * are readmitted: nobody is in a class between the day after `left_on` and
+ * `readmitted_on`, and a membership that had not begun when the leaving was
+ * recorded never begins.
+ */
+export const studentLeaving = pgTable(
+  "student_leaving",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    // The last day at the school (as F0a's user.left_on).
+    leftOn: date("left_on", { mode: "string" }).notNull(),
+    kind: text("kind").notNull(),
+    reason: text("reason"),
+    recordedBy: text("recorded_by").references(() => user.id, { onDelete: "set null" }),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
+    // The first day back; null while away.
+    readmittedOn: date("readmitted_on", { mode: "string" }),
+    readmittedBy: text("readmitted_by").references(() => user.id, { onDelete: "set null" }),
+    readmittedAt: timestamp("readmitted_at", { withTimezone: true }),
+    readmitReason: text("readmit_reason"),
+  },
+  (table) => [
+    index("studentLeaving_studentId_idx").on(table.studentId),
+    uniqueIndex("studentLeaving_one_open_idx").on(table.studentId).where(sql`readmitted_on IS NULL`),
+    check("student_leaving_kind_valid", sql`${table.kind} IN ('withdrawn', 'transferred')`),
+    check("student_leaving_dates_ordered", sql`${table.readmittedOn} IS NULL OR ${table.readmittedOn} >= ${table.leftOn}`),
+  ]
+);
+
+/**
+ * A clash in a published timetable the coordinator accepted: a change made
+ * after publishing (a student added to a group, moved between sections, a
+ * group's teacher changed) put a student or a teacher in two lessons at once,
+ * and the coordinator went ahead. Shown on the Timetables screen until a new
+ * version resolves it.
+ */
+export const publishedClash = pgTable(
+  "published_clash",
+  {
+    id: text("id").primaryKey(),
+    timetableId: text("timetable_id").notNull().references(() => timetable.id, { onDelete: "cascade" }),
+    // 'students_busy' | 'teacher_busy'
+    kind: text("kind").notNull(),
+    studentId: text("student_id").references(() => user.id, { onDelete: "cascade" }),
+    teacherId: text("teacher_id").references(() => teacher.id, { onDelete: "cascade" }),
+    lessonAId: text("lesson_a_id").notNull().references(() => timetableLesson.id, { onDelete: "cascade" }),
+    lessonBId: text("lesson_b_id").notNull().references(() => timetableLesson.id, { onDelete: "cascade" }),
+    // The first date it happens, and the last (inclusive; null = to the end of the version).
+    fromDate: date("from_date", { mode: "string" }).notNull(),
+    toDate: date("to_date", { mode: "string" }),
+    message: text("message").notNull(),
+    // The change that caused it ("Added to Physics 11", "Moved to 11B", "Teacher changed to …").
+    cause: text("cause").notNull(),
+    acceptedBy: text("accepted_by").references(() => user.id, { onDelete: "set null" }),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("publishedClash_timetableId_idx").on(table.timetableId),
+    check("published_clash_kind_valid", sql`${table.kind} IN ('students_busy', 'teacher_busy')`),
+    check("published_clash_one_person", sql`(${table.studentId} IS NULL) <> (${table.teacherId} IS NULL)`),
   ]
 );
 

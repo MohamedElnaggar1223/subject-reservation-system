@@ -33,13 +33,16 @@ import {
   sectionMembership, user, parentStudentLink, calendarFeedToken, eq, and, inArray, isNull, sql, asc, or, gte, lte, ne,
 } from '@repo/db';
 import { randomBytes, createHash, randomUUID } from 'crypto';
-import { ACADEMIC_ROLES, hasRole, schoolDateString, WEEKDAY_NAMES, type LessonStatus, type LessonOnDay, type DaySchedule, type SchedulePerson } from '@repo/validations';
-import { getSchoolDays } from './academic.services';
+import { ACADEMIC_ROLES, hasRole, WEEKDAY_NAMES, type LessonStatus, type LessonOnDay, type DaySchedule, type SchedulePerson } from '@repo/validations';
+import { getSchoolDays, sectionsBetween, sectionsOn, leavingPeriodsOf, awayOn, type LeavingPeriod } from './academic.services';
+import { isBanned } from '../lib/auth-policy';
 import { logAction, type AuditContext } from './audit.services';
 import { gridOfYear } from './timetable.services';
 import {
-  SchedulingError, addDays, maxDate, minDate, weekStartOf, cairoInstant, readableDate, groupMembersBetween, candidateGroupsOfStudent, type MemberInterval,
+  SchedulingError, addDays, maxDate, minDate, weekStartOf, cairoInstant, readableDate, groupMembersBetween, candidateGroupsOfStudent,
+  groupTeachersBetween, groupsTaughtBetween, teachersOn, type MemberInterval, type TeacherInterval,
 } from './scheduling-shared.services';
+import { todayAtSchool } from '../lib/clock';
 
 export type ScheduleTarget = { studentId: string } | { teacherId: string } | { roomId: string } | { sectionId: string };
 
@@ -65,41 +68,33 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
     .sort((a, b) => b.effectiveFrom!.localeCompare(a.effectiveFrom!) || b.publishedAt!.getTime() - a.publishedAt!.getTime())[0] ?? null;
   const usedVersionIds = [...new Set(days.map((d) => versionOn(d.term?.id, d.date)?.id).filter((x): x is string => !!x))];
 
-  // Which groups (and, for students, when) the target reaches.
+  // Which groups (and, for students and teachers, on which dates) the target reaches.
   let memberIntervals: MemberInterval[] = [];
-  let groupFilter: Set<string> | null = null;
+  let taught: TeacherInterval[] = [];
   let coverTeacherId: string | null = null;
-  let leftOn: string | null = null;
+  let leavings: LeavingPeriod[] = [];
   let sectionStudentsOn: ((date: string) => Set<string>) | null = null;
   if ('studentId' in target) {
-    const [s] = await db.select({ leftOn: user.leftOn }).from(user).where(eq(user.id, target.studentId));
-    leftOn = s?.leftOn ?? null;
+    leavings = await leavingPeriodsOf([target.studentId]);
     const candidates = await candidateGroupsOfStudent(target.studentId, from, to);
     memberIntervals = (await groupMembersBetween(candidates, from, to)).filter((m) => m.studentId === target.studentId);
-    groupFilter = new Set(memberIntervals.map((m) => m.groupId));
   } else if ('teacherId' in target) {
     coverTeacherId = target.teacherId;
-    const taught = await db.select({ id: teachingGroup.id }).from(teachingGroup).where(eq(teachingGroup.teacherId, target.teacherId));
-    groupFilter = new Set(taught.map((g) => g.id));
+    taught = await groupsTaughtBetween(target.teacherId, from, to);
   } else if ('sectionId' in target) {
     const [sec] = await db.select().from(section).where(eq(section.id, target.sectionId));
     if (!sec) throw new SchedulingError('Section not found', 404);
     const yearGroups = await db.select({ id: teachingGroup.id }).from(teachingGroup).where(eq(teachingGroup.academicYearId, sec.academicYearId));
     memberIntervals = await groupMembersBetween(yearGroups.map((g) => g.id), from, to);
-    const own = await db.select({ id: teachingGroup.id }).from(teachingGroup).where(and(eq(teachingGroup.kind, 'section'), eq(teachingGroup.sectionId, sec.id)));
-    const ownMembers = await groupMembersBetween([own[0]?.id ?? '__none__'], from, to);
-    // The section's students on a date: read through a group of its own when it has one, else from its membership rows.
-    const rows = await db.select().from(sectionMembership).where(eq(sectionMembership.sectionId, sec.id));
-    sectionStudentsOn = (date: string) => new Set(
-      own.length
-        ? ownMembers.filter((m) => m.from <= date && m.to >= date).map((m) => m.studentId)
-        : rows.filter((r) => r.startedOn <= date && (r.endedOn === null || r.endedOn >= date)).map((r) => r.studentId),
-    );
+    // The section's students on a date: F0a's single reading of "which section on a date".
+    const everIn = await db.selectDistinct({ studentId: sectionMembership.studentId }).from(sectionMembership).where(eq(sectionMembership.sectionId, sec.id));
+    const intervals = (await sectionsBetween(everIn.map((r) => r.studentId), from, to)).filter((i) => i.sectionId === sec.id);
+    sectionStudentsOn = (date: string) => new Set(intervals.filter((i) => i.from <= date && i.to >= date).map((i) => i.studentId));
   }
 
   const lessons = usedVersionIds.length
     ? await db.select({
-      l: timetableLesson, groupName: teachingGroup.name, groupTeacherId: teachingGroup.teacherId, archivedOn: teachingGroup.archivedOn,
+      l: timetableLesson, groupName: teachingGroup.name, archivedOn: teachingGroup.archivedOn,
       subjectId: subject.id, subjectName: subject.name, subjectCode: subject.code, roomName: room.name,
     }).from(timetableLesson)
       .innerJoin(teachingGroup, eq(teachingGroup.id, timetableLesson.groupId))
@@ -116,11 +111,17 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
         : inArray(coverAssignment.lessonId, lessonIds.concat('__none__')),
     ))
     : [];
-  // Lessons a teacher covers may belong to versions or groups not loaded yet.
+  // Arrangements lost because the cover teacher is away themselves: that lesson needs new cover.
+  const lost = lessonIds.length
+    ? await db.select({ lessonId: coverAssignment.lessonId, date: coverAssignment.date }).from(coverAssignment).where(and(
+      gte(coverAssignment.date, from), lte(coverAssignment.date, to), eq(coverAssignment.status, 'removed'),
+      eq(coverAssignment.removal, 'cover_teacher_away'), inArray(coverAssignment.lessonId, lessonIds)))
+    : [];
+  // Lessons a teacher covers may belong to groups not loaded yet (their own version is loaded above).
   const extraIds = covers.map((c) => c.lessonId).filter((id) => !lessonIds.includes(id));
   if (extraIds.length) {
     lessons.push(...await db.select({
-      l: timetableLesson, groupName: teachingGroup.name, groupTeacherId: teachingGroup.teacherId, archivedOn: teachingGroup.archivedOn,
+      l: timetableLesson, groupName: teachingGroup.name, archivedOn: teachingGroup.archivedOn,
       subjectId: subject.id, subjectName: subject.name, subjectCode: subject.code, roomName: room.name,
     }).from(timetableLesson)
       .innerJoin(teachingGroup, eq(teachingGroup.id, timetableLesson.groupId))
@@ -128,8 +129,11 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
       .leftJoin(room, eq(room.id, timetableLesson.roomId))
       .where(inArray(timetableLesson.id, extraIds)));
   }
+  // Who teaches each group on each date (a mid-term change of teacher does not rewrite earlier weeks).
+  const teaching = await groupTeachersBetween([...new Set(lessons.map((x) => x.l.groupId))], from, to);
+  const teacherOn = (groupId: string, date: string) => teaching.find((t) => t.groupId === groupId && t.from <= date && t.to >= date)?.teacherId ?? null;
   const teacherIds = [...new Set([
-    ...lessons.map((x) => x.groupTeacherId), ...covers.map((c) => c.coverTeacherId), ...covers.map((c) => c.originalTeacherId),
+    ...teaching.map((t) => t.teacherId), ...covers.map((c) => c.coverTeacherId), ...covers.map((c) => c.originalTeacherId),
   ].filter((x): x is string => !!x))];
   const teachers = new Map((teacherIds.length ? await db.select({ id: teacher.id, name: teacher.name }).from(teacher).where(inArray(teacher.id, teacherIds)) : []).map((t) => [t.id, t]));
   const absences = teacherIds.length
@@ -137,6 +141,11 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
     : [];
   const absent = (teacherId: string | null, date: string, periods: number[]) => !!teacherId && absences.some((a) =>
     a.teacherId === teacherId && a.startsOn <= date && a.endsOn >= date && (!a.periods || a.periods.some((p) => periods.includes(p))));
+  // The weekdays the year's grid teaches on (an extra school day on another weekday has no lessons).
+  const gridWeekdays = new Map<string, Set<number>>();
+  for (const v of versions) {
+    if (!gridWeekdays.has(v.academicYearId)) gridWeekdays.set(v.academicYearId, new Set((await gridOfYear(v.academicYearId)).days.map((d) => d.weekday)));
+  }
 
   const out: DaySchedule[] = [];
   for (const d of days) {
@@ -151,18 +160,19 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
       day.note = d.kind === 'holiday' ? 'holiday' : d.kind === 'weekend' ? 'weekend' : d.kind === 'no_academic_year' ? 'no_academic_year' : 'out_of_term';
       continue;
     }
-    if (leftOn && d.date > leftOn) { day.note = 'left'; continue; }
+    if ('studentId' in target && awayOn(leavings, target.studentId, d.date)) { day.note = 'left'; continue; }
     const lessonPeriods = d.periods.filter((p) => p.kind === 'lesson');
     const sectionNow = sectionStudentsOn ? sectionStudentsOn(d.date) : null;
     const coverHere = covers.filter((c) => c.date === d.date);
+    // A lesson is held on a date only from the version in force then, on its weekday.
+    const inForce = (x: typeof lessons[number]) => !!version && x.l.timetableId === version.id && x.l.weekday === d.weekday;
     const todays = lessons.filter((x) => {
-      const inVersion = !!version && x.l.timetableId === version.id && x.l.weekday === d.weekday;
+      if (!inForce(x)) return false;
       if (x.archivedOn && x.archivedOn <= d.date) return false;
       if ('teacherId' in target) {
         const covering = coverHere.some((c) => c.lessonId === x.l.id && c.coverTeacherId === target.teacherId && c.status === 'assigned');
-        return covering || (inVersion && groupFilter!.has(x.l.groupId));
+        return covering || teacherOn(x.l.groupId, d.date) === target.teacherId;
       }
-      if (!inVersion) return false;
       if ('studentId' in target) return memberIntervals.some((m) => m.groupId === x.l.groupId && m.from <= d.date && m.to >= d.date);
       if ('roomId' in target) return x.l.roomId === target.roomId;
       if ('sectionId' in target) return memberIntervals.some((m) => m.groupId === x.l.groupId && m.from <= d.date && m.to >= d.date && sectionNow!.has(m.studentId));
@@ -173,7 +183,8 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
       day.notHeld = todays.map((x) => ({ lessonId: x.l.id, groupName: x.groupName, period: x.l.period!, reason: 'exam_only' as const }));
       continue;
     }
-    if (!version && !('teacherId' in target && todays.length)) { day.note = 'no_timetable'; continue; }
+    if (!version) { day.note = 'no_timetable'; continue; }
+    if (d.kind === 'extra_school_day' && !gridWeekdays.get(version.academicYearId)?.has(d.weekday)) { day.note = 'extra_day'; continue; }
     for (const x of todays.sort((a, b) => a.l.period! - b.l.period! || a.groupName.localeCompare(b.groupName))) {
       const periods = Array.from({ length: x.l.length }, (_, k) => x.l.period! + k).filter((p) => p <= lessonPeriods.length);
       if (!periods.length) {
@@ -183,13 +194,14 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
       const first = lessonPeriods[periods[0]! - 1]!;
       const last = lessonPeriods[periods[periods.length - 1]! - 1]!;
       const cover = coverHere.find((c) => c.lessonId === x.l.id) ?? null;
-      const scheduled = x.groupTeacherId ? teachers.get(x.groupTeacherId) ?? null : null;
+      const scheduledId = teacherOn(x.l.groupId, d.date);
+      const scheduled = scheduledId ? teachers.get(scheduledId) ?? null : null;
       const coverTeacher = cover?.coverTeacherId ? teachers.get(cover.coverTeacherId) ?? null : null;
       let status: LessonStatus;
       let who: Person | null = scheduled;
       if (cover?.status === 'cancelled') { status = 'cancelled'; who = null; }
       else if (cover?.status === 'assigned') { status = 'covered'; who = coverTeacher; }
-      else if (absent(x.groupTeacherId, d.date, periods)) { status = 'uncovered'; who = null; }
+      else if (absent(scheduledId, d.date, periods)) { status = 'uncovered'; who = null; }
       else status = 'scheduled';
       if ('teacherId' in target) {
         if (cover?.status === 'assigned' && cover.coverTeacherId === target.teacherId) status = 'covering';
@@ -203,6 +215,7 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
         room: x.l.roomId ? { id: x.l.roomId, name: x.roomName ?? '' } : null,
         teacher: who, scheduledTeacher: scheduled, status,
         cover: cover ? { assignmentId: cover.id, status: cover.status as 'assigned' | 'cancelled', teacher: coverTeacher } : null,
+        needsNewCover: status === 'uncovered' && lost.some((c) => c.lessonId === x.l.id && c.date === d.date),
       };
       if (sectionNow) item.sectionStudents = new Set(memberIntervals.filter((m) => m.groupId === x.l.groupId && m.from <= d.date && m.to >= d.date && sectionNow.has(m.studentId)).map((m) => m.studentId)).size;
       day.lessons.push(item);
@@ -300,7 +313,9 @@ export async function lessonOnDate(lessonId: string, date: string) {
   if (x.g.archivedOn && x.g.archivedOn <= date) return null;
   const lessonPeriods = day.periods.filter((p) => p.kind === 'lesson');
   if (x.l.period! > lessonPeriods.length) return null;
-  return { lesson: x.l, timetable: x.t, group: x.g, day };
+  // The group's teacher on that date (a mid-term change of teacher does not reach back).
+  const teacherId = (await teachersOn([x.g.id], date)).get(x.g.id) ?? null;
+  return { lesson: x.l, timetable: x.t, group: x.g, day, teacherId };
 }
 
 /**
@@ -314,7 +329,7 @@ export async function lessonAccess(viewer: { id: string; role?: string | null },
   if (hasRole(viewer.role, ...ACADEMIC_ROLES)) return 'staff';
   const [t] = await db.select({ id: teacher.id }).from(teacher).where(eq(teacher.userId, viewer.id));
   if (!t) return null;
-  if (held.group.teacherId === t.id) return 'teacher';
+  if (held.teacherId === t.id) return 'teacher';
   const [c] = await db.select({ id: coverAssignment.id }).from(coverAssignment)
     .where(and(eq(coverAssignment.lessonId, lessonId), eq(coverAssignment.date, date), eq(coverAssignment.status, 'assigned'), eq(coverAssignment.coverTeacherId, t.id)));
   return c ? 'cover' : null;
@@ -330,20 +345,16 @@ export async function classListFor(viewer: { id: string; role?: string | null },
   const students = ids.length
     ? await db.select({ id: user.id, name: user.name, studentCode: user.studentId }).from(user).where(inArray(user.id, ids)).orderBy(asc(user.name))
     : [];
-  const sectionRows = ids.length
-    ? await db.select({ studentId: sectionMembership.studentId, name: section.name, startedOn: sectionMembership.startedOn, createdAt: sectionMembership.createdAt })
-      .from(sectionMembership).innerJoin(section, eq(section.id, sectionMembership.sectionId))
-      .where(and(inArray(sectionMembership.studentId, ids), sql`${sectionMembership.startedOn} <= ${date}`, sql`(${sectionMembership.endedOn} IS NULL OR ${sectionMembership.endedOn} >= ${date})`))
-    : [];
-  const sectionOf = new Map<string, string>();
-  for (const r of sectionRows.sort((a, b) => a.startedOn.localeCompare(b.startedOn) || a.createdAt.getTime() - b.createdAt.getTime())) sectionOf.set(r.studentId, r.name);
+  // Each student's section that day: F0a's single reading (sectionOn).
+  const sections = await sectionsOn(ids, date);
+  const sectionOf = new Map([...sections.entries()].map(([id, sec]) => [id, sec.name]));
   const lessonPeriods = held.day.periods.filter((p) => p.kind === 'lesson');
   const periods = Array.from({ length: held.lesson.length }, (_, k) => held.lesson.period! + k).filter((p) => p <= lessonPeriods.length);
   const first = lessonPeriods[periods[0]! - 1]!;
   const last = lessonPeriods[periods[periods.length - 1]! - 1]!;
   const [cover] = await db.select({ status: coverAssignment.status, coverTeacherId: coverAssignment.coverTeacherId }).from(coverAssignment)
     .where(and(eq(coverAssignment.lessonId, lessonId), eq(coverAssignment.date, date), ne(coverAssignment.status, 'removed')));
-  const teacherId = cover?.status === 'assigned' ? cover.coverTeacherId : cover?.status === 'cancelled' ? null : held.group.teacherId;
+  const teacherId = cover?.status === 'assigned' ? cover.coverTeacherId : cover?.status === 'cancelled' ? null : held.teacherId;
   const [who] = teacherId ? await db.select({ id: teacher.id, name: teacher.name }).from(teacher).where(eq(teacher.id, teacherId)) : [];
   const [where] = held.lesson.roomId ? await db.select({ id: room.id, name: room.name }).from(room).where(eq(room.id, held.lesson.roomId)) : [];
   return {
@@ -364,8 +375,8 @@ export async function classListFor(viewer: { id: string; role?: string | null },
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
 async function feedTargets(userId: string): Promise<{ target: { studentId: string } | { teacherId: string }; prefix: string | null }[]> {
-  const [u] = await db.select({ id: user.id, role: user.role }).from(user).where(eq(user.id, userId));
-  if (!u) return [];
+  const [u] = await db.select({ id: user.id, role: user.role, banned: user.banned, banExpires: user.banExpires }).from(user).where(eq(user.id, userId));
+  if (!u || isBanned(u)) return [];
   const out: { target: { studentId: string } | { teacherId: string }; prefix: string | null }[] = [];
   if (u.role === 'student') out.push({ target: { studentId: u.id }, prefix: null });
   if (u.role === 'parent') {
@@ -373,7 +384,7 @@ async function feedTargets(userId: string): Promise<{ target: { studentId: strin
       .where(and(eq(parentStudentLink.parentId, u.id), eq(parentStudentLink.status, 'approved'))).orderBy(asc(user.name));
     for (const k of kids) out.push({ target: { studentId: k.id }, prefix: k.name });
   }
-  const [t] = await db.select({ id: teacher.id }).from(teacher).where(eq(teacher.userId, u.id));
+  const [t] = await db.select({ id: teacher.id }).from(teacher).where(and(eq(teacher.userId, u.id), eq(teacher.isActive, true)));
   if (t) out.push({ target: { teacherId: t.id }, prefix: null });
   return out;
 }
@@ -408,6 +419,16 @@ export async function revokeFeedToken(userId: string, ctx?: AuditContext) {
   });
 }
 
+/** A banned account's calendar links stop working (RF-23's rule for sessions, applied to the feed). */
+export async function revokeFeedTokensOnBan(userId: string, actorId: string, ctx?: AuditContext) {
+  return db.transaction(async (tx) => {
+    const revoked = await tx.update(calendarFeedToken).set({ revokedAt: new Date() })
+      .where(and(eq(calendarFeedToken.userId, userId), isNull(calendarFeedToken.revokedAt))).returning({ id: calendarFeedToken.id });
+    for (const r of revoked) await logAction(actorId, 'CALENDAR_FEED_REVOKED', 'calendar_feed', r.id, null, { userId, reason: 'account banned' }, ctx, tx);
+    return revoked.length;
+  });
+}
+
 const icsText = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
 const icsTime = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 
@@ -439,9 +460,11 @@ export async function calendarFeed(rawToken: string): Promise<string | null> {
   if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) return null;
   const [row] = await db.select().from(calendarFeedToken).where(and(eq(calendarFeedToken.tokenHash, hashToken(token)), isNull(calendarFeedToken.revokedAt)));
   if (!row) return null;
-  await db.update(calendarFeedToken).set({ lastUsedAt: new Date() }).where(eq(calendarFeedToken.id, row.id));
+  // A banned account's link gets nothing (a ban also revokes it); an account with nothing to follow neither.
   const targets = await feedTargets(row.userId);
-  const today = schoolDateString(new Date());
+  if (!targets.length) return null;
+  await db.update(calendarFeedToken).set({ lastUsedAt: new Date() }).where(eq(calendarFeedToken.id, row.id));
+  const today = todayAtSchool();
   const since = addDays(today, -7);
   const terms = await db.selectDistinct({ id: academicTerm.id, startsOn: academicTerm.startsOn, endsOn: academicTerm.endsOn })
     .from(academicTerm).innerJoin(timetable, eq(timetable.termId, academicTerm.id))

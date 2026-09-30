@@ -246,9 +246,11 @@ describe('F1: the timetable generator at the school’s size', () => {
     expect(astroWhy).toHaveLength(2);
     expect(astroWhy[0]!.reasons).toContain('teacher gen-away is unavailable at every period');
     expect(astroWhy[0]!.reasons).toContain('Teacher gen-away is unavailable at 35 of the 35 periods');
-    expect(astroWhy[0]!.summary).toBe('Astronomy club, lesson 1 could not be placed: teacher gen-away is unavailable at every period');
+    expect(astroWhy[0]!.summary).toBe('Astronomy club, lesson 1 cannot be placed: teacher gen-away is unavailable at every period');
+    expect(astroWhy.map((u) => u.cause)).toEqual(['impossible', 'impossible']);
     const potteryWhy = run.unplaced.find((u) => u.groupName === 'Pottery')!;
     expect(potteryWhy.reasons[0]).toBe('No room in use is an art room with a fume cupboard seating 0');
+    expect(potteryWhy).toMatchObject({ cause: 'impossible', summary: 'Pottery, lesson 1 cannot be placed: no room in use is an art room with a fume cupboard seating 0' });
     // The explanations are kept with the run and shown with the timetable.
     const tt = await load(draftD);
     expect(tt.runs[0]!.explanations.map((e) => e.groupName).sort()).toEqual(['Astronomy club', 'Astronomy club', 'Pottery']);

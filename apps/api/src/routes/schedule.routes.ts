@@ -15,15 +15,16 @@
 
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { ScheduleDayQuery, ScheduleWeekQuery, MyScheduleQuery, LessonOnDateQuery, FeedTokenParam, schoolDateString } from '@repo/validations';
+import { ScheduleDayQuery, ScheduleWeekQuery, MyScheduleQuery, LessonOnDateQuery, FeedTokenParam } from '@repo/validations';
 import { success, error } from '../lib/response';
 import { requireAuth, requireStaff } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import { extractAuditContext } from '../services/audit.services';
 import * as schedule from '../services/schedule.services';
 import { fail } from './scheduling.routes';
+import { todayAtSchool } from '../lib/clock';
 
-const today = () => schoolDateString(new Date());
+const today = () => todayAtSchool();
 
 export const scheduleRoutes = new Hono<HonoEnv>()
   .use('*', requireAuth())

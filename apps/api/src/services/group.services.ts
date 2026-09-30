@@ -21,12 +21,12 @@
  */
 
 import {
-  db, teachingGroup, teachingGroupMember, timetable, timetableLesson, academicYear, academicTerm, subject, teacher, section,
+  db, teachingGroup, teachingGroupMember, teachingGroupTeacher, timetable, timetableLesson, academicYear, academicTerm, subject, teacher, section,
   courseEnrolment, user, room, subjectTeacher, eq, and, inArray, isNull, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  cardsFor, gradeInAcademicYear, schoolDateString,
+  cardsFor, gradeInAcademicYear,
   type FormGroupsType, type CreateSectionGroupsType, type CreateGroupType, type UpdateGroupType, type AddGroupMembersType,
   type EndGroupMembersType, type SplitGroupType, type MergeGroupsType, type ArchiveGroupType,
 } from '@repo/validations';
@@ -35,6 +35,8 @@ import { getTeachingDemand } from './enrolment.services';
 import {
   SchedulingError, isUniqueViolation, addDays, readableDate, groupMembersBetween, peakSize, type Tx, type Executor,
 } from './scheduling-shared.services';
+import { todayAtSchool } from '../lib/clock';
+import { guardPublishedTimetable } from './timetable-clash.services';
 
 /**
  * The last day of a membership that ends on `lastDay`: a membership that has
@@ -56,7 +58,7 @@ function defaultStart(y: { startsOn: string; endsOn: string }, asked?: string) {
     if (asked < y.startsOn || asked > y.endsOn) throw new SchedulingError(`The date falls inside the school year (${readableDate(y.startsOn)} – ${readableDate(y.endsOn)})`);
     return asked;
   }
-  const today = schoolDateString(new Date());
+  const today = todayAtSchool();
   return today < y.startsOn ? y.startsOn : today > y.endsOn ? y.startsOn : today;
 }
 
@@ -82,6 +84,38 @@ async function linkTeacherToSubject(tx: Tx, teacherId: string | null, subjectId:
     .where(and(eq(subjectTeacher.teacherId, teacherId), eq(subjectTeacher.subjectId, subjectId)));
   if (have) return false;
   await tx.insert(subjectTeacher).values({ id: randomUUID(), teacherId, subjectId });
+  return true;
+}
+
+/**
+ * Who teaches a group from a day on: the open row ends the day before (an
+ * empty stay if it began that day) and a new one starts, so earlier weeks keep
+ * their teacher; the group's own teacher_id follows the latest row. A change
+ * dated before the current teacher began is refused (it would rewrite a week
+ * already given to them).
+ */
+async function setGroupTeacher(tx: Tx, groupId: string, teacherId: string | null, from: string, reason: string, actorId: string) {
+  const [g] = await tx.select().from(teachingGroup).where(eq(teachingGroup.id, groupId)).for('update');
+  const rows = await tx.select().from(teachingGroupTeacher).where(eq(teachingGroupTeacher.groupId, groupId)).for('update');
+  const open = rows.find((r) => r.endedOn === null) ?? null;
+  if (open && (open.teacherId ?? null) === (teacherId ?? null)) return false;
+  if (!rows.length && g!.teacherId && (g!.teacherId ?? null) !== (teacherId ?? null)) {
+    // A group whose teacher was never dated: its teacher so far taught it from the year's start.
+    const [y] = await tx.select({ startsOn: academicYear.startsOn }).from(academicYear).where(eq(academicYear.id, g!.academicYearId));
+    await tx.insert(teachingGroupTeacher).values({
+      id: randomUUID(), groupId, teacherId: g!.teacherId, startedOn: y!.startsOn, endedOn: lastDayOf(y!.startsOn, addDays(from, -1)), reason: 'The teacher before the first dated change', setBy: actorId,
+    });
+  }
+  if (open) {
+    if (from < open.startedOn) {
+      throw new SchedulingError(`The new teacher's first day must be on or after ${readableDate(open.startedOn)}, when the current teacher began`, 409);
+    }
+    await tx.update(teachingGroupTeacher).set({ endedOn: lastDayOf(open.startedOn, addDays(from, -1)) }).where(eq(teachingGroupTeacher.id, open.id));
+  }
+  if (teacherId || open || rows.length) {
+    await tx.insert(teachingGroupTeacher).values({ id: randomUUID(), groupId, teacherId, startedOn: from, reason, setBy: actorId });
+  }
+  await tx.update(teachingGroup).set({ teacherId, updatedAt: new Date() }).where(eq(teachingGroup.id, groupId));
   return true;
 }
 
@@ -255,7 +289,9 @@ export async function formGroups(data: FormGroupsType, actorId: string, ctx?: Au
     let created = 0;
     let added = 0;
     let removed = 0;
+    let accepted: { message: string }[] = [];
     if (data.commit) {
+      const commit = async () => {
       const touched: string[] = [];
       for (const p of plans) {
         if (p.action === 'unchanged') continue;
@@ -266,6 +302,7 @@ export async function formGroups(data: FormGroupsType, actorId: string, ctx?: Au
             id: groupId, academicYearId: y.id, name: uniqueName(p.name, groups.map((g) => g.name)), subjectId: p.subject.id, teacherId: p.teacher?.id ?? null,
             kind: 'enrolment', weeklyPeriods, doublePeriods: 0, createdBy: actorId,
           });
+          if (p.teacher) await tx.insert(teachingGroupTeacher).values({ id: randomUUID(), groupId, teacherId: p.teacher.id, startedOn: startsOn, reason: 'Formed from the course enrolment', setBy: actorId });
           groups.push({ name: p.name } as typeof groups[number]);
           p.groupId = groupId;
           created++;
@@ -286,10 +323,15 @@ export async function formGroups(data: FormGroupsType, actorId: string, ctx?: Au
       }
       if (touched.length) {
         await syncDraftCards(tx, touched);
-        await logAction(actorId, 'TEACHING_GROUPS_FORMED', 'academic_year', y.id, null, { created, added, removed, startsOn }, ctx, tx);
+      }
+      };
+      const adding = plans.flatMap((p) => p.adding.map((a) => a.studentId));
+      accepted = (await guardPublishedTimetable(tx, { studentIds: adding }, startsOn, { anyway: data.anyway, cause: 'Groups formed from the course enrolment', actorId }, commit)).accepted;
+      if (created || added || removed) {
+        await logAction(actorId, 'TEACHING_GROUPS_FORMED', 'academic_year', y.id, null, { created, added, removed, startsOn, clashesAccepted: accepted.map((c) => c.message) }, ctx, tx);
       }
     }
-    return { academicYearId: y.id, startsOn, committed: data.commit, groups: plans, teacherDiffers, created, added, removed };
+    return { academicYearId: y.id, startsOn, committed: data.commit, groups: plans, teacherDiffers, created, added, removed, clashesAccepted: accepted.map((c) => c.message) };
   };
   try {
     return await db.transaction(run);
@@ -334,6 +376,7 @@ export async function createSectionGroups(data: CreateSectionGroupsType, actorId
         weeklyPeriods: data.weeklyPeriods, doublePeriods: data.doublePeriods, roomType: data.roomType ?? null, roomFeatures: data.roomFeatures ?? [], roomId: data.roomId ?? null,
         createdBy: actorId,
       });
+      if (data.teacherId) await tx.insert(teachingGroupTeacher).values({ id: randomUUID(), groupId: id, teacherId: data.teacherId, startedOn: defaultStart(y), reason: 'Group made', setBy: actorId });
       made.push({ id, name });
     }
     const linked = await linkTeacherToSubject(tx, data.teacherId ?? null, data.subjectId ?? null);
@@ -361,6 +404,7 @@ export async function createGroup(data: CreateGroupType, actorId: string, ctx?: 
         weeklyPeriods: data.weeklyPeriods, doublePeriods: data.doublePeriods, roomType: data.roomType ?? null, roomFeatures: data.roomFeatures ?? [], roomId: data.roomId ?? null,
         createdBy: actorId,
       });
+      if (data.teacherId) await tx.insert(teachingGroupTeacher).values({ id: randomUUID(), groupId: id, teacherId: data.teacherId, startedOn: defaultStart(y, data.startsOn), reason: 'Group made', setBy: actorId });
       const linked = await linkTeacherToSubject(tx, data.teacherId ?? null, data.subjectId ?? null);
       let moved = 0;
       if (data.studentIds?.length) moved = (await addMembersTx(tx, id, data.studentIds, defaultStart(y, data.startsOn), actorId)).moved;
@@ -393,13 +437,24 @@ export async function updateGroup(id: string, data: UpdateGroupType, actorId: st
         roomFeatures: data.roomFeatures ?? g.roomFeatures,
         roomId: data.roomId !== undefined ? data.roomId : g.roomId,
       };
-      await tx.update(teachingGroup).set({ ...next, updatedAt: new Date() }).where(eq(teachingGroup.id, id));
-      const linked = next.teacherId !== g.teacherId ? await linkTeacherToSubject(tx, next.teacherId, g.subjectId) : false;
+      const { teacherId: nextTeacher, ...rest } = next;
+      await tx.update(teachingGroup).set({ ...rest, updatedAt: new Date() }).where(eq(teachingGroup.id, id));
+      let teacherFrom: string | null = null;
+      let accepted: { message: string }[] = [];
+      if ((nextTeacher ?? null) !== (g.teacherId ?? null)) {
+        const [y] = await tx.select().from(academicYear).where(eq(academicYear.id, g.academicYearId));
+        teacherFrom = defaultStart(y!, data.teacherFrom);
+        const [t] = nextTeacher ? await tx.select({ name: teacher.name }).from(teacher).where(eq(teacher.id, nextTeacher)) : [];
+        accepted = (await guardPublishedTimetable(tx, { teacherIds: nextTeacher ? [nextTeacher] : [] }, teacherFrom,
+          { anyway: data.anyway, cause: `${g.name}: teacher changed to ${t?.name ?? 'nobody'}`, actorId },
+          () => setGroupTeacher(tx, id, nextTeacher, teacherFrom!, `Teacher changed from ${readableDate(teacherFrom!)}`, actorId))).accepted;
+      }
+      const linked = nextTeacher !== g.teacherId ? await linkTeacherToSubject(tx, nextTeacher, g.subjectId) : false;
       const cards = weeklyPeriods !== g.weeklyPeriods || doublePeriods !== g.doublePeriods ? await syncDraftCards(tx, [id]) : { drafts: 0, added: 0, removed: 0 };
       await logAction(actorId, 'TEACHING_GROUP_UPDATED', 'teaching_group', id,
         { name: g.name, teacherId: g.teacherId, weeklyPeriods: g.weeklyPeriods, doublePeriods: g.doublePeriods, roomType: g.roomType, roomFeatures: g.roomFeatures, roomId: g.roomId },
-        { ...next, teacherLinkedToSubject: linked, cards }, ctx, tx);
-      return { id, cards };
+        { ...next, teacherFrom, teacherLinkedToSubject: linked, cards, clashesAccepted: accepted.map((c) => c.message) }, ctx, tx);
+      return { id, cards, teacherFrom, clashesAccepted: accepted.map((c) => c.message) };
     });
   } catch (err) {
     if (isUniqueViolation(err)) throw new SchedulingError(`That year already has a group named ${data.name}`, 409);
@@ -475,9 +530,11 @@ export async function addGroupMembers(groupId: string, data: AddGroupMembersType
       const g = await groupOrThrow(groupId, tx);
       const [y] = await tx.select().from(academicYear).where(eq(academicYear.id, g.academicYearId));
       const startsOn = defaultStart(y!, data.startsOn);
-      const r = await addMembersTx(tx, groupId, data.studentIds, startsOn, actorId);
-      if (r.added) await logAction(actorId, 'TEACHING_GROUP_MEMBERS_ADDED', 'teaching_group', groupId, null, { studentIds: data.studentIds, startsOn, ...r }, ctx, tx);
-      return r;
+      const { result: r, accepted } = await guardPublishedTimetable(tx, { studentIds: data.studentIds }, startsOn,
+        { anyway: data.anyway, cause: `Added to ${g.name}`, actorId }, () => addMembersTx(tx, groupId, data.studentIds, startsOn, actorId));
+      const clashesAccepted = accepted.map((c) => c.message);
+      if (r.added) await logAction(actorId, 'TEACHING_GROUP_MEMBERS_ADDED', 'teaching_group', groupId, null, { studentIds: data.studentIds, startsOn, ...r, clashesAccepted }, ctx, tx);
+      return { ...r, clashesAccepted };
     });
   } catch (err) {
     if (isUniqueViolation(err)) throw new SchedulingError('Someone changed this group at the same moment — look again', 409);
@@ -489,7 +546,7 @@ export async function endGroupMembers(groupId: string, data: EndGroupMembersType
   return db.transaction(async (tx) => {
     const g = await groupOrThrow(groupId, tx, true);
     if (g.kind === 'section') throw new SchedulingError("This group's students are its section's — change the section on the Sections screen", 409);
-    const endedOn = data.endedOn ?? schoolDateString(new Date());
+    const endedOn = data.endedOn ?? todayAtSchool();
     const rows = await tx.select({ id: teachingGroupMember.id, studentId: teachingGroupMember.studentId, startedOn: teachingGroupMember.startedOn, name: user.name })
       .from(teachingGroupMember).innerJoin(user, eq(user.id, teachingGroupMember.studentId))
       .where(and(eq(teachingGroupMember.groupId, groupId), inArray(teachingGroupMember.studentId, data.studentIds), isNull(teachingGroupMember.endedOn)))
@@ -522,21 +579,29 @@ export async function splitGroup(groupId: string, data: SplitGroupType, actorId:
       const strangers = all.filter((s) => !inGroup.has(s));
       if (strangers.length) throw new SchedulingError(`${strangers.length} of the chosen students ${strangers.length === 1 ? 'is' : 'are'} not in ${g.name}`);
       const made: { id: string; name: string; students: number }[] = [];
-      for (const p of data.parts) {
-        await assertTeacher(tx, p.teacherId);
-        const id = randomUUID();
-        await tx.insert(teachingGroup).values({
-          id, academicYearId: g.academicYearId, name: p.name, subjectId: g.subjectId, teacherId: p.teacherId !== undefined ? p.teacherId : g.teacherId,
-          kind: 'manual', weeklyPeriods: g.weeklyPeriods, doublePeriods: g.doublePeriods, roomType: g.roomType, roomFeatures: g.roomFeatures, roomId: g.roomId,
-          splitFromGroupId: g.id, createdBy: actorId,
-        });
-        await linkTeacherToSubject(tx, p.teacherId ?? null, g.subjectId);
-        await addMembersTx(tx, id, p.studentIds, startsOn, actorId);
-        made.push({ id, name: p.name, students: p.studentIds.length });
-      }
+      const { accepted } = await guardPublishedTimetable(tx, { studentIds: all }, startsOn, { anyway: data.anyway, cause: `Split from ${g.name}`, actorId }, async () => {
+        for (const p of data.parts) {
+          await assertTeacher(tx, p.teacherId);
+          const id = randomUUID();
+          const partTeacher = p.teacherId !== undefined ? p.teacherId : g.teacherId;
+          await tx.insert(teachingGroup).values({
+            id, academicYearId: g.academicYearId, name: p.name, subjectId: g.subjectId, teacherId: partTeacher,
+            kind: 'manual', weeklyPeriods: g.weeklyPeriods, doublePeriods: g.doublePeriods, roomType: g.roomType, roomFeatures: g.roomFeatures, roomId: g.roomId,
+            splitFromGroupId: g.id, createdBy: actorId,
+          });
+          if (partTeacher) await tx.insert(teachingGroupTeacher).values({ id: randomUUID(), groupId: id, teacherId: partTeacher, startedOn: startsOn, reason: `Split from ${g.name}`, setBy: actorId });
+          await linkTeacherToSubject(tx, p.teacherId ?? null, g.subjectId);
+          await addMembersTx(tx, id, p.studentIds, startsOn, actorId);
+          made.push({ id, name: p.name, students: p.studentIds.length });
+        }
+      });
       await syncDraftCards(tx, made.map((m) => m.id));
-      await logAction(actorId, 'TEACHING_GROUP_SPLIT', 'teaching_group', groupId, null, { into: made, startsOn }, ctx, tx);
-      return { groups: made, startsOn };
+      // A published timetable has no lessons for groups made after it: say so, so a new version follows.
+      const published = await tx.select({ id: timetable.id }).from(timetable).innerJoin(academicTerm, eq(academicTerm.id, timetable.termId))
+        .where(and(eq(timetable.academicYearId, g.academicYearId), eq(timetable.status, 'published'), sql`${academicTerm.endsOn} >= ${startsOn}`));
+      const clashesAccepted = accepted.map((c) => c.message);
+      await logAction(actorId, 'TEACHING_GROUP_SPLIT', 'teaching_group', groupId, null, { into: made, startsOn, clashesAccepted }, ctx, tx);
+      return { groups: made, startsOn, clashesAccepted, notInPublishedTimetable: published.length > 0 };
     });
   } catch (err) {
     if (isUniqueViolation(err)) throw new SchedulingError('A group with one of those names already exists this year', 409);
@@ -548,7 +613,7 @@ export async function splitGroup(groupId: string, data: SplitGroupType, actorId:
 export async function mergeGroups(data: MergeGroupsType, actorId: string, ctx?: AuditContext) {
   return db.transaction(async (tx) => {
     const into = await groupOrThrow(data.intoGroupId, tx, true);
-    const others = [];
+    const others: Awaited<ReturnType<typeof groupOrThrow>>[] = [];
     for (const id of [...new Set(data.groupIds)].filter((x) => x !== into.id)) others.push(await groupOrThrow(id, tx, true));
     if (!others.length) throw new SchedulingError('Choose the groups to merge in');
     for (const g of [into, ...others]) {
@@ -560,14 +625,19 @@ export async function mergeGroups(data: MergeGroupsType, actorId: string, ctx?: 
     const [y] = await tx.select().from(academicYear).where(eq(academicYear.id, into.academicYearId));
     const startsOn = defaultStart(y!, data.startsOn);
     let movedStudents = 0;
-    for (const g of others) {
-      const members = await tx.select({ studentId: teachingGroupMember.studentId }).from(teachingGroupMember)
-        .where(and(eq(teachingGroupMember.groupId, g.id), isNull(teachingGroupMember.endedOn)));
-      if (members.length) movedStudents += (await addMembersTx(tx, into.id, members.map((m) => m.studentId), startsOn, actorId)).added;
-      await archiveTx(tx, g.id, startsOn, `Merged into ${into.name}`, actorId);
-    }
-    await logAction(actorId, 'TEACHING_GROUPS_MERGED', 'teaching_group', into.id, null, { merged: others.map((g) => ({ id: g.id, name: g.name })), startsOn, movedStudents }, ctx, tx);
-    return { into: into.id, merged: others.length, movedStudents, startsOn };
+    const moving = (await tx.select({ studentId: teachingGroupMember.studentId }).from(teachingGroupMember)
+      .where(and(inArray(teachingGroupMember.groupId, others.map((g) => g.id)), isNull(teachingGroupMember.endedOn)))).map((m) => m.studentId);
+    const { accepted } = await guardPublishedTimetable(tx, { studentIds: moving }, startsOn, { anyway: data.anyway, cause: `Merged into ${into.name}`, actorId }, async () => {
+      for (const g of others) {
+        const members = await tx.select({ studentId: teachingGroupMember.studentId }).from(teachingGroupMember)
+          .where(and(eq(teachingGroupMember.groupId, g.id), isNull(teachingGroupMember.endedOn)));
+        if (members.length) movedStudents += (await addMembersTx(tx, into.id, members.map((m) => m.studentId), startsOn, actorId)).added;
+        await archiveTx(tx, g.id, startsOn, `Merged into ${into.name}`, actorId);
+      }
+    });
+    const clashesAccepted = accepted.map((c) => c.message);
+    await logAction(actorId, 'TEACHING_GROUPS_MERGED', 'teaching_group', into.id, null, { merged: others.map((g) => ({ id: g.id, name: g.name })), startsOn, movedStudents, clashesAccepted }, ctx, tx);
+    return { into: into.id, merged: others.length, movedStudents, startsOn, clashesAccepted };
   });
 }
 
@@ -637,7 +707,7 @@ export async function endGroupMembershipsForSubject(tx: Tx, studentId: string, s
  * Published timetables are never touched.
  */
 export async function syncDraftCards(tx: Tx, groupIds: string[]) {
-  const today = schoolDateString(new Date());
+  const today = todayAtSchool();
   if (!groupIds.length) return { drafts: 0, added: 0, removed: 0 };
   const groups = await tx.select().from(teachingGroup).where(inArray(teachingGroup.id, groupIds));
   const years = [...new Set(groups.map((g) => g.academicYearId))];
@@ -689,7 +759,7 @@ export async function syncDraftCards(tx: Tx, groupIds: string[]) {
  * first take effect (the term's start, or today once the term has begun).
  */
 export async function groupsForTerm(tx: Executor, academicYearId: string, termStart: string) {
-  const today = schoolDateString(new Date());
+  const today = todayAtSchool();
   const from = termStart > today ? termStart : today;
   return tx.select().from(teachingGroup)
     .where(and(eq(teachingGroup.academicYearId, academicYearId), sql`(${teachingGroup.archivedOn} IS NULL OR ${teachingGroup.archivedOn} > ${from})`));

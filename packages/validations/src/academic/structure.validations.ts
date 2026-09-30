@@ -194,6 +194,10 @@ export const AddSectionMembers = z.object({
   // A student already in another section of the same year is moved: that
   // membership ends the day before this one starts.
   startsOn: DateOnlySchema.optional(),
+  // F1: go ahead although the move puts a student in two lessons at once in a
+  // published timetable (their new section's lessons against their own); the
+  // clash is recorded and listed on the Timetables screen.
+  anyway: z.boolean().optional(),
 });
 export type AddSectionMembersType = z.infer<typeof AddSectionMembers>;
 

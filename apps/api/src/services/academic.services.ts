@@ -14,7 +14,7 @@
  */
 
 import {
-  db, academicYear, academicTerm, calendarEntry, bellSchedule, bellPeriod, room, section, sectionMembership, user, teacher,
+  db, academicYear, academicTerm, calendarEntry, bellSchedule, bellPeriod, room, section, sectionMembership, user, teacher, studentLeaving,
   eq, and, ne, inArray, isNull, sql, asc, gradeTodayExtras,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -27,6 +27,7 @@ import {
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { getSetting } from './settings.services';
+import { todayAtSchool } from '../lib/clock';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -580,7 +581,7 @@ export async function addSectionMembers(sectionId: string, data: AddSectionMembe
       .where(eq(section.id, sectionId))
       .for('update', { of: section });
     if (!s) throw new AcademicError('Section not found', 404);
-    const today = schoolDateString(new Date());
+    const today = todayAtSchool();
     const startsOn = data.startsOn ?? (today < s.startsOn ? s.startsOn : today > s.endsOn ? s.endsOn : today);
     if (startsOn < s.startsOn || startsOn > s.endsOn) {
       throw new AcademicError(`The start date falls inside the school year (${readableDate(s.startsOn)} – ${readableDate(s.endsOn)})`);
@@ -632,24 +633,36 @@ export async function addSectionMembers(sectionId: string, data: AddSectionMembe
       }
     }
     const moved: { studentId: string; from: string }[] = [];
-    for (const id of toAdd) {
-      const prev = openBy.get(id);
-      if (prev) {
-        const endedOn = prev.startedOn >= startsOn ? prev.startedOn : dayBefore(startsOn);
-        await tx.update(sectionMembership)
-          .set({ endedOn, endReason: `Moved to ${s.name}`, endedBy: actorId })
-          .where(eq(sectionMembership.id, prev.id));
-        moved.push({ studentId: id, from: prev.sectionName });
+    const change = async () => {
+      for (const id of toAdd) {
+        const prev = openBy.get(id);
+        if (prev) {
+          const endedOn = prev.startedOn >= startsOn ? prev.startedOn : dayBefore(startsOn);
+          await tx.update(sectionMembership)
+            .set({ endedOn, endReason: `Moved to ${s.name}`, endedBy: actorId })
+            .where(eq(sectionMembership.id, prev.id));
+          moved.push({ studentId: id, from: prev.sectionName });
+        }
       }
-    }
+      if (toAdd.length) {
+        await tx.insert(sectionMembership).values(toAdd.map((studentId) => ({
+          id: randomUUID(), sectionId, studentId, academicYearId: s.academicYearId, startedOn: startsOn, addedBy: actorId,
+        })));
+      }
+    };
+    // F1: a section's lessons follow its students, so a move must not put one in two lessons at
+    // once in a published timetable (refused with the clashes, or recorded when the coordinator
+    // goes ahead anyway). Loaded here to keep the academic module free of a static cycle.
+    const { guardPublishedTimetable } = await import('./timetable-clash.services');
+    const { accepted } = await guardPublishedTimetable(tx, { studentIds: toAdd }, startsOn, { anyway: data.anyway, cause: `Moved to ${s.name}`, actorId }, change)
+      .catch((err: unknown) => { throw err instanceof Error && 'status' in err ? new AcademicError(err.message, (err as { status: 400 | 404 | 409 }).status) : err; });
+    const clashesAccepted = accepted.map((c) => c.message);
     if (toAdd.length) {
-      await tx.insert(sectionMembership).values(toAdd.map((studentId) => ({
-        id: randomUUID(), sectionId, studentId, academicYearId: s.academicYearId, startedOn: startsOn, addedBy: actorId,
-      })));
       await logAction(actorId, 'SECTION_MEMBERS_ADDED', 'section', sectionId, null,
-        { added: toAdd, moved, startsOn, alreadyIn: ids.filter((id) => !toAdd.includes(id)) }, ctx, tx);
+        { added: toAdd, moved, startsOn, alreadyIn: ids.filter((id) => !toAdd.includes(id)), clashesAccepted }, ctx, tx);
     }
-    return { added: toAdd.length, moved: moved.length, alreadyIn: ids.length - toAdd.length };
+    // F0a's answer is unchanged unless the coordinator went ahead with a clash.
+    return { added: toAdd.length, moved: moved.length, alreadyIn: ids.length - toAdd.length, ...(clashesAccepted.length ? { clashesAccepted } : {}) };
   });
 }
 
@@ -801,6 +814,144 @@ export async function sectionOf(studentId: string, startYear: number = academicY
     .innerJoin(academicYear, eq(academicYear.id, sectionMembership.academicYearId))
     .where(and(eq(sectionMembership.studentId, studentId), eq(academicYear.startYear, startYear), isNull(sectionMembership.endedOn)));
   return row ?? null;
+}
+
+// ─── Where a student is on a date (F1; F2 and F3 read it through F1) ────────
+//
+// One reading of "which section is this student in on this date", used by the
+// timetable, the class lists and the teaching groups that follow a section, so
+// the features built on them cannot disagree:
+// - two memberships of one year can cover the same day (a move dated the day
+//   the student joined ends the old membership on its own start day, ST-16):
+//   the later membership wins that day;
+// - nobody is in a section on a day they were away from the school (after the
+//   day they left, before the day they came back), and a membership they had
+//   been given before a leaving was recorded, starting after the day they left,
+//   never begins (the leaving cancelled it; F0a clamps its end to its start,
+//   SO-9). The leavings are kept (student_leaving), so readmission keeps them.
+
+type Executor = typeof db | Tx;
+
+/** A student's time away from the school: after `leftOn` (their last day) until `readmittedOn` (their first day back). */
+export type LeavingPeriod = { studentId: string; leftOn: string; readmittedOn: string | null; recordedAt: Date };
+
+export async function leavingPeriodsOf(studentIds: string[], executor: Executor = db): Promise<LeavingPeriod[]> {
+  const ids = [...new Set(studentIds)];
+  if (!ids.length) return [];
+  const rows: LeavingPeriod[] = await executor
+    .select({ studentId: studentLeaving.studentId, leftOn: studentLeaving.leftOn, readmittedOn: studentLeaving.readmittedOn, recordedAt: studentLeaving.recordedAt })
+    .from(studentLeaving).where(inArray(studentLeaving.studentId, ids));
+  // A leaving on the user with no row of its own (written outside recordLeaving) still counts.
+  const current = await executor.select({ id: user.id, leftOn: user.leftOn, recordedAt: user.leftRecordedAt })
+    .from(user).where(and(inArray(user.id, ids), sql`${user.leftOn} IS NOT NULL`));
+  for (const u of current) {
+    if (!rows.some((r) => r.studentId === u.id && r.readmittedOn === null)) {
+      rows.push({ studentId: u.id, leftOn: u.leftOn!, readmittedOn: null, recordedAt: u.recordedAt ?? new Date() });
+    }
+  }
+  return rows;
+}
+
+/** Whether a student is away from the school on a date. */
+export function awayOn(periods: LeavingPeriod[], studentId: string, date: string): boolean {
+  return periods.some((p) => p.studentId === studentId && p.leftOn < date && (p.readmittedOn === null || date < p.readmittedOn));
+}
+
+/** A membership given before a leaving was recorded and starting after the day the student left: the leaving cancelled it. */
+export function cancelledByLeaving(periods: LeavingPeriod[], studentId: string, row: { startedOn: string; createdAt: Date }): boolean {
+  return periods.some((p) => p.studentId === studentId && row.startedOn > p.leftOn && row.createdAt.getTime() <= p.recordedAt.getTime());
+}
+
+/** The days from `from` to `to` the student was at the school, as one or more [from, to] pieces. */
+export function daysPresent(periods: LeavingPeriod[], studentId: string, from: string, to: string): [string, string][] {
+  let pieces: [string, string][] = from <= to ? [[from, to]] : [];
+  for (const p of periods.filter((x) => x.studentId === studentId)) {
+    const awayFrom = dayAfter(p.leftOn);
+    const awayTo = p.readmittedOn ? dayBefore(p.readmittedOn) : '9999-12-31';
+    if (awayFrom > awayTo) continue;
+    pieces = pieces.flatMap(([a, b]): [string, string][] => {
+      if (awayTo < a || awayFrom > b) return [[a, b]];
+      const out: [string, string][] = [];
+      if (a < awayFrom) out.push([a, dayBefore(awayFrom)]);
+      if (awayTo < b) out.push([dayAfter(awayTo), b]);
+      return out;
+    });
+  }
+  return pieces;
+}
+
+/** A membership row of one student in one family of memberships (a year's sections, a year's groups of one subject). */
+export type MembershipRow = { id: string; studentId: string; key: string; startedOn: string; endedOn: string | null; createdAt: Date };
+
+/**
+ * Each row's last effective day: a row gives way to the next one of the same
+ * student and family that starts before it ends — the later membership wins a
+ * day both cover (the one that started later, or on the same start day the one
+ * recorded later).
+ */
+export function laterMembershipWins(rows: MembershipRow[]): Map<string, string | null> {
+  const out = new Map<string, string | null>();
+  const byKey = new Map<string, MembershipRow[]>();
+  for (const r of rows) {
+    const k = `${r.studentId}|${r.key}`;
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k)!.push(r);
+  }
+  for (const list of byKey.values()) {
+    list.sort((a, b) => a.startedOn.localeCompare(b.startedOn) || a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id));
+    list.forEach((r, i) => {
+      let end = r.endedOn;
+      const next = list[i + 1];
+      if (next && (end === null || next.startedOn <= end)) {
+        const cut = dayBefore(next.startedOn);
+        end = end === null || cut < end ? cut : end;
+      }
+      out.set(r.id, end);
+    });
+  }
+  return out;
+}
+
+export type SectionInterval = { studentId: string; sectionId: string; sectionName: string; academicYearId: string; from: string; to: string };
+
+/** Each student's section, date by date, between two dates (the rules above). */
+export async function sectionsBetween(studentIds: string[], from: string, to: string, executor: Executor = db): Promise<SectionInterval[]> {
+  const ids = [...new Set(studentIds)];
+  if (!ids.length || to < from) return [];
+  const rows = await executor
+    .select({
+      id: sectionMembership.id, studentId: sectionMembership.studentId, sectionId: sectionMembership.sectionId, sectionName: section.name,
+      academicYearId: sectionMembership.academicYearId, startedOn: sectionMembership.startedOn, endedOn: sectionMembership.endedOn, createdAt: sectionMembership.createdAt,
+    })
+    .from(sectionMembership).innerJoin(section, eq(section.id, sectionMembership.sectionId))
+    .where(inArray(sectionMembership.studentId, ids));
+  const ends = laterMembershipWins(rows.map((r) => ({ id: r.id, studentId: r.studentId, key: r.academicYearId, startedOn: r.startedOn, endedOn: r.endedOn, createdAt: r.createdAt })));
+  const periods = await leavingPeriodsOf(ids, executor);
+  const out: SectionInterval[] = [];
+  for (const r of rows) {
+    if (cancelledByLeaving(periods, r.studentId, r)) continue;
+    const end = ends.get(r.id) ?? null;
+    const a = r.startedOn > from ? r.startedOn : from;
+    const b = end === null || end > to ? to : end;
+    if (a > b) continue;
+    for (const [x, y] of daysPresent(periods, r.studentId, a, b)) {
+      out.push({ studentId: r.studentId, sectionId: r.sectionId, sectionName: r.sectionName, academicYearId: r.academicYearId, from: x, to: y });
+    }
+  }
+  return out.sort((p, q) => p.studentId.localeCompare(q.studentId) || p.from.localeCompare(q.from));
+}
+
+/** The section a student is in on a date, or null (away, or in none). */
+export async function sectionOn(studentId: string, date: string, executor: Executor = db) {
+  const [s] = await sectionsBetween([studentId], date, date, executor);
+  return s ? { sectionId: s.sectionId, name: s.sectionName, academicYearId: s.academicYearId } : null;
+}
+
+/** `sectionOn` for many students at once. */
+export async function sectionsOn(studentIds: string[], date: string, executor: Executor = db) {
+  const out = new Map<string, { sectionId: string; name: string; academicYearId: string }>();
+  for (const s of await sectionsBetween(studentIds, date, date, executor)) out.set(s.studentId, { sectionId: s.sectionId, name: s.sectionName, academicYearId: s.academicYearId });
+  return out;
 }
 
 /** Every section a student has been in, newest first. */

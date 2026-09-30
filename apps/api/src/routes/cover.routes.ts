@@ -7,7 +7,7 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
-  IdParam, RangeQuery, CreateAbsence, CancelAbsence, CoverSuggestionsQuery, AssignCover, RemoveCover, CoverReportQuery, schoolDateString,
+  IdParam, RangeQuery, CreateAbsence, CancelAbsence, CoverSuggestionsQuery, AssignCover, RemoveCover, CoverReportQuery,
 } from '@repo/validations';
 import { success, error } from '../lib/response';
 import { requireAuth, requireAcademic } from '../middleware/access-control.middleware';
@@ -16,6 +16,7 @@ import { extractAuditContext } from '../services/audit.services';
 import * as cover from '../services/cover.services';
 import { addDays } from '../services/scheduling-shared.services';
 import { fail } from './scheduling.routes';
+import { todayAtSchool } from '../lib/clock';
 
 export const coverRoutes = new Hono<HonoEnv>()
   .use('*', requireAuth())
@@ -80,7 +81,7 @@ export const coverRoutes = new Hono<HonoEnv>()
   })
   .get('/log', zValidator('query', RangeQuery), async (c) => {
     const q = c.req.valid('query');
-    const today = schoolDateString(new Date());
+    const today = todayAtSchool();
     try {
       return success(c, await cover.coverLog(q.from ?? addDays(today, -30), q.to ?? addDays(today, 30)));
     } catch (err) {

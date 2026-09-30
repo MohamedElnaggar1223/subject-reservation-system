@@ -21,8 +21,9 @@
  */
 
 import {
-  db, teachingGroup, teachingGroupMember, sectionMembership, user, eq, and, inArray, sql, isNull, or,
+  db, teachingGroup, teachingGroupMember, teachingGroupTeacher, sectionMembership, eq, and, inArray, sql, isNull, or,
 } from '@repo/db';
+import { sectionsBetween, leavingPeriodsOf, cancelledByLeaving, daysPresent, laterMembershipWins } from './academic.services';
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type Executor = typeof db | Tx;
@@ -93,41 +94,12 @@ export function cairoInstant(date: string, hhmm: string): Date {
 
 export type MemberInterval = { studentId: string; groupId: string; from: string; to: string };
 
-type Row = { id: string; studentId: string; key: string; startedOn: string; endedOn: string | null; createdAt: Date };
-
-/**
- * Each row's last effective day: a row gives way to the next one of the same
- * student and family (subject, or section) that starts before it ends — the
- * later membership wins a day both cover.
- */
-function effectiveEnds(rows: Row[]): Map<string, string | null> {
-  const out = new Map<string, string | null>();
-  const byKey = new Map<string, Row[]>();
-  for (const r of rows) {
-    const k = `${r.studentId}|${r.key}`;
-    if (!byKey.has(k)) byKey.set(k, []);
-    byKey.get(k)!.push(r);
-  }
-  for (const list of byKey.values()) {
-    list.sort((a, b) => a.startedOn.localeCompare(b.startedOn) || a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id));
-    list.forEach((r, i) => {
-      let end = r.endedOn;
-      const next = list[i + 1];
-      if (next && (end === null || next.startedOn <= end)) {
-        const cut = addDays(next.startedOn, -1);
-        end = end === null || cut < end ? cut : end;
-      }
-      out.set(r.id, end);
-    });
-  }
-  return out;
-}
-
 /**
  * Who is in each of these groups between two dates, as date intervals (a
  * student in and out of a group has several). The rules are the module's:
- * section groups follow the section, the later membership wins a shared day,
- * nobody is in a group after leaving the school, nothing after an archive.
+ * section groups follow the section (F0a's `sectionsBetween`, the one reading
+ * of "which section on a date"), the later membership wins a shared day,
+ * nobody is in a group while away from the school, nothing after an archive.
  */
 export async function groupMembersBetween(groupIds: string[], from: string, to: string, executor: Executor = db): Promise<MemberInterval[]> {
   if (!groupIds.length || to < from) return [];
@@ -163,13 +135,21 @@ export async function groupMembersBetween(groupIds: string[], from: string, to: 
         ))
       : [];
     const all = new Map([...rows, ...rivals].map((r) => [r.id, r]));
-    const ends = effectiveEnds([...all.values()].map((r) => ({
+    const ends = laterMembershipWins([...all.values()].map((r) => ({
       id: r.id, studentId: r.studentId, key: r.subjectId ? `${r.academicYearId}|${r.subjectId}` : `group|${r.groupId}`, startedOn: r.startedOn, endedOn: r.endedOn, createdAt: r.createdAt,
     })));
-    for (const r of rows) pending.push({ studentId: r.studentId, groupId: r.groupId, from: r.startedOn, to: ends.get(r.id) ?? '9999-12-31' });
+    const periods = await leavingPeriodsOf(rows.map((r) => r.studentId), executor);
+    for (const r of rows) {
+      if (cancelledByLeaving(periods, r.studentId, r)) continue;
+      const end = ends.get(r.id) ?? null;
+      const a = maxDate(r.startedOn, from);
+      const b = end === null ? to : minDate(end, to);
+      if (a > b) continue;
+      for (const [x, y] of daysPresent(periods, r.studentId, a, b)) pending.push({ studentId: r.studentId, groupId: r.groupId, from: x, to: y });
+    }
   }
 
-  // Section groups: the section's students on each date, one section at a time per year.
+  // Section groups: the section's students on each date.
   const sectional = groups.filter((g) => g.kind === 'section' && g.sectionId);
   if (sectional.length) {
     const inSections = await executor
@@ -180,40 +160,67 @@ export async function groupMembersBetween(groupIds: string[], from: string, to: 
         sql`${sectionMembership.startedOn} <= ${to}`,
         or(isNull(sectionMembership.endedOn), sql`${sectionMembership.endedOn} >= ${from}`),
       ));
-    const studentIds = [...new Set(inSections.map((r) => r.studentId))];
-    if (studentIds.length) {
-      const years = [...new Set(sectional.map((g) => g.academicYearId))];
-      const rows = await executor
-        .select({ id: sectionMembership.id, sectionId: sectionMembership.sectionId, studentId: sectionMembership.studentId, academicYearId: sectionMembership.academicYearId, startedOn: sectionMembership.startedOn, endedOn: sectionMembership.endedOn, createdAt: sectionMembership.createdAt })
-        .from(sectionMembership)
-        .where(and(inArray(sectionMembership.studentId, studentIds), inArray(sectionMembership.academicYearId, years)));
-      const ends = effectiveEnds(rows.map((r) => ({ id: r.id, studentId: r.studentId, key: r.academicYearId, startedOn: r.startedOn, endedOn: r.endedOn, createdAt: r.createdAt })));
-      for (const g of sectional) {
-        for (const r of rows) {
-          if (r.sectionId !== g.sectionId) continue;
-          pending.push({ studentId: r.studentId, groupId: g.id, from: r.startedOn, to: ends.get(r.id) ?? '9999-12-31' });
-        }
-      }
+    const intervals = await sectionsBetween(inSections.map((r) => r.studentId), from, to, executor);
+    for (const g of sectional) {
+      for (const i of intervals) if (i.sectionId === g.sectionId) pending.push({ studentId: i.studentId, groupId: g.id, from: i.from, to: i.to });
     }
   }
 
-  // Nobody after leaving; nothing after an archive; only the asked dates.
-  const studentIds = [...new Set(pending.map((p) => p.studentId))];
-  const left = studentIds.length
-    ? new Map((await executor.select({ id: user.id, leftOn: user.leftOn }).from(user).where(inArray(user.id, studentIds))).map((u) => [u.id, u.leftOn]))
-    : new Map<string, string | null>();
+  // Nothing after an archive.
   const archived = new Map(groups.map((g) => [g.id, g.archivedOn]));
   for (const p of pending) {
-    let a = maxDate(p.from, from);
-    let b = minDate(p.to, to);
-    const l = left.get(p.studentId);
-    if (l) b = minDate(b, l);
+    let b = p.to;
     const arch = archived.get(p.groupId);
     if (arch) b = minDate(b, addDays(arch, -1));
-    if (a <= b) out.push({ studentId: p.studentId, groupId: p.groupId, from: a, to: b });
+    if (p.from <= b) out.push({ studentId: p.studentId, groupId: p.groupId, from: p.from, to: b });
   }
   out.sort((x, y) => x.groupId.localeCompare(y.groupId) || x.studentId.localeCompare(y.studentId) || x.from.localeCompare(y.from));
   return out;
+}
+
+// ─── Who teaches a group, date by date ───────────────────────────────────────
+
+export type TeacherInterval = { groupId: string; teacherId: string | null; from: string; to: string };
+
+/**
+ * Each group's teacher between two dates (teaching_group_teacher: a change of
+ * teacher mid-term starts a new row, so past weeks keep their teacher). A
+ * group with no dated row at all has the teacher on the group throughout.
+ */
+export async function groupTeachersBetween(groupIds: string[], from: string, to: string, executor: Executor = db): Promise<TeacherInterval[]> {
+  const ids = [...new Set(groupIds)];
+  if (!ids.length || to < from) return [];
+  const rows = await executor.select().from(teachingGroupTeacher).where(inArray(teachingGroupTeacher.groupId, ids));
+  const out: TeacherInterval[] = [];
+  const dated = new Set(rows.map((r) => r.groupId));
+  for (const r of rows) {
+    const a = maxDate(r.startedOn, from);
+    const b = r.endedOn === null ? to : minDate(r.endedOn, to);
+    if (a <= b) out.push({ groupId: r.groupId, teacherId: r.teacherId, from: a, to: b });
+  }
+  const undated = ids.filter((id) => !dated.has(id));
+  if (undated.length) {
+    const gs = await executor.select({ id: teachingGroup.id, teacherId: teachingGroup.teacherId }).from(teachingGroup).where(inArray(teachingGroup.id, undated));
+    for (const g of gs) out.push({ groupId: g.id, teacherId: g.teacherId, from, to });
+  }
+  return out.sort((x, y) => x.groupId.localeCompare(y.groupId) || x.from.localeCompare(y.from));
+}
+
+/** Each group's teacher on one date. */
+export async function teachersOn(groupIds: string[], date: string, executor: Executor = db): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
+  for (const i of await groupTeachersBetween(groupIds, date, date, executor)) out.set(i.groupId, i.teacherId);
+  return out;
+}
+
+/** The groups a teacher teaches on some day between two dates, with the days. */
+export async function groupsTaughtBetween(teacherId: string, from: string, to: string, executor: Executor = db): Promise<TeacherInterval[]> {
+  const byRow = await executor.select({ groupId: teachingGroupTeacher.groupId }).from(teachingGroupTeacher)
+    .where(and(eq(teachingGroupTeacher.teacherId, teacherId), sql`${teachingGroupTeacher.startedOn} <= ${to}`,
+      or(isNull(teachingGroupTeacher.endedOn), sql`${teachingGroupTeacher.endedOn} >= ${from}`)));
+  const byGroup = await executor.select({ id: teachingGroup.id }).from(teachingGroup).where(eq(teachingGroup.teacherId, teacherId));
+  const intervals = await groupTeachersBetween([...byRow.map((r) => r.groupId), ...byGroup.map((g) => g.id)], from, to, executor);
+  return intervals.filter((i) => i.teacherId === teacherId);
 }
 
 /** The groups a student is in on some day between two dates (then read with groupMembersBetween). */

@@ -35,6 +35,7 @@ import { logAction, extractAuditContext } from '../services/audit.services';
 import * as userService from '../services/user.services';
 import { createTeacherForAccount, linkTeacherAccount, TeacherError } from '../services/teacher.services';
 import { db } from '@repo/db';
+import { revokeFeedTokensOnBan } from '../services/schedule.services';
 
 export const users = new Hono<HonoEnv>()
   // All routes require authentication
@@ -470,6 +471,8 @@ export const users = new Hono<HonoEnv>()
       }
       if (data.banned === true) {
         await userService.revokeAllSessions(id);
+        // F1: and their calendar links (the feed also refuses a banned account on every request).
+        await revokeFeedTokensOnBan(id, c.get('user')!.id, extractAuditContext(c));
       }
 
       // RF-14: an admin changing someone's account (role, ban, grade) left no

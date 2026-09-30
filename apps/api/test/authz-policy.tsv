@@ -262,6 +262,7 @@ POST	/v1/scheduling/rules/day-rules	D	D	D	D	D	A	A	D	D
 DELETE	/v1/scheduling/rules/day-rules/:id	D	D	D	D	D	A	A	D	D
 GET	/v1/timetables	D	D	D	D	D	A	A	D	D
 POST	/v1/timetables	D	D	D	D	D	A	A	D	D
+GET	/v1/timetables/clashes	D	D	D	D	D	A	A	D	D
 GET	/v1/timetables/:id	D	D	D	D	D	A	A	D	D
 PUT	/v1/timetables/:id	D	D	D	D	D	A	A	D	D
 DELETE	/v1/timetables/:id	D	D	D	D	D	A	A	D	D

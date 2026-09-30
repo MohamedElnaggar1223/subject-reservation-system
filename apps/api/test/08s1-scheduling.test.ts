@@ -225,7 +225,7 @@ describe('F1: scheduling', () => {
       .toEqual({ status: 409, error: expect.stringMatching(/^A move must start on or after the day the student joined their current group: Student sch-a joined Chemistry S1 \(extension\) on .*1 October/) });
     // Back on the same day: that membership is replaced (withdrawn before its first day), never doubled.
     expect(await apiResponse(coordinator.api.v1.scheduling.groups[':id'].members.$post({ param: { id: g('Chemistry S1').id }, json: { studentIds: [f.a!.studentId], startsOn: `${Y}-10-01` } })))
-      .toEqual({ added: 1, moved: 1, alreadyIn: 0 });
+      .toEqual({ added: 1, moved: 1, alreadyIn: 0, clashesAccepted: [] });
     expect(await sql(`select g.name, m.started_on, m.ended_on from teaching_group_member m join teaching_group g on g.id = m.group_id where m.student_id = $1 and m.subject_id = $2 order by m.created_at`, [f.a!.studentId, chem]))
       .toEqual([
         { name: 'Chemistry S1', started_on: `${Y}-09-06`, ended_on: `${Y}-09-30` },

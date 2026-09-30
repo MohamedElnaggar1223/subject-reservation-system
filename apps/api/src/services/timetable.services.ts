@@ -24,12 +24,12 @@
 
 import {
   db, timetable, timetableLesson, timetableGenerationRun, teachingGroup, academicTerm, academicYear, bellSchedule, bellPeriod, room,
-  teacher, teacherLoadLimit, scheduleUnavailability, groupDayRule, subject, section, sectionMembership, user, parentStudentLink,
-  eq, and, inArray, isNull, sql, asc, desc, ne,
+  teacher, teacherLoadLimit, scheduleUnavailability, groupDayRule, subject, section, sectionMembership, user, parentStudentLink, coverAssignment,
+  eq, and, inArray, isNull, sql, asc, desc, ne, gte,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  gridFromBells, evaluate, measure, judgeMove, generate, canonicalInput, cardsFor, schoolDateString, slotName, WEEKDAY_NAMES,
+  gridFromBells, evaluate, measure, judgeMove, generate, canonicalInput, cardsFor, slotName, WEEKDAY_NAMES,
   type EngineInput, type GridDay, type CreateTimetableType, type UpdateTimetableType, type MoveLessonType, type UnplaceLessonType,
   type LockLessonType, type GenerateTimetableType, type PublishTimetableType, type ExportCsvQueryType,
 } from '@repo/validations';
@@ -38,8 +38,11 @@ import { getSetting } from './settings.services';
 import { createBulkNotifications } from './notification.services';
 import { groupsForTerm, syncDraftCards } from './group.services';
 import {
-  SchedulingError, readableDate, groupMembersBetween, peakSize, overlapsOf, csvCell, type Tx, type Executor,
+  SchedulingError, readableDate, groupMembersBetween, groupTeachersBetween, teachersOn, peakSize, overlapsOf, csvCell, addDays, type Tx, type Executor,
 } from './scheduling-shared.services';
+import { sectionsBetween } from './academic.services';
+import { generateInWorker } from './generator-runner';
+import { todayAtSchool } from '../lib/clock';
 
 // ─── Loading ─────────────────────────────────────────────────────────────────
 
@@ -77,36 +80,38 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
   const grid = await gridOfYear(tt.academicYearId, executor);
   const lessons = await executor.select().from(timetableLesson).where(eq(timetableLesson.timetableId, tt.id)).orderBy(asc(timetableLesson.groupId), asc(timetableLesson.seq));
   const groupIds = [...new Set(lessons.map((l) => l.groupId))];
-  const groups = groupIds.length
+  // The day the version is read for: today inside its term, else the term's first day; a version
+  // that takes effect later, from that day. Each group's teacher is the one teaching it then.
+  const today = todayAtSchool();
+  const inTerm = today < term.startsOn ? term.startsOn : today > term.endsOn ? term.endsOn : today;
+  const asOf = tt.effectiveFrom && tt.effectiveFrom > inTerm ? tt.effectiveFrom : inTerm;
+  const teacherOn = await teachersOn(groupIds, asOf, executor);
+  const rawGroups = groupIds.length
     ? await executor.select({
       g: teachingGroup,
       subjectName: subject.name, subjectCode: subject.code,
-      teacherName: teacher.name,
       sectionName: section.name, sectionRoomId: section.roomId,
     }).from(teachingGroup)
       .leftJoin(subject, eq(subject.id, teachingGroup.subjectId))
-      .leftJoin(teacher, eq(teacher.id, teachingGroup.teacherId))
       .leftJoin(section, eq(section.id, teachingGroup.sectionId))
       .where(inArray(teachingGroup.id, groupIds))
     : [];
+  const teacherIds = [...new Set([...teacherOn.values()].filter((x): x is string => !!x))];
+  const teachers = teacherIds.length ? await executor.select().from(teacher).where(inArray(teacher.id, teacherIds)) : [];
+  const groups = rawGroups.map((x) => {
+    const teacherId = teacherOn.has(x.g.id) ? teacherOn.get(x.g.id)! : null;
+    return { ...x, g: { ...x.g, teacherId }, teacherName: teachers.find((t) => t.id === teacherId)?.name ?? null };
+  });
   const members = await groupMembersBetween(groupIds, term.startsOn, term.endsOn, executor);
   const studentIds = [...new Set(members.map((m) => m.studentId))];
   const students = studentIds.length
     ? await executor.select({ id: user.id, name: user.name, studentCode: user.studentId }).from(user).where(inArray(user.id, studentIds)).orderBy(asc(user.name))
     : [];
-  // Each student's section during the term (the latest membership that touches it).
-  const sectionRows = studentIds.length
-    ? await executor.select({ studentId: sectionMembership.studentId, sectionId: section.id, name: section.name, startedOn: sectionMembership.startedOn, createdAt: sectionMembership.createdAt })
-      .from(sectionMembership).innerJoin(section, eq(section.id, sectionMembership.sectionId))
-      .where(and(inArray(sectionMembership.studentId, studentIds), eq(sectionMembership.academicYearId, tt.academicYearId),
-        sql`${sectionMembership.startedOn} <= ${term.endsOn}`, sql`(${sectionMembership.endedOn} IS NULL OR ${sectionMembership.endedOn} >= ${term.startsOn})`))
-    : [];
+  // Each student's section during the term: the last one they are in (F0a's single reading, sectionsBetween).
   const sectionOf = new Map<string, { id: string; name: string }>();
-  for (const r of [...sectionRows].sort((a, b) => a.startedOn.localeCompare(b.startedOn) || a.createdAt.getTime() - b.createdAt.getTime())) {
-    sectionOf.set(r.studentId, { id: r.sectionId, name: r.name });
+  for (const r of await sectionsBetween(studentIds, term.startsOn, term.endsOn, executor)) {
+    if (r.academicYearId === tt.academicYearId) sectionOf.set(r.studentId, { id: r.sectionId, name: r.sectionName });
   }
-  const teacherIds = [...new Set(groups.map((g) => g.g.teacherId).filter((x): x is string => !!x))];
-  const teachers = teacherIds.length ? await executor.select().from(teacher).where(inArray(teacher.id, teacherIds)) : [];
   const limits = teacherIds.length
     ? await executor.select().from(teacherLoadLimit).where(and(eq(teacherLoadLimit.academicYearId, tt.academicYearId), inArray(teacherLoadLimit.teacherId, teacherIds)))
     : [];
@@ -169,6 +174,7 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
     term,
     year: year!,
     grid,
+    asOf,
     input,
     display: {
       groups: groups.map(({ g, subjectName, subjectCode, teacherName, sectionName }) => {
@@ -210,7 +216,7 @@ export async function listTimetables(filters: { academicYearId?: string; termId?
       filters.termId ? eq(timetable.termId, filters.termId) : undefined,
     ))
     .orderBy(asc(academicTerm.startsOn), desc(timetable.createdAt));
-  const today = schoolDateString(new Date());
+  const today = todayAtSchool();
   const inForce = new Set<string>();
   const byTerm = new Map<string, typeof rows>();
   for (const r of rows) {
@@ -400,7 +406,8 @@ export async function generateTimetable(id: string, data: GenerateTimetableType,
   if (!before.input.days.length) throw new SchedulingError('This year has no lesson periods to place lessons in — set up the default bell schedule first', 409);
   const start = startingPoint(before.input);
   const started = Date.now();
-  const result = generate(start, { iterations: data.iterations });
+  // On a worker thread: the API keeps answering while it searches.
+  const result = await generateInWorker(start, { iterations: data.iterations });
   const durationMs = Date.now() - started;
   const run = {
     id: randomUUID(), timetableId: id, startedBy: actorId, durationMs, inputHash: result.inputHash, outputHash: result.outputHash,
@@ -455,7 +462,7 @@ export async function publishTimetable(id: string, data: PublishTimetableType, a
     await tx.select({ id: academicTerm.id }).from(academicTerm).where(eq(academicTerm.id, draft.termId)).for('update');
     const t = await draftForEdit(tx, id);
     const term = await termOf(t.termId, tx);
-    const today = schoolDateString(new Date());
+    const today = todayAtSchool();
     if (data.effectiveFrom < term.startsOn || data.effectiveFrom > term.endsOn) {
       throw new SchedulingError(`${term.name} runs from ${readableDate(term.startsOn)} to ${readableDate(term.endsOn)}: the timetable takes effect inside it`);
     }
@@ -475,14 +482,55 @@ export async function publishTimetable(id: string, data: PublishTimetableType, a
     await tx.update(timetable).set({ status: 'published', effectiveFrom: data.effectiveFrom, publishedBy: actorId, publishedAt, publishNote: data.note ?? null, updatedAt: publishedAt })
       .where(eq(timetable.id, id));
     const changedGroups = await changedGroupsSince(tx, previous?.id ?? null, id);
+    const covers = await carryCoversOver(tx, id, term.id, data.effectiveFrom, t.name, actorId);
     await logAction(actorId, 'TIMETABLE_PUBLISHED', 'timetable', id, { status: 'draft' },
-      { status: 'published', effectiveFrom: data.effectiveFrom, replaces: previous?.id ?? null, lessons: model.input.lessons.length, unplaced: unplaced.length, changedGroups: changedGroups.length, note: data.note ?? null }, ctx, tx);
-    return { term, previous, changedGroups, name: t.name, unplaced: unplaced.length };
+      { status: 'published', effectiveFrom: data.effectiveFrom, replaces: previous?.id ?? null, lessons: model.input.lessons.length, unplaced: unplaced.length, changedGroups: changedGroups.length, note: data.note ?? null,
+        coversMoved: covers.moved, coversRemoved: covers.removed }, ctx, tx);
+    return { term, previous, changedGroups, name: t.name, unplaced: unplaced.length, covers };
   });
-  // After the commit: tell the people whose timetable this is (or changed for).
+  // After the commit: tell the people whose timetable this is (or changed for), and those whose cover is gone.
   const notified = await notifyPublished(id, result.term, data.effectiveFrom, result.changedGroups, !!result.previous)
     .catch((err) => { console.error('[timetable] publish notices failed:', err); return { students: 0, parents: 0, teachers: 0 }; });
-  return { id, effectiveFrom: data.effectiveFrom, replaces: result.previous?.id ?? null, changedGroups: result.changedGroups.length, unplaced: result.unplaced, notified };
+  const cover = await import('./cover.services');
+  await cover.coverChangeNotices(result.covers.removed, 'timetable_changed', { effectiveFrom: data.effectiveFrom })
+    .catch((err) => console.error('[timetable] cover notices failed:', err));
+  return {
+    id, effectiveFrom: data.effectiveFrom, replaces: result.previous?.id ?? null, changedGroups: result.changedGroups.length, unplaced: result.unplaced, notified,
+    coversMoved: await cover.describeCovers(result.covers.moved), coversRemoved: await cover.describeCovers(result.covers.removed),
+  };
+}
+
+/**
+ * Cover arranged on lessons of another version of the term, for dates this one
+ * now governs: moved to this version's same lesson (the same group, number and
+ * slot), or removed when it has none (the people concerned are told after the
+ * commit). An arrangement on a date a later version still governs stays.
+ */
+async function carryCoversOver(tx: Tx, id: string, termId: string, effectiveFrom: string, name: string, actorId: string) {
+  const others = (await tx.select({ id: timetable.id }).from(timetable).where(and(eq(timetable.termId, termId), ne(timetable.id, id)))).map((r) => r.id);
+  const live = others.length
+    ? await tx.select({ c: coverAssignment, l: timetableLesson }).from(coverAssignment)
+      .innerJoin(timetableLesson, eq(timetableLesson.id, coverAssignment.lessonId))
+      .where(and(inArray(coverAssignment.timetableId, others), ne(coverAssignment.status, 'removed'), gte(coverAssignment.date, effectiveFrom)))
+      .for('update', { of: coverAssignment })
+    : [];
+  const cards = live.length ? await tx.select().from(timetableLesson).where(eq(timetableLesson.timetableId, id)) : [];
+  const moved: string[] = [];
+  const removed: string[] = [];
+  for (const x of live) {
+    const inForce = await versionInForce(termId, x.c.date, tx);
+    if (inForce?.id !== id) continue;
+    const same = cards.find((l) => l.groupId === x.l.groupId && l.seq === x.l.seq && l.weekday === x.l.weekday && l.period === x.l.period && l.length === x.l.length);
+    if (same) {
+      await tx.update(coverAssignment).set({ lessonId: same.id, timetableId: id }).where(eq(coverAssignment.id, x.c.id));
+      moved.push(x.c.id);
+    } else {
+      await tx.update(coverAssignment).set({ status: 'removed', removal: 'timetable_changed', removeReason: `${name} takes effect from ${readableDate(effectiveFrom)}`, removedAt: new Date(), removedBy: actorId })
+        .where(eq(coverAssignment.id, x.c.id));
+      removed.push(x.c.id);
+    }
+  }
+  return { moved, removed };
 }
 
 /** Groups whose lessons (slots, rooms, teacher) differ between two versions — every group when there is no previous one. */
@@ -502,8 +550,9 @@ async function notifyPublished(id: string, term: { name: string; startsOn: strin
   if (!groupIds.length) return { students: 0, parents: 0, teachers: 0 };
   const members = await groupMembersBetween(groupIds, effectiveFrom, term.endsOn);
   const studentIds = [...new Set(members.map((m) => m.studentId))];
-  const groups = await db.select({ teacherId: teachingGroup.teacherId }).from(teachingGroup).where(inArray(teachingGroup.id, groupIds));
-  const teacherIds = [...new Set(groups.map((g) => g.teacherId).filter((x): x is string => !!x))];
+  // The teachers who teach those groups while this version is in force (a dated change of teacher included).
+  const teaching = await groupTeachersBetween(groupIds, effectiveFrom, term.endsOn);
+  const teacherIds = [...new Set(teaching.map((g) => g.teacherId).filter((x): x is string => !!x))];
   const teacherUsers = teacherIds.length
     ? (await db.select({ userId: teacher.userId }).from(teacher).where(inArray(teacher.id, teacherIds))).map((t) => t.userId).filter((x): x is string => !!x)
     : [];
