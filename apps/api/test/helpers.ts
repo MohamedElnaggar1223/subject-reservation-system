@@ -502,3 +502,23 @@ export async function expireByHand(registrationId: string, reason = 'session_clo
     [registrationId, JSON.stringify({ status: 'expired', reason })]
   );
 }
+
+// ─── F2: today at the gate ───────────────────────────────────────────────────
+
+/**
+ * Today at the school is a school day whose bells run from 00:00 to 23:59,
+ * whatever the suite's calendar made of it (a weekend, between terms, a
+ * short day), so the gate's scenarios work on any day at any hour. Outside
+ * every academic year (July to early September) the day is not judged.
+ */
+export async function makeTodayASchoolDay(coordinator: Client) {
+  const today = schoolToday();
+  const day = await apiResponse(coordinator.api.v1.academic.calendar.day.$get({ query: { date: today } }));
+  if (!day.academicYear) return;
+  const bells = await apiResponse(coordinator.api.v1.academic['bell-schedules'].$post({ json: { academicYearId: day.academicYear.id, name: `Campus leave all day ${Date.now()}`, isDefault: false } }));
+  await apiResponse(coordinator.api.v1.academic['bell-schedules'][':id'].periods.$put({
+    param: { id: bells.id }, json: { periods: [{ weekday: null, label: 'All day', kind: 'lesson', startsAt: '00:00', endsAt: '23:59' }] },
+  }));
+  if (day.entry) await apiResponse(coordinator.api.v1.academic.calendar[':id'].$delete({ param: { id: day.entry.id } }));
+  await apiResponse(coordinator.api.v1.academic.calendar.$post({ json: { academicYearId: day.academicYear.id, kind: 'school_day', name: 'Campus leave test day', startsOn: today, endsOn: today, bellScheduleId: bells.id } }));
+}

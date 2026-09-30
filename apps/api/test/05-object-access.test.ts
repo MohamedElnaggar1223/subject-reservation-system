@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, one, sql, notified, money, clientFor,
-  openWindow, futureWindow, type Client,
+  openWindow, futureWindow, makeTodayASchoolDay, schoolToday, type Client,
 } from './helpers';
 
 /**
@@ -524,6 +524,94 @@ describe('object-level access between families', () => {
     expect(bFeed).toContain('OA Physics B');
     expect(bFeed).not.toContain('OA Physics A');
     expect(await covers()).toEqual(before);
+  });
+
+  // ─── F2 ──────────────────────────────────────────────────────────────────
+
+  it("F2 campus leave: another family's leave, pass and collectors; another class; the gate reaching only today's list and only what check-out needs", async () => {
+    const coordinator = await staff(adm, 'coordinator', 'oa-lv');
+    const gate = await staff(adm, 'gate', 'oa-lv');
+    const teacher = await staff(adm, 'teacher', 'oa-lv');
+    await makeTodayASchoolDay(coordinator);
+    const far = `${academicYearStartOf() + 28}-10-06`;
+    const png = () => new File([Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'))], 'p.png', { type: 'image/png' });
+    const pdf = () => new File([new TextEncoder().encode('%PDF-1.4\n%oa\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n')], 'order.pdf', { type: 'application/pdf' });
+    const upload = (who: Client, purpose: 'collector_photo' | 'custody_photo' | 'custody_document', file: File, studentId: string) =>
+      apiResponse(who.api.v1.files.upload.$post({ form: { file, purpose, studentId } }));
+    const content = (who: Client, id: string) => who.api.v1.files[':id'].content.$get({ param: { id }, query: {} });
+
+    // A's records: a collector with a photo, a request for a later day, today's approved leave, a custody restriction.
+    const photoA = await upload(parentA, 'collector_photo', png(), studentAId);
+    const collectorA = await apiResponse(parentA.api.v1.leave.collectors.$post({ json: { name: 'Oa Grandfather', relation: 'Grandparent', phone: '01000001000', idNumber: '26001011234567', photoFileId: photoA.id, studentIds: [studentAId] } }));
+    await apiResponse(coordinator.api.v1.leave.collectors[':id'].approve.$post({ param: { id: collectorA.id } }));
+    const farLeave = (await apiResponse(parentA.api.v1.leave.requests.$post({ json: { studentId: studentAId, date: far, leaveTime: '09:00', returning: false, reasonCategory: 'medical', collector: { kind: 'parent', parentId: parentA.id } } }))).leaves[0]!.id;
+    await apiResponse(coordinator.api.v1.leave.requests[':id'].approve.$post({ param: { id: farLeave }, json: {} }));
+    const farPass = (await apiResponse(parentA.api.v1.leave.requests[':id'].pass.$get({ param: { id: farLeave } }))).token!;
+    const todayLeave = (await apiResponse(coordinator.api.v1.leave.requests.$post({ json: { studentId: studentAId, date: schoolToday(), leaveTime: '08:00', returning: false, reasonCategory: 'medical', collector: { kind: 'collector', collectorId: collectorA.id }, approveNow: true } }))).leaves[0]!.id;
+    const custodyPhoto = await upload(coordinator, 'custody_photo', png(), studentAId);
+    const custodyDoc = await upload(coordinator, 'custody_document', pdf(), studentAId);
+    await apiResponse(coordinator.api.v1.leave.restrictions.$post({ json: { studentId: studentAId, personName: 'Oa Restricted', note: 'Court order', photoFileId: custodyPhoto.id, documentFileId: custodyDoc.id } }));
+    // B's collector (B has no leave today).
+    const photoB = await upload(parentB, 'collector_photo', png(), studentBId);
+    await apiResponse(parentB.api.v1.leave.collectors.$post({ json: { name: 'Oa Aunt', relation: 'Aunt', phone: '01000001001', idNumber: '26101011234567', photoFileId: photoB.id, studentIds: [studentBId] } }));
+    const snapshot = async () => [
+      await sql(`select id, status, pass_version, cancelled_at, checked_out_at from leave_request where student_id = $1 order by id`, [studentAId]),
+      await sql(`select c.id, c.status from leave_collector c join leave_collector_student s on s.collector_id = c.id where s.student_id = $1 order by c.id`, [studentAId]),
+      await sql(`select id, ended_at from leave_custody_restriction where student_id = $1`, [studentAId]),
+    ];
+    const before = await snapshot();
+
+    // Another family: nothing of A's, as "not found"; nothing changed.
+    for (const [who, label] of [[parentB, 'parentB'], [studentB, 'studentB']] as const) {
+      expect(await refusedAs(`${label} reads A leave`, who.api.v1.leave.requests[':id'].$get({ param: { id: farLeave } }))).toBe(404);
+      expect(await refusedAs(`${label} reads A pass`, who.api.v1.leave.requests[':id'].pass.$get({ param: { id: todayLeave } }))).toBe(404);
+      expect(await refusedAs(`${label} lists A leave`, who.api.v1.leave.requests.$get({ query: { studentId: studentAId } }))).toBe(404);
+      expect(await refusedAs(`${label} lists A collectors`, who.api.v1.leave.collectors.$get({ query: { studentId: studentAId } }))).toBe(404);
+      expect(await refusedAs(`${label} reads A collector photo`, content(who, photoA.id))).toBe(404);
+      expect(await refusedAs(`${label} reads A custody photo`, content(who, custodyPhoto.id))).toBe(404);
+      await refusedAs(`${label} reads A leave record`, who.api.v1.leave.students[':studentId'].$get({ param: { studentId: studentAId } }));
+      await refusedAs(`${label} reads A restrictions`, who.api.v1.leave.restrictions.$get({ query: { studentId: studentAId } }));
+      expect((await apiResponse(who.api.v1.leave.family.$get())).children.map((c) => c.id)).not.toContain(studentAId);
+      expect((await apiResponse(who.api.v1.leave.requests.$get({ query: {} }))).map((l) => l.student.id)).not.toContain(studentAId);
+    }
+    expect(await refusedAs('parentB replaces A pass', parentB.api.v1.leave.requests[':id'].pass.$post({ param: { id: todayLeave } }))).toBe(404);
+    expect(await refusedAs('parentB cancels A leave', parentB.api.v1.leave.requests[':id'].cancel.$post({ param: { id: farLeave }, json: {} }))).toBe(404);
+    expect(await refusedAs('parentB requests for A', parentB.api.v1.leave.requests.$post({ json: { studentId: studentAId, date: far, leaveTime: '10:00', returning: false, reasonCategory: 'medical', collector: { kind: 'parent', parentId: parentB.id } } }))).toBe(404);
+    expect(await refusedAs('parentB adds a collector for A', parentB.api.v1.leave.collectors.$post({ json: { name: 'Oa Stranger', relation: 'Uncle', phone: '01000001002', idNumber: '26201011234567', studentIds: [studentAId] } }))).toBe(404);
+    expect(await refusedAs('parentB withdraws A collector', parentB.api.v1.leave.collectors[':id'].withdraw.$post({ param: { id: collectorA.id }, json: {} }))).toBe(404);
+    await refusedAs('parentB approves A leave', parentB.api.v1.leave.requests[':id'].approve.$post({ param: { id: farLeave }, json: {} }));
+    await refusedAs('studentB cancels A leave', studentB.api.v1.leave.requests[':id'].cancel.$post({ param: { id: farLeave }, json: {} }));
+
+    // Another class: a teacher sees no family's leave, only the students leaving their own lessons (none here).
+    await refusedAs('teacher reads A leave', teacher.api.v1.leave.requests[':id'].$get({ param: { id: farLeave } }));
+    await refusedAs('teacher lists leave', teacher.api.v1.leave.requests.$get({ query: { studentId: studentAId } }));
+    await refusedAs('teacher reads the gate list', teacher.api.v1.leave.gate.today.$get());
+    await refusedAs('teacher lists A collectors', teacher.api.v1.leave.collectors.$get({ query: { studentId: studentAId } }));
+    expect(await refusedAs('teacher reads A collector photo', content(teacher, photoA.id))).toBe(404);
+    expect((await apiResponse(teacher.api.v1.leave.teaching.$get({ query: {} }))).lessons).toEqual([]);
+
+    // The gate: today's list only, and only what check-out needs.
+    const list = await apiResponse(gate.api.v1.leave.gate.today.$get());
+    expect(list.leaves.map((l) => l.id)).toContain(todayLeave);
+    expect(list.leaves.map((l) => l.id)).not.toContain(farLeave);
+    expect(JSON.stringify(list)).not.toContain('Court order');
+    expect(await refusedAs('gate reads a leave', gate.api.v1.leave.requests[':id'].$get({ param: { id: farLeave } }))).toBe(403);
+    expect(await refusedAs('gate lists leave', gate.api.v1.leave.requests.$get({ query: { date: far } }))).toBe(403);
+    expect(await refusedAs('gate checks out another day', gate.api.v1.leave.gate[':id']['check-out'].$post({ param: { id: farLeave }, json: { collectedBy: { kind: 'parent', parentId: parentA.id }, idChecked: true, via: 'lookup' } }))).toBe(404);
+    expect(await refusedAs('gate records a return another day', gate.api.v1.leave.gate[':id'].return.$post({ param: { id: farLeave }, json: {} }))).toBe(404);
+    expect(await refusedAs("gate scans another day's pass", gate.api.v1.leave.gate.scan.$post({ json: { token: farPass } }))).toBe(409);
+    expect(await refusedAs('gate lists collectors', gate.api.v1.leave.collectors.$get({ query: { studentId: studentAId } }))).toBe(403);
+    expect(await refusedAs('gate reads restrictions', gate.api.v1.leave.restrictions.$get({ query: { studentId: studentAId } }))).toBe(403);
+    expect(await refusedAs('gate reads A leave record', gate.api.v1.leave.students[':studentId'].$get({ param: { studentId: studentAId } }))).toBe(403);
+    expect(await refusedAs('gate reads reports', gate.api.v1.leave.reports.$get({ query: { from: far, to: far } }))).toBe(403);
+    expect(await refusedAs('gate reads the queue', gate.api.v1.leave.queue.$get())).toBe(403);
+    expect(await refusedAs('gate approves', gate.api.v1.leave.requests[':id'].approve.$post({ param: { id: farLeave }, json: {} }))).toBe(403);
+    // Photos only for a student on today's list; never the custody document.
+    expect((await content(gate, photoA.id)).status).toBe(200);
+    expect((await content(gate, custodyPhoto.id)).status).toBe(200);
+    expect(await refusedAs('gate reads the custody document', content(gate, custodyDoc.id))).toBe(404);
+    expect(await refusedAs('gate reads a photo of a student not leaving today', content(gate, photoB.id))).toBe(404);
+    expect(await snapshot()).toEqual(before);
   });
 
   it('F0a exceptions: each type names who may grant it — a coordinator is refused a fee waiver, a finance admin the grade-10 exception', async () => {
