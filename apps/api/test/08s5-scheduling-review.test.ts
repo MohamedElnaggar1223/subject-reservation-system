@@ -203,31 +203,33 @@ describe('F1: the review round — changes after publishing, dated teachers, cov
     await apiResponse(coordinator.api.v1.cover.assignments.$post({ json: { lessonId: p1.id, date: D3, coverTeacherId: t.e!.id } }));
     await apiResponse(coordinator.api.v1.cover.assignments.$post({ json: { lessonId: p1.id, date: D4, coverTeacherId: t.d!.id } }));
 
-    // A second version, the same Physics R: both covers move to it.
+    // A second version from D3, the same Physics R; a third from D4 with Physics R at period 3.
     const v2 = (await apiResponse(coordinator.api.v1.timetables.$post({ json: { termId, name: 'R — second', copyFromId: v1 } }))).id;
     await place(v2, 'Chemistry R2', 1, 2); // the group split off after the first version
     const pub2 = await apiResponse(coordinator.api.v1.timetables[':id'].publish.$post({ param: { id: v2 }, json: { effectiveFrom: D3 } }));
-    expect(pub2.coversMoved.map((c) => c.date)).toEqual([D3, D4]);
-    expect(pub2.coversRemoved).toEqual([]);
-    const p2 = await lessonOf(v2, 'Physics R');
-    expect(await sql(`select date, lesson_id, timetable_id, status from cover_assignment where group_id = $1 and date in ($2, $3) order by date`, [gid['Physics R'], D3, D4]))
-      .toEqual([{ date: D3, lesson_id: p2.id, timetable_id: v2, status: 'assigned' }, { date: D4, lesson_id: p2.id, timetable_id: v2, status: 'assigned' }]);
-
-    // A third, from D4, with Physics R at period 3: the D4 cover has no lesson to go to — removed, and people told.
     const v3 = (await apiResponse(coordinator.api.v1.timetables.$post({ json: { termId, name: 'R — third', copyFromId: v2 } }))).id;
     await place(v3, 'Physics R', 0, 3);
     const pub3 = await apiResponse(coordinator.api.v1.timetables[':id'].publish.$post({ param: { id: v3 }, json: { effectiveFrom: D4 } }));
+
+    // The days as they now are. On D4 Physics R is at period 3, its teacher away and nothing arranged: the teacher
+    // who was to cover it at period 1 covers nothing (a lesson not in force is nobody's to cover).
+    expect((await teacherDay('d', D4)).lessons).toEqual([]);
+    expect((await dayOf('1', D4)).lessons.find((l) => l.groupName === 'Physics R')).toMatchObject({ period: 3, status: 'uncovered' });
+    // On D3 the cover stands, on the version in force that day.
+    expect((await teacherDay('e', D3)).lessons.map((l) => [l.groupName, l.status])).toEqual([['Physics R', 'covering'], ['Physics R2', 'scheduled']]);
+
+    // The second version took both covers over (the same lesson, group, number and slot) ...
+    expect(pub2.coversMoved.map((c) => c.date)).toEqual([D3, D4]);
+    expect(pub2.coversRemoved).toEqual([]);
+    // ... and the third had no lesson for the D4 one: removed, listed, and the people concerned told.
     expect(pub3.coversMoved).toEqual([]);
     expect(pub3.coversRemoved).toEqual([expect.objectContaining({ date: D4, groupName: 'Physics R', cover: 'teacher rev-d' })]);
-    expect(await one(`select status, removal from cover_assignment where group_id = $1 and date = $2`, [gid['Physics R'], D4])).toEqual({ status: 'removed', removal: 'timetable_changed' });
+    const p2 = await lessonOf(v2, 'Physics R');
+    expect(await sql(`select date, lesson_id, timetable_id, status, removal from cover_assignment where group_id = $1 and date in ($2, $3) order by date`, [gid['Physics R'], D3, D4]))
+      .toEqual([{ date: D3, lesson_id: p2.id, timetable_id: v2, status: 'assigned', removal: null }, { date: D4, lesson_id: p2.id, timetable_id: v2, status: 'removed', removal: 'timetable_changed' }]);
     const told = await notified('teacher.rev-d@test.local', 'COVER_CHANGED', 1);
     expect(told[0]!.body).toMatch(/^You no longer cover Physics R on Sunday,? .*, period 1: the timetable changes from Sunday,?/);
     for (const k of ['1', '2', '5']) expect((await notified(`student.rev-${k}@test.local`, 'COVER_CHANGED', 1))[0]!.body).toMatch(/the timetable changes from .*, so the arrangement made for this lesson no longer applies/);
-    // The day as it now is: Physics R at period 3, its teacher away and nothing arranged; the former cover teacher covers nothing.
-    expect((await dayOf('1', D4)).lessons.find((l) => l.groupName === 'Physics R')).toMatchObject({ period: 3, status: 'uncovered' });
-    expect((await teacherDay('d', D4)).lessons).toEqual([]);
-    // The D3 cover still stands on the version in force that day.
-    expect((await teacherDay('e', D3)).lessons.map((l) => [l.groupName, l.status])).toEqual([['Physics R', 'covering'], ['Physics R2', 'scheduled']]);
   });
 
   it('a teacher who covers is then recorded away: the lesson needs new cover and its class is told; removing a cover and withdrawing an absence tell the class and the cover teacher', async () => {

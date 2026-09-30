@@ -310,15 +310,28 @@ describe('F1: scheduling', () => {
     expect(await clashOf('teacher_week_limit')).toEqual(['teacher sch-chem teaches 2 periods a week; the most is 1']);
     await unplace(ttId, 'Chemistry S1', 2);
 
-    // Rooms: type, features, capacity, out of use, fixed, none
+    // Rooms: type, features, capacity, out of use, fixed, none — each refused, then placed anyway and listed.
     await expectClash('room_type', () => move(ttId, 'Physics S1', 2, MON, 3, { roomId: roomA }), 'Physics S1 needs a science lab; F1S1 Room 11A is not one');
+    await move(ttId, 'Physics S1', 2, MON, 3, { roomId: roomA, allowClash: true });
+    expect(await clashOf('room_type')).toEqual(['Physics S1 needs a science lab; F1S1 Room 11A is not one']);
+    await move(ttId, 'Physics S1', 2, MON, 3, { roomId: lab });
     await apiResponse(coordinator.api.v1.scheduling.groups[':id'].$put({ param: { id: groupOf(tt, 'Chemistry S1').id }, json: { roomFeatures: ['fume_cupboard'] } }));
     await expectClash('room_features', () => move(ttId, 'Chemistry S1', 1, TUE, 1, { roomId: lab }), 'Chemistry S1 needs a fume cupboard; F1S1 Lab has none');
+    await move(ttId, 'Chemistry S1', 1, TUE, 1, { roomId: lab, allowClash: true });
+    expect(await clashOf('room_features')).toEqual(['Chemistry S1 needs a fume cupboard; F1S1 Lab has none']);
     await apiResponse(coordinator.api.v1.scheduling.groups[':id'].$put({ param: { id: groupOf(tt, 'Chemistry S1').id }, json: { roomFeatures: [] } }));
+    expect(await clashOf('room_features')).toEqual([]);
     await expectClash('room_capacity', () => move(ttId, 'Arabic F1S1-11A', 2, TUE, 5, { roomId: booth }), 'Arabic F1S1-11A has 2 students; F1S1 Booth seats 1');
+    await move(ttId, 'Arabic F1S1-11A', 2, TUE, 5, { roomId: booth, allowClash: true });
+    expect(await clashOf('room_capacity')).toEqual(['Arabic F1S1-11A has 2 students; F1S1 Booth seats 1']);
     await apiResponse(coordinator.api.v1.academic.rooms[':id'].$put({ param: { id: booth }, json: { isActive: false } }));
     await expectClash('room_closed', () => move(ttId, 'Arabic F1S1-11A', 2, TUE, 5, { roomId: booth }), 'F1S1 Booth is out of use');
+    expect(await clashOf('room_closed')).toEqual(['F1S1 Booth is out of use']);
+    await unplace(ttId, 'Arabic F1S1-11A', 2);
     await expectClash('room_fixed', () => move(ttId, 'Study skills S1', 1, WED, 1, { roomId: roomB }), 'Study skills S1 is always in F1S1 Hall, not F1S1 Room 11B');
+    await move(ttId, 'Study skills S1', 1, WED, 1, { roomId: roomB, allowClash: true });
+    expect(await clashOf('room_fixed')).toEqual(['Study skills S1 is always in F1S1 Hall, not F1S1 Room 11B']);
+    await move(ttId, 'Study skills S1', 1, WED, 1, { roomId: hall });
     await expectClash('no_room', () => move(ttId, 'Arabic F1S1-11A', 2, TUE, 5, { roomId: null }), 'Arabic F1S1-11A at Tuesday P5 has no room');
     await move(ttId, 'Arabic F1S1-11A', 2, TUE, 5, { roomId: null, allowClash: true });
     expect(await clashOf('no_room')).toEqual(['Arabic F1S1-11A at Tuesday P5 has no room']);
