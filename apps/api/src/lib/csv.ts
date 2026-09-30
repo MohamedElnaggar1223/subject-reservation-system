@@ -37,7 +37,5 @@ export function readCsv(text: string): string[][] {
   return rows;
 }
 
-/** A CSV line for a value list (templates, exports): quoted where needed. */
-export function csvLine(values: readonly string[]): string {
-  return values.map((v) => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)).join(',');
-}
+// Writing CSV is the web's (apps/web/lib/csv.ts, with its formula-injection guard) and the
+// report routes'; this module only reads.

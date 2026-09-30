@@ -10,12 +10,17 @@
  * row number reported to staff is the one their spreadsheet shows.
  *
  * Hardened for files staff upload: every offset is checked against the
- * buffer, a part may not inflate beyond MAX_PART_BYTES (a zip bomb stops
- * there), and only the parts a workbook needs are inflated.
+ * buffer; only the parts a workbook needs are inflated; a workbook may have
+ * at most MAX_ENTRIES parts in its directory and MAX_SHEETS sheets; a part may
+ * not inflate beyond MAX_PART_BYTES, and all the parts together beyond
+ * MAX_TOTAL_BYTES (a zip bomb, one large part or many, stops there).
  */
 import { inflateRawSync } from 'node:zlib';
 
 const MAX_PART_BYTES = 64 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 128 * 1024 * 1024;
+const MAX_ENTRIES = 2000;
+const MAX_SHEETS = 200;
 
 export class WorkbookError extends Error {}
 
@@ -30,8 +35,18 @@ function unzip(buf: Buffer, wanted: (name: string) => boolean): Map<string, Buff
   }
   if (eocd < 0) throw new WorkbookError('This file is not a readable .xlsx workbook');
   const entries = buf.readUInt16LE(eocd + 10);
+  if (entries > MAX_ENTRIES) throw new WorkbookError('This workbook has too many parts to read');
   let p = buf.readUInt32LE(eocd + 16);
   const files = new Map<string, Buffer>();
+  let total = 0;
+  const keep = (name: string, data: Buffer) => {
+    total += data.length;
+    if (total > MAX_TOTAL_BYTES) throw new WorkbookError('This workbook is too large to read');
+    if (/^xl\/worksheets\//.test(name) && [...files.keys()].filter((k) => k.startsWith('xl/worksheets/')).length >= MAX_SHEETS) {
+      throw new WorkbookError('This workbook has too many sheets to read');
+    }
+    files.set(name, data);
+  };
   for (let n = 0; n < entries; n++) {
     at(p, 46);
     if (buf.readUInt32LE(p) !== 0x02014b50) throw new WorkbookError('This file is not a readable .xlsx workbook');
@@ -49,13 +64,18 @@ function unzip(buf: Buffer, wanted: (name: string) => boolean): Map<string, Buff
     const dataStart = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
     at(dataStart, compressed);
     const raw = buf.subarray(dataStart, dataStart + compressed);
-    if (method === 0) files.set(name, Buffer.from(raw));
+    if (method === 0) keep(name, Buffer.from(raw));
     else if (method === 8) {
+      // The part may use what is left of the workbook's budget, never more than one part's cap.
+      const left = MAX_TOTAL_BYTES - total;
+      if (left < 1) throw new WorkbookError('This workbook is too large to read');
+      let data: Buffer;
       try {
-        files.set(name, inflateRawSync(raw, { maxOutputLength: MAX_PART_BYTES }));
+        data = inflateRawSync(raw, { maxOutputLength: Math.min(MAX_PART_BYTES, left) });
       } catch {
-        throw new WorkbookError('This workbook has a part too large or damaged to read');
+        throw new WorkbookError(left < MAX_PART_BYTES ? 'This workbook is too large to read' : 'This workbook has a part too large or damaged to read');
       }
+      keep(name, data);
     } else throw new WorkbookError('This workbook is compressed in a way that cannot be read');
   }
   return files;

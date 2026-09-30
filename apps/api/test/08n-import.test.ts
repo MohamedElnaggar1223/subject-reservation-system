@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { apiResponse, academicYearStartOf, academicYearShortLabel, seriesYearInAcademicYear } from '@repo/validations';
+import { apiResponse, academicYearStartOf, academicYearShortLabel, seriesYearInAcademicYear, seriesOrder } from '@repo/validations';
 import {
   app, admin, staff, onboard, subject, session, feedSeries, refused, one, sql, audited, openWindow, holdRowLock, lockWaiters, type Client,
 } from './helpers';
-import { schoolSheet, sclRoster, moneyRecord, workbook, serial, years, D, type Cell } from './import-fixtures';
+import { schoolSheet, sclRoster, moneyRecord, workbook, zip, serial, years, D, type Cell } from './import-fixtures';
 
 /**
  * F7 — the day-one import (FEATURES_PLAN.md F7; IMPORT_SPIKE.md).
@@ -683,6 +683,36 @@ describe('F7: the day-one import', () => {
         expect(fromDb.split(',').map((x) => x.trim()).filter((x) => money.test(x)), f).toEqual([]);
         expect(/\b(insert|update)\s+(into\s+)?"?(payment|escrow|escrow_transaction|receipt)\b/i.test(text), f).toBe(false);
       }
+    });
+  });
+
+  describe('files that must not be read whole, and the order of exam series', () => {
+    const stageRefused = async (bytes: Buffer, name: string) => {
+      const f = await apiResponse(coordinator.api.v1.files.upload.$post({ form: { file: new File([new Uint8Array(bytes)], name, { type: XLSX }), purpose: 'import_file' } }));
+      return refused(coordinator.api.v1.imports.$post({ json: { fileId: f.id, kind: 'school_sheet' } }));
+    };
+
+    it('a workbook with too many parts, or parts that inflate too far together, is refused before it is read', async () => {
+      // Workbooks as the upload recognises them (the content types part first), then the parts that hurt.
+      const types = { name: '[Content_Types].xml', data: Buffer.from('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/></Types>') };
+      const book = { name: 'xl/workbook.xml', data: Buffer.from('<workbook><sheets><sheet name="A" sheetId="1" r:id="rId1"/></sheets></workbook>') };
+      const tiny = Buffer.from('<x/>');
+      const many = zip([types, book, ...Array.from({ length: 2000 }, (_, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: tiny }))]);
+      expect(await stageRefused(many, 'many-parts.xlsx')).toEqual({ status: 400, error: 'This workbook has too many parts to read' });
+      // Three parts of 50 MB each: each under the per-part cap, together over the workbook's.
+      const zeros = Buffer.alloc(50 * 1024 * 1024);
+      const bomb = zip([types, book, ...[1, 2, 3].map((i) => ({ name: `xl/worksheets/sheet${i}.xml`, data: zeros }))]);
+      expect(bomb.length).toBeLessThan(1024 * 1024);
+      expect(await stageRefused(bomb, 'bomb.xlsx')).toEqual({ status: 400, error: 'This workbook is too large to read' });
+    });
+
+    it('seriesOrder: October before November of the same year; the same month of another board is the same sitting', () => {
+      expect(seriesOrder('october', Y)).toBeLessThan(seriesOrder('november', Y));
+      expect(seriesOrder('november', Y)).toBeLessThan(seriesOrder('january', Y + 1));
+      expect(seriesOrder('january', Y + 1)).toBeLessThan(seriesOrder('june', Y + 1));
+      expect(seriesOrder('june', Y + 1)).toBeLessThan(seriesOrder('october', Y + 1));
+      // A Pearson June and a Cambridge June are one sitting: neither is before the other.
+      expect(seriesOrder('june', Y)).toBe(seriesOrder('june', Y));
     });
   });
 
