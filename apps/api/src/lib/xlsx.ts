@@ -11,16 +11,15 @@
  *
  * Hardened for files staff upload: every offset is checked against the
  * buffer; only the parts a workbook needs are inflated; a workbook may have
- * at most MAX_ENTRIES parts in its directory and MAX_SHEETS sheets; a part may
- * not inflate beyond MAX_PART_BYTES, and all the parts together beyond
- * MAX_TOTAL_BYTES (a zip bomb, one large part or many, stops there).
+ * at most MAX_ENTRIES parts in its directory; a part may not inflate beyond
+ * MAX_PART_BYTES, and all the parts together beyond MAX_TOTAL_BYTES (a zip
+ * bomb, one large part or many, stops there).
  */
 import { inflateRawSync } from 'node:zlib';
 
 const MAX_PART_BYTES = 64 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 128 * 1024 * 1024;
 const MAX_ENTRIES = 2000;
-const MAX_SHEETS = 200;
 
 export class WorkbookError extends Error {}
 
@@ -42,9 +41,6 @@ function unzip(buf: Buffer, wanted: (name: string) => boolean): Map<string, Buff
   const keep = (name: string, data: Buffer) => {
     total += data.length;
     if (total > MAX_TOTAL_BYTES) throw new WorkbookError('This workbook is too large to read');
-    if (/^xl\/worksheets\//.test(name) && [...files.keys()].filter((k) => k.startsWith('xl/worksheets/')).length >= MAX_SHEETS) {
-      throw new WorkbookError('This workbook has too many sheets to read');
-    }
     files.set(name, data);
   };
   for (let n = 0; n < entries; n++) {
