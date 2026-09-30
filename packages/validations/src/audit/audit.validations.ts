@@ -298,6 +298,7 @@ export const AUDIT_ACTIONS = [
   'EXAM_RESULTS_PUBLISHED',
   'EXAM_CERTIFICATES_RECEIVED',
   'EXAM_CERTIFICATE_COLLECTED',
+  'EXAM_CERTIFICATE_SLIP_ATTACHED',
   'EXAM_CERTIFICATE_DISPOSED',
   'EXAM_DEADLINE_REMINDED',
   // Parent-student links (security audit RF-14: access to a child's money
@@ -492,6 +493,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   EXAM_RESULTS_PUBLISHED:     'Exam Results Published',
   EXAM_CERTIFICATES_RECEIVED: 'Certificates Received',
   EXAM_CERTIFICATE_COLLECTED: 'Certificate Collected',
+  EXAM_CERTIFICATE_SLIP_ATTACHED: 'Signed Collection Slip Attached',
   EXAM_CERTIFICATE_DISPOSED:  'Certificate Returned or Destroyed',
   EXAM_DEADLINE_REMINDED:     'Exam Deadline Reminder Sent',
 };

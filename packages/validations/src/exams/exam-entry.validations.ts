@@ -637,12 +637,27 @@ export const COLLECTOR_RELATION_LABELS: Record<(typeof COLLECTOR_RELATIONS)[numb
   parent: 'A parent',
   other: 'Someone else, with the candidate’s written consent',
 };
+/**
+ * Which document the desk saw — a choice, never its number: a free-text box
+ * here would invite a national ID number into a list field.
+ */
+export const COLLECTOR_ID_DOCUMENTS = ['national_id_card', 'passport', 'school_id', 'birth_certificate', 'other'] as const;
+export const COLLECTOR_ID_DOCUMENT_LABELS: Record<(typeof COLLECTOR_ID_DOCUMENTS)[number], string> = {
+  national_id_card: 'National ID card',
+  passport: 'Passport',
+  school_id: 'School ID card',
+  birth_certificate: 'Birth certificate',
+  other: 'Another document',
+};
 export const CollectCertificate = z.object({
   collectorName: z.string().trim().min(2).max(120),
   collectorRelation: z.enum(COLLECTOR_RELATIONS),
-  collectorIdChecked: z.string().trim().max(120).nullable().optional(),
+  collectorIdChecked: z.enum(COLLECTOR_ID_DOCUMENTS).nullable().optional(),
   signatureFileId: z.string().min(1).nullable().optional(),
 });
+
+/** The scan of the signed slip, attached after the hand-over (record, print, sign, scan). */
+export const AttachCertificateSlip = z.object({ signatureFileId: z.string().min(1) });
 export type CollectCertificateType = z.infer<typeof CollectCertificate>;
 
 export const DisposeCertificate = z.object({

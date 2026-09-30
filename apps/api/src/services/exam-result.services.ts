@@ -221,10 +221,11 @@ export async function importResults(data: ImportResultsType, actor: Actor, ctx?:
     candidates: new Set(lines.filter((l) => l.studentId).map((l) => l.studentId)).size,
   });
   const preview = (rows: string[][]) => rows.slice(0, Math.max(mapping.headerRow + 5, 8));
-  const mappingFrom = data.mapping ? 'yours' : saved ? `saved: ${saved.name}` : 'guessed';
+  const mappingFrom: 'yours' | 'saved' | 'guessed' = data.mapping ? 'yours' : saved ? 'saved' : 'guessed';
+  const mappingName = !data.mapping && saved ? saved.name : null;
   if (!data.commit) {
     const { header, lines } = await planImport(series, source.rows, mapping, db);
-    return { series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom, header, sample: preview(source.rows), lines, summary: summarize(lines), committed: false, importId: null };
+    return { series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom, mappingName, header, sample: preview(source.rows), lines, summary: summarize(lines), committed: false, importId: null };
   }
   return db.transaction(async (tx) => {
     await advisoryLock(tx, `exam:results:${series.id}`);
@@ -247,7 +248,7 @@ export async function importResults(data: ImportResultsType, actor: Actor, ctx?:
         .onConflictDoUpdate({ target: [examResultMapping.boardCode, examResultMapping.name], set: { mapping, updatedBy: actor.id, updatedAt: new Date() } });
     }
     await logAction(actor.id, 'EXAM_RESULTS_IMPORTED', 'board_series', series.id, null, { importId, sourceName: source.name, ...summary }, ctx, tx);
-    return { series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom, header, sample: preview(source.rows), lines, summary, committed: true, importId };
+    return { series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom, mappingName, header, sample: preview(source.rows), lines, summary, committed: true, importId };
   });
 }
 
@@ -262,10 +263,11 @@ export async function listResults(q: { boardSeriesId?: string; studentId?: strin
   if (!q.boardSeriesId && !q.studentId) throw new ExamError('Choose a series or a student', 400);
   const rows = await db.select({
     r: examResult, studentName: user.name, month: boardSeries.month, year: boardSeries.year, label: boardSeries.label,
-    entryTitle: examEntry.title, importName: examResultImport.sourceName,
+    entryTitle: examEntry.title, importName: examResultImport.sourceName, unitTitle: examUnit.title, awardTitle: qualification.title,
   })
     .from(examResult).innerJoin(user, eq(user.id, examResult.studentId)).innerJoin(boardSeries, eq(boardSeries.id, examResult.boardSeriesId))
     .leftJoin(examEntry, eq(examEntry.id, examResult.entryId)).leftJoin(examResultImport, eq(examResultImport.id, examResult.importId))
+    .leftJoin(examUnit, eq(examUnit.id, examResult.unitId)).leftJoin(qualification, eq(qualification.id, examResult.qualificationId))
     .where(and(
       q.boardSeriesId ? eq(examResult.boardSeriesId, q.boardSeriesId) : undefined,
       q.studentId ? eq(examResult.studentId, q.studentId) : undefined,
@@ -284,8 +286,10 @@ export async function listResults(q: { boardSeriesId?: string; studentId?: strin
   const [state] = q.boardSeriesId ? await db.select().from(examSeriesState).where(eq(examSeriesState.boardSeriesId, q.boardSeriesId)) : [];
   return {
     publishedAt: state?.resultsPublishedAt ?? null,
-    results: rows.map(({ r, studentName, month, year, label, entryTitle, importName }, i) => ({
+    results: rows.map(({ r, studentName, month, year, label, entryTitle, importName, unitTitle, awardTitle }, i) => ({
       ...r, studentName, entryTitle, importName,
+      // What the unit or award is called: the entry's title, else the catalogue's (a result from another centre).
+      title: entryTitle ?? unitTitle ?? awardTitle ?? r.code,
       seriesName: boardSeriesName(names, { boardCode: r.boardCode, month, year, label }),
       // The first row per candidate and code (in this order) is the board's latest report of it.
       latest: i === 0 || rows[i - 1]!.r.studentId !== r.studentId || rows[i - 1]!.r.code !== r.code || rows[i - 1]!.r.boardSeriesId !== r.boardSeriesId,

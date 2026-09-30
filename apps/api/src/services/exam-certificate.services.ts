@@ -13,11 +13,11 @@
 
 import {
   db, examCertificate, examResult, examEntry, qualification, user, file, boardSeries,
-  eq, and, inArray, sql, asc,
+  eq, and, inArray, sql, asc, isNull,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  schoolDateString, COLLECTOR_RELATION_LABELS,
+  schoolDateString, COLLECTOR_RELATION_LABELS, COLLECTOR_ID_DOCUMENT_LABELS,
   type CollectCertificateType, type DisposeCertificateType, type ReceiveCertificatesType,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
@@ -71,9 +71,11 @@ export async function listCertificates(q: { boardSeriesId?: string; status?: str
  */
 export async function receiveCertificates(data: ReceiveCertificatesType, actorId: string, ctx?: AuditContext) {
   const series = await seriesOrThrow(data.boardSeriesId);
+  // By default every candidate with a published award result: boards certificate awards (a
+  // Pearson unit sat without its cash-in has no certificate).
   const students = data.studentIds ?? (await db.selectDistinct({ id: examResult.studentId }).from(examResult)
-    .where(and(eq(examResult.boardSeriesId, series.id), eq(examResult.status, 'published')))).map((r) => r.id);
-  if (!students.length) throw new ExamError(`${series.name} has no published results: publish them, or name the candidates`, 409);
+    .where(and(eq(examResult.boardSeriesId, series.id), eq(examResult.status, 'published'), eq(examResult.kind, 'award')))).map((r) => r.id);
+  if (!students.length) throw new ExamError(`${series.name} has no published award results: publish them, or name the candidates`, 409);
   const [awards, entries, existing, users] = await Promise.all([
     db.select({ studentId: examResult.studentId, title: qualification.title, code: examResult.code }).from(examResult)
       .leftJoin(qualification, eq(qualification.id, examResult.qualificationId))
@@ -139,6 +141,27 @@ export async function collectCertificate(id: string, data: CollectCertificateTyp
 }
 
 /**
+ * Attach the scan of the signed slip after the hand-over (the desk records,
+ * prints, the collector signs, the desk scans). Evidence: once attached it is
+ * not replaced.
+ */
+export async function attachCertificateSlip(id: string, signatureFileId: string, actorId: string, ctx?: AuditContext) {
+  const [c] = await db.select().from(examCertificate).where(eq(examCertificate.id, id));
+  if (!c) throw new ExamError('Certificate not found', 404);
+  const [f] = await db.select({ purpose: file.purpose, studentId: file.studentId }).from(file).where(eq(file.id, signatureFileId));
+  if (!f || f.purpose !== 'supporting_document' || f.studentId !== c.studentId) throw new ExamError('Attach the signed slip uploaded for this student', 400);
+  return db.transaction(async (tx) => {
+    const [row] = await tx.update(examCertificate).set({ signatureFileId, updatedAt: new Date() })
+      .where(and(eq(examCertificate.id, id), eq(examCertificate.status, 'collected'), isNull(examCertificate.signatureFileId))).returning();
+    if (!row) {
+      throw new ExamError(c.status !== 'collected' ? 'Record the hand-over first; then attach the signed slip' : 'A signed slip is already attached to this certificate', 409);
+    }
+    await logAction(actorId, 'EXAM_CERTIFICATE_SLIP_ATTACHED', 'exam_certificate', id, null, { signatureFileId }, ctx, tx);
+    return row;
+  });
+}
+
+/**
  * Return a certificate to the board (any time, with a reason — a misspelt
  * name) or destroy it (only once unclaimed past the retention period).
  */
@@ -176,6 +199,7 @@ export async function certificateSlip(id: string) {
       legalName: cand?.legalSurname && cand?.legalForenames ? `${cand.legalSurname.toUpperCase()}, ${cand.legalForenames}` : null,
     },
     collectorRelationLabel: c.c.collectorRelation ? COLLECTOR_RELATION_LABELS[c.c.collectorRelation as keyof typeof COLLECTOR_RELATION_LABELS] : null,
+    collectorIdLabel: c.c.collectorIdChecked ? COLLECTOR_ID_DOCUMENT_LABELS[c.c.collectorIdChecked as keyof typeof COLLECTOR_ID_DOCUMENT_LABELS] ?? c.c.collectorIdChecked : null,
     handedOverBy: staff?.name ?? null,
   };
 }

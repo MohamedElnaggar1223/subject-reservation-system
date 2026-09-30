@@ -11,7 +11,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   IdParam, ImportResults, ResultsQuery, PublishResults, ListCertificatesQuery, ReceiveCertificates, CollectCertificate, DisposeCertificate,
-  DeadlinesQuery, BoardCodeSchema,
+  DeadlinesQuery, BoardCodeSchema, AttachCertificateSlip,
 } from '@repo/validations';
 import { z } from 'zod';
 import { success, error } from '../lib/response';
@@ -85,6 +85,16 @@ export const examResultRoutes = new Hono<HonoEnv>()
       return success(c, await certificates.collectCertificate(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
     } catch (err) {
       const f = fail(err, 'Failed to record the collection');
+      return error(c, f.message, f.status);
+    }
+  })
+
+  /** POST /exams/certificates/:id/slip — the scan of the signed slip, after the hand-over; never replaced. */
+  .post('/certificates/:id/slip', requireStudentRecords(), zValidator('param', IdParam), zValidator('json', AttachCertificateSlip), async (c) => {
+    try {
+      return success(c, await certificates.attachCertificateSlip(c.req.valid('param').id, c.req.valid('json').signatureFileId, c.get('user')!.id, extractAuditContext(c)));
+    } catch (err) {
+      const f = fail(err, 'Failed to attach the slip');
       return error(c, f.message, f.status);
     }
   })

@@ -255,7 +255,7 @@ async function main() {
   const certs = await apiResponse(officer.v1.exams.certificates.$get({ query: { boardSeriesId: camJun } }));
   const laila = certs.certificates.find((c) => c.studentId === students['laila.mostafa']);
   if (laila && laila.status === 'received') {
-    await apiResponse(officer.v1.exams.certificates[':id'].collect.$post({ param: { id: laila.id }, json: { collectorName: 'Laila Mostafa', collectorRelation: 'candidate', collectorIdChecked: 'school ID card' } }));
+    await apiResponse(officer.v1.exams.certificates[':id'].collect.$post({ param: { id: laila.id }, json: { collectorName: 'Laila Mostafa', collectorRelation: 'candidate', collectorIdChecked: 'school_id' } }));
   }
   console.log('F4 demo data ready:', Object.keys(students).length, 'families');
 }

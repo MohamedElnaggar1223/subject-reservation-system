@@ -101,15 +101,15 @@ describe('F4: races', () => {
 
   it('two results imports of the same file at once record each result once', async () => {
     await apiResponse(coord.api.v1.exams.candidates[':studentId'].$put({ param: { studentId: b }, json: { uci: '91234B260201R' } }));
-    const text = 'UCI,Unit Code,Grade,UMS\n91234B260201R,XRWMA11,B,80\n91234B260201R,XRWMA12,A,90';
+    const text = 'UCI,Unit Code,Grade,UMS\n91234B260201R,XRWMA11,B,80\n91234B260201R,XRWMA12,A,90\n91234B260201R,XRXMA01,A,';
     const release = await holdAdvisory(`exam:results:${w.series.pearsonJan}`);
     const imp = () => coord.api.v1.exams.results.import.$post({ json: { boardSeriesId: w.series.pearsonJan, source: { text, name: 'race' }, commit: true } });
     const both = [imp(), imp()];
     await lockWaiters(2);
     await release();
     const [r1, r2] = await Promise.all([apiResponse(both[0]!), apiResponse(both[1]!)]);
-    expect([r1.summary.new, r2.summary.new].sort()).toEqual([0, 2]);
-    expect(await sql(`select 1 from exam_result where student_id = $1 and board_series_id = $2`, [b, w.series.pearsonJan])).toHaveLength(2);
+    expect([r1.summary.new, r2.summary.new].sort()).toEqual([0, 3]);
+    expect(await sql(`select 1 from exam_result where student_id = $1 and board_series_id = $2`, [b, w.series.pearsonJan])).toHaveLength(3);
   });
 
   it('a certificate collected at two desks at once: collected once, the other officer told who took it', async () => {

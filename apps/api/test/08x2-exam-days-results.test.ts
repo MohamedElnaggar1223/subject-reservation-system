@@ -280,13 +280,16 @@ describe('F4: exam days, results and certificates', () => {
       await audited([w.series.pearsonJan], ['EXAM_RESULTS_IMPORTED']);
       // The same file again adds nothing; the saved mapping is used without being asked for.
       const again = await apiResponse(coord.api.v1.exams.results.import.$post({ json: { boardSeriesId: w.series.pearsonJan, source: { fileId }, commit: true } }));
-      expect(again).toMatchObject({ mappingFrom: 'saved: Pearson results file', summary: { new: 0, unchanged: 5 } });
+      expect(again).toMatchObject({ mappingFrom: 'saved', mappingName: 'Pearson results file', summary: { new: 0, unchanged: 5 } });
       // The board's revised report (after a review): a new row beside the first, nothing overwritten.
       const revised = await apiResponse(coord.api.v1.exams.results.import.$post({ json: { boardSeriesId: w.series.pearsonJan, source: { text: pearsonFile({ aP1: 'A*' }), name: 'revised' }, commit: true } }));
       expect(revised.summary).toMatchObject({ new: 0, revised: 1, unchanged: 4 });
       const rows = await sql<{ series: string; grade: string; mark: string | null }>(
         `select board_series_id as series, grade, mark from exam_result where student_id = $1 and code = 'XDWMA11' order by created_at`, [a]);
       expect(rows.map((r) => [r.series === juneSeries ? 'june' : 'january', r.grade, Number(r.mark)])).toEqual([['june', 'C', 62], ['january', 'A', 92], ['january', 'A*', 92]]);
+      // A result with no entry here (another centre's sitting) is named by the catalogue.
+      const juneList = await apiResponse(coord.api.v1.exams.results.$get({ query: { boardSeriesId: juneSeries } }));
+      expect(juneList.results.map((r) => [r.code, r.title, r.entryId])).toEqual([['XDWMA11', 'Pure Mathematics 1', null]]);
 
       // F5's contract: both attempts, every report, and no grade of record decided (RF-09).
       const sittings = await apiResponse(coord.api.v1.exams.students[':studentId'].sittings.$get({ param: { studentId: a } }));
@@ -355,14 +358,24 @@ describe('F4: exam days, results and certificates', () => {
     });
 
     it('collected once at the desk, with the collector and a slip to sign; a second hand-over is told who took it', async () => {
-      const got = await apiResponse(w.officer.api.v1.exams.certificates[':id'].collect.$post({ param: { id: certA }, json: { collectorName: 'Amira Mostafa', collectorRelation: 'candidate', collectorIdChecked: 'national ID card' } }));
+      const got = await apiResponse(w.officer.api.v1.exams.certificates[':id'].collect.$post({ param: { id: certA }, json: { collectorName: 'Amira Mostafa', collectorRelation: 'candidate', collectorIdChecked: 'national_id_card' } }));
       expect(got).toMatchObject({ status: 'collected', collectorName: 'Amira Mostafa', collectedBy: w.officer.id });
       const again = await refused(w.finadmin.api.v1.exams.certificates[':id'].collect.$post({ param: { id: certA }, json: { collectorName: 'Someone', collectorRelation: 'parent' } }));
       expect(again.status).toBe(409);
       expect(again.error).toMatch(/^This certificate was already collected by Amira Mostafa on \d{4}-\d{2}-\d{2}$/);
       const slip = await apiResponse(w.officer.api.v1.exams.certificates[':id'].slip.$get({ param: { id: certA } }));
-      expect(slip).toMatchObject({ candidate: { legalName: 'MOSTAFA, Amira' }, collectorRelationLabel: 'The candidate', handedOverBy: 'finance_officer x-xd' });
-      await audited([certA], ['EXAM_CERTIFICATE_COLLECTED']);
+      expect(slip).toMatchObject({ candidate: { legalName: 'MOSTAFA, Amira' }, collectorRelationLabel: 'The candidate', collectorIdLabel: 'National ID card', handedOverBy: 'finance_officer x-xd' });
+      // The ID seen is a choice, never a number typed into a list field.
+      expect((await refused(w.officer.api.v1.exams.certificates[':id'].collect.$post({ param: { id: certB }, json: { collectorName: 'Omar', collectorRelation: 'candidate', collectorIdChecked: '30803141234567' as never } }))).status).toBe(400);
+      // Record, print, sign, scan: the scan is attached after the hand-over, once.
+      const pdf = new File([new TextEncoder().encode('%PDF-1.4\n%%EOF\n')], 'slip.pdf', { type: 'application/pdf' });
+      const scan = (await apiResponse(w.officer.api.v1.files.upload.$post({ form: { file: pdf, purpose: 'supporting_document', studentId: a } }))).id;
+      expect(await refused(w.officer.api.v1.exams.certificates[':id'].slip.$post({ param: { id: certB }, json: { signatureFileId: scan } })))
+        .toEqual({ status: 400, error: 'Attach the signed slip uploaded for this student' });
+      expect(await apiResponse(w.officer.api.v1.exams.certificates[':id'].slip.$post({ param: { id: certA }, json: { signatureFileId: scan } }))).toMatchObject({ signatureFileId: scan });
+      expect(await refused(w.officer.api.v1.exams.certificates[':id'].slip.$post({ param: { id: certA }, json: { signatureFileId: scan } })))
+        .toEqual({ status: 409, error: 'A signed slip is already attached to this certificate' });
+      await audited([certA], ['EXAM_CERTIFICATE_COLLECTED', 'EXAM_CERTIFICATE_SLIP_ATTACHED']);
     });
 
     it('an unclaimed certificate is kept for the retention period, then may be destroyed with a reason', async () => {

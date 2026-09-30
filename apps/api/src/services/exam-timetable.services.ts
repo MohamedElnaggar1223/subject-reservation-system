@@ -548,7 +548,7 @@ export async function getStatement(studentId: string, boardSeriesId: string, fam
   if (familyView && !state?.timetablePublishedAt) throw new ExamError(`The statement of entry for ${series.name} is not ready yet`, 404);
   const entries = await liveEntriesOf(studentId, series.id, familyView);
   const [cands, numbers, centre, timetable] = await Promise.all([
-    candidatesOf([studentId]), numbersIn(series.id, [studentId]), centreFor(series.boardCode), candidateTimetable(studentId, series.id, false),
+    candidatesOf([studentId]), numbersIn(series.id, [studentId]), centreFor(series.boardCode), candidateTimetable(studentId, series.id, familyView),
   ]);
   const cand = cands.get(studentId);
   return {
