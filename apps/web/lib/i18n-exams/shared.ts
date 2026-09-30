@@ -111,6 +111,9 @@ export const sharedArabic: Record<string, string> = {
   'Through the British Council': 'عبر المجلس الثقافي البريطاني',
   'Five letters or digits, as the board issued it (Cambridge EG123, Pearson 91234). Leave a board empty if the school does not enter with it.':
     'خمسة أحرف أو أرقام كما أصدرها المجلس (Cambridge EG123، Pearson 91234). اترك المجلس فارغًا إن لم تكن المدرسة تقيّد لديه.',
+  // ── The student record's links ──
+  'Exams: entries, timetable, results': 'الامتحانات: القيود والجدول والنتائج',
+  'Candidate details': 'بيانات المرشح',
   // ── Notices ──
   'Exam Timetable Ready': 'جدول الامتحانات جاهز',
   'Exam Timetable Changed': 'تغيّر جدول الامتحانات',

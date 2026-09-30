@@ -71,6 +71,23 @@ export default function StudentClient({ studentId, viewerRole }: { studentId: st
                 )}
               </dl>
             </div>
+            {/* F4: the student's exams — statement of entry, timetable, results. */}
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={`/exams/my?student=${studentId}` as never}
+                className="inline-flex h-10 items-center rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                Exams: entries, timetable, results
+              </Link>
+              {(viewerRole === ROLES.COORDINATOR || viewerRole === ROLES.ADMIN) && (
+                <Link
+                  href={`/exams/candidates?search=${encodeURIComponent(r.student.studentId ?? r.student.name)}` as never}
+                  className="inline-flex h-10 items-center rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  Candidate details
+                </Link>
+              )}
+            </div>
             {MONEY_ROLES.includes(viewerRole) && (
               <Link
                 href="/desk"
