@@ -301,8 +301,15 @@ export async function upsertEnrolments(
   const studentIds = [...new Set(rows.map((r) => r.studentId))];
   const subjectIds = [...new Set(rows.map((r) => r.subjectId))];
   const teacherIds = [...new Set(rows.map((r) => r.teacherId).filter((t): t is string => !!t))];
-  const [students, subjects, teachers, existing] = await Promise.all([
-    studentIds.length ? tx.select({ id: user.id, name: user.name, role: user.role, cohortYear: user.cohortYear, leftOn: user.leftOn }).from(user).where(inArray(user.id, studentIds)) : [],
+  // The students FOR SHARE, in id order, as a single enrolment reads its
+  // student: a leaving (which holds the student FOR UPDATE while it ends every
+  // open enrolment) and this run one after the other, so no enrolment is made
+  // for a student whose leaving has just ended the others.
+  const students = studentIds.length
+    ? await tx.select({ id: user.id, name: user.name, role: user.role, cohortYear: user.cohortYear, leftOn: user.leftOn })
+        .from(user).where(inArray(user.id, studentIds)).orderBy(user.id).for('share')
+    : [];
+  const [subjects, teachers, existing] = await Promise.all([
     subjectIds.length ? tx.select({ id: subject.id, name: subject.name, code: subject.code, isActive: subject.isActive, isOfferedAtSchool: subject.isOfferedAtSchool }).from(subject).where(inArray(subject.id, subjectIds)) : [],
     teacherIds.length ? tx.select({ id: teacher.id, name: teacher.name, isActive: teacher.isActive }).from(teacher).where(inArray(teacher.id, teacherIds)) : [],
     studentIds.length

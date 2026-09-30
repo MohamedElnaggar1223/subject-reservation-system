@@ -22,7 +22,7 @@
 
 import {
   db, examBoard, qualification, examUnit, qualificationUnit, qualificationOption, qualificationOptionUnit,
-  subject, subjectUnit, registration, boardSeries, sessionBoardSeries, user,
+  subject, subjectUnit, registration, boardSeries, sessionBoardSeries, sessionSubjectSeries, registrationSession, user,
   eq, and, inArray, notInArray, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -35,6 +35,7 @@ import {
 import { logAction, logActions, type AuditContext } from './audit.services';
 import { getSetting } from './settings.services';
 import { boardSeriesName } from './series.services';
+import { schoolDate } from './window.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -368,11 +369,15 @@ export async function updateOption(id: string, data: UpdateQualificationOptionTy
  * and at the row's level.
  *
  * Changing the board is the coordinator's answer to "which board is it
- * entered with?" (IS-14). The row's live registrations follow it: each moves
- * to its window's series of the new board (the route the window names for
- * the subject, else the default), in the same transaction, audited. Refused,
- * with nothing moved, when a window has no series of the new board, or a
- * registration's series is past its entry deadline (its entry is made).
+ * entered with?" (IS-14): see applyBoardChange. The row's live registrations
+ * move to their window's default series of the new board, and a window's
+ * route for the subject (to a series of the old board) is re-pointed to that
+ * default, in the same transaction, audited. Refused, with nothing changed,
+ * when a window has no series of the new board, when a registration's
+ * series is past its entry deadline (its entry is made), or when the
+ * registrations or the route would land in a series whose deadline has passed
+ * or differs from the one they are in now (MO-10: a board change never moves
+ * an entry across deadlines).
  */
 export async function mapRegistrable(subjectId: string, data: MapRegistrableType, actorId: string, ctx?: AuditContext) {
   const names = await boardNames();
@@ -431,74 +436,143 @@ function levelWord(level: string): string {
 
 /**
  * Change a subject's board in the caller's transaction (the subject row
- * locked): its live registrations move to their windows' series of the new
- * board, each audited, and its catalogue links — the old board's award and
- * units — are cleared unless the caller sets new ones. Refused, with nothing
- * changed, when a window has no series of the new board or a registration's
- * series is past its entry deadline. The subject screen's board field and the
- * Catalogue's mapping both come here.
+ * locked FOR UPDATE by the caller): its live registrations move to their
+ * windows' default series of the new board and the windows' routes for it are
+ * re-pointed there, each audited; its catalogue links — the old board's award
+ * and units — are cleared unless the caller sets new ones. Refused, with
+ * nothing changed, by followBoardChange's rules. The subject screen's board
+ * field and the Catalogue's mapping both come here.
+ *
+ * Locks, in order: the subject (caller), its live registrations (id order),
+ * the windows' routes for it, the windows' series links, the series involved
+ * (id order). A registration reads the subject FOR SHARE before routing, and
+ * a change to a window's series reads its routed subjects FOR SHARE before
+ * its links, so each waits for the other rather than crossing it.
  */
 export async function applyBoardChange(
   tx: Tx, s: typeof subject.$inferSelect, newBoard: string, actorId: string | null, names?: Map<string, string>,
 ) {
   const boardNamesNow = names ?? (await boardNames(tx));
   await boardOrThrow(newBoard, tx);
-  const moved = await followBoardChange(tx, s, newBoard, boardNamesNow);
+  const { moved, routes } = await followBoardChange(tx, s, newBoard, boardNamesNow);
   await tx.update(subject).set({ council: newBoard, qualificationId: null, updatedAt: new Date() }).where(eq(subject.id, s.id));
   await tx.delete(subjectUnit).where(eq(subjectUnit.subjectId, s.id));
+  const why = `The subject's board changed to ${boardName(boardNamesNow, newBoard)}`;
   if (moved.length) {
     for (const m of moved) {
       await tx.update(registration).set({ boardSeriesId: m.to, updatedAt: new Date() }).where(eq(registration.id, m.id));
     }
     await logActions(moved.map((m) => ({
       userId: actorId, action: 'REGISTRATION_SERIES_MOVED' as const, entityType: 'registration' as const, entityId: m.id,
-      previousData: { boardSeriesId: m.from }, newData: { boardSeriesId: m.to, reason: `The subject's board changed to ${boardName(boardNamesNow, newBoard)}` },
+      previousData: { boardSeriesId: m.from }, newData: { boardSeriesId: m.to, reason: why },
+    })), tx);
+  }
+  // A route to the new board's default is no route at all: the default applies.
+  for (const r of routes) {
+    await tx.delete(sessionSubjectSeries).where(and(eq(sessionSubjectSeries.sessionId, r.sessionId), eq(sessionSubjectSeries.subjectId, s.id)));
+  }
+  if (routes.length) {
+    await logActions(routes.map((r) => ({
+      userId: actorId, action: 'SUBJECT_ROUTE_MOVED' as const, entityType: 'session' as const, entityId: r.sessionId,
+      previousData: { subjectId: s.id, boardSeriesId: r.from }, newData: { subjectId: s.id, boardSeriesId: r.to, reason: why },
     })), tx);
   }
   return moved;
 }
 
+const sameDeadline = (a: Date | null, b: Date | null) => (a?.getTime() ?? null) === (b?.getTime() ?? null);
+const deadlineText = (d: Date | null) => (d ? schoolDate(d) : 'none set');
+
 /**
- * Where each live registration of a subject goes when its board changes:
- * its window's series of the new board. Refuses, naming the first obstacle.
+ * Where a subject's live registrations and its windows' routes go when its
+ * board changes: each window's default series of the new board. Refuses,
+ * naming the first obstacle:
+ * - a registration's series is past its entry deadline (its entry is made);
+ * - a window with a live registration or a route for the subject feeds no
+ *   series of the new board;
+ * - the series they would go to is past its entry deadline, or has another
+ *   deadline than the one they are in (MO-10: as the admin's move refuses a
+ *   passed target; a board change also keeps the deadline, so no checkout or
+ *   refund is judged against a date the family was not given).
  */
 async function followBoardChange(tx: Tx, s: typeof subject.$inferSelect, newBoard: string, names: Map<string, string>) {
   const live = await tx
-    .select({
-      id: registration.id, sessionId: registration.sessionId, boardSeriesId: registration.boardSeriesId,
-      entryDeadline: boardSeries.entryDeadline, month: boardSeries.month, year: boardSeries.year, label: boardSeries.label, boardCode: boardSeries.boardCode,
-    })
+    .select({ id: registration.id, sessionId: registration.sessionId, boardSeriesId: registration.boardSeriesId })
     .from(registration)
-    .leftJoin(boardSeries, eq(boardSeries.id, registration.boardSeriesId))
     .where(and(eq(registration.subjectId, s.id), notInArray(registration.status, [...DONE_REGISTRATION_STATUSES])))
     .orderBy(registration.id)
-    .for('update', { of: registration });
+    .for('update');
+  const routeRows = await tx.select().from(sessionSubjectSeries).where(eq(sessionSubjectSeries.subjectId, s.id))
+    .orderBy(sessionSubjectSeries.sessionId).for('update');
+  const sessionIds = [...new Set([...live.map((r) => r.sessionId), ...routeRows.map((r) => r.sessionId)])];
+  if (!sessionIds.length) return { moved: [], routes: [] };
+
+  const links = await tx
+    .select({ sessionId: sessionBoardSeries.sessionId, boardSeriesId: sessionBoardSeries.boardSeriesId, isDefault: sessionBoardSeries.isDefault, boardCode: sessionBoardSeries.boardCode })
+    .from(sessionBoardSeries).where(inArray(sessionBoardSeries.sessionId, sessionIds)).for('share');
+  const targets = new Map(links.filter((l) => l.boardCode === newBoard && l.isDefault).map((l) => [l.sessionId, l.boardSeriesId]));
+  // Every series involved, read FOR SHARE: a deadline changing at the same moment waits for this.
+  const seriesIds = [...new Set([
+    ...live.map((r) => r.boardSeriesId), ...routeRows.map((r) => r.boardSeriesId), ...targets.values(),
+  ].filter((x): x is string => !!x))];
+  const seriesRows = seriesIds.length
+    ? await tx.select().from(boardSeries).where(inArray(boardSeries.id, seriesIds)).orderBy(boardSeries.id).for('share')
+    : [];
+  const seriesBy = new Map(seriesRows.map((r) => [r.id, r]));
+  const windowNames = new Map((await tx.select({ id: registrationSession.id, name: registrationSession.name }).from(registrationSession)
+    .where(inArray(registrationSession.id, sessionIds))).map((w) => [w.id, w.name]));
+  const wName = (id: string) => windowNames.get(id) ?? 'A window';
+  const sName = (id: string) => boardSeriesName(names, seriesBy.get(id)!);
   const now = new Date();
-  const passed = live.find((r) => r.entryDeadline && r.entryDeadline <= now);
+
+  const passed = live
+    .map((r) => (r.boardSeriesId ? seriesBy.get(r.boardSeriesId) : undefined))
+    .find((x) => x?.entryDeadline && x.entryDeadline <= now);
   if (passed) {
     throw new CatalogueError(
-      `${s.name} is already entered with ${boardName(names, passed.boardCode!)} in ${boardSeriesName(names, { boardCode: passed.boardCode, month: passed.month!, year: passed.year!, label: passed.label })}, whose entry deadline has passed — its board cannot change now. Make a new subject for the new board.`,
+      `${s.name} is already entered with ${boardName(names, passed.boardCode)} in ${boardSeriesName(names, passed)}, whose entry deadline has passed — its board cannot change now. Make a new subject for the new board.`,
       409,
     );
   }
+
   const moved: { id: string; from: string | null; to: string }[] = [];
-  const bySession = new Map<string, typeof live>();
-  for (const r of live) bySession.set(r.sessionId, [...(bySession.get(r.sessionId) ?? []), r]);
-  for (const [sessionId, regs] of bySession) {
-    const links = await tx.select({ boardSeriesId: sessionBoardSeries.boardSeriesId, isDefault: sessionBoardSeries.isDefault, boardCode: sessionBoardSeries.boardCode })
-      .from(sessionBoardSeries).where(eq(sessionBoardSeries.sessionId, sessionId)).for('share');
-    if (!links.length) continue; // a window feeding no series routes nothing
-    const target = links.find((l) => l.boardCode === newBoard && l.isDefault);
+  const routes: { sessionId: string; from: string; to: string }[] = [];
+  for (const sessionId of sessionIds) {
+    if (!links.some((l) => l.sessionId === sessionId)) continue; // a window feeding no series routes nothing
+    const regs = live.filter((r) => r.sessionId === sessionId);
+    const route = routeRows.find((r) => r.sessionId === sessionId);
+    const target = targets.get(sessionId);
     if (!target) {
-      const [w] = await tx.execute(sql`select name from registration_session where id = ${sessionId}`).then((r) => r.rows as { name: string }[]);
       throw new CatalogueError(
-        `${w?.name ?? 'A window'} has ${regs.length} registration${regs.length === 1 ? '' : 's'} for ${s.name} and feeds no ${boardName(names, newBoard)} series — add one to the window first`,
+        regs.length
+          ? `${wName(sessionId)} has ${regs.length} registration${regs.length === 1 ? '' : 's'} for ${s.name} and feeds no ${boardName(names, newBoard)} series — add one to the window first`
+          : `${wName(sessionId)} enters ${s.name} in ${sName(route!.boardSeriesId)} and feeds no ${boardName(names, newBoard)} series — add one to the window first`,
         409,
       );
     }
-    for (const r of regs) moved.push({ id: r.id, from: r.boardSeriesId, to: target.boardSeriesId });
+    const t = seriesBy.get(target)!;
+    const sources = [...new Set([
+      ...regs.map((r) => r.boardSeriesId).filter((x): x is string => !!x), ...(route ? [route.boardSeriesId] : []),
+    ])].filter((id) => id !== target);
+    if (sources.length) {
+      if (t.entryDeadline && t.entryDeadline <= now) {
+        throw new CatalogueError(
+          `${sName(target)} is past its entry deadline (${schoolDate(t.entryDeadline)}): ${s.name} cannot be moved into it in ${wName(sessionId)}`,
+          409,
+        );
+      }
+      const differs = sources.find((id) => !sameDeadline(seriesBy.get(id)!.entryDeadline, t.entryDeadline));
+      if (differs) {
+        throw new CatalogueError(
+          `In ${wName(sessionId)}, ${s.name} is entered in ${sName(differs)} (entry deadline ${deadlineText(seriesBy.get(differs)!.entryDeadline)}) and would move to ${sName(target)} (entry deadline ${deadlineText(t.entryDeadline)}): a board change keeps the entry deadline — give the two series the same deadline first`,
+          409,
+        );
+      }
+    }
+    for (const r of regs) if (r.boardSeriesId !== target) moved.push({ id: r.id, from: r.boardSeriesId, to: target });
+    if (route && route.boardSeriesId !== target) routes.push({ sessionId, from: route.boardSeriesId, to: target });
   }
-  return moved;
+  return { moved, routes };
 }
 
 /** A registrable row by the name the school's sheet uses, or its code (F7). */

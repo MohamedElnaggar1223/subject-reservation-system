@@ -31,11 +31,18 @@ export type SessionWindow = {
 /**
  * F0b: the entry deadline is a board series' (MO-10 per series). Asked for a
  * registration, pass its `boardSeriesId`: its series' deadline decides. Asked
- * for the window as a whole (before a subject is chosen), the window is past
- * its deadline only once every series it feeds is — until then each subject
- * is checked against its own series when it is registered
- * (series.services.ts assertRoutesOpen). A window that feeds no series has
- * no deadline, as a window with none set had before.
+ * for the window as a whole (a new registration, before its subjects are
+ * routed), the window's **earliest** series deadline decides: the window
+ * closes before it (the strict order), so past it nothing new is registered
+ * in the window, even by a student with a deadline extension, and each
+ * existing registration goes on against its own series. A window that feeds
+ * no series has no deadline, as a window with none set had before.
+ *
+ * Callers without a series id (all new registrations, each then routed and
+ * checked per series by assertRoutesOpen): the request, direct and override
+ * registrations and the desk's registration. Every caller acting on an
+ * existing registration passes its series: payment, confirmation, reference,
+ * desk collection, swaps, preregistration payment.
  */
 export async function sessionWindow(
   studentId: string,
@@ -50,7 +57,7 @@ export async function sessionWindow(
     .where(eq(registrationSession.id, sessionId));
   const entryDeadline = boardSeriesId
     ? await seriesDeadline(boardSeriesId, executor)
-    : (await windowDeadlines(sessionId, executor)).latest;
+    : (await windowDeadlines(sessionId, executor)).earliest;
   const entryDeadlinePassed = !!entryDeadline && entryDeadline <= now;
   if (!sess || entryDeadlinePassed) {
     return { open: false, entryDeadlinePassed, entryDeadline, status: sess?.status ?? null };

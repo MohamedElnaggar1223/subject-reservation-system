@@ -241,6 +241,28 @@ export async function updateBoardSeries(
           if (late) throw new SeriesError("The board's entry deadline must be after the registration window closes");
           if (entryDeadline <= new Date()) throw new SeriesError("The board's entry deadline must be in the future");
         }
+        // A checkout still open that pays for this series together with
+        // another series would span two deadlines after the change, and the
+        // sweep would close all of it at the earlier one: refused until it
+        // is settled (series with the same deadline may share a checkout).
+        const spanning = await tx.execute(sql`
+          select count(distinct p.id)::int as n from payment p
+          join payment_registration pr on pr.payment_id = p.id
+          join registration r on r.id = pr.registration_id
+          where p.status in ('pending', 'pending_verification') and r.board_series_id = ${id}
+            and exists (
+              select 1 from payment_registration pr2
+              join registration r2 on r2.id = pr2.registration_id
+              join board_series b2 on b2.id = r2.board_series_id
+              where pr2.payment_id = p.id and b2.id <> ${id}
+                and b2.entry_deadline is distinct from ${entryDeadline ?? null}::timestamptz)`)
+          .then((r) => Number((r.rows[0] as { n: number } | undefined)?.n ?? 0));
+        if (spanning > 0) {
+          throw new SeriesError(
+            `${spanning} checkout${spanning === 1 ? '' : 's'} still open pay${spanning === 1 ? 's' : ''} for this series together with another whose entry deadline would then differ — confirm or cancel ${spanning === 1 ? 'it' : 'them'} first, or give the other series the same deadline`,
+            409,
+          );
+        }
       }
       for (const f of BOARD_SERIES_DATE_FIELDS) if (dates[f] === undefined) delete dates[f];
       const next = { ...dates, ...(deadlineChanges ? { entryDeadline: entryDeadline ?? null } : {}) };
@@ -408,6 +430,15 @@ async function writeWindowSeries(
   names: Map<string, string>,
 ) {
   const ids = data.series.map((s) => s.boardSeriesId);
+  // The subjects whose routes this writes or removes, read FOR SHARE before
+  // the window's links are touched: a board change holds its subject FOR
+  // UPDATE while it re-points that subject's routes, so the two run one after
+  // the other (subject, then links — the order the board change takes).
+  const existingRoutes = await tx.select({ subjectId: sessionSubjectSeries.subjectId }).from(sessionSubjectSeries).where(eq(sessionSubjectSeries.sessionId, w.id));
+  const routedSubjects = [...new Set([...(data.routes ?? []).map((r) => r.subjectId), ...existingRoutes.map((r) => r.subjectId)])];
+  if (routedSubjects.length) {
+    await tx.select({ id: subject.id }).from(subject).where(inArray(subject.id, routedSubjects)).orderBy(subject.id).for('share');
+  }
   const rows = ids.length
     ? await tx.select().from(boardSeries).where(inArray(boardSeries.id, ids)).orderBy(boardSeries.id).for('share')
     : [];
@@ -597,6 +628,61 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
   }
 }
 
+// ─── One checkout per entry deadline ─────────────────────────────────────────
+
+export type DeadlineGroup = {
+  entryDeadline: Date | null;
+  series: { id: string; name: string }[];
+  registrationIds: string[];
+  subjects: string[];
+};
+
+/**
+ * The board series a set of registrations is entered in, grouped by entry
+ * deadline (F0b, MO-10 per series): money is taken per group — the deadline
+ * sweep closes a checkout at its series' deadline, so a checkout never spans
+ * two deadlines. Series with the same deadline share a group. Earliest
+ * deadline first; no deadline last. `lock` reads the series FOR SHARE
+ * (inside the transaction that takes the money), so a deadline changing at
+ * the same moment waits for it.
+ */
+export async function seriesDeadlineGroups(executor: Executor, registrationIds: string[], lock = false): Promise<DeadlineGroup[]> {
+  if (!registrationIds.length) return [];
+  const regs = await executor
+    .select({ id: registration.id, boardSeriesId: registration.boardSeriesId, subjectName: subject.name })
+    .from(registration).innerJoin(subject, eq(subject.id, registration.subjectId))
+    .where(inArray(registration.id, registrationIds))
+    .orderBy(registration.id);
+  const ids = [...new Set(regs.map((r) => r.boardSeriesId).filter((x): x is string => !!x))];
+  const q = executor.select().from(boardSeries).where(inArray(boardSeries.id, ids.length ? ids : ['__none__'])).orderBy(boardSeries.id);
+  const rows = ids.length ? (lock ? await q.for('share') : await q) : [];
+  const { names } = await boardNameMap(executor);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const groups = new Map<string, DeadlineGroup>();
+  for (const r of regs) {
+    const sr = r.boardSeriesId ? byId.get(r.boardSeriesId) : undefined;
+    const deadline = sr?.entryDeadline ?? null;
+    const key = deadline ? String(deadline.getTime()) : 'none';
+    const g = groups.get(key) ?? { entryDeadline: deadline, series: [], registrationIds: [], subjects: [] };
+    if (sr && !g.series.some((x) => x.id === sr.id)) g.series.push({ id: sr.id, name: boardSeriesName(names, sr) });
+    g.registrationIds.push(r.id);
+    g.subjects.push(r.subjectName);
+    groups.set(key, g);
+  }
+  return [...groups.values()].sort((a, b) =>
+    (a.entryDeadline?.getTime() ?? Number.MAX_SAFE_INTEGER) - (b.entryDeadline?.getTime() ?? Number.MAX_SAFE_INTEGER));
+}
+
+/** The family's refusal for a checkout spanning deadlines: each group named, to pay separately. */
+export function mixedDeadlinesSentence(groups: DeadlineGroup[]) {
+  const parts = groups.map((g) => {
+    const series = g.series.length ? g.series.map((x) => x.name).join(' and ') : 'No board series';
+    const when = g.entryDeadline ? `entry deadline ${schoolDate(g.entryDeadline)}` : 'no entry deadline yet';
+    return `${series} (${when}): ${g.subjects.join(', ')}`;
+  });
+  return `These subjects are entered in exam board series with different entry deadlines, so each series is paid for on its own: ${parts.join('; ')}`;
+}
+
 // ─── Routing a new registration ──────────────────────────────────────────────
 
 export type Route = { boardSeriesId: string; entryDeadline: Date | null; name: string };
@@ -659,13 +745,29 @@ export function assertRoutesOpen(
   return out;
 }
 
-/** Route and check in one step, with the board names for the sentence. */
+/**
+ * Route and check in one step, with the board names for the sentence. With
+ * `lock` (inside the transaction that inserts): each subject's board is read
+ * again `FOR SHARE`, so a board change (which holds the subject `FOR UPDATE`
+ * while it moves the subject's registrations) and this registration run one
+ * after the other — the registration is routed by the board it is entered
+ * with, never by one being replaced.
+ */
 export async function routeAndCheck(
   executor: Executor, sessionId: string, subjects: { id: string; name: string; council: string }[], lock = false,
 ) {
-  const routing = await routeSubjects(executor, sessionId, subjects, lock);
+  let current = subjects;
+  if (lock && subjects.length) {
+    const boards = await executor.select({ id: subject.id, council: subject.council }).from(subject)
+      .where(inArray(subject.id, [...new Set(subjects.map((s) => s.id))]))
+      .orderBy(subject.id)
+      .for('share');
+    const by = new Map(boards.map((b) => [b.id, b.council]));
+    current = subjects.map((s) => ({ ...s, council: by.get(s.id) ?? s.council }));
+  }
+  const routing = await routeSubjects(executor, sessionId, current, lock);
   const { names } = await boardNameMap(executor);
-  return assertRoutesOpen(routing, subjects, new Date(), names);
+  return assertRoutesOpen(routing, current, new Date(), names);
 }
 
 /**

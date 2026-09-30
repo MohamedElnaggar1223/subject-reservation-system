@@ -62,7 +62,7 @@ import {
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
 import { sessionOpenFor, sessionWindow, entryDeadlineMessage, schoolDateTime } from './window.services';
-import { seriesPastDeadline, seriesDisplayName, windowsOfSeries } from './series.services';
+import { seriesPastDeadline, seriesDisplayName, windowsOfSeries, seriesDeadlineGroups, mixedDeadlinesSentence } from './series.services';
 import {
   notifyPaymentConfirmed,
   notifyPaymentReversed,
@@ -170,6 +170,14 @@ export async function initiatePayment(
   // Validate parent-child link
   const linked = await validateParentStudentLink(parentId, studentId);
   if (!linked) throw new Error('You are not linked to this student');
+
+  // F0b: one checkout per entry deadline. The deadline sweep closes a checkout
+  // at its series' deadline, so one spanning two deadlines would lose the later
+  // series' subjects at the earlier one: the family pays for each series on its
+  // own (the checkout screen offers one action per series). Asked again with
+  // the registrations and their series held, in the transaction below.
+  const deadlineGroups = await seriesDeadlineGroups(db, data.registrationIds);
+  if (deadlineGroups.length > 1) throw new Error(mixedDeadlinesSentence(deadlineGroups));
 
   // All must be in pending_payment, OR (V3 §6.8) all preregistered —
   // a prereg payment funds the held wallet for a future session.
@@ -349,6 +357,10 @@ export async function initiatePayment(
     if (existingPaymentLinksInTx.some((pl) => pl.payment.status === 'completed')) {
       throw new Error('One or more of these subjects is already paid for.');
     }
+    // One entry deadline, asked again with the series held (a move or a
+    // deadline change at the same moment waits for this checkout).
+    const groupsInTx = await seriesDeadlineGroups(tx, data.registrationIds, true);
+    if (groupsInTx.length > 1) throw new Error(mixedDeadlinesSentence(groupsInTx));
 
     // 1. Create payment record FIRST so the escrow_transaction FK can resolve.
     const [paymentRecord] = await tx
@@ -2085,11 +2097,21 @@ export async function getCheckoutSummary(
   const openPayment =
     links.map((l) => l.payment).find((p) => (OPEN_PAYMENT_STATUSES as readonly string[]).includes(p.status)) ?? null;
 
+  // F0b: the subjects grouped by their series' entry deadline — one checkout per group.
+  const deadlineGroups = (await seriesDeadlineGroups(db, registrationIds)).map((g) => ({
+    entryDeadline: g.entryDeadline,
+    series: g.series,
+    registrationIds: g.registrationIds,
+    subjects: g.subjects,
+    total: Math.round(regs.filter((r) => g.registrationIds.includes(r.id)).reduce((sum, r) => sum + r.priceAtRegistration, 0) * 100) / 100,
+  }));
+
   return {
     registrations: regs,
     totalCost,
     escrowBalance,
     student: regs[0]!.student,
     openPayment,
+    deadlineGroups,
   };
 }

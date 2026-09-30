@@ -183,6 +183,44 @@ describe('F0b: races', () => {
     });
   });
 
+  it('a registration racing its subject\'s board change is entered with the new board (review flag 4)', async () => {
+    const sub = await subject(adm, 'F0BR-BRD', 'Board race (F0b races)', { course: 1000, registration: 200 });
+    const w = await session(adm, 'November (IGCSE, F0b races, board)', 'november', 'igcse', futureWindow());
+    const year = (await one<{ year: number }>(`select series_year as year from registration_session where id = $1`, [w])).year;
+    const mk = async (boardCode: 'cambridge' | 'pearson_edexcel') =>
+      (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode, month: 'november', year, label: 'F0b races board' } }))).id;
+    const cam = await mk('cambridge');
+    const pea = await mk('pearson_edexcel');
+    await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({
+      param: { id: w }, json: { series: [{ boardSeriesId: cam, isDefault: true }, { boardSeriesId: pea, isDefault: true }], routes: [] },
+    }));
+    const prereg = (f: { parent: Client; studentId: string }) =>
+      f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, subjectIds: [sub], studentId: f.studentId } });
+    const a = await onboard(officer, 'f0br-board-a', 11);
+    const b = await onboard(officer, 'f0br-board-b', 11);
+    const aReg = ((await apiResponse(prereg(a))) as { id: string }[])[0]!.id;
+
+    // The board change holds the subject and queues behind A's row; B registers meanwhile.
+    const release = await holdRowLock('registration', aReg);
+    let change: Promise<Res> | undefined;
+    let registering: Promise<Res> | undefined;
+    try {
+      change = adm.api.v1.subjects[':id'].$put({ param: { id: sub }, json: { council: 'pearson_edexcel' } });
+      await lockWaiters(1);
+      registering = prereg(b);
+      await Promise.race([registering, lockWaiters(2)]);
+    } finally {
+      await release();
+    }
+    const [chg, reg] = await Promise.all([change!, registering!]);
+    expect(chg.status).toBe(200);
+    expect(reg.status).toBe(201);
+    const bReg = ((await reg.json()) as { data: { id: string }[] }).data[0]!.id;
+    // Both entered with Pearson: B waited for the change and was routed by the new board.
+    expect(await sql(`select id, board_series_id from registration where id in ($1, $2) order by id`, [aReg, bReg]))
+      .toEqual([aReg, bReg].sort().map((id) => ({ id, board_series_id: pea })));
+  });
+
   it("two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix", async () => {
     const q = await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({
       json: { boardCode: 'oxford', code: 'RACE1', title: 'Race (AS)', level: 'as_level', suite: 'OxfordAQA International AS', subjectArea: 'Race', entryMethod: 'qualification' },

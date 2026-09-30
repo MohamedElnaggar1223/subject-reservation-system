@@ -27,7 +27,7 @@ import {
   insertRoutedRegistrations,
 } from './registration.services';
 import { sessionWindow, entryDeadlineMessage } from './window.services';
-import { routeAndCheck } from './series.services';
+import { routeAndCheck, seriesDeadlineGroups, type DeadlineGroup } from './series.services';
 import { setStudentFields } from './user.services';
 import { getEscrowBalance, debitEscrow } from './escrow.services';
 import { confirmPayment, failPayment } from './payment.services';
@@ -39,6 +39,8 @@ import {
 import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterFor, standingToday } from './eligibility.services';
 import { sectionOf } from './academic.services';
 import { academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, gradeLabel, academicYearStartFromLabel } from '@repo/validations';
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 // ─── Desk onboarding (G5) ────────────────────────────────────────────────────
 
@@ -271,78 +273,130 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     }
   }
 
-  const paymentId = randomUUID();
   // Only money needs a payer of record; register-only desk actions (family
   // pays later) can proceed for a student who is not linked yet.
-  const payerParentId = data.collectNow ? await resolvePayerParent(data.studentId) : staffId;
+  const payerParentId = await resolvePayerParent(data.studentId);
 
-  const created = await db.transaction(async (tx) => {
+  const made = await db.transaction(async (tx) => {
     // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
     const inserted = await insertRoutedRegistrations(tx, data.sessionId, subjects, records);
-
-    await tx.insert(payment).values({
-      id: paymentId,
-      studentId: data.studentId,
-      // Payer of record is the family, not the officer (RF-03): confirmations
-      // go to whoever is here; the staff member stays in confirmedBy/metadata.
-      parentId: payerParentId,
-      amount: Math.max(0, totalCost - escrowToApply),
-      escrowAmountApplied: escrowToApply,
-      paymentMethod: 'in_school',
-      purpose: 'registration',
-      status: 'pending',
-      externalReference: `DESK-${paymentId.slice(0, 8).toUpperCase()}`,
-      metadata: { desk: true, staffId },
+    // F0b: one payment per entry deadline (the sweep closes a payment at its
+    // series' deadline), each with its own escrow share and audit row.
+    const groups = await seriesDeadlineGroups(tx, inserted.map((r) => r.id), true);
+    const payments = await createDeskPayments(tx, {
+      studentId: data.studentId, payerParentId, staffId, escrowToApply, groups,
+      prices: new Map(inserted.map((r) => [r.id, r.priceAtRegistration])),
     });
-
-    if (escrowToApply > 0) {
-      await debitEscrow(
-        {
-          studentId: data.studentId,
-          amount: escrowToApply,
-          reason: 'payment',
-          initiatedBy: staffId,
-          relatedPaymentId: paymentId,
-        },
-        tx
-      );
-    }
-
-    await tx.insert(paymentRegistration).values(
-      inserted.map((r) => ({ id: randomUUID(), paymentId, registrationId: r.id }))
-    );
-
-    // The registrations, the escrow debit and their audit row commit together
-    // (MO-1); the confirmation that follows writes its own rows.
+    // The registrations, the escrow debits and their audit rows commit together
+    // (MO-1); the confirmations that follow write their own rows. The desk's
+    // row names the first payment (as it always has), and every other payment
+    // has its own PAYMENT_INITIATED row: one creation row per payment.
     await logAction(staffId, 'DESK_REGISTRATION', 'registration', data.studentId, null,
-      { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), paymentId,
+      { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), paymentId: payments[0]!.id,
+        ...(payments.length > 1 ? { paymentIds: payments.map((p) => p.id) } : {}),
         toCollect: Math.max(0, totalCost - escrowToApply), escrowApplied: escrowToApply }, auditCtx, tx);
-
-    return inserted;
+    for (const p of payments.slice(1)) {
+      await logAction(staffId, 'PAYMENT_INITIATED', 'payment', p.id, null,
+        { desk: true, registrationIds: p.registrationIds, amount: p.amount, escrowApplied: p.escrowApplied, series: p.series }, auditCtx, tx);
+    }
+    return { inserted, payments };
   });
+  const created = made.inserted;
 
-  // Money is in hand — confirm through the shared path so registrations
+  // Money is in hand — confirm each through the shared path so registrations
   // flip to confirmed, receipts are created, and NOT-005 fires.
-  await confirmDeskPayment(
-    paymentId,
-    staffId,
-    data.collectNow.notes ?? 'Collected at the finance desk',
-    data.collectNow.instrumentUsed,
-    auditCtx
-  );
+  const outcome = await confirmDeskPayments(made.payments, staffId, data.collectNow.notes ?? 'Collected at the finance desk', data.collectNow.instrumentUsed, auditCtx);
 
   const receipts = await db.query.receipt.findMany({
     where: (r, { inArray }) => inArray(r.registrationId, created.map((c) => c.id)),
     columns: { id: true, registrationId: true, receiptNumber: true, status: true },
   });
 
+  const first = outcome.confirmed[0]!;
   return {
     registrations: created,
-    payment: { id: paymentId, collected: Math.max(0, totalCost - escrowToApply), escrowApplied: escrowToApply },
+    payment: { id: first.id, collected: outcome.collected, escrowApplied: outcome.escrowApplied },
+    payments: outcome.confirmed.map((p) => ({ id: p.id, series: p.series, entryDeadline: p.entryDeadline, collected: p.amount, escrowApplied: p.escrowApplied, registrationIds: p.registrationIds })),
+    notCollected: outcome.notCollected,
     totalCost,
-    collected: Math.max(0, totalCost - escrowToApply),
+    collected: outcome.collected,
     receipts,
+  };
+}
+
+type DeskPayment = {
+  id: string; amount: number; escrowApplied: number; registrationIds: string[];
+  series: string[]; entryDeadline: Date | null;
+};
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * The desk's payments for subjects just registered or waiting, in the
+ * caller's transaction: one per entry-deadline group, the escrow applied to
+ * the earliest deadline first, each linked to its registrations and debited
+ * in its own name. The caller writes the creation audit rows.
+ */
+async function createDeskPayments(
+  tx: Tx,
+  a: { studentId: string; payerParentId: string; staffId: string; escrowToApply: number; groups: DeadlineGroup[]; prices: Map<string, number> },
+): Promise<DeskPayment[]> {
+  let escrowLeft = a.escrowToApply;
+  const out: DeskPayment[] = [];
+  for (const g of a.groups) {
+    const cost = round2(g.registrationIds.reduce((sum, id) => sum + (a.prices.get(id) ?? 0), 0));
+    const escrowApplied = round2(Math.min(escrowLeft, cost));
+    escrowLeft = round2(escrowLeft - escrowApplied);
+    const id = randomUUID();
+    await tx.insert(payment).values({
+      id,
+      studentId: a.studentId,
+      // Payer of record is the family, not the officer (RF-03): confirmations
+      // go to whoever is here; the staff member stays in confirmedBy/metadata.
+      parentId: a.payerParentId,
+      amount: round2(cost - escrowApplied),
+      escrowAmountApplied: escrowApplied,
+      paymentMethod: 'in_school',
+      purpose: 'registration',
+      status: 'pending',
+      externalReference: `DESK-${id.slice(0, 8).toUpperCase()}`,
+      metadata: { desk: true, staffId: a.staffId, ...(a.groups.length > 1 ? { series: g.series.map((x) => x.name) } : {}) },
+    });
+    if (escrowApplied > 0) {
+      await debitEscrow({ studentId: a.studentId, amount: escrowApplied, reason: 'payment', initiatedBy: a.staffId, relatedPaymentId: id }, tx);
+    }
+    await tx.insert(paymentRegistration).values(g.registrationIds.map((registrationId) => ({ id: randomUUID(), paymentId: id, registrationId })));
+    out.push({ id, amount: round2(cost - escrowApplied), escrowApplied, registrationIds: g.registrationIds, series: g.series.map((x) => x.name), entryDeadline: g.entryDeadline });
+  }
+  return out;
+}
+
+/**
+ * Confirm the desk's payments one by one. Each is confirmed in its own
+ * transaction; one closed in between (the close, a parent) is reported as not
+ * collected — the officer hands that money back — while the others stand.
+ * Nothing confirmed at all is the old single-payment refusal.
+ */
+async function confirmDeskPayments(payments: DeskPayment[], staffId: string, notes: string, instrumentUsed: string, auditCtx?: AuditContext) {
+  const confirmed: DeskPayment[] = [];
+  const notCollected: { paymentId: string; series: string[]; amount: number; reason: string }[] = [];
+  let firstError: unknown = null;
+  for (const p of payments) {
+    try {
+      await confirmDeskPayment(p.id, staffId, notes, instrumentUsed, auditCtx);
+      confirmed.push(p);
+    } catch (err) {
+      firstError ??= err;
+      notCollected.push({ paymentId: p.id, series: p.series, amount: p.amount, reason: err instanceof Error ? err.message : 'Not confirmed' });
+    }
+  }
+  if (!confirmed.length) throw firstError;
+  return {
+    confirmed,
+    notCollected,
+    collected: round2(confirmed.reduce((sum, p) => sum + p.amount, 0)),
+    escrowApplied: round2(confirmed.reduce((sum, p) => sum + p.escrowApplied, 0)),
   };
 }
 
@@ -416,9 +470,9 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
   const escrowToApply = data.escrowAmountToApply ?? 0;
   if (escrowToApply > totalCost) throw new Error('Escrow amount cannot exceed the total cost');
   const payerParentId = await resolvePayerParent(data.studentId);
-  const paymentId = randomUUID();
+  const prices = new Map(regs.map((r) => [r.id, r.priceAtRegistration]));
 
-  await db.transaction(async (tx) => {
+  const payments = await db.transaction(async (tx) => {
     // Same guard as an app checkout (MA-06): lock the subjects, then make sure
     // nothing else is already paying for them.
     const locked = await tx
@@ -440,33 +494,17 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
         `These subjects already have a ${open[0]!.method === 'instapay' ? 'transfer' : 'checkout'} in progress — confirm it or reject it in the Finance Workbench first`
       );
     }
-
-    await tx.insert(payment).values({
-      id: paymentId,
-      studentId: data.studentId,
-      parentId: payerParentId,
-      amount: Math.max(0, Math.round((totalCost - escrowToApply) * 100) / 100),
-      escrowAmountApplied: escrowToApply,
-      paymentMethod: 'in_school',
-      purpose: 'registration',
-      status: 'pending',
-      externalReference: `DESK-${paymentId.slice(0, 8).toUpperCase()}`,
-      metadata: { desk: true, staffId },
-    });
-    if (escrowToApply > 0) {
-      await debitEscrow(
-        { studentId: data.studentId, amount: escrowToApply, reason: 'payment', initiatedBy: staffId, relatedPaymentId: paymentId },
-        tx
-      );
+    // F0b: one payment per entry deadline, each with its own creation audit row.
+    const groups = await seriesDeadlineGroups(tx, data.registrationIds, true);
+    const made = await createDeskPayments(tx, { studentId: data.studentId, payerParentId, staffId, escrowToApply, groups, prices });
+    for (const p of made) {
+      await logAction(staffId, 'PAYMENT_INITIATED', 'payment', p.id, null,
+        { desk: true, registrationIds: p.registrationIds, amount: p.amount, escrowApplied: p.escrowApplied, ...(made.length > 1 ? { series: p.series } : {}) }, auditCtx, tx);
     }
-    await tx.insert(paymentRegistration).values(
-      data.registrationIds.map((registrationId) => ({ id: randomUUID(), paymentId, registrationId }))
-    );
-    await logAction(staffId, 'PAYMENT_INITIATED', 'payment', paymentId, null,
-      { desk: true, registrationIds: data.registrationIds, amount: totalCost - escrowToApply, escrowApplied: escrowToApply }, auditCtx, tx);
+    return made;
   });
 
-  await confirmDeskPayment(paymentId, staffId, data.notes ?? 'Collected at the finance desk', data.instrumentUsed, auditCtx);
+  const outcome = await confirmDeskPayments(payments, staffId, data.notes ?? 'Collected at the finance desk', data.instrumentUsed, auditCtx);
 
   // Only receipts ready to hand over; a void one is never offered (MA-20).
   const receipts = await db.query.receipt.findMany({
@@ -475,9 +513,11 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
     columns: { id: true, registrationId: true, receiptNumber: true, status: true },
   });
   return {
-    paymentId,
-    collected: Math.max(0, Math.round((totalCost - escrowToApply) * 100) / 100),
-    escrowApplied: escrowToApply,
+    paymentId: outcome.confirmed[0]!.id,
+    payments: outcome.confirmed.map((p) => ({ id: p.id, series: p.series, entryDeadline: p.entryDeadline, collected: p.amount, escrowApplied: p.escrowApplied, registrationIds: p.registrationIds })),
+    notCollected: outcome.notCollected,
+    collected: outcome.collected,
+    escrowApplied: outcome.escrowApplied,
     receipts,
   };
 }

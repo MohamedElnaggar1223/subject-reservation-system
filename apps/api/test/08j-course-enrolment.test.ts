@@ -285,6 +285,31 @@ describe('F0b: course enrolment', () => {
       expect((await one<{ n: string }>(`select count(*) as n from course_enrolment where student_id = $1 and subject_id = $2 and ended_on is null`, [s.s2!.studentId, subj.PHY!])).n).toBe('1');
     });
 
+    it('rows committed while the student leaves: the leaving ends them too, never an open enrolment for a student who left', async () => {
+      const leaver = await onboard(officer, 'enr-s6', 11);
+      // The commit reads its students, then queues behind the year's lock;
+      // the leaving fires while it waits. The commit holds the student FOR
+      // SHARE, so the leaving waits for it and then ends what it made.
+      const release = await holdEnrolmentLock(thisYear);
+      let commit: Promise<{ status: number }> | undefined;
+      let leaving: Promise<{ status: number }> | undefined;
+      try {
+        commit = coordinator.api.v1.enrolments.batch.$post({ json: { academicYearId: thisYear, rows: [{ student: leaver.studentId, subject: 'EN-ENG', mode: 'in_school' }], commit: true } });
+        await lockWaiters(1);
+        leaving = coordinator.api.v1.students[':id'].leave.$post({
+          param: { id: leaver.studentId }, json: { kind: 'transferred', leftOn: schoolToday(), reason: 'moved to another school' },
+        });
+        await Promise.race([leaving, lockWaiters(2)]);
+      } finally {
+        await release();
+      }
+      const [c, l] = await Promise.all([commit!, leaving!]);
+      expect(c.status).toBe(200);
+      expect(l.status).toBe(200);
+      expect(await openEnrolments(leaver.studentId)).toEqual([]);
+      expect((await one<{ reason: string }>(`select end_reason as reason from course_enrolment where student_id = $1`, [leaver.studentId])).reason).toBe('Left the school (transferred)');
+    });
+
     it('a single enrolment and a section enrolment of the same student at once: one open enrolment', async () => {
       const [single, whole] = await Promise.allSettled([
         apiResponse(enrol({ studentId: s.s1!.studentId, subjectId: subj.MAT!, teacherId: tB })),
