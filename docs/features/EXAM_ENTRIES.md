@@ -242,6 +242,28 @@ entry is its registration's student's in its series, a result its entry's; one w
 hand-over audit row each; no seat double-booked, no candidate seated twice, no invigilator in two
 rooms; no national ID in an audit row.
 
+**Negative controls** (`.audit/exams-evidence/controls.py`; one trail row each; logs in
+`.audit/exams-evidence/controls/`): each guard undone once, its tests red, restored.
+
+| Control | Undone | Red |
+|---|---|---|
+| C1 | the hard stop on making an entry (derived and by hand) | 08x1; 09's MO-10 rule |
+| C2 | the hard stop on sending a draft | 08x1 |
+| C3 | the national ID read opened to all staff (route and service) | 08x1 |
+| C4 | the national ID write lets the driver's error (with the number) through | 08x1 |
+| C5 | the forecast's `teacherOf` check | 08x1, 05 |
+| C6 | the entry list's missing-forecast flag | 08x1 |
+| C7 | clash detection | 08x2 |
+| C8 | the database's one-candidate-per-seat index (0041) | 08x2, 08x3 |
+| C9 | the certificate hand-over's status guard | 08x3 (the race), 08x2 |
+| C10 | results: a line compared with the latest report | 08x2 |
+| C11 | derivation's advisory lock and conflict guard | 08x3 |
+| C12 | numbering's advisory lock | 08x3 |
+| C13 | an entry's row lock (withdraw against amend) | 08x3 |
+| C14 | a reminder's notices sent before its claim, outside the transaction | 08x3 |
+| C15 | a parent's link to the child (family endpoints) | 05 |
+| C16 | a teacher's register limited to the room they invigilate | 08x2, 05 |
+
 ## 10. Decisions and why
 
 - **Board rules are data** (`exam_board_rule`), seeded from the research with what is not in it
