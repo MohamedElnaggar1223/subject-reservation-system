@@ -19,8 +19,11 @@
 import { z } from 'zod';
 import { ROLES, type Role } from '../roles';
 import { LevelCodeReadingSchema, LEVEL_CODE_READINGS, LEVEL_CODE_READING_LABELS } from '../catalogue/level-code';
+import {
+  SelfStudyRuleSchema, SELF_STUDY_RULES, SELF_STUDY_RULE_LABELS, CarryForwardReadingSchema, CARRY_FORWARD_READINGS, CARRY_FORWARD_LABELS,
+} from '../import/import.validations';
 
-export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar' | 'catalogue';
+export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar' | 'catalogue' | 'import';
 
 export type SettingDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   schema: S;
@@ -107,6 +110,33 @@ export const SETTINGS = {
     source: 'IS-01',
     input: 'choice',
     choices: LEVEL_CODE_READINGS.map((r) => ({ value: r, label: LEVEL_CODE_READING_LABELS[r] })),
+  }),
+  // F7: two of the coordinator's pending answers (owner decision 3), as the
+  // defaults every import's review starts from. A review can choose
+  // otherwise for its own file; the answer, once given, is set here once.
+  'import.selfStudyOnTaught': defineSetting({
+    schema: SelfStudyRuleSchema,
+    default: 'retake_only' as const,
+    group: 'import',
+    label: 'Self-study on a subject the school teaches',
+    description:
+      'The school\'s sheet marks some rows self-study on subjects the school also teaches (IMPORT_SPIKE.md IS-03). Today\'s rule allows studying outside school only on a retake or a subject the school does not teach. The day-one import starts every review from this answer.',
+    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    source: 'IS-03',
+    input: 'choice',
+    choices: SELF_STUDY_RULES.map((r) => ({ value: r, label: SELF_STUDY_RULE_LABELS[r] })),
+  }),
+  'import.carryForward': defineSetting({
+    schema: CarryForwardReadingSchema,
+    default: 'note_only' as const,
+    group: 'import',
+    label: 'What "Carry forward on …" means in the sheet',
+    description:
+      'Staff wrote "Carry forward on June 2022" on some A2 rows (IMPORT_SPIKE.md IS-02, DISCOVERY.md Q-02): an AS result carried into the entry, or a payment carried forward. The day-one import starts every review from this answer.',
+    editableBy: [ROLES.ADMIN, ROLES.COORDINATOR],
+    source: 'IS-02',
+    input: 'choice',
+    choices: CARRY_FORWARD_READINGS.map((r) => ({ value: r, label: CARRY_FORWARD_LABELS[r] })),
   }),
 } as const;
 

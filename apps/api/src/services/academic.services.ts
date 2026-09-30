@@ -542,85 +542,92 @@ export async function deleteSection(id: string, actorId: string, ctx?: AuditCont
  * this section is left as they are.
  */
 export async function addSectionMembers(sectionId: string, data: AddSectionMembersType, actorId: string, ctx?: AuditContext) {
-  return db.transaction(async (tx) => {
-    const [s] = await tx
-      .select({ id: section.id, name: section.name, grade: section.grade, capacity: section.capacity, academicYearId: section.academicYearId, startYear: academicYear.startYear, startsOn: academicYear.startsOn, endsOn: academicYear.endsOn })
-      .from(section)
-      .innerJoin(academicYear, eq(academicYear.id, section.academicYearId))
-      .where(eq(section.id, sectionId))
-      .for('update', { of: section });
-    if (!s) throw new AcademicError('Section not found', 404);
-    const today = schoolDateString(new Date());
-    const startsOn = data.startsOn ?? (today < s.startsOn ? s.startsOn : today > s.endsOn ? s.endsOn : today);
-    if (startsOn < s.startsOn || startsOn > s.endsOn) {
-      throw new AcademicError(`The start date falls inside the school year (${readableDate(s.startsOn)} – ${readableDate(s.endsOn)})`);
-    }
-    const ids = [...new Set(data.studentIds)];
-    const students = await tx
-      .select({ id: user.id, name: user.name, role: user.role, cohortYear: user.cohortYear, leftOn: user.leftOn })
-      .from(user)
-      .where(inArray(user.id, ids))
-      .orderBy(user.id)
-      .for('update');
-    if (students.length !== ids.length) throw new AcademicError('One or more students were not found', 404);
-    const problems: string[] = [];
-    for (const st of students) {
-      if (st.role !== 'student') problems.push(`${st.name} is not a student`);
-      else if (st.leftOn) problems.push(`${st.name} has left the school`);
-      else {
-        const g = gradeInAcademicYear(st.cohortYear, s.startYear);
-        if (g === null) problems.push(`${st.name}'s grade is not recorded`);
-        else if (g !== s.grade) problems.push(`${st.name} is in grade ${g > 12 ? 'past 12 (graduated)' : g} in ${academicYearShortLabel(s.startYear)}, not ${s.grade}`);
-      }
-    }
-    if (problems.length) throw new AcademicError(`${s.name} is a grade ${s.grade} section: ${problems.join('; ')}`);
+  return db.transaction((tx) => addSectionMembersInTx(tx, sectionId, data, actorId, ctx));
+}
 
-    const open = await tx
-      .select({ id: sectionMembership.id, studentId: sectionMembership.studentId, sectionId: sectionMembership.sectionId, startedOn: sectionMembership.startedOn, sectionName: section.name })
-      .from(sectionMembership)
-      .innerJoin(section, eq(section.id, sectionMembership.sectionId))
-      .where(and(inArray(sectionMembership.studentId, ids), eq(sectionMembership.academicYearId, s.academicYearId), isNull(sectionMembership.endedOn)))
-      .for('update', { of: sectionMembership });
-    const openBy = new Map(open.map((o) => [o.studentId, o]));
-    const toAdd = ids.filter((id) => openBy.get(id)?.sectionId !== sectionId);
-    // A move starts on or after the day the student joined their current
-    // section: dated before it, the new section would begin before the old one
-    // did and the history would overlap (found on 30 Sep 2026 when a test's
-    // date and the school's differed by a day).
-    const tooEarly = toAdd
-      .map((id) => ({ id, prev: openBy.get(id) }))
-      .filter((m) => m.prev && startsOn < m.prev.startedOn)
-      .map((m) => `${students.find((st) => st.id === m.id)!.name} joined ${m.prev!.sectionName} on ${readableDate(m.prev!.startedOn)}`);
-    if (tooEarly.length) {
-      throw new AcademicError(`A move must start on or after the day the student joined their current section: ${tooEarly.join('; ')}`, 409);
+/**
+ * addSectionMembers in the caller's transaction (F7's import places each
+ * family's students in the family's own transaction). Locks the section, then
+ * the students, as addSectionMembers always has.
+ */
+export async function addSectionMembersInTx(tx: Tx, sectionId: string, data: AddSectionMembersType, actorId: string, ctx?: AuditContext) {
+  const [s] = await tx
+    .select({ id: section.id, name: section.name, grade: section.grade, capacity: section.capacity, academicYearId: section.academicYearId, startYear: academicYear.startYear, startsOn: academicYear.startsOn, endsOn: academicYear.endsOn })
+    .from(section)
+    .innerJoin(academicYear, eq(academicYear.id, section.academicYearId))
+    .where(eq(section.id, sectionId))
+    .for('update', { of: section });
+  if (!s) throw new AcademicError('Section not found', 404);
+  const today = schoolDateString(new Date());
+  const startsOn = data.startsOn ?? (today < s.startsOn ? s.startsOn : today > s.endsOn ? s.endsOn : today);
+  if (startsOn < s.startsOn || startsOn > s.endsOn) {
+    throw new AcademicError(`The start date falls inside the school year (${readableDate(s.startsOn)} – ${readableDate(s.endsOn)})`);
+  }
+  const ids = [...new Set(data.studentIds)];
+  const students = await tx
+    .select({ id: user.id, name: user.name, role: user.role, cohortYear: user.cohortYear, leftOn: user.leftOn })
+    .from(user)
+    .where(inArray(user.id, ids))
+    .orderBy(user.id)
+    .for('update');
+  if (students.length !== ids.length) throw new AcademicError('One or more students were not found', 404);
+  const problems: string[] = [];
+  for (const st of students) {
+    if (st.role !== 'student') problems.push(`${st.name} is not a student`);
+    else if (st.leftOn) problems.push(`${st.name} has left the school`);
+    else {
+      const g = gradeInAcademicYear(st.cohortYear, s.startYear);
+      if (g === null) problems.push(`${st.name}'s grade is not recorded`);
+      else if (g !== s.grade) problems.push(`${st.name} is in grade ${g > 12 ? 'past 12 (graduated)' : g} in ${academicYearShortLabel(s.startYear)}, not ${s.grade}`);
     }
-    if (s.capacity !== null) {
-      const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(sectionMembership)
-        .where(and(eq(sectionMembership.sectionId, sectionId), isNull(sectionMembership.endedOn))) as [{ n: number }];
-      if (n + toAdd.length > s.capacity) {
-        throw new AcademicError(`${s.name} holds ${s.capacity}: it has ${n}, and ${toAdd.length} more would not fit`, 409);
-      }
+  }
+  if (problems.length) throw new AcademicError(`${s.name} is a grade ${s.grade} section: ${problems.join('; ')}`);
+
+  const open = await tx
+    .select({ id: sectionMembership.id, studentId: sectionMembership.studentId, sectionId: sectionMembership.sectionId, startedOn: sectionMembership.startedOn, sectionName: section.name })
+    .from(sectionMembership)
+    .innerJoin(section, eq(section.id, sectionMembership.sectionId))
+    .where(and(inArray(sectionMembership.studentId, ids), eq(sectionMembership.academicYearId, s.academicYearId), isNull(sectionMembership.endedOn)))
+    .for('update', { of: sectionMembership });
+  const openBy = new Map(open.map((o) => [o.studentId, o]));
+  const toAdd = ids.filter((id) => openBy.get(id)?.sectionId !== sectionId);
+  // A move starts on or after the day the student joined their current
+  // section: dated before it, the new section would begin before the old one
+  // did and the history would overlap (found on 30 Sep 2026 when a test's
+  // date and the school's differed by a day).
+  const tooEarly = toAdd
+    .map((id) => ({ id, prev: openBy.get(id) }))
+    .filter((m) => m.prev && startsOn < m.prev.startedOn)
+    .map((m) => `${students.find((st) => st.id === m.id)!.name} joined ${m.prev!.sectionName} on ${readableDate(m.prev!.startedOn)}`);
+  if (tooEarly.length) {
+    throw new AcademicError(`A move must start on or after the day the student joined their current section: ${tooEarly.join('; ')}`, 409);
+  }
+  if (s.capacity !== null) {
+    const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(sectionMembership)
+      .where(and(eq(sectionMembership.sectionId, sectionId), isNull(sectionMembership.endedOn))) as [{ n: number }];
+    if (n + toAdd.length > s.capacity) {
+      throw new AcademicError(`${s.name} holds ${s.capacity}: it has ${n}, and ${toAdd.length} more would not fit`, 409);
     }
-    const moved: { studentId: string; from: string }[] = [];
-    for (const id of toAdd) {
-      const prev = openBy.get(id);
-      if (prev) {
-        const endedOn = prev.startedOn >= startsOn ? prev.startedOn : dayBefore(startsOn);
-        await tx.update(sectionMembership)
-          .set({ endedOn, endReason: `Moved to ${s.name}`, endedBy: actorId })
-          .where(eq(sectionMembership.id, prev.id));
-        moved.push({ studentId: id, from: prev.sectionName });
-      }
+  }
+  const moved: { studentId: string; from: string }[] = [];
+  for (const id of toAdd) {
+    const prev = openBy.get(id);
+    if (prev) {
+      const endedOn = prev.startedOn >= startsOn ? prev.startedOn : dayBefore(startsOn);
+      await tx.update(sectionMembership)
+        .set({ endedOn, endReason: `Moved to ${s.name}`, endedBy: actorId })
+        .where(eq(sectionMembership.id, prev.id));
+      moved.push({ studentId: id, from: prev.sectionName });
     }
-    if (toAdd.length) {
-      await tx.insert(sectionMembership).values(toAdd.map((studentId) => ({
-        id: randomUUID(), sectionId, studentId, academicYearId: s.academicYearId, startedOn: startsOn, addedBy: actorId,
-      })));
-      await logAction(actorId, 'SECTION_MEMBERS_ADDED', 'section', sectionId, null,
-        { added: toAdd, moved, startsOn, alreadyIn: ids.filter((id) => !toAdd.includes(id)) }, ctx, tx);
-    }
-    return { added: toAdd.length, moved: moved.length, alreadyIn: ids.length - toAdd.length };
-  });
+  }
+  if (toAdd.length) {
+    await tx.insert(sectionMembership).values(toAdd.map((studentId) => ({
+      id: randomUUID(), sectionId, studentId, academicYearId: s.academicYearId, startedOn: startsOn, addedBy: actorId,
+    })));
+    await logAction(actorId, 'SECTION_MEMBERS_ADDED', 'section', sectionId, null,
+      { added: toAdd, moved, startsOn, alreadyIn: ids.filter((id) => !toAdd.includes(id)) }, ctx, tx);
+  }
+  return { added: toAdd.length, moved: moved.length, alreadyIn: ids.length - toAdd.length };
 }
 
 export async function endSectionMembership(sectionId: string, membershipId: string, data: EndSectionMembershipType, actorId: string, ctx?: AuditContext) {

@@ -27,10 +27,14 @@ import {
   registrationSession,
   parentStudentLink,
   user,
+  subjectTeacher,
+  registrationHistory,
   eq,
+  ne,
   and,
   inArray,
   notInArray,
+  isNotNull,
   gradeTodayExtras,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -94,21 +98,28 @@ export async function insertRoutedRegistrations(
 /**
  * Subject IDs the student has previously sat (confirmed) or dropped in
  * OTHER sessions — registering one of these again is a retake (V3 §6.9).
+ * F7: a registration the school recorded before the system (the day-one
+ * import's history, registered or dropped) counts the same way — the student
+ * sat the subject before, whether or not the system saw it.
  */
 async function getRetakeSubjectIds(
   studentId: string,
-  excludeSessionId: string
+  excludeSessionId: string,
+  executor: typeof db | Tx = db,
 ): Promise<Set<string>> {
-  const prior = await db.query.registration.findMany({
-    where: (r, { eq, and, ne, inArray }) =>
-      and(
-        eq(r.studentId, studentId),
-        ne(r.sessionId, excludeSessionId),
-        inArray(r.status, ['confirmed', 'dropped'])
-      ),
-    columns: { subjectId: true },
-  });
-  return new Set(prior.map((r) => r.subjectId));
+  const [prior, history] = await Promise.all([
+    executor.select({ subjectId: registration.subjectId }).from(registration).where(and(
+      eq(registration.studentId, studentId),
+      ne(registration.sessionId, excludeSessionId),
+      inArray(registration.status, ['confirmed', 'dropped']),
+    )),
+    executor.select({ subjectId: registrationHistory.subjectId }).from(registrationHistory).where(and(
+      eq(registrationHistory.studentId, studentId),
+      inArray(registrationHistory.outcome, ['registered', 'dropped']),
+      isNotNull(registrationHistory.subjectId),
+    )),
+  ]);
+  return new Set([...prior.map((r) => r.subjectId), ...history.map((h) => h.subjectId!)]);
 }
 
 /**
@@ -132,7 +143,10 @@ export async function prepareRegistrationInputs(
     name: string;
   }[],
   subjectOptions: Record<string, SubjectRegistrationOptionsType> | undefined,
-  eligibility: Eligibility
+  eligibility: Eligibility,
+  // F7: the import reads inside its family's transaction (the teacher links
+  // and the history it has just written); every other caller reads committed data.
+  executor: typeof db | Tx = db,
 ) {
   // Level match: an IGCSE session only takes IGCSE subjects, etc.
   const wrongLevel = subjects.filter((s) => s.qualificationLevel !== sess.qualificationLevel);
@@ -152,13 +166,11 @@ export async function prepareRegistrationInputs(
     .map((o) => o.teacherId)
     .filter((t): t is string => !!t);
   const teacherLinks = requestedTeacherIds.length
-    ? await db.query.subjectTeacher.findMany({
-        where: (st, { inArray }) => inArray(st.teacherId, requestedTeacherIds),
-        columns: { subjectId: true, teacherId: true },
-      })
+    ? await executor.select({ subjectId: subjectTeacher.subjectId, teacherId: subjectTeacher.teacherId })
+        .from(subjectTeacher).where(inArray(subjectTeacher.teacherId, requestedTeacherIds))
     : [];
 
-  const retakeSet = await getRetakeSubjectIds(studentId, sess.id);
+  const retakeSet = await getRetakeSubjectIds(studentId, sess.id, executor);
 
   const result = new Map<
     string,

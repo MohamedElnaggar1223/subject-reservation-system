@@ -90,6 +90,11 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     'GET /v1/enrolments',
     'POST /v1/enrolments',
     '* /v1/enrolments/*',
+    // F7: the day-one import (registering in a window and adding catalogue
+    // rows stay the admin's: the handlers refuse them).
+    'GET /v1/imports',
+    'POST /v1/imports',
+    '* /v1/imports/*',
   ],
   teacher: [
     ...SELF_SERVICE,

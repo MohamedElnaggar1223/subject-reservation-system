@@ -59,6 +59,8 @@ export const AUDIT_ENTITY_TYPES = [
   'qualification_option',
   'board_series',
   'enrolment',
+  // F7
+  'import',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -96,6 +98,7 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   qualification_option: 'Option Code',
   board_series:   'Board Series',
   enrolment:      'Course Enrolment',
+  import:         'Import',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -248,6 +251,15 @@ export const AUDIT_ACTIONS = [
   'ENROLMENT_UPDATED',
   'ENROLMENT_ENDED',
   'ENROLMENTS_BULK_CREATED',
+  // F7: the day-one import
+  'IMPORT_STAGED',
+  'IMPORT_REVIEWED',
+  'IMPORT_REFERENCE_DATA_CREATED',
+  'IMPORT_ACCOUNT_CREATED',
+  'IMPORT_FAMILY_COMMITTED',
+  'IMPORT_REGISTRATION',
+  'IMPORT_COMMITTED',
+  'IMPORT_DISCARDED',
   // Parent-student links (security audit RF-14: access to a child's money
   // and records hangs on these, so every change is recorded)
   'LINK_REQUESTED',
@@ -408,6 +420,14 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   ENROLMENT_UPDATED:          'Course Enrolment Changed',
   ENROLMENT_ENDED:            'Course Enrolment Ended',
   ENROLMENTS_BULK_CREATED:    'Course Enrolments Created in Bulk',
+  IMPORT_STAGED:              'Import Staged for Review',
+  IMPORT_REVIEWED:            'Import Reviewed (Fix, Merge, Skip or Mapping)',
+  IMPORT_REFERENCE_DATA_CREATED: 'Import Created Teachers, Sections or Subjects',
+  IMPORT_ACCOUNT_CREATED:     'Account Created by the Import',
+  IMPORT_FAMILY_COMMITTED:    'Import Committed a Family',
+  IMPORT_REGISTRATION:        'Registered by the Import (Awaiting Payment)',
+  IMPORT_COMMITTED:           'Import Committed',
+  IMPORT_DISCARDED:           'Import Discarded',
 };
 
 // ─── Query Filters ────────────────────────────────────────────────────────────
