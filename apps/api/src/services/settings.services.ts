@@ -131,10 +131,13 @@ export async function updateSetting(
       return { changed: false, result: undefined };
     }
     const now = new Date();
+    // F2: a setting may be empty ("no cut-off", "no limit"): stored as the JSON
+    // value null, not SQL NULL (the column holds a value for every key set).
+    const stored = value === null ? sql`'null'::jsonb` : value;
     await tx
       .insert(schoolSetting)
-      .values({ key, value, updatedAt: now, updatedBy: actor.id })
-      .onConflictDoUpdate({ target: schoolSetting.key, set: { value, updatedAt: now, updatedBy: actor.id } });
+      .values({ key, value: stored, updatedAt: now, updatedBy: actor.id })
+      .onConflictDoUpdate({ target: schoolSetting.key, set: { value: stored, updatedAt: now, updatedBy: actor.id } });
     await logAction(actor.id, 'SETTING_CHANGED', 'setting', key, { value: beforeValue as never }, { value: value as never, reason }, auditCtx, tx);
     const moved = hook ? await hook.inTransaction(tx, beforeValue, value, actor.id) : undefined;
     return { changed: true, result: moved };

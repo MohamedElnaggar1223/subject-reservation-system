@@ -89,6 +89,15 @@ export async function createCollector(input: CreateCollectorType, viewer: Viewer
 
   await db.transaction(async (tx) => {
     for (const s of [...studentIds].sort()) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`leave:collectors:${s}`}))`);
+    // A person a custody restriction names is refused first, whatever else is on file.
+    const restrictions = await activeRestrictions(studentIds, tx);
+    const hit = matchingRestrictions({ name: input.name, idNumber: input.idNumber }, restrictions);
+    if (hit.length) {
+      const who = students.find((s) => s.id === hit[0]!.studentId)!.name;
+      throw new LeaveError(isFamily(viewer)
+        ? `${input.name} cannot be added for ${who} — please contact the school`
+        : `${input.name} matches a custody restriction for ${who} (${hit[0]!.personName}) — they may not collect`, 409);
+    }
     // One live record per person per child.
     const live = await tx.select({ c: leaveCollector, studentId: leaveCollectorStudent.studentId }).from(leaveCollector)
       .innerJoin(leaveCollectorStudent, eq(leaveCollectorStudent.collectorId, leaveCollector.id))
@@ -97,14 +106,6 @@ export async function createCollector(input: CreateCollectorType, viewer: Viewer
     if (dupe) {
       const who = students.find((s) => s.id === dupe.studentId)!.name;
       throw new LeaveError(`${dupe.c.name} is already ${dupe.c.status === 'approved' ? 'an authorised collector' : 'waiting for approval'} for ${who}`, 409);
-    }
-    const restrictions = await activeRestrictions(studentIds, tx);
-    const hit = matchingRestrictions({ name: input.name, idNumber: input.idNumber }, restrictions);
-    if (hit.length) {
-      const who = students.find((s) => s.id === hit[0]!.studentId)!.name;
-      throw new LeaveError(isFamily(viewer)
-        ? `${input.name} cannot be added for ${who} — please contact the school`
-        : `${input.name} matches a custody restriction for ${who} (${hit[0]!.personName}) — they may not collect`, 409);
     }
     await tx.insert(leaveCollector).values({
       id, name: input.name.trim(), relation: input.relation.trim(), phone: input.phone.trim(), idNumber: input.idNumber.trim(),

@@ -41,8 +41,7 @@ import {
 
 type LeaveRow = typeof leaveRequest.$inferSelect;
 
-/** How far ahead a request may be made, and a recurring one may run. */
-const MAX_DAYS_AHEAD = 180;
+/** How long a recurring request may run, and how many school days it may cover. */
 const MAX_SERIES_DAYS = 120;
 const MAX_SERIES_DATES = 60;
 
@@ -348,8 +347,9 @@ export async function createLeave(input: CreateLeaveRequestType, viewer: Viewer,
 
   // When.
   if (input.date < today.date) throw new LeaveError('A leave is for today or a later day', 400);
-  if (addDays(today.date, MAX_DAYS_AHEAD) < input.date) throw new LeaveError(`A leave can be requested up to ${MAX_DAYS_AHEAD} days ahead`, 400);
-  if (origin !== 'school' && input.date === today.date && input.leaveTime <= today.time) {
+  // A family asks ahead; staff may record a leave from a time already passed
+  // today (a parent phoning from the gate, a student sent home at 9:00).
+  if (origin === 'parent' && input.date === today.date && input.leaveTime <= today.time) {
     throw new LeaveError(`${input.leaveTime} has already passed today — choose a later time`, 400);
   }
   const { dates, skipped } = await datesOf(input, today.date);
@@ -408,6 +408,10 @@ export async function createLeave(input: CreateLeaveRequestType, viewer: Viewer,
     // One student's requests one at a time: the overlap and limit checks read what the last one wrote.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`leave:student:${student.id}`}))`);
     const seriesId = input.repeat ? randomUUID() : null;
+    if (seriesId) {
+      await tx.insert(leaveSeries).values({ id: seriesId, studentId: student.id, startsOn: input.date, endsOn: input.repeat!.until, weekdays: [...input.repeat!.weekdays].sort(), createdBy: viewer.id });
+      await logAction(viewer.id, 'LEAVE_REQUESTED', 'leave_series', seriesId, null, { studentId: student.id, from: input.date, until: input.repeat!.until, weekdays: input.repeat!.weekdays }, ctx, tx);
+    }
     const rows: LeaveRow[] = [];
     const warnings: LeaveWarning[] = [];
     const clash: { date: string; why: string }[] = [];
@@ -446,10 +450,6 @@ export async function createLeave(input: CreateLeaveRequestType, viewer: Viewer,
         decidedBy: approveIt && !auto ? viewer.id : null, decidedAt: approveIt ? now : null,
         decisionNote: auto ? 'Approved automatically: no rule broken' : null,
       }).returning();
-      if (seriesId && rows.length === 0) {
-        await tx.insert(leaveSeries).values({ id: seriesId, studentId: student.id, startsOn: input.date, endsOn: input.repeat!.until, weekdays: [...input.repeat!.weekdays].sort(), createdBy: viewer.id });
-        await logAction(viewer.id, 'LEAVE_REQUESTED', 'leave_series', seriesId, null, { studentId: student.id, from: input.date, until: input.repeat!.until, weekdays: input.repeat!.weekdays }, ctx, tx);
-      }
       rows.push(row!);
       warnings.push(...w.filter((x) => !warnings.some((y) => y.code === x.code)));
       await logAction(viewer.id, 'LEAVE_REQUESTED', 'leave_request', id, null, {
@@ -540,7 +540,7 @@ function notWaiting(r: LeaveRow, names?: Map<string, string>): string {
 async function requireApprover(viewer: Viewer) {
   const policy = await readLeavePolicy();
   if (!isApprover(viewer.role, policy)) {
-    throw new LeaveError(`Only ${policy.approverRoles.map((r) => (r === 'admin' ? 'the admin' : 'the coordinator')).join(' or ')} approve leave`, 403);
+    throw new LeaveError(`Leave is approved by ${policy.approverRoles.map((r) => (r === 'admin' ? 'the admin' : 'the coordinator')).join(' or ')}`, 403);
   }
   return policy;
 }
@@ -880,10 +880,10 @@ export async function studentLeaveRecord(studentId: string, viewer: Viewer) {
   const today = schoolNow().date;
   const familyIds = await familyOfStudent(studentId);
   const siblings = familyIds.filter((x) => x !== studentId);
-  const [rows, parents, restrictions, collectors, summary, siblingNames] = await Promise.all([
+  const [rows, parents, allRestrictions, collectors, summary, siblingNames] = await Promise.all([
     db.select().from(leaveRequest).where(eq(leaveRequest.studentId, studentId)).orderBy(desc(leaveRequest.date), desc(leaveRequest.createdAt)).limit(500),
     parentsOf(studentId),
-    activeRestrictions([studentId]),
+    db.select().from(leaveCustodyRestriction).where(eq(leaveCustodyRestriction.studentId, studentId)).orderBy(asc(leaveCustodyRestriction.createdAt)),
     collectorsOfStudents([studentId], viewer),
     studentHistorySummary(studentId, today),
     namesOf(siblings),
@@ -891,6 +891,7 @@ export async function studentLeaveRecord(studentId: string, viewer: Viewer) {
   const policy = await readLeavePolicy();
   const grade = gradeOn(s.cohortYear, today);
   const custody = seesIdNumbers(viewer);
+  const restrictions = allRestrictions.filter((r) => r.endedAt === null);
   const [section] = [...(await sectionsOn([{ studentId, date: today }])).values()];
   return {
     student: { id: s.id, name: s.name, code: s.code, grade, gradeLabel: gradeLabel(grade), section: section ?? null, leftOn: s.leftOn },
@@ -902,7 +903,8 @@ export async function studentLeaveRecord(studentId: string, viewer: Viewer) {
     leaves: await shapeLeaves(rows, viewer),
     collectors,
     custodyOnFile: restrictions.length,
-    restrictions: custody ? await shapeRestrictions(restrictions) : [],
+    // Every restriction, ended ones included (the record keeps them), for the coordinator and the admin.
+    restrictions: custody ? await shapeRestrictions(allRestrictions) : [],
     canDecide: isApprover(viewer.role, policy),
   };
 }
@@ -1000,7 +1002,12 @@ async function reportRows(from: string, to: string): Promise<(ReportRow & { grad
     left join "user" d on d.id = r.decided_by left join "user" c on c.id = r.created_by
     where r.date between ${from} and ${to}
     order by r.date, r.leave_time, s.name`);
-  const rows = res.rows as ReportRow[];
+  // A raw query's timestamps come back as text: made instants here, once.
+  const at = (v: unknown) => (v === null || v === undefined ? null : new Date(v as string));
+  const rows = (res.rows as ReportRow[]).map((r) => ({
+    ...r, checked_out_at: at(r.checked_out_at), returned_at: at(r.returned_at), no_show_at: at(r.no_show_at),
+    late_return_at: at(r.late_return_at), created_at: at(r.created_at)!,
+  }));
   const sections = await sectionsOn(rows.map((r) => ({ studentId: r.student_id, date: r.date })));
   return rows.map((r) => ({ ...r, grade: gradeOn(r.cohort_year, r.date), section: sections.get(`${r.student_id}|${r.date}`) ?? null }));
 }
