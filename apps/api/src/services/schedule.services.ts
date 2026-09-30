@@ -33,7 +33,7 @@ import {
   sectionMembership, user, parentStudentLink, calendarFeedToken, eq, and, inArray, isNull, sql, asc, or, gte, lte, ne,
 } from '@repo/db';
 import { randomBytes, createHash, randomUUID } from 'crypto';
-import { ACADEMIC_ROLES, hasRole, schoolDateString, WEEKDAY_NAMES } from '@repo/validations';
+import { ACADEMIC_ROLES, hasRole, schoolDateString, WEEKDAY_NAMES, type LessonStatus, type LessonOnDay, type DaySchedule, type SchedulePerson } from '@repo/validations';
 import { getSchoolDays } from './academic.services';
 import { logAction, type AuditContext } from './audit.services';
 import { gridOfYear } from './timetable.services';
@@ -43,55 +43,9 @@ import {
 
 export type ScheduleTarget = { studentId: string } | { teacherId: string } | { roomId: string } | { sectionId: string };
 
-export type LessonStatus =
-  | 'scheduled'        // taught by its own teacher
-  | 'covered'          // its teacher is away; another teacher covers it
-  | 'uncovered'        // its teacher is away and no cover is arranged yet
-  | 'cancelled'        // it does not take place (the students were told)
-  | 'covering'         // (a teacher's view) a lesson they cover for someone
-  | 'covered_by_other'; // (a teacher's view) their lesson, covered by someone else
-
-type Person = { id: string; name: string };
-
-export type LessonOnDay = {
-  lessonId: string;
-  timetableId: string;
-  groupId: string;
-  groupName: string;
-  subject: { id: string; name: string; code: string } | null;
-  /** The lesson period it starts at, and every period it takes that day. */
-  period: number;
-  periods: number[];
-  label: string;
-  startsAt: string;
-  endsAt: string;
-  length: number;
-  room: Person | null;
-  /** Who teaches it that day (cover applied), and who is timetabled. */
-  teacher: Person | null;
-  scheduledTeacher: Person | null;
-  status: LessonStatus;
-  cover: { assignmentId: string; status: 'assigned' | 'cancelled'; teacher: Person | null } | null;
-  /** How many of the section's students are in it (section view). */
-  sectionStudents?: number;
-};
-
-export type NotHeld = { lessonId: string; groupName: string; period: number; reason: 'short_day' | 'exam_only' };
-
-export type DaySchedule = {
-  date: string;
-  weekday: number;
-  kind: string;
-  isSchoolDay: boolean;
-  term: { id: string; name: string } | null;
-  entry: { kind: string; name: string } | null;
-  bellSchedule: { id: string; name: string } | null;
-  timetable: { id: string; name: string; effectiveFrom: string } | null;
-  /** Why the day has no lessons, when it has none. */
-  note: 'holiday' | 'weekend' | 'out_of_term' | 'no_academic_year' | 'exam_only' | 'no_timetable' | 'left' | null;
-  lessons: LessonOnDay[];
-  notHeld: NotHeld[];
-};
+// The shape of a day (§2's contract) lives in @repo/validations so the web can name it.
+export type { LessonStatus, LessonOnDay, NotHeld, DaySchedule } from '@repo/validations';
+type Person = SchedulePerson;
 
 // ─── The range ───────────────────────────────────────────────────────────────
 
