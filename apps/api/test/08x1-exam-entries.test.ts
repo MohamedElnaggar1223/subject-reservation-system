@@ -200,6 +200,13 @@ describe('F4: candidates and entries', () => {
       expect(row.values).toMatchObject({ previousCentre: 'EG777', previousCandidate: '0452', carryForwardFrom: `June ${w.Y}` });
       await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param: { id: ea!.id }, json: { carryForward: 'none', cfFromMonth: null, cfFromYear: null, cfCentreNumber: null, cfCandidateNumber: null } }));
     });
+
+    it("a candidate with two entries in a Cambridge series lists both, in code order (Cambridge's columns carry no entry code)", async () => {
+      const extra = await apiResponse(coord.api.v1.exams.entries.$post({ json: { studentId: a, boardSeriesId: w.series.cambridgeNov, unitId: w.catalogue.cp1 } }));
+      const list = await apiResponse(coord.api.v1.exams['entry-lists'].$get({ query: { boardSeriesId: w.series.cambridgeNov } }));
+      expect(list.rows.filter((r) => r.studentId === a).map((r) => r.values.syllabusCode)).toEqual([`${w.T}97`, `${w.T}97/12`]);
+      await apiResponse(coord.api.v1.exams.entries[':id'].withdraw.$post({ param: { id: extra.id }, json: { reason: 'added for the scenario' } }));
+    });
   });
 
   describe("MO-10's hard stop, withdrawals and amendments", () => {

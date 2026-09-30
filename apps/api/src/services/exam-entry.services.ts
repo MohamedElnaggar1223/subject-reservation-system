@@ -739,11 +739,11 @@ export async function getEntryList(boardSeriesId: string) {
       accessArrangements: aa,
     };
     return {
-      entryId: e.id, studentId: e.studentId, studentName, status: e.status, kind: e.kind, title: e.title,
+      entryId: e.id, studentId: e.studentId, studentName, status: e.status, kind: e.kind, entryCode: e.entryCode, title: e.title,
       values: Object.fromEntries(columns.map((col) => [col.key, values[col.key] ?? ''])),
       problems: a.problemsOf(e),
     };
-  }).sort((x, y) => (x.values.candidateNumber || 'z').localeCompare(y.values.candidateNumber || 'z') || x.studentName.localeCompare(y.studentName) || x.values.entryCode!.localeCompare(y.values.entryCode!));
+  }).sort((x, y) => (x.values.candidateNumber || 'z').localeCompare(y.values.candidateNumber || 'z') || x.studentName.localeCompare(y.studentName) || x.entryCode.localeCompare(y.entryCode));
   // Confirmed registrations of the series with no live entry: derive them, or map the subject first.
   const unentered = (await db.execute(sql`
     select r.id as "registrationId", r.student_id as "studentId", u.name as "studentName", sub.name as "subjectName", sub.code as "subjectCode",
