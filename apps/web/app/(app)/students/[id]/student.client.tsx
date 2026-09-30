@@ -14,16 +14,21 @@
  */
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiResponse, ROLES } from '@repo/validations';
 import { api } from '~/lib/hono';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { StudentAcademicPanel, studentRecordKey } from '~/components/student-academic-panel';
+import { WeekTimetable, schoolTodayDate } from '~/components/week-timetable';
 
 // The panel's own fetcher, under the panel's key: one request serves both.
 const fetchStudentRecord = (id: string) => apiResponse(api.v1.students[':id'].$get({ param: { id } }));
 
 const MONEY_ROLES: string[] = [ROLES.FINANCE_OFFICER, ROLES.FINANCE_ADMIN, ROLES.ADMIN];
+
+// F1: the student's week, as the family sees it — the desk answers "what does she have now?".
+const fetchStudentWeek = (studentId: string, date: string) => apiResponse(api.v1.schedule.week.$get({ query: { studentId, date } }));
 
 export default function StudentClient({ studentId, viewerRole }: { studentId: string; viewerRole: string }): React.JSX.Element {
   const { data: r, isLoading, isError, error, refetch } = useQuery({
@@ -82,8 +87,26 @@ export default function StudentClient({ studentId, viewerRole }: { studentId: st
           </header>
 
           <StudentAcademicPanel studentId={studentId} viewerRole={viewerRole} />
+          <StudentWeek studentId={studentId} />
         </>
       )}
     </div>
+  );
+}
+
+/** The week this student has (cover, holidays and short days applied), a week at a time. */
+function StudentWeek({ studentId }: { studentId: string }) {
+  const [date, setDate] = useState(schoolTodayDate());
+  const week = useQuery({ queryKey: ['schedule', 'week', studentId, date], queryFn: () => fetchStudentWeek(studentId, date) });
+  return (
+    <section aria-label="Timetable" className="mt-6">
+      {week.isLoading ? (
+        <LoadingState label="Loading the week…" />
+      ) : week.isError || !week.data ? (
+        <ErrorState title="The timetable did not load" message="This is a connection problem, not an empty week." onRetry={() => week.refetch()} />
+      ) : (
+        <WeekTimetable week={week.data} date={date} onDate={setDate} title="Timetable" />
+      )}
+    </section>
   );
 }
