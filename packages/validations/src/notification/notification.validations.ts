@@ -51,6 +51,15 @@ export const NOTIFICATION_TYPES = [
   'LINK_DECISION',
   // Staff: a preregistration held at its series' opening (F0a)
   'PREREGISTRATION_HELD',
+  // F4: exam entries — the family's statement of entry and timetable, a
+  // changed paper, a withdrawn entry, results, a certificate to collect; the
+  // staff's deadline reminders.
+  'EXAM_TIMETABLE_PUBLISHED',
+  'EXAM_TIMETABLE_CHANGED',
+  'EXAM_ENTRY_WITHDRAWN',
+  'EXAM_RESULTS_PUBLISHED',
+  'EXAM_CERTIFICATE_READY',
+  'EXAM_DEADLINE_REMINDER',
 ] as const;
 
 export const NotificationTypeSchema = z.enum(NOTIFICATION_TYPES);
@@ -78,6 +87,12 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   LINK_REQUEST_RECEIVED:            'New Parent Link Request',
   LINK_DECISION:                    'Link Request Decision',
   PREREGISTRATION_HELD:             'Preregistration Held',
+  EXAM_TIMETABLE_PUBLISHED:         'Exam Timetable Ready',
+  EXAM_TIMETABLE_CHANGED:           'Exam Timetable Changed',
+  EXAM_ENTRY_WITHDRAWN:             'Exam Entry Withdrawn',
+  EXAM_RESULTS_PUBLISHED:           'Exam Results',
+  EXAM_CERTIFICATE_READY:           'Certificate Ready to Collect',
+  EXAM_DEADLINE_REMINDER:           'Exam Deadline Coming Up',
 };
 
 // Icons mapped per type (used in the notification center UI)
@@ -103,6 +118,12 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   LINK_REQUEST_RECEIVED:            '🔗',
   LINK_DECISION:                    '🔗',
   PREREGISTRATION_HELD:             '⏸️',
+  EXAM_TIMETABLE_PUBLISHED:         '🗓️',
+  EXAM_TIMETABLE_CHANGED:           '🗓️',
+  EXAM_ENTRY_WITHDRAWN:             '📝',
+  EXAM_RESULTS_PUBLISHED:           '🎓',
+  EXAM_CERTIFICATE_READY:           '📜',
+  EXAM_DEADLINE_REMINDER:           '⏰',
 };
 
 // ─── Admin bulk announcement recipient groups ─────────────────────────────────

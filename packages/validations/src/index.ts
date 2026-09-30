@@ -56,3 +56,8 @@ export * from './catalogue/catalogue.validations'
 export * from './catalogue/level-code'
 export * from './catalogue/board-series.validations'
 export * from './enrolment/enrolment.validations'
+/**
+ * F4 — exam-entry management: candidates, entries, entry lists, the exam
+ * timetable and exam days, results and certificates.
+ */
+export * from './exams/exam-entry.validations'

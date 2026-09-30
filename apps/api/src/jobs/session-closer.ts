@@ -19,6 +19,7 @@ import { failPayment, enforcePaymentDeadlines } from '../services/payment.servic
 import { notifySessionOpened, notifySessionClosingSoon, notifySessionClosed, processScheduledAnnouncements, getStudentAndParentBroadcastIds } from '../services/notification.services';
 import { capturePreregistrationsForSession } from '../services/prereg.services';
 import { lapseGrade10Exceptions } from '../services/exception-lapse.services';
+import { sendDeadlineReminders } from '../services/exam-deadline.services';
 import { logAction } from '../services/audit.services';
 import { logger } from '../lib/logger';
 
@@ -188,6 +189,15 @@ export function startSessionScheduler(): void {
             );
           }
         }
+      }
+      // F4: remind the coordinator and admin before each board date the school
+      // acts by. Each reminder is claimed with the notices it sends, in one
+      // transaction: a second instance sends nothing, a failure retries.
+      try {
+        const { sent } = await sendDeadlineReminders();
+        if (sent > 0) logger.info(`[session-closer] Sent ${sent} exam deadline reminder(s).`);
+      } catch (err) {
+        logger.error('[session-closer] Exam deadline reminders failed:', err);
       }
       // State audit ST-06: finish a close whose finalisation never completed,
       // and capture preregistrations still waiting in an open session.

@@ -239,3 +239,63 @@ POST	/v1/enrolments/:id/end	D	D	D	D	D	A	A	D	D
 POST	/v1/enrolments/bulk	D	D	D	D	D	A	A	D	D
 POST	/v1/enrolments/section	D	D	D	D	D	A	A	D	D
 POST	/v1/enrolments/batch	D	D	D	D	D	A	A	D	D
+# F4 (FEATURES_PLAN.md; docs/features/EXAM_ENTRIES.md §6): exam-entry management is the
+# coordinator's and the admin's. The national ID (/candidates/:studentId/identity) is theirs alone.
+# A teacher reaches forecasts, their duties and registers (the handler checks teacherOf and the
+# invigilated room: 05). A family reads its own child's /students/:studentId/* (05); the desk
+# reads any student's and hands certificates over. The gate reaches nothing here.
+GET	/v1/exams/candidates	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/candidates/:studentId	D	D	D	D	D	A	A	D	D
+PUT	/v1/exams/candidates/:studentId	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/candidates/:studentId/identity	D	D	D	D	D	A	A	D	D
+PUT	/v1/exams/candidates/:studentId/identity	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/candidate-numbers/assign	D	D	D	D	D	A	A	D	D
+PUT	/v1/exams/candidate-numbers	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/board-rules	D	D	D	D	D	A	A	D	D
+PUT	/v1/exams/board-rules/:boardCode	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/entries	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/entries	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/entries/derive	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/entries/submit	D	D	D	D	D	A	A	D	D
+PUT	/v1/exams/entries/:id	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/entries/:id/withdraw	D	D	D	D	D	A	A	D	D
+PUT	/v1/exams/entries/:id/forecast	D	D	D	A	A	A	A	A	D
+GET	/v1/exams/forecasts	D	D	D	A	A	A	A	A	D
+POST	/v1/exams/forecasts/submit	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/entry-lists	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/papers	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/papers	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/papers/import	D	D	D	D	D	A	A	D	D
+PUT	/v1/exams/papers/:id	D	D	D	D	D	A	A	D	D
+DELETE	/v1/exams/papers/:id	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/clashes	D	D	D	D	D	A	A	D	D
+PUT	/v1/exams/clashes	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/timetable/publish	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/students/:studentId/series	D	A	A	A	A	A	A	D	D
+GET	/v1/exams/students/:studentId/timetable	D	A	A	A	A	A	A	D	D
+GET	/v1/exams/students/:studentId/statement	D	A	A	A	A	A	A	D	D
+GET	/v1/exams/students/:studentId/exams	D	A	A	A	A	A	A	D	D
+GET	/v1/exams/students/:studentId/results	D	A	A	A	A	A	A	D	D
+GET	/v1/exams/students/:studentId/sittings	D	A	A	A	A	A	A	D	D
+GET	/v1/exams/sittings	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/sittings/plan	D	D	D	D	D	A	A	D	D
+PUT	/v1/exams/sittings/rooms	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/sittings/seat	D	D	D	D	D	A	A	D	D
+PUT	/v1/exams/seats	D	D	D	D	D	A	A	D	D
+PUT	/v1/exams/invigilation	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/invigilation/mine	D	D	D	A	A	A	A	A	D
+GET	/v1/exams/registers	D	D	D	A	A	A	A	A	D
+PUT	/v1/exams/registers	D	D	D	A	A	A	A	A	D
+GET	/v1/exams/special-consideration	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/special-consideration	D	D	D	D	D	A	A	D	D
+PUT	/v1/exams/special-consideration/:id	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/results/import	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/results/mappings	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/results/publish	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/results	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/certificates	D	D	D	A	A	A	A	D	D
+POST	/v1/exams/certificates/receive	D	D	D	D	D	A	A	D	D
+POST	/v1/exams/certificates/:id/collect	D	D	D	A	A	A	A	D	D
+POST	/v1/exams/certificates/:id/dispose	D	D	D	D	D	A	A	D	D
+GET	/v1/exams/certificates/:id/slip	D	D	D	A	A	A	A	D	D
+GET	/v1/exams/deadlines	D	D	D	D	D	A	A	D	D

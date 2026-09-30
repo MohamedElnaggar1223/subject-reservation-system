@@ -60,6 +60,13 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
         'calendar.schoolWeekdays': true,
         // F0b: what "A.S./A.2." marks is the coordinator's answer (IS-01).
         'catalogue.levelCodeReading': true,
+        // F4: the school as an exam centre — the coordinator keeps these.
+        'exams.centres': true,
+        'exams.carryForward': true,
+        'exams.selfStudyForecast': true,
+        'exams.certificateRetentionMonths': true,
+        'exams.candidatesPerInvigilator': true,
+        'exams.reminderDaysBefore': true,
       });
     });
 

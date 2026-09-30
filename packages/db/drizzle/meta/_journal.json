@@ -288,6 +288,20 @@
       "when": 1790727862029,
       "tag": "0040_catalogue_tier",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1790736604578,
+      "tag": "0041_exam_entries",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1790736608650,
+      "tag": "0042_exam_entries_board_rules",
+      "breakpoints": true
     }
   ]
 }

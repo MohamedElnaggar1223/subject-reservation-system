@@ -39,6 +39,9 @@ import { teachingRoutes } from './routes/teaching.routes';
 import { catalogueRoutes } from './routes/catalogue.routes';
 import { boardSeriesRoutes } from './routes/board-series.routes';
 import { enrolmentRoutes } from './routes/enrolment.routes';
+import { examEntryRoutes } from './routes/exam-entry.routes';
+import { examTimetableRoutes } from './routes/exam-timetable.routes';
+import { examResultRoutes } from './routes/exam-result.routes';
 import { isGrantedRole, isGranted } from './lib/role-grants';
 import { reports } from './routes/report.routes';
 import { teachers } from './routes/teacher.routes';
@@ -354,6 +357,12 @@ const v1 = new Hono<HonoEnv>()
    * - /v1/sessions/:id/board-series   the series a window feeds
    * - /v1/enrolments     course enrolment per academic year
    *
+   * F4 — exam-entry management (docs/features/EXAM_ENTRIES.md):
+   * - /v1/exams          candidates, entries, forecasts, entry lists, the
+   *                      exam timetable, rooms, seats, invigilators, the
+   *                      boards' registers, special consideration, results,
+   *                      certificates, the deadlines dashboard
+   *
    * Reports routes mounted at /v1/reports (admin only):
    * - GET    /v1/reports/dashboard                - Admin dashboard metrics (REP-008)
    * - GET    /v1/reports/registrations            - Registration report per session (REP-001)
@@ -403,7 +412,12 @@ const v1 = new Hono<HonoEnv>()
   // F0b: the exam catalogue, board series, course enrolment
   .route('/catalogue', catalogueRoutes)
   .route('/board-series', boardSeriesRoutes)
-  .route('/enrolments', enrolmentRoutes);
+  .route('/enrolments', enrolmentRoutes)
+  // F4: exam-entry management — candidates, entries, entry lists, the exam
+  // timetable and exam days, results, certificates, the deadlines.
+  .route('/exams', examEntryRoutes)
+  .route('/exams', examTimetableRoutes)
+  .route('/exams', examResultRoutes);
 
 // Mount v1 under /v1 (keep chaining for proper RPC typing)
 // Exported for in-process tests (app.request) and for index.ts to serve.
