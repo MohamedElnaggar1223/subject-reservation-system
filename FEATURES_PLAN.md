@@ -63,7 +63,8 @@ Not the owner's words; each can be overturned by the owner.
 ## 0c. 7 October 2026 — the admin's direction, and the plan reset
 
 The owner met the school's admin. Her priority is **subject reservations and fees paid**; her
-verdict on the current implementation: "very hard to use, counter intuitive and not usable".
+verdict on the current implementation: "very hard to use, counter intuitive and not usable that
+much".
 The forms the school actively uses (Drive folder "June 2027") and eight PDFs (fees per board
 and series, registration links for November 2026/January 2027 and June 2027, Cambridge's
 enquiry-about-results service) are now the ground truth. The owner's instruction, verbatim:

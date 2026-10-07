@@ -2,8 +2,8 @@
 
 **Date:** 7 October 2026
 **Why this file exists:** On 7 October the school's admin told the owner that subject
-reservations and fees paid are her priority and that the current admin side is not usable
-(FEATURES_PLAN.md §0c). The forms the school registers with, and its fee sheets, are now the
+reservations and fees paid are her priority and that the current admin side is "very hard to
+use, counter intuitive and not usable that much" (FEATURES_PLAN.md §0c). The forms the school registers with, and its fee sheets, are now the
 ground truth. This file reads every form and every option, records the fee lists, and maps each
 element onto the system as it is today. It is Phase 1 of the plan the owner accepted: nothing
 is designed here; §4–§7 are the input to the design (Phase 2), which waits for the owner's
@@ -166,7 +166,7 @@ form says January 2027 only); Biology Edexcel IAL (one); Computer Science Cambri
 | A.2. (Carry forward on June 2026 / November 2025) | the A2 entry carrying an AS result from that series | the A2 price | the carried-from series on the line — DISCOVERY Q-02 reading (b), now in the school's words |
 | Self Study (ONLY 2nd entry) Yes / No | the self-study flag again, as its own question | — | redundant with the teacher/entry choice; the desk reconciles the two today |
 | (ONLINE ONLY) | the teacher teaches online this cycle | — | a mode on the teacher's group |
-| (Komy's team) / External | an outside provider teaches the subject | — | a provider as the "teacher" |
+| an external team (named on the links sheet) / External | an outside provider teaches the subject | — | a provider as the "teacher" |
 | Retake (Self Study ONLY) — on the links sheet | the subject is in this cycle only for re-sitters, untaught | — | availability per session subject |
 | I confirm my registration / I will drop the course | the family's intent; drops are submitted on the same form | a drop follows the refund policy | the drop flow (exists) |
 | I confirm that I read the refund policy / Student Declaration | consent | — | a consent record per registration |
