@@ -133,6 +133,32 @@ describe('08n: sessions and offers', () => {
     expect(fee.copied).not.toBeNull();
     expect(await one(`select new_data->>'fromSessionId' as "from", (new_data->>'offers')::int as offers from audit_log where action = 'SESSION_COPIED' and entity_id = $1`, [june2]))
       .toEqual({ from: june1, offers: 2 });
+    // A session converted while closed (migration 0042 closed its offers and items with it) copies
+    // as its subjects allow: the closing was the conversion's, not the school's. One the school
+    // closed itself in a session it ran stays behind.
+    await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: june1 } }));
+    await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: june1 }, json: { reason: '08n: a June that has ended' } }));
+    await sql(`update session_offer set availability = 'closed', legacy = '{"converted": true}'::jsonb where session_id = $1`, [june1]);
+    await sql(`update session_offer_item set availability = 'closed', legacy = '{"converted": true}'::jsonb where session_id = $1`, [june1]);
+    const fromConverted = await apiResponse(adm.api.v1.sessions.$post({
+      json: {
+        type: 'june', year: Y + 2, label: `n08a2-${RUN}`, ...futureWindow(), courseStartsOn: `${Y + 2}-02-01`,
+        paymentDueAt: new Date(Date.now() + days(170)).toISOString(), copyFromSessionId: june1,
+      },
+    }));
+    const copied = await apiResponse(coordinator.api.v1.sessions[':id'].offers.$get({ param: { id: fromConverted.id } }));
+    expect(copied.offers.map((o) => [o.subjectId, o.availability, o.items.map((i) => i.availability)]).sort())
+      .toEqual([[english, 'open', ['open']], [oxfordSubject, 'open', ['open']]].sort());
+    // A session the school ran and closed: an offer it had closed is not brought back.
+    await sql(`update session_offer set legacy = null where session_id = $1 and subject_id = $2`, [june1, oxfordSubject]);
+    const fromRun = await apiResponse(adm.api.v1.sessions.$post({
+      json: {
+        type: 'june', year: Y + 2, label: `n08a3-${RUN}`, ...futureWindow(), courseStartsOn: `${Y + 2}-02-01`,
+        paymentDueAt: new Date(Date.now() + days(170)).toISOString(), copyFromSessionId: june1,
+      },
+    }));
+    expect((await apiResponse(coordinator.api.v1.sessions[':id'].offers.$get({ param: { id: fromRun.id } }))).offers.map((o) => o.subjectId)).toEqual([english]);
+
     // A session copies from one of its own kind only.
     const winter = await apiResponse(adm.api.v1.sessions.$post({
       json: { type: 'winter', year: Y + 1, label: `n08a-${RUN}`, ...futureWindow(), courseStartsOn: `${Y + 1}-09-01`, paymentDueAt: new Date(Date.now() + days(170)).toISOString() },

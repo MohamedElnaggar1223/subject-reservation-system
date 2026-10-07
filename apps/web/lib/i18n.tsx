@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { foundationArabic } from './i18n-foundation';
 import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
+import { sessionsArabic, translateSessionsText } from './i18n-sessions';
 
 export type Language = 'en' | 'ar';
 
@@ -1493,6 +1494,8 @@ Object.assign(autoArabicText, foundationArabic);
 // F0b screens (lib/i18n-catalogue.ts): only words the app does not already
 // translate, so a shared word keeps the Arabic the other screens use.
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// The reservations rework's screens (lib/i18n-sessions.ts): the same rule.
+for (const [en, ar] of Object.entries(sessionsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1571,6 +1574,9 @@ function translateDynamicText(text: string): string | null {
   // F0b: the catalogue's, the series' and the enrolment's sentences with names in them.
   const f0bText = translateCatalogueText(text);
   if (f0bText) return f0bText;
+  // The reservations rework: session names, refund sentences, the refusals of its screens.
+  const reworkText = translateSessionsText(text);
+  if (reworkText) return reworkText;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

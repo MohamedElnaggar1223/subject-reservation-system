@@ -107,7 +107,8 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
       { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, ...teaching] },
       { titleKey: 'nav.academic', items: ACADEMIC_ITEMS },
       EXAMS_SECTION,
-      { titleKey: 'nav.school', items: [{ labelKey: 'nav.settings', href: '/settings', icon: 'settings' }] },
+      // The reservations rework (§4.2): the coordinator keeps each session's subjects, teachers and items.
+      { titleKey: 'nav.school', items: [{ labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' }, { labelKey: 'nav.settings', href: '/settings', icon: 'settings' }] },
       ACCOUNT_SECTION,
     ];
   }
@@ -181,6 +182,8 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
           { labelKey: 'nav.students', href: '/students', icon: 'students' },
           ...teaching,
           { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'payments' },
+          // The reservations rework (§4.2, §4.6): the sessions' fees and money.
+          { labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' },
           { labelKey: 'nav.dailyTakings', href: '/takings', icon: 'escrow' },
           { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
           { labelKey: 'nav.resultsEntry', href: '/results-entry', icon: 'reports' },
