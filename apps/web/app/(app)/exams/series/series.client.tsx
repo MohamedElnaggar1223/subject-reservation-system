@@ -234,6 +234,9 @@ function SeriesRow({ s, open, onToggle, isAdmin }: { s: BoardSeriesRow; open: bo
           <div className="flex flex-col items-start gap-1">
             {s.entryDeadline && <InstantText iso={s.entryDeadline} />}
             <DeadlineBadge iso={s.entryDeadline} />
+            {s.retakeDeadline && (
+              <p className="text-xs text-muted-foreground"><span>Retakes until</span> <InstantText iso={s.retakeDeadline} /></p>
+            )}
           </div>
         </td>
         <td className="px-3 py-2.5 text-foreground"><MaybeDate date={s.lateFeeFrom} /></td>
@@ -288,19 +291,21 @@ function DatesForm({ s, isAdmin, onDone }: { s: BoardSeriesRow; isAdmin: boolean
     () => Object.fromEntries(BOARD_SERIES_DATE_FIELDS.map((f) => [f, (s[f] as string | null) ?? ''])) as Record<BoardSeriesDateField, string>,
   );
   const [deadline, setDeadline] = useState(toLocalInput(s.entryDeadline));
+  const [retake, setRetake] = useState(toLocalInput(s.retakeDeadline));
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState(s.notes ?? '');
   const [error, setError] = useState('');
   const deadlineChanged = deadline !== toLocalInput(s.entryDeadline);
+  const retakeChanged = retake !== toLocalInput(s.retakeDeadline);
 
   const save = useMutation({
     mutationFn: () => {
       const json: UpdateBoardSeriesType = { notes: notes.trim() || null };
       for (const f of BOARD_SERIES_DATE_FIELDS) if ((dates[f] || null) !== (s[f] ?? null)) json[f] = dates[f] || null;
-      if (isAdmin && deadlineChanged) {
-        json.entryDeadline = deadline ? new Date(deadline) : null;
-        json.reason = reason.trim();
-      }
+      if (isAdmin && deadlineChanged) json.entryDeadline = deadline ? new Date(deadline) : null;
+      // The reservations rework (§3.3): a later date for retakes of the board's previous sitting.
+      if (isAdmin && retakeChanged) json.retakeDeadline = retake ? new Date(retake) : null;
+      if (isAdmin && (deadlineChanged || retakeChanged)) json.reason = reason.trim();
       return apiResponse(api.v1['board-series'][':id'].$put({ param: { id: s.id }, json }));
     },
     onSuccess: () => {
@@ -314,7 +319,7 @@ function DatesForm({ s, isAdmin, onDone }: { s: BoardSeriesRow; isAdmin: boolean
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (isAdmin && deadlineChanged && reason.trim().length < 5) return setError('Say why the deadline changes (at least 5 characters) — it is recorded.');
+        if (isAdmin && (deadlineChanged || retakeChanged) && reason.trim().length < 5) return setError('Say why the deadline changes (at least 5 characters) — it is recorded.');
         setError('');
         save.mutate();
       }}
@@ -328,14 +333,18 @@ function DatesForm({ s, isAdmin, onDone }: { s: BoardSeriesRow; isAdmin: boolean
               <Label htmlFor={`deadline-${s.id}`} className="mb-1 text-xs text-muted-foreground">Deadline (your clock)</Label>
               <Input id={`deadline-${s.id}`} type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="w-60" />
             </div>
-            {deadlineChanged && (
+            <div>
+              <Label htmlFor={`retake-${s.id}`} className="mb-1 text-xs text-muted-foreground">Retakes until (your clock)</Label>
+              <Input id={`retake-${s.id}`} type="datetime-local" value={retake} onChange={(e) => setRetake(e.target.value)} className="w-60" />
+            </div>
+            {(deadlineChanged || retakeChanged) && (
               <div className="min-w-72 flex-1">
                 <Label htmlFor={`reason-${s.id}`} className="mb-1 text-xs text-muted-foreground">Why it changes</Label>
                 <Input id={`reason-${s.id}`} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Pearson key dates 2026/27 published" maxLength={500} />
               </div>
             )}
             <p className="basis-full text-xs text-muted-foreground">
-              Past it, every payment still unconfirmed for this series closes on its own (wallet money returned, families told) and every registration still waiting expires. It must fall after every window feeding the series closes. Leave it empty for no automatic cut-off.
+              Past it, every payment still unconfirmed for this series closes on its own (wallet money returned, families told) and every registration still waiting expires. It may fall while a session is still open: what is entered in this series stops at it, and the rest of the session goes on. A retake of the board&apos;s previous sitting runs to the retake date where the board gives one (Cambridge). Leave the deadline empty and the exams&apos; start is the cut-off.
             </p>
           </div>
         ) : (

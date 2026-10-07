@@ -190,8 +190,11 @@ WHERE o.legacy->>'converted' = 'true'
 ON CONFLICT (offer_id, teacher_id) DO NOTHING;
 --> statement-breakpoint
 
--- 6. Items: one "whole subject" per (offer, series its lines sit in); an offer with no line takes
---    the series the window's route or its board's default gave; no series → closed, no_series.
+-- 6. Items: one "whole subject" per (offer, series its lines sit in), and one in the series the
+--    window's route or its board's default gives (where F0b entered a new registration). Only that
+--    one takes new lines: an item that holds lines in another series (an admin's move, a route set
+--    later) is closed for new lines — its lines stand — so a new reservation goes where F0b sent it.
+--    No series at all → closed, no_series.
 INSERT INTO session_offer_item (id, offer_id, session_id, label, kind, enters_kind, qualification_id, board_series_id, availability, sort_order, legacy, created_at, updated_at)
 SELECT md5('rework-item:' || o.id || ':' || coalesce(p.board_series_id, 'none'))::uuid::text, o.id, o.session_id,
   'Whole subject', 'whole',
@@ -200,9 +203,13 @@ SELECT md5('rework-item:' || o.id || ':' || coalesce(p.board_series_id, 'none'))
        ELSE 'subject' END,
   s.qualification_id,
   p.board_series_id,
-  CASE WHEN p.board_series_id IS NULL THEN 'closed' ELSE o.availability END,
+  CASE WHEN p.board_series_id IS NULL THEN 'closed'
+       WHEN p.board_series_id IS DISTINCT FROM rt.board_series_id THEN 'closed'
+       ELSE o.availability END,
   0,
-  CASE WHEN p.board_series_id IS NULL THEN '{"converted": true, "no_series": true}'::jsonb ELSE '{"converted": true}'::jsonb END,
+  CASE WHEN p.board_series_id IS NULL THEN '{"converted": true, "no_series": true}'::jsonb
+       WHEN p.board_series_id IS DISTINCT FROM rt.board_series_id THEN '{"converted": true, "not_routed": true}'::jsonb
+       ELSE '{"converted": true}'::jsonb END,
   now(), now()
 FROM session_offer o
 JOIN subject s ON s.id = o.subject_id
@@ -214,8 +221,17 @@ JOIN (
   JOIN subject s2 ON s2.id = o2.subject_id
   LEFT JOIN session_subject_series ss ON ss.session_id = o2.session_id AND ss.subject_id = o2.subject_id
   LEFT JOIN session_board_series l ON l.session_id = o2.session_id AND l.board_code = s2.council AND l.is_default
-  WHERE NOT EXISTS (SELECT 1 FROM registration r2 WHERE r2.session_id = o2.session_id AND r2.subject_id = o2.subject_id)
+  WHERE coalesce(ss.board_series_id, l.board_series_id) IS NOT NULL
+     OR NOT EXISTS (SELECT 1 FROM registration r2 WHERE r2.session_id = o2.session_id AND r2.subject_id = o2.subject_id)
 ) p ON p.session_id = o.session_id AND p.subject_id = o.subject_id
+-- Where F0b would enter a new registration of the subject in this window: its route, else the
+-- default series of its board.
+LEFT JOIN LATERAL (
+  SELECT coalesce(
+    (SELECT ss.board_series_id FROM session_subject_series ss WHERE ss.session_id = o.session_id AND ss.subject_id = o.subject_id),
+    (SELECT l.board_series_id FROM session_board_series l WHERE l.session_id = o.session_id AND l.board_code = s.council AND l.is_default LIMIT 1)
+  ) AS board_series_id
+) rt ON true
 WHERE o.legacy->>'converted' = 'true'
 ON CONFLICT (id) DO NOTHING;
 --> statement-breakpoint

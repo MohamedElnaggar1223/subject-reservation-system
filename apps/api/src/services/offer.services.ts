@@ -687,7 +687,14 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
   if (!from) throw new OfferError('The session to copy from was not found', 404);
   if (from.id === session.id) throw new OfferError('Choose another session to copy from');
   if (from.sessionType !== session.sessionType) throw new OfferError('Copy from a session of the same kind (June from June, winter from winter)');
-  const offers = await tx.select().from(sessionOffer).where(and(eq(sessionOffer.sessionId, from.id), ne(sessionOffer.availability, 'closed'))).orderBy(sessionOffer.sortOrder, sessionOffer.id);
+  // A session converted while closed had its offers and items closed with it (migration 0042),
+  // not by choice: they come across as their subject allows. An offer the school closed itself
+  // stays behind.
+  const closedByConversion = (row: { availability: string; legacy: unknown }) =>
+    from.status === 'closed' && row.availability === 'closed' && (row.legacy as { converted?: boolean; no_series?: boolean } | null)?.converted === true
+    && !(row.legacy as { no_series?: boolean; not_routed?: boolean }).no_series && !(row.legacy as { not_routed?: boolean }).not_routed;
+  const offers = (await tx.select().from(sessionOffer).where(eq(sessionOffer.sessionId, from.id)).orderBy(sessionOffer.sortOrder, sessionOffer.id))
+    .filter((o) => o.availability !== 'closed' || closedByConversion(o));
   const have = new Set((await tx.select({ subjectId: sessionOffer.subjectId }).from(sessionOffer).where(eq(sessionOffer.sessionId, session.id))).map((o) => o.subjectId));
   let copied = 0;
   let feesCopied = 0;
@@ -696,15 +703,17 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
     const [s] = await tx.select().from(subject).where(eq(subject.id, o.subjectId));
     if (!s || !s.isActive) continue;
     const offerId = randomUUID();
+    const availability = closedByConversion(o) ? (s.isOfferedAtSchool ? 'open' : 'self_study_only') : o.availability;
     await tx.insert(sessionOffer).values({
-      id: offerId, sessionId: session.id, subjectId: o.subjectId, availability: o.availability, courseFee: o.courseFee,
+      id: offerId, sessionId: session.id, subjectId: o.subjectId, availability, courseFee: o.courseFee,
       grade10Core: o.grade10Core, notes: o.notes, sortOrder: o.sortOrder, createdBy: actorId,
     });
     const ts = await tx.select().from(sessionOfferTeacher).where(eq(sessionOfferTeacher.offerId, o.id));
     const activeTeachers = ts.length ? await tx.select({ id: teacher.id }).from(teacher).where(and(inArray(teacher.id, ts.map((t) => t.teacherId)), eq(teacher.isActive, true))) : [];
     const keep = ts.filter((t) => activeTeachers.some((a) => a.id === t.teacherId));
     if (keep.length) await tx.insert(sessionOfferTeacher).values(keep.map((t) => ({ id: randomUUID(), offerId, teacherId: t.teacherId, mode: t.mode, sortOrder: t.sortOrder })));
-    const items = await tx.select().from(sessionOfferItem).where(and(eq(sessionOfferItem.offerId, o.id), ne(sessionOfferItem.availability, 'closed'))).orderBy(sessionOfferItem.sortOrder, sessionOfferItem.id);
+    const items = (await tx.select().from(sessionOfferItem).where(eq(sessionOfferItem.offerId, o.id)).orderBy(sessionOfferItem.sortOrder, sessionOfferItem.id))
+      .filter((it) => it.availability !== 'closed' || closedByConversion(it));
     for (const it of items) {
       if (!it.boardSeriesId) continue;
       const [fs] = await tx.select().from(boardSeries).where(eq(boardSeries.id, it.boardSeriesId));
@@ -714,7 +723,7 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
       const id = randomUUID();
       await tx.insert(sessionOfferItem).values({
         id, offerId, sessionId: session.id, label: it.label, kind: it.kind, entersKind: it.entersKind, qualificationId: it.qualificationId,
-        qualificationOptionId: it.qualificationOptionId, boardSeriesId: seriesId, availability: it.availability, courseFee: it.courseFee,
+        qualificationOptionId: it.qualificationOptionId, boardSeriesId: seriesId, availability: closedByConversion(it) ? availability : it.availability, courseFee: it.courseFee,
         needsPriorSeries: it.needsPriorSeries, requiredInSeries: it.requiredInSeries, exclusiveGroup: it.exclusiveGroup, sortOrder: it.sortOrder, createdBy: actorId,
       });
       const us = await tx.select().from(sessionOfferItemUnit).where(eq(sessionOfferItemUnit.itemId, it.id));

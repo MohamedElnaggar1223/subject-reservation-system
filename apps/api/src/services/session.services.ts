@@ -122,6 +122,7 @@ export async function getSessions(filters?: {
         .map((link) => ({
           id: link.boardSeries.id, name: boardSeriesName(names, link.boardSeries), boardCode: link.boardSeries.boardCode,
           boardName: names.get(link.boardSeries.boardCode) ?? link.boardSeries.boardCode, month: link.boardSeries.month,
+          year: link.boardSeries.year, label: link.boardSeries.label,
           entryDeadline: link.boardSeries.entryDeadline, retakeDeadline: link.boardSeries.retakeDeadline, examsStart: link.boardSeries.examsStart,
           entryDeadlinePassed: !!link.boardSeries.entryDeadline && link.boardSeries.entryDeadline <= now,
           isDefault: link.isDefault,
