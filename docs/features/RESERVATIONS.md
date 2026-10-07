@@ -392,8 +392,52 @@ series of the last two years for a declaration.
 
 ---
 
+### 2.11 Added to the contract since it was published (read before branching)
+
+- **Writers that move lines lock the students first** (`apps/api/src/lib/student-locks.ts`):
+  `lockStudents(tx, ids)`, `assertStudentsLocked(locked, ids)` and `withStudentsFirst(run)`. An
+  item's series change, a session's series correction and a subject's board change lock the
+  students of the lines they move before their own rows, read the students again under their
+  rows, and run again (at most three times) when a reservation landed meanwhile. A new writer
+  that moves lines into a series (B's teacher replace does not; C's plan capture does not; F7's
+  import does) uses the same three calls.
+- **`insertLines` holds the series an item is in after its item lock** (an item moved while the
+  reservation waited is read again), so a series' deadline writer and a line never interleave.
+- **Due dates follow what they are computed from** (`deadline.services.ts`):
+  `redateLines(tx, lineIds, actorId, why)` re-dates waiting lines the caller has locked
+  (`LINE_DUE_MOVED` with why); `redateSeriesLines(seriesId, actorId, why)` runs in its own
+  transaction after a series' dates change (a checkout locks lines before series, so the series'
+  writer may not lock lines after it). Called by the session's payment-date change, an item's
+  series change, the series correction, the board change, the admin's move and a series' dates.
+- **A checkout and the desk refuse a line whose price changed after it was read**
+  (`PRICE_CHANGED_REFUSAL`, `pricing.services.ts`): a re-price committing between the family's
+  reading and the checkout's lock would otherwise charge the old price (09: a payment charges
+  exactly what it covers). B's Reserve pages and C's charge payments that read a price before
+  their transaction compare it again under the lock the same way.
+- **A board change carries the old board's fee** into the new board's series as a provisional
+  row when finance has set none there (`BOARD_FEES_SET`, reason "the old board's fee,
+  provisional until confirmed"), so the subject stays reservable, not payable; and it compares
+  each line's **effective** deadline (not only the entry deadline) where it would go.
+- **The enrolment's unit** (`enrolment.services.ts`): `EnrolmentRowInput.unitId`; one open
+  enrolment per (student, unit, year) with one, per (student, subject, year) without; `bulkEnrol`
+  from registrations gives a line of an item entering units one enrolment per unit, with the
+  line's teacher; `getTeachingDemand` groups per (subject, unit, teacher) and returns `unitId`,
+  `unitCode` (F1's contract, §10).
+- **The past-deadline change refusal** (`swap.services.ts`): a family is told to ask the desk; a
+  staff caller is told it cannot be changed or dropped here — the desk-drop past the deadline
+  (`POST /registrations/:id/desk-drop`, with the receipt gate and the "sent" refund) is step
+  B/C's.
+
 ## 3. Progress log
 
 - 2026-10-07 19:54Z — worktree and branch from origin/main c99b553; baseline suite green on
   `igcse_rwa_test` (22 files, 308 passed, 1 todo).
 - 20:00Z — this document's §1 and §2 written before the code.
+- 20:50Z — schema and migrations 0041–0043 and the services built; every old line-creating path
+  goes through `insertLines` (commit 7e83d60, 20:50Z).
+- 21:35Z — the F0b suites (08i–08m) adapted to sessions, offers and items, every assertion change
+  with its trail row (two flagged for the lead); 09's rules of the rework; the student-first lock
+  order for line movers; re-dating (commit d56ef27).
+- 22:01Z — WIP commit 1ba3de1 pushed at the lead's request so B and C can branch from it (gates
+  stated in its message); §2.11 lists what the contract gained since it was published. 08n,
+  08p written and green alone; 08t written.
