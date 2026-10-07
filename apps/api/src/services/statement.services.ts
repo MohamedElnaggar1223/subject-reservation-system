@@ -13,7 +13,7 @@
  */
 
 import { db, sql } from '@repo/db';
-import { gradeInAcademicYear, gradeLabel, academicYearStartOf, academicYearStartFromLabel, type PricingBasis } from '@repo/validations';
+import { gradeInAcademicYear, gradeLabel, academicYearStartOf, academicYearStartFromLabel, type PricingBasis, type RefundPolicySnapshot } from '@repo/validations';
 import { academicYearForDate, getSchoolFeeStanding } from './school-fee.services';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -43,7 +43,8 @@ export function basisText(basis: PricingBasis | null, line: { courseFee: number;
 
 type LineRow = {
   id: string; student_id: string; session_id: string; session_name: string; status: string; subject: string; item: string; kind: string;
-  attempt: string; mode: string; teacher: string | null; price: string; course_fee: string; board_fee: string; due_at: string | null;
+  attempt: string; mode: string; teacher: string | null; teacher_id: string | null; offer_item_id: string; snapshot: RefundPolicySnapshot | null;
+  price: string; course_fee: string; board_fee: string; due_at: string | null;
   provisional: boolean; basis: PricingBasis | null; board_name: string | null; month: string | null; year: number | null; series_label: string | null;
   deadline: string | null; prior_board: string | null; prior_month: string | null; prior_year: number | null; prior_label: string | null;
   prior_source: string | null; prior_outcome: string | null; declaration_rejected: boolean; created_at: string;
@@ -56,7 +57,8 @@ const WAITING = ['pending_approval', 'pending_payment'];
 async function linesOf(studentIds: string[]) {
   const r = await db.execute(sql`
     select r.id, r.student_id, r.session_id, rs.name as session_name, r.status, s.name as subject, i.label as item, i.kind, r.attempt, r.mode,
-      t.name as teacher, r.price_at_registration as price, r.course_fee_at_registration as course_fee, r.registration_fee_at_registration as board_fee,
+      t.name as teacher, r.teacher_id, r.offer_item_id, r.refund_policy_snapshot as snapshot,
+      r.price_at_registration as price, r.course_fee_at_registration as course_fee, r.registration_fee_at_registration as board_fee,
       r.due_at, r.price_provisional as provisional, r.pricing_basis as basis, b.name as board_name, bs.month, bs.year, bs.label as series_label,
       line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) as deadline,
       pb.name as prior_board, ps.month as prior_month, ps.year as prior_year, ps.label as prior_label,
@@ -128,6 +130,10 @@ async function linesOf(studentIds: string[]) {
       paidAt: l.paid_at ? new Date(l.paid_at) : null,
       paymentId: l.paid_payment_id,
       consents: (l.consents ?? []).map((c) => ({ kind: c.kind, channel: c.channel, at: new Date(c.at) })),
+      // The refund steps the family consented to (the slip prints them) and what a teacher change reads.
+      refundPolicySnapshot: l.snapshot,
+      offerItemId: l.offer_item_id,
+      teacherId: l.teacher_id,
       reservedAt: new Date(l.created_at),
     };
   });

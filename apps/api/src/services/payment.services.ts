@@ -2153,5 +2153,8 @@ export async function getCheckoutSummary(
     student: regs[0]!.student,
     openPayment,
     deadlineGroups,
+    // Lines the school reserved (grade 10) whose family has not given its own consent yet: the
+    // checkout asks for it (step B, RESERVATIONS_REWORK.md §3.5).
+    familyConsentNeeded: (await consentStanding(db, registrationIds)).schoolOnly,
   };
 }

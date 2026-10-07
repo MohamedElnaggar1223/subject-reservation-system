@@ -449,4 +449,25 @@ describe('object-level access between families', () => {
     expect((await apiResponse(coordinator.api.v1.exceptions.$get({ query: {} }))).some((e) => e.id === w.id)).toBe(false);
     await apiResponse(finadmin.api.v1.exceptions[':id'].revoke.$post({ param: { id: w.id } }));
   });
+
+  it("step B: B cannot read A's statement, answer a declared sitting or change a teacher on A's line; the To verify list is the school's", async () => {
+    // The statement: A's child, by id or by A's family, refused to B's parent and student.
+    await refusedAs('parentB statement of A', parentB.api.v1.statement.$get({ query: { studentId: studentAId } }));
+    await refusedAs('studentB statement of A', studentB.api.v1.statement.$get({ query: { studentId: studentAId } }));
+    await refusedAs('parentB family statement of A', parentB.api.v1.statement.$get({ query: { familyId: parentA.id } }));
+    await refusedAs('studentB family statement of A', studentB.api.v1.statement.$get({ query: { familyId: parentA.id } }));
+    // B's own family statement lists B's child only.
+    const own = await apiResponse(parentB.api.v1.statement.$get({ query: {} }));
+    expect(own.students.map((s) => s.student.id)).toEqual([studentBId]);
+    expect((await apiResponse(studentB.api.v1.statement.$get({ query: {} }))).students.map((s) => s.student.id)).toEqual([studentBId]);
+    // The To verify list, a declared sitting's answer and a line's teacher are staff's.
+    await refusedAs('parentB to-verify', parentB.api.v1.sessions[':id']['to-verify'].$get({ param: { id: sessionId }, query: {} }));
+    await refusedAs('studentB to-verify', studentB.api.v1.sessions[':id']['to-verify'].$get({ param: { id: sessionId }, query: {} }));
+    const before = await one(`select status, teacher_id, prior_sitting_verified_outcome, updated_at from registration where id = $1`, [bioA]);
+    await refusedAs('parentB verify-prior A', parentB.api.v1.registrations[':id']['verify-prior'].$post({ param: { id: bioA }, json: { outcome: 'rejected', reason: 'not my child at all' } }));
+    await refusedAs('studentB verify-prior A', studentB.api.v1.registrations[':id']['verify-prior'].$post({ param: { id: bioA }, json: { outcome: 'verified', reason: 'not my child at all' } }));
+    await refusedAs('parentB teacher of A', parentB.api.v1.registrations[':id'].teacher.$put({ param: { id: bioA }, json: { teacherId: null, reason: 'not my child at all' } }));
+    await refusedAs('studentB teacher of A', studentB.api.v1.registrations[':id'].teacher.$put({ param: { id: bioA }, json: { teacherId: null, reason: 'not my child at all' } }));
+    expect(await one(`select status, teacher_id, prior_sitting_verified_outcome, updated_at from registration where id = $1`, [bioA])).toEqual(before);
+  });
 });
