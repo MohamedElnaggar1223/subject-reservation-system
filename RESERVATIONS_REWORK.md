@@ -1,6 +1,6 @@
 # The reservations rework — sessions, reservations, fees, exceptions, notifications
 
-**Date:** 7 October 2026 (version 7, after six Opus 5.5 reviews — §16)
+**Date:** 7 October 2026 (version 8, after six Opus 5.5 reviews and two diff checks — §16)
 **Status:** design for the owner's review (Phase 2 of FEATURES_PLAN.md §0c). Nothing here is
 built. The questions only the owner can answer are in §17.
 **Inputs:** `SCHOOL_FORMS.md` (every form and option, the fee lists, the 30-row gap map, the
@@ -89,8 +89,9 @@ expire a line by itself. **What expires a waiting line automatically**, each wit
 `REGISTRATION_EXPIRED` reason (the 09 rule that every expired line has one audit row saying why
 learns the new reasons): the series' entry deadline, or the retake deadline for a retake line
 (MO-10, the sweep); the session's close, as today; `payment.expireOverdueAfterDays` when a
-session turns it on (setting, default off); a rejected declaration (§3.5, `declaration_rejected`); a plan revoked, lapsed or whose
-instalment payment failed (§3.6, `plan_revoked`, `plan_lapsed`, `plan_ended`).
+session turns it on (setting, default off); a rejected declaration (§3.5, `declaration_rejected`); a plan revoked or lapsed, or an instalment
+payment failed on a line that is no longer payable (§3.6, `plan_revoked`, `plan_lapsed`,
+`plan_ended`).
 A paid line is expired by none of these; the deadline sweep's `hold` case **drops** a paid line
 through the receipt-gated drop (§3.5).
 
@@ -188,8 +189,8 @@ retake deadline when that applies, else the entry deadline, and every site that 
 (`window.services.ts`, which serves checkout, confirmation, approval and desk collection),
 `routeAndCheck` / `assertRoutesOpen` (with the line's attempt and prior sitting),
 `seriesDeadlineGroups` and `openCheckoutsSpanningDeadlines` and 09's "one deadline per open
-payment" (grouped by the effective deadline — that 09 rule reads the effective deadline; the
-other per-series rules are unchanged), `enforcePaymentDeadlines` (two passes per series: first
+payment" (grouped by the effective deadline — that 09 rule reads it; what the other per-series
+rules read is said below), `enforcePaymentDeadlines` (two passes per series: first
 entries at the entry deadline, qualifying retakes at the retake deadline),
 `submitInstapayReference` and `referenceDueFor` in `finalizePendingRecords` (the InstaPay cap
 at submission and at the close), `moveRegistrations` (the admin's move between series),
@@ -459,14 +460,15 @@ receipted, reversed and refunded is §3.10.
   reason `plan_lapsed`), or finance revoking the plan (which **expires the line**, reason
   `plan_revoked`, unless finance chooses "release in full and keep the line payable") — **the
   deposits are settled as a drop on that day** (Q-15's default, §17): the school **keeps what a
-  paid drop that day would keep**, `keep = min(deposits, price − refundFor(line, at))` (ledger
+  paid drop that day, before the entry is sent, would keep**, `keep = min(deposits,
+  price − refundFor(line, at))` (ledger
   reason `plan_forfeit`, an audit row, on the statement), and releases the rest to free escrow
   (`plan_release`); nothing is owed beyond the deposits. So the school keeps from a stopped plan
   the same course share that a paid drop made **before the entry is sent** leaves it, capped at
-  the deposits: a family that stops paying never does better than such a drop, and does worse
-  only when its deposits are below that share (the worked example in Q-15 shows both cases; a
-  paid drop after the entry is sent leaves the school the board fee as well, which a plan line,
-  never entered, never involves). For a line that was never confirmed **no entry was ever
+  the deposits: a family that stops paying **never loses more than such a drop**, and loses
+  less only when its deposits are below that share, because it can lose only what it paid (the
+  worked example in Q-15 shows both cases; a paid drop after the entry is sent leaves the
+  school the board fee as well, which a plan line, never entered, never involves). For a line that was never confirmed **no entry was ever
   sent**, so `refundFor` counts its board fee as not sent whatever the date (§3.9). **A plan is
   refused on a line that has an open checkout**; a line under a live plan cannot be reverted to
   approval by the parent (the guard reads the live plan exception, so a plan with nothing paid
@@ -475,9 +477,12 @@ receipted, reversed and refunded is §3.10.
   as they spare a line with an open checkout. The deadline sweep also **fails an open
   instalment payment of a dead plan** (a second query over `payment_charge`, `failPayment` with
   reason `plan_ended`), and confirmation refuses an instalment payment whose plan is no longer
-  live; an instalment payment that fails or is rejected **expires its line** through the
-  charge's line, as `failOpenPayment` expires a checkout's lines (a plan line has no
-  `payment_registration` row for that function to find). An instalment payment issues a **deposit slip**, not a tracked paper receipt (an escrow
+  live; an instalment payment that fails or is rejected runs `failOpenPayment`'s own test on its
+  line through the charge (a plan line has no `payment_registration` row for that function to
+  find): the line expires, reason `plan_ended`, **only when it is no longer payable** — the
+  window closed for the student, the line's effective deadline passed, the student no longer
+  eligible — and otherwise the plan stands and the instalment can be paid again (a cancelled
+  InstaPay checkout, a declined card or a rejected reference is not a family stopping). An instalment payment issues a **deposit slip**, not a tracked paper receipt (an escrow
   credit has none today); the line's tracked receipt comes at capture, so nothing is out that
   the settlement would have to ask back. Reminders fire per instalment.
 - **Price adjustment**: finance's explicit act after a fee change or a verification (§3.4,
@@ -638,7 +643,7 @@ nothing else:
    the schedule's; the waiver is the exception).
 8. **New automatic expiries** of a waiting line (§3.1) each write their `REGISTRATION_EXPIRED`
    reason (`overdue`, `declaration_rejected`, `hold_unverified`, `plan_revoked`,
-   `plan_lapsed`, `plan_ended` for a failed instalment); 09's "every expired
+   `plan_lapsed`, `plan_ended` for an instalment failed on a line no longer payable); 09's "every expired
    registration has exactly one audit row saying why" accepts them; `CHARGE_PAYMENT_INITIATED`
    joins the creation actions 09 counts for "every payment has exactly one audit row for its
    creation".
@@ -1113,8 +1118,7 @@ running system before Phase 3 closes.
   specified payment from them at the end, so every existing rule about a line's payment and
   receipt holds; a plan that stops lets the school keep what a paid drop that day, before the
   entry is sent, would leave it, capped at the deposits, so a family that stops paying never
-  does better than such a family, and does worse only when its deposits are below the school's
-  share.
+  loses more than such a family, and loses less only because it paid less.
 - **A registry of policies, not more exception types.** "Everything can have an exception" is a
   registry where each policy names its hook and what a null scope means; the screen reads the
   registry; the entry deadline is in it, gated by a setting until the owner answers Q-20.
@@ -1311,6 +1315,19 @@ seventh full pass is not needed." Version 7 does each:
 | 75 | items 2 and 3 against deposit slips; Q-22 missing from DISCOVERY.md; the prototype's January deadline | **accepted** |
 | 43, 56, 59, 60, 61 | residues (`submitInstapayReference` and `referenceDueFor`; the revert guard; "series' deadline" in §8; the 09 wording; "of that syllabus") | **accepted**: each corrected |
 
+The reviewer's diff check of version 7 (19:05Z): 70, 71, 73, 75 and the residues resolved; 72
+mostly; **69 not** — the restated comparison was the wrong way round (a family whose deposits
+are below the school's share loses *less* than a paid drop, not more, because it can lose only
+what it paid), and three sentences still compared with a drop "that day" without "before the
+entry is sent"; and a new material flag **76**: version 7 made *any* failed instalment payment
+expire the line with a forfeit, where `failOpenPayment` expires a checkout's lines only when
+they are no longer payable. Version 8 (this text): the comparison stated the right way round in
+§3.6, §12 and Q-15, "before the entry is sent" added where it was missing (§3.6, Q-15,
+DISCOVERY.md Q-15); an instalment payment's failure expires the line only under
+`failOpenPayment`'s own test, otherwise the plan stands and the instalment can be paid again
+(§3.1, §3.6, §3.10 item 8); the stray "other per-series rules are unchanged" clause removed
+(§3.3). The reviewer checks this diff too.
+
 ## 17. Questions for the owner, each with the default built unless answered
 
 | # | Question | Default |
@@ -1318,5 +1335,5 @@ seventh full pass is not needed." Version 7 does each:
 | Q-19 | On a drop, the forms refund a percentage of "the Course fees". Is the **board fee** refunded in full while the school has not yet sent the entry to the board, and not at all after — or does the percentage apply to the whole price as today? "Sent" is F4's mark once F4 is live; until then the series' entry deadline; for a series whose deadline was never entered, the day its exams start — so a series left without a deadline refunds the board fee in full up to the exams. The default changes four test outcomes (§3.10). | the percentage on the course fee; the board fee in full before the entry is sent, 0 after; converted lines keep today's basis |
 | Q-20 | The admin's point 9 says every deadline can have an exception; MO-10 (27 Sep) made the board's entry deadline a hard stop. May the admin grant a late entry past it, with the board's late fee charged to the family as a charge? | the hard stop stays; the `deadline.boardEntry` policy exists but is switched off by the setting until you say otherwise |
 | Q-21 | When a remark changes the grade, the British Council refunds the fee less 100 EGP per component to the school. Does the school pass exactly that on to the family (today the system refunds the whole fee)? | **today's behaviour** (the whole fee) until you answer; the rule is a field per service |
-| Q-15 | Instalments are built as your default: a plan per line, granted as an exception, each instalment paid into the family's held wallet on its date, the line paid from those deposits at the last. **When a family stops paying** (the line expires, or finance ends the plan), the deposits are settled as a drop on that day: the school keeps what it would have kept from a family who paid in full and dropped that day, capped at what was deposited; the rest returns to the family's escrow; nothing more is owed. Worked example with course 1,000 and board 500 in a winter week where the policy refunds 50% of the course fee: a family who paid 1,500 and drops before the school has sent the entry gets 1,000 back and the school keeps 500 (after the entry is sent the board fee is with the board, so that family gets 500 back and the school keeps 1,000); a plan family who paid 1,000 of 1,500 and stops gets 500 back and the school keeps 500; one who paid 500 gets nothing back and the school keeps 500; one who paid only 300 gets nothing back and the school keeps 300 — the deposits are the ceiling, and a family that stops paying never does better than the family that paid and dropped. Note what this does not change: a family with no plan that never pays at all is expired at no cost, as today (a line awaiting payment is taught, and costs nothing when it expires) — if you want an unpaid taught line to cost something, that is a separate rule to ask for. Is this the rule you want, and who may grant a plan? | finance admin and admin; a stopped plan settled as a drop on that day |
+| Q-15 | Instalments are built as your default: a plan per line, granted as an exception, each instalment paid into the family's held wallet on its date, the line paid from those deposits at the last. **When a family stops paying** (the line expires, or finance ends the plan), the deposits are settled as a drop on that day: the school keeps what it would have kept from a family who paid in full and dropped that day before the entry was sent to the board, capped at what was deposited; the rest returns to the family's escrow; nothing more is owed. Worked example with course 1,000 and board 500 in a winter week where the policy refunds 50% of the course fee: a family who paid 1,500 and drops before the school has sent the entry gets 1,000 back and the school keeps 500 (after the entry is sent the board fee is with the board, so that family gets 500 back and the school keeps 1,000); a plan family who paid 1,000 of 1,500 and stops gets 500 back and the school keeps 500; one who paid 500 gets nothing back and the school keeps 500; one who paid only 300 gets nothing back and the school keeps 300 — the deposits are the ceiling: a family that stops paying never loses more than the family that paid and dropped before the entry was sent, and loses less only because it paid less. Note what this does not change: a family with no plan that never pays at all is expired at no cost, as today (a line awaiting payment is taught, and costs nothing when it expires) — if you want an unpaid taught line to cost something, that is a separate rule to ask for. Is this the rule you want, and who may grant a plan? | finance admin and admin; a stopped plan settled as a drop on that day |
 | Q-22 | A family may declare a retake the school has not verified yet. Until the coordinator verifies it, the line keeps the later retake deadline where the board sets one, so an unverified declaration lets a line run past the first-entry deadline. Keep that (the form trusts the family; the coordinator's list and reminders exist to verify in time), or hold every unverified line at the first-entry deadline? | keep it (`enter_as_declared`) |
