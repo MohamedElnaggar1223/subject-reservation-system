@@ -544,6 +544,56 @@ describe('08n: the line rules (§3.5)', () => {
   });
 });
 
+describe("08n: past a line's own deadline (flags 59, 60)", () => {
+  it("a family's drop of a paid line whose deadline passed is refused and sent to the desk; a series with no entry deadline is cut off at the start of its exams' day", async () => {
+    const adm = await admin('n08x');
+    const officer = await staff(adm, 'finance_officer', 'n08x');
+    const teacherId = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher X (08n ${RUN})` } })))!.id;
+    const june = (await apiResponse(adm.api.v1.sessions.$post({
+      json: {
+        type: 'june', year: Y + 1, label: `n08x-${RUN}`, startDate: new Date(Date.now() - days(1)).toISOString(), endDate: new Date(Date.now() + days(60)).toISOString(),
+        courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + days(40)).toISOString(),
+      },
+    })))!.id;
+    const mk = async (label: string, dates: { entryDeadline?: Date; examsStart?: string }) =>
+      (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label, ...dates } })))!.id;
+    const dated = await mk(`n08x-${RUN}`, { entryDeadline: new Date(Date.now() + days(20)) });
+    const examsLater = await mk(`n08x-exams-${RUN}`, { examsStart: cairoDate(new Date(Date.now() + days(10))) });
+    const examsToday = await mk(`n08x-today-${RUN}`, { examsStart: cairoDate(new Date()) });
+    const offerIn = async (code: string, seriesId: string) => {
+      const sub = await subject(adm, `RWN-X${code}-${RUN}`, `Cut-off ${code} (08n ${RUN})`, { course: 1000, registration: 300 });
+      await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind: 'subject', keyId: sub, amount: 300, provisional: false }] } }));
+      const o = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+        param: { id: june }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false }] },
+      })))!;
+      return { sub, item: o.items[0]! };
+    };
+    const a = await offerIn('A', dated);
+    const b = await offerIn('B', examsLater);
+    const c = await offerIn('C', examsToday);
+
+    // A family reserves and pays A; the board's deadline then passes: the entry is the board's.
+    const f = await onboard(officer, `n08x-${RUN}`, 11);
+    const [line] = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, subjectIds: [a.sub], studentId: f.studentId } })))!;
+    const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } })))!.id!;
+    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay }, json: { instrumentUsed: 'cash' } }));
+    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [dated]);
+    const drop = await refused(f.parent.api.v1.registrations[':id'].drop.$post({ param: { id: line!.id }, json: { reason: 'changed our mind' } }));
+    expect(drop.error).toMatch(/^The entry is with the board \(its deadline, .+, has passed\): ask the finance desk to drop it$/);
+    expect((await one<{ status: string }>(`select status from registration where id = $1`, [line!.id])).status).toBe('confirmed');
+
+    // B's series has no entry deadline: its exams' start (Cairo) is the cut-off, and the due date is capped by it.
+    const g = await onboard(officer, `n08x-b-${RUN}`, 11);
+    const [lb] = await reserve(g.studentId, june, [{ offerItemId: b.item, attempt: 'first', mode: 'in_school', teacherId }]);
+    const startOfExams = (await one<{ at: string }>(`select line_effective_deadline('first', null, $1) as at`, [examsLater])).at;
+    expect(new Date((await one<{ d: string }>(`select due_at as d from registration where id = $1`, [lb!.id])).d).getTime()).toBe(new Date(startOfExams).getTime());
+    expect(await one(`select line_effective_deadline_kind('first', null, $1) as kind`, [examsLater])).toEqual({ kind: 'exams_start' });
+    // C's exams start today: past the start of the day, no line.
+    await expect(reserve(g.studentId, june, [{ offerItemId: c.item, attempt: 'first', mode: 'in_school', teacherId }]))
+      .rejects.toThrow(/^The registration window is not open: this series' exams start on .+ and it has no entry deadline$/);
+  });
+});
+
 describe('08n: the enrolment per unit (§3.2, §10: F1 reads it)', () => {
   it("a line of an item entering units is enrolled per unit with its item's teacher; the teaching demand groups per unit", async () => {
     const adm = await admin('n08u');

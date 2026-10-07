@@ -493,9 +493,10 @@ re-price with what it will skip), Money (lines only: totals, filters, subject, e
 editors); Board series gains the retake deadline. Arabic for all of it in
 `apps/web/lib/i18n-sessions.ts` (data marked `data-i18n-skip`), checked right to left.
 
-**Tests.** 08n (16: sessions, copy, a winter session's per-item cut-off and retake deadline,
-IGCSE never October/January, the defaults, capture's four cases, the line rules, the per-unit
-enrolment, grade 10 twice, due dates), 08p (6: A-16, one-paper retake, settings for new lines
+**Tests.** 08n (17: sessions, copy, a winter session's per-item cut-off and retake deadline,
+IGCSE never October/January, the defaults, capture's four cases, the line rules, a family's drop
+past the deadline, the exams' start as the cut-off, the per-unit enrolment, grade 10 twice, due
+dates), 08p (6: A-16, one-paper retake, settings for new lines
 only, exceptions in order, provisional fee, confirm higher and re-price), 08t (10 races), a 05
 cross-family case for `/registrations/offers`, the authz rows, 09's rules (§8). Six guards shown
 red when undone (trail rows `control`).
@@ -516,8 +517,9 @@ red when undone (trail rows `control`).
 4. **Re-dating after a series' dates change** runs in its own transaction after the change (a
    checkout locks lines before series). A crash between the two leaves due dates stale until the
    next change; the money is safe (the sweep reads the effective deadline, not `due_at`).
-5. **No drop past a line's deadline on today's paths** — for staff too — until B/C's desk-drop
-   with the "sent" refund exists.
+5. **Past a line's deadline a family's drop or swap is refused** and sent to the desk; today's
+   drop paths are all the family's, so until B/C's desk-drop (the receipt gate, the "sent"
+   refund) exists, a line past its deadline is not dropped by anyone (08n).
 6. **Grade 10 in bulk** applies the school-fee gate per student, and the school's consent rows
    lock the session's refund policy as a family's would.
 7. **0042 routes new lines as F0b did** (`not_routed`, §1.3). A database that ran 0042 before
