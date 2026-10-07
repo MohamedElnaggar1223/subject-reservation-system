@@ -156,6 +156,9 @@ describe('object-level access between families', () => {
     await refusedAs('studentB GET registration A', studentB.api.v1.registrations[':id'].$get({ param: { id: physA } }));
     await refusedAs('parentB GET history A', parentB.api.v1.registrations.history.$get({ query: { studentId: studentAId } } as never));
     await refusedAs('parentB GET available subjects for A', parentB.api.v1.registrations.available.$get({ query: { sessionId, studentId: studentAId } }));
+    // The reservations rework: the offers a student may reserve, with their prices (§5).
+    await refusedAs('parentB GET offers for A', parentB.api.v1.registrations.offers.$get({ query: { sessionId, studentId: studentAId } }));
+    await refusedAs('studentB GET offers for A', studentB.api.v1.registrations.offers.$get({ query: { sessionId, studentId: studentAId } }));
     await refusedAs('parentB drop A', parentB.api.v1.registrations[':id'].drop.$post({ param: { id: physA }, json: { reason: 'not mine' } }));
     await refusedAs('parentB swap A', parentB.api.v1.registrations[':id'].swap.$post({ param: { id: physA }, json: { newSubjectId: maths, reason: 'not mine' } }));
     await refusedAs('studentB request-drop A', studentB.api.v1.registrations[':id']['request-drop'].$post({ param: { id: physA }, json: { reason: 'not mine' } }));

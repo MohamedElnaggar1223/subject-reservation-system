@@ -170,7 +170,11 @@ async function validateChangeEligibility(
   // and only the desk can drop it.
   const deadline = await effectiveDeadlineFor(db, reg);
   if (deadline.at && deadline.at <= new Date()) {
-    throw new Error(`The entry is with the board (its deadline, ${schoolDate(deadline.at)}, has passed): ask the finance desk to drop it`);
+    // A family is sent to the desk; the desk's own drop past the deadline (with the receipt gate
+    // and the "sent" refund) is the desk-drop of step B/C, not this path.
+    throw new Error(checkOwnership
+      ? `The entry is with the board (its deadline, ${schoolDate(deadline.at)}, has passed): ask the finance desk to drop it`
+      : `The entry is with the board (its deadline, ${schoolDate(deadline.at)}, has passed): it cannot be changed or dropped here`);
   }
 
   // The student's grade in the series' academic year, for the core lock

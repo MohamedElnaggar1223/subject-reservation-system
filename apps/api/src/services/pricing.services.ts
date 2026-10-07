@@ -32,6 +32,14 @@ export class PricingError extends Error {
   }
 }
 
+/**
+ * A checkout's refusal when a line's price changed between the family's (or the desk's) reading
+ * and the checkout's lock: a re-price committed in between (§3.4). The payment would otherwise
+ * charge the old price for a line that now costs another (09: a payment charges exactly what it
+ * covers).
+ */
+export const PRICE_CHANGED_REFUSAL = 'The price of one or more of these subjects changed while this was open (the exam board confirmed its fee) — look at the new price and pay again';
+
 /** The desk's and the checkout's refusal for a line whose board fee is not yet confirmed (§3.4). */
 export const PROVISIONAL_REFUSAL = 'Board fee provisional, confirmed before payment: this line can be reserved but not paid until the exam board publishes its fee and the school confirms it';
 

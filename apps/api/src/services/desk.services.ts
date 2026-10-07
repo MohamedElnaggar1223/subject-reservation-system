@@ -26,7 +26,7 @@ import { insertLines } from './line.services';
 import { sessionWindow, windowRefusal } from './window.services';
 import { seriesDeadlineGroups, type DeadlineGroup } from './series.services';
 import { getSetting } from './settings.services';
-import { PROVISIONAL_REFUSAL } from './pricing.services';
+import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { setStudentFields } from './user.services';
 import { getEscrowBalance, debitEscrow } from './escrow.services';
 import { confirmPayment, failPayment } from './payment.services';
@@ -432,7 +432,7 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
     // Same guard as an app checkout (MA-06): lock the subjects, then make sure
     // nothing else is already paying for them.
     const locked = await tx
-      .select({ id: registration.id, status: registration.status })
+      .select({ id: registration.id, status: registration.status, price: registration.priceAtRegistration })
       .from(registration)
       .where(inArray(registration.id, data.registrationIds))
       .orderBy(registration.id)
@@ -440,6 +440,8 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
     if (locked.some((r) => r.status !== 'pending_payment')) {
       throw new Error('One or more subjects are not waiting for payment');
     }
+    // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
+    if (locked.some((l) => l.price !== prices.get(l.id))) throw new Error(PRICE_CHANGED_REFUSAL);
     const open = await tx
       .select({ ref: payment.externalReference, method: payment.paymentMethod })
       .from(paymentRegistration)

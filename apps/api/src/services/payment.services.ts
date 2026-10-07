@@ -65,7 +65,7 @@ import { expireWaitingRegistrations } from './expiry.services';
 import { sessionOpenFor, sessionWindow, windowRefusal, entryDeadlineMessage, schoolDateTime } from './window.services';
 import { effectiveDeadlinesOf, lineDeadlineSql } from './deadline.services';
 import { getSetting } from './settings.services';
-import { PROVISIONAL_REFUSAL } from './pricing.services';
+import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { seriesPastDeadline, seriesDisplayName, windowsOfSeries, seriesDeadlineGroups, mixedDeadlinesSentence } from './series.services';
 import {
   notifyPaymentConfirmed,
@@ -338,7 +338,7 @@ export async function initiatePayment(
     // In id order, as every path that locks several registrations does, so
     // two of them can never wait on each other.
     const locked = await tx
-      .select({ id: registration.id, status: registration.status })
+      .select({ id: registration.id, status: registration.status, price: registration.priceAtRegistration })
       .from(registration)
       .where(inArray(registration.id, data.registrationIds))
       .orderBy(registration.id)
@@ -347,6 +347,8 @@ export async function initiatePayment(
     if (locked.length !== data.registrationIds.length || locked.some((r) => r.status !== expected)) {
       throw new Error('One or more registrations are not ready for payment');
     }
+    // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
+    if (locked.some((l) => l.price !== regs.find((r) => r.id === l.id)?.priceAtRegistration)) throw new Error(PRICE_CHANGED_REFUSAL);
 
     const existingPaymentLinksInTx = await tx.query.paymentRegistration.findMany({
       where: (pr, { inArray: inArr }) => inArr(pr.registrationId, data.registrationIds),
