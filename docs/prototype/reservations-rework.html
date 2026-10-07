@@ -189,7 +189,7 @@ pages.sessions = () => `
       <td>${series.slice(0,3).map(s => `<span class="badge ${s.deadline ? 'ok' : 'warn'}">${s.board} ${s.deadline || '⚠ not set'}</span>`).join('')}</td>
       <td class="num">${existing.length} · ${existing.filter(e=>e.paid).length} paid</td><td><button class="sm">Open</button> <button class="sm" onclick="event.stopPropagation();go('session','money')">Money</button></td></tr>
     <tr class="click"><td><b>November 2026 – January 2027</b></td><td><span class="badge ok">open</span></td><td>1 Jun – 31 Oct 2026</td><td>7 Sep 2026</td><td>30 Sep 2026</td><td>18 · 3 boards</td>
-      <td><span class="badge">Pearson Oct 28 Aug · passed, 61 lines entered</span><span class="badge">Cambridge Nov 16 Aug · passed; retakes to 21 Sep</span><span class="badge">Pearson IGCSE Nov 12 Sep · passed</span><span class="badge ok">Pearson Jan 16 Oct</span></td><td class="num">201 · 160 paid</td><td><button class="sm">Open</button></td></tr>
+      <td><span class="badge">Pearson Oct 28 Aug · passed, 61 lines entered</span><span class="badge">Cambridge Nov 16 Aug · passed; retakes to 21 Sep</span><span class="badge">Pearson IGCSE Nov 12 Sep · passed</span><span class="badge">Pearson Jan 16 Oct · passed</span></td><td class="num">201 · 160 paid</td><td><button class="sm">Open</button></td></tr>
     <tr class="click muted"><td>June 2026</td><td><span class="badge">closed</span></td><td>15 Sep 2025 – 15 Feb 2026</td><td>20 Sep 2025</td><td>30 Nov 2025</td><td>24 · 3 boards</td><td></td><td class="num">434 · 434 paid</td><td></td></tr>
   </tbody></table>
 </div>
