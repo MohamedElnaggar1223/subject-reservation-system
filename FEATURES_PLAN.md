@@ -625,7 +625,7 @@ API and web ports):
 | F6 UI audit | `feature/ui-audit` | `ui` | 3071 / 3070 |
 | Rework A — sessions, offers, fees (RESERVATIONS_REWORK.md §9 step 1) | `feature/rework-sessions` | `rwa` | 3101 / 3100 |
 | Rework B — reservations (step 2) | `feature/rework-reservations` | `rwb` | 3111 / 3110 |
-| Rework C — money changes, charges, exceptions (step 2) | `feature/rework-money` | `rwc` | 3121 / 3120 |
+| Rework C — money changes, charges, exceptions (step 2) | `feature/rework-money` | `rwc` | 3141 / 3140 (A's servers took 3121/3120 because 3101/3100 were held by an older worktree's dev servers) |
 | Rework D — messages and reminders (step 3) | `feature/rework-messages` | `rwd` | 3131 / 3130 |
 
 | Feature | Implemented | Reviewed | Merged | Notes |
