@@ -71,7 +71,7 @@ offer is linked there. An `open` offer needs a teacher (refused: "who teaches it
 | `needs_prior_series` | bool: a carry-forward option, or a one-paper retake carrying the other components |
 | `required_in_series` | bool: a first entry of the subject in that series must include it |
 | `exclusive_group` | text or null: items of one group cannot be reserved together |
-| `sort_order`, `legacy` (jsonb: `converted`, `no_series`) | |
+| `sort_order`, `legacy` (jsonb: `converted`, `no_series`, `not_routed`) | `not_routed` *(changed: 7 Oct, the conversion proof)*: a converted item that exists only because lines sit in a series F0b would not route a new registration to; it is closed for new lines, its lines stand |
 
 `session_offer_item_unit (item_id, unit_id)` — the units an `units` item enters.
 `session_offer_item_teacher (item_id, teacher_id, mode, sort_order)` — none: the offer's.
@@ -428,7 +428,117 @@ series of the last two years for a declaration.
   (`POST /registrations/:id/desk-drop`, with the receipt gate and the "sent" refund) is step
   B/C's.
 
-## 3. Progress log
+## 3. As built (step 1)
+
+Commits on `feature/rework-sessions`: 7e83d60 (schema, migrations, services), d56ef27 (the F0b
+suites on the item model, student-first locks, re-dating, 09), 1ba3de1 (WIP for B and C),
+27e3233 (suite green), 19570e6 (the screens), 5360b1c (conversion proof, 0042's routing), and
+the last commit (this section, the per-unit enrolment test).
+
+**Sessions (§3.1).** `POST /v1/sessions` takes six inputs (`type`, `year`, reserve from and to,
+`courseStartsOn`, `paymentDueAt`) and optionally `copyFromSessionId`; the name and the refund
+policy follow (the policy from `refund.defaultPolicy.<type>`). Copying brings an earlier
+session's open offers with their teachers, items (in the corresponding series of the new year,
+made when not on record) and course fees; its board fees come across provisional. A session
+converted while closed is copied as its subjects allow (0042 closed its offers with the window).
+`PUT /v1/sessions/:id` changes the header (a draft: anything; an open session: its end with a
+reason, course start, payment due; the refund policy until a consent exists); moving the payment
+date re-dates every waiting line. `PUT /v1/sessions/:id/series` (F0a's correction) carries the
+items and their lines to the corresponding series.
+
+**Offers, teachers, items (§3.2).** `GET/POST/PUT/DELETE /v1/sessions/:id/offers…`, items,
+`replace-teacher`, `offers/addable`. Items come from the catalogue (`generateItems`: an IAL row
+one item per unit; a Cambridge syllabus with options one route per option, one exclusive group;
+an award the whole subject; an unmapped row the row itself). An open offer names a teacher;
+providers are teachers of kind `provider`. An item with live lines cannot be unticked; with only
+history it is closed. An item's series change moves its live lines (refused past a line's
+deadline, when a checkout would span two deadlines, or when the same entry is already in the
+target series), each audited (`LINE_SERIES_MOVED`), re-dated.
+
+**Series by item and the per-line cut-off (§3.3).** Links are derived (attached when an item
+lands in a series, detached when nothing references it). A line's effective deadline
+(`line_effective_deadline`, SQL and `effectiveDeadlineFor`): the retake deadline for a retake of
+the board's previous sitting, else the entry deadline, else the exams' start (Cairo), else none;
+a series with neither date takes no line. Read at: `insertLines`, the offers read (`open`), the
+checkout's deadline groups and their lock, the payment sweep, InstaPay references and their
+reversal, preregistration cancel and capture (deadline first: paid refunded in full, unfunded
+expired, an open payment left, a SO-4 held row untouched; the student locked first), the
+family's change and drop (refused past it; the desk's drop past it is B/C's `desk-drop`), the
+admin's move, the board change, the series correction and the 09 rules. The window rule lost
+its deadline clause; a session may open after one of its series' deadlines.
+
+**Fees (§3.4).** `GET/PUT /v1/board-fees?seriesId`, `POST /v1/board-fees/:seriesId/confirm`,
+`/reprice`, `/copy`, `/parse`. A provisional row prices a line provisional: reserved, not payable
+(checkout and desk refuse `PROVISIONAL_REFUSAL`) unless `pricing.payOnProvisionalFee`; confirmed
+at the same amount clears the line and moves its due date to the confirmation plus the grace;
+confirmed at another amount, "Re-price" re-prices the board part of lines with no payment
+history using the exceptions their basis recorded, lists the others, tells each family
+(`PRICE_CHANGED`). The lines are locked before their payment history; a checkout that read the
+price before a re-price is refused (`PRICE_CHANGED_REFUSAL`). `priceLine` replaces
+`computeRegistrationPricing`; the pricing settings are in F0a's store.
+
+**Enrolment unit (§10).** `upsertEnrolments` rows carry `unitId`; `bulkEnrol` from registrations
+gives a line of an item entering units one enrolment per unit with the line's teacher;
+`getTeachingDemand` groups per (subject, unit, teacher).
+
+**Screens (§4.1, §4.2, §4.6).** `/admin/sessions` (a route group of its own: admin,
+coordinator, finance admin, finance officer; each tab only for who may read it): the list (§4.1)
+and the Session screen — the header with its deadlines line, Edit, Open now, Close, Correct the
+series; Subjects (grouped O.L. and A.S./A.L., the offer drawer with availability, course fee and
+start, grade-10 core, teachers from the pool or any teacher, notes, replace teacher, remove; per
+item series, availability, course fee, exclusive group, required, untick; add an item; add a
+subject; copy from), Fees (per series: type, paste, copy, confirm, change a confirmed amount,
+re-price with what it will skip), Money (lines only: totals, filters, subject, export), Grade 10
+(core, preview, register). Settings gain Prices, Payment and Refunds (number and refund-policy
+editors); Board series gains the retake deadline. Arabic for all of it in
+`apps/web/lib/i18n-sessions.ts` (data marked `data-i18n-skip`), checked right to left.
+
+**Tests.** 08n (16: sessions, copy, a winter session's per-item cut-off and retake deadline,
+IGCSE never October/January, the defaults, capture's four cases, the line rules, the per-unit
+enrolment, grade 10 twice, due dates), 08p (6: A-16, one-paper retake, settings for new lines
+only, exceptions in order, provisional fee, confirm higher and re-price), 08t (10 races), a 05
+cross-family case for `/registrations/offers`, the authz rows, 09's rules (§8). Six guards shown
+red when undone (trail rows `control`).
+
+## 4. Decisions made while building (for the lead)
+
+1. **Two F0b assertions changed outside the brief's explicit list**, both in the scenario class
+   it pre-authorised: 08's MO-10 test (a deadline before the window's close was refused, now
+   accepted; the database no longer rejects it) and 08k's first race (a change to a window's
+   series was refused once a registration landed; an item's series change now carries the line,
+   its student locked first). Trail rows `assertion`, 21:00:24Z and 21:25:07Z.
+2. **Writers that move lines take the students first** and run again when a student appeared
+   while they waited (`lib/student-locks.ts`), rather than locking students after their own rows
+   (a deadlock with a reservation).
+3. **A board change** moves each item to the new board's series of the same month and label
+   (else its unlabelled series of that month, else the default), compares each line's effective
+   deadline, and carries the old board's fee as a provisional row when finance has none there.
+4. **Re-dating after a series' dates change** runs in its own transaction after the change (a
+   checkout locks lines before series). A crash between the two leaves due dates stale until the
+   next change; the money is safe (the sweep reads the effective deadline, not `due_at`).
+5. **No drop past a line's deadline on today's paths** — for staff too — until B/C's desk-drop
+   with the "sent" refund exists.
+6. **Grade 10 in bulk** applies the school-fee gate per student, and the school's consent rows
+   lock the session's refund policy as a family's would.
+7. **0042 routes new lines as F0b did** (`not_routed`, §1.3). A database that ran 0042 before
+   commit 5360b1c (igcse_rwa_dev; B's and C's branches of 1ba3de1) keeps its converted items.
+8. `GRADUATE_RETAKE_SESSION_TYPES` keeps the old winter types beside `winter`, so a board
+   series' month still answers.
+9. The running system is on API 3121 / web 3120: 3101/3100 are held by another worktree's dev
+   servers, left alone.
+
+## 5. Not in this step
+
+- B: `lines`/consent inputs on the reservation paths, declarations and To verify, the teacher
+  change, the desk's and the family's Reserve pages, the Statement, the desk-drop past a deadline.
+- C: `refundFor` and the refund-policy snapshot, the exceptions registry (gates granted by
+  exception, one-shot use, `deadline.payment`), charges and instalments, board services and the
+  remark fee from the grid, the Money tab's charges.
+- D: reminders and the Money tab's "Remind".
+- F7: the import spike's sessions now take the new shape but get no offers; it must add them.
+- §7 step 3: dropping `qualification_level`, `session_subject_series`, the old type names.
+
+## 6. Progress log
 
 - 2026-10-07 19:54Z — worktree and branch from origin/main c99b553; baseline suite green on
   `igcse_rwa_test` (22 files, 308 passed, 1 todo).
@@ -441,3 +551,11 @@ series of the last two years for a declaration.
 - 22:01Z — WIP commit 1ba3de1 pushed at the lead's request so B and C can branch from it (gates
   stated in its message); §2.11 lists what the contract gained since it was published. 08n,
   08p written and green alone; 08t written.
+- 22:11Z — full suite green in local time and UTC on the tree of 27e3233 (25 files, 341
+  passed); six guard controls red when undone. Pushed.
+- 22:50Z — the Sessions and Session screens, settings and the series' retake deadline; driven
+  in headless Chrome on igcse_rwa_dev (API 3121, web 3120) in English and Arabic; three defects
+  found by driving and fixed. Commit 19570e6 pushed; CI green.
+- 23:05Z — conversion proved on copies of four databases (0 differences; 09 as before plus the
+  new basis rule's coverage count); 0042 now routes new lines as F0b did. Commit 5360b1c pushed.
+- 23:20Z — §3–§5 above; the per-unit enrolment test in 08n.
