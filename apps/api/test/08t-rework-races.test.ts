@@ -234,9 +234,9 @@ describe('08t: the rework races', () => {
       const o = await offerOf(s1, sub, [whole(s)]);
       const f = await onboard(officer, `t08-rp${tag}-${RUN}`, 11);
       const [line] = await reserve(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
-      // The board's fee changes (typed again, confirmed): the line read 600, the row now says 650.
-      await feeFor(s, sub, 650, false);
+      // The board's fee changes (confirmed at the new amount): the line read 600, the row now says 650.
       const feeId = (await one<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_id = $2`, [s, sub])).id;
+      await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: s }, json: { rows: [{ feeId, amount: 650 }], reason: 'race: the board changed its fee' } }));
       const checkout = () => f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } });
       const reprice = () => finadmin.api.v1['board-fees'][':seriesId'].reprice.$post({ param: { seriesId: s }, json: { feeIds: [feeId], reason: 'race: the board changed its fee' } });
       return { line: line!.id, checkout, reprice };
@@ -303,7 +303,9 @@ describe('08t: the rework races', () => {
     const [l1, l2] = await reserve(f.studentId, s1, [
       { offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }, { offerItemId: o2.items[0]!, attempt: 'first', mode: 'in_school', teacherId },
     ]);
-    const release = await holdRowLock('registration', [l1!.id, l2!.id].sort()[0]!);
+    // The line the change moves is the one held: the checkout (which locks both in id order) and
+    // the change both queue on it, the checkout first.
+    const release = await holdRowLock('registration', l1!.id);
     let pay: Promise<Res> | undefined;
     let move: Promise<Res> | undefined;
     try {

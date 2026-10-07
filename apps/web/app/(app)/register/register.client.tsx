@@ -15,7 +15,7 @@ type Session = {
   id: string;
   name: string;
   sessionType: string;
-  qualificationLevel: string;
+  qualificationLevel: string | null; // null since the reservations rework: a session spans levels
   startDate: string;
   endDate: string;
   status: string;
@@ -529,9 +529,11 @@ export default function RegisterClient({ userId, userRole }: Props): React.JSX.E
                 >
                   <div className="font-medium text-foreground text-sm flex items-center gap-2">
                     {sess.name}
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                      {LEVEL_LABELS[sess.qualificationLevel] ?? sess.qualificationLevel}
-                    </span>
+                    {sess.qualificationLevel && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        {LEVEL_LABELS[sess.qualificationLevel] ?? sess.qualificationLevel}
+                      </span>
+                    )}
                     {sess.status === 'draft' && (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
                         Preregistration
