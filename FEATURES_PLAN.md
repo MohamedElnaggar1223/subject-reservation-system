@@ -60,6 +60,48 @@ Not the owner's words; each can be overturned by the owner.
 
 ---
 
+## 0c. 7 October 2026 — the admin's direction, and the plan reset
+
+The owner met the school's admin. Her priority is **subject reservations and fees paid**; her
+verdict on the current implementation: "very hard to use, counter intuitive and not usable".
+The forms the school actively uses (Drive folder "June 2027") and eight PDFs (fees per board
+and series, registration links for November 2026/January 2027 and June 2027, Cambridge's
+enquiry-about-results service) are now the ground truth. The owner's instruction, verbatim:
+"analyzing every single form and understanding every option and every thing about it and
+mapping these onto changes to our current system is key"; "if our own implementation degrades
+the experience or makes it harder or more complex then we failed"; "do not try and fix the
+current implementation and if needed just redo it all over again correctly"; "we need to plan
+first".
+
+Her points: (1) subjects registrable per paper; (2) some papers required; (3) splitting
+certificates (A Level) is a service like remarks, late cash-in, cash-in; (4) remark differs per
+board; (5) broadcast, batch and direct notifications, email and WhatsApp, not deletable by
+parents or students; (6) automated repeating reminders for payments and deadlines; (7) a
+complete rework of the logic and UI of the admin side for reservations and sessions — a session
+selects its subjects, each with its teachers, its name derived from its type, far fewer inputs;
+board series "very confusing, redundant"; (8) school fees pushed by the admin into pending
+payments; (9) the exception system revised so that "every policy, every deadline, every
+percentage, literally everything can have an exception"; (10) the teacher of a subject
+changeable later; (11) more payment data for parents (date, end date).
+
+**The plan the owner accepted (7 Oct):** Phase 0 — freeze the six in-flight agents (F1 round
+two, F2 fixes, F7 fixes, F4 review, the preview build, the walkthrough stage 1); their work stays
+on disk and on their pushed branches until each feature's future is decided. Phase 1 — digest
+every form and PDF into `SCHOOL_FORMS.md` (the register, the gap map, the questions), update
+`DISCOVERY.md`, and have the owner confirm the reading before any design. Phase 2 — design the
+rework (`RESERVATIONS_REWORK.md`: sessions from type and year with their subjects, papers,
+teachers and fees; board series kept underneath but never assembled by hand; reservations per
+paper with services as lines; admin-pushed charges; parent payment detail; one exceptions
+engine; notifications and reminders; the proven money core kept: ledger, escrow, receipts,
+takings, the 09 invariants), reviewed on Opus 5.5, then by the owner. Phase 3 — build in her
+priority order with two or three agents at most, then re-plan F1/F2/F4/F7 on the new session
+model. Phase 4 — regenerate the walkthrough (F8).
+
+The owner's answers to the five strategy questions: the freeze, agreed; the admin is not
+available until we show her the work again (no questions to her meanwhile); other cycles' forms
+exist, but "work with what we have for now"; no WhatsApp Business account — postpone the
+integration, keep it in mind; "take your time". Trail: `.audit/school-forms.tsv`.
+
 ## 1. The features and their full scope
 
 Each feature lists its scope, then **named scenarios** (tests in `apps/api/test`, driven
