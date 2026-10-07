@@ -64,14 +64,15 @@ def main() -> int:
         evidence = a.evidence
 
     path = os.path.join(ROOT, '.audit', f'{a.trail}.tsv')
-    last_ts = None
+    # Any row, not only the last: a row written with --at for a past event may sit between
+    # two live rows stamped in the same second (7 Oct 2026), so the guard reads every time.
+    seen = set()
     if os.path.exists(path):
         with open(path) as f:
             rows = [l for l in f.read().splitlines() if l and not l.startswith('ts\t')]
-        if rows:
-            last_ts = rows[-1].split('\t', 1)[0]
-    if last_ts == ts and not a.same_event:
-        sys.exit(f'the previous row already has {ts}: write each row when its event happens, '
+        seen = {r.split('\t', 1)[0] for r in rows}
+    if ts in seen and not a.same_event:
+        sys.exit(f'a row already has {ts}: write each row when its event happens, '
                  'give a past event its own time with --at/--source, or pass --same-event')
 
     new = not os.path.exists(path)
