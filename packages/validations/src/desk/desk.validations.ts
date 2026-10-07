@@ -108,11 +108,14 @@ export type DeskRegistrationType = z.infer<typeof DeskRegistration>;
  */
 export const DeskCollect = z.object({
   studentId: z.string().min(1, 'Pick a student'),
-  registrationIds: z.array(z.string().min(1)).min(1, 'Select at least one subject').max(20),
+  registrationIds: z.array(z.string().min(1)).max(20).default([]),
+  // The reservations rework (§3.10 item 1): the student's charges, collected in the same action —
+  // one payment per group (lines per entry deadline, charges per service deadline).
+  chargeIds: z.array(z.string().min(1)).max(20).default([]),
   instrumentUsed: z.enum(['cash', 'card', 'instapay', 'other']),
   escrowAmountToApply: z.number().min(0).max(1_000_000).refine(isWholePiastres, PIASTRES_MESSAGE).default(0),
   notes: z.string().max(500).optional(),
-});
+}).refine((d) => d.registrationIds.length + d.chargeIds.length > 0, { message: 'Select at least one subject', path: ['registrationIds'] });
 export type DeskCollectType = z.infer<typeof DeskCollect>;
 
 /** Desk school-fee collection: officer takes the money, gate unlocks now */

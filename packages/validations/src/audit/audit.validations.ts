@@ -63,6 +63,9 @@ export const AUDIT_ENTITY_TYPES = [
   'session_offer',
   'offer_item',
   'board_fee',
+  // Reservations rework, step C: charges and board services
+  'charge',
+  'board_service',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -103,6 +106,8 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   session_offer:  'Session Subject (Offer)',
   offer_item:     'Offer Item',
   board_fee:      'Board Fee',
+  charge:         'Charge',
+  board_service:  'Board Service',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -278,6 +283,30 @@ export const AUDIT_ACTIONS = [
   'LINE_REPRICED',
   'LINE_DUE_MOVED',
   'GRADE10_BULK_COMMITTED',
+  // Reservations rework, step C: charges, plans, the registry, board services, the desk-drop
+  'CHARGE_CREATED',
+  'CHARGE_REQUESTED',
+  'CHARGE_ACCEPTED',
+  'CHARGE_CANCELLED',
+  'CHARGE_REPRICED',
+  'CHARGE_PAID',
+  'CHARGE_REOPENED',
+  'CHARGE_SETTLED',
+  'CHARGE_REFUNDED',
+  'CHARGE_CLOSED_AT_DEADLINE',
+  'CHARGE_PAYMENT_INITIATED',
+  'SCHOOL_FEE_PUSHED',
+  'PLAN_CAPTURED',
+  'PLAN_SETTLED',
+  'EXCEPTION_CONFIRMED',
+  'EXCEPTION_USED',
+  'BOARD_SERVICE_UPDATED',
+  'SERVICE_DEADLINES_SET',
+  'SERVICE_FEES_SET',
+  'SERVICE_FEE_DEFAULT_COPIED',
+  'DESK_DROP_EXECUTED',
+  'REWORK_BACKFILL_EXCEPTION',
+  'REWORK_BACKFILL_SERVICE',
   // Parent-student links (security audit RF-14: access to a child's money
   // and records hangs on these, so every change is recorded)
   'LINK_REQUESTED',
@@ -460,6 +489,29 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   LINE_REPRICED:              'Line Re-priced (Board Fee Confirmed)',
   LINE_DUE_MOVED:             'Line Due Date Moved',
   GRADE10_BULK_COMMITTED:     'Grade 10 Registered in Bulk',
+  CHARGE_CREATED: 'Charge Added',
+  CHARGE_REQUESTED: 'Charge Requested by the Family',
+  CHARGE_ACCEPTED: 'Charge Request Accepted',
+  CHARGE_CANCELLED: 'Charge Cancelled',
+  CHARGE_REPRICED: 'Charge Price Changed by an Exception',
+  CHARGE_PAID: 'Charge Paid',
+  CHARGE_REOPENED: 'Charge Reopened (Payment Reversed)',
+  CHARGE_SETTLED: 'Pushed School Fee Settled',
+  CHARGE_REFUNDED: 'Charge Refunded to Escrow',
+  CHARGE_CLOSED_AT_DEADLINE: 'Charge Closed at the Service Deadline',
+  CHARGE_PAYMENT_INITIATED: 'Charge Payment Started',
+  SCHOOL_FEE_PUSHED: 'School Fee Pushed to Families',
+  PLAN_CAPTURED: 'Instalment Plan Captured into the Line',
+  PLAN_SETTLED: 'Instalment Plan Settled',
+  EXCEPTION_CONFIRMED: 'Migrated Exception Confirmed',
+  EXCEPTION_USED: 'One-Shot Exception Used',
+  BOARD_SERVICE_UPDATED: 'Board Service Updated',
+  SERVICE_DEADLINES_SET: 'Board Service Deadlines Set',
+  SERVICE_FEES_SET: 'Board Service Fees Set',
+  SERVICE_FEE_DEFAULT_COPIED: 'Board Service Fee Copied from the Defaults',
+  DESK_DROP_EXECUTED: 'Dropped at the Desk after the Deadline',
+  REWORK_BACKFILL_EXCEPTION: 'Exception Moved onto the Policy Registry',
+  REWORK_BACKFILL_SERVICE: 'Remark Fees and Deadlines Moved onto Board Services',
 };
 
 // ─── Query Filters ────────────────────────────────────────────────────────────

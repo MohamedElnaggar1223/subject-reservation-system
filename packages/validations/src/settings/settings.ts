@@ -21,7 +21,7 @@ import { ROLES, type Role } from '../roles';
 import { LevelCodeReadingSchema, LEVEL_CODE_READINGS, LEVEL_CODE_READING_LABELS } from '../catalogue/level-code';
 import { RefundPolicySchema, DEFAULT_REFUND_POLICIES } from '../session/session.validations';
 
-export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar' | 'catalogue' | 'pricing' | 'payment' | 'refund';
+export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar' | 'catalogue' | 'pricing' | 'payment' | 'refund' | 'exceptions';
 
 export type SettingDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   schema: S;
@@ -172,6 +172,31 @@ export const SETTINGS = {
     min: 0,
     max: 60,
     unit: 'days',
+  }),
+  // Reservations rework, step C (RESERVATIONS_REWORK.md §3.1, §3.7).
+  'payment.expireOverdueAfterDays': defineSetting({
+    schema: z.number().int().min(0).max(365),
+    default: 0,
+    group: 'payment',
+    label: 'Expire an unpaid line this many days after it was due',
+    description:
+      'A line still unpaid this many days after its due date expires (reason "overdue"), and an instalment plan on it is settled as a drop that day. 0: never — a due date then drives reminders and the "overdue" list only, and the line waits for its board\'s deadline or the session\'s close.',
+    editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
+    input: 'number',
+    min: 0,
+    max: 365,
+    unit: 'days',
+  }),
+  'exceptions.boardEntryDeadline': defineSetting({
+    schema: z.boolean(),
+    default: false,
+    group: 'exceptions',
+    label: 'Allow late board entries by exception',
+    description:
+      'Off: the board\'s entry deadline is a hard stop (owner decision MO-10) and the "Late board entry" exception cannot be granted. On: the admin may grant one student a late entry in one series, with the board\'s late fee charged to the family (question Q-20 to the owner).',
+    editableBy: [ROLES.ADMIN],
+    source: 'Q-20',
+    input: 'boolean',
   }),
   'refund.defaultPolicy.june': defineSetting({
     schema: RefundPolicySchema,

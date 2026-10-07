@@ -1674,6 +1674,8 @@ export const escrowTransaction = pgTable(
       () => payment.id,
       { onDelete: "set null" }
     ),
+    // The reservations rework (§3.10): the charge a refund (charge_refund) is for.
+    relatedChargeId: text("related_charge_id").references((): AnyPgColumn => charge.id, { onDelete: "set null" }),
     // Who triggered this transaction (parent, admin, or system)
     initiatedBy: text("initiated_by")
       .notNull()
@@ -1791,10 +1793,13 @@ export const receipt = pgTable(
   "receipt",
   {
     id: text("id").primaryKey(),
+    // A line's receipt, or (the reservations rework, §3.10 item 2) a charge's: exactly one of the two.
     registrationId: text("registration_id")
-      .notNull()
       .unique()
       .references(() => registration.id, { onDelete: "restrict" }),
+    chargeId: text("charge_id")
+      .unique()
+      .references((): AnyPgColumn => charge.id, { onDelete: "restrict" }),
     // Human-friendly number quoted at the desk, e.g. RCP-2026-AB12CD34
     receiptNumber: text("receipt_number").notNull().unique(),
     // 'pending_issue' | 'issued' | 'return_required' | 'returned' | 'lost' | 'void'
@@ -1822,6 +1827,7 @@ export const receipt = pgTable(
       "receipt_refund_nonneg",
       sql`${table.refundAmountOnReturn} IS NULL OR ${table.refundAmountOnReturn} >= 0`,
     ),
+    check("receipt_one_subject", sql`num_nonnulls(${table.registrationId}, ${table.chargeId}) = 1`),
   ]
 );
 
@@ -1829,6 +1835,10 @@ export const receiptRelations = relations(receipt, ({ one }) => ({
   registration: one(registration, {
     fields: [receipt.registrationId],
     references: [registration.id],
+  }),
+  charge: one(charge, {
+    fields: [receipt.chargeId],
+    references: [charge.id],
   }),
 }));
 
@@ -1872,44 +1882,65 @@ export const refundWindow = pgTable(
 
 /**
  * ============================================
- * EXCEPTION TABLE (V3 §6.3)
+ * EXCEPTION TABLE — the policy registry (RESERVATIONS_REWORK.md §3.7)
  * ============================================
  *
- * The sanctioned way around the system's own rules — per-student
- * overrides granted by finance admins (or admins), fully audited.
+ * An exception lifts one policy (`policy_key`, from POLICIES in @repo/validations) for one
+ * student, or for one family (`family_id`, a parent account: every linked child), narrowed to a
+ * scope by any of the scope columns (a null column: the policy's null scope). Its value is in the
+ * typed column its policy names: a percent or an amount in `value_number`, a date in
+ * `value_date`, an instalment schedule in `value_json`. Status: active, revoked, lapsed (past
+ * its validUntil, or its plan's line ended), used (a one-shot gate used by the reservation it let
+ * through; a plan captured into its line).
  *
- * Types and their `value` semantics:
- * - discount_percent:      value = percentage off (0–100)
- * - discount_fixed:        value = EGP off the total
- * - custom_price:          value = absolute EGP price
- * - fee_waiver:            value unused — school-fee gate bypass
- * - deadline_extension:    value unused — closed window treated open
- *                          for this student until validUntil
- * - late_registration:     alias semantics of deadline_extension
- * - custom_refund_percent: value = refund percentage (0–100) overriding
- *                          refund windows
- *
- * Scope: sessionId/subjectId null = applies to all.
+ * The eight V3 types were moved onto policy keys by migration (0045); `type` and `value` are kept
+ * one release and read by nothing. A migrated subject-scoped deadline or refund exception, and a
+ * price exception scoped to an old unit row, carries `check_reason`: it applies only once a finance
+ * admin confirms it ("Check these").
  */
 export const exception = pgTable(
   "exception",
   {
     id: text("id").primaryKey(),
-    type: text("type").notNull(),
-    studentId: text("student_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    // V3's type, kept one release (the migration mapped it onto policy_key).
+    type: text("type"),
+    // The registry's key (backfilled by 0045, not null since 0046).
+    policyKey: text("policy_key").notNull(),
+    // One of the two (a check, 0046): a student, or a family (a parent account).
+    studentId: text("student_id").references(() => user.id, { onDelete: "cascade" }),
+    familyId: text("family_id").references(() => user.id, { onDelete: "cascade" }),
+    // The scope: each set column narrows it.
     sessionId: text("session_id").references(() => registrationSession.id, { onDelete: "cascade" }),
     subjectId: text("subject_id").references(() => subject.id, { onDelete: "cascade" }),
+    offerId: text("offer_id").references(() => sessionOffer.id, { onDelete: "cascade" }),
+    offerItemId: text("offer_item_id").references(() => sessionOfferItem.id, { onDelete: "cascade" }),
+    registrationId: text("registration_id").references(() => registration.id, { onDelete: "cascade" }),
+    chargeId: text("charge_id").references((): AnyPgColumn => charge.id, { onDelete: "cascade" }),
+    boardSeriesId: text("board_series_id").references(() => boardSeries.id, { onDelete: "cascade" }),
+    // '2026-2027'
+    academicYear: text("academic_year"),
+    // V3's value, kept one release (copied into value_number).
     value: numeric("value", { precision: 12, scale: 2, mode: "number" }),
+    valueNumber: numeric("value_number", { precision: 12, scale: 2, mode: "number" }),
+    valueDate: timestamp("value_date", { withTimezone: true }),
+    valueJson: jsonb("value_json").$type<unknown>(),
     reason: text("reason").notNull(),
     validUntil: timestamp("valid_until", { withTimezone: true }),
-    status: text("status").notNull().default("active"), // 'active' | 'revoked' | 'lapsed' (a grade-10 exception past its validUntil, F0a)
+    // 'active' | 'revoked' | 'lapsed' | 'used'
+    status: text("status").notNull().default("active"),
     grantedBy: text("granted_by")
       .notNull()
       .references(() => user.id, { onDelete: "restrict" }),
     revokedBy: text("revoked_by").references(() => user.id, { onDelete: "set null" }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokeReason: text("revoke_reason"),
+    // A one-shot gate: when it was used, and by which lines.
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    usedFor: jsonb("used_for").$type<{ registrationIds: string[] }>(),
+    // "Check these" (§3.7): why a migrated exception waits for a finance admin, and the confirmation.
+    checkReason: text("check_reason"),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    confirmedBy: text("confirmed_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
@@ -1918,9 +1949,17 @@ export const exception = pgTable(
   },
   (table) => [
     index("exception_studentId_idx").on(table.studentId),
+    index("exception_familyId_idx").on(table.familyId),
     index("exception_type_idx").on(table.type),
+    index("exception_policyKey_idx").on(table.policyKey),
     index("exception_status_idx").on(table.status),
+    index("exception_registrationId_idx").on(table.registrationId),
+    index("exception_chargeId_idx").on(table.chargeId),
     check("exception_value_nonneg", sql`${table.value} IS NULL OR ${table.value} >= 0`),
+    check("exception_value_number_nonneg", sql`${table.valueNumber} IS NULL OR ${table.valueNumber} >= 0`),
+    check("exception_status_valid", sql`${table.status} IN ('active', 'revoked', 'lapsed', 'used')`),
+    // A student or a family, never both, never neither (0046, after the backfill).
+    check("exception_one_holder", sql`num_nonnulls(${table.studentId}, ${table.familyId}) = 1`),
   ]
 );
 
@@ -1930,6 +1969,11 @@ export const exceptionRelations = relations(exception, ({ one }) => ({
     references: [user.id],
     relationName: "studentExceptions",
   }),
+  family: one(user, {
+    fields: [exception.familyId],
+    references: [user.id],
+    relationName: "familyExceptions",
+  }),
   session: one(registrationSession, {
     fields: [exception.sessionId],
     references: [registrationSession.id],
@@ -1938,6 +1982,245 @@ export const exceptionRelations = relations(exception, ({ one }) => ({
     fields: [exception.subjectId],
     references: [subject.id],
   }),
+  offer: one(sessionOffer, { fields: [exception.offerId], references: [sessionOffer.id] }),
+  offerItem: one(sessionOfferItem, { fields: [exception.offerItemId], references: [sessionOfferItem.id] }),
+  registration: one(registration, { fields: [exception.registrationId], references: [registration.id] }),
+  charge: one(charge, { fields: [exception.chargeId], references: [charge.id], relationName: "chargeExceptions" }),
+  boardSeries: one(boardSeries, { fields: [exception.boardSeriesId], references: [boardSeries.id] }),
+  grantedByUser: one(user, { fields: [exception.grantedBy], references: [user.id], relationName: "grantedExceptions" }),
+}));
+
+/**
+ * ============================================
+ * BOARD SERVICES (RESERVATIONS_REWORK.md §3.6)
+ * ============================================
+ *
+ * What a board offers after (or around) an entry: its enquiry-about-results services (Cambridge
+ * 1, 1S, 2, 2S; Pearson's review of marking, clerical re-check, access to scripts, priority
+ * review; Oxford's), cash-in and late cash-in, certificate splitting. A service's fee is per
+ * series and per level (`board_service_fee`: IGCSE and AS/A Level rates), its deadline per series
+ * (`board_service_deadline`, replacing `remark_deadline`). `refund_rule` is what a family gets
+ * back when a remark changes the grade (Q-21: seeded `full`, today's behaviour).
+ *
+ * The fees sit in their own table beside `board_fee` rather than as a fourth kind of its key:
+ * step A's fee grid (copy, labels, the generated key) knows four kinds, and a service row there
+ * would break its copy (docs/features/RESERVATIONS_MONEY.md, "For the lead").
+ */
+export const boardService = pgTable(
+  "board_service",
+  {
+    id: text("id").primaryKey(),
+    boardCode: text("board_code").notNull().references(() => examBoard.code, { onDelete: "restrict" }),
+    // The board's own code for it ("1", "2S") or a short name ("review_of_marking").
+    code: text("code").notNull(),
+    label: text("label").notNull(),
+    // 'remark' | 'cash_in' | 'late_cash_in' | 'certificate_split'
+    kind: text("kind").notNull(),
+    // The fee is per component (paper) rather than per entry.
+    perComponent: boolean("per_component").notNull().default(false),
+    // The fee differs between IGCSE and AS/A Level (two rows per series).
+    levelRates: boolean("level_rates").notNull().default(false),
+    // 'none' | 'full' | 'less_fixed' (refund_deduction per component)
+    refundRule: text("refund_rule").notNull().default("full"),
+    refundDeduction: numeric("refund_deduction", { precision: 12, scale: 2, mode: "number" }),
+    requestableByFamily: boolean("requestable_by_family").notNull().default(false),
+    // The V3 remark service type it stands for on this board (clerical_check, review_of_marking,
+    // script_copy, priority_review), so a request naming one keeps working.
+    legacyServiceType: text("legacy_service_type"),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("boardService_board_code_idx").on(table.boardCode, table.code),
+    uniqueIndex("boardService_board_legacy_idx").on(table.boardCode, table.legacyServiceType).where(sql`legacy_service_type IS NOT NULL`),
+    check("board_service_kind_valid", sql`${table.kind} IN ('remark', 'cash_in', 'late_cash_in', 'certificate_split')`),
+    check("board_service_refund_rule_valid", sql`${table.refundRule} IN ('none', 'full', 'less_fixed')`),
+    check("board_service_deduction_whole", sql`(${table.refundRule} = 'less_fixed') = (${table.refundDeduction} IS NOT NULL AND ${table.refundDeduction} > 0)`),
+  ]
+);
+
+/** A service's fee in one series, per level ('igcse' | 'as_a_level'); provisional until confirmed. */
+export const boardServiceFee = pgTable(
+  "board_service_fee",
+  {
+    id: text("id").primaryKey(),
+    boardSeriesId: text("board_series_id").notNull().references(() => boardSeries.id, { onDelete: "restrict" }),
+    boardServiceId: text("board_service_id").notNull().references(() => boardService.id, { onDelete: "restrict" }),
+    level: text("level").notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
+    provisional: boolean("provisional").notNull().default(true),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    confirmedBy: text("confirmed_by").references(() => user.id, { onDelete: "set null" }),
+    // Copied from the defaults (V3's remark_fee_schedule) when a series first needed it.
+    copiedFromDefault: boolean("copied_from_default").notNull().default(false),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("boardServiceFee_series_service_level_idx").on(table.boardSeriesId, table.boardServiceId, table.level),
+    check("board_service_fee_level_valid", sql`${table.level} IN ('igcse', 'as_a_level')`),
+    check("board_service_fee_amount_nonneg", sql`${table.amount} >= 0`),
+    check("board_service_fee_confirmed_whole", sql`(${table.provisional} AND ${table.confirmedAt} IS NULL) OR (NOT ${table.provisional} AND ${table.confirmedAt} IS NOT NULL)`),
+  ]
+);
+
+/** A service's deadline in one series (replaces remark_deadline, which was per window). */
+export const boardServiceDeadline = pgTable(
+  "board_service_deadline",
+  {
+    id: text("id").primaryKey(),
+    boardSeriesId: text("board_series_id").notNull().references(() => boardSeries.id, { onDelete: "restrict" }),
+    boardServiceId: text("board_service_id").notNull().references(() => boardService.id, { onDelete: "restrict" }),
+    deadline: timestamp("deadline", { withTimezone: true }).notNull(),
+    setBy: text("set_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("boardServiceDeadline_series_service_idx").on(table.boardSeriesId, table.boardServiceId),
+  ]
+);
+
+export const boardServiceRelations = relations(boardService, ({ one, many }) => ({
+  board: one(examBoard, { fields: [boardService.boardCode], references: [examBoard.code] }),
+  fees: many(boardServiceFee),
+  deadlines: many(boardServiceDeadline),
+}));
+export const boardServiceFeeRelations = relations(boardServiceFee, ({ one }) => ({
+  service: one(boardService, { fields: [boardServiceFee.boardServiceId], references: [boardService.id] }),
+  boardSeries: one(boardSeries, { fields: [boardServiceFee.boardSeriesId], references: [boardSeries.id] }),
+}));
+export const boardServiceDeadlineRelations = relations(boardServiceDeadline, ({ one }) => ({
+  service: one(boardService, { fields: [boardServiceDeadline.boardServiceId], references: [boardService.id] }),
+  boardSeries: one(boardSeries, { fields: [boardServiceDeadline.boardSeriesId], references: [boardSeries.id] }),
+}));
+
+/**
+ * ============================================
+ * CHARGES (RESERVATIONS_REWORK.md §3.6, §3.10)
+ * ============================================
+ *
+ * Anything a family owes that is not a line, a remark fee or the school fee itself. Paid in a
+ * payment of purpose `charge` (payment_charge rows), never mixed with lines; receipted
+ * (receipt.charge_id), except an instalment, which issues a deposit slip; reversible (MO-11) and
+ * refundable to escrow (at most its amount). A `school_fee_push` is never paid as a charge: the
+ * school-fee payment of that student and year settles it (settled_by_payment_id). An
+ * `instalment` belongs to a plan (plan_exception_id) on a line (registration_id): paid into the
+ * held wallet earmarked for that line, captured into the line's payment at the last.
+ */
+export const charge = pgTable(
+  "charge",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    // 'cash_in' | 'late_cash_in' | 'certificate_split' | 'late_entry_fee' | 'school_fee_push' |
+    // 'instalment' | 'price_adjustment' | 'custom'
+    kind: text("kind").notNull(),
+    registrationId: text("registration_id").references(() => registration.id, { onDelete: "restrict" }),
+    boardSeriesId: text("board_series_id").references(() => boardSeries.id, { onDelete: "restrict" }),
+    boardServiceId: text("board_service_id").references(() => boardService.id, { onDelete: "restrict" }),
+    // A service's rate: 'igcse' | 'as_a_level'.
+    level: text("level"),
+    // A pushed school fee's year ('2026-2027').
+    academicYear: text("academic_year"),
+    description: text("description").notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    // 'requested' | 'pending_payment' | 'paid' | 'cancelled' | 'refunded'
+    status: text("status").notNull().default("pending_payment"),
+    // An instalment: its plan (the plan.instalments exception) and its place in it.
+    planExceptionId: text("plan_exception_id").references((): AnyPgColumn => exception.id, { onDelete: "restrict" }),
+    instalmentNo: integer("instalment_no"),
+    // What came back to escrow (charge_refund), at most the amount.
+    refundAmount: numeric("refund_amount", { precision: 12, scale: 2, mode: "number" }),
+    refundedAt: timestamp("refunded_at", { withTimezone: true }),
+    refundedBy: text("refunded_by").references(() => user.id, { onDelete: "set null" }),
+    refundReason: text("refund_reason"),
+    // A pushed school fee: the school-fee payment that settled it.
+    settledByPaymentId: text("settled_by_payment_id").references((): AnyPgColumn => payment.id, { onDelete: "restrict" }),
+    requestedBy: text("requested_by").references(() => user.id, { onDelete: "set null" }),
+    acceptedBy: text("accepted_by").references(() => user.id, { onDelete: "set null" }),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    cancelledBy: text("cancelled_by").references(() => user.id, { onDelete: "set null" }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelReason: text("cancel_reason"),
+    // The price exceptions (charge scope) applied to its amount (chargeRules).
+    pricingBasis: jsonb("pricing_basis").$type<Record<string, unknown>>(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("charge_studentId_idx").on(table.studentId),
+    index("charge_registrationId_idx").on(table.registrationId),
+    index("charge_status_idx").on(table.status),
+    index("charge_kind_idx").on(table.kind),
+    index("charge_planExceptionId_idx").on(table.planExceptionId),
+    index("charge_series_service_idx").on(table.boardSeriesId, table.boardServiceId),
+    // One live push per student and year: an open one, or the one its payment settled.
+    uniqueIndex("charge_one_push_per_year_idx").on(table.studentId, table.academicYear)
+      .where(sql`kind = 'school_fee_push' AND status IN ('pending_payment', 'paid')`),
+    // One charge per instalment of a plan.
+    uniqueIndex("charge_one_instalment_idx").on(table.planExceptionId, table.instalmentNo).where(sql`kind = 'instalment'`),
+    check("charge_kind_valid", sql`${table.kind} IN ('cash_in', 'late_cash_in', 'certificate_split', 'late_entry_fee', 'school_fee_push', 'instalment', 'price_adjustment', 'custom')`),
+    check("charge_status_valid", sql`${table.status} IN ('requested', 'pending_payment', 'paid', 'cancelled', 'refunded')`),
+    check("charge_amount_nonneg", sql`${table.amount} >= 0`),
+    check("charge_level_valid", sql`${table.level} IS NULL OR ${table.level} IN ('igcse', 'as_a_level')`),
+    check("charge_refund_within", sql`${table.refundAmount} IS NULL OR (${table.refundAmount} > 0 AND ${table.refundAmount} <= ${table.amount})`),
+    check("charge_refunded_whole", sql`(${table.status} = 'refunded') = (${table.refundAmount} IS NOT NULL)`),
+    check("charge_push_shape", sql`(${table.kind} = 'school_fee_push') = (${table.academicYear} IS NOT NULL)`),
+    check("charge_settled_push_only", sql`${table.settledByPaymentId} IS NULL OR ${table.kind} = 'school_fee_push'`),
+    check("charge_instalment_shape", sql`(${table.kind} = 'instalment') = (${table.planExceptionId} IS NOT NULL AND ${table.instalmentNo} IS NOT NULL AND ${table.registrationId} IS NOT NULL)`),
+    check("charge_service_shape", sql`${table.kind} NOT IN ('cash_in', 'late_cash_in', 'certificate_split') OR (${table.boardServiceId} IS NOT NULL AND ${table.boardSeriesId} IS NOT NULL)`),
+  ]
+);
+
+/** The charges a charge payment covers (the twin of payment_registration). */
+export const paymentCharge = pgTable(
+  "payment_charge",
+  {
+    id: text("id").primaryKey(),
+    paymentId: text("payment_id").notNull().references(() => payment.id, { onDelete: "cascade" }),
+    chargeId: text("charge_id").notNull().references(() => charge.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("paymentCharge_paymentId_idx").on(table.paymentId),
+    index("paymentCharge_chargeId_idx").on(table.chargeId),
+    uniqueIndex("paymentCharge_unique_idx").on(table.paymentId, table.chargeId),
+  ]
+);
+
+export const chargeRelations = relations(charge, ({ one, many }) => ({
+  student: one(user, { fields: [charge.studentId], references: [user.id], relationName: "studentCharges" }),
+  registration: one(registration, { fields: [charge.registrationId], references: [registration.id] }),
+  boardSeries: one(boardSeries, { fields: [charge.boardSeriesId], references: [boardSeries.id] }),
+  boardService: one(boardService, { fields: [charge.boardServiceId], references: [boardService.id] }),
+  plan: one(exception, { fields: [charge.planExceptionId], references: [exception.id], relationName: "planCharges" }),
+  settledByPayment: one(payment, { fields: [charge.settledByPaymentId], references: [payment.id], relationName: "settledPushes" }),
+  paymentCharges: many(paymentCharge),
+  receipt: one(receipt, { fields: [charge.id], references: [receipt.chargeId] }),
+}));
+
+export const paymentChargeRelations = relations(paymentCharge, ({ one }) => ({
+  payment: one(payment, { fields: [paymentCharge.paymentId], references: [payment.id] }),
+  charge: one(charge, { fields: [paymentCharge.chargeId], references: [charge.id] }),
 }));
 
 /**
@@ -2086,6 +2369,8 @@ export const paymentRelations = relations(payment, ({ one, many }) => ({
     relationName: "lateTransferPayments",
   }),
   paymentRegistrations: many(paymentRegistration),
+  // The reservations rework (§3.10 item 1): a charge payment's charges.
+  paymentCharges: many(paymentCharge),
 }));
 
 export const paymentRegistrationRelations = relations(paymentRegistration, ({ one }) => ({
@@ -2123,6 +2408,10 @@ export const escrowTransactionRelations = relations(escrowTransaction, ({ one })
   relatedPayment: one(payment, {
     fields: [escrowTransaction.relatedPaymentId],
     references: [payment.id],
+  }),
+  relatedCharge: one(charge, {
+    fields: [escrowTransaction.relatedChargeId],
+    references: [charge.id],
   }),
   initiatedByUser: one(user, {
     fields: [escrowTransaction.initiatedBy],
@@ -2260,6 +2549,10 @@ export const remarkRequest = pgTable(
       .references(() => registration.id, { onDelete: "restrict" }),
     // 'clerical_check' | 'review_of_marking' | 'priority_review' | 'script_copy'
     serviceType: text("service_type").notNull(),
+    // The reservations rework (§3.6): the board service of the line's board it is for, and the
+    // rate it was priced at ('igcse' | 'as_a_level') from the series' fee grid.
+    boardServiceId: text("board_service_id").references(() => boardService.id, { onDelete: "restrict" }),
+    serviceLevel: text("service_level"),
     // 'pending_approval' | 'pending_consent' | 'pending_payment' |
     // 'awaiting_submission' | 'submitted' | 'outcome_recorded' |
     // 'rejected' | 'cancelled'
@@ -2357,6 +2650,10 @@ export const remarkRequestRelations = relations(remarkRequest, ({ one, many }) =
   registration: one(registration, {
     fields: [remarkRequest.registrationId],
     references: [registration.id],
+  }),
+  boardService: one(boardService, {
+    fields: [remarkRequest.boardServiceId],
+    references: [boardService.id],
   }),
   items: many(remarkRequestItem),
 }));

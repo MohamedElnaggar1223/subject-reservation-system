@@ -1,23 +1,46 @@
 /**
- * Exception Service (V3 §6.3)
+ * Exceptions — grant, revoke, list, "Check these" (RESERVATIONS_REWORK.md §3.7).
  *
- * Grant/revoke plus the four enforcement hooks:
- * 1. Pricing        — custom_price / discount_percent / discount_fixed
- * 2. Window checks  — deadline_extension / late_registration treat a
- *                     closed window as open for one student
- * 3. School-fee gate — fee_waiver
- * 4. Refund percent — custom_refund_percent overrides refund windows
+ * An exception lifts one policy of the registry (POLICIES, @repo/validations) for one student or
+ * one family, narrowed to the scopes the policy accepts, with the value its policy takes. The
+ * registry says who may grant each policy; the grant and its audit row commit together, as do a
+ * revocation and what rested on it:
+ * - a grade-10 exception revoked: the waiting registrations it allowed expire (F0a);
+ * - a plan revoked: its line expires (`plan_revoked`) and its deposits are settled as a drop that
+ *   day; "release in full" keeps the line payable and gives every deposit back (§3.6);
+ * - a school-fee waiver granted: an open pushed school fee it covers is cancelled (§3.6);
+ * - a price exception on one unpaid line with no payment history: the line is re-priced with it.
+ *
+ * The V3 shape ({ type, studentId, sessionId?, subjectId?, value?, validUntil? }) is still
+ * accepted and mapped onto its key exactly as the migration mapped the old rows.
+ *
+ * Every hook reads exceptions through exception-registry.services (and line-exceptions for
+ * priceLine, assertLineRules and dueDateFor).
  */
 
-import { db, exception, user, registrationSession, eq, and, inArray, gradeTodayExtras } from '@repo/db';
+import {
+  db, exception, user, registration, registrationSession, subject, sessionOffer, sessionOfferItem, charge, boardSeries, parentStudentLink,
+  paymentRegistration,
+  eq, and, inArray, sql, gradeTodayExtras,
+} from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  EXCEPTION_GRANT_ROLES, EXCEPTION_TYPE_LABELS, exceptionTypesGrantableBy, hasRole,
-  academicYearStartOf, gradeInAcademicYear, seriesAcademicYearStart, seriesLabel,
-  type CreateExceptionType, type ListExceptionsQueryType, type ExceptionType, type Role,
+  POLICIES, LEGACY_TYPE_TO_POLICY, SCOPE_FIELD, isRegistryPolicyKey, policiesGrantableBy, hasRole,
+  academicYearStartOf, gradeInAcademicYear, seriesAcademicYearStart, seriesLabel, InstalmentRow,
+  type GrantExceptionType, type ListExceptionsQueryType, type RegistryPolicyKey, type PolicyScopeInputType, type Role, type InstalmentRowType,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { expireIneligibleRegistrations } from './eligibility.services';
+import { expireWaitingRegistrations } from './expiry.services';
+import { windowExtended, schoolFeeWaived } from './exception-registry.services';
+import { grantPlanInTx, settlePlanInTx, PlanError } from './plan.services';
+import { cancelPushesForWaiverInTx } from './school-fee.services';
+import { getSetting } from './settings.services';
+import { priceLine } from './pricing.services';
+import { cairoDayStart } from './refund.services';
+import { dueDateFor } from './deadline.services';
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export class ExceptionError extends Error {
   constructor(message: string, public readonly status: 400 | 403 | 404 | 409 = 400) {
@@ -25,20 +48,17 @@ export class ExceptionError extends Error {
   }
 }
 
-function assertMayGrant(type: ExceptionType, role: string | null | undefined, verb: 'grant' | 'revoke') {
-  const roles = EXCEPTION_GRANT_ROLES[type];
+function assertMayGrant(key: RegistryPolicyKey, role: string | null | undefined, verb: 'grant' | 'revoke' | 'confirm') {
+  const roles = POLICIES[key].grantRoles;
   if (!hasRole(role, ...(roles as readonly Role[]))) {
-    throw new ExceptionError(
-      `Only ${roles.map((r) => r.replace(/_/g, ' ')).join(' or ')} may ${verb} "${EXCEPTION_TYPE_LABELS[type]}"`,
-      403,
-    );
+    throw new ExceptionError(`Only ${roles.map((r) => r.replace(/_/g, ' ')).join(' or ')} may ${verb} "${POLICIES[key].label}"`, 403);
   }
 }
 
 /**
- * The grade-10 exception is for a student who is in grade 10 in the series
- * it names (or, with no series, in grade 10 this academic year or starting
- * next): a series they may sit anyway needs no exception.
+ * The grade-10 exception is for a student who is in grade 10 in the series it names (or, with no
+ * series, in grade 10 this academic year or starting next): a series they may sit anyway needs no
+ * exception.
  */
 async function assertGrade10ExceptionFits(studentId: string, sessionId: string | null | undefined) {
   const [s] = await db.select({ name: user.name, cohortYear: user.cohortYear }).from(user).where(eq(user.id, studentId));
@@ -61,158 +81,428 @@ async function assertGrade10ExceptionFits(studentId: string, sessionId: string |
   }
 }
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
+// ─── The grant, normalised ───────────────────────────────────────────────────
+
+type Normalised = {
+  policyKey: RegistryPolicyKey;
+  legacyType: string | null;
+  studentId: string | null;
+  familyId: string | null;
+  scope: PolicyScopeInputType;
+  value: number | string | InstalmentRowType[] | null;
+  validUntil: Date | null;
+  reason: string;
+};
+
+function normalise(data: GrantExceptionType): Normalised {
+  if ('type' in data) {
+    // V3's shape, mapped as the migration maps the old rows.
+    const key = LEGACY_TYPE_TO_POLICY[data.type];
+    const deadline = data.type === 'deadline_extension' || data.type === 'late_registration';
+    return {
+      policyKey: key,
+      legacyType: data.type,
+      studentId: data.studentId,
+      familyId: null,
+      scope: { ...(data.sessionId ? { sessionId: data.sessionId } : {}), ...(data.subjectId ? { subjectId: data.subjectId } : {}) },
+      value: deadline ? (data.validUntil ? data.validUntil.toISOString() : null) : (data.value ?? null),
+      validUntil: data.validUntil ?? null,
+      reason: data.reason,
+    };
+  }
+  return {
+    policyKey: data.policyKey,
+    legacyType: null,
+    studentId: data.studentId ?? null,
+    familyId: data.familyId ?? null,
+    scope: data.scope ?? {},
+    value: data.value ?? null,
+    validUntil: data.validUntil ?? null,
+    reason: data.reason,
+  };
+}
+
+/** A date value: a day ('2026-11-30') means the end of that school day for a deadline, the day itself for an anchor. */
+function toDate(key: RegistryPolicyKey, v: unknown): Date {
+  if (typeof v !== 'string') throw new ExceptionError(`${POLICIES[key].label} takes a date`);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    if (key === 'refund.courseStart') return new Date(`${v}T12:00:00Z`);
+    const next = new Date(Date.parse(`${v}T12:00:00Z`) + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    return new Date(cairoDayStart(next).getTime() - 1000);
+  }
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) throw new ExceptionError(`${POLICIES[key].label} takes a date`);
+  return d;
+}
+
+function typedValue(n: Normalised) {
+  const p = POLICIES[n.policyKey];
+  const out = { valueNumber: null as number | null, valueDate: null as Date | null, valueJson: null as unknown };
+  switch (p.valueType) {
+    case 'none':
+      if (n.value !== null && n.value !== undefined && n.legacyType === null) throw new ExceptionError(`${p.label} takes no value`);
+      return out;
+    case 'percent':
+    case 'amount': {
+      if (typeof n.value !== 'number') throw new ExceptionError(`${p.label} needs a value`);
+      const min = p.min ?? 0;
+      const max = p.max ?? 1_000_000;
+      if (n.value < min || n.value > max) throw new ExceptionError(p.valueType === 'percent' ? 'Percentage must be 0–100' : `The amount must be between ${min} and ${max}`);
+      out.valueNumber = Math.round(n.value * 100) / 100;
+      return out;
+    }
+    case 'date':
+      if (n.value === null || n.value === undefined) {
+        throw new ExceptionError(n.policyKey === 'deadline.window' ? 'Deadline extensions need an expiry date' : `${p.label} needs a date`);
+      }
+      out.valueDate = toDate(n.policyKey, n.value);
+      return out;
+    case 'schedule': {
+      const rows = InstalmentRow.array().min(1).max(24).safeParse(n.value);
+      if (!rows.success) throw new ExceptionError('A plan needs its instalments: a date and an amount each');
+      out.valueJson = rows.data.map((r) => ({ dueAt: r.dueAt.toISOString(), amount: Math.round(r.amount * 100) / 100 }));
+      return out;
+    }
+  }
+}
+
+/** Every scope field set is one the policy accepts, points at a row that exists, and is the holder's. */
+async function checkScope(tx: Tx, n: Normalised, holderStudents: string[]) {
+  const p = POLICIES[n.policyKey];
+  const allowed = new Set(p.scopes.map((s) => SCOPE_FIELD[s]));
+  const set = (Object.entries(n.scope) as [keyof PolicyScopeInputType, string | undefined][]).filter(([, v]) => !!v);
+  for (const [field] of set) {
+    if (!allowed.has(field)) throw new ExceptionError(`${p.label} cannot be narrowed by ${field.replace(/Id$/, '').replace(/([A-Z])/g, ' $1').toLowerCase()}`);
+  }
+  if (!set.length && p.nullScope === null) throw new ExceptionError(`${p.label} applies to something specific: choose what it is for`);
+  const s = n.scope;
+  if (s.sessionId && !(await tx.select({ id: registrationSession.id }).from(registrationSession).where(eq(registrationSession.id, s.sessionId))).length) throw new ExceptionError('Session not found', 404);
+  if (s.subjectId && !(await tx.select({ id: subject.id }).from(subject).where(eq(subject.id, s.subjectId))).length) throw new ExceptionError('Subject not found', 404);
+  if (s.offerId) {
+    const [o] = await tx.select({ sessionId: sessionOffer.sessionId }).from(sessionOffer).where(eq(sessionOffer.id, s.offerId));
+    if (!o) throw new ExceptionError('That subject is not offered in the session', 404);
+    if (s.sessionId && o.sessionId !== s.sessionId) throw new ExceptionError('That subject is offered in another session');
+  }
+  if (s.offerItemId) {
+    const [i] = await tx.select({ offerId: sessionOfferItem.offerId }).from(sessionOfferItem).where(eq(sessionOfferItem.id, s.offerItemId));
+    if (!i) throw new ExceptionError('That item is not on offer', 404);
+    if (s.offerId && i.offerId !== s.offerId) throw new ExceptionError('That item is of another subject');
+  }
+  if (s.boardSeriesId && !(await tx.select({ id: boardSeries.id }).from(boardSeries).where(eq(boardSeries.id, s.boardSeriesId))).length) throw new ExceptionError('Board series not found', 404);
+  // A line or a charge is one family's: never another's (05).
+  if (s.registrationId) {
+    const [l] = await tx.select({ studentId: registration.studentId }).from(registration).where(eq(registration.id, s.registrationId));
+    if (!l || !holderStudents.includes(l.studentId)) throw new ExceptionError('That line was not found for this student or family', 404);
+  }
+  if (s.chargeId) {
+    const [c] = await tx.select({ studentId: charge.studentId }).from(charge).where(eq(charge.id, s.chargeId));
+    if (!c || !holderStudents.includes(c.studentId)) throw new ExceptionError('That charge was not found for this student or family', 404);
+  }
+}
+
+/** The students an exception covers: the student, or every child linked to the family. */
+async function holderStudentsOf(executor: Tx | typeof db, n: { studentId: string | null; familyId: string | null }) {
+  if (n.studentId) {
+    const [st] = await executor.select({ id: user.id, role: user.role }).from(user).where(eq(user.id, n.studentId));
+    if (!st || st.role !== 'student') throw new ExceptionError('Exceptions can only be granted to students');
+    return [st.id];
+  }
+  const [fam] = await executor.select({ id: user.id, role: user.role }).from(user).where(eq(user.id, n.familyId!));
+  if (!fam || fam.role !== 'parent') throw new ExceptionError('A family is a parent account');
+  const kids = await executor.select({ id: parentStudentLink.studentId }).from(parentStudentLink)
+    .where(and(eq(parentStudentLink.parentId, fam.id), eq(parentStudentLink.status, 'approved')));
+  if (!kids.length) throw new ExceptionError('This parent has no linked child yet');
+  return kids.map((k) => k.id).sort();
 }
 
 // ─── Management ──────────────────────────────────────────────────────────────
 
 /**
- * Grant an exception. Each type names the roles that may grant it
- * (EXCEPTION_GRANT_ROLES, F0a): money exceptions are the finance admin's,
- * the grade-10 exception the coordinator's; admin may grant any. The grant
- * and its audit row commit together.
+ * Grant an exception (§3.7, §4.7). The registry decides who may grant the policy, the value it
+ * takes and the scopes it accepts; the grant and its audit row commit together with what it sets
+ * off (a plan's instalments; an open pushed fee a waiver covers, cancelled; an unpaid line's
+ * price, re-priced by a line-scoped price exception).
  */
-export async function grantException(data: CreateExceptionType, actor: { id: string; role: string | null | undefined }, ctx?: AuditContext) {
-  assertMayGrant(data.type, actor.role, 'grant');
-  const student = await db.query.user.findFirst({
-    where: (u, { eq }) => eq(u.id, data.studentId),
-    columns: { id: true, role: true },
-  });
-  if (!student || student.role !== 'student') {
-    throw new ExceptionError('Exceptions can only be granted to students');
+export async function grantException(data: GrantExceptionType, actor: { id: string; role: string | null | undefined }, ctx?: AuditContext) {
+  const n = normalise(data);
+  const p = POLICIES[n.policyKey];
+  assertMayGrant(n.policyKey, actor.role, 'grant');
+  if (p.status === 'pending') {
+    throw new ExceptionError(`${p.label} is registered but not yet applied by pricing: it cannot be granted yet`, 409);
   }
-  if (data.type === 'grade10_other_series') await assertGrade10ExceptionFits(data.studentId, data.sessionId);
+  if (p.status === 'gated' && !(await getSetting('exceptions.boardEntryDeadline'))) {
+    throw new ExceptionError('Late board entries are off: the board\'s entry deadline is a hard stop (owner question Q-20; the setting exceptions.boardEntryDeadline)', 409);
+  }
+  const holderStudents = await holderStudentsOf(db, n);
+  if (n.policyKey === 'eligibility.grade10OtherSeries') {
+    for (const s of holderStudents) await assertGrade10ExceptionFits(s, n.scope.sessionId);
+  }
+  const typed = typedValue(n);
+  if (n.policyKey === 'plan.instalments' && !n.studentId) throw new ExceptionError('A plan is for one student\'s line');
 
-  return db.transaction(async (tx) => {
-    const [created] = await tx
-      .insert(exception)
-      .values({
-        id: randomUUID(),
-        type: data.type,
-        studentId: data.studentId,
-        sessionId: data.sessionId ?? null,
-        subjectId: data.subjectId ?? null,
-        value: data.value ?? null,
-        reason: data.reason,
-        validUntil: data.validUntil ?? null,
+  try {
+    return await db.transaction(async (tx) => {
+      // The students first (the reservation's lock, §6), then what the grant rests on.
+      await tx.select({ id: user.id }).from(user).where(inArray(user.id, holderStudents)).orderBy(user.id).for('no key update');
+      if (n.scope.registrationId) await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, n.scope.registrationId)).for('update');
+      await checkScope(tx, n, holderStudents);
+      const id = randomUUID();
+      const [created] = await tx.insert(exception).values({
+        id,
+        type: n.legacyType,
+        policyKey: n.policyKey,
+        studentId: n.studentId,
+        familyId: n.familyId,
+        sessionId: n.scope.sessionId ?? null,
+        subjectId: n.scope.subjectId ?? null,
+        offerId: n.scope.offerId ?? null,
+        offerItemId: n.scope.offerItemId ?? null,
+        registrationId: n.scope.registrationId ?? null,
+        chargeId: n.scope.chargeId ?? null,
+        boardSeriesId: n.scope.boardSeriesId ?? null,
+        academicYear: n.scope.academicYear ?? null,
+        value: n.legacyType && typeof n.value === 'number' ? n.value : null,
+        valueNumber: typed.valueNumber,
+        valueDate: typed.valueDate,
+        valueJson: typed.valueJson,
+        reason: n.reason,
+        validUntil: n.validUntil,
         status: 'active',
         grantedBy: actor.id,
-      })
-      .returning();
-    await logAction(actor.id, 'EXCEPTION_GRANTED', 'exception', created!.id, null, created as Record<string, unknown>, ctx, tx);
-    return created!;
-  });
+      }).returning();
+      await logAction(actor.id, 'EXCEPTION_GRANTED', 'exception', id, null, created as Record<string, unknown>, ctx, tx);
+
+      let plan: Awaited<ReturnType<typeof grantPlanInTx>> | null = null;
+      if (n.policyKey === 'plan.instalments') {
+        plan = await grantPlanInTx(tx, { planId: id, lineId: n.scope.registrationId!, schedule: n.value as InstalmentRowType[], actorId: actor.id, ctx });
+      }
+      let pushesCancelled = 0;
+      if (n.policyKey === 'gate.schoolFee') {
+        pushesCancelled = await cancelPushesForWaiverInTx(tx, holderStudents, n.scope.academicYear ?? null, actor.id, ctx);
+      }
+      let repriced: { from: number; to: number } | null = null;
+      if (n.policyKey.startsWith('price.') && n.scope.registrationId) {
+        repriced = await repriceLineForException(tx, n.scope.registrationId, id, actor.id, ctx);
+      }
+      return { ...created!, plan, pushesCancelled, repriced };
+    });
+  } catch (err) {
+    if (err instanceof PlanError) throw new ExceptionError(err.message, err.status);
+    throw err;
+  }
 }
 
 /**
- * Revoke an exception — by a role that may grant its type. Revoking a
- * grade-10 exception is an eligibility change (F0a): the waiting
- * registrations it allowed expire in the same transaction, and the caller
- * closes their open checkouts after it commits.
+ * A price exception on one line (§3.7: price.* × line): an unpaid line with no payment history is
+ * re-priced with it, in the grant's transaction (its basis records it: 09's "price = basis"). A
+ * line with any payment history keeps the price its checkout saw — a difference is a price
+ * adjustment or a refund, finance's explicit act — so the grant is refused for it.
  */
-export async function revokeException(id: string, actor: { id: string; role: string | null | undefined }, ctx?: AuditContext) {
+async function repriceLineForException(tx: Tx, lineId: string, exceptionId: string, actorId: string, ctx?: AuditContext) {
+  const [l] = await tx.select().from(registration).where(eq(registration.id, lineId));
+  if (!l) throw new ExceptionError('That line was not found', 404);
+  const history = await tx.select({ id: paymentRegistration.id }).from(paymentRegistration).where(eq(paymentRegistration.registrationId, lineId)).limit(1);
+  if (!['pending_approval', 'pending_payment', 'preregistered'].includes(l.status) || history.length) {
+    throw new ExceptionError('This line has been paid for or has a payment: its price stays — add a price adjustment or refund the difference instead', 409);
+  }
+  const basis = l.pricingBasis as { exceptionIds?: string[] } | null;
+  if (!basis) throw new ExceptionError('A converted line keeps its price: add a price adjustment instead', 409);
+  const price = await priceLine(tx, { item: { id: l.offerItemId }, attempt: l.attempt as 'first' | 'retake', mode: l.mode as 'in_school' | 'self_study', studentId: l.studentId, sessionId: l.sessionId },
+    { exceptionIds: [...(basis.exceptionIds ?? []), exceptionId] });
+  await tx.update(registration).set({
+    priceAtRegistration: price.total, courseFeeAtRegistration: price.courseFee, registrationFeeAtRegistration: price.registrationFee,
+    priceProvisional: price.provisional, pricingBasis: price.basis as unknown as Record<string, unknown>, updatedAt: new Date(),
+  }).where(eq(registration.id, lineId));
+  await logAction(actorId, 'LINE_REPRICED', 'registration', lineId, { priceAtRegistration: l.priceAtRegistration },
+    { priceAtRegistration: price.total, reason: 'a price exception granted on this line', exceptionId }, ctx, tx);
+  const due = await dueDateFor(tx, { kind: 'line', lineId });
+  if (due.getTime() !== l.dueAt.getTime()) await tx.update(registration).set({ dueAt: due }).where(eq(registration.id, lineId));
+  return { from: l.priceAtRegistration, to: price.total };
+}
+
+/**
+ * Revoke an exception — by a role that may grant its policy. What rested on it follows in the
+ * same transaction: a grade-10 exception's waiting registrations expire (F0a; the caller closes
+ * their checkouts after); a plan's line expires (`plan_revoked`) and its deposits are settled as a
+ * drop that day. A one-shot gate already used stays used (what it let through stands).
+ */
+export async function revokeException(id: string, actor: { id: string; role: string | null | undefined }, ctx?: AuditContext, opts: { reason?: string } = {}) {
+  const [peek] = await db.select().from(exception).where(eq(exception.id, id));
+  if (!peek || peek.status !== 'active') throw new ExceptionError('Exception not found or already revoked', 404);
+  if (!isRegistryPolicyKey(peek.policyKey)) throw new ExceptionError('Exception not found or already revoked', 404);
+  assertMayGrant(peek.policyKey, actor.role, 'revoke');
   return db.transaction(async (tx) => {
+    // A plan: the student and the line first (§6), then the exception.
+    if (peek.policyKey === 'plan.instalments' && peek.registrationId && peek.studentId) {
+      await tx.select({ id: user.id }).from(user).where(eq(user.id, peek.studentId)).for('no key update');
+      await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, peek.registrationId)).for('update');
+    }
     const [row] = await tx.select().from(exception).where(eq(exception.id, id)).for('update');
     if (!row || row.status !== 'active') throw new ExceptionError('Exception not found or already revoked', 404);
-    assertMayGrant(row.type as ExceptionType, actor.role, 'revoke');
     const now = new Date();
     const [updated] = await tx
       .update(exception)
-      .set({ status: 'revoked', revokedBy: actor.id, revokedAt: now, updatedAt: now })
+      .set({ status: 'revoked', revokedBy: actor.id, revokedAt: now, revokeReason: opts.reason ?? null, updatedAt: now })
       .where(and(eq(exception.id, id), eq(exception.status, 'active')))
       .returning();
     await logAction(actor.id, 'EXCEPTION_REVOKED', 'exception', id, { status: 'active' }, updated as Record<string, unknown>, ctx, tx);
-    const expired = row.type === 'grade10_other_series'
-      ? await expireIneligibleRegistrations(tx, { studentIds: [row.studentId], ...(row.sessionId ? { sessionIds: [row.sessionId] } : {}) }, 'exception_revoked', now)
-      : [];
+    let expired: { id: string; studentId: string; subjectId: string }[] = [];
+    if (row.policyKey === 'eligibility.grade10OtherSeries') {
+      const students = row.studentId ? [row.studentId] : await holderStudentsOf(tx, row);
+      expired = await expireIneligibleRegistrations(tx, { studentIds: students, ...(row.sessionId ? { sessionIds: [row.sessionId] } : {}) }, 'exception_revoked', now);
+    }
+    if (row.policyKey === 'plan.instalments' && row.registrationId) {
+      // The line ends: expired as plan_revoked, the plan settled as a drop that day.
+      expired = await expireWaitingRegistrations(tx, eq(registration.id, row.registrationId), 'plan_revoked', now, opts.reason);
+      await settlePlanInTx(tx, { lineId: row.registrationId, planId: row.id, cause: 'revoked', at: now, actorId: actor.id, detail: opts.reason ?? 'the plan was revoked', ctx });
+    }
     return { exception: updated!, expired };
   });
 }
 
-/** Exceptions of the types the caller may grant (a coordinator sees the grade-10 ones only). */
+/**
+ * Finance ends a plan and keeps the line payable (§3.6): every deposit released to free escrow, the
+ * unpaid instalments cancelled, the line due by the session's date again. The line can then be
+ * paid in full, escrow included.
+ */
+export async function releasePlanInFull(id: string, actor: { id: string; role: string | null | undefined }, reason: string, ctx?: AuditContext) {
+  const [peek] = await db.select().from(exception).where(eq(exception.id, id));
+  if (!peek || peek.status !== 'active' || peek.policyKey !== 'plan.instalments' || !peek.registrationId || !peek.studentId) {
+    throw new ExceptionError('No live instalment plan with that id', 404);
+  }
+  assertMayGrant('plan.instalments', actor.role, 'revoke');
+  return db.transaction(async (tx) => {
+    await tx.select({ id: user.id }).from(user).where(eq(user.id, peek.studentId!)).for('no key update');
+    const [line] = await tx.select({ id: registration.id, status: registration.status }).from(registration).where(eq(registration.id, peek.registrationId!)).for('update');
+    const [row] = await tx.select().from(exception).where(eq(exception.id, id)).for('update');
+    if (!row || row.status !== 'active') throw new ExceptionError('No live instalment plan with that id', 404);
+    if (line?.status !== 'pending_payment') throw new ExceptionError('The line is no longer awaiting payment', 409);
+    const now = new Date();
+    const [updated] = await tx.update(exception).set({ status: 'revoked', revokedBy: actor.id, revokedAt: now, revokeReason: reason, updatedAt: now })
+      .where(and(eq(exception.id, id), eq(exception.status, 'active'))).returning();
+    await logAction(actor.id, 'EXCEPTION_REVOKED', 'exception', id, { status: 'active' }, { ...updated, releaseInFull: true } as Record<string, unknown>, ctx, tx);
+    const settlement = await settlePlanInTx(tx, { lineId: row.registrationId!, planId: row.id, cause: 'released_in_full', at: now, actorId: actor.id, detail: reason, ctx });
+    // Due by the session's date again (the plan's last date no longer applies).
+    const [cur] = await tx.select({ dueAt: registration.dueAt }).from(registration).where(eq(registration.id, row.registrationId!));
+    const due = await dueDateFor(tx, { kind: 'line', lineId: row.registrationId! });
+    if (cur && due.getTime() !== cur.dueAt.getTime()) {
+      await tx.update(registration).set({ dueAt: due, updatedAt: now }).where(eq(registration.id, row.registrationId!));
+      await logAction(actor.id, 'LINE_DUE_MOVED', 'registration', row.registrationId!, { dueAt: cur.dueAt.toISOString() }, { dueAt: due.toISOString(), reason: 'instalment plan released in full' }, ctx, tx);
+    }
+    return { exception: updated!, settlement };
+  });
+}
+
+/** Exceptions of the policies the caller may grant (a coordinator sees the academic ones). */
 export async function getExceptions(filters: ListExceptionsQueryType | undefined, role: string | null | undefined) {
-  const types = exceptionTypesGrantableBy(role);
+  const keys = policiesGrantableBy(role);
+  const legacyKey = filters?.type ? LEGACY_TYPE_TO_POLICY[filters.type] : null;
   return db.query.exception.findMany({
-    where: (e, { eq, and }) => {
-      const conditions = [inArray(e.type, types.length ? types : ['__none__'])];
-      if (filters?.studentId) conditions.push(eq(e.studentId, filters.studentId));
-      if (filters?.status) conditions.push(eq(e.status, filters.status));
-      if (filters?.type) conditions.push(eq(e.type, filters.type));
-      return and(...conditions);
+    where: (e, { eq: eqOp, and: andOp, inArray: inArr }) => {
+      const conditions = [inArr(e.policyKey, keys.length ? keys : ['__none__'])];
+      if (filters?.studentId) conditions.push(eqOp(e.studentId, filters.studentId));
+      if (filters?.familyId) conditions.push(eqOp(e.familyId, filters.familyId));
+      if (filters?.status) conditions.push(eqOp(e.status, filters.status));
+      if (filters?.policyKey) conditions.push(eqOp(e.policyKey, filters.policyKey));
+      if (legacyKey) conditions.push(eqOp(e.policyKey, legacyKey));
+      return andOp(...conditions);
     },
     with: {
       student: { columns: { id: true, name: true, email: true, cohortYear: true }, extras: gradeTodayExtras },
+      family: { columns: { id: true, name: true, email: true } },
       session: { columns: { id: true, name: true } },
       subject: { columns: { id: true, name: true, code: true } },
+      offer: { columns: { id: true }, with: { subject: { columns: { id: true, name: true } } } },
+      offerItem: { columns: { id: true, label: true } },
+      registration: { columns: { id: true, status: true, priceAtRegistration: true }, with: { subject: { columns: { name: true } }, session: { columns: { name: true } } } },
+      charge: { columns: { id: true, description: true, amount: true, status: true } },
+      boardSeries: { columns: { id: true, boardCode: true, month: true, year: true, label: true } },
     },
     orderBy: (e, { desc }) => [desc(e.createdAt)],
   });
 }
 
-// ─── Enforcement helpers ─────────────────────────────────────────────────────
-
 /**
- * Active, unexpired exceptions of the given types matching the scope.
- * A null sessionId/subjectId on the exception means "applies to all".
+ * "Check these" (§3.7): exceptions whose meaning the rework changed, for a finance admin to confirm
+ * (apply as they are now scoped) or revoke —
+ * - a migrated subject-scoped deadline or refund exception (V3 never applied one): until
+ *   confirmed it covers nothing;
+ * - a price exception scoped to an old unit row whose unit an item of another subject now enters
+ *   (a parent row, §3.2): it still applies to that row's lines only, so a new reservation of the
+ *   parent's item would not get it — re-scope it (revoke and grant it on the item) or confirm it.
  */
-export async function getActiveExceptions(
-  studentId: string,
-  types: string[],
-  scope: { sessionId?: string; subjectId?: string } = {},
-  executor: Pick<typeof db, 'query'> = db
-) {
-  const now = new Date();
-  const rows = await executor.query.exception.findMany({
-    where: (e, { eq, and, inArray }) =>
-      and(eq(e.studentId, studentId), eq(e.status, 'active'), inArray(e.type, types)),
+export async function getCheckThese(role: string | null | undefined) {
+  const keys = policiesGrantableBy(role);
+  if (!keys.length) return [];
+  const listed = await db.query.exception.findMany({
+    where: (e, { and: andOp, eq: eqOp, isNotNull: nn, isNull: nu, inArray: inArr }) =>
+      andOp(eqOp(e.status, 'active'), nn(e.checkReason), nu(e.confirmedAt), inArr(e.policyKey, keys)),
+    with: {
+      student: { columns: { id: true, name: true } },
+      family: { columns: { id: true, name: true } },
+      session: { columns: { id: true, name: true } },
+      subject: { columns: { id: true, name: true, code: true } },
+    },
+    orderBy: (e, { asc }) => [asc(e.createdAt)],
   });
+  const priceKeys = keys.filter((k) => k.startsWith('price.'));
+  const unitRows = priceKeys.length ? await db.execute(sql`
+    select e.id from exception e
+    where e.status = 'active' and e.confirmed_at is null and e.check_reason is null and e.subject_id is not null
+      and e.policy_key in (${sql.join(priceKeys.map((k) => sql`${k}`), sql`, `)})
+      and exists (
+        select 1 from subject_unit su
+        join session_offer_item_unit iu on iu.unit_id = su.unit_id
+        join session_offer_item i on i.id = iu.item_id
+        join session_offer o on o.id = i.offer_id
+        join registration_session rs on rs.id = o.session_id
+        where su.subject_id = e.subject_id and o.subject_id <> e.subject_id and rs.status <> 'closed')`).then((r) => (r.rows as { id: string }[]).map((x) => x.id)) : [];
+  const parents = unitRows.length ? await db.query.exception.findMany({
+    where: (e, { inArray: inArr }) => inArr(e.id, unitRows),
+    with: {
+      student: { columns: { id: true, name: true } },
+      family: { columns: { id: true, name: true } },
+      session: { columns: { id: true, name: true } },
+      subject: { columns: { id: true, name: true, code: true } },
+    },
+  }) : [];
+  return [
+    ...listed.map((e) => ({ ...e, why: e.checkReason! })),
+    ...parents.map((e) => ({ ...e, why: `A price exception on ${e.subject?.name ?? 'an old unit row'}, whose unit is now reserved under another subject: it applies only to that row's lines — re-scope it to the new item (revoke and grant again) or confirm it as it is` })),
+  ];
+}
 
-  return rows.filter((e) => {
-    if (e.validUntil && e.validUntil < now) return false;
-    if (e.sessionId && scope.sessionId && e.sessionId !== scope.sessionId) return false;
-    if (e.sessionId && !scope.sessionId) return false;
-    if (e.subjectId && scope.subjectId && e.subjectId !== scope.subjectId) return false;
-    if (e.subjectId && !scope.subjectId) return false;
-    return true;
+/** Confirm an exception listed under "Check these": from now on it applies as it is scoped. */
+export async function confirmCheckedException(id: string, actor: { id: string; role: string | null | undefined }, note: string | undefined, ctx?: AuditContext) {
+  return db.transaction(async (tx) => {
+    const [row] = await tx.select().from(exception).where(eq(exception.id, id)).for('update');
+    if (!row || row.status !== 'active' || !isRegistryPolicyKey(row.policyKey)) throw new ExceptionError('Exception not found', 404);
+    assertMayGrant(row.policyKey, actor.role, 'confirm');
+    if (row.confirmedAt) throw new ExceptionError('Already confirmed', 409);
+    const now = new Date();
+    const [updated] = await tx.update(exception).set({ confirmedAt: now, confirmedBy: actor.id, updatedAt: now }).where(eq(exception.id, id)).returning();
+    await logAction(actor.id, 'EXCEPTION_CONFIRMED', 'exception', id, { checkReason: row.checkReason }, { confirmedAt: now.toISOString(), note: note ?? null }, ctx, tx);
+    return updated!;
   });
 }
 
-// Hook 1 — pricing — moved to the exception adapter (line-exceptions.ts), which priceLine reads
-// (RESERVATIONS_REWORK.md §3.4; the order of application is today's).
+// ─── Hooks the V3 services call by name ──────────────────────────────────────
 
 /**
- * Hook 2 — window checks. A closed (or not-yet-open) session is treated
- * as open for this student while an extension is active.
+ * Hook 2 — window checks (MA-13): a closed (or not-yet-open) session is treated as open for this
+ * student while a deadline.window exception covers it, until its date.
  */
 export async function hasDeadlineExtension(
   studentId: string,
   sessionId: string,
   // A caller inside a transaction passes it, so the lookup does not take a
   // second pool connection while the transaction holds its locks.
-  executor: Pick<typeof db, 'query'> = db
+  executor: Tx | typeof db = db
 ): Promise<boolean> {
-  const rows = await getActiveExceptions(
-    studentId,
-    ['deadline_extension', 'late_registration'],
-    { sessionId },
-    executor
-  );
-  return rows.length > 0;
+  return windowExtended(executor, studentId, sessionId);
 }
 
-/** Hook 3 — school-fee gate bypass */
-export async function hasFeeWaiver(studentId: string): Promise<boolean> {
-  const rows = await getActiveExceptions(studentId, ['fee_waiver']);
-  return rows.length > 0;
-}
-
-/** Hook 4 — refund percentage override; null = no override */
-export async function customRefundPercent(
-  studentId: string,
-  sessionId: string
-): Promise<number | null> {
-  const rows = await getActiveExceptions(studentId, ['custom_refund_percent'], { sessionId });
-  const row = rows.find((e) => e.value != null);
-  return row ? row.value! : null;
+/** Hook 3 — the school-fee gate's waiver (gate.schoolFee): for that academic year, or every year. */
+export async function hasFeeWaiver(studentId: string, academicYear: string | null = null): Promise<boolean> {
+  return schoolFeeWaived(db, studentId, academicYear);
 }

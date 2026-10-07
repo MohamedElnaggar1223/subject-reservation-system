@@ -16,7 +16,7 @@
  *   on one screen.
  */
 
-import { db, payment, paymentRegistration, registration, parentStudentLink, user as userTable, eq, and, inArray, gradeTodayExtras } from '@repo/db';
+import { db, payment, paymentRegistration, registration, parentStudentLink, charge, user as userTable, eq, and, inArray, gradeTodayExtras } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { DeskOnboardFamilyType, DeskRegistrationType, DeskCollectType } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
@@ -29,7 +29,7 @@ import { getSetting } from './settings.services';
 import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { setStudentFields } from './user.services';
 import { getEscrowBalance, debitEscrow } from './escrow.services';
-import { confirmPayment, failPayment } from './payment.services';
+import { confirmPayment, failPayment, assertNoLivePlan, createChargePaymentsInTx } from './payment.services';
 import {
   academicYearForDate,
   getSchoolFeeStanding,
@@ -281,6 +281,8 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
 type DeskPayment = {
   id: string; amount: number; escrowApplied: number; registrationIds: string[];
   series: string[]; entryDeadline: Date | null;
+  // The reservations rework (§3.10 item 1): a charge payment's charges (its series: their description).
+  chargeIds?: string[];
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -399,11 +401,12 @@ async function confirmDeskPayment(
  * once through confirmPayment (receipts, notifications, audit rows).
  */
 export async function collectAtDesk(staffId: string, data: DeskCollectType, auditCtx?: AuditContext) {
-  const regs = await db.query.registration.findMany({
-    where: (r, { inArray }) => inArray(r.id, data.registrationIds),
+  const lineIds = data.registrationIds;
+  const regs = lineIds.length ? await db.query.registration.findMany({
+    where: (r, { inArray }) => inArray(r.id, lineIds),
     columns: { id: true, studentId: true, sessionId: true, status: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true, priceProvisional: true },
-  });
-  if (regs.length !== data.registrationIds.length || regs.some((r) => r.studentId !== data.studentId)) {
+  }) : [];
+  if (regs.length !== lineIds.length || regs.some((r) => r.studentId !== data.studentId)) {
     throw new Error('One or more subjects do not belong to this student');
   }
   if (regs.some((r) => r.status !== 'pending_payment')) {
@@ -422,42 +425,68 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
   // A line whose board fee is still provisional is not collected (§3.4).
   if (regs.some((r) => r.priceProvisional) && !(await getSetting('pricing.payOnProvisionalFee'))) throw new Error(PROVISIONAL_REFUSAL);
 
+  // The reservations rework (§3.10 item 1): the student's charges in the same action, each group
+  // its own payment (lines per entry deadline, charges per service deadline or per plan line).
+  const chargeRows = data.chargeIds.length
+    ? await db.select({ id: charge.id, studentId: charge.studentId, amount: charge.amount, kind: charge.kind }).from(charge).where(inArray(charge.id, data.chargeIds))
+    : [];
+  if (chargeRows.length !== data.chargeIds.length || chargeRows.some((c) => c.studentId !== data.studentId)) {
+    throw new Error('One or more charges do not belong to this student');
+  }
+
   const totalCost = Math.round(regs.reduce((s, r) => s + r.priceAtRegistration, 0) * 100) / 100;
   const escrowToApply = data.escrowAmountToApply ?? 0;
-  if (escrowToApply > totalCost) throw new Error('Escrow amount cannot exceed the total cost');
+  const chargeTotal = Math.round(chargeRows.filter((c) => c.kind !== 'instalment').reduce((s, c) => s + c.amount, 0) * 100) / 100;
+  if (escrowToApply > totalCost + chargeTotal + 0.001) throw new Error('Escrow amount cannot exceed the total cost');
   const payerParentId = await resolvePayerParent(data.studentId);
   const prices = new Map(regs.map((r) => [r.id, r.priceAtRegistration]));
 
   const payments = await db.transaction(async (tx) => {
-    // Same guard as an app checkout (MA-06): lock the subjects, then make sure
-    // nothing else is already paying for them.
-    const locked = await tx
-      .select({ id: registration.id, status: registration.status, price: registration.priceAtRegistration })
-      .from(registration)
-      .where(inArray(registration.id, data.registrationIds))
-      .orderBy(registration.id)
-      .for('update');
-    if (locked.some((r) => r.status !== 'pending_payment')) {
-      throw new Error('One or more subjects are not waiting for payment');
+    const made: DeskPayment[] = [];
+    let escrowLeft = escrowToApply;
+    if (lineIds.length) {
+      // Same guard as an app checkout (MA-06): lock the subjects, then make sure
+      // nothing else is already paying for them.
+      const locked = await tx
+        .select({ id: registration.id, status: registration.status, price: registration.priceAtRegistration })
+        .from(registration)
+        .where(inArray(registration.id, lineIds))
+        .orderBy(registration.id)
+        .for('update');
+      if (locked.some((r) => r.status !== 'pending_payment')) {
+        throw new Error('One or more subjects are not waiting for payment');
+      }
+      // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
+      if (locked.some((l) => l.price !== prices.get(l.id))) throw new Error(PRICE_CHANGED_REFUSAL);
+      // A line under a live plan is paid by its instalments only (§3.10 item 7).
+      await assertNoLivePlan(tx, lineIds);
+      const open = await tx
+        .select({ ref: payment.externalReference, method: payment.paymentMethod })
+        .from(paymentRegistration)
+        .innerJoin(payment, eq(payment.id, paymentRegistration.paymentId))
+        .where(and(inArray(paymentRegistration.registrationId, lineIds), inArray(payment.status, ['pending', 'pending_verification'])));
+      if (open.length > 0) {
+        throw new Error(
+          `These subjects already have a ${open[0]!.method === 'instapay' ? 'transfer' : 'checkout'} in progress — confirm it or reject it in the Finance Workbench first`
+        );
+      }
+      // F0b: one payment per entry deadline, each with its own creation audit row.
+      const groups = await seriesDeadlineGroups(tx, lineIds, true);
+      const lineEscrow = Math.min(escrowLeft, totalCost);
+      escrowLeft = Math.round((escrowLeft - lineEscrow) * 100) / 100;
+      const lines = await createDeskPayments(tx, { studentId: data.studentId, payerParentId, staffId, escrowToApply: lineEscrow, groups, prices });
+      for (const p of lines) {
+        await logAction(staffId, 'PAYMENT_INITIATED', 'payment', p.id, null,
+          { desk: true, registrationIds: p.registrationIds, amount: p.amount, escrowApplied: p.escrowApplied, ...(lines.length > 1 ? { series: p.series } : {}) }, auditCtx, tx);
+      }
+      made.push(...lines);
     }
-    // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
-    if (locked.some((l) => l.price !== prices.get(l.id))) throw new Error(PRICE_CHANGED_REFUSAL);
-    const open = await tx
-      .select({ ref: payment.externalReference, method: payment.paymentMethod })
-      .from(paymentRegistration)
-      .innerJoin(payment, eq(payment.id, paymentRegistration.paymentId))
-      .where(and(inArray(paymentRegistration.registrationId, data.registrationIds), inArray(payment.status, ['pending', 'pending_verification'])));
-    if (open.length > 0) {
-      throw new Error(
-        `These subjects already have a ${open[0]!.method === 'instapay' ? 'transfer' : 'checkout'} in progress — confirm it or reject it in the Finance Workbench first`
-      );
-    }
-    // F0b: one payment per entry deadline, each with its own creation audit row.
-    const groups = await seriesDeadlineGroups(tx, data.registrationIds, true);
-    const made = await createDeskPayments(tx, { studentId: data.studentId, payerParentId, staffId, escrowToApply, groups, prices });
-    for (const p of made) {
-      await logAction(staffId, 'PAYMENT_INITIATED', 'payment', p.id, null,
-        { desk: true, registrationIds: p.registrationIds, amount: p.amount, escrowApplied: p.escrowApplied, ...(made.length > 1 ? { series: p.series } : {}) }, auditCtx, tx);
+    if (data.chargeIds.length) {
+      const expected = new Map(chargeRows.map((c) => [c.id, c.amount]));
+      const charges = await createChargePaymentsInTx(tx, {
+        studentId: data.studentId, payerParentId, actorId: staffId, chargeIds: data.chargeIds, method: 'in_school', escrowToApply: escrowLeft, desk: true, expected, auditCtx,
+      });
+      made.push(...charges.map((c) => ({ id: c.id, amount: c.amount, escrowApplied: c.escrowApplied, registrationIds: [] as string[], chargeIds: c.chargeIds, series: [c.description], entryDeadline: c.deadline })));
     }
     return made;
   });
@@ -466,13 +495,13 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
 
   // Only receipts ready to hand over; a void one is never offered (MA-20).
   const receipts = await db.query.receipt.findMany({
-    where: (r, { inArray: inArr, and: andOp, eq: eqOp }) =>
-      andOp(inArr(r.registrationId, data.registrationIds), eqOp(r.status, 'pending_issue')),
-    columns: { id: true, registrationId: true, receiptNumber: true, status: true },
+    where: (r, { inArray: inArr, and: andOp, eq: eqOp, or: orOp }) =>
+      andOp(orOp(inArr(r.registrationId, [...lineIds, '__none__']), inArr(r.chargeId, [...data.chargeIds, '__none__'])), eqOp(r.status, 'pending_issue')),
+    columns: { id: true, registrationId: true, chargeId: true, receiptNumber: true, status: true },
   });
   return {
     paymentId: outcome.confirmed[0]!.id,
-    payments: outcome.confirmed.map((p) => ({ id: p.id, series: p.series, entryDeadline: p.entryDeadline, collected: p.amount, escrowApplied: p.escrowApplied, registrationIds: p.registrationIds })),
+    payments: outcome.confirmed.map((p) => ({ id: p.id, series: p.series, entryDeadline: p.entryDeadline, collected: p.amount, escrowApplied: p.escrowApplied, registrationIds: p.registrationIds, chargeIds: p.chargeIds ?? [] })),
     notCollected: outcome.notCollected,
     collected: outcome.collected,
     escrowApplied: outcome.escrowApplied,

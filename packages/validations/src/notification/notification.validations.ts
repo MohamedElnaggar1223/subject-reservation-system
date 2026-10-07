@@ -53,6 +53,10 @@ export const NOTIFICATION_TYPES = [
   'PREREGISTRATION_HELD',
   // Reservations rework: a line re-priced when the board confirmed its fee
   'PRICE_CHANGED',
+  // Reservations rework, step C: a charge added or pushed, or what happened to it; a plan's news
+  'CHARGE_ADDED',
+  'CHARGE_UPDATED',
+  'PLAN_UPDATED',
 ] as const;
 
 export const NotificationTypeSchema = z.enum(NOTIFICATION_TYPES);
@@ -81,6 +85,9 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   LINK_DECISION:                    'Link Request Decision',
   PREREGISTRATION_HELD:             'Preregistration Held',
   PRICE_CHANGED:                    'Price Changed',
+  CHARGE_ADDED:                     'New Charge',
+  CHARGE_UPDATED:                   'Charge Updated',
+  PLAN_UPDATED:                     'Instalment Plan',
 };
 
 // Icons mapped per type (used in the notification center UI)
@@ -107,6 +114,9 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   LINK_DECISION:                    '🔗',
   PREREGISTRATION_HELD:             '⏸️',
   PRICE_CHANGED:                    '💱',
+  CHARGE_ADDED:                     '🧾',
+  CHARGE_UPDATED:                   '🧾',
+  PLAN_UPDATED:                     '🗓️',
 };
 
 // ─── Admin bulk announcement recipient groups ─────────────────────────────────

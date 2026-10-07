@@ -60,7 +60,7 @@ import type {
   ChangeRequestsQueryType,
 } from '@repo/validations';
 import { creditEscrow, getEscrowBalance } from './escrow.services';
-import { refundPercentage } from './refund.services';
+import { refundFor, refundSentence } from './refund.services';
 import { executeReceiptGatedDrop } from './receipt.services';
 import { priceLine } from './pricing.services';
 import { insertLines } from './line.services';
@@ -487,9 +487,11 @@ export async function approveChangeRequest(
 
   const now = new Date();
 
-  // V3 §6.12: the refund percentage locks at drop-APPROVAL time
-  const pct = await refundPercentage(now, cr.registration.sessionId, cr.registration.studentId);
-  const refundAmount = round2((cr.registration.priceAtRegistration * pct) / 100);
+  // V3 §6.12: the refund locks at drop-APPROVAL time; since the reservations rework it is the
+  // line's own (refundFor, §3.9: the percent on the course fee, the board fee while not sent).
+  const quote = await refundFor(db, cr.registrationId, now);
+  const pct = quote.percent;
+  const refundAmount = quote.amount;
 
   const result = await db.transaction(async (tx) => {
     // A swap registers a new subject: asked again with the student and window
@@ -531,7 +533,7 @@ export async function approveChangeRequest(
       newRegistrationId = made!.id;
     }
 
-    const outcome = { success: true, type: cr.type, ...dropOutcome, refundPercentage: pct };
+    const outcome = { success: true, type: cr.type, ...dropOutcome, refundPercentage: pct, refundCoursePart: quote.coursePart, refundBoardPart: quote.boardPart };
     // The drop, its refund and their audit row commit together (MO-1).
     await logAction(parentId, 'CHANGE_REQUEST_APPROVED', 'change_request', changeRequestId, { status: 'pending_approval' },
       { ...outcome, registrationId: cr.registrationId, newRegistrationId }, auditCtx, tx);
@@ -546,8 +548,8 @@ export async function approveChangeRequest(
     result.refundAmount <= 0
       ? `No refund applies (${result.refundPercentage}% refund window)`
       : result.gated
-        ? `EGP ${result.refundAmount.toFixed(2)} (${result.refundPercentage}%) will be credited once the subject's receipt is returned to the school`
-        : `EGP ${result.refundAmount.toFixed(2)} (${result.refundPercentage}%) credited to your escrow`;
+        ? `${refundSentence(quote)} will be credited once the subject's receipt is returned to the school`
+        : `${refundSentence(quote)} credited to your escrow`;
 
   notifyDropSwapProcessed({
     studentId,
@@ -679,9 +681,10 @@ export async function executeDirectDrop(
 
   const now = new Date();
 
-  // V3 §6.12: refund percentage locks at drop time
-  const pct = await refundPercentage(now, reg.sessionId, reg.studentId);
-  const refundAmount = round2((reg.priceAtRegistration * pct) / 100);
+  // V3 §6.12: the refund locks at drop time (refundFor, §3.9).
+  const quote = await refundFor(db, registrationId, now);
+  const pct = quote.percent;
+  const refundAmount = quote.amount;
 
   // Atomic transaction (OI-009) — receipt-gated (D-D)
   const result = await db.transaction(async (tx) => {
@@ -692,7 +695,7 @@ export async function executeDirectDrop(
       refundReason: 'drop',
       initiatedBy: parentId,
     });
-    const outcome = { success: true, creditedAmount: dropOutcome.gated ? 0 : refundAmount, ...dropOutcome, refundPercentage: pct };
+    const outcome = { success: true, creditedAmount: dropOutcome.gated ? 0 : refundAmount, ...dropOutcome, refundPercentage: pct, refundCoursePart: quote.coursePart, refundBoardPart: quote.boardPart };
     // The drop, its refund and their audit row commit together (MO-1).
     await logAction(parentId, 'DIRECT_DROP_EXECUTED', 'registration', registrationId, { status: reg.status }, outcome, auditCtx, tx);
     return outcome;
@@ -702,8 +705,8 @@ export async function executeDirectDrop(
     refundAmount <= 0
       ? `No refund applies (${pct}% refund window).`
       : result.gated
-        ? `EGP ${refundAmount.toFixed(2)} (${pct}%) will be credited once the receipt is returned to the school.`
-        : `EGP ${refundAmount.toFixed(2)} (${pct}%) credited to your escrow.`;
+        ? `${refundSentence(quote)} will be credited once the receipt is returned to the school.`
+        : `${refundSentence(quote)} credited to your escrow.`;
 
   // NOT-007 / SWAP-004: Student receives email + in-app notification when
   // a parent directly drops a subject for them.
@@ -777,9 +780,10 @@ export async function executeDirectSwap(
   const newSubjectPrice = swap.price.total;
   const now = new Date();
 
-  // V3 §6.12: refund percentage locks at swap time (drop leg)
-  const pct = await refundPercentage(now, reg.sessionId, reg.studentId);
-  const refundAmount = round2((reg.priceAtRegistration * pct) / 100);
+  // V3 §6.12: the drop leg's refund locks at swap time (refundFor, §3.9).
+  const quote = await refundFor(db, registrationId, now);
+  const pct = quote.percent;
+  const refundAmount = quote.amount;
 
   // Atomic transaction (OI-009) — drop leg receipt-gated (D-D)
   const result = await db.transaction(async (tx) => {
@@ -822,8 +826,8 @@ export async function executeDirectSwap(
     refundAmount <= 0
       ? `No refund applies for the dropped subject (${pct}% refund window); payment for the new subject is pending.`
       : result.gated
-        ? `EGP ${refundAmount.toFixed(2)} (${pct}%) will be credited once the old receipt is returned; payment for the new subject is pending.`
-        : `EGP ${refundAmount.toFixed(2)} (${pct}%) credited to your escrow; payment for the new subject is pending.`;
+        ? `${refundSentence(quote)} will be credited once the old receipt is returned; payment for the new subject is pending.`
+        : `${refundSentence(quote)} credited to your escrow; payment for the new subject is pending.`;
 
   notifyDirectDropSwapExecuted({
     studentId: reg.studentId,
