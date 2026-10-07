@@ -421,6 +421,51 @@ export async function seriesOfSession(sessionId: string, board: 'cambridge' | 'p
     where i.session_id = $1 and bs.board_code = $2 and i.availability <> 'closed'`, [sessionId, board])).id;
 }
 
+/** Both consents ticked: every reservation path takes them since step B (RESERVATIONS_REWORK.md §3.5). */
+export const CONSENT = { refundPolicy: true, declaration: true } as const;
+
+/** A subject's whole item in a session — what resolveItem picks: an open one first, then one with a series. */
+async function wholeItemOf(sessionId: string, subjectId: string) {
+  const [it] = await sql<{ id: string; offer_availability: string; availability: string }>(
+    `select i.id, o.availability as offer_availability, i.availability from session_offer_item i join session_offer o on o.id = i.offer_id
+     where o.session_id = $1 and o.subject_id = $2 and i.kind = 'whole' order by (i.availability = 'closed'), (i.board_series_id is null), i.id limit 1`,
+    [sessionId, subjectId]);
+  return it ?? null;
+}
+
+/**
+ * A file's subjects as one reservation's `lines` and `consent` (step B: every reservation path
+ * takes lines — one per item — and both consents, not `subjectIds`): each subject's whole item in
+ * the session, a first entry, in school unless the item is self-study only; `teachers` names a
+ * line's teacher (else the server's default: the item's or offer's only teacher, or none).
+ * A subject the session does not offer becomes an item id the server refuses as not on offer.
+ */
+export async function reservationOf(
+  sessionId: string,
+  subjectIds: string[],
+  opts: { teachers?: Record<string, string> } = {},
+) {
+  const lines: { offerItemId: string; attempt: 'first'; mode: 'in_school' | 'self_study'; teacherId?: string }[] = [];
+  for (const subjectId of subjectIds) {
+    const it = await wholeItemOf(sessionId, subjectId);
+    const selfStudyOnly = it ? it.offer_availability === 'self_study_only' || it.availability === 'self_study_only' : false;
+    lines.push({
+      offerItemId: it?.id ?? `not-offered:${subjectId}`,
+      attempt: 'first',
+      mode: selfStudyOnly ? 'self_study' : 'in_school',
+      ...(opts.teachers?.[subjectId] ? { teacherId: opts.teachers[subjectId] } : {}),
+    });
+  }
+  return { lines, consent: CONSENT };
+}
+
+/** A swap's new line (step B): the subject's whole item in the session of the line being swapped, a first entry. */
+export async function swapTo(registrationId: string, subjectId: string) {
+  const [r] = await sql<{ session_id: string }>(`select session_id from registration where id = $1`, [registrationId]);
+  const { lines } = await reservationOf(r?.session_id ?? '', [subjectId]);
+  return lines[0]!;
+}
+
 /** A session's name (derived from its type, year and label since the reservations rework). */
 export async function sessionName(sessionId: string) {
   return (await one<{ name: string }>(`select name from registration_session where id = $1`, [sessionId])).name;

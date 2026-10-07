@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, refused, one, sql, audited, money, futureWindow, runPaymentDeadlines, runSessionRecovery,
-  schoolToday, type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, refused, one, sql, audited, money, futureWindow, runPaymentDeadlines, runSessionRecovery, schoolToday, type Client, reservationOf } from './helpers';
 
 /**
  * The reservations rework, step 1 (RESERVATIONS_REWORK.md §3.1–§3.3, §4.1, §8): sessions, their
@@ -32,14 +29,20 @@ const Y = academicYearStartOf();
 const cairoDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
 type Line = Pick<LineInputType, 'offerItemId' | 'attempt' | 'mode'> & Partial<LineInputType>;
 
-/** Reserve lines as every reservation path does (the student locked first, then insertLines). */
+/**
+ * Reserve lines as every reservation path does (the student locked first, then insertLines), with
+ * the family's two consent rows the paths write since step B (a line without them is never confirmed).
+ */
 async function reserve(studentId: string, sessionId: string, lines: Line[], status: 'pending_payment' | 'preregistered' = 'pending_payment') {
   const { db } = await import('@repo/db');
   const { insertLines } = await import('../src/services/line.services');
+  const { writeConsents } = await import('../src/services/reservation.services');
   const { assertMayRegisterForInTx } = await import('../src/services/eligibility.services');
   return db.transaction(async (tx) => {
     const eligibility = await assertMayRegisterForInTx(tx, studentId, sessionId);
-    return insertLines(tx, { studentId, sessionId, lines: lines as LineInputType[], status, requestedBy: studentId, eligibility });
+    const made = await insertLines(tx, { studentId, sessionId, lines: lines as LineInputType[], status, requestedBy: studentId, eligibility });
+    await writeConsents(tx, made.map((r) => r.id), { channel: 'app', confirmedBy: studentId });
+    return made;
   });
 }
 const lineOf = async (id: string) => one<{
@@ -327,7 +330,7 @@ describe('08n: capture asks each preregistration its deadline first (MO-21; flag
     await place(sub, s1);
     await place(subJ, s2);
     const prereg = async (f: { parent: Client; studentId: string }, subjectId: string) =>
-      (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: d.id, subjectIds: [subjectId], studentId: f.studentId } })))![0]!.id;
+      (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: d.id, ...(await reservationOf(d.id, [subjectId])), studentId: f.studentId } })))![0]!.id;
     const payInSchool = async (f: { parent: Client }, id: string, confirm: boolean) => {
       const p = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [id], paymentMethod: 'in_school', escrowAmountToApply: 0 } })))!.id!;
       if (confirm) await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: p }, json: { instrumentUsed: 'cash' } }));
@@ -545,7 +548,7 @@ describe('08n: grade 10 in bulk (A-15) and due dates (§3.1)', () => {
     const b = await onboard(officer, `n08g-b-${RUN}`, 10);
     const lone = await onboard(officer, `n08g-lone-${RUN}`, 10);
     // A family alone must reserve every core offer (the grade-10 rule, A-05).
-    const alone = await refused(lone.parent.api.v1.registrations.direct.$post({ json: { sessionId: s.id, subjectIds: [core[0]!], studentId: lone.studentId } }));
+    const alone = await refused(lone.parent.api.v1.registrations.direct.$post({ json: { sessionId: s.id, ...(await reservationOf(s.id, [core[0]!])), studentId: lone.studentId } }));
     expect(alone.error).toMatch(/^Grade 10 June session requires all core subjects\. Missing: /);
 
     const ids = [a.studentId, b.studentId];

@@ -38,15 +38,10 @@
 
 import {
   db,
-  registration,
-  registrationSession,
   changeRequest,
-  subject,
-  parentStudentLink,
-  user,
+  registrationConsent,
   eq,
   and,
-  inArray,
   gradeTodayExtras,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -58,13 +53,14 @@ import type {
   ApproveChangeRequestType,
   RejectChangeRequestType,
   ChangeRequestsQueryType,
+  SeriesMonth,
 } from '@repo/validations';
 import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { refundPercentage } from './refund.services';
 import { executeReceiptGatedDrop } from './receipt.services';
 import { priceLine } from './pricing.services';
-import { insertLines } from './line.services';
 import { resolveItem, availabilityConstraints } from './offer.services';
+import { reserveLines, inheritConsents, writeConsents } from './reservation.services';
 import { effectiveDeadlineFor } from './deadline.services';
 import { schoolDate } from './window.services';
 import {
@@ -73,7 +69,9 @@ import {
   notifyDirectDropSwapExecuted,
   notifyEscrowBalanceChanged,
 } from './notification.services';
-import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterFor } from './eligibility.services';
+import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterFor, type Eligibility } from './eligibility.services';
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 import { logAction, type AuditContext } from './audit.services';
 
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
@@ -94,21 +92,68 @@ export const isParentLinkedToStudent = validateParentStudentLink;
 
 /**
  * The line a swap goes to and its price, exactly as a fresh reservation of it would be priced
- * (priceLine: the course and board fees, the pricing policies, the student's exceptions): the
- * new subject's whole item (or the item a pending request names), a first entry, in school unless
- * the item is self-study only. MA-10: the split is kept and the exceptions applied.
+ * (priceLine: the course and board fees, the pricing policies, the student's exceptions). Since
+ * step B the swap names its line like any reservation (item, entry, teacher, the sitting a
+ * retake follows); a request made before step B (no `new_line`) goes to the item it names, a
+ * first entry, in school unless the item is self-study only. MA-10: the split is kept and the
+ * exceptions applied.
  */
-async function swapLine(studentId: string, sessionId: string, subjectId: string, offerItemId?: string | null) {
-  const resolved = offerItemId
-    ? await db.query.sessionOfferItem.findFirst({ where: (i, { eq: eqOp }) => eqOp(i.id, offerItemId), with: { offer: true } })
+type SwapLine = { offerItemId: string; attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study'; teacherId?: string | null;
+  priorSittingSeriesId?: string | null; priorSitting?: { month: SeriesMonth; year: number }; consent?: boolean };
+
+async function swapQuote(studentId: string, sessionId: string, line: SwapLine) {
+  const item = await db.query.sessionOfferItem.findFirst({ where: (i, { eq: eqOp }) => eqOp(i.id, line.offerItemId), with: { offer: true } });
+  if (!item || item.sessionId !== sessionId) throw new Error('The item to swap to is not on offer in this session');
+  const sub = await db.query.subject.findFirst({ where: (s, { eq: eqOp }) => eqOp(s.id, item.offer.subjectId), columns: { id: true, name: true, isActive: true } });
+  if (!sub || !sub.isActive) throw new Error('This subject is no longer available for registration');
+  const price = await priceLine(db, { item: { id: item.id }, attempt: line.attempt, mode: line.mode, studentId, sessionId });
+  const name = item.kind === 'whole' ? sub.name : `${sub.name} — ${item.label}`;
+  return { line, price, subject: sub, name, isCore: item.offer.grade10Core };
+}
+
+/** The new line a pending swap request stored (step B), or the default of a request made before it. */
+async function storedSwapLine(cr: { newOfferItemId: string | null; newSubjectId: string | null; newLine: Record<string, unknown> | null }, sessionId: string): Promise<SwapLine> {
+  if (cr.newLine && cr.newOfferItemId) return { ...(cr.newLine as Omit<SwapLine, 'offerItemId'>), offerItemId: cr.newOfferItemId };
+  const r = cr.newOfferItemId
+    ? await db.query.sessionOfferItem.findFirst({ where: (i, { eq: eqOp }) => eqOp(i.id, cr.newOfferItemId!), with: { offer: true } })
         .then((i) => (i && i.sessionId === sessionId ? { item: i, offer: i.offer } : null))
     : null;
-  const r = resolved ?? (await resolveItem(db, sessionId, subjectId));
-  const c = availabilityConstraints(r.offer.availability, r.item.availability);
-  const line = { offerItemId: r.item.id, attempt: 'first' as const, mode: c.selfStudyOnly ? 'self_study' as const : 'in_school' as const, teacherId: null };
-  const price = await priceLine(db, { item: { id: r.item.id }, attempt: line.attempt, mode: line.mode, studentId, sessionId });
-  return { line, price, isCore: r.offer.grade10Core };
+  const resolved = r ?? (await resolveItem(db, sessionId, cr.newSubjectId!));
+  const c = availabilityConstraints(resolved.offer.availability, resolved.item.availability);
+  return { offerItemId: resolved.item.id, attempt: 'first', mode: c.selfStudyOnly ? 'self_study' : 'in_school', teacherId: null };
 }
+
+/** Does the line being dropped carry the two consents a swap's new line inherits? */
+async function hasConsents(registrationId: string) {
+  const rows = await db.select({ kind: registrationConsent.kind }).from(registrationConsent).where(eq(registrationConsent.registrationId, registrationId));
+  return new Set(rows.map((r) => r.kind)).size >= 2;
+}
+
+/**
+ * The swap's new line in the caller's transaction (after the student lock and the drop):
+ * resolved and made like any reservation line, then the dropped line's consent inherited — or,
+ * for a dropped line with none to give (converted from before the rework), the family's consent
+ * given with the swap, on the app channel.
+ */
+async function makeSwapLine(
+  tx: Tx,
+  a: { studentId: string; sessionId: string; line: SwapLine; fromRegistrationId: string; requestedBy: string; approvedBy: string; approvedAt: Date;
+    approvalComments: string; eligibility: Eligibility; consentBy: string; consentAt: Date },
+) {
+  const { consent, ...line } = a.line;
+  const [made] = await reserveLines(tx, {
+    studentId: a.studentId, sessionId: a.sessionId, lines: [line], status: 'pending_payment',
+    requestedBy: a.requestedBy, approvedBy: a.approvedBy, approvedAt: a.approvedAt, approvalComments: a.approvalComments,
+    eligibility: a.eligibility, declaredBy: 'family', channel: null,
+  });
+  if (!(await inheritConsents(tx, a.fromRegistrationId, [made!.id]))) {
+    if (!consent) throw new Error(SWAP_CONSENT_NEEDED);
+    await writeConsents(tx, [made!.id], { channel: 'app', confirmedBy: a.consentBy, at: a.consentAt });
+  }
+  return made!;
+}
+
+const SWAP_CONSENT_NEEDED = 'Tick the refund policy and the declaration for the new subject: the subject being dropped was registered before the school recorded them';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -226,51 +271,16 @@ async function assertOwnRegistrationEligible(registrationId: string, studentId: 
   await assertMayRegisterFor(reg.studentId, reg.sessionId);
 }
 
-/**
- * Validate a new subject for a swap:
- * - Subject exists and is active
- * - Student is not already actively registered for it in the same session
- */
-async function validateNewSubjectForSwap(
-  studentId: string,
-  sessionId: string,
-  newSubjectId: string,
-  currentRegistrationId: string
-) {
-  const newSub = await db.query.subject.findFirst({
-    where: (s, { eq }) => eq(s.id, newSubjectId),
-    columns: {
-      id: true,
-      name: true,
-      council: true,
-      isActive: true,
-      isOfferedAtSchool: true,
-      courseFee: true,
-      registrationFee: true,
-      isCore: true,
-    },
-  });
-
-  if (!newSub) throw new Error('New subject not found');
-  if (!newSub.isActive) throw new Error('This subject is no longer available for registration');
-
-  // Check for existing active registration for this subject in the same session
+/** A swap's item is not one the student already holds in the session (any live line on it). */
+async function assertItemNotHeld(studentId: string, sessionId: string, offerItemId: string, droppedId: string) {
   const conflict = await db.query.registration.findFirst({
-    where: (r, { eq, and, notInArray }) =>
-      and(
-        eq(r.studentId, studentId),
-        eq(r.sessionId, sessionId),
-        eq(r.subjectId, newSubjectId),
-        notInArray(r.status, ['dropped', 'rejected', 'expired'])
-      ),
+    where: (r, { eq: eqOp, and: andOp, notInArray }) =>
+      andOp(eqOp(r.studentId, studentId), eqOp(r.sessionId, sessionId), eqOp(r.offerItemId, offerItemId), notInArray(r.status, ['dropped', 'rejected', 'expired'])),
     columns: { id: true },
   });
-
   if (conflict) {
-    throw new Error('You are already registered for this subject in the current session');
+    throw new Error(conflict.id === droppedId ? 'Choose another item to swap to' : 'You are already registered for this item in the current session');
   }
-
-  return newSub;
 }
 
 // ─── Student: Create Requests ─────────────────────────────────────────────────
@@ -345,14 +355,10 @@ export async function createSwapRequest(
   await assertOwnRegistrationEligible(registrationId, requestedBy);
   const { reg } = await validateChangeEligibility(registrationId, requestedBy, true);
 
-  const newSub = await validateNewSubjectForSwap(
-    reg.studentId,
-    reg.sessionId,
-    data.newSubjectId,
-    registrationId
-  );
-
-  const swap = await swapLine(reg.studentId, reg.sessionId, newSub.id);
+  await assertItemNotHeld(reg.studentId, reg.sessionId, data.line.offerItemId, registrationId);
+  const swap = await swapQuote(reg.studentId, reg.sessionId, data.line);
+  // The new line inherits the dropped line's consent; a line from before the rework has none.
+  if (!data.consent && !(await hasConsents(registrationId))) throw new Error(SWAP_CONSENT_NEEDED);
   const newSubjectPrice = swap.price.total;
   const priceDifference = round2(newSubjectPrice - reg.priceAtRegistration);
 
@@ -364,8 +370,14 @@ export async function createSwapRequest(
       type: 'swap',
       requestedBy,
       reason: data.reason,
-      newSubjectId: data.newSubjectId,
-      newOfferItemId: swap.line.offerItemId,
+      newSubjectId: swap.subject.id,
+      newOfferItemId: data.line.offerItemId,
+      // The line as asked (step B): approval makes exactly this line.
+      newLine: {
+        attempt: data.line.attempt, mode: data.line.mode, teacherId: data.line.teacherId ?? null,
+        priorSittingSeriesId: data.line.priorSittingSeriesId ?? null, ...(data.line.priorSitting ? { priorSitting: data.line.priorSitting } : {}),
+        consent: !!data.consent,
+      },
       priceAtRequest: newSubjectPrice,
       priceDifference,
       status: 'pending_approval',
@@ -391,7 +403,7 @@ export async function createSwapRequest(
       studentName:    studentUser?.name ?? 'Student',
       changeType:     'swap',
       subjectName:    reg.subject.name,
-      newSubjectName: newSub.name,
+      newSubjectName: swap.name,
       financialImpact: impactText,
       reason:         data.reason,
       changeRequestId: request!.id,
@@ -455,34 +467,14 @@ export async function approveChangeRequest(
     throw new Error('The registration window has closed; this request can no longer be approved');
   }
 
-  let swap: Awaited<ReturnType<typeof swapLine>> | null = null;
-  let eligibility: Awaited<ReturnType<typeof assertMayRegisterFor>> | null = null;
-  if (cr.type === 'swap' && cr.newSubjectId) {
-    const newSubject = await db.query.subject.findFirst({
-      where: (s, { eq: eqOp }) => eqOp(s.id, cr.newSubjectId!),
-      columns: { id: true, name: true, council: true, isActive: true },
-    });
-    if (!newSubject || !newSubject.isActive) {
-      throw new Error('The requested subject is no longer available');
-    }
+  let swap: Awaited<ReturnType<typeof swapQuote>> | null = null;
+  let eligibility: Eligibility | null = null;
+  if (cr.type === 'swap' && (cr.newOfferItemId || cr.newSubjectId)) {
     eligibility = await assertMayRegisterFor(cr.registration.studentId, cr.registration.sessionId);
     // Priced now, the way a fresh reservation made now would be; the quote on the request
-    // (priceAtRequest) is what the parent was shown. Its series is checked when the line is made.
-    swap = await swapLine(cr.registration.studentId, cr.registration.sessionId, newSubject.id, cr.newOfferItemId);
-
-    const existingReg = await db.query.registration.findFirst({
-      where: (r, { eq: eqOp, and: andOp, notInArray: niArr }) =>
-        andOp(
-          eqOp(r.studentId, cr.registration.studentId),
-          eqOp(r.sessionId, cr.registration.session.id),
-          eqOp(r.subjectId, cr.newSubjectId!),
-          niArr(r.status, ['dropped', 'rejected', 'expired']),
-        ),
-      columns: { id: true },
-    });
-    if (existingReg) {
-      throw new Error('Student is already registered for the requested subject');
-    }
+    // (priceAtRequest) is what the parent was shown. Its series, its rules and whether the item
+    // is already held are checked when the line is made (reserveLines).
+    swap = await swapQuote(cr.registration.studentId, cr.registration.sessionId, await storedSwapLine(cr, cr.registration.sessionId));
   }
 
   const now = new Date();
@@ -519,16 +511,17 @@ export async function approveChangeRequest(
     });
 
     let newRegistrationId: string | null = null;
-    if (cr.type === 'swap' && cr.newSubjectId && swap && eligibility) {
+    if (cr.type === 'swap' && swap && eligibility) {
       // The new line: checked against its series' deadline and the line rules, priced and
-      // entered in its item's series (insertLines). created_at from the column's default: the
-      // database's clock, the one a close compares it with (ST-15).
-      const [made] = await insertLines(tx, {
-        studentId: cr.registration.studentId, sessionId: cr.registration.sessionId, lines: [swap.line], status: 'pending_payment',
+      // entered in its item's series (insertLines), the dropped line's consent inherited.
+      // created_at from the column's default: the database's clock, the one a close compares it
+      // with (ST-15).
+      const made = await makeSwapLine(tx, {
+        studentId: cr.registration.studentId, sessionId: cr.registration.sessionId, line: swap.line, fromRegistrationId: cr.registrationId,
         requestedBy: cr.registration.studentId, approvedBy: parentId, approvedAt: now,
-        approvalComments: `Swap from registration ${cr.registrationId}`, eligibility,
+        approvalComments: `Swap from registration ${cr.registrationId}`, eligibility, consentBy: cr.requestedBy, consentAt: cr.createdAt,
       });
-      newRegistrationId = made!.id;
+      newRegistrationId = made.id;
     }
 
     const outcome = { success: true, type: cr.type, ...dropOutcome, refundPercentage: pct };
@@ -554,7 +547,7 @@ export async function approveChangeRequest(
     parentId,
     changeType:       cr.type as 'drop' | 'swap',
     subjectName:      cr.registration.subject?.name ?? 'the subject',
-    newSubjectName:   cr.newSubject?.name,
+    newSubjectName:   swap?.name ?? cr.newSubject?.name,
     approved:         true,
     financialImpact:  refundText,
     comments:         data.comments,
@@ -765,15 +758,11 @@ export async function executeDirectSwap(
 
   const { reg } = await validateChangeEligibility(registrationId, '', false);
 
-  const newSub = await validateNewSubjectForSwap(
-    reg.studentId,
-    reg.sessionId,
-    data.newSubjectId,
-    registrationId
-  );
-
+  await assertItemNotHeld(reg.studentId, reg.sessionId, data.line.offerItemId, registrationId);
   const eligibility = await assertMayRegisterFor(reg.studentId, reg.sessionId);
-  const swap = await swapLine(reg.studentId, reg.sessionId, newSub.id);
+  const swap = await swapQuote(reg.studentId, reg.sessionId, { ...data.line, consent: !!data.consent });
+  // The new line inherits the dropped line's consent; a line from before the rework has none.
+  if (!data.consent && !(await hasConsents(registrationId))) throw new Error(SWAP_CONSENT_NEEDED);
   const newSubjectPrice = swap.price.total;
   const now = new Date();
 
@@ -795,13 +784,13 @@ export async function executeDirectSwap(
     });
 
     // The new line, pending payment (insertLines: its series, its rules, its price; created_at
-    // from the column's default, the database's clock — ST-15).
-    const [made] = await insertLines(tx, {
-      studentId: reg.studentId, sessionId: reg.sessionId, lines: [swap.line], status: 'pending_payment',
+    // from the column's default, the database's clock — ST-15), the dropped line's consent inherited.
+    const made = await makeSwapLine(tx, {
+      studentId: reg.studentId, sessionId: reg.sessionId, line: swap.line, fromRegistrationId: registrationId,
       requestedBy: parentId, approvedBy: parentId, approvedAt: now,
-      approvalComments: `Direct swap from registration ${registrationId}`, eligibility,
+      approvalComments: `Direct swap from registration ${registrationId}`, eligibility, consentBy: parentId, consentAt: now,
     });
-    const newRegId = made!.id;
+    const newRegId = made.id;
 
     const outcome = {
       success: true,
@@ -830,7 +819,7 @@ export async function executeDirectSwap(
     parentId,
     changeType: 'swap',
     subjectName: reg.subject.name,
-    newSubjectName: newSub.name,
+    newSubjectName: swap.name,
     financialImpact: swapImpact,
   }).catch((err) => console.error('[notification] NOT-007 (direct swap) failed:', err));
 
@@ -848,7 +837,7 @@ export async function executeDirectSwap(
       previousBalance: newBalance - refundAmount,
       newBalance,
       changeAmount:    refundAmount,
-      reason:          `Direct swap: ${reg.subject.name} → ${newSub.name} (escrow refund)`,
+      reason:          `Direct swap: ${reg.subject.name} → ${swap.name} (escrow refund)`,
     }).catch((err) => console.error('[notification] NOT-008 (direct swap) failed:', err));
   }
 

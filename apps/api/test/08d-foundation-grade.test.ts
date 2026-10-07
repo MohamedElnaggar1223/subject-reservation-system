@@ -3,10 +3,7 @@ import { randomUUID } from 'node:crypto';
 import {
   apiResponse, academicYearStartOf, gradeInAcademicYear, gradeToday, seriesYearInAcademicYear, academicYearLabel,
 } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, futureWindow, schoolToday, loneStudent, signUp, signIn, audited, wholeItemSql,
-  type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, futureWindow, schoolToday, loneStudent, signUp, signIn, audited, wholeItemSql, type Client, reservationOf, swapTo } from './helpers';
 
 /**
  * F0a — the grade comes from the cohort and the exam series
@@ -249,7 +246,7 @@ describe('F0a: grade and eligibility', () => {
     const paidWhileEligible = async (f: Family) => {
       await extend(f.studentId, S.nov2026!);
       const desk = await apiResponse(officer.api.v1.registrations.desk.$post({
-        json: { studentId: f.studentId, sessionId: S.nov2026!, subjectIds: [subj.c!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+        json: { studentId: f.studentId, sessionId: S.nov2026!, ...(await reservationOf(S.nov2026!, [subj.c!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
       }));
       return desk.registrations[0]!.id;
     };
@@ -285,16 +282,16 @@ describe('F0a: grade and eligibility', () => {
 
     it('1 a student request, 2 a parent direct registration, 3 an admin override, 4 the desk — nothing is registered', async () => {
       const before = { g10: await regCount(g10.studentId), gone: await regCount(gone.studentId) };
-      await bothRefused('student request', (f) => f.student.api.v1.registrations.request.$post({ json: { sessionId: S.nov2026!, subjectIds: [subj.a!] } }));
-      await bothRefused('parent direct', (f) => f.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.nov2026!, subjectIds: [subj.a!], studentId: f.studentId } }));
-      await bothRefused('admin override', (f) => adm.api.v1.registrations['admin-override'].$post({ json: { studentId: f.studentId, sessionId: S.nov2026!, subjectIds: [subj.a!], reason: 'override attempt' } }));
-      await bothRefused('desk registration', (f) => officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId: S.nov2026!, subjectIds: [subj.a!] } }));
+      await bothRefused('student request', async (f) => f.student.api.v1.registrations.request.$post({ json: { sessionId: S.nov2026!, ...(await reservationOf(S.nov2026!, [subj.a!])) } }));
+      await bothRefused('parent direct', async (f) => f.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.nov2026!, ...(await reservationOf(S.nov2026!, [subj.a!])), studentId: f.studentId } }));
+      await bothRefused('admin override', async (f) => adm.api.v1.registrations['admin-override'].$post({ json: { studentId: f.studentId, sessionId: S.nov2026!, ...(await reservationOf(S.nov2026!, [subj.a!])), reason: 'override attempt' } }));
+      await bothRefused('desk registration', async (f) => officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId: S.nov2026!, ...(await reservationOf(S.nov2026!, [subj.a!])) } }));
       expect({ g10: await regCount(g10.studentId), gone: await regCount(gone.studentId) }).toEqual(before);
     });
 
     it('5 a preregistration for the draft series', async () => {
       const before = await regCount(g10.studentId);
-      await bothRefused('preregistration', (f) => f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: S.nov2026!, subjectIds: [subj.a!], studentId: f.studentId } }));
+      await bothRefused('preregistration', async (f) => f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: S.nov2026!, ...(await reservationOf(S.nov2026!, [subj.a!])), studentId: f.studentId } }));
       expect(await regCount(g10.studentId)).toBe(before);
     });
 
@@ -310,8 +307,8 @@ describe('F0a: grade and eligibility', () => {
     it('9 a drop request, 10 a swap request, 11 a parent direct swap, 12 approving a swap — nothing changes', async () => {
       const reg = (f: Family) => (f === g10 ? seeded.confirmed!.g10 : seeded.confirmed!.gone);
       await bothRefused('drop request', (f) => f.student.api.v1.registrations[':id']['request-drop'].$post({ param: { id: reg(f) }, json: { reason: 'try a drop' } }));
-      await bothRefused('swap request', (f) => f.student.api.v1.registrations[':id']['request-swap'].$post({ param: { id: reg(f) }, json: { newSubjectId: subj.a!, reason: 'try a swap' } }));
-      await bothRefused('direct swap', (f) => f.parent.api.v1.registrations[':id'].swap.$post({ param: { id: reg(f) }, json: { newSubjectId: subj.a!, reason: 'try a swap' } }));
+      await bothRefused('swap request', async (f) => f.student.api.v1.registrations[':id']['request-swap'].$post({ param: { id: reg(f) }, json: { line: await swapTo(reg(f), subj.a!), reason: 'try a swap' } }));
+      await bothRefused('direct swap', async (f) => f.parent.api.v1.registrations[':id'].swap.$post({ param: { id: reg(f) }, json: { line: await swapTo(reg(f), subj.a!), reason: 'try a swap' } }));
       const cr = async (f: Family) => {
         const id = randomUUID();
         await sql(`insert into change_request (id, registration_id, type, requested_by, reason, new_subject_id, price_at_request, price_difference, status)
@@ -325,12 +322,18 @@ describe('F0a: grade and eligibility', () => {
       await sql(`update change_request set status = 'cancelled' where id in ($1, $2)`, [crs.g10, crs.gone]);
     });
 
-    it('13 the subjects offered: none, for a series the student may not register for', async () => {
+    it('13 the subjects offered: none reservable, for a series the student may not register for', async () => {
+      // Step B: the Reserve pages read /registrations/offers (GET /registrations/available is
+      // gone); it answers with the student's eligibility, and the pages offer nothing to reserve
+      // when it refuses (the paths refuse too, above).
       for (const f of [g10, gone]) {
-        expect(await apiResponse(f.parent.api.v1.registrations.available.$get({ query: { sessionId: S.nov2026!, studentId: f.studentId } }))).toEqual([]);
+        const read = await apiResponse(f.parent.api.v1.registrations.offers.$get({ query: { sessionId: S.nov2026!, studentId: f.studentId } }));
+        expect(read.eligibility.allowed).toBe(false);
       }
       // The same grade-10 student is offered June's subjects.
-      expect((await apiResponse(g10.parent.api.v1.registrations.available.$get({ query: { sessionId: S.jun2027!, studentId: g10.studentId } }))).length).toBeGreaterThan(0);
+      const june = await apiResponse(g10.parent.api.v1.registrations.offers.$get({ query: { sessionId: S.jun2027!, studentId: g10.studentId } }));
+      expect(june.eligibility.allowed).toBe(true);
+      expect(june.offers.length).toBeGreaterThan(0);
     });
 
     it("the grade-10 exception: a coordinator grants it (audited) and the student may sit that series; revoked, refused again", async () => {
@@ -358,12 +361,12 @@ describe('F0a: grade and eligibility', () => {
       await setCohort(eleven.studentId, 2025);
       for (const f of [ten, eleven]) await extend(f.studentId, S.jun2027!);
 
-      const missing = await refused(ten.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.jun2027!, subjectIds: [subj.a!], studentId: ten.studentId } }));
+      const missing = await refused(ten.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.jun2027!, ...(await reservationOf(S.jun2027!, [subj.a!])), studentId: ten.studentId } }));
       expect(missing.error).toBe('Grade 10 June session requires all core subjects. Missing: English (core, F0a grade)');
-      const ok = await apiResponse(ten.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.jun2027!, subjectIds: [subj.a!, subj.core], studentId: ten.studentId } }));
+      const ok = await apiResponse(ten.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.jun2027!, ...(await reservationOf(S.jun2027!, [subj.a!, subj.core])), studentId: ten.studentId } }));
       expect(ok.map((r) => r.wasCoreAtRegistration).sort()).toEqual([false, true]);
       // Grade 11 in 2026/27: no core rule, whatever today's grade says.
-      const eleventh = await apiResponse(eleven.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.jun2027!, subjectIds: [subj.a!], studentId: eleven.studentId } }));
+      const eleventh = await apiResponse(eleven.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.jun2027!, ...(await reservationOf(S.jun2027!, [subj.a!])), studentId: eleven.studentId } }));
       expect(eleventh).toHaveLength(1);
 
       // In grade 9 today, grade 10 in next year's June: the rule follows the
@@ -371,7 +374,7 @@ describe('F0a: grade and eligibility', () => {
       const nine = await family('core9', 9);
       const juneNext = await makeSession('June next year', 'june', 'igcse', seriesYearInAcademicYear('june', academicYearStartOf() + 1));
       await extend(nine.studentId, juneNext);
-      expect((await refused(nine.parent.api.v1.registrations.direct.$post({ json: { sessionId: juneNext, subjectIds: [subj.a!], studentId: nine.studentId } }))).error)
+      expect((await refused(nine.parent.api.v1.registrations.direct.$post({ json: { sessionId: juneNext, ...(await reservationOf(juneNext, [subj.a!])), studentId: nine.studentId } }))).error)
         .toBe('Grade 10 June session requires all core subjects. Missing: English (core, F0a grade)');
       await sql(`update subject set is_core = false where id = $1`, [subj.core]);
     });
@@ -389,13 +392,13 @@ describe('F0a: grade and eligibility', () => {
         const s = await apiResponse(finadmin.api.v1['school-fees'].schedules.$post({ json: { academicYear: '2027-2028', grade, amount, opensAt } }));
         scheduleIds.push(s.id);
       }
-      const blocked = await refused(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.nov2027!, subjectIds: [subj.a!], studentId: f.studentId } }));
+      const blocked = await refused(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.nov2027!, ...(await reservationOf(S.nov2027!, [subj.a!])), studentId: f.studentId } }));
       expect(blocked).toEqual({ status: 400, error: 'The 2027-2028 school fee (4000.00 EGP) must be paid before registering subjects' });
       expect(await sql(`select 1 from registration where student_id = $1`, [f.studentId])).toEqual([]);
 
       // No 2027/28 schedule open yet: the gate is off, as today (A-14 default).
       for (const id of scheduleIds.splice(0)) await apiResponse(finadmin.api.v1['school-fees'].schedules[':id'].$delete({ param: { id } }));
-      const made = await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.nov2027!, subjectIds: [subj.a!], studentId: f.studentId } }));
+      const made = await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.nov2027!, ...(await reservationOf(S.nov2027!, [subj.a!])), studentId: f.studentId } }));
       expect(made[0]).toMatchObject({ status: 'pending_payment', priceAtRegistration: 1200 });
     });
 
@@ -414,7 +417,7 @@ describe('F0a: grade and eligibility', () => {
       const pay = await apiResponse(f.parent.api.v1['school-fees'].pay.$post({ json: { studentId: f.studentId, paymentMethod: 'in_school', academicYear: next } }));
       expect(pay).toMatchObject({ academicYear: next, amount: 4500, purpose: 'school_fee' });
       await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay.id }, json: { instrumentUsed: 'cash' } }));
-      const made = await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: sess, subjectIds: [subj.a!], studentId: f.studentId } }));
+      const made = await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: sess, ...(await reservationOf(sess, [subj.a!])), studentId: f.studentId } }));
       expect(made).toHaveLength(1);
       // A year beyond next is refused with a sentence.
       const far = academicYearLabel(academicYearStartOf() + 2);
@@ -432,10 +435,10 @@ describe('F0a: grade and eligibility', () => {
         json: { academicYear: '2027-2028', amount: 6000, opensAt: new Date(Date.now() - days(1)).toISOString() },
       }));
       scheduleIds.push(uniform.id);
-      const retake = await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.nov2027!, subjectIds: [subj.a!], studentId: f.studentId } }));
+      const retake = await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.nov2027!, ...(await reservationOf(S.nov2027!, [subj.a!])), studentId: f.studentId } }));
       expect(retake).toHaveLength(1);
       await setSetting('schoolFee.graduatesExempt', false, finadmin);
-      expect(await refused(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.nov2027!, subjectIds: [subj.b!], studentId: f.studentId } })))
+      expect(await refused(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: S.nov2027!, ...(await reservationOf(S.nov2027!, [subj.b!])), studentId: f.studentId } })))
         .toEqual({ status: 400, error: 'The 2027-2028 school fee (6000.00 EGP) must be paid before registering subjects' });
       await setSetting('schoolFee.graduatesExempt', true, finadmin);
       await apiResponse(finadmin.api.v1['school-fees'].schedules[':id'].$delete({ param: { id: uniform.id } }));
@@ -448,12 +451,12 @@ describe('F0a: grade and eligibility', () => {
       const sess = await makeSession('November after next July', 'november', 'igcse', seriesYearInAcademicYear('november', nextStart));
       await extend(f.studentId, sess);
       await setSetting('schoolFee.newYearWithoutSchedule', 'hold', finadmin);
-      const held = await refused(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: sess, subjectIds: [subj.a!], studentId: f.studentId } }));
+      const held = await refused(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: sess, ...(await reservationOf(sess, [subj.a!])), studentId: f.studentId } }));
       // The series label of a winter session (the reservations rework): its months.
       const y = seriesYearInAcademicYear('november', nextStart);
       expect(held.error).toBe(`The ${academicYearLabel(nextStart)} school fee is not open yet — registration for the November ${y} – January ${y + 1} series waits until it opens`);
       await setSetting('schoolFee.newYearWithoutSchedule', 'proceed', finadmin);
-      expect(await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: sess, subjectIds: [subj.a!], studentId: f.studentId } }))).toHaveLength(1);
+      expect(await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: sess, ...(await reservationOf(sess, [subj.a!])), studentId: f.studentId } }))).toHaveLength(1);
     });
   });
 

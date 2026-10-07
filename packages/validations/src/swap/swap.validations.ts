@@ -12,6 +12,7 @@
  */
 
 import { z } from 'zod';
+import { ReservationLine, ReservationConsent } from '../registration/reservation.validations';
 
 // ─── Change Request Status ────────────────────────────────────────────────────
 
@@ -75,9 +76,15 @@ export type RequestDropType = z.infer<typeof RequestDrop>;
  * Registration window must be open (SWAP-006).
  * Requires parent approval; financial impact shown to parent (SWAP-003).
  */
+/**
+ * The swap's new line names its item, entry and teacher like any reservation line (the
+ * reservations rework). It inherits the dropped line's consent; `consent` is asked only when
+ * the dropped line has none to give (a line converted from before the rework).
+ */
 export const RequestSwap = z.object({
-  newSubjectId: z.string().min(1, 'Invalid subject ID'),
-  reason:       z.string().min(5, 'Please provide a reason for this swap (min 5 chars)').max(500),
+  line:   ReservationLine,
+  reason: z.string().min(5, 'Please provide a reason for this swap (min 5 chars)').max(500),
+  consent: ReservationConsent.optional(),
 });
 export type RequestSwapType = z.infer<typeof RequestSwap>;
 
@@ -100,8 +107,9 @@ export type DirectDropType = z.infer<typeof DirectDrop>;
  * No approval queue — takes effect immediately.
  */
 export const DirectSwap = z.object({
-  newSubjectId: z.string().min(1, 'Invalid subject ID'),
-  reason:       z.string().min(5, 'Please provide a reason for this swap (min 5 chars)').max(500).optional(),
+  line:   ReservationLine,
+  reason: z.string().min(5, 'Please provide a reason for this swap (min 5 chars)').max(500).optional(),
+  consent: ReservationConsent.optional(),
 });
 export type DirectSwapType = z.infer<typeof DirectSwap>;
 

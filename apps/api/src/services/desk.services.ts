@@ -21,8 +21,8 @@ import { randomUUID } from 'crypto';
 import type { DeskOnboardFamilyType, DeskRegistrationType, DeskCollectType } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { auth } from '../lib/auth';
-import { prepareLegacyLines, getExistingRegistrationSubjectIds } from './registration.services';
-import { insertLines } from './line.services';
+import { assertSchoolFeeGate } from './registration.services';
+import { reserveLines, consentStanding, writeConsents, CONSENT_MISSING_REFUSAL, FAMILY_CONSENT_NEEDED } from './reservation.services';
 import { sessionWindow, windowRefusal } from './window.services';
 import { seriesDeadlineGroups, type DeadlineGroup } from './series.services';
 import { getSetting } from './settings.services';
@@ -156,8 +156,13 @@ export async function onboardFamily(data: DeskOnboardFamilyType, staffId: string
 // ─── Desk registration + payment (G1) ────────────────────────────────────────
 
 /**
- * Register subjects for a student and (optionally) record the money the
- * officer just took — one action, receipts born immediately.
+ * Reserve lines for a student at the desk and (optionally) record the money the officer just
+ * took — one action, receipts born immediately (RESERVATIONS_REWORK.md §4.3: "Reserve only",
+ * "Reserve and collect"). The desk's one consent tick ("read and signed by the parent") is
+ * recorded on every line on the desk channel; a sitting the officer names that the system does
+ * not know is declared by the desk and listed to verify. A line whose board fee is still
+ * provisional is reserved and not collected — it is collected once the fee is confirmed (unless
+ * the school takes payment at the provisional price, `pricing.payOnProvisionalFee`).
  */
 export async function executeDeskRegistration(staffId: string, data: DeskRegistrationType, auditCtx?: AuditContext) {
   // F0a: call site 5 of mayRegisterFor — the desk registers only for a
@@ -173,40 +178,28 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     throw new Error(windowRefusal(w, 'Registration window is not open — a finance admin can grant this student a deadline extension'));
   }
 
-  const subjects = await db.query.subject.findMany({
-    where: (s, { eq, and, inArray }) =>
-      and(eq(s.isActive, true), inArray(s.id, data.subjectIds)),
-  });
-  if (subjects.length !== data.subjectIds.length) {
-    throw new Error('One or more subjects are invalid or inactive');
-  }
-  const already = await getExistingRegistrationSubjectIds(data.studentId, data.sessionId);
-  if (data.subjectIds.some((id) => already.includes(id))) {
-    throw new Error('Some subjects are already registered for this session');
-  }
-
-  // The school-fee gate, then each subject as a line (its whole item, attempt from history,
-  // mode, teacher). Checked, priced and entered in its item's series by insertLines, in the
-  // transaction (the grade-10 core rule included).
-  const lines = await prepareLegacyLines(data.studentId, data.sessionId, data.subjectIds, data.subjectOptions, eligibility);
+  // The school-fee gate, then the lines: checked, priced and entered in their items' series by
+  // insertLines, in the transaction (the grade-10 core rule included), with the desk's consent.
+  await assertSchoolFeeGate(data.studentId, eligibility);
   const now = new Date();
   const lineInput = {
-    studentId: data.studentId, sessionId: data.sessionId, lines, status: 'pending_payment' as const,
+    studentId: data.studentId, sessionId: data.sessionId, lines: data.lines, status: 'pending_payment' as const,
     requestedBy: staffId, approvedBy: staffId, approvedAt: now, approvalComments: '[DESK] Registered at the finance desk', eligibility,
+    declaredBy: 'desk' as const, channel: 'desk' as const,
   };
 
-  // No money taken → register only; the family pays later (app or desk)
+  // No money taken → reserve only; the family pays later (app or desk)
   if (!data.collectNow) {
     const created = await db.transaction(async (tx) => {
       // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
       await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-      const inserted = await insertLines(tx, lineInput);
+      const inserted = await reserveLines(tx, lineInput);
       await logAction(staffId, 'DESK_REGISTRATION', 'registration', data.studentId, null,
         { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), collected: 0 }, auditCtx, tx);
       return inserted;
     });
     const totalCost = created.reduce((sum, r) => sum + r.priceAtRegistration, 0);
-    return { registrations: created, payment: null, payments: [], notCollected: [], totalCost, collected: 0, receipts: [] };
+    return { registrations: created, payment: null, payments: [], notCollected: [], reservedNotCollected: [], totalCost, collected: 0, receipts: [] };
   }
 
   const escrowToApply = data.collectNow.escrowAmountToApply ?? 0;
@@ -227,18 +220,30 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
   const made = await db.transaction(async (tx) => {
     // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    const inserted = await insertLines(tx, lineInput);
-    const totalCost = inserted.reduce((sum, r) => sum + r.priceAtRegistration, 0);
-    if (escrowToApply > totalCost) throw new Error('Escrow amount cannot exceed the total cost');
-    // A line whose board fee is still provisional is reserved, not collected (§3.4).
-    const provisional = inserted.filter((r) => r.priceProvisional);
-    if (provisional.length && !payOnProvisional) throw new Error(PROVISIONAL_REFUSAL);
+    const inserted = await reserveLines(tx, lineInput);
+    const totalCost = round2(inserted.reduce((sum, r) => sum + r.priceAtRegistration, 0));
+    // A line whose board fee is still provisional is reserved, not collected (§3.4, §4.3): it is
+    // collected once the fee is confirmed.
+    const payable = payOnProvisional ? inserted : inserted.filter((r) => !r.priceProvisional);
+    const held = inserted.filter((r) => !payable.includes(r));
+    const payableCost = round2(payable.reduce((sum, r) => sum + r.priceAtRegistration, 0));
+    if (escrowToApply > payableCost) {
+      throw new Error(held.length
+        ? `Escrow amount cannot exceed what is collected now (${payableCost.toFixed(2)} EGP): the lines on a provisional board fee are collected once it is confirmed`
+        : 'Escrow amount cannot exceed the total cost');
+    }
+    if (!payable.length) {
+      // Everything waits for a board fee to be confirmed: reserved, nothing collected.
+      await logAction(staffId, 'DESK_REGISTRATION', 'registration', data.studentId, null,
+        { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), collected: 0, provisional: held.map((r) => r.id) }, auditCtx, tx);
+      return { inserted, payments: [] as DeskPayment[], totalCost, held };
+    }
     // F0b: one payment per entry deadline (the sweep closes a payment at its
     // series' deadline), each with its own escrow share and audit row.
-    const groups = await seriesDeadlineGroups(tx, inserted.map((r) => r.id), true);
+    const groups = await seriesDeadlineGroups(tx, payable.map((r) => r.id), true);
     const payments = await createDeskPayments(tx, {
       studentId: data.studentId, payerParentId, staffId, escrowToApply, groups,
-      prices: new Map(inserted.map((r) => [r.id, r.priceAtRegistration])),
+      prices: new Map(payable.map((r) => [r.id, r.priceAtRegistration])),
     });
     // The registrations, the escrow debits and their audit rows commit together
     // (MO-1); the confirmations that follow write their own rows. The desk's
@@ -247,15 +252,20 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     await logAction(staffId, 'DESK_REGISTRATION', 'registration', data.studentId, null,
       { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), paymentId: payments[0]!.id,
         ...(payments.length > 1 ? { paymentIds: payments.map((p) => p.id) } : {}),
-        toCollect: Math.max(0, totalCost - escrowToApply), escrowApplied: escrowToApply }, auditCtx, tx);
+        ...(held.length ? { provisional: held.map((r) => r.id) } : {}),
+        toCollect: Math.max(0, payableCost - escrowToApply), escrowApplied: escrowToApply }, auditCtx, tx);
     for (const p of payments.slice(1)) {
       await logAction(staffId, 'PAYMENT_INITIATED', 'payment', p.id, null,
         { desk: true, registrationIds: p.registrationIds, amount: p.amount, escrowApplied: p.escrowApplied, series: p.series }, auditCtx, tx);
     }
-    return { inserted, payments, totalCost };
+    return { inserted, payments, totalCost, held };
   });
   const created = made.inserted;
   const totalCost = made.totalCost;
+  const reservedNotCollected = made.held.map((r) => ({ registrationId: r.id, price: r.priceAtRegistration }));
+  if (!made.payments.length) {
+    return { registrations: created, payment: null, payments: [], notCollected: [], reservedNotCollected, totalCost, collected: 0, receipts: [] };
+  }
 
   // Money is in hand — confirm each through the shared path so registrations
   // flip to confirmed, receipts are created, and NOT-005 fires.
@@ -272,6 +282,7 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     payment: { id: first.id, collected: outcome.collected, escrowApplied: outcome.escrowApplied },
     payments: outcome.confirmed.map((p) => ({ id: p.id, series: p.series, entryDeadline: p.entryDeadline, collected: p.amount, escrowApplied: p.escrowApplied, registrationIds: p.registrationIds })),
     notCollected: outcome.notCollected,
+    reservedNotCollected,
     totalCost,
     collected: outcome.collected,
     receipts,
@@ -283,7 +294,9 @@ type DeskPayment = {
   series: string[]; entryDeadline: Date | null;
 };
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
+function round2(n: number) {
+  return Math.round(n * 100) / 100;
+}
 
 /**
  * The desk's payments for subjects just registered or waiting, in the
@@ -421,6 +434,11 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
   }
   // A line whose board fee is still provisional is not collected (§3.4).
   if (regs.some((r) => r.priceProvisional) && !(await getSetting('pricing.payOnProvisionalFee'))) throw new Error(PROVISIONAL_REFUSAL);
+  // Consent (§3.5): a line nobody consented to is never paid; one the school reserved (grade 10)
+  // takes the family's own pair here, "read and signed by the parent".
+  const consent = await consentStanding(db, data.registrationIds);
+  if (consent.missing.length) throw new Error(CONSENT_MISSING_REFUSAL);
+  if (consent.schoolOnly.length && !data.consent) throw new Error(FAMILY_CONSENT_NEEDED);
 
   const totalCost = Math.round(regs.reduce((s, r) => s + r.priceAtRegistration, 0) * 100) / 100;
   const escrowToApply = data.escrowAmountToApply ?? 0;
@@ -452,6 +470,7 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
         `These subjects already have a ${open[0]!.method === 'instapay' ? 'transfer' : 'checkout'} in progress — confirm it or reject it in the Finance Workbench first`
       );
     }
+    if (consent.schoolOnly.length) await writeConsents(tx, consent.schoolOnly, { channel: 'desk', confirmedBy: staffId });
     // F0b: one payment per entry deadline, each with its own creation audit row.
     const groups = await seriesDeadlineGroups(tx, data.registrationIds, true);
     const made = await createDeskPayments(tx, { studentId: data.studentId, payerParentId, staffId, escrowToApply, groups, prices });

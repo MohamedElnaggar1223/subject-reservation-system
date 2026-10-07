@@ -95,6 +95,11 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     'POST /v1/sessions/:id/grade10/*',
     'GET /v1/board-fees',
     'GET /v1/registrations/offers',
+    // Step B: declared sittings (the coordinator owns verification), the teacher on a line, the statement.
+    'GET /v1/sessions/:id/to-verify',
+    'POST /v1/registrations/:id/verify-prior',
+    'PUT /v1/registrations/:id/teacher',
+    'GET /v1/statement',
     'GET /v1/enrolments',
     'POST /v1/enrolments',
     '* /v1/enrolments/*',

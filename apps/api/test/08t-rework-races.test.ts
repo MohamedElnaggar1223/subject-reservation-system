@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
-import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLock, type Client } from './helpers';
+import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLock, type Client, reservationOf } from './helpers';
 
 /**
  * The reservations rework, step 1 — races (RESERVATIONS_REWORK.md §6, §8; FEATURES_PLAN.md §5:
@@ -29,10 +29,13 @@ type Line = Pick<LineInputType, 'offerItemId' | 'attempt' | 'mode'> & Partial<Li
 async function reserve(studentId: string, sessionId: string, lines: Line[], hold?: { inserted: () => void; until: Promise<void> }) {
   const { db } = await import('@repo/db');
   const { insertLines } = await import('../src/services/line.services');
+  const { writeConsents } = await import('../src/services/reservation.services');
   const { assertMayRegisterForInTx } = await import('../src/services/eligibility.services');
   return db.transaction(async (tx) => {
     const eligibility = await assertMayRegisterForInTx(tx, studentId, sessionId);
     const made = await insertLines(tx, { studentId, sessionId, lines: lines as LineInputType[], status: 'pending_payment', requestedBy: studentId, eligibility });
+    // The family's consent, as every reservation path writes it since step B.
+    await writeConsents(tx, made.map((r) => r.id), { channel: 'app', confirmedBy: studentId });
     if (hold) {
       hold.inserted();
       await hold.until;
@@ -90,8 +93,8 @@ describe('08t: the rework races', () => {
     let one1: Promise<Res> | undefined;
     let two: Promise<Res> | undefined;
     try {
-      one1 = officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId: s1, subjectIds: [subA] } });
-      two = officer2.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId: s1, subjectIds: [subA] } });
+      one1 = officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId: s1, ...(await reservationOf(s1, [subA])) } });
+      two = officer2.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId: s1, ...(await reservationOf(s1, [subA])) } });
       await lockWaiters(2);
     } finally {
       await release();
@@ -335,7 +338,7 @@ describe('08t: the rework races', () => {
     await feeFor(s, sub);
     await offerOf(d, sub, [whole(s)]);
     const f = await onboard(officer, `t08-cap-${RUN}`, 11);
-    const reg = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: d, subjectIds: [sub], studentId: f.studentId } })))![0]!.id;
+    const reg = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: d, ...(await reservationOf(d, [sub])), studentId: f.studentId } })))![0]!.id;
     const p = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'in_school', escrowAmountToApply: 0 } })))!.id!;
     await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: p }, json: { instrumentUsed: 'cash' } }));
     await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [s]);

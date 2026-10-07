@@ -30,10 +30,14 @@ type Line = Pick<LineInputType, 'offerItemId' | 'attempt' | 'mode'> & Partial<Li
 async function reserve(studentId: string, sessionId: string, lines: Line[]) {
   const { db } = await import('@repo/db');
   const { insertLines } = await import('../src/services/line.services');
+  const { writeConsents } = await import('../src/services/reservation.services');
   const { assertMayRegisterForInTx } = await import('../src/services/eligibility.services');
   return db.transaction(async (tx) => {
     const eligibility = await assertMayRegisterForInTx(tx, studentId, sessionId);
-    return insertLines(tx, { studentId, sessionId, lines: lines as LineInputType[], status: 'pending_payment', requestedBy: studentId, eligibility });
+    const made = await insertLines(tx, { studentId, sessionId, lines: lines as LineInputType[], status: 'pending_payment', requestedBy: studentId, eligibility });
+    // The family's consent, as every reservation path writes it since step B.
+    await writeConsents(tx, made.map((r) => r.id), { channel: 'app', confirmedBy: studentId });
+    return made;
   });
 }
 const priceOf = async (id: string) => {

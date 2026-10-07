@@ -66,6 +66,8 @@ import { sessionOpenFor, sessionWindow, windowRefusal, entryDeadlineMessage, sch
 import { effectiveDeadlinesOf, lineDeadlineSql } from './deadline.services';
 import { getSetting } from './settings.services';
 import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
+import { consentStanding, writeConsents, CONSENT_MISSING_REFUSAL, FAMILY_CONSENT_NEEDED } from './reservation.services';
+import { holdUnverifiedAtDeadline } from './verification.services';
 import { seriesPastDeadline, seriesDisplayName, windowsOfSeries, seriesDeadlineGroups, mixedDeadlinesSentence } from './series.services';
 import {
   notifyPaymentConfirmed,
@@ -242,6 +244,12 @@ export async function initiatePayment(
     throw new Error(PROVISIONAL_REFUSAL);
   }
 
+  // Consent (RESERVATIONS_REWORK.md §3.5): a line nobody consented to is never paid; a line the
+  // school reserved (grade 10, channel 'school') takes the family's own pair here, at checkout.
+  const consent = await consentStanding(db, data.registrationIds);
+  if (consent.missing.length) throw new Error(CONSENT_MISSING_REFUSAL);
+  if (consent.schoolOnly.length && !data.consent) throw new Error(FAMILY_CONSENT_NEEDED);
+
   // Held-wallet funding is provider money only — no escrow application
   if (isPrereg && (data.escrowAmountToApply ?? 0) > 0) {
     throw new Error('Escrow cannot be applied to preregistration payments');
@@ -373,6 +381,8 @@ export async function initiatePayment(
     // deadline change at the same moment waits for this checkout).
     const groupsInTx = await seriesDeadlineGroups(tx, data.registrationIds, true);
     if (groupsInTx.length > 1) throw new Error(mixedDeadlinesSentence(groupsInTx));
+    // The family's own consent on the lines the school reserved, with the checkout it came with.
+    if (consent.schoolOnly.length) await writeConsents(tx, consent.schoolOnly, { channel: 'app', confirmedBy: parentId });
 
     // 1. Create payment record FIRST so the escrow_transaction FK can resolve.
     const [paymentRecord] = await tx
@@ -553,6 +563,9 @@ export async function confirmPayment(
         'Payment cannot be confirmed — at least one registration is no longer payable (session closed or already expired).'
       );
     }
+    // A line nobody consented to is never confirmed (§3.5); the database refuses it too (0045).
+    const toConfirm = regs.filter((r) => r.status === 'pending_payment').map((r) => r.id);
+    if ((await consentStanding(tx, toConfirm)).missing.length) throw new Error(CONSENT_MISSING_REFUSAL);
 
     // V3 §6.10: a remark fee moves its request on in this transaction, and
     // only a request still awaiting payment. The move used to run after the
@@ -1206,6 +1219,14 @@ export async function undoLateTransfer(paymentId: string, financeAdminId: string
  *    (MO-21).
  */
 export async function enforcePaymentDeadlines(now: Date = new Date()) {
+  // Under `verification.unverifiedAtDeadline = hold`, a declared sitting still unverified at its
+  // line's deadline ends the line first (RESERVATIONS_REWORK.md §3.5): a waiting one expires
+  // (hold_unverified), a paid one is dropped through the receipt-gated drop. Off (the default,
+  // enter_as_declared): nothing. Its own failures never stop the sweep below.
+  const held = await holdUnverifiedAtDeadline(now).catch((err) => {
+    console.error('[deadlines] Could not hold the unverified declared sittings:', err);
+    return { expired: 0, dropped: 0 };
+  });
   let referencesLapsed = 0;
   let paymentsClosedAtDeadline = 0;
   let registrationsExpiredAtDeadline = 0;
@@ -1311,7 +1332,10 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
     }
   }
 
-  return { referencesLapsed, paymentsClosedAtDeadline, registrationsExpiredAtDeadline, preregistrationsRefundedAtDeadline, preregistrationsExpiredUnopened };
+  return {
+    referencesLapsed, paymentsClosedAtDeadline, registrationsExpiredAtDeadline, preregistrationsRefundedAtDeadline, preregistrationsExpiredUnopened,
+    unverifiedExpired: held.expired, unverifiedDropped: held.dropped,
+  };
 }
 
 /**

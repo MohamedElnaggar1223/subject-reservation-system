@@ -309,6 +309,20 @@
       "when": 1791404015550,
       "tag": "0043_rework_constraints",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1791412653415,
+      "tag": "0044_rework_reservations",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1791412676908,
+      "tag": "0045_rework_reservations_consent_guard",
+      "breakpoints": true
     }
   ]
 }

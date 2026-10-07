@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, notified, money,
-  takings, takingsDelta, openWindow, type Client, type Takings,
-} from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, notified, money, takings, takingsDelta, openWindow, type Client, type Takings, reservationOf } from './helpers';
 
 /**
  * Money in and money out through the self-serve channel: InstaPay with
@@ -32,7 +29,7 @@ describe('money paths', () => {
     // a desk-paid subject, receipt handed over, dropped, receipt returned.
     const desk = await apiResponse(
       officer.api.v1.registrations.desk.$post({
-        json: { studentId, sessionId, subjectIds: [history], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+        json: { studentId, sessionId, ...(await reservationOf(sessionId, [history])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
       })
     );
     const historyReg = desk.registrations[0]!.id;
@@ -45,7 +42,7 @@ describe('money paths', () => {
 
   it('InstaPay: 500 EGP escrow applied at checkout, reference submitted, officer verifies', async () => {
     const created = await apiResponse(
-      parent.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [biology], studentId } })
+      parent.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [biology])), studentId } })
     );
     biologyReg = created[0]!.id;
     expect(created[0]?.status).toBe('pending_payment');
@@ -82,7 +79,7 @@ describe('money paths', () => {
   });
 
   it('refuses a reference already used by another payment with a sentence, not SQL (RF-07)', async () => {
-    const created = await apiResponse(parent.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [ict], studentId } }));
+    const created = await apiResponse(parent.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [ict])), studentId } }));
     ictPayment = (await apiResponse(
       parent.api.v1.payments.initiate.$post({ json: { registrationIds: [created[0]!.id], paymentMethod: 'instapay', escrowAmountToApply: 0 } })
     )).id!;

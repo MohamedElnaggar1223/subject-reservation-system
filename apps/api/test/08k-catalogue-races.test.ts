@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, one, sql, futureWindow, lockWaiters, holdRowLock, feedSeries, audited, wholeItemSql, seriesOfSession,
-  type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, one, sql, futureWindow, lockWaiters, holdRowLock, feedSeries, audited, wholeItemSql, seriesOfSession, type Client, reservationOf } from './helpers';
 
 /**
  * F0b — races (FEATURES_PLAN.md §5: anything two people can act on at once
@@ -76,7 +73,7 @@ describe('F0b: races', () => {
     let registering: Promise<Res> | undefined;
     let changing: Promise<Res> | undefined;
     try {
-      registering = f.parent.api.v1.registrations.direct.$post({ json: { sessionId: w, subjectIds: [subj[0]!], studentId: f.studentId } });
+      registering = f.parent.api.v1.registrations.direct.$post({ json: { sessionId: w, ...(await reservationOf(w, [subj[0]!])), studentId: f.studentId } });
       await lockWaiters(1);
       // The admin moves the subject's item to series B (its lines go with it).
       changing = adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
@@ -116,8 +113,8 @@ describe('F0b: races', () => {
     };
     const moveDeadline = (s: string, entryDeadline: Date) =>
       adm.api.v1['board-series'][':id'].$put({ param: { id: s }, json: { entryDeadline, reason: 'race: the board moved it earlier' } });
-    const prereg = (f: { parent: Client; studentId: string }, w: string) =>
-      f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, subjectIds: [subj[1]!], studentId: f.studentId } });
+    const prereg = async (f: { parent: Client; studentId: string }, w: string) =>
+      f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, ...(await reservationOf(w, [subj[1]!])), studentId: f.studentId } });
     const dueOf = async (id: string) => new Date((await one<{ due: string }>(`select due_at as due from registration where id = $1`, [id])).due).getTime();
 
     it('the reservation first: it is entered, then the earlier deadline re-dates it, audited', async () => {
@@ -179,8 +176,8 @@ describe('F0b: races', () => {
     const cam = await seriesOfSession(w, 'cambridge');
     const pea = await seriesOfSession(w, 'pearson_edexcel');
     expect(cam).not.toBe(pea);
-    const prereg = (f: { parent: Client; studentId: string }) =>
-      f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, subjectIds: [sub], studentId: f.studentId } });
+    const prereg = async (f: { parent: Client; studentId: string }) =>
+      f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, ...(await reservationOf(w, [sub])), studentId: f.studentId } });
     const a = await onboard(officer, 'f0br-board-a', 11);
     const b = await onboard(officer, 'f0br-board-b', 11);
     const aReg = ((await apiResponse(prereg(a))) as { id: string }[])[0]!.id;

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
-import { app, admin, staff, onboard, signUp, signIn, subject, session, openWindow, one, sql, PASSWORD, type Client } from './helpers';
+import { app, admin, staff, onboard, signUp, signIn, subject, session, openWindow, one, sql, PASSWORD, type Client, reservationOf } from './helpers';
 import { clientIp, rateLimitKey } from '../src/lib/client-ip';
 import { emailVerificationRequired } from '../src/lib/auth-policy';
 
@@ -350,7 +350,7 @@ describe('auth surface', () => {
   });
 
   it('a family cannot spend or withdraw escrow it does not hold', async () => {
-    const reg = (await apiResponse(parent.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [econ], studentId } })))[0]!.id;
+    const reg = (await apiResponse(parent.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [econ])), studentId } })))[0]!.id;
     const pay = await parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'in_school', escrowAmountToApply: 1000 } });
     expect([400, 422]).toContain(pay.status);
     expect(await sql(`select 1 from payment_registration where registration_id = $1`, [reg])).toEqual([]);

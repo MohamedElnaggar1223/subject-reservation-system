@@ -2,10 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, one, sql, notified, money,
-  openWindow, futureWindow, type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, one, sql, notified, money, openWindow, futureWindow, type Client, reservationOf, swapTo } from './helpers';
 
 /**
  * Object-level access (security audit, Phase 1.1).
@@ -80,7 +77,7 @@ describe('object-level access between families', () => {
 
     // A: three subjects paid in cash at the desk.
     const desk = await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: studentAId, sessionId, subjectIds: [phys, chem, geo], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: studentAId, sessionId, ...(await reservationOf(sessionId, [phys, chem, geo])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }));
     const regOf = (s: string) => desk.registrations.find((r) => r.subjectId === s)!.id;
     physA = regOf(phys); chemA = regOf(chem); geoA = regOf(geo);
@@ -89,7 +86,7 @@ describe('object-level access between families', () => {
 
     // A: 1500 of free escrow the real way (desk-paid, receipt out, dropped, receipt back).
     const h = await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: studentAId, sessionId, subjectIds: [hist], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: studentAId, sessionId, ...(await reservationOf(sessionId, [hist])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }));
     const hr = await one<{ id: string }>(`select id from receipt where registration_id = $1`, [h.registrations[0]!.id]);
     await apiResponse(officer.api.v1.receipts[':id'].issue.$post({ param: { id: hr.id } }));
@@ -101,14 +98,14 @@ describe('object-level access between families', () => {
     withdrawalA = (await apiResponse(parentA.api.v1.escrow.withdraw.$post({ json: { studentId: studentAId, amount: 200 } }))).id;
 
     // A: a direct registration with a pending InstaPay payment.
-    bioA = (await apiResponse(parentA.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [bio], studentId: studentAId } })))[0]!.id;
+    bioA = (await apiResponse(parentA.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [bio])), studentId: studentAId } })))[0]!.id;
     instaPaymentA = (await apiResponse(parentA.api.v1.payments.initiate.$post({
       json: { registrationIds: [bioA], paymentMethod: 'instapay', escrowAmountToApply: 0 },
     }))).id!;
 
     // A: a student request waiting for the parent, and a preregistration.
-    econA = (await apiResponse(studentA.api.v1.registrations.request.$post({ json: { sessionId, subjectIds: [econ] } })))[0]!.id;
-    preregA = (await apiResponse(parentA.api.v1.registrations.preregister.$post({ json: { sessionId: draftId, subjectIds: [lit], studentId: studentAId } })))[0]!.id;
+    econA = (await apiResponse(studentA.api.v1.registrations.request.$post({ json: { sessionId, ...(await reservationOf(sessionId, [econ])) } })))[0]!.id;
+    preregA = (await apiResponse(parentA.api.v1.registrations.preregister.$post({ json: { sessionId: draftId, ...(await reservationOf(draftId, [lit])), studentId: studentAId } })))[0]!.id;
 
     // A: a drop request from the student on a confirmed subject.
     const cr = await apiResponse(studentA.api.v1.registrations[':id']['request-drop'].$post({ param: { id: chemA }, json: { reason: 'too much work' } }));
@@ -138,14 +135,14 @@ describe('object-level access between families', () => {
 
     // B: a confirmed, resulted subject with a remark awaiting consent, and a pending InstaPay payment.
     const deskB = await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: studentBId, sessionId, subjectIds: [phys], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: studentBId, sessionId, ...(await reservationOf(sessionId, [phys])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }));
     physB = deskB.registrations[0]!.id;
     await apiResponse(officer.api.v1.remarks.results.$post({ json: { results: [{ registrationId: physB, grade: 'C' }] } }));
     remarkB = (await apiResponse(parentB.api.v1.remarks.$post({
       json: { registrationId: physB, serviceType: 'review_of_marking', papers: [{ paperCode: '9702/42' }] },
     }))).id;
-    bioB = (await apiResponse(parentB.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [bio], studentId: studentBId } })))[0]!.id;
+    bioB = (await apiResponse(parentB.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [bio])), studentId: studentBId } })))[0]!.id;
     instaPaymentB = (await apiResponse(parentB.api.v1.payments.initiate.$post({
       json: { registrationIds: [bioB], paymentMethod: 'instapay', escrowAmountToApply: 0 },
     }))).id!;
@@ -155,14 +152,14 @@ describe('object-level access between families', () => {
     await refusedAs('parentB GET registration A', parentB.api.v1.registrations[':id'].$get({ param: { id: physA } }));
     await refusedAs('studentB GET registration A', studentB.api.v1.registrations[':id'].$get({ param: { id: physA } }));
     await refusedAs('parentB GET history A', parentB.api.v1.registrations.history.$get({ query: { studentId: studentAId } } as never));
-    await refusedAs('parentB GET available subjects for A', parentB.api.v1.registrations.available.$get({ query: { sessionId, studentId: studentAId } }));
-    // The reservations rework: the offers a student may reserve, with their prices (§5).
+    // The reservations rework: the offers a student may reserve, with their prices (§5); they
+    // replaced the old list of available subjects (step B removed GET /registrations/available).
     await refusedAs('parentB GET offers for A', parentB.api.v1.registrations.offers.$get({ query: { sessionId, studentId: studentAId } }));
     await refusedAs('studentB GET offers for A', studentB.api.v1.registrations.offers.$get({ query: { sessionId, studentId: studentAId } }));
     await refusedAs('parentB drop A', parentB.api.v1.registrations[':id'].drop.$post({ param: { id: physA }, json: { reason: 'not mine' } }));
-    await refusedAs('parentB swap A', parentB.api.v1.registrations[':id'].swap.$post({ param: { id: physA }, json: { newSubjectId: maths, reason: 'not mine' } }));
+    await refusedAs('parentB swap A', parentB.api.v1.registrations[':id'].swap.$post({ param: { id: physA }, json: { line: await swapTo(physA, maths), reason: 'not mine' } }));
     await refusedAs('studentB request-drop A', studentB.api.v1.registrations[':id']['request-drop'].$post({ param: { id: physA }, json: { reason: 'not mine' } }));
-    await refusedAs('studentB request-swap A', studentB.api.v1.registrations[':id']['request-swap'].$post({ param: { id: physA }, json: { newSubjectId: maths, reason: 'not mine' } }));
+    await refusedAs('studentB request-swap A', studentB.api.v1.registrations[':id']['request-swap'].$post({ param: { id: physA }, json: { line: await swapTo(physA, maths), reason: 'not mine' } }));
     await refusedAs('parentB approve A request', parentB.api.v1.registrations.approve.$put({ json: { registrationIds: [econA] } }));
     await refusedAs('parentB reject A request', parentB.api.v1.registrations.reject.$put({ json: { registrationIds: [econA], comments: 'not mine' } }));
     expect(await statusOf('registration', econA)).toBe('pending_approval');
@@ -170,8 +167,8 @@ describe('object-level access between families', () => {
     await apiResponse(parentA.api.v1.registrations.approve.$put({ json: { registrationIds: [econA] } }));
     await refusedAs('parentB revert A approval', parentB.api.v1.registrations['revert-approval'].$put({ json: { registrationIds: [econA] } }));
     expect(await statusOf('registration', econA)).toBe('pending_payment');
-    await refusedAs('parentB direct-register A', parentB.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [maths], studentId: studentAId } }));
-    await refusedAs('parentB preregister A', parentB.api.v1.registrations.preregister.$post({ json: { sessionId: draftId, subjectIds: [maths], studentId: studentAId } }));
+    await refusedAs('parentB direct-register A', parentB.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [maths])), studentId: studentAId } }));
+    await refusedAs('parentB preregister A', parentB.api.v1.registrations.preregister.$post({ json: { sessionId: draftId, ...(await reservationOf(draftId, [maths])), studentId: studentAId } }));
     await refusedAs('parentB cancel A prereg', parentB.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: preregA } }));
 
     expect(await statusOf('registration', physA)).toBe('confirmed');

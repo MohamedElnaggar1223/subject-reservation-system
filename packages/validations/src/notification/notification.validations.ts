@@ -53,6 +53,8 @@ export const NOTIFICATION_TYPES = [
   'PREREGISTRATION_HELD',
   // Reservations rework: a line re-priced when the board confirmed its fee
   'PRICE_CHANGED',
+  // Step B: the school's answer to a declared sitting (a retake or a carry-forward)
+  'DECLARATION_REVIEWED',
 ] as const;
 
 export const NotificationTypeSchema = z.enum(NOTIFICATION_TYPES);
@@ -81,6 +83,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   LINK_DECISION:                    'Link Request Decision',
   PREREGISTRATION_HELD:             'Preregistration Held',
   PRICE_CHANGED:                    'Price Changed',
+  DECLARATION_REVIEWED:             'Declared Sitting Reviewed',
 };
 
 // Icons mapped per type (used in the notification center UI)
@@ -107,6 +110,7 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   LINK_DECISION:                    '🔗',
   PREREGISTRATION_HELD:             '⏸️',
   PRICE_CHANGED:                    '💱',
+  DECLARATION_REVIEWED:             '🔎',
 };
 
 // ─── Admin bulk announcement recipient groups ─────────────────────────────────
