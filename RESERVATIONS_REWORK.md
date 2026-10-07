@@ -1147,10 +1147,11 @@ pixels.
 
 ## 14. Review
 
-The six Opus 5.5 reviews and the lead's answers are §16; the trail is
+The six Opus 5.5 reviews, the two diff checks and the lead's answers are §16; the trail is
 `.audit/school-forms.tsv`. Round six found the settlement formula sound and its wording
-overstated; version 7 corrects the wording and the small money-path points it listed, and the
-reviewer confirms the diff (§16 round six) before the owner reads it.
+overstated; versions 7 and 8 corrected the wording and the small money-path points it listed;
+the reviewer's diff check of version 8 (7 Oct, 19:08Z): **ready for the owner, nothing
+material left.** What the owner decides is §17; what is built next is §9.
 
 ## 15. Today's steps (the survey)
 
@@ -1326,7 +1327,10 @@ they are no longer payable. Version 8 (this text): the comparison stated the rig
 DISCOVERY.md Q-15); an instalment payment's failure expires the line only under
 `failOpenPayment`'s own test, otherwise the plan stands and the instalment can be paid again
 (§3.1, §3.6, §3.10 item 8); the stray "other per-series rules are unchanged" clause removed
-(§3.3). The reviewer checks this diff too.
+(§3.3). The reviewer's diff check of version 8 (19:08Z): 69, 72 and 76 resolved, the
+comparison the right way round in all four places and every comparison with a paid drop
+qualified; **"ready for the owner. Nothing material is left."** Last line: "I am Claude Opus
+5.5."
 
 ## 17. Questions for the owner, each with the default built unless answered
 
