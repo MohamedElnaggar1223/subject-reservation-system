@@ -68,10 +68,18 @@ async function lockForLines(tx: Tx, sessionId: string, itemIds: string[]) {
   if (seriesIds.length) await tx.select({ id: boardSeries.id }).from(boardSeries).where(inArray(boardSeries.id, seriesIds)).orderBy(boardSeries.id).for('share');
   const offerIds = [...new Set(items.map((i) => i.offerId))].sort();
   if (offerIds.length) await tx.select({ id: sessionOffer.id }).from(sessionOffer).where(inArray(sessionOffer.id, offerIds)).orderBy(sessionOffer.id).for('share');
-  if (itemIds.length) await tx.select({ id: sessionOfferItem.id }).from(sessionOfferItem).where(inArray(sessionOfferItem.id, [...itemIds].sort())).orderBy(sessionOfferItem.id).for('share');
+  const held = itemIds.length
+    ? await tx.select({ id: sessionOfferItem.id, seriesId: sessionOfferItem.boardSeriesId }).from(sessionOfferItem)
+      .where(inArray(sessionOfferItem.id, [...itemIds].sort())).orderBy(sessionOfferItem.id).for('share')
+    : [];
+  // An item's series read before its lock may have moved while this waited (a series change or a
+  // board change commits first): the series it is in now, held too. Only a deadline's writer
+  // takes a series FOR UPDATE, and it holds no item, so this later share lock waits on no cycle.
+  const moved = [...new Set(held.map((i) => i.seriesId).filter((x): x is string => !!x && !seriesIds.includes(x)))].sort();
+  if (moved.length) await tx.select({ id: boardSeries.id }).from(boardSeries).where(inArray(boardSeries.id, moved)).orderBy(boardSeries.id).for('share');
   const keys = itemIds.length ? await tx.select().from(sessionOfferItemFeeKey).where(inArray(sessionOfferItemFeeKey.itemId, itemIds)) : [];
   const feeConds = keys.flatMap((k) => {
-    const it = items.find((i) => i.id === k.itemId);
+    const it = held.find((i) => i.id === k.itemId);
     return it?.seriesId ? [and(eq(boardFee.boardSeriesId, it.seriesId), eq(boardFee.keyKind, k.keyKind), eq(boardFee.keyId, k.keyId))] : [];
   });
   if (feeConds.length) await tx.select({ id: boardFee.id }).from(boardFee).where(or(...feeConds)).orderBy(boardFee.id).for('share');

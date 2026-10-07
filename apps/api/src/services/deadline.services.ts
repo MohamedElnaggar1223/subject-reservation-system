@@ -15,9 +15,10 @@
  * reminders, "overdue" and the statement; it expires nothing by itself.
  */
 
-import { db, registration, registrationSession, boardFee, sql, eq, inArray } from '@repo/db';
+import { db, registration, registrationSession, boardFee, sql, eq, and, inArray } from '@repo/db';
 import { getSetting } from './settings.services';
 import { lineExceptions, type ExceptionScope } from './line-exceptions';
+import { logActions } from './audit.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -135,5 +136,48 @@ export async function dueDateFor(executor: Executor, input: DueDateInput): Promi
   return computeDueAt({
     basis: line.paymentDueAt, reservedAt: line.createdAt, graceDays, provisional: line.priceProvisional, feeConfirmedAt,
     exceptionDate: exc.find((e) => e.valueDate)?.valueDate ?? null, cap: deadline.at,
+  });
+}
+
+// ─── Re-dating (a due date follows what it is computed from) ─────────────────
+
+const WAITING = ['pending_approval', 'pending_payment', 'preregistered'];
+
+/**
+ * Re-date waiting lines the caller has locked, in its transaction: each line's due date computed
+ * again (`dueDateFor`); a changed one written and audited (`LINE_DUE_MOVED`, with why). A paid or
+ * finished line keeps its date. Returns how many moved.
+ */
+export async function redateLines(tx: Tx, lineIds: string[], actorId: string | null, why: string) {
+  if (!lineIds.length) return 0;
+  const rows = await tx.select({ id: registration.id, dueAt: registration.dueAt, status: registration.status })
+    .from(registration).where(inArray(registration.id, lineIds)).orderBy(registration.id);
+  const moves: { id: string; from: Date; to: Date }[] = [];
+  for (const r of rows) {
+    if (!WAITING.includes(r.status)) continue;
+    const due = await dueDateFor(tx, { kind: 'line', lineId: r.id });
+    if (due.getTime() !== r.dueAt.getTime()) {
+      await tx.update(registration).set({ dueAt: due }).where(eq(registration.id, r.id));
+      moves.push({ id: r.id, from: r.dueAt, to: due });
+    }
+  }
+  await logActions(moves.map((m) => ({
+    userId: actorId, action: 'LINE_DUE_MOVED' as const, entityType: 'registration' as const, entityId: m.id,
+    previousData: { dueAt: m.from.toISOString() }, newData: { dueAt: m.to.toISOString(), reason: why },
+  })), tx);
+  return moves.length;
+}
+
+/**
+ * After a series' dates changed — in its own transaction, once the change has committed: a
+ * checkout locks its lines before their series (MA-06), so the series' writer may not lock lines
+ * after the series — the waiting lines entered in it are re-dated. Run again, it changes nothing.
+ */
+export async function redateSeriesLines(seriesId: string, actorId: string | null, why: string) {
+  return db.transaction(async (tx) => {
+    const lines = await tx.select({ id: registration.id }).from(registration)
+      .where(and(eq(registration.boardSeriesId, seriesId), inArray(registration.status, WAITING as never[])))
+      .orderBy(registration.id).for('update');
+    return redateLines(tx, lines.map((l) => l.id), actorId, why);
   });
 }

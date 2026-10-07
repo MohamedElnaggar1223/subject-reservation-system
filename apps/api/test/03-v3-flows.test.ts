@@ -102,10 +102,19 @@ describe('V3 flows', () => {
 
   it('held wallet: preregister for a draft session, pay at the desk into held, capture on activation', async () => {
     const draft = futureWindow();
-    const wrongLevel = await refused(
-      adm.api.v1.sessions.$post({ json: { name: 'January IGCSE?', sessionType: 'january', seriesYear: 2027, qualificationLevel: 'igcse', ...draft } })
-    );
-    expect(wrongLevel.status).toBe(400);
+    // The reservations rework (RESERVATIONS_REWORK.md §3.1, §3.3): a winter session is valid;
+    // "IGCSE sits neither October nor January" is checked per item, so an IGCSE item entered in a
+    // January series is refused (it was a January IGCSE window that was refused before).
+    const igcse = await subject(adm, 'T4MA1', 'Mathematics (IGCSE, v3 flows)', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
+    const winter = await session(adm, 'Winter (IGCSE, v3 flows)', 'november', 'igcse', draft);
+    const offer = (await apiResponse(adm.api.v1.sessions[':id'].offers.$get({ param: { id: winter } }))).offers.find((o) => o.subjectId === igcse)!;
+    const year = (await one<{ y: number }>(`select series_year as y from registration_session where id = $1`, [winter])).y;
+    const january = await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month: 'january', year: year + 1, label: 'v3 flows' } }));
+    const wrongLevel = await refused(adm.api.v1.sessions[':id'].offers[':offerId'].items.$post({
+      param: { id: winter, offerId: offer.id },
+      json: { label: 'Whole subject (January)', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: january.id, availability: 'open', requiredInSeries: false },
+    }));
+    expect(wrongLevel).toEqual({ status: 400, error: 'IGCSE sits neither October nor January: an IGCSE item is entered in a June or November series' });
 
     januaryA = await session(adm, 'January (A-Level)', 'january', 'a_level', draft);
     const pre = await apiResponse(parent.api.v1.registrations.preregister.$post({ json: { sessionId: januaryA, subjectIds: [physicsA], studentId } }));

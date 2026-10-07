@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, lockWaiters, schoolToday, type Client,
+  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, lockWaiters, schoolToday, teachOffer, sessionName, type Client,
 } from './helpers';
 
 /** Hold the year's enrolment lock (upsertEnrolments' advisory lock) from outside, so two commits queue behind it together. */
@@ -70,6 +70,9 @@ describe('F0b: course enrolment', () => {
       param: { id: section }, json: { studentIds: [s.s1!.studentId, s.s2!.studentId, s.s3!.studentId] },
     }));
     june = await session(adm, 'June (IGCSE, enrolment)', 'june', 'igcse', futureWindow());
+    // Who teaches English and Mathematics this cycle (the reservations rework: a line names one of its offer's teachers).
+    await teachOffer(adm, june, subj.ENG!, [tA, tB]);
+    await teachOffer(adm, june, subj.MAT!, [tA, tB]);
   });
 
   describe('one at a time', () => {
@@ -209,7 +212,7 @@ describe('F0b: course enrolment', () => {
       expect(reg.status).toBe('preregistered');
       const flags = await apiResponse(coordinator.api.v1.enrolments.check.$get({ query: { academicYearId: thisYear } }));
       expect(flags.registeredNotEnrolled.filter((f) => f.studentId === s.s4!.studentId).map((f) => [f.subjectName, f.window, f.registrationStatus]))
-        .toEqual([['Biology (enrolment)', 'June (IGCSE, enrolment)', 'preregistered']]);
+        .toEqual([['Biology (enrolment)', await sessionName(june), 'preregistered']]);
       // s1 is enrolled in English and registered nowhere this year.
       expect(flags.enrolledNotRegistered.filter((f) => f.studentId === s.s1!.studentId).map((f) => [f.subjectName, f.teacherName, f.section]))
         .toContainEqual(['English (enrolment)', 'teacher enr-a', 'EN-11A']);

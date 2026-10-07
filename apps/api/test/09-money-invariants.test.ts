@@ -383,18 +383,83 @@ describe('money invariants over the whole database', () => {
   });
 
   it('every live registration in a window that feeds board series is entered in one of them, of its subject\'s board (F0b)', async () => {
+    // The reservations rework (§8, 09 adds): and every live line has an item of its own offer —
+    // the session's, of its subject — and is in its item's series; only a converted line the old
+    // routing never entered (legacy.no_series) has none.
     const broken = await sql(`
-      select r.id, r.status, r.board_series_id, s.council, b.board_code
+      select r.id, r.status, r.board_series_id, s.council, b.board_code, i.board_series_id as item_series
       from registration r
       join subject s on s.id = r.subject_id
+      join session_offer_item i on i.id = r.offer_item_id
+      join session_offer o on o.id = i.offer_id
       left join board_series b on b.id = r.board_series_id
       where r.status not in ('rejected', 'expired', 'dropped')
         and (
-          (r.board_series_id is null and exists (select 1 from session_board_series l where l.session_id = r.session_id))
+          (r.board_series_id is null and not coalesce((r.legacy->>'no_series')::boolean, false))
           or (r.board_series_id is not null and not exists (
                 select 1 from session_board_series l where l.session_id = r.session_id and l.board_series_id = r.board_series_id))
           or (b.board_code is not null and b.board_code <> s.council)
+          or i.session_id <> r.session_id or o.subject_id <> r.subject_id
+          or r.board_series_id is distinct from i.board_series_id
         )
+    `);
+    expect(broken).toEqual([]);
+    // And the session's series are exactly its items' and its lines' (the links are derived).
+    const strayLinks = await sql(`
+      select l.session_id, l.board_series_id from session_board_series l
+      where not exists (select 1 from session_offer_item i where i.session_id = l.session_id and i.board_series_id = l.board_series_id)
+        and not exists (select 1 from registration r where r.session_id = l.session_id and r.board_series_id = l.board_series_id)
+    `);
+    expect(strayLinks).toEqual([]);
+  });
+
+  it("every line priced since the reservations rework has the price its basis says (§8: 'every line with a basis has its price equal to it')", async () => {
+    const broken = await sql(`
+      select id, price_at_registration, course_fee_at_registration, registration_fee_at_registration, pricing_basis->>'total' as total
+      from registration
+      where pricing_basis is not null
+        and (${cents('price_at_registration')} <> ${cents("(pricing_basis->>'total')::numeric")}
+          or ${cents('course_fee_at_registration')} <> ${cents("(pricing_basis->>'courseFee')::numeric")}
+          or ${cents('registration_fee_at_registration')} <> ${cents("(pricing_basis->>'registrationFee')::numeric")})
+    `);
+    expect(broken).toEqual([]);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from registration where pricing_basis is not null`))[0]?.n)).toBeGreaterThan(0);
+  });
+
+  it('one live line per student, unit or award and series, across sessions (§3.5 gate.sameEntryOnce)', async () => {
+    // A line's entry keys: its award (an award or option item), each of its units, or its subject
+    // row (an item entering the subject as a whole). Two live lines of a student in one series
+    // never share one.
+    const broken = await sql(`
+      with keys as (
+        select r.id, r.student_id, r.board_series_id, 'q:' || i.qualification_id as k
+          from registration r join session_offer_item i on i.id = r.offer_item_id
+          where i.enters_kind in ('award', 'option') and i.qualification_id is not null
+        union all
+        select r.id, r.student_id, r.board_series_id, 'u:' || u.unit_id
+          from registration r join session_offer_item_unit u on u.item_id = r.offer_item_id
+        union all
+        select r.id, r.student_id, r.board_series_id, 's:' || r.subject_id
+          from registration r join session_offer_item i on i.id = r.offer_item_id
+          where i.enters_kind = 'subject'
+      )
+      select k.student_id, k.board_series_id, k.k, count(distinct k.id) as lines
+      from keys k join registration r on r.id = k.id
+      where r.status not in ('rejected', 'expired', 'dropped') and k.board_series_id is not null
+      group by k.student_id, k.board_series_id, k.k having count(distinct k.id) > 1
+    `);
+    expect(broken).toEqual([]);
+  });
+
+  it("a registration expired at an entry deadline was past its own effective deadline (MO-10 per line: the retake deadline, the entry deadline or the exams' start)", async () => {
+    // The reservations rework (§3.3): which date a line is cut off at is its effective deadline.
+    const broken = await sql(`
+      select r.id, r.board_series_id, line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) as deadline, a.created_at
+      from audit_log a
+      join registration r on r.id = a.entity_id
+      where a.action = 'REGISTRATION_EXPIRED' and a.new_data->>'reason' in ('entry_deadline', 'preregistration_unfunded_at_deadline')
+        and r.board_series_id is not null
+        and coalesce(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) > a.created_at, true)
     `);
     expect(broken).toEqual([]);
   });
@@ -412,26 +477,32 @@ describe('money invariants over the whole database', () => {
   });
 
   it("every open payment's registrations share one entry deadline (F0b: the sweep closes a payment at its series' deadline)", async () => {
+    // Changed by the reservations rework (pre-authorised; trail row "assertion"): the deadline is
+    // each line's effective one (a retake's retake deadline, a series with no entry deadline its
+    // exams' start), which is what the sweep closes a payment at (§3.3).
+    const deadline = `coalesce(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id)::text, 'none')`;
     const broken = await sql(`
-      select p.id, count(distinct coalesce(b.entry_deadline::text, 'none')) as deadlines
+      select p.id, count(distinct ${deadline}) as deadlines
       from payment p
       join payment_registration pr on pr.payment_id = p.id
       join registration r on r.id = pr.registration_id
-      left join board_series b on b.id = r.board_series_id
       where p.status in ('pending', 'pending_verification')
-      group by p.id having count(distinct coalesce(b.entry_deadline::text, 'none')) > 1
+      group by p.id having count(distinct ${deadline}) > 1
     `);
     expect(broken).toEqual([]);
   });
 
-  it('every window closes before the entry deadline of every series it feeds, and every series is in its academic year and kind (F0b)', async () => {
+  it('every series a session is entered in is in its academic year and kind, of its board (F0b)', async () => {
+    // Changed by the reservations rework (pre-authorised; trail row "assertion"): the clause "a
+    // window closes before the entry deadline of every series it feeds" is gone — a deadline may
+    // fall inside an open session, the cut-off is per item (§3.3). The year, kind and board
+    // clauses stay.
     const broken = await sql(`
       select l.session_id, l.board_series_id, w.end_date, b.entry_deadline, w.session_type, w.series_year, b.month, b.year
       from session_board_series l
       join registration_session w on w.id = l.session_id
       join board_series b on b.id = l.board_series_id
-      where (b.entry_deadline is not null and w.end_date >= b.entry_deadline)
-         or school_series_academic_year_start(b.month, b.year) <> school_series_academic_year_start(w.session_type, w.series_year)
+      where school_series_academic_year_start(b.month, b.year) <> school_series_academic_year_start(w.session_type, w.series_year)
          or (b.month = 'june') <> (w.session_type = 'june')
          or l.board_code <> b.board_code
     `);

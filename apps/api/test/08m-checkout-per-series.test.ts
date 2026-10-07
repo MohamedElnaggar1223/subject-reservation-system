@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, audited, money, takings, takingsDelta,
-  futureWindow, runPaymentDeadlines, type Client,
+  futureWindow, runPaymentDeadlines, subjectFeeIn, type Client,
 } from './helpers';
 
 /**
@@ -15,14 +15,26 @@ import {
  * names each series to pay separately; the desk splits one action into one
  * payment per deadline, each confirmed with its receipts; series with the
  * same deadline share a checkout. A deadline change that would split an open
- * checkout is refused. And MO-21 per series: in a draft window feeding
- * October and January, October's deadline refunds only October's
+ * checkout is refused. And MO-21 per series: in a draft session whose items
+ * sit October and January, October's deadline refunds only October's
  * preregistrations, and a January one cancelled after it is judged by
  * January's own deadline.
  *
- * The open window takes a (type, level) pair no earlier file holds open, and
- * is closed at the end.
+ * The reservations rework: a session's series are its items' — each subject's
+ * item is placed in its series (`place`), where F0b fed the window and routed
+ * subjects. The open session (a winter AS session of its own label) is closed
+ * at the end.
  */
+
+/** A subject's item in a session placed in a series, its board fee there set first (the Session and Fees screens). */
+async function place(adm: Client, sessionId: string, subjectId: string, boardSeriesId: string) {
+  await subjectFeeIn(adm, boardSeriesId, subjectId);
+  const it = await one<{ id: string; offer_id: string }>(
+    `select i.id, i.offer_id from session_offer_item i join session_offer o on o.id = i.offer_id where i.session_id = $1 and o.subject_id = $2 and i.availability <> 'closed'`, [sessionId, subjectId]);
+  return adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
+    param: { id: sessionId, offerId: it.offer_id, itemId: it.id }, json: { boardSeriesId, reason: 'the series it is sat in' },
+  });
+}
 
 const days = (n: number) => n * 24 * 60 * 60 * 1000;
 const statusOf = async (table: 'payment' | 'registration', id: string) =>
@@ -38,7 +50,7 @@ describe('F0b: one checkout per entry deadline', () => {
   const Y = academicYearStartOf();
   const subj: Record<string, string> = {};
   let windowId: string, x: string, z: string, later: string, windowEnd: Date;
-  let type: 'october' | 'november' | 'january', level: 'as_level' | 'a_level', otherMonth: 'october' | 'january';
+  const type = 'october' as const, level = 'as_level' as const, otherMonth = 'january' as const;
 
   type Family = { parent: Client; student: Client; studentId: string };
   const direct = async (f: Family, subjectIds: string[]) =>
@@ -54,11 +66,6 @@ describe('F0b: one checkout per entry deadline', () => {
     adm = await admin('ckd');
     officer = await staff(adm, 'finance_officer', 'ckd');
     finadmin = await staff(adm, 'finance_admin', 'ckd');
-    const open = new Set((await sql<{ t: string; l: string }>(`select session_type as t, qualification_level as l from registration_session where status = 'active'`)).map((r) => `${r.t}|${r.l}`));
-    const pair = (['october|as_level', 'october|a_level', 'november|as_level', 'november|a_level', 'january|as_level', 'january|a_level'] as const).find((p) => !open.has(p));
-    expect(pair).toBeDefined();
-    [type, level] = pair!.split('|') as [typeof type, typeof level];
-    otherMonth = type === 'january' ? 'october' : 'january';
     for (const tag of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'PO', 'PJ']) {
       subj[tag] = await subject(adm, `CKD-${tag}`, `Deadlines ${tag}`, { course: 1000, registration: 500 }, { qualificationLevel: level, council: 'pearson_edexcel' });
     }
@@ -70,14 +77,10 @@ describe('F0b: one checkout per entry deadline', () => {
     x = await mkSeries(type, 'deadlines X');
     z = await mkSeries(type, 'deadlines Z');
     later = await mkSeries(otherMonth, 'deadlines later');
-    // B, E and G go to the later series; C to Z, whose deadline is X's.
-    await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({
-      param: { id: windowId },
-      json: {
-        series: [{ boardSeriesId: x, isDefault: true }, { boardSeriesId: z, isDefault: false }, { boardSeriesId: later, isDefault: false }],
-        routes: [{ subjectId: subj.B!, boardSeriesId: later }, { subjectId: subj.E!, boardSeriesId: later }, { subjectId: subj.G!, boardSeriesId: later }, { subjectId: subj.C!, boardSeriesId: z }],
-      },
-    }));
+    // B, E and G are sat in the later series; C in Z, whose deadline is X's; the rest in X.
+    for (const tag of ['A', 'D', 'F', 'PO', 'PJ']) await apiResponse(place(adm, windowId, subj[tag]!, x));
+    for (const tag of ['B', 'E', 'G']) await apiResponse(place(adm, windowId, subj[tag]!, later));
+    await apiResponse(place(adm, windowId, subj.C!, z));
     await apiResponse(setDeadline(x, new Date(windowEnd.getTime() + days(5))));
     await apiResponse(setDeadline(z, new Date(windowEnd.getTime() + days(5))));
     await apiResponse(setDeadline(later, new Date(windowEnd.getTime() + days(10))));
@@ -241,6 +244,17 @@ describe('F0b: one checkout per entry deadline', () => {
 
   it("the admin's move may not split an open checkout across deadlines", async () => {
     const f4 = await onboard(officer, 'ckd-4', 12);
+    // The reservations rework: a line moves to another series with an item of its subject there
+    // (an admin's move is behind the item's series) — A and C get one in the later series, closed
+    // so that new lines keep going to their own.
+    for (const tag of ['A', 'C']) {
+      await subjectFeeIn(adm, later, subj[tag]!);
+      const o = await one<{ id: string }>(`select id from session_offer where session_id = $1 and subject_id = $2`, [windowId, subj[tag]!]);
+      await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].items.$post({
+        param: { id: windowId, offerId: o.id },
+        json: { label: 'Whole subject (later)', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: later, availability: 'closed', requiredInSeries: false },
+      }));
+    }
     const [a, c] = await direct(f4, [subj.A!, subj.C!]);
     const pay = (await apiResponse(checkout(f4, [a!, c!]))).id!;
     const moved = await refused(adm.api.v1.sessions[':id']['board-series'].move.$post({
@@ -259,8 +273,13 @@ describe('F0b: one checkout per entry deadline', () => {
   });
 });
 
-describe("F0b: a window's first series may not split an open checkout across deadlines", () => {
-  it('refused, nothing entered, until the checkout is settled', async () => {
+// Changed by the reservations rework (trail row "assertion"): F0b refused feeding a window its first
+// series when an open checkout would then span two deadlines. A line is always in its item's series
+// now, so the same guard stands on the change that can split a checkout — moving an item to a
+// series with another deadline (offer.services.ts changeItemSeries): refused, nothing moved, until
+// the checkout is settled. The outcome is F0b's; the action and its sentence are the item's.
+describe("F0b: an item's series change may not split an open checkout across deadlines", () => {
+  it('refused, nothing moved, until the checkout is settled', async () => {
     const adm = await admin('ckw');
     const officer = await staff(adm, 'finance_officer', 'ckw');
     const Y = academicYearStartOf();
@@ -269,33 +288,29 @@ describe("F0b: a window's first series may not split an open checkout across dea
     const w = await session(adm, 'October (AS, window guard)', 'october', 'as_level', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('october', Y) });
     const end = new Date((await one<{ end: string }>(`select end_date as "end" from registration_session where id = $1`, [w])).end);
     const f = await onboard(officer, 'ckw-1', 12);
-    // The window feeds no series yet: both preregistrations carry none, and share one checkout.
+    // Both items are in the session's one series so far: the two preregistrations share one checkout.
     const ids = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, subjectIds: [one1, two], studentId: f.studentId } }))).map((r) => r.id);
+    const first = (await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [ids[0]!])).s;
     const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: ids, paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
     const mk = async (month: 'october' | 'january', days: number) => {
       const id = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month, year: seriesYearInAcademicYear(month, Y), label: 'window guard' } }))).id;
       await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id }, json: { entryDeadline: new Date(end.getTime() + days * 24 * 60 * 60 * 1000), reason: 'board key dates published' } }));
       return id;
     };
-    const oct = await mk('october', 5);
     const jan = await mk('january', 10);
-    const feed = () => adm.api.v1.sessions[':id']['board-series'].$put({
-      param: { id: w }, json: { series: [{ boardSeriesId: oct, isDefault: true }, { boardSeriesId: jan, isDefault: false }], routes: [{ subjectId: two, boardSeriesId: jan }] },
-    });
-    expect(await refused(feed())).toEqual({
+    expect(await refused(place(adm, w, two, jan))).toEqual({
       status: 409,
-      error: "1 checkout still open pays for this window's registrations, which these series would enter with different deadlines — confirm or cancel it first, or route the subjects to series with the same deadline",
+      error: '1 checkout still open would pay for two deadlines after this move — confirm or cancel it first',
     });
-    expect(await sql(`select board_series_id from registration where id in ($1, $2)`, ids)).toEqual([{ board_series_id: null }, { board_series_id: null }]);
-    expect(await sql(`select id from session_board_series where session_id = $1`, [w])).toEqual([]);
-    // Settled, the same change goes through.
+    expect(await sql(`select board_series_id as s from registration where id in ($1, $2)`, ids)).toEqual([{ s: first }, { s: first }]);
+    // Settled, the same change goes through, the line with its item.
     await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
-    await apiResponse(feed());
-    expect((await sql<{ s: string }>(`select board_series_id as s from registration where id in ($1, $2) order by board_series_id`, ids)).map((x) => x.s).sort()).toEqual([oct, jan].sort());
+    await apiResponse(place(adm, w, two, jan));
+    expect((await sql<{ s: string }>(`select board_series_id as s from registration where id in ($1, $2)`, ids)).map((x) => x.s).sort()).toEqual([first, jan].sort());
   });
 });
 
-describe('F0b: MO-21 per series — a draft window feeding October and January', () => {
+describe('F0b: MO-21 per series — a draft session whose items sit October and January', () => {
   let adm: Client, officer: Client, finadmin: Client;
   const Y = academicYearStartOf();
 
@@ -310,9 +325,12 @@ describe('F0b: MO-21 per series — a draft window feeding October and January',
       (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month, year: seriesYearInAcademicYear(month, Y), label: 'prereg per series' } }))).id;
     const oct = await mk('october');
     const jan = await mk('january');
-    await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({
-      param: { id: w }, json: { series: [{ boardSeriesId: oct, isDefault: true }, { boardSeriesId: jan, isDefault: false }], routes: [{ subjectId: pj, boardSeriesId: jan }] },
-    }));
+    // Dates for both (a series with none takes no line); the scenario moves them below.
+    for (const id of [oct, jan]) {
+      await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id }, json: { entryDeadline: new Date(Date.now() + 200 * 24 * 60 * 60 * 1000), reason: 'board key dates published' } }));
+    }
+    await apiResponse(place(adm, w, po, oct));
+    await apiResponse(place(adm, w, pj, jan));
     const f = await onboard(officer, 'ckp-1', 12);
     const prereg = async (subjectId: string) =>
       (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, subjectIds: [subjectId], studentId: f.studentId } })))[0]!.id;

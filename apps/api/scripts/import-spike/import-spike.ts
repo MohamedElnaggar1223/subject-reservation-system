@@ -344,12 +344,16 @@ try {
     if (!r.series || !r.level) continue;
     const key = `${r.series.type}|${r.level}`;
     if (sessions.has(key)) continue;
+    // The reservations rework: a session is June or winter (its year: June's, or November's for a
+    // January series); the tab's series and level become its label, its name derived.
+    const labelYear = Number(r.series.label.slice(-4));
+    const winter = r.series.type !== 'june';
     const s = await attempt<{ id: string; status: string }>(adm.v1.sessions.$post({
       json: {
-        name: `${r.series.label} ${LEVEL_NAME[r.level]} (spike)`, sessionType: r.series.type, qualificationLevel: r.level,
-        // F0a: the series year is the one in the label ("November 2026").
-        seriesYear: Number(r.series.label.slice(-4)),
+        type: winter ? 'winter' : 'june', year: r.series.type === 'january' ? labelYear - 1 : labelYear,
+        label: `${r.series.type} ${LEVEL_NAME[r.level]} spike`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         startDate: new Date(Date.now() - day).toISOString(), endDate: new Date(Date.now() + 30 * day).toISOString(),
+        courseStartsOn: new Date(Date.now()).toISOString().slice(0, 10), paymentDueAt: new Date(Date.now() + 30 * day).toISOString(),
       },
     }));
     if (!s.ok) { note('session-refused', 'Session refused', `${r.series.label} ${LEVEL_NAME[r.level]}: ${s.error}`, r.row); sessions.set(key, ''); continue; }

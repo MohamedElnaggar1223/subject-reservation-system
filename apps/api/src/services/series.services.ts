@@ -31,8 +31,8 @@ import {
   type MoveRegistrationsToSeriesType, type ListBoardSeriesQueryType,
 } from '@repo/validations';
 import { logAction, logActions, type AuditContext } from './audit.services';
-import { schoolDate } from './window.services';
-import { lineDeadlineSql, effectiveDeadlinesOf, deadlinePassedSentence } from './deadline.services';
+import { schoolDate, entryDeadlineMessage } from './window.services';
+import { lineDeadlineSql, effectiveDeadlinesOf, deadlinePassedSentence, redateLines, redateSeriesLines } from './deadline.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -263,7 +263,7 @@ export async function updateBoardSeries(
 ) {
   const { names } = await boardNameMap();
   try {
-    return await db.transaction(async (tx) => {
+    const changed = await db.transaction(async (tx) => {
       await tx
         .select({ id: registrationSession.id })
         .from(sessionBoardSeries)
@@ -300,7 +300,7 @@ export async function updateBoardSeries(
         const spanning = await openCheckoutsSpanningDeadlines(tx, { boardSeriesId: id });
         if (spanning > 0) {
           throw new SeriesError(
-            `${checkouts(spanning)} for this series together with another whose deadline would then differ — ${settleFirst(spanning)}, or give the other series the same deadline`,
+            `${checkouts(spanning)} for this series together with another whose entry deadline would then differ — ${settleFirst(spanning)}, or give the other series the same deadline`,
             409,
           );
         }
@@ -320,8 +320,13 @@ export async function updateBoardSeries(
         await logAction(actorId, 'BOARD_SERIES_UPDATED', 'board_series', id,
           Object.fromEntries(Object.keys(dates).map((k) => [k, s[k as keyof typeof s] ?? null])), dates as Record<string, unknown>, ctx, tx);
       }
-      return { ...updated!, name: boardSeriesName(names, updated!) };
+      return { ...updated!, name: boardSeriesName(names, updated!), datesChanged: deadlineChanges || retakeChanges || dates.examsStart !== undefined };
     });
+    // The waiting lines' due dates follow the series' dates (capped by the effective deadline),
+    // once the change has committed (deadline.services.ts redateSeriesLines: the lock order).
+    const { datesChanged, ...result } = changed;
+    if (datesChanged) await redateSeriesLines(id, actorId, 'the series\' dates changed');
+    return result;
   } catch (err) {
     if (isUniqueViolation(err)) throw new SeriesError('Another series of this board, month and year already has that label', 409);
     const sentence = seriesRuleSentence(err);
@@ -433,6 +438,8 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
       if (!link) throw new SeriesError('This session has no item in that series', 404);
       const target = link.series;
       const now = new Date();
+      // A series past its entry deadline takes no more entries (MO-10), as before the rework.
+      if (target.entryDeadline && target.entryDeadline <= now) throw new SeriesError(entryDeadlineMessage(target.entryDeadline));
       const regs = await tx
         .select({ id: registration.id, sessionId: registration.sessionId, status: registration.status, boardSeriesId: registration.boardSeriesId,
           offerItemId: registration.offerItemId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId,
@@ -482,7 +489,7 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
       const spanning = await openCheckoutsSpanningDeadlines(tx, { registrationIds: moving.map((r) => r.id) });
       if (spanning > 0) {
         throw new SeriesError(
-          `${checkouts(spanning)} for these registrations together with others whose deadline would then differ — ${settleFirst(spanning)}, or move them together`,
+          `${checkouts(spanning)} for these registrations together with others whose entry deadline would then differ — ${settleFirst(spanning)}, or move them together`,
           409,
         );
       }
@@ -490,6 +497,7 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
         userId: actorId, action: 'REGISTRATION_SERIES_MOVED' as const, entityType: 'registration' as const, entityId: r.id,
         previousData: { boardSeriesId: r.boardSeriesId, offerItemId: r.offerItemId }, newData: { boardSeriesId: target.id, reason: data.reason },
       })), tx);
+      await redateLines(tx, moving.map((r) => r.id), actorId, 'moved to another series');
 
       return { moved: moving.length, alreadyThere: regs.length - moving.length, boardSeriesId: target.id, series: boardSeriesName(names, target) };
     });

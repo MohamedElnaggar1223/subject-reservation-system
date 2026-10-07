@@ -4,7 +4,7 @@ import {
   apiResponse, academicYearStartOf, gradeInAcademicYear, gradeToday, seriesYearInAcademicYear, academicYearLabel,
 } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, futureWindow, schoolToday, loneStudent, signUp, signIn, audited,
+  admin, staff, onboard, subject, session, refused, one, sql, futureWindow, schoolToday, loneStudent, signUp, signIn, audited, wholeItemSql,
   type Client,
 } from './helpers';
 
@@ -226,8 +226,8 @@ describe('F0a: grade and eligibility', () => {
     const seed = async (studentId: string, status: string) => {
       const id = randomUUID();
       const subjectId = { pending_approval: subj.a!, pending_payment: subj.b! }[status]!;
-      await sql(`insert into registration (id, student_id, session_id, subject_id, price_at_registration, course_fee_at_registration, registration_fee_at_registration, status, requested_by)
-                 values ($1, $2, $3, $4, 1200, 1000, 200, $5, $6)`, [id, studentId, S.nov2026!, subjectId, status, studentId]);
+      await sql(`insert into registration (id, student_id, session_id, subject_id, price_at_registration, course_fee_at_registration, registration_fee_at_registration, status, requested_by, offer_item_id, due_at)
+                 values ($1, $2, $3, $4, 1200, 1000, 200, $5, $6, ${wholeItemSql('$7', '$8')}, now() + interval '30 days')`, [id, studentId, S.nov2026!, subjectId, status, studentId, S.nov2026!, subjectId]);
       return id;
     };
     const G10 = 'Grade 10 sits the June series only';
@@ -449,7 +449,9 @@ describe('F0a: grade and eligibility', () => {
       await extend(f.studentId, sess);
       await setSetting('schoolFee.newYearWithoutSchedule', 'hold', finadmin);
       const held = await refused(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: sess, subjectIds: [subj.a!], studentId: f.studentId } }));
-      expect(held.error).toBe(`The ${academicYearLabel(nextStart)} school fee is not open yet — registration for the November ${seriesYearInAcademicYear('november', nextStart)} series waits until it opens`);
+      // The series label of a winter session (the reservations rework): its months.
+      const y = seriesYearInAcademicYear('november', nextStart);
+      expect(held.error).toBe(`The ${academicYearLabel(nextStart)} school fee is not open yet — registration for the November ${y} – January ${y + 1} series waits until it opens`);
       await setSetting('schoolFee.newYearWithoutSchedule', 'proceed', finadmin);
       expect(await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: sess, subjectIds: [subj.a!], studentId: f.studentId } }))).toHaveLength(1);
     });

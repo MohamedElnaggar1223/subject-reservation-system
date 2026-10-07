@@ -1,40 +1,42 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, one, sql, futureWindow, lockWaiters, holdRowLock, feedSeries, type Client,
+  admin, staff, onboard, subject, session, one, sql, futureWindow, lockWaiters, holdRowLock, feedSeries, audited, wholeItemSql, seriesOfSession,
+  type Client,
 } from './helpers';
 
 /**
  * F0b — races (FEATURES_PLAN.md §5: anything two people can act on at once
  * has a race test). The dangerous order is forced, not hoped for.
  *
- * - A registration racing a change to its window's series: the registration
- *   holds the window FOR SHARE and its series links FOR SHARE while it is
- *   entered, and a change to the window's series takes the window FOR
- *   UPDATE — so the registration is entered by the old routing and the change
- *   then sees it, never a registration in a series the window no longer feeds.
- * - A window's end and its series' deadline changed at the same moment: the
- *   window always closes before the deadline (MO-10), whichever lands first.
+ * - A line racing a change to its item's series (the reservations rework: a session's series are
+ *   its items'): the line holds its offer and item FOR SHARE while it is entered, and the change
+ *   takes them FOR UPDATE — so the line is entered by the old routing and the change then
+ *   carries it with the item, its student locked first (the change runs again when a student
+ *   appeared while it waited: lib/student-locks.ts). Never a line in a series its item is not in.
+ * - A reservation and its series' deadline moved at the same moment: the line's due date is
+ *   capped by its deadline, whichever lands first (MO-10 per line; RESERVATIONS_REWORK.md §3.3).
+ * - A registration racing its subject's board change is entered with the new board.
  * - Two coordinators set an award's units at once: the award ends with one
  *   of the two sets, never a mix.
- * (Enrolment races are in 08j.)
+ * (Enrolment races are in 08j; the rework's own races in 08t.)
  *
- * Sessions: november/igcse drafts, opened per student by a deadline extension.
+ * Sessions: winter/igcse drafts, opened per student by a deadline extension.
  */
 
 const days = (n: number) => n * 86_400_000;
 type Res = { status: number; json(): Promise<unknown> };
 
-/** An uncommitted registration from the test's own connection: the app's insert of the same key queues behind it. */
+/** An uncommitted line from the test's own connection: the app's insert of the same key queues behind it. */
 async function holdInsert(studentId: string, sessionId: string, subjectId: string): Promise<() => Promise<void>> {
   const { default: pg } = await import('pg');
   const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
   await client.query('BEGIN');
   await client.query(
-    `insert into registration (id, student_id, session_id, subject_id, price_at_registration, status, requested_by)
-     values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment', $1)`,
-    [studentId, sessionId, subjectId],
+    `insert into registration (id, student_id, session_id, subject_id, price_at_registration, status, requested_by, offer_item_id, due_at)
+     values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment', $1, ${wholeItemSql('$4', '$5')}, now() + interval '30 days')`,
+    [studentId, sessionId, subjectId, sessionId, subjectId],
   );
   return async () => {
     await client.query('ROLLBACK');
@@ -58,10 +60,13 @@ describe('F0b: races', () => {
     }
   });
 
-  it("a registration racing a change to its window's series is entered by the old routing; the change then sees it", async () => {
+  it("a line racing a change to its item's series is entered by the old routing; the change then carries it, its student locked first", async () => {
     const w = await session(adm, 'November (IGCSE, F0b races)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', Y) });
+    const year = seriesYearInAcademicYear('november', Y);
     const a = await feedSeries(adm, w, { label: 'F0b races A' });
-    const b = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month: 'november', year: seriesYearInAcademicYear('november', Y), label: 'F0b races B' } }))).id;
+    const b = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month: 'november', year, label: 'F0b races B', examsStart: `${year + 1}-12-31` } }))).id;
+    const item = await one<{ id: string; offer_id: string }>(
+      `select i.id, i.offer_id from session_offer_item i join session_offer o on o.id = i.offer_id where i.session_id = $1 and o.subject_id = $2 and i.board_series_id = $3`, [w, subj[0]!, a]);
     const f = await onboard(officer, 'f0br-route', 11);
     await apiResponse(finadmin.api.v1.exceptions.$post({
       json: { type: 'deadline_extension', studentId: f.studentId, sessionId: w, reason: 'open the draft for this race', validUntil: new Date(Date.now() + days(10)).toISOString() },
@@ -73,8 +78,10 @@ describe('F0b: races', () => {
     try {
       registering = f.parent.api.v1.registrations.direct.$post({ json: { sessionId: w, subjectIds: [subj[0]!], studentId: f.studentId } });
       await lockWaiters(1);
-      // The admin swaps the window over to series B, dropping A.
-      changing = adm.api.v1.sessions[':id']['board-series'].$put({ param: { id: w }, json: { series: [{ boardSeriesId: b, isDefault: true }], routes: [] } });
+      // The admin moves the subject's item to series B (its lines go with it).
+      changing = adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
+        param: { id: w, offerId: item.offer_id, itemId: item.id }, json: { boardSeriesId: b, reason: 'race: the board moved the subject' },
+      });
       await Promise.race([changing, lockWaiters(2)]);
     } finally {
       await release();
@@ -82,118 +89,96 @@ describe('F0b: races', () => {
     const [reg, chg] = await Promise.all([registering!, changing!]);
     expect(reg.status).toBe(201);
     const [created] = (await reg.json() as { data: { id: string }[] }).data;
-    // Entered in A, which the window still feeds: the change waited, then saw it.
-    expect((await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [created!.id])).s).toBe(a);
-    expect(chg.status).toBe(409);
-    expect((await chg.json() as { error: string }).error).toMatch(/has 1 registration in this window — move them to another series first/);
-    expect(await sql(`select board_series_id from session_board_series where session_id = $1`, [w])).toEqual([{ board_series_id: a }]);
+    // The change waited for the line, saw it, and carried it with the item (run again with the
+    // line's student locked first): the line is in B, where its item is, and the move is audited.
+    expect(chg.status).toBe(200);
+    expect((await chg.json() as { data: { linesMoved: number } }).data.linesMoved).toBe(1);
+    expect(await sql(`select r.board_series_id as s, i.board_series_id as item from registration r join session_offer_item i on i.id = r.offer_item_id where r.id = $1`, [created!.id]))
+      .toEqual([{ s: b, item: b }]);
+    await audited([created!.id], ['LINE_SERIES_MOVED']);
+    // The session's series are its items': A still holds the other subject, B this one.
+    expect((await sql<{ id: string }>(`select board_series_id as id from session_board_series where session_id = $1 order by board_series_id`, [w])).map((r) => r.id))
+      .toEqual([a, b].sort());
   });
 
-  describe("a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10)", () => {
+  // Changed by the reservations rework (RESERVATIONS_REWORK.md §3.3; pre-authorised: 08k's
+  // window-end-vs-deadline scenarios; trail row "assertion"). F0b raced a window's end against its
+  // series' deadline, because a window had to close before the deadline of every series it fed.
+  // The cut-off is per item now and a deadline may fall before the session's end, so that rule and
+  // its three races are gone; what must hold, whichever lands first, is that a line is never due
+  // after its own deadline (and is never entered past it: 08n).
+  describe("a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line)", () => {
     const setUp = async (label: string) => {
       const w = await session(adm, `November (IGCSE, F0b races, ${label})`, 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', Y) });
       const end = new Date((await one<{ end: string }>(`select end_date as end from registration_session where id = $1`, [w])).end);
       const s = await feedSeries(adm, w, { label: `F0b races ${label}`, entryDeadline: new Date(end.getTime() + days(10)) });
       return { w, s, end };
     };
-    const extendWindow = (w: string, endDate: Date) =>
-      // @ts-expect-error — the route reads its body by session status, without zValidator (as the web does)
-      adm.api.v1.sessions[':id'].$put({ param: { id: w }, json: { endDate, reason: 'race: extend the window' } });
     const moveDeadline = (s: string, entryDeadline: Date) =>
       adm.api.v1['board-series'][':id'].$put({ param: { id: s }, json: { entryDeadline, reason: 'race: the board moved it earlier' } });
-    const holds = async (w: string, s: string) => {
-      const [r] = await sql<{ ok: boolean }>(`select w.end_date < b.entry_deadline as ok from registration_session w, board_series b where w.id = $1 and b.id = $2`, [w, s]);
-      return r!.ok;
-    };
+    const prereg = (f: { parent: Client; studentId: string }, w: string) =>
+      f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, subjectIds: [subj[1]!], studentId: f.studentId } });
+    const dueOf = async (id: string) => new Date((await one<{ due: string }>(`select due_at as due from registration where id = $1`, [id])).due).getTime();
 
-    it('the window first: it is extended, and the earlier deadline is refused', async () => {
-      const { w, s, end } = await setUp('window first');
-      const release = await holdRowLock('registration_session', w);
+    it('the reservation first: it is entered, then the earlier deadline re-dates it, audited', async () => {
+      const { w, s, end } = await setUp('line first');
+      const f = await onboard(officer, 'f0br-line-first', 11);
+      const earlier = new Date(end.getTime() - days(5));
+      const release = await holdInsert(f.studentId, w, subj[1]!);
       let first: Promise<Res> | undefined;
       let second: Promise<Res> | undefined;
       try {
-        first = extendWindow(w, new Date(end.getTime() + days(5)));
+        first = prereg(f, w);
         await lockWaiters(1);
-        second = moveDeadline(s, new Date(end.getTime() + days(3)));
+        // The line holds its series FOR SHARE while it waits: the deadline's writer queues behind it.
+        second = moveDeadline(s, earlier);
         await lockWaiters(2);
       } finally {
         await release();
       }
-      const [ext, dl] = await Promise.all([first!, second!]);
-      expect(ext.status).toBe(200);
-      expect(dl.status).toBe(400);
-      expect((await dl.json() as { error: string }).error).toBe("The board's entry deadline must be after the registration window closes");
-      expect(await holds(w, s)).toBe(true);
+      const [reg, dl] = await Promise.all([first!, second!]);
+      expect(reg.status).toBe(201);
+      expect(dl.status).toBe(200);
+      const [line] = (await reg.json() as { data: { id: string }[] }).data;
+      // Reserved due at the session's payment date (its deadline was later); the deadline moved
+      // before it, so its due date followed, audited with why.
+      expect(await dueOf(line!.id)).toBe(earlier.getTime());
+      expect(await one<{ reason: string }>(`select new_data->>'reason' as reason from audit_log where action = 'LINE_DUE_MOVED' and entity_id = $1`, [line!.id]))
+        .toEqual({ reason: "the series' dates changed" });
     });
 
-    it('the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock', async () => {
+    it('the deadline first: the reservation waits for it and is due by the new deadline', async () => {
       const { w, s, end } = await setUp('deadline first');
-      const release = await holdRowLock('registration_session', w);
+      const f = await onboard(officer, 'f0br-deadline-first', 11);
+      const earlier = new Date(end.getTime() - days(5));
+      const release = await holdRowLock('board_series', s);
       let first: Promise<Res> | undefined;
       let second: Promise<Res> | undefined;
       try {
-        first = moveDeadline(s, new Date(end.getTime() + days(3)));
+        first = moveDeadline(s, earlier);
         await lockWaiters(1);
-        // The window's route checked the old deadline before queueing; the
-        // draft update (F0a: under the window's row lock) reads the new one.
-        second = extendWindow(w, new Date(end.getTime() + days(5)));
+        second = prereg(f, w);
         await lockWaiters(2);
       } finally {
         await release();
       }
-      const [dl, ext] = await Promise.all([first!, second!]);
+      const [dl, reg] = await Promise.all([first!, second!]);
       expect(dl.status).toBe(200);
-      expect(ext.status).toBe(400);
-      expect((await ext.json() as { error: string }).error).toMatch(/^The window cannot close on or after the exam board's entry deadline \(.+\) — move the board deadline first$/);
-      expect(await holds(w, s)).toBe(true);
-    });
-
-    it('the deadline first, an open window: it moves, and the extension that would pass it is refused by the database', async () => {
-      // An open window's extension takes no lock of its own before its UPDATE:
-      // the database's trigger is what reads the moved deadline. A (type,
-      // level) pair no earlier file holds open is used, and closed after.
-      const openPairs = new Set((await sql<{ t: string; l: string }>(`select session_type as t, qualification_level as l from registration_session where status = 'active'`)).map((r) => `${r.t}|${r.l}`));
-      const pair = (['october|a_level', 'october|as_level', 'november|a_level', 'november|as_level', 'january|a_level', 'january|as_level'] as const).find((p) => !openPairs.has(p));
-      expect(pair).toBeDefined();
-      const [type, level] = pair!.split('|') as ['october' | 'november' | 'january', 'a_level' | 'as_level'];
-      const now = Date.now();
-      const w = await session(adm, `Open window (F0b races, deadline first)`, type, level, {
-        startDate: new Date(now - days(1)).toISOString(), endDate: new Date(now + days(10)).toISOString(), seriesYear: seriesYearInAcademicYear(type, Y),
-      });
-      const end = new Date((await one<{ end: string }>(`select end_date as end from registration_session where id = $1`, [w])).end);
-      expect((await one<{ status: string }>(`select status from registration_session where id = $1`, [w])).status).toBe('active');
-      const s = await feedSeries(adm, w, { label: 'F0b races open', entryDeadline: new Date(end.getTime() + days(10)) });
-      const release = await holdRowLock('registration_session', w);
-      let first: Promise<Res> | undefined;
-      let second: Promise<Res> | undefined;
-      try {
-        first = moveDeadline(s, new Date(end.getTime() + days(3)));
-        await lockWaiters(1);
-        second = extendWindow(w, new Date(end.getTime() + days(5)));
-        await lockWaiters(2);
-      } finally {
-        await release();
-      }
-      const [dl, ext] = await Promise.all([first!, second!]);
-      expect(dl.status).toBe(200);
-      expect(ext.status).toBe(409);
-      expect((await ext.json() as { error: string }).error).toBe("A window must close before the exam board's entry deadline of every series it feeds — the window or the deadline changed at the same moment; reload and try again");
-      expect(await holds(w, s)).toBe(true);
-      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: w }, json: { reason: 'race test done: free the pair' } }));
+      expect(reg.status).toBe(201);
+      const [line] = (await reg.json() as { data: { id: string }[] }).data;
+      expect(await dueOf(line!.id)).toBe(earlier.getTime());
+      expect(await sql(`select 1 from audit_log where action = 'LINE_DUE_MOVED' and entity_id = $1`, [line!.id])).toEqual([]);
     });
   });
 
   it('a registration racing its subject\'s board change is entered with the new board (review flag 4)', async () => {
     const sub = await subject(adm, 'F0BR-BRD', 'Board race (F0b races)', { course: 1000, registration: 200 });
     const w = await session(adm, 'November (IGCSE, F0b races, board)', 'november', 'igcse', futureWindow());
-    const year = (await one<{ year: number }>(`select series_year as year from registration_session where id = $1`, [w])).year;
-    const mk = async (boardCode: 'cambridge' | 'pearson_edexcel') =>
-      (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode, month: 'november', year, label: 'F0b races board' } }))).id;
-    const cam = await mk('cambridge');
-    const pea = await mk('pearson_edexcel');
-    await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({
-      param: { id: w }, json: { series: [{ boardSeriesId: cam, isDefault: true }, { boardSeriesId: pea, isDefault: true }], routes: [] },
-    }));
+    // The session's Cambridge item of the subject, and its Pearson series (the file's Pearson
+    // subjects' items are in it): the board change carries the item there.
+    const cam = await seriesOfSession(w, 'cambridge');
+    const pea = await seriesOfSession(w, 'pearson_edexcel');
+    expect(cam).not.toBe(pea);
     const prereg = (f: { parent: Client; studentId: string }) =>
       f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, subjectIds: [sub], studentId: f.studentId } });
     const a = await onboard(officer, 'f0br-board-a', 11);
@@ -219,6 +204,10 @@ describe('F0b: races', () => {
     // Both entered with Pearson: B waited for the change and was routed by the new board.
     expect(await sql(`select id, board_series_id from registration where id in ($1, $2) order by id`, [aReg, bReg]))
       .toEqual([aReg, bReg].sort().map((id) => ({ id, board_series_id: pea })));
+    // The reservations rework: A keeps the price it was given; B is priced with the fee the change
+    // carried into Pearson's series (the old board's amount, provisional until finance confirms it).
+    expect(await sql(`select id, price_at_registration::float as price, price_provisional as provisional from registration where id in ($1, $2) order by id`, [aReg, bReg]))
+      .toEqual([{ id: aReg, price: 1200, provisional: false }, { id: bReg, price: 1200, provisional: true }].sort((x, y) => x.id.localeCompare(y.id)));
   });
 
   it("two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix", async () => {

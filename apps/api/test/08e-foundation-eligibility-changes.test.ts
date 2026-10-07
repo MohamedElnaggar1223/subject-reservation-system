@@ -280,38 +280,40 @@ describe('F0a: when eligibility changes after a registration exists', () => {
   });
 
   // ─── A draft window's series (reviewer flag 6) ─────────────────────────────
+  // Changed by the reservations rework (trail row "assertion"; not money): a session's header
+  // (PUT /sessions/:id) carries its dates, course start, payment due and refund policy only — its
+  // type and year change only through the audited "Correct series", which checks each student
+  // again. The flag-6 outcome stands: a draft's series never changes silently under its lines.
 
-  // The draft update route reads its body by status, so its RPC type has no json: cast the input only.
-  const editDraft = (id: string, json: Record<string, unknown>) =>
-    adm.api.v1.sessions[':id'].$put({ param: { id }, json } as never) as Promise<Response>;
-
-  it("a draft window's series cannot be edited once anyone has preregistered: the audited series correction is the way", async () => {
+  it("a draft session's header never changes its series: the audited series correction is the way", async () => {
     const f = await family('draft-series');
     const draft = await session(adm, 'November (IGCSE, F0a draft edit)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', thisYear) });
     const igcse = await subject(adm, 'F0E-IG3', 'Geography (F0a draft edit)', { course: 1000, registration: 200 });
     await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, subjectIds: [igcse], studentId: f.studentId } }));
 
-    const r = await refused(editDraft(draft, { seriesYear: thisYear + 1, reason: 'next year' }));
-    expect(r.status).toBe(409);
-    expect(r.error).toContain('Correct series');
+    const r = await refused(adm.api.v1.sessions[':id'].$put({ param: { id: draft }, json: { seriesYear: thisYear + 1, reason: 'next year' } as never }));
+    expect(r).toEqual({ status: 400, error: 'Nothing to change' });
     expect((await one<{ series_year: number }>(`select series_year from registration_session where id = $1`, [draft])).series_year)
       .toBe(seriesYearInAcademicYear('november', thisYear));
     // Other fields still change, audited with the reason in the same transaction.
-    const renamed = await editDraft(draft, { name: 'November (IGCSE, F0a draft, renamed)', reason: 'clearer name' });
-    expect(renamed.status).toBe(200);
-    expect(await sql(`select new_data->>'_updateReason' as reason from audit_log where action = 'SESSION_UPDATED' and entity_id = $1`, [draft]))
-      .toEqual([{ reason: 'clearer name' }]);
+    const end = new Date((await one<{ end: string }>(`select end_date as end from registration_session where id = $1`, [draft])).end);
+    const later = await apiResponse(adm.api.v1.sessions[':id'].$put({ param: { id: draft }, json: { endDate: new Date(end.getTime() + days(1)), reason: 'clearer dates' } }));
+    expect(new Date(later.endDate).getTime()).toBe(end.getTime() + days(1));
+    expect(await sql(`select new_data->>'reason' as reason from audit_log where action = 'SESSION_UPDATED' and entity_id = $1`, [draft]))
+      .toEqual([{ reason: 'clearer dates' }]);
   });
 
-  it("a draft window with no preregistrations: its series may be edited, and the change is audited", async () => {
+  it("a draft session with no preregistrations: its series is corrected, its items carried, and the change is audited", async () => {
     const draft = await session(adm, 'January (AS, F0a draft edit)', 'january', 'as_level', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('january', thisYear) });
-    const res = await editDraft(draft, { seriesYear: seriesYearInAcademicYear('january', thisYear + 1), reason: 'the board moved it a year' });
-    expect(res.status).toBe(200);
-    const row = await one<{ changed: { from: string; to: string }; reason: string }>(
-      `select new_data->'seriesChanged' as changed, new_data->>'_updateReason' as reason from audit_log where action = 'SESSION_UPDATED' and entity_id = $1`, [draft]);
-    expect(row).toEqual({
-      changed: { from: `January ${thisYear + 1}`, to: `January ${thisYear + 2}` },
-      reason: 'the board moved it a year',
-    });
+    const year = (await one<{ y: number }>(`select series_year as y from registration_session where id = $1`, [draft])).y;
+    const res = await apiResponse(adm.api.v1.sessions[':id'].series.$put({ param: { id: draft }, json: { sessionType: 'winter', seriesYear: year + 1, reason: 'the board moved it a year' } }));
+    expect(res).toMatchObject({ sessionType: 'winter', seriesYear: year + 1, registrationsExpired: 0 });
+    const row = await one<{ prev: { sessionType: string; seriesYear: number }; next: { seriesYear: number; reason: string } }>(
+      `select previous_data as prev, new_data as next from audit_log where action = 'SESSION_SERIES_CORRECTED' and entity_id = $1`, [draft]);
+    expect(row.prev).toEqual({ sessionType: 'winter', seriesYear: year });
+    expect(row.next).toMatchObject({ seriesYear: year + 1, reason: 'the board moved it a year' });
+    // Its items went with it: every series it is fed by is in the new academic year.
+    expect(await sql(`select distinct bs.year from session_offer_item i join board_series bs on bs.id = i.board_series_id where i.session_id = $1 and bs.month <> 'january'`, [draft]))
+      .toEqual(await sql(`select distinct bs.year from session_offer_item i join board_series bs on bs.id = i.board_series_id where i.session_id = $1 and bs.month <> 'january' and bs.year = $2`, [draft, year + 1]));
   });
 });

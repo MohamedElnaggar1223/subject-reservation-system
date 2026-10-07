@@ -10,7 +10,8 @@
  */
 
 import { db, subject, subjectTeacher, subjectUnit, eq, and, or, ilike } from '@repo/db';
-import { applyBoardChange } from './catalogue.services';
+import { applyBoardChange, lockStudentsOfSubject } from './catalogue.services';
+import { withStudentsFirst } from '../lib/student-locks';
 import { randomUUID } from 'crypto';
 import type { CreateSubjectType, UpdateSubjectType } from '@repo/validations';
 
@@ -135,7 +136,9 @@ export async function getSubjectById(id: string) {
  * Returns the updated subject or undefined if not found.
  */
 export async function updateSubject(id: string, data: UpdateSubjectType, actorId?: string) {
-  return db.transaction(async (tx) => {
+  return withStudentsFirst((extra) => db.transaction(async (tx) => {
+    // A board change moves lines into series: their students before the subject (§6).
+    const locked = data.council ? await lockStudentsOfSubject(tx, id, extra) : new Set<string>();
     const [current] = await tx.select().from(subject).where(eq(subject.id, id)).for('update');
     if (!current) return undefined;
 
@@ -148,7 +151,7 @@ export async function updateSubject(id: string, data: UpdateSubjectType, actorId
     // the old board's catalogue links (catalogue.services.ts applyBoardChange).
     const { council, ...rest } = data;
     if (council && council !== current.council) {
-      await applyBoardChange(tx, current, council, actorId ?? null);
+      await applyBoardChange(tx, current, council, actorId ?? null, locked);
     }
     // A new level no longer fits the old award and units: they are cleared,
     // for the Catalogue screen to map again.
@@ -167,7 +170,7 @@ export async function updateSubject(id: string, data: UpdateSubjectType, actorId
       .returning();
 
     return updated;
-  });
+  }));
 }
 
 /**

@@ -92,12 +92,11 @@ const SERIES_MONTH: Record<string, string> = {
   june: 'June',
   october: 'October',
   november: 'November',
-  // A winter session (reservations rework): its November year.
-  winter: 'Winter',
 };
 
-/** "November 2026". */
+/** "November 2026"; a winter session (the reservations rework) "November 2026 – January 2027". */
 export function seriesLabel(sessionType: string, seriesYear: number): string {
+  if (sessionType === 'winter') return `November ${seriesYear} – January ${seriesYear + 1}`;
   return `${SERIES_MONTH[sessionType] ?? sessionType} ${seriesYear}`;
 }
 

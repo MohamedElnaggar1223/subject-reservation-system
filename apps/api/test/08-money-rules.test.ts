@@ -3,7 +3,7 @@ import { apiResponse } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, notified, notificationsFor, money, audited,
   takings, takingsOn, takingsDelta, openWindow, futureWindow, localToday, localYesterday, waitFor, runPaymentDeadlines, runSessionScheduler,
-  expireByHand, feedSeries, type Client,
+  expireByHand, feedSeries, seriesOfSession, sessionName, runSessionRecovery, type Client,
 } from './helpers';
 
 /**
@@ -784,12 +784,13 @@ describe('money rules', () => {
     });
 
     it('an unpaid desk checkout fails at close, its escrow comes back, and the student is told which subject was not completed', async () => {
+      const name = await sessionName(sessionId);
       expect(await statusOf('payment', deskPay)).toBe('failed');
       expect(await statusOf('registration', deskReg)).toBe('expired');
       expect(await escrowOf(f.studentId)).toBe(950);
       // The checkout expired its own subject; the close's notice still names it (review of fc1a101, flag 3).
       const notice = await waitFor(async () => (await notificationsFor(f.student.email, 'SESSION_CLOSED'))
-        .find((n) => n.title === 'Your pending registrations for January (AS, money rules) were not completed') ?? null);
+        .find((n) => n.title === `Your pending registrations for ${name} were not completed`) ?? null);
       expect(notice.body).toContain('Biology (AS, money rules)');
       expect(notice.body).not.toContain('Physics');
     });
@@ -896,15 +897,17 @@ describe('money rules', () => {
     });
 
     it("at the exam board's entry deadline, everything still unconfirmed on the series is closed, extension or not (MO-10)", async () => {
-      // F0b: the deadline is a board series' — the window feeds Pearson's
-      // January series, and its registrations so far are entered in it.
-      const seriesId = await feedSeries(adm, sessionId, { label: 'money rules' });
-      // The admin sets it from the board's calendar: after the window's close, with a reason.
+      // F0b: the deadline is a board series' — the session's items are entered in Pearson's
+      // January series, and its registrations so far with them (the reservations rework: a
+      // session's series are its items', attached when they were placed).
+      const seriesId = await seriesOfSession(sessionId);
+      // The admin sets it from the board's calendar, with a reason. Changed by the reservations
+      // rework (RESERVATIONS_REWORK.md §3.3; trail row "assertion"): a deadline may fall before the
+      // session's end — the cut-off is per item — so one before the close is accepted (it was refused).
       const end = new Date((await one<{ end: string }>(`select end_date as end from registration_session where id = $1`, [sessionId])).end);
-      const early = await refused(adm.api.v1['board-series'][':id'].$put({
+      await apiResponse(adm.api.v1['board-series'][':id'].$put({
         param: { id: seriesId }, json: { entryDeadline: new Date(end.getTime() - 60 * 1000), reason: 'board calendar' },
       }));
-      expect(early).toEqual({ status: 400, error: "The board's entry deadline must be after the registration window closes" });
       await apiResponse(adm.api.v1['board-series'][':id'].$put({
         param: { id: seriesId }, json: { entryDeadline: new Date(end.getTime() + 24 * 60 * 60 * 1000), reason: 'Pearson calendar published' },
       }));
@@ -925,11 +928,10 @@ describe('money rules', () => {
       const fre = await direct(f, subj.FRE!);
       expect(await escrowOf(f.studentId)).toBe(1200);
 
-      // The deadline arrives (moved with SQL: the window's end first, since the
-      // database keeps the deadline of every series a window feeds after it).
-      await expect(sql(
-        `update board_series set entry_deadline = (select end_date from registration_session where id = $1) where id = $2`, [sessionId, seriesId],
-      )).rejects.toThrow();
+      // The deadline arrives (moved with SQL). Changed by the reservations rework (§3.3; trail row
+      // "assertion"): the database no longer keeps a series' deadline after the session's end — its
+      // window-deadline clause is gone, its year and kind clauses stay — so this update now succeeds.
+      await sql(`update board_series set entry_deadline = (select end_date from registration_session where id = $1) where id = $2`, [sessionId, seriesId]);
       await sql(`update registration_session set end_date = now() - interval '2 days' where id = $1`, [sessionId]);
       await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [seriesId]);
       const deadlineSentence = /^The registration window is not open: the exam board's entry deadline for this series \(.+\) has passed$/;
@@ -941,7 +943,7 @@ describe('money rules', () => {
       const reference = await refused(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: musPay }, json: { reference: 'FT-MR-DEADLINE-9' } }));
       expect(reference.error).toMatch(deadlineSentence);
       const checkout = await refused(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [fre], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
-      expect(checkout).toEqual({ status: 422, error: 'Registration window is closed for: January (AS, money rules)' });
+      expect(checkout).toEqual({ status: 422, error: `Registration window is closed for: ${await sessionName(sessionId)}` });
       const desk = await refused(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [fre], instrumentUsed: 'cash' } }));
       expect(desk.status).toBe(422);
       expect(desk.error).toMatch(deadlineSentence);
@@ -1114,21 +1116,24 @@ describe('money rules', () => {
       expect(money(w.held)).toBe(1500);
     });
 
-    it("a window cannot be moved to close on or after its board entry deadline (MO-10)", async () => {
+    // Changed by the reservations rework (RESERVATIONS_REWORK.md §3.3; trail row "assertion"): the
+    // window-closes-before-the-deadline rule is retired — a session's end is only when new
+    // reservations stop, and each line is cut off at its own series' deadline (MO-10's meaning
+    // kept: nothing is entered, paid or confirmed for a series after it). It was "refused".
+    it("a session may close after one of its series' entry deadlines: the cut-off is per item (MO-10 per line)", async () => {
       for (const id of [january, june]) {
         const end = new Date((await one<{ end: string }>(`select end_date as end from registration_session where id = $1`, [id])).end);
         const deadline = new Date(end.getTime() + 24 * 60 * 60 * 1000);
-        // F0b: the deadline is set on the board series the window feeds.
+        // F0b: the deadline is set on the board series the session's items are entered in.
         const seriesId = await feedSeries(adm, id, { label: `money rules prereg ${id === january ? 'January' : 'June'}` });
         seriesOf[id] = seriesId;
         await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id: seriesId }, json: { entryDeadline: deadline, reason: 'board calendar published' } }));
-        const moved = await refused(adm.api.v1.sessions[':id'].$put({
+        const later = new Date(deadline.getTime() + 60 * 60 * 1000);
+        const moved = await apiResponse(adm.api.v1.sessions[':id'].$put({
           param: { id },
-          // @ts-expect-error — the route reads its body by session status, without zValidator (as the web does)
-          json: { endDate: new Date(deadline.getTime() + 60 * 60 * 1000), reason: 'extend past the board deadline' },
+          json: { endDate: later, reason: 'extend past the board deadline' },
         }));
-        expect(moved.status).toBe(400);
-        expect(moved.error).toMatch(/^The window cannot close on or after the exam board's entry deadline \(.+\) — move the board deadline first$/);
+        expect(new Date(moved.endDate).getTime()).toBe(later.getTime());
       }
     });
 
@@ -1194,22 +1199,27 @@ describe('money rules', () => {
       for (const reg of [his, eco, ger]) expect(await statusOf('registration', reg)).toBe('expired');
       expect(await wallet()).toEqual({ free: 3000, held: 1500 });
       await audited([late], ['PREREG_REFUNDED_AT_DEADLINE']);
+      const juneName = await sessionName(june);
       const refundNotice = await waitFor(async () => (await notificationsFor(f.parent.email, 'SESSION_CLOSED'))
-        .find((n) => n.title === 'Refunded: June (AS, money rules, prereg) did not open') ?? null);
+        .find((n) => n.title === `Refunded: ${juneName} did not open`) ?? null);
       expect(refundNotice.body).toContain('EGP 1500.00 paid for Geography (AS, money rules) has been returned to your escrow balance in full');
       expect(refundNotice.body).toContain('History (AS, money rules)');
       // Running it again changes nothing; November's preregistration is untouched.
       expect(await runPaymentDeadlines()).toMatchObject({ preregistrationsRefundedAtDeadline: 0, preregistrationsExpiredUnopened: 0 });
       expect(await statusOf('registration', nov)).toBe('preregistered');
 
-      // June never opens now — not by hand, not by the scheduler — so nothing is
-      // captured for entries the board refuses.
-      const open = await refused(adm.api.v1.sessions[':id'].activate.$post({ param: { id: june } }));
-      expect(open.status).toBe(409);
-      expect(open.error).toMatch(/^This series cannot be opened: the exam board's entry deadline \(.+\) has passed$/);
-      await runSessionScheduler();
-      expect((await one<{ status: string }>(`select status from registration_session where id = $1`, [june])).status).toBe('draft');
+      // Changed by the reservations rework (RESERVATIONS_REWORK.md §3.3, pre-authorised: MO-21's
+      // scenario; trail row "assertion"): a session may open after one of its series' deadlines —
+      // that series' items are simply closed — and nothing is captured for entries the board
+      // refuses, because the capture asks each row's deadline first (refunds a paid one in full,
+      // expires an unfunded one: 08n). Here the sweep has settled every row already, so opening
+      // June by hand (it was refused) captures nothing and moves no money.
+      const opened = await apiResponse(adm.api.v1.sessions[':id'].activate.$post({ param: { id: june } }));
+      expect(opened.status).toBe('active');
+      await runSessionRecovery();
       expect(await wallet()).toEqual({ free: 3000, held: 1500 });
+      expect(await statusOf('registration', late)).toBe('dropped');
+      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: june }, json: { reason: 'money rules: June was only opened to show nothing is captured' } }));
     });
 
     it('a family reference set aside by a transfer found later cannot be submitted again', async () => {

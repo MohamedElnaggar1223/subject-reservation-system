@@ -93,7 +93,10 @@ describe('the desk', () => {
     expect(payer).toMatchObject({ email: parent.email, role: 'parent', confirmed_by: officer.id });
 
     const toParent = await notified(parent.email, 'PAYMENT_CONFIRMED', 1);
-    expect(toParent[0]?.title).toBe('Payment confirmed — November (desk)');
+    // The session's name is derived since the reservations rework (its type, year and label).
+    const { name } = await one<{ name: string }>(`select name from registration_session where id = $1`, [sessionId]);
+    expect(name).toMatch(/^November \d{4} – January \d{4} — /);
+    expect(toParent[0]?.title).toBe(`Payment confirmed — ${name}`);
     await notified(student.email, 'PAYMENT_CONFIRMED', 1);
     expect((await notificationsFor(officer.email)).length).toBe(0);
 

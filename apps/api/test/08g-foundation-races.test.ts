@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, one, sql, futureWindow, openWindow, schoolToday, lockWaiters, holdRowLock,
+  admin, staff, onboard, subject, session, one, sql, futureWindow, openWindow, schoolToday, lockWaiters, holdRowLock, wholeItemSql,
   type Client,
 } from './helpers';
 
@@ -41,8 +41,8 @@ async function holdInsert(studentId: string, sessionId: string, subjectId: strin
   await client.connect();
   await client.query('BEGIN');
   await client.query(
-    `insert into registration (id, student_id, session_id, subject_id, price_at_registration, status, requested_by)
-     values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment', $1)`,
+    `insert into registration (id, student_id, session_id, subject_id, price_at_registration, status, requested_by, offer_item_id, due_at)
+     values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment', $1, ${wholeItemSql('$2', '$3')}, now() + interval '30 days')`,
     [studentId, sessionId, subjectId],
   );
   return async () => {
@@ -160,7 +160,7 @@ describe('F0a: races', () => {
       await extend(f.studentId, own);
       // Corrected to the November a year earlier: grade 10 then, and grade 10 sits June only.
       const { reg, chg } = await race(f, own, subj[1]!, () =>
-        adm.api.v1.sessions[':id'].series.$put({ param: { id: own }, json: { sessionType: 'november', seriesYear: seriesYearInAcademicYear('november', thisYear - 1), reason: 'race check' } }));
+        adm.api.v1.sessions[':id'].series.$put({ param: { id: own }, json: { sessionType: 'winter', seriesYear: seriesYearInAcademicYear('november', thisYear - 1), reason: 'race check' } }));
       expect(reg.status).toBe(201);
       expect(chg.status).toBe(200);
       const [created] = (await reg.json() as { data: { id: string }[] }).data;

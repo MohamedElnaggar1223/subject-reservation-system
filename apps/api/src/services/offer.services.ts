@@ -27,9 +27,10 @@ import {
 } from '@repo/validations';
 import { logAction, logActions, type AuditContext } from './audit.services';
 import { boardSeriesName, seriesRuleSentence, openCheckoutsSpanningDeadlines } from './series.services';
-import { effectiveDeadlineFor, effectiveDeadlinesOf, deadlinePassedSentence } from './deadline.services';
+import { effectiveDeadlineFor, effectiveDeadlinesOf, deadlinePassedSentence, redateLines } from './deadline.services';
 import { itemBoardFees } from './pricing.services';
 import { schoolDate } from './window.services';
+import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -487,21 +488,20 @@ async function itemForChange(tx: Tx, offerId: string, itemId: string) {
  */
 export async function updateItem(sessionId: string, offerId: string, itemId: string, data: UpdateOfferItemType, actorId: string, ctx?: AuditContext) {
   try {
-    return await db.transaction(async (tx) => {
-      // A series change puts lines into a series: the students first (§6).
+    return await withStudentsFirst((extra) => db.transaction(async (tx) => {
+      // A series change puts lines into a series: the students first (§6; lib/student-locks.ts).
+      let locked = new Set<string>();
       if (data.boardSeriesId) {
         const students = await tx.selectDistinct({ id: registration.studentId }).from(registration)
           .where(and(eq(registration.offerItemId, itemId), inArray(registration.status, [...LIVE])));
-        if (students.length) {
-          await tx.select({ id: user.id }).from(user).where(inArray(user.id, students.map((s) => s.id))).orderBy(user.id).for('no key update');
-        }
+        locked = await lockStudents(tx, [...students.map((s) => s.id), ...extra]);
       }
       const session = await sessionForChange(tx, sessionId);
       const { offer, subjectRow } = await offerForChange(tx, sessionId, offerId);
       const item = await itemForChange(tx, offerId, itemId);
       const { reason, teachers, feeKeys, boardSeriesId, ...fields } = data;
       const moved = boardSeriesId && boardSeriesId !== item.boardSeriesId
-        ? await changeItemSeries(tx, session, subjectRow, item, boardSeriesId, actorId, reason ?? null)
+        ? await changeItemSeries(tx, session, subjectRow, item, boardSeriesId, actorId, reason ?? null, locked)
         : [];
       if (teachers !== undefined) await writeItemTeachers(tx, itemId, teachers?.length ? await resolveTeachers(tx, offer.subjectId, teachers, actorId) : []);
       if (feeKeys) await writeFeeKeys(tx, itemId, feeKeys);
@@ -510,7 +510,7 @@ export async function updateItem(sessionId: string, offerId: string, itemId: str
         { label: item.label, availability: item.availability, courseFee: item.courseFee, boardSeriesId: item.boardSeriesId, exclusiveGroup: item.exclusiveGroup, requiredInSeries: item.requiredInSeries },
         { ...fields, ...(boardSeriesId ? { boardSeriesId } : {}), ...(feeKeys ? { feeKeys } : {}), ...(teachers !== undefined ? { teachers } : {}), linesMoved: moved.length, reason: reason ?? null }, ctx, tx);
       return { ...updated!, linesMoved: moved.length };
-    });
+    }));
   } catch (err) {
     if (err instanceof OfferError) throw err;
     rethrow(err);
@@ -520,7 +520,7 @@ export async function updateItem(sessionId: string, offerId: string, itemId: str
 /** Move an item to another series of its board, with its live lines (in the caller's transaction). */
 async function changeItemSeries(
   tx: Tx, session: SessionRow, subjectRow: typeof subject.$inferSelect, item: typeof sessionOfferItem.$inferSelect,
-  targetId: string, actorId: string | null, reason: string | null,
+  targetId: string, actorId: string | null, reason: string | null, locked: Set<string>,
 ) {
   const level = await levelOf(tx, subjectRow.qualificationLevel, {
     kind: item.entersKind, qualificationId: item.qualificationId, optionId: item.qualificationOptionId,
@@ -532,6 +532,8 @@ async function changeItemSeries(
   const lines = await tx.select().from(registration)
     .where(and(eq(registration.offerItemId, item.id), inArray(registration.status, [...LIVE])))
     .orderBy(registration.id).for('update');
+  // A line committed while this change waited for the item: its student was not locked first.
+  assertStudentsLocked(locked, lines.map((l) => l.studentId));
   const now = new Date();
   const { names } = await boardNames(tx);
   // The entries already made stand: a line past its own deadline does not move.
@@ -574,6 +576,7 @@ async function changeItemSeries(
     userId: actorId, action: 'LINE_SERIES_MOVED' as const, entityType: 'registration' as const, entityId: l.id,
     previousData: { boardSeriesId: l.boardSeriesId }, newData: { boardSeriesId: targetId, offerItemId: item.id, reason },
   })), tx);
+  await redateLines(tx, lines.map((l) => l.id), actorId, 'its item moved to another series');
   await detachUnusedSeries(tx, session.id);
   return lines;
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, feedSeries, type Client,
+  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, feedSeries, placeItemsIn, type Client,
 } from './helpers';
 
 /**
@@ -145,7 +145,7 @@ describe('F0b: the exam catalogue', () => {
       asWindow = await session(adm, 'January (AS, catalogue)', 'january', 'as_level', futureWindow());
       alWindow = await session(adm, 'January (A-Level, catalogue)', 'january', 'a_level', futureWindow());
       const seriesId = await feedSeries(adm, asWindow, { label: 'catalogue' });
-      await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({ param: { id: alWindow }, json: { series: [{ boardSeriesId: seriesId, isDefault: true }], routes: [] } }));
+      await placeItemsIn(adm, alWindow, seriesId);
 
       g11 = await onboard(officer, 'cat-g11', 11);
       g12 = await onboard(officer, 'cat-g12', 12);

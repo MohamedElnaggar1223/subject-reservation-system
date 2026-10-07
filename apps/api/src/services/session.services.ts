@@ -14,7 +14,7 @@
 
 import {
   db, registrationSession, registration, changeRequest, paymentRegistration, payment, user, examBoard, registrationConsent,
-  sessionOffer, boardSeries, sessionBoardSeries,
+  sessionOffer, sessionOfferItem, subject, boardSeries, sessionBoardSeries,
   eq, and, lte, inArray, notInArray, isNull, sql,
 } from '@repo/db';
 import { capturePreregistrationsForSession } from './prereg.services';
@@ -26,10 +26,13 @@ import { expireIneligibleRegistrations } from './eligibility.services';
 import { deriveSessionName, seriesLabel, sessionSeriesMonths, type CorrectSessionSeriesType, type CreateSessionType, type UpdateSessionType } from '@repo/validations';
 import { env } from '../env';
 import { randomUUID } from 'crypto';
-import { seriesRuleSentence, windowChangeMisfit, boardSeriesName } from './series.services';
+import { seriesRuleSentence, windowChangeMisfit, boardSeriesName, openCheckoutsSpanningDeadlines } from './series.services';
+import { findOrCreateSeries, defaultSeriesFor, attachSeries, copyOffersFrom } from './offer.services';
+import { effectiveDeadlinesOf } from './deadline.services';
+import { schoolDate } from './window.services';
 import { getSetting } from './settings.services';
-import { copyOffersFrom } from './offer.services';
-import { dueDateFor } from './deadline.services';
+import { dueDateFor, redateLines } from './deadline.services';
+import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
 
 /**
  * Determine the correct initial status when creating a session.
@@ -334,22 +337,10 @@ export async function updateSession(id: string, data: UpdateSessionType, actorId
     // The payment due date moved: the waiting lines' due dates follow.
     let dueMoved = 0;
     if (next.paymentDueAt) {
-      const waiting = await tx.select({ id: registration.id, dueAt: registration.dueAt }).from(registration)
+      const waiting = await tx.select({ id: registration.id }).from(registration)
         .where(and(eq(registration.sessionId, id), inArray(registration.status, ['pending_approval', 'pending_payment', 'preregistered'])))
         .orderBy(registration.id).for('update');
-      const moves: { id: string; from: Date; to: Date }[] = [];
-      for (const w of waiting) {
-        const due = await dueDateFor(tx, { kind: 'line', lineId: w.id });
-        if (due.getTime() !== w.dueAt.getTime()) {
-          await tx.update(registration).set({ dueAt: due }).where(eq(registration.id, w.id));
-          moves.push({ id: w.id, from: w.dueAt, to: due });
-        }
-      }
-      await logActions(moves.map((m) => ({
-        userId: actorId, action: 'LINE_DUE_MOVED' as const, entityType: 'registration' as const, entityId: m.id,
-        previousData: { dueAt: m.from.toISOString() }, newData: { dueAt: m.to.toISOString(), reason: 'the session\'s payment due date changed' },
-      })), tx);
-      dueMoved = moves.length;
+      dueMoved = await redateLines(tx, waiting.map((w) => w.id), actorId, 'the session\'s payment due date changed');
     }
     await logAction(actorId, 'SESSION_UPDATED', 'session', id,
       Object.fromEntries(Object.keys(next).map((k) => [k, (current as Record<string, unknown>)[k] ?? null])),
@@ -396,26 +387,84 @@ export async function getSessionDetail(id: string) {
  */
 export async function correctSessionSeries(id: string, data: CorrectSessionSeriesType, adminId: string, auditCtx?: AuditContext) {
   try {
-    return await db.transaction(async (tx) => {
+    return await withStudentsFirst((extra) => db.transaction(async (tx) => {
+      // The students with live lines first (§6: every path that puts a line into a series), then the session.
+      const students = await tx.selectDistinct({ id: registration.studentId }).from(registration)
+        .where(and(eq(registration.sessionId, id), notInArray(registration.status, ['rejected', 'expired', 'dropped'])));
+      const locked = await lockStudents(tx, [...students.map((s) => s.id), ...extra]);
       const [sess] = await tx.select().from(registrationSession).where(eq(registrationSession.id, id)).for('update');
       if (!sess) throw new Error('Session not found');
       if (sess.sessionType === data.sessionType && sess.seriesYear === data.seriesYear) {
         throw new Error(`This session is already for the ${deriveSessionName(data.sessionType, data.seriesYear)} series`);
       }
-      // The board series its items are entered in must still fit it (year, June or not).
-      const misfit = await windowChangeMisfit(tx, id, { sessionType: data.sessionType, seriesYear: data.seriesYear });
-      if (misfit) throw new Error(misfit);
+      // Since the reservations rework the session's items carry it into the corrected series: each
+      // item goes to the corresponding series of the new type and year (same board, month and
+      // label; a June item of a winter correction to its default), with its live lines. Lines that
+      // are history pin their series, which then no longer fits: refused, as F0b refused a window
+      // whose fed series would not fit.
+      const items = await tx.select({ id: sessionOfferItem.id, seriesId: sessionOfferItem.boardSeriesId, offerId: sessionOfferItem.offerId, subjectLevel: subject.qualificationLevel })
+        .from(sessionOfferItem).innerJoin(sessionOffer, eq(sessionOffer.id, sessionOfferItem.offerId)).innerJoin(subject, eq(subject.id, sessionOffer.subjectId))
+        .where(eq(sessionOfferItem.sessionId, id)).orderBy(sessionOfferItem.id).for('update', { of: sessionOfferItem });
+      const history = await tx.select({ n: sql<number>`count(*)::int` }).from(registration)
+        .where(and(eq(registration.sessionId, id), inArray(registration.status, ['rejected', 'expired', 'dropped']), sql`${registration.boardSeriesId} is not null`));
+      const months = sessionSeriesMonths(data.sessionType, data.seriesYear);
+      const plan: { itemId: string; to: string | null }[] = [];
+      for (const it of items) {
+        if (!it.seriesId) { plan.push({ itemId: it.id, to: null }); continue; }
+        const [s] = await tx.select().from(boardSeries).where(eq(boardSeries.id, it.seriesId));
+        const same = months.find((m) => m.month === s!.month);
+        const to = same
+          ? (await findOrCreateSeries(tx, s!.boardCode, same.month, same.year, s!.label, adminId)).id
+          : await defaultSeriesFor(tx, data, s!.boardCode, it.subjectLevel === 'igcse' ? 'igcse' : it.subjectLevel === 'as_level' ? 'as' : 'a_level', adminId);
+        plan.push({ itemId: it.id, to });
+      }
+      const moving = plan.some((p, i) => p.to !== items[i]!.seriesId);
+      if (moving && (history[0]?.n ?? 0) > 0) {
+        const misfit = await windowChangeMisfit(tx, id, { sessionType: data.sessionType, seriesYear: data.seriesYear });
+        if (misfit) throw new Error(`${misfit} (its lines that are history stay in the series they were in)`);
+      }
+      const live = await tx.select().from(registration)
+        .where(and(eq(registration.sessionId, id), notInArray(registration.status, ['rejected', 'expired', 'dropped'])))
+        .orderBy(registration.id).for('update');
+      // A line committed while the correction waited for the session: its student was not locked first.
+      assertStudentsLocked(locked, live.map((l) => l.studentId));
+      const now = new Date();
+      const passed = [...(await effectiveDeadlinesOf(tx, live.map((l) => l.id))).values()].find((d) => d.at && d.at <= now);
+      if (passed) throw new Error(`A line of this session is past its deadline (${schoolDate(passed.at!)}): its entry is made, and the session's series can no longer be corrected`);
+      // Out of the old series (items, then their live lines), the old links gone, the session corrected…
+      for (const p of plan) await tx.update(sessionOfferItem).set({ boardSeriesId: null }).where(eq(sessionOfferItem.id, p.itemId));
+      for (const l of live) await tx.update(registration).set({ boardSeriesId: null }).where(eq(registration.id, l.id));
+      await tx.execute(sql`
+        delete from session_board_series l where l.session_id = ${id}
+          and not exists (select 1 from registration r where r.session_id = l.session_id and r.board_series_id = l.board_series_id)`);
       const [updated] = await tx
         .update(registrationSession)
-        .set({ sessionType: data.sessionType, seriesYear: data.seriesYear, name: deriveSessionName(data.sessionType, data.seriesYear, sess.label), updatedAt: new Date() })
+        .set({ sessionType: data.sessionType, seriesYear: data.seriesYear, name: deriveSessionName(data.sessionType, data.seriesYear, sess.label), updatedAt: now })
         .where(eq(registrationSession.id, id))
         .returning();
+      // …then into the corresponding series.
+      for (const p of plan) {
+        if (!p.to) continue;
+        await attachSeries(tx, id, p.to, adminId);
+        await tx.update(sessionOfferItem).set({ boardSeriesId: p.to, updatedAt: now }).where(eq(sessionOfferItem.id, p.itemId));
+      }
+      for (const l of live) {
+        const to = plan.find((p) => p.itemId === l.offerItemId)?.to ?? null;
+        await tx.update(registration).set({ boardSeriesId: to, updatedAt: now }).where(eq(registration.id, l.id));
+      }
+      const spanning = await openCheckoutsSpanningDeadlines(tx, { registrationIds: live.map((l) => l.id) });
+      if (spanning > 0) throw new Error(`${spanning} checkout${spanning === 1 ? '' : 's'} still open would pay for two deadlines after the correction — confirm or cancel ${spanning === 1 ? 'it' : 'them'} first`);
       await logAction(adminId, 'SESSION_SERIES_CORRECTED', 'session', id,
         { sessionType: sess.sessionType, seriesYear: sess.seriesYear },
-        { sessionType: data.sessionType, seriesYear: data.seriesYear, reason: data.reason }, auditCtx, tx);
+        { sessionType: data.sessionType, seriesYear: data.seriesYear, reason: data.reason, itemsMoved: plan.filter((p) => p.to).length, linesMoved: live.length }, auditCtx, tx);
+      await logActions(live.map((l) => ({
+        userId: adminId, action: 'LINE_SERIES_MOVED' as const, entityType: 'registration' as const, entityId: l.id,
+        previousData: { boardSeriesId: l.boardSeriesId }, newData: { boardSeriesId: plan.find((p) => p.itemId === l.offerItemId)?.to ?? null, reason: data.reason },
+      })), tx);
+      await redateLines(tx, live.map((l) => l.id), adminId, 'the session\'s series was corrected');
       const expired = await expireIneligibleRegistrations(tx, { sessionIds: [id] }, 'series_corrected');
       return { session: updated!, expired };
-    });
+    }));
   } catch (err) {
     if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') {
       throw new Error(`Another ${deriveSessionName(data.sessionType, data.seriesYear)} session is already open — close it first`);

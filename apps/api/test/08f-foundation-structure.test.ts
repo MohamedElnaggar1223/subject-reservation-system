@@ -58,6 +58,15 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
         'schoolFee.graduatesExempt': false,
         'schoolFee.newYearWithoutSchedule': false,
         'calendar.schoolWeekdays': true,
+        // The reservations rework (step 1): the pricing, payment and refund policies are finance's and the admin's.
+        'pricing.selfStudyCoursePercent': false,
+        'pricing.selfStudyBoardPercent': false,
+        'pricing.retakeTaughtCoursePercent': false,
+        'pricing.onePaperCoursePercent': false,
+        'pricing.payOnProvisionalFee': false,
+        'payment.graceDays': false,
+        'refund.defaultPolicy.june': false,
+        'refund.defaultPolicy.winter': false,
         // F0b: what "A.S./A.2." marks is the coordinator's answer (IS-01).
         'catalogue.levelCodeReading': true,
       });
