@@ -47,7 +47,7 @@
   <a data-page="statement">Statement</a>
   <a data-page="exceptions">Exceptions</a>
   <a data-page="messages">Messages &amp; reminders</a>
-  <span class="note">Static prototype (version 3) of RESERVATIONS_REWORK.md §4. Fixture data shaped like SCHOOL_FORMS.md §2; teacher and student names are placeholders; course fees are illustrative; board fees are the June 2026 lists, provisional for June 2027. "Add subject" is a stub.</span>
+  <span class="note">Static prototype of RESERVATIONS_REWORK.md §4 (kept in step with the design; the fixture's "today" is 20 October 2026). Fixture data shaped like SCHOOL_FORMS.md §2; teacher and student names are placeholders; course fees are illustrative; board fees are the June 2026 lists, provisional for June 2027. "Add subject" is a stub.</span>
 </header>
 <main id="main"></main>
 <div class="drawer" id="drawer"></div>
@@ -140,7 +140,7 @@ const existing = [
   { student:'Student G', section:'12C', family:'Family G', line:'Mathematics A.S./A.L. — P3, first entry', price:9800, paid:9800, due:'30 Nov 2026', receipt:'#1051' },
   { student:'Student G', section:'12C', family:'Family G', line:'Mathematics A.S./A.L. — M1, first entry', price:9450, paid:0, due:'30 Nov 2026', receipt:'' },
   { student:'Student H', section:'12D', family:'Family H', line:'Physics A.S./A.L. — A.2. carry forward (from June 2026), first entry self-study', price:19400, paid:0, due:'once the fee is confirmed', receipt:'' },
-  { student:'Student H', section:'12D', family:'Family H', line:'Mathematics A.S./A.L. — P1 (Teacher 18, online), first entry', price:9800, paid:9800, due:'30 Nov 2026', receipt:'#1051' },
+  { student:'Student H', section:'12D', family:'Family H', line:'Mathematics A.S./A.L. — P1 (Teacher 18, online), first entry', price:9800, paid:9800, due:'30 Nov 2026', receipt:'#1052' },
   { student:'Student H', section:'12D', family:'Family H', line:'Remark: Chemistry O.L. June 2026, service 2 (per component)', price:3820, paid:3820, due:'—', receipt:'—', charge:true },
 ];
 
@@ -188,7 +188,7 @@ pages.sessions = () => `
     <tr class="click" onclick="go('session')"><td><b>June 2027</b></td><td><span class="badge ok">open</span></td><td>15 Sep 2026 – 15 Feb 2027</td><td>20 Sep 2026</td><td>30 Nov 2026</td><td>${offers.length} · 3 boards</td>
       <td>${series.slice(0,3).map(s => `<span class="badge ${s.deadline ? 'ok' : 'warn'}">${s.board} ${s.deadline || '⚠ not set'}</span>`).join('')}</td>
       <td class="num">${existing.length} · ${existing.filter(e=>e.paid).length} paid</td><td><button class="sm">Open</button> <button class="sm" onclick="event.stopPropagation();go('session','money')">Money</button></td></tr>
-    <tr class="click"><td><b>November 2026 – January 2027</b></td><td><span class="badge ok">open</span></td><td>1 Jun – 10 Oct 2026</td><td>7 Sep 2026</td><td>30 Sep 2026</td><td>18 · 3 boards</td>
+    <tr class="click"><td><b>November 2026 – January 2027</b></td><td><span class="badge ok">open</span></td><td>1 Jun – 31 Oct 2026</td><td>7 Sep 2026</td><td>30 Sep 2026</td><td>18 · 3 boards</td>
       <td><span class="badge">Pearson Oct 28 Aug · passed, 61 lines entered</span><span class="badge">Cambridge Nov 16 Aug · passed; retakes to 21 Sep</span><span class="badge">Pearson IGCSE Nov 12 Sep · passed</span><span class="badge ok">Pearson Jan 16 Oct</span></td><td class="num">201 · 160 paid</td><td><button class="sm">Open</button></td></tr>
     <tr class="click muted"><td>June 2026</td><td><span class="badge">closed</span></td><td>15 Sep 2025 – 15 Feb 2026</td><td>20 Sep 2025</td><td>30 Nov 2025</td><td>24 · 3 boards</td><td></td><td class="num">434 · 434 paid</td><td></td></tr>
   </tbody></table>
@@ -349,7 +349,7 @@ pages.statement = () => {
   </tbody></table>
   <h3>Payments (one per entry deadline or charge group)</h3><table><thead><tr><th>Date</th><th>Instrument</th><th class="right">Amount</th><th>Covers</th><th>Receipts</th></tr></thead><tbody>
   <tr><td>2 Sep 2026</td><td>InstaPay</td><td class="right num">30,000</td><td>School fee 2026/27</td><td>—</td></tr>
-  <tr><td>12 Oct 2026</td><td>cash (desk)</td><td class="right num">9,800</td><td>Pearson Edexcel June 2027: P1</td><td>#1051</td></tr>
+  <tr><td>12 Oct 2026</td><td>cash (desk)</td><td class="right num">9,800</td><td>Pearson Edexcel June 2027: P1</td><td>#1052</td></tr>
   <tr><td>12 Oct 2026</td><td>cash (desk)</td><td class="right num">3,820</td><td>Remark, Chemistry O.L. June 2026 (its own payment)</td><td>—</td></tr>
   <tr><td>18 Oct 2026</td><td>—</td><td class="right num">+3,820 to escrow</td><td>the remark changed the grade: refunded by the service's rule (today: the whole fee; Q-21)</td><td></td></tr>
   </tbody></table>
