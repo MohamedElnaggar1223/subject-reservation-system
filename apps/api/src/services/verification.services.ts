@@ -27,7 +27,7 @@
  */
 
 import {
-  db, registration, receipt, paymentRegistration, payment, parentStudentLink,
+  db, registration, receipt, paymentRegistration, payment, parentStudentLink, schoolSetting,
   and, eq, inArray, sql,
 } from '@repo/db';
 import { hasRole, ROLES, FINANCE_ROLES, type VerifyPriorSittingType } from '@repo/validations';
@@ -280,18 +280,24 @@ export async function verifyPriorSitting(
  * one is dropped through the receipt-gated drop with that day's refund, the board fee counted not
  * sent (a held line was never entered). A waiting line with a payment still open is left to the
  * deadline sweep that follows on the same tick (it fails the payment and expires the line, as at
- * any deadline). Claim before acting (ST-06, ST-12): each line is locked and read again in its
+ * any deadline). Only a deadline that passed while `hold` was in force counts (the setting's own
+ * time): a line whose deadline passed under `enter_as_declared` was entered then. Claim before acting (ST-06, ST-12): each line is locked and read again in its
  * own transaction, and acted on only while it is still unverified and in the status it was
  * found in — a second scheduler instance finds it done and skips it; a failure is retried next
  * tick. Under `enter_as_declared` nothing happens: F4 lists the line as declared, unverified.
  */
 export async function holdUnverifiedAtDeadline(now: Date = new Date()) {
   if ((await getSetting('verification.unverifiedAtDeadline')) !== 'hold') return { expired: 0, dropped: 0 };
+  // Only a deadline that passed while `hold` was in force: a line whose deadline passed under
+  // `enter_as_declared` was entered as declared then, and turning `hold` on later does not undo it.
+  const [since] = await db.select({ at: schoolSetting.updatedAt }).from(schoolSetting).where(eq(schoolSetting.key, 'verification.unverifiedAtDeadline'));
+  if (!since) return { expired: 0, dropped: 0 };
   const due = await db.execute(sql`
     select r.id from registration r
     where r.prior_sitting_source in ('declared_by_family', 'declared_by_desk') and r.prior_sitting_verified_outcome is null
       and r.status in ('pending_approval', 'pending_payment', 'confirmed')
       and line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) <= ${now}
+      and line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) > ${since.at}
     order by r.id`).then((x) => x.rows as { id: string }[]);
   let expired = 0;
   let dropped = 0;
@@ -301,7 +307,7 @@ export async function holdUnverifiedAtDeadline(now: Date = new Date()) {
         const line = await lockLine(tx, id);
         if (!line || line.outcome || !(DECLARED as readonly string[]).includes(line.priorSittingSource ?? '')) return null;
         const d = await effectiveDeadlineFor(tx, line);
-        if (!d.at || d.at > now) return null;
+        if (!d.at || d.at > now || d.at <= since.at) return null;
         if (line.status === 'pending_approval' || line.status === 'pending_payment') {
           if ((await paymentState(tx, id)).open) return null;
           const [row] = await tx.update(registration).set({ status: 'expired', updatedAt: now })

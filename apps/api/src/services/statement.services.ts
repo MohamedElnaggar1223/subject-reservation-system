@@ -30,13 +30,14 @@ export function formatSeriesName(s: { boardName: string | null; month: string; y
  * percent (self-study, a retake, one paper), the board fee with its percent, and any exception.
  * A line from before the rework has no basis: its recorded split is shown.
  */
-export function basisText(basis: PricingBasis | null, line: { courseFee: number; boardFee: number }) {
+export function basisText(basis: PricingBasis | null, line: { courseFee: number; boardFee: number; provisional?: boolean }) {
   if (!basis) return `course ${fmt(line.courseFee)} + board ${fmt(line.boardFee)} (recorded before the rework)`;
   if (basis.customPrice) return `custom price ${fmt(basis.total)} (an exception; board fee included)`;
   const coursePct = round2((basis.coursePercent * (basis.itemKind === 'one_paper' ? basis.onePaperPercent : 100)) / 100);
   const parts = `course ${fmt(basis.courseFeeBase)} × ${coursePct}% + board ${fmt(basis.boardFeeBase)} × ${basis.boardPercent}%`;
   const plain = round2((basis.courseFeeBase * coursePct) / 100 + (basis.boardFeeBase * basis.boardPercent) / 100);
-  const provisional = basis.feeRows.some((f) => f.provisional) ? ' (board fee provisional)' : '';
+  // Provisional as the line is now: a fee confirmed at its amount clears the line, not its basis.
+  const provisional = line.provisional ? ' (board fee provisional)' : '';
   return round2(basis.total) === plain ? `${parts}${provisional}` : `${parts} = ${fmt(plain)}, less exceptions = ${fmt(basis.total)}${provisional}`;
 }
 
@@ -111,7 +112,7 @@ async function linesOf(studentIds: string[]) {
       dueAt: waiting ? dueAt : null,
       overdueDays: outstanding > 0 && dueAt && dueAt.getTime() < now ? Math.floor((now - dueAt.getTime()) / 86_400_000) : 0,
       provisional: l.provisional,
-      basisText: basisText(l.basis, { courseFee, boardFee }),
+      basisText: basisText(l.basis, { courseFee, boardFee, provisional: l.provisional }),
       series: l.month ? formatSeriesName({ boardName: l.board_name, month: l.month, year: Number(l.year), label: l.series_label }) : null,
       deadline: l.deadline ? new Date(l.deadline) : null,
       priorSitting: l.prior_month ? {
