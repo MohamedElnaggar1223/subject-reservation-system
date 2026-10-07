@@ -57,7 +57,7 @@ export async function createReceiptsForRegistrations(
       .update(receipt)
       .set({
         status: 'pending_issue',
-        receiptNumber: `${receiptNumberFor(rc.registrationId)}-R${n}`,
+        receiptNumber: `${receiptNumberFor(rc.registrationId!)}-R${n}`,
         issuedBy: null, issuedAt: null, returnedTo: null, returnedAt: null,
         refundAmountOnReturn: null, refundReason: null, refundInitiatedBy: null,
         notes: `Reissued — ${rc.receiptNumber} was voided when an earlier payment was reversed`,

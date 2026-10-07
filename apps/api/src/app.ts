@@ -47,6 +47,10 @@ import { schoolFees } from './routes/school-fee.routes';
 import { receipts } from './routes/receipt.routes';
 import { exceptions } from './routes/exception.routes';
 import { remarks } from './routes/remark.routes';
+// The reservations rework, step C: charges, board services, the policy registry.
+import { charges } from './routes/charge.routes';
+import { boardServices } from './routes/board-service.routes';
+import { policies } from './routes/policy.routes';
 
 /**
  * Rate limiters (auth: brute force; v1: abuse).
@@ -405,7 +409,11 @@ const v1 = new Hono<HonoEnv>()
   .route('/catalogue', catalogueRoutes)
   .route('/board-series', boardSeriesRoutes)
   .route('/board-fees', boardFeeRoutes)
-  .route('/enrolments', enrolmentRoutes);
+  .route('/enrolments', enrolmentRoutes)
+  // The reservations rework, step C
+  .route('/charges', charges)
+  .route('/board-services', boardServices)
+  .route('/policies', policies);
 
 // Mount v1 under /v1 (keep chaining for proper RPC typing)
 // Exported for in-process tests (app.request) and for index.ts to serve.

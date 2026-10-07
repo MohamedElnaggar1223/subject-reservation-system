@@ -67,6 +67,10 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
         'payment.graceDays': false,
         'refund.defaultPolicy.june': false,
         'refund.defaultPolicy.winter': false,
+        // The reservations rework (step C): the overdue expiry is finance's and the admin's; late
+        // board entries (Q-20) the admin's alone.
+        'payment.expireOverdueAfterDays': false,
+        'exceptions.boardEntryDeadline': false,
         // F0b: what "A.S./A.2." marks is the coordinator's answer (IS-01).
         'catalogue.levelCodeReading': true,
       });

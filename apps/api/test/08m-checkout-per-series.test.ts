@@ -314,7 +314,7 @@ describe('F0b: MO-21 per series — a draft session whose items sit October and 
   let adm: Client, officer: Client, finadmin: Client;
   const Y = academicYearStartOf();
 
-  it("October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate", async () => {
+  it("October's deadline refunds only October's preregistrations; a January one cancelled after it gets the policy's rate on the course fee and its board fee back", async () => {
     adm = await admin('ckp');
     officer = await staff(adm, 'finance_officer', 'ckp');
     finadmin = await staff(adm, 'finance_admin', 'ckp');
@@ -343,10 +343,13 @@ describe('F0b: MO-21 per series — a draft session whose items sit October and 
     expect((await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [j])).s).toBe(jan);
     await pay(o);
     await pay(j);
-    const hour = 60 * 60 * 1000;
-    await apiResponse(finadmin.api.v1.receipts['refund-windows'].$post({
-      json: { sessionId: w, startsAt: new Date(Date.now() - hour).toISOString(), endsAt: new Date(Date.now() + 24 * hour).toISOString(), percentage: 50, label: 'October window: half back' },
-    }));
+    // Changed by the reservations rework (RESERVATIONS_REWORK.md §3.9, §3.10; Q-19's default; trail
+    // row "assertion"): a line refunds from its session's policy — here the winter default, 100% to
+    // week 2, 50% in weeks 3–6 — counted from the course start, on the course fee; the board fee of a
+    // preregistration (never confirmed, so never sent) comes back in full. The course start is put 15
+    // days back (week 3) where a 50% refund window used to be posted.
+    const day = (d: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(Date.now() + d * 24 * 60 * 60 * 1000));
+    await apiResponse(adm.api.v1.sessions[':id'].$put({ param: { id: w }, json: { courseStartsOn: day(-15), reason: 'the course started two weeks ago' } }));
     const wallet = async () => {
       const x = await one<{ balance: string; held: string }>(`select balance, held_balance as held from escrow where student_id = $1`, [f.studentId]);
       return { free: money(x.balance), held: money(x.held) };
@@ -364,9 +367,10 @@ describe('F0b: MO-21 per series — a draft session whose items sit October and 
     await audited([o], ['PREREG_REFUNDED_AT_DEADLINE']);
     expect(await wallet()).toEqual({ free: 1500, held: 1500 });
 
-    // January's own deadline has not passed: cancelling is the family's own drop, at the window's rate.
+    // January's own deadline has not passed: cancelling is the family's own drop, at the policy's
+    // rate on the course fee (500 of 1,000) and the board fee in full (500): 2,500 free (was 2,250).
     const cancelled = await apiResponse(f.parent.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: j } }));
     expect(cancelled).toMatchObject({ funded: true, refundPercentage: 50 });
-    expect(await wallet()).toEqual({ free: 2250, held: 0 });
+    expect(await wallet()).toEqual({ free: 2500, held: 0 });
   });
 });

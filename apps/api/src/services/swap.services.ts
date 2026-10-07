@@ -531,7 +531,7 @@ export async function approveChangeRequest(
       newRegistrationId = made!.id;
     }
 
-    const outcome = { success: true, type: cr.type, ...dropOutcome, refundPercentage: pct, refundCoursePart: quote.coursePart, refundBoardPart: quote.boardPart };
+    const outcome = { success: true, type: cr.type, ...dropOutcome, refundPercentage: pct };
     // The drop, its refund and their audit row commit together (MO-1).
     await logAction(parentId, 'CHANGE_REQUEST_APPROVED', 'change_request', changeRequestId, { status: 'pending_approval' },
       { ...outcome, registrationId: cr.registrationId, newRegistrationId }, auditCtx, tx);
@@ -693,7 +693,7 @@ export async function executeDirectDrop(
       refundReason: 'drop',
       initiatedBy: parentId,
     });
-    const outcome = { success: true, creditedAmount: dropOutcome.gated ? 0 : refundAmount, ...dropOutcome, refundPercentage: pct, refundCoursePart: quote.coursePart, refundBoardPart: quote.boardPart };
+    const outcome = { success: true, creditedAmount: dropOutcome.gated ? 0 : refundAmount, ...dropOutcome, refundPercentage: pct };
     // The drop, its refund and their audit row commit together (MO-1).
     await logAction(parentId, 'DIRECT_DROP_EXECUTED', 'registration', registrationId, { status: reg.status }, outcome, auditCtx, tx);
     return outcome;

@@ -33,6 +33,7 @@ import {
   ChangeRequestId,
   RegistrationIdParam,
   ChangeRequestsQuery,
+  DeskDrop,
   ROLES,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
@@ -41,7 +42,9 @@ import {
   requireStudent,
   requireParent,
   requireStudentOrParent,
+  requireFinance,
 } from '../middleware/access-control.middleware';
+import { deskDrop, DeskDropError } from '../services/desk-drop.services';
 import type { HonoEnv } from '../lib/types';
 import * as swapService from '../services/swap.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
@@ -168,6 +171,25 @@ export const registrationSwapRoutes = new Hono<HonoEnv>()
                        message.includes('Core subjects') || message.includes('closed') ? 422 :
                        message.includes('already registered') ? 409 : 400;
         return error(c, message, status);
+      }
+    }
+  )
+
+  /**
+   * POST /registrations/:id/desk-drop — the reservations rework (§3.3, §5): the desk drops a paid
+   * line past its deadline (a family's own drop is refused then), with a reason, through the
+   * receipt-gated drop and the "sent" refund (desk-drop.services). Finance desk and admin.
+   */
+  .post('/:id/desk-drop',
+    requireFinance(),
+    zValidator('param', RegistrationIdParam),
+    zValidator('json', DeskDrop),
+    async (c) => {
+      const user = c.get('user')!;
+      try {
+        return success(c, await deskDrop(c.req.valid('param').id, user.id, c.req.valid('json').reason, extractAuditContext(c)));
+      } catch (err) {
+        return error(c, clientMessage(err, 'Failed to drop the line'), err instanceof DeskDropError ? err.status : 400);
       }
     }
   );

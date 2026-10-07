@@ -95,6 +95,15 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     'POST /v1/sessions/:id/grade10/*',
     'GET /v1/board-fees',
     'GET /v1/registrations/offers',
+    // The reservations rework, step C: the policy registry and the exceptions they grant (the
+    // handler refuses a money policy), "Check these" for theirs, the boards' services and their
+    // deadlines (the fees are finance's).
+    'GET /v1/policies',
+    'GET /v1/exceptions/check-these',
+    'POST /v1/exceptions/:id/confirm',
+    'GET /v1/board-services',
+    'PUT /v1/board-services/deadlines',
+    'PUT /v1/board-services/:id',
     'GET /v1/enrolments',
     'POST /v1/enrolments',
     '* /v1/enrolments/*',

@@ -263,3 +263,19 @@ POST	/v1/board-fees/:seriesId/reprice	D	D	D	D	A	A	D	D	D
 POST	/v1/board-fees/:seriesId/copy	D	D	D	D	A	A	D	D	D
 POST	/v1/board-fees/:seriesId/parse	D	D	D	D	A	A	D	D	D
 GET	/v1/registrations/offers	D	A	A	A	A	A	A	D	D
+# The reservations rework, step C (docs/features/RESERVATIONS_MONEY.md §5): charges, board services, the registry, the desk-drop, the push.
+GET	/v1/board-services	D	A	A	A	A	A	A	D	D
+PUT	/v1/board-services/:id	D	D	D	D	D	A	A	D	D
+PUT	/v1/board-services/deadlines	D	D	D	D	D	A	A	D	D
+PUT	/v1/board-services/fees	D	D	D	D	A	A	D	D	D
+GET	/v1/charges	D	A	A	A	A	A	D	D	D
+POST	/v1/charges	D	A	A	A	A	A	D	D	D
+POST	/v1/charges/:id/accept	D	D	D	A	A	A	D	D	D
+POST	/v1/charges/:id/cancel	D	D	D	A	A	A	D	D	D
+POST	/v1/charges/:id/refund	D	D	D	D	A	A	D	D	D
+GET	/v1/exceptions/check-these	D	D	D	D	A	A	A	D	D
+POST	/v1/exceptions/:id/confirm	D	D	D	D	A	A	A	D	D
+POST	/v1/exceptions/:id/release	D	D	D	D	A	A	D	D	D
+GET	/v1/policies	D	D	D	A	A	A	A	D	D
+POST	/v1/registrations/:id/desk-drop	D	D	D	A	A	A	D	D	D
+POST	/v1/school-fees/push	D	D	D	D	A	A	D	D	D

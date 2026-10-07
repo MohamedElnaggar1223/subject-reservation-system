@@ -38,7 +38,7 @@ import {
   and, eq, inArray, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
-import type { InstalmentRowType } from '@repo/validations';
+import type { InstalmentRowType, NotificationType } from '@repo/validations';
 import { logAction, logActions, type AuditContext } from './audit.services';
 import { getOrCreateEscrow, earmarkedHeld, debitHeld, creditEscrow, creditHeld } from './escrow.services';
 import { refundFor } from './refund.services';
@@ -90,7 +90,7 @@ export async function depositsOfLine(executor: Executor, studentId: string, line
 }
 
 /** In-app notices written in the money transaction, so the family hears of exactly what committed. */
-async function tellFamily(tx: Tx, studentId: string, type: 'CHARGE_ADDED' | 'CHARGE_UPDATED' | 'PLAN_UPDATED', title: string, body: string, data: Record<string, unknown>) {
+async function tellFamily(tx: Tx, studentId: string, type: NotificationType, title: string, body: string, data: Record<string, unknown>) {
   const parents = await tx.select({ id: parentStudentLink.parentId }).from(parentStudentLink)
     .where(and(eq(parentStudentLink.studentId, studentId), eq(parentStudentLink.status, 'approved')));
   const ids = [...new Set([studentId, ...parents.map((p) => p.id)])];
