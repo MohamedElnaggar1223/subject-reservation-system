@@ -31,7 +31,7 @@ export type HomeSummary = {
   role: 'parent' | 'student';
   children: ChildSummary[];
   totals: { owing: number; actionsNeeded: number };
-  openSessions: { id: string; name: string; endDate: Date; qualificationLevel: string }[];
+  openSessions: { id: string; name: string; endDate: Date; qualificationLevel: string | null }[];
 };
 
 async function summariseStudent(studentId: string): Promise<ChildSummary> {

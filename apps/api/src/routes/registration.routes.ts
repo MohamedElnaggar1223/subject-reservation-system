@@ -41,6 +41,7 @@ import {
   FINANCE_ROLES,
   STUDENT_RECORD_ROLES,
   EligibilityQuery,
+  OffersQuery,
   hasRole,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
@@ -59,6 +60,7 @@ import * as preregService from '../services/prereg.services';
 import * as deskService from '../services/desk.services';
 import * as linkService from '../services/link.services';
 import { mayRegisterFor } from '../services/eligibility.services';
+import { offersForStudent } from '../services/offers-read.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 
 export const registrations = new Hono<HonoEnv>()
@@ -88,6 +90,39 @@ export const registrations = new Hono<HonoEnv>()
         return success(c, await mayRegisterFor(studentId, sessionId));
       } catch (err) {
         const message = clientMessage(err, 'Failed to check eligibility');
+        return error(c, message, message.includes('not found') ? 404 : 400);
+      }
+    }
+  )
+
+  /**
+   * GET /registrations/offers?sessionId=&studentId= (the reservations rework, §5)
+   *
+   * What a student can reserve in a session: the offers and items with the student's known
+   * sittings, teachers, deadlines and the price of each allowed attempt and mode. The student
+   * themself, a linked parent, staff with student records. Replaces /available once step B's
+   * Reserve pages read it.
+   */
+  .get('/offers',
+    zValidator('query', OffersQuery),
+    async (c) => {
+      const user = c.get('user')!;
+      const q = c.req.valid('query');
+      const studentId = user.role === ROLES.STUDENT ? user.id : q.studentId;
+      if (!studentId) return error(c, 'studentId is required', 400);
+      if (user.role === ROLES.STUDENT && q.studentId && q.studentId !== user.id) return error(c, 'Forbidden', 403);
+      if (user.role === ROLES.PARENT) {
+        const children = await linkService.getLinkedChildren(user.id);
+        if (!children.some((child) => child.studentId === studentId)) return error(c, 'You are not linked to this student', 403);
+      } else if (user.role !== ROLES.STUDENT && !hasRole(user.role, ...STUDENT_RECORD_ROLES)) {
+        return error(c, 'Forbidden', 403);
+      }
+      try {
+        const offers = await offersForStudent(studentId, q.sessionId);
+        if (!offers) return error(c, 'Session not found', 404);
+        return success(c, offers);
+      } catch (err) {
+        const message = clientMessage(err, 'Failed to load the offers');
         return error(c, message, message.includes('not found') ? 404 : 400);
       }
     }

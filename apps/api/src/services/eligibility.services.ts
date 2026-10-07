@@ -205,7 +205,10 @@ export async function assertMayRegisterForInTx(tx: Tx, studentId: string, sessio
 
 /** The locked judgement without the throw (a preregistration's capture holds a refused row instead). */
 export async function mayRegisterForInTx(tx: Tx, studentId: string, sessionId: string): Promise<Eligibility> {
-  await tx.select({ id: user.id }).from(user).where(eq(user.id, studentId)).for('share');
+  // The student FOR NO KEY UPDATE (the rework, §6): a student's own reservations are serialised —
+  // what gate.sameEntryOnce and gate.exclusiveItems need, since no index can express them across
+  // sessions; NO KEY so inserts referencing the student are not blocked.
+  await tx.select({ id: user.id }).from(user).where(eq(user.id, studentId)).for('no key update');
   await tx.select({ id: registrationSession.id }).from(registrationSession).where(eq(registrationSession.id, sessionId)).for('share');
   let e = await mayRegisterFor(studentId, sessionId, tx);
   if (e.grade10ExceptionId) {

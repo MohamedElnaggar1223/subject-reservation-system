@@ -92,6 +92,8 @@ const SERIES_MONTH: Record<string, string> = {
   june: 'June',
   october: 'October',
   november: 'November',
+  // A winter session (reservations rework): its November year.
+  winter: 'Winter',
 };
 
 /** "November 2026". */
@@ -104,7 +106,7 @@ export function seriesLabel(sessionType: string, seriesYear: number): string {
  * October, November and January series of the academic year right after
  * their grade-12 year — never the June after it.
  */
-export const GRADUATE_RETAKE_SESSION_TYPES = ['october', 'november', 'january'] as const;
+export const GRADUATE_RETAKE_SESSION_TYPES = ['winter', 'october', 'november', 'january'] as const;
 
 /** Grade 10 sits the June series only (owner decision 28 Sep 2026). */
 export const GRADE_10_SESSION_TYPES = ['june'] as const;

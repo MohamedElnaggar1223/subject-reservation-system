@@ -21,13 +21,12 @@ import { randomUUID } from 'crypto';
 import type { DeskOnboardFamilyType, DeskRegistrationType, DeskCollectType } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { auth } from '../lib/auth';
-import {
-  prepareRegistrationInputs,
-  validateCoreSubjectRequirements,
-  insertRoutedRegistrations,
-} from './registration.services';
-import { sessionWindow, entryDeadlineMessage } from './window.services';
-import { routeAndCheck, seriesDeadlineGroups, type DeadlineGroup } from './series.services';
+import { prepareLegacyLines, getExistingRegistrationSubjectIds } from './registration.services';
+import { insertLines } from './line.services';
+import { sessionWindow, windowRefusal } from './window.services';
+import { seriesDeadlineGroups, type DeadlineGroup } from './series.services';
+import { getSetting } from './settings.services';
+import { PROVISIONAL_REFUSAL } from './pricing.services';
 import { setStudentFields } from './user.services';
 import { getEscrowBalance, debitEscrow } from './escrow.services';
 import { confirmPayment, failPayment } from './payment.services';
@@ -171,11 +170,7 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
   if (!sess) throw new Error('Session not found');
   const w = await sessionWindow(data.studentId, sess.id, null);
   if (!w.open) {
-    throw new Error(
-      w.entryDeadlinePassed
-        ? entryDeadlineMessage(w.entryDeadline!)
-        : 'Registration window is not open — a finance admin can grant this student a deadline extension'
-    );
+    throw new Error(windowRefusal(w, 'Registration window is not open — a finance admin can grant this student a deadline extension'));
   }
 
   const subjects = await db.query.subject.findMany({
@@ -185,78 +180,32 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
   if (subjects.length !== data.subjectIds.length) {
     throw new Error('One or more subjects are invalid or inactive');
   }
-
-  const already = await db.query.registration.findMany({
-    where: (r, { eq, and, inArray, notInArray }) =>
-      and(
-        eq(r.studentId, data.studentId),
-        eq(r.sessionId, data.sessionId),
-        inArray(r.subjectId, data.subjectIds),
-        notInArray(r.status, ['dropped', 'rejected', 'expired'])
-      ),
-    columns: { subjectId: true },
-  });
-  if (already.length > 0) {
+  const already = await getExistingRegistrationSubjectIds(data.studentId, data.sessionId);
+  if (data.subjectIds.some((id) => already.includes(id))) {
     throw new Error('Some subjects are already registered for this session');
   }
-  // F0b: each subject's board series is open (asked again in the transaction).
-  await routeAndCheck(db, data.sessionId, subjects);
 
-  const coreCheck = await validateCoreSubjectRequirements(
-    data.studentId,
-    data.sessionId,
-    data.subjectIds
-  );
-  if (!coreCheck.valid) {
-    const names = coreCheck.missingCoreSubjects.map((s) => s.name).join(', ');
-    throw new Error(`Grade 10 June session requires all core subjects. Missing: ${names}`);
-  }
-
-  // Full V3 pipeline: level match, school-fee gate, retakes, teachers,
-  // pricing + exceptions
-  const prepared = await prepareRegistrationInputs(
-    data.studentId,
-    sess,
-    subjects,
-    data.subjectOptions,
-    eligibility
-  );
-
+  // The school-fee gate, then each subject as a line (its whole item, attempt from history,
+  // mode, teacher). Checked, priced and entered in its item's series by insertLines, in the
+  // transaction (the grade-10 core rule included).
+  const lines = await prepareLegacyLines(data.studentId, data.sessionId, data.subjectIds, data.subjectOptions, eligibility);
   const now = new Date();
-  const records = subjects.map((sub) => {
-    const p = prepared.get(sub.id)!;
-    return {
-      id: randomUUID(),
-      studentId: data.studentId,
-      sessionId: data.sessionId,
-      subjectId: sub.id,
-      priceAtRegistration: p.pricing.total,
-      courseFeeAtRegistration: p.pricing.courseFee,
-      registrationFeeAtRegistration: p.pricing.registrationFee,
-      isRetake: p.isRetake,
-      takenOutsideSchool: p.pricing.isOutsideSchool,
-      teacherId: p.teacherId,
-      wasCoreAtRegistration: sub.isCore,
-      status: 'pending_payment' as const,
-      requestedBy: staffId,
-      approvedBy: staffId,
-      approvedAt: now,
-      approvalComments: '[DESK] Registered at the finance desk',
-    };
-  });
-
-  const totalCost = records.reduce((sum, r) => sum + r.priceAtRegistration, 0);
+  const lineInput = {
+    studentId: data.studentId, sessionId: data.sessionId, lines, status: 'pending_payment' as const,
+    requestedBy: staffId, approvedBy: staffId, approvedAt: now, approvalComments: '[DESK] Registered at the finance desk', eligibility,
+  };
 
   // No money taken → register only; the family pays later (app or desk)
   if (!data.collectNow) {
     const created = await db.transaction(async (tx) => {
       // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
       await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-      const inserted = await insertRoutedRegistrations(tx, data.sessionId, subjects, records);
+      const inserted = await insertLines(tx, lineInput);
       await logAction(staffId, 'DESK_REGISTRATION', 'registration', data.studentId, null,
         { subjects: inserted.length, registrationIds: inserted.map((r) => r.id), collected: 0 }, auditCtx, tx);
       return inserted;
     });
+    const totalCost = created.reduce((sum, r) => sum + r.priceAtRegistration, 0);
     return { registrations: created, payment: null, payments: [], notCollected: [], totalCost, collected: 0, receipts: [] };
   }
 
@@ -268,19 +217,22 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
         `Escrow balance insufficient. Available: ${balance.toFixed(2)} EGP`
       );
     }
-    if (escrowToApply > totalCost) {
-      throw new Error('Escrow amount cannot exceed the total cost');
-    }
   }
 
   // Only money needs a payer of record; register-only desk actions (family
   // pays later) can proceed for a student who is not linked yet.
   const payerParentId = await resolvePayerParent(data.studentId);
+  const payOnProvisional = await getSetting('pricing.payOnProvisionalFee');
 
   const made = await db.transaction(async (tx) => {
     // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    const inserted = await insertRoutedRegistrations(tx, data.sessionId, subjects, records);
+    const inserted = await insertLines(tx, lineInput);
+    const totalCost = inserted.reduce((sum, r) => sum + r.priceAtRegistration, 0);
+    if (escrowToApply > totalCost) throw new Error('Escrow amount cannot exceed the total cost');
+    // A line whose board fee is still provisional is reserved, not collected (§3.4).
+    const provisional = inserted.filter((r) => r.priceProvisional);
+    if (provisional.length && !payOnProvisional) throw new Error(PROVISIONAL_REFUSAL);
     // F0b: one payment per entry deadline (the sweep closes a payment at its
     // series' deadline), each with its own escrow share and audit row.
     const groups = await seriesDeadlineGroups(tx, inserted.map((r) => r.id), true);
@@ -300,9 +252,10 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
       await logAction(staffId, 'PAYMENT_INITIATED', 'payment', p.id, null,
         { desk: true, registrationIds: p.registrationIds, amount: p.amount, escrowApplied: p.escrowApplied, series: p.series }, auditCtx, tx);
     }
-    return { inserted, payments };
+    return { inserted, payments, totalCost };
   });
   const created = made.inserted;
+  const totalCost = made.totalCost;
 
   // Money is in hand — confirm each through the shared path so registrations
   // flip to confirmed, receipts are created, and NOT-005 fires.
@@ -448,7 +401,7 @@ async function confirmDeskPayment(
 export async function collectAtDesk(staffId: string, data: DeskCollectType, auditCtx?: AuditContext) {
   const regs = await db.query.registration.findMany({
     where: (r, { inArray }) => inArray(r.id, data.registrationIds),
-    columns: { id: true, studentId: true, sessionId: true, status: true, priceAtRegistration: true, boardSeriesId: true },
+    columns: { id: true, studentId: true, sessionId: true, status: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true, priceProvisional: true },
   });
   if (regs.length !== data.registrationIds.length || regs.some((r) => r.studentId !== data.studentId)) {
     throw new Error('One or more subjects do not belong to this student');
@@ -459,18 +412,15 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
   // F0a: call site 6 of mayRegisterFor — no money for a subject the
   // student may no longer sit (SO-7).
   for (const sessionId of new Set(regs.map((r) => r.sessionId))) await assertMayRegisterFor(data.studentId, sessionId);
-  // F0b: each subject's own board series decides its deadline (MO-10).
-  for (const key of new Set(regs.map((r) => `${r.sessionId}|${r.boardSeriesId ?? ''}`))) {
-    const [sessionId, boardSeriesId] = key.split('|') as [string, string];
-    const w = await sessionWindow(data.studentId, sessionId, boardSeriesId || null);
+  // Each line's own deadline decides (MO-10, per line since the rework).
+  for (const r of regs) {
+    const w = await sessionWindow(data.studentId, r.sessionId, r);
     if (!w.open) {
-      throw new Error(
-        w.entryDeadlinePassed
-          ? entryDeadlineMessage(w.entryDeadline!)
-          : 'Registration window is not open — a finance admin can grant this student a deadline extension'
-      );
+      throw new Error(windowRefusal(w, 'Registration window is not open — a finance admin can grant this student a deadline extension'));
     }
   }
+  // A line whose board fee is still provisional is not collected (§3.4).
+  if (regs.some((r) => r.priceProvisional) && !(await getSetting('pricing.payOnProvisionalFee'))) throw new Error(PROVISIONAL_REFUSAL);
 
   const totalCost = Math.round(regs.reduce((s, r) => s + r.priceAtRegistration, 0) * 100) / 100;
   const escrowToApply = data.escrowAmountToApply ?? 0;

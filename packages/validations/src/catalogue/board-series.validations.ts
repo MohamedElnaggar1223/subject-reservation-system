@@ -16,7 +16,7 @@
  */
 
 import { z } from 'zod';
-import { SessionTypeSchema } from '../session/session.validations';
+import { SeriesMonthSchema } from '../session/session.validations';
 import { SeriesYearSchema } from '../academic/academic-year';
 import { DateOnlySchema } from '../academic/structure.validations';
 import { BoardCodeSchema } from './catalogue.validations';
@@ -27,7 +27,6 @@ export const BOARD_SERIES_DATE_FIELDS = [
   'lateFeeFrom',
   'highLateFeeFrom',
   'lateEntriesClose',
-  'retakeDeadline',
   'forecastGradesDue',
   'neaDue',
   'accessArrangementsDue',
@@ -43,7 +42,6 @@ export const BOARD_SERIES_DATE_LABELS: Record<BoardSeriesDateField, string> = {
   lateFeeFrom: 'Late entry fee from',
   highLateFeeFrom: 'High late fee from',
   lateEntriesClose: 'Late entries close',
-  retakeDeadline: 'Retake deadline (no late fee)',
   forecastGradesDue: 'Forecast grades due',
   neaDue: 'Coursework (NEA) marks due',
   accessArrangementsDue: 'Access arrangements due',
@@ -58,7 +56,7 @@ const dates = Object.fromEntries(BOARD_SERIES_DATE_FIELDS.map((f) => [f, optiona
 
 export const CreateBoardSeries = z.object({
   boardCode: BoardCodeSchema,
-  month: SessionTypeSchema,
+  month: SeriesMonthSchema,
   year: SeriesYearSchema,
   /**
    * Only when one board runs two calendars in one month (Pearson's June for
@@ -67,6 +65,11 @@ export const CreateBoardSeries = z.object({
   label: z.string().trim().max(60).default(''),
   /** The exam board's entry deadline: the school's hard stop (MO-10). Admin only. */
   entryDeadline: z.coerce.date().nullable().optional(),
+  /**
+   * Reservations rework (§3.3): the later deadline for a retake of the board's previous sitting
+   * (Cambridge). An instant with the entry deadline's rules: admin only, in the future.
+   */
+  retakeDeadline: z.coerce.date().nullable().optional(),
   ...dates,
   notes: z.string().trim().max(1000).nullable().optional(),
 });
@@ -80,6 +83,7 @@ export type CreateBoardSeriesType = z.infer<typeof CreateBoardSeries>;
 export const UpdateBoardSeries = z.object({
   label: z.string().trim().max(60).optional(),
   entryDeadline: z.coerce.date().nullable().optional(),
+  retakeDeadline: z.coerce.date().nullable().optional(),
   ...dates,
   notes: z.string().trim().max(1000).nullable().optional(),
   reason: z.string().trim().max(500).optional(),

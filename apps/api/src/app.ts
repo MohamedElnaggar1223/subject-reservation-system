@@ -39,6 +39,7 @@ import { teachingRoutes } from './routes/teaching.routes';
 import { catalogueRoutes } from './routes/catalogue.routes';
 import { boardSeriesRoutes } from './routes/board-series.routes';
 import { enrolmentRoutes } from './routes/enrolment.routes';
+import { boardFeeRoutes } from './routes/board-fee.routes';
 import { isGrantedRole, isGranted } from './lib/role-grants';
 import { reports } from './routes/report.routes';
 import { teachers } from './routes/teacher.routes';
@@ -403,6 +404,7 @@ const v1 = new Hono<HonoEnv>()
   // F0b: the exam catalogue, board series, course enrolment
   .route('/catalogue', catalogueRoutes)
   .route('/board-series', boardSeriesRoutes)
+  .route('/board-fees', boardFeeRoutes)
   .route('/enrolments', enrolmentRoutes);
 
 // Mount v1 under /v1 (keep chaining for proper RPC typing)

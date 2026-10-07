@@ -16,7 +16,6 @@ import {
   academicYearStartOf, gradeInAcademicYear, seriesAcademicYearStart, seriesLabel,
   type CreateExceptionType, type ListExceptionsQueryType, type ExceptionType, type Role,
 } from '@repo/validations';
-import type { RegistrationPricing } from './pricing.services';
 import { logAction, type AuditContext } from './audit.services';
 import { expireIneligibleRegistrations } from './eligibility.services';
 
@@ -179,50 +178,8 @@ export async function getActiveExceptions(
   });
 }
 
-/**
- * Hook 1 — pricing. Applied after the 50% rule: custom_price replaces
- * the total outright; then percentage discounts; then fixed discounts.
- * The split is kept summing to the total (custom/fixed adjust courseFee).
- */
-export async function applyPricingExceptions(
-  studentId: string,
-  sessionId: string,
-  subjectId: string,
-  pricing: RegistrationPricing
-): Promise<RegistrationPricing> {
-  const rows = await getActiveExceptions(
-    studentId,
-    ['custom_price', 'discount_percent', 'discount_fixed'],
-    { sessionId, subjectId }
-  );
-  if (rows.length === 0) return pricing;
-
-  let { courseFee, registrationFee, total } = pricing;
-
-  const custom = rows.find((e) => e.type === 'custom_price' && e.value != null);
-  if (custom) {
-    total = round2(custom.value!);
-    courseFee = total;
-    registrationFee = 0;
-  }
-
-  for (const e of rows.filter((r) => r.type === 'discount_percent' && r.value != null)) {
-    const factor = 1 - e.value! / 100;
-    courseFee = round2(courseFee * factor);
-    registrationFee = round2(registrationFee * factor);
-    total = round2(courseFee + registrationFee);
-  }
-
-  for (const e of rows.filter((r) => r.type === 'discount_fixed' && r.value != null)) {
-    const off = Math.min(e.value!, total);
-    const fromCourse = Math.min(off, courseFee);
-    courseFee = round2(courseFee - fromCourse);
-    registrationFee = round2(registrationFee - (off - fromCourse));
-    total = round2(courseFee + registrationFee);
-  }
-
-  return { ...pricing, courseFee, registrationFee, total };
-}
+// Hook 1 — pricing — moved to the exception adapter (line-exceptions.ts), which priceLine reads
+// (RESERVATIONS_REWORK.md §3.4; the order of application is today's).
 
 /**
  * Hook 2 — window checks. A closed (or not-yet-open) session is treated

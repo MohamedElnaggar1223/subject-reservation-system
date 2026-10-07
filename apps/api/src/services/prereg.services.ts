@@ -16,18 +16,17 @@
  *    normal receipt-gated refund path with refund windows applied (D-J).
  */
 
-import { db, registration, auditLog, eq, and } from '@repo/db';
-import { randomUUID } from 'crypto';
+import { db, registration, auditLog, eq, and, sql } from '@repo/db';
 import type { PreregisterRegistrationType } from '@repo/validations';
-import { prepareRegistrationInputs, insertRoutedRegistrations } from './registration.services';
-import { routeAndCheck } from './series.services';
+import { prepareLegacyLines, getExistingRegistrationSubjectIds } from './registration.services';
+import { insertLines } from './line.services';
+import { effectiveDeadlineFor } from './deadline.services';
 import { creditHeld, debitHeld, getEscrowBalance } from './escrow.services';
 import { executeReceiptGatedDrop } from './receipt.services';
 import { refundPercentage } from './refund.services';
 import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterForInTx } from './eligibility.services';
-import { notifyFinanceOfHeldPreregistration } from './notification.services';
+import { notifyFinanceOfHeldPreregistration, notifyPreregistrationsRefundedAtDeadline } from './notification.services';
 import { logger } from '../lib/logger';
-import { entryDeadlineMessage } from './window.services';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 
 function round2(n: number): number {
@@ -69,60 +68,22 @@ export async function createPreregistration(parentId: string, data: PreregisterR
   if (subjects.length !== data.subjectIds.length) {
     throw new Error('One or more subjects are invalid or inactive');
   }
-  // Past a subject's board series deadline nothing more can be entered
-  // (MO-10, per series since F0b).
-  await routeAndCheck(db, data.sessionId, subjects);
-
-  const existing = await db.query.registration.findMany({
-    where: (r, { eq, and, notInArray, inArray }) =>
-      and(
-        eq(r.studentId, data.studentId),
-        eq(r.sessionId, data.sessionId),
-        inArray(r.subjectId, data.subjectIds),
-        notInArray(r.status, ['dropped', 'rejected', 'expired'])
-      ),
-    columns: { subjectId: true },
-  });
-  if (existing.length > 0) {
+  const existing = await getExistingRegistrationSubjectIds(data.studentId, data.sessionId);
+  if (data.subjectIds.some((id) => existing.includes(id))) {
     throw new Error('Some subjects are already preregistered for this session');
   }
 
-  // Same V3 pipeline: level match, school-fee gate, retakes, teachers,
-  // pricing engine + exceptions. Price locks NOW (D-E).
-  const prepared = await prepareRegistrationInputs(
-    data.studentId,
-    sess,
-    subjects,
-    data.subjectOptions,
-    eligibility
-  );
-
+  // The school-fee gate, then each subject as a line; past a line's deadline nothing more can
+  // be entered (MO-10, per line). The price locks now (D-E).
+  const lines = await prepareLegacyLines(data.studentId, data.sessionId, data.subjectIds, data.subjectOptions, eligibility);
   const now = new Date();
-  const records = subjects.map((sub) => {
-    const p = prepared.get(sub.id)!;
-    return {
-      id: randomUUID(),
-      studentId: data.studentId,
-      sessionId: data.sessionId,
-      subjectId: sub.id,
-      priceAtRegistration: p.pricing.total,
-      courseFeeAtRegistration: p.pricing.courseFee,
-      registrationFeeAtRegistration: p.pricing.registrationFee,
-      isRetake: p.isRetake,
-      takenOutsideSchool: p.pricing.isOutsideSchool,
-      teacherId: p.teacherId,
-      wasCoreAtRegistration: sub.isCore,
-      status: 'preregistered' as const,
-      requestedBy: parentId,
-      approvedBy: parentId,
-      approvedAt: now,
-    };
-  });
-
   // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
   return db.transaction(async (tx) => {
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    return insertRoutedRegistrations(tx, data.sessionId, subjects, records);
+    return insertLines(tx, {
+      studentId: data.studentId, sessionId: data.sessionId, lines, status: 'preregistered',
+      requestedBy: parentId, approvedBy: parentId, approvedAt: now, eligibility,
+    });
   });
 }
 
@@ -158,8 +119,7 @@ export async function cancelPreregistration(registrationId: string, parentId: st
     where: (r, { eq }) => eq(r.id, registrationId),
     with: {
       session: { columns: { id: true, status: true } },
-      // F0b: its board series' deadline (MO-10, per series).
-      boardSeries: { columns: { entryDeadline: true } },
+      // Its line's own deadline decides (MO-10, per line since the rework).
     },
   });
   if (!reg) throw new Error('Registration not found');
@@ -176,7 +136,8 @@ export async function cancelPreregistration(registrationId: string, parentId: st
   // Past the board's deadline the series never opens: the full price back, as
   // the deadline sweep gives — the refund windows are for a family's own
   // drop (MO-21; review of ae4f88b, flag 1).
-  const pastDeadline = !!reg.boardSeries?.entryDeadline && reg.boardSeries.entryDeadline <= new Date();
+  const deadline = await effectiveDeadlineFor(db, reg);
+  const pastDeadline = !!deadline.at && deadline.at <= new Date();
   const pct = pastDeadline ? 100 : await refundPercentage(new Date(), reg.sessionId, reg.studentId);
 
   const result = await db.transaction(async (tx) => {
@@ -226,26 +187,56 @@ export async function cancelPreregistration(registrationId: string, parentId: st
 }
 
 /**
- * A series still in draft when its exam-board entry deadline passes never
- * opens (the scheduler will not open it, nor an admin), so its
- * preregistrations can never be entered. Owner decision MO-21: the family
- * gets the full price back — the refund windows are for a family's own drop,
- * and here the school never ran the window. Run by the deadline sweep for
- * such a series; idempotent (only rows still preregistered move).
- *
- * A paid row releases its held money and is dropped with a 100% refund on
- * the same receipt-gated path as a cancellation, so paper already handed to
- * the family must come back first (MA-16). An unpaid row expires. Each
- * money move writes its audit row in its transaction.
+ * One preregistration whose line's deadline has passed, settled as MO-21 says (owner decision,
+ * 28 Sep): the series never opened for it, so a **paid** one releases its held money and is
+ * dropped with a 100% refund on the receipt-gated path (paper handed over comes back first,
+ * MA-16), with PREREG_REFUNDED_AT_DEADLINE; an **unfunded** one expires; one with a payment
+ * still **open** is left for that payment's own deadline sweep. In the caller's transaction,
+ * the row already locked. Shared by the deadline sweep and the capture (§3.3).
  */
-export async function refundPreregistrationsAtDeadline(sessionId: string, boardSeriesId: string) {
-  // F0b: the deadline is a board series'; only the preregistrations entered
-  // in that series are refunded (a window can feed several).
-  const preregs = await db.query.registration.findMany({
-    where: (r, { eq: eqOp, and: andOp }) =>
-      andOp(eqOp(r.sessionId, sessionId), eqOp(r.boardSeriesId, boardSeriesId), eqOp(r.status, 'preregistered')),
-    columns: { id: true, studentId: true, subjectId: true, priceAtRegistration: true },
+async function settlePreregistrationAtDeadline(
+  tx: Tx,
+  reg: { id: string; studentId: string; priceAtRegistration: number },
+): Promise<{ refunded: number; gated: boolean } | 'open'> {
+  const { funded, open } = await preregPaymentState(reg.id, tx);
+  if (open) return 'open';
+  if (!funded) {
+    await tx.update(registration).set({ status: 'expired', updatedAt: new Date() })
+      .where(and(eq(registration.id, reg.id), eq(registration.status, 'preregistered')));
+    await logActions(expiryEntries([{ id: reg.id, from: 'preregistered' }], 'preregistration_unfunded_at_deadline'), tx);
+    return { refunded: 0, gated: false };
+  }
+  await debitHeld(
+    { studentId: reg.studentId, amount: reg.priceAtRegistration, reason: 'prereg_release', initiatedBy: reg.studentId, relatedRegistrationId: reg.id },
+    tx
+  );
+  const drop = await executeReceiptGatedDrop(tx, {
+    registrationId: reg.id,
+    studentId: reg.studentId,
+    refundAmount: reg.priceAtRegistration,
+    refundReason: 'drop',
+    initiatedBy: reg.studentId,
+    fromStatus: 'preregistered',
   });
+  await logAction(null, 'PREREG_REFUNDED_AT_DEADLINE', 'registration', reg.id, { status: 'preregistered' },
+    { status: drop.gated ? 'dropped_pending_receipt' : 'dropped', refundAmount: drop.refundAmount, refundPercentage: 100, gated: drop.gated }, undefined, tx);
+  return { refunded: drop.refundAmount, gated: drop.gated };
+}
+
+/**
+ * A session still in draft when a line's deadline passes never opens for it (the scheduler will
+ * not open the series' items, and the board takes no more entries), so its preregistrations in
+ * that series past their deadline are settled as MO-21 says (settlePreregistrationAtDeadline).
+ * Run by the deadline sweep for such a series; idempotent (only rows still preregistered move).
+ */
+export async function refundPreregistrationsAtDeadline(sessionId: string, boardSeriesId: string, now: Date = new Date()) {
+  // Only the preregistrations entered in that series whose own deadline has passed.
+  const preregs = await db.select({ id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId, priceAtRegistration: registration.priceAtRegistration })
+    .from(registration)
+    .where(and(
+      eq(registration.sessionId, sessionId), eq(registration.boardSeriesId, boardSeriesId), eq(registration.status, 'preregistered'),
+      sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}) <= ${now}`,
+    ));
 
   const outcomes: { studentId: string; subjectId: string; refunded: number; gated: boolean }[] = [];
   for (const reg of preregs) {
@@ -253,31 +244,9 @@ export async function refundPreregistrationsAtDeadline(sessionId: string, boardS
       const outcome = await db.transaction(async (tx) => {
         const [row] = await tx.select({ status: registration.status }).from(registration).where(eq(registration.id, reg.id)).for('update');
         if (row?.status !== 'preregistered') return undefined;
-        const { funded, open } = await preregPaymentState(reg.id, tx);
+        const r = await settlePreregistrationAtDeadline(tx, reg);
         // The sweep closes open payments first; one still open waits for the next tick.
-        if (open) return undefined;
-
-        if (!funded) {
-          await tx.update(registration).set({ status: 'expired', updatedAt: new Date() })
-            .where(and(eq(registration.id, reg.id), eq(registration.status, 'preregistered')));
-          await logActions(expiryEntries([{ id: reg.id, from: 'preregistered' }], 'preregistration_unfunded_at_deadline'), tx);
-          return { refunded: 0, gated: false };
-        }
-        await debitHeld(
-          { studentId: reg.studentId, amount: reg.priceAtRegistration, reason: 'prereg_release', initiatedBy: reg.studentId, relatedRegistrationId: reg.id },
-          tx
-        );
-        const drop = await executeReceiptGatedDrop(tx, {
-          registrationId: reg.id,
-          studentId: reg.studentId,
-          refundAmount: reg.priceAtRegistration,
-          refundReason: 'drop',
-          initiatedBy: reg.studentId,
-          fromStatus: 'preregistered',
-        });
-        await logAction(null, 'PREREG_REFUNDED_AT_DEADLINE', 'registration', reg.id, { status: 'preregistered' },
-          { status: drop.gated ? 'dropped_pending_receipt' : 'dropped', refundAmount: drop.refundAmount, refundPercentage: 100, gated: drop.gated }, undefined, tx);
-        return { refunded: drop.refundAmount, gated: drop.gated };
+        return r === 'open' ? undefined : r;
       });
       if (outcome) outcomes.push({ studentId: reg.studentId, subjectId: reg.subjectId, ...outcome });
     } catch (err) {
@@ -291,44 +260,44 @@ export async function refundPreregistrationsAtDeadline(sessionId: string, boardS
  * Auto-capture on session activation (V3 §6.8 step 4). Idempotent —
  * status-guarded updates; safe to run on every scheduler tick.
  *
- * Funded preregs: held is debited by the locked price and the
- * registration confirms. Unfunded preregs: fall back to
- * pending_payment so the parent pays through the normal open-session
- * flow.
- *
- * F0a: a student who may no longer sit the series (withdrawn, transferred,
- * a corrected cohort or series, A-12 off) is neither confirmed nor moved to
- * payment: the row stays preregistered with its money held, one
- * PREREG_HELD_INELIGIBLE row says why, and finance is told — refunding it
- * is the owner's call (STATE_AUDIT.md SO-4). Asked with the student and the
- * window held (mayRegisterForInTx), after the row's own lock. While the
- * window is open, a held row is captured on a later tick if the student may
- * sit the series again (a readmission). Nothing else releases it: the family
- * cannot cancel an opened series' preregistration, and after the window
- * closes it stays held until the owner decides (SO-4).
+ * Per row, with the student locked first (as every path that puts a line into a series, §6),
+ * then the row:
+ * 1. **The line's deadline first** (§3.3, §3.10 item 5): past it, the row is not captured — a paid
+ *    one is refunded in full (MO-21: the series never opened for it), an unfunded one expires,
+ *    one with an open payment is left for that payment's sweep, and one held as ineligible under
+ *    SO-4 is left as it is (the owner's decision stands). So no held money is confirmed for an
+ *    entry the board refuses.
+ * 2. **Eligibility** (F0a): a student who may no longer sit the series is neither confirmed nor
+ *    moved to payment — the row stays preregistered with its money held, one
+ *    PREREG_HELD_INELIGIBLE row says why, and finance is told (SO-4). While the window is open, a
+ *    held row is captured on a later tick if the student may sit the series again.
+ * 3. Funded rows confirm with their held money captured; unfunded ones move to pending_payment.
  */
 export async function capturePreregistrationsForSession(sessionId: string): Promise<{
   captured: number;
   movedToPendingPayment: number;
   heldIneligible: number;
+  refundedAtDeadline: number;
 }> {
   const preregs = await db.query.registration.findMany({
     where: (r, { eq, and }) =>
       and(eq(r.sessionId, sessionId), eq(r.status, 'preregistered')),
-    columns: { id: true, studentId: true, priceAtRegistration: true },
+    columns: { id: true, studentId: true, subjectId: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true },
   });
 
   let captured = 0;
   let movedToPendingPayment = 0;
   let heldIneligible = 0;
   const newlyHeld: { registrationId: string; held: number; reason: string }[] = [];
+  const refunded: { studentId: string; subjectId: string; refunded: number; gated: boolean; deadline: Date }[] = [];
 
   for (const reg of preregs) {
     try {
-      // Lock the row, then ask whether it is paid for. Asked before the lock,
-      // a confirmation committing in between moved a paid row to
-      // pending_payment and stranded its held money (the MA-15 outcome).
       const outcome = await db.transaction(async (tx) => {
+        // The student first (FOR NO KEY UPDATE, with the session and what the verdict rests on),
+        // then the row; asked before the row's lock, a confirmation committing in between
+        // moved a paid row to pending_payment and stranded its held money (the MA-15 outcome).
+        const eligibility = await mayRegisterForInTx(tx, reg.studentId, sessionId);
         const [row] = await tx
           .select({ status: registration.status })
           .from(registration)
@@ -336,17 +305,26 @@ export async function capturePreregistrationsForSession(sessionId: string): Prom
           .for('update');
         if (row?.status !== 'preregistered') return 'skipped' as const;
 
+        const [held] = await tx.select({ id: auditLog.id }).from(auditLog)
+          .where(and(eq(auditLog.action, 'PREREG_HELD_INELIGIBLE'), eq(auditLog.entityId, reg.id))).limit(1);
+        const deadline = await effectiveDeadlineFor(tx, reg);
+        if (deadline.at && deadline.at <= new Date()) {
+          // A row held under SO-4 is left as it is: refunding it is the owner's call.
+          if (held) return 'held' as const;
+          const r = await settlePreregistrationAtDeadline(tx, reg);
+          if (r === 'open') return 'skipped' as const;
+          refunded.push({ studentId: reg.studentId, subjectId: reg.subjectId, ...r, deadline: deadline.at });
+          return 'refunded' as const;
+        }
+
         const { funded } = await preregPaymentState(reg.id, tx);
-        const eligibility = await mayRegisterForInTx(tx, reg.studentId, sessionId);
         if (!eligibility.allowed) {
           // Recorded once: the recovery sweep asks again every tick.
-          const [already] = await tx.select({ id: auditLog.id }).from(auditLog)
-            .where(and(eq(auditLog.action, 'PREREG_HELD_INELIGIBLE'), eq(auditLog.entityId, reg.id))).limit(1);
-          if (already) return 'held' as const;
-          const held = funded ? reg.priceAtRegistration : 0;
+          if (held) return 'held' as const;
+          const heldAmount = funded ? reg.priceAtRegistration : 0;
           await logAction(null, 'PREREG_HELD_INELIGIBLE', 'registration', reg.id, { status: 'preregistered' },
-            { status: 'preregistered', heldAmount: held, code: eligibility.code, reason: eligibility.reason }, undefined, tx);
-          newlyHeld.push({ registrationId: reg.id, held, reason: eligibility.reason ?? eligibility.code });
+            { status: 'preregistered', heldAmount, code: eligibility.code, reason: eligibility.reason }, undefined, tx);
+          newlyHeld.push({ registrationId: reg.id, held: heldAmount, reason: eligibility.reason ?? eligibility.code });
           return 'held' as const;
         }
         await tx
@@ -385,7 +363,12 @@ export async function capturePreregistrationsForSession(sessionId: string): Prom
     await notifyFinanceOfHeldPreregistration(h.registrationId, h.held, h.reason)
       .catch((err) => logger.error(`[prereg] Held-preregistration notice for ${h.registrationId} failed:`, err));
   }
-  return { captured, movedToPendingPayment, heldIneligible };
+  if (refunded.length) {
+    const earliest = new Date(Math.min(...refunded.map((r) => r.deadline.getTime())));
+    await notifyPreregistrationsRefundedAtDeadline(sessionId, earliest, refunded)
+      .catch((err) => logger.error(`[prereg] Deadline refund notices for session ${sessionId} failed:`, err));
+  }
+  return { captured, movedToPendingPayment, heldIneligible, refundedAtDeadline: refunded.length };
 }
 
 /** Held-balance snapshot used by the escrow UI */

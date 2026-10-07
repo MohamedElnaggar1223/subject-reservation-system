@@ -62,8 +62,11 @@ import type {
 import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { refundPercentage } from './refund.services';
 import { executeReceiptGatedDrop } from './receipt.services';
-import { computeRegistrationPricing } from './pricing.services';
-import { applyPricingExceptions } from './exception.services';
+import { priceLine } from './pricing.services';
+import { insertLines } from './line.services';
+import { resolveItem, availabilityConstraints } from './offer.services';
+import { effectiveDeadlineFor } from './deadline.services';
+import { schoolDate } from './window.services';
 import {
   notifyDropSwapRequestReceived,
   notifyDropSwapProcessed,
@@ -72,7 +75,6 @@ import {
 } from './notification.services';
 import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterFor } from './eligibility.services';
 import { logAction, type AuditContext } from './audit.services';
-import { routeAndCheck } from './series.services';
 
 // ─── Internal Helpers ─────────────────────────────────────────────────────────
 
@@ -91,26 +93,21 @@ async function validateParentStudentLink(
 export const isParentLinkedToStudent = validateParentStudentLink;
 
 /**
- * Price a subject being swapped in exactly as a fresh registration into it
- * would be priced: the shared engine (in-school by default; the 50% rule when
- * the school does not offer it), then the student's pricing exceptions, with
- * the course / registration fee split kept.
- *
- * This used to stop after the engine and store the whole total as the course
- * fee, so a family with a discount paid full price for the new subject and
- * the stored split was wrong (money audit MA-10).
+ * The line a swap goes to and its price, exactly as a fresh reservation of it would be priced
+ * (priceLine: the course and board fees, the pricing policies, the student's exceptions): the
+ * new subject's whole item (or the item a pending request names), a first entry, in school unless
+ * the item is self-study only. MA-10: the split is kept and the exceptions applied.
  */
-async function priceSwappedInSubject(
-  studentId: string,
-  sessionId: string,
-  sub: { id: string; isOfferedAtSchool: boolean; courseFee: number; registrationFee: number }
-) {
-  return applyPricingExceptions(
-    studentId,
-    sessionId,
-    sub.id,
-    computeRegistrationPricing(sub, { isRetake: false, takeOutsideSchool: false })
-  );
+async function swapLine(studentId: string, sessionId: string, subjectId: string, offerItemId?: string | null) {
+  const resolved = offerItemId
+    ? await db.query.sessionOfferItem.findFirst({ where: (i, { eq: eqOp }) => eqOp(i.id, offerItemId), with: { offer: true } })
+        .then((i) => (i && i.sessionId === sessionId ? { item: i, offer: i.offer } : null))
+    : null;
+  const r = resolved ?? (await resolveItem(db, sessionId, subjectId));
+  const c = availabilityConstraints(r.offer.availability, r.item.availability);
+  const line = { offerItemId: r.item.id, attempt: 'first' as const, mode: c.selfStudyOnly ? 'self_study' as const : 'in_school' as const, teacherId: null };
+  const price = await priceLine(db, { item: { id: r.item.id }, attempt: line.attempt, mode: line.mode, studentId, sessionId });
+  return { line, price, isCore: r.offer.grade10Core };
 }
 
 function round2(n: number): number {
@@ -168,6 +165,12 @@ async function validateChangeEligibility(
 
   if (!reg.session || reg.session.status !== 'active') {
     throw new Error('Changes can only be made while the registration window is open (SWAP-006)');
+  }
+  // The cut-off is per line (§3.3): past the line's own deadline the entry is with the board,
+  // and only the desk can drop it.
+  const deadline = await effectiveDeadlineFor(db, reg);
+  if (deadline.at && deadline.at <= new Date()) {
+    throw new Error(`The entry is with the board (its deadline, ${schoolDate(deadline.at)}, has passed): ask the finance desk to drop it`);
   }
 
   // The student's grade in the series' academic year, for the core lock
@@ -345,7 +348,8 @@ export async function createSwapRequest(
     registrationId
   );
 
-  const newSubjectPrice = (await priceSwappedInSubject(reg.studentId, reg.sessionId, newSub)).total;
+  const swap = await swapLine(reg.studentId, reg.sessionId, newSub.id);
+  const newSubjectPrice = swap.price.total;
   const priceDifference = round2(newSubjectPrice - reg.priceAtRegistration);
 
   const [request] = await db
@@ -357,6 +361,7 @@ export async function createSwapRequest(
       requestedBy,
       reason: data.reason,
       newSubjectId: data.newSubjectId,
+      newOfferItemId: swap.line.offerItemId,
       priceAtRequest: newSubjectPrice,
       priceDifference,
       status: 'pending_approval',
@@ -446,24 +451,20 @@ export async function approveChangeRequest(
     throw new Error('The registration window has closed; this request can no longer be approved');
   }
 
-  let newSubjectIsCore = false;
-  let newPricing: Awaited<ReturnType<typeof priceSwappedInSubject>> | null = null;
-  let newSubjectForRoute: { id: string; name: string; council: string } | null = null;
+  let swap: Awaited<ReturnType<typeof swapLine>> | null = null;
+  let eligibility: Awaited<ReturnType<typeof assertMayRegisterFor>> | null = null;
   if (cr.type === 'swap' && cr.newSubjectId) {
     const newSubject = await db.query.subject.findFirst({
       where: (s, { eq: eqOp }) => eqOp(s.id, cr.newSubjectId!),
-      columns: { id: true, name: true, council: true, isActive: true, isCore: true, isOfferedAtSchool: true, courseFee: true, registrationFee: true },
+      columns: { id: true, name: true, council: true, isActive: true },
     });
     if (!newSubject || !newSubject.isActive) {
       throw new Error('The requested subject is no longer available');
     }
-    newSubjectIsCore = newSubject.isCore;
-    newSubjectForRoute = newSubject;
-    // F0b: the new subject is entered in its board series, which must be open.
-    await routeAndCheck(db, cr.registration.sessionId, [newSubject]);
-    // Priced now, the way a fresh registration made now would be; the quote
-    // on the request (priceAtRequest) is what the parent was shown.
-    newPricing = await priceSwappedInSubject(cr.registration.studentId, cr.registration.sessionId, newSubject);
+    eligibility = await assertMayRegisterFor(cr.registration.studentId, cr.registration.sessionId);
+    // Priced now, the way a fresh reservation made now would be; the quote on the request
+    // (priceAtRequest) is what the parent was shown. Its series is checked when the line is made.
+    swap = await swapLine(cr.registration.studentId, cr.registration.sessionId, newSubject.id, cr.newOfferItemId);
 
     const existingReg = await db.query.registration.findFirst({
       where: (r, { eq: eqOp, and: andOp, notInArray: niArr }) =>
@@ -514,29 +515,16 @@ export async function approveChangeRequest(
     });
 
     let newRegistrationId: string | null = null;
-    if (cr.type === 'swap' && cr.newSubjectId && newPricing && newSubjectForRoute) {
-      newRegistrationId = randomUUID();
-      const routes = await routeAndCheck(tx, cr.registration.sessionId, [newSubjectForRoute], true);
-      await tx.insert(registration).values({
-        id: newRegistrationId,
-        studentId: cr.registration.studentId,
-        sessionId: cr.registration.sessionId,
-        subjectId: cr.newSubjectId,
-        boardSeriesId: routes.get(cr.newSubjectId) ?? null,
-        priceAtRegistration: newPricing.total,
-        courseFeeAtRegistration: newPricing.courseFee,
-        registrationFeeAtRegistration: newPricing.registrationFee,
-        takenOutsideSchool: newPricing.isOutsideSchool,
-        wasCoreAtRegistration: newSubjectIsCore,
-        status: 'pending_payment',
-        requestedBy: cr.registration.studentId,
-        approvedBy: parentId,
-        approvedAt: now,
-        approvalComments: `Swap from registration ${cr.registrationId}`,
-        // created_at from the column's default: the database's clock, the one a
-        // close compares it with (ST-15).
-        updatedAt: now,
+    if (cr.type === 'swap' && cr.newSubjectId && swap && eligibility) {
+      // The new line: checked against its series' deadline and the line rules, priced and
+      // entered in its item's series (insertLines). created_at from the column's default: the
+      // database's clock, the one a close compares it with (ST-15).
+      const [made] = await insertLines(tx, {
+        studentId: cr.registration.studentId, sessionId: cr.registration.sessionId, lines: [swap.line], status: 'pending_payment',
+        requestedBy: cr.registration.studentId, approvedBy: parentId, approvedAt: now,
+        approvalComments: `Swap from registration ${cr.registrationId}`, eligibility,
       });
+      newRegistrationId = made!.id;
     }
 
     const outcome = { success: true, type: cr.type, ...dropOutcome, refundPercentage: pct };
@@ -780,10 +768,9 @@ export async function executeDirectSwap(
     registrationId
   );
 
-  // F0b: the new subject is entered in its board series, which must be open.
-  await routeAndCheck(db, reg.sessionId, [newSub]);
-  const newPricing = await priceSwappedInSubject(reg.studentId, reg.sessionId, newSub);
-  const newSubjectPrice = newPricing.total;
+  const eligibility = await assertMayRegisterFor(reg.studentId, reg.sessionId);
+  const swap = await swapLine(reg.studentId, reg.sessionId, newSub.id);
+  const newSubjectPrice = swap.price.total;
   const now = new Date();
 
   // V3 §6.12: refund percentage locks at swap time (drop leg)
@@ -795,7 +782,6 @@ export async function executeDirectSwap(
     // Asked again with the student and window held, before anything else is
     // locked (F0a; see assertMayRegisterForInTx).
     await assertMayRegisterForInTx(tx, reg.studentId, reg.sessionId);
-    const routes = await routeAndCheck(tx, reg.sessionId, [newSub], true);
     const dropOutcome = await executeReceiptGatedDrop(tx, {
       registrationId,
       studentId: reg.studentId,
@@ -804,27 +790,14 @@ export async function executeDirectSwap(
       initiatedBy: parentId,
     });
 
-    // Create new pending_payment registration
-    const newRegId = randomUUID();
-    await tx.insert(registration).values({
-      id: newRegId,
-      studentId: reg.studentId,
-      sessionId: reg.sessionId,
-      subjectId: data.newSubjectId,
-      boardSeriesId: routes.get(data.newSubjectId) ?? null,
-      priceAtRegistration: newPricing.total,
-      courseFeeAtRegistration: newPricing.courseFee,
-      registrationFeeAtRegistration: newPricing.registrationFee,
-      takenOutsideSchool: newPricing.isOutsideSchool,
-      wasCoreAtRegistration: newSub.isCore,
-      status: 'pending_payment',
-      requestedBy: parentId,
-      approvedBy: parentId,
-      approvedAt: now,
-      approvalComments: `Direct swap from registration ${registrationId}`,
-      // created_at from the column's default: the database's clock (ST-15).
-      updatedAt: now,
+    // The new line, pending payment (insertLines: its series, its rules, its price; created_at
+    // from the column's default, the database's clock — ST-15).
+    const [made] = await insertLines(tx, {
+      studentId: reg.studentId, sessionId: reg.sessionId, lines: [swap.line], status: 'pending_payment',
+      requestedBy: parentId, approvedBy: parentId, approvedAt: now,
+      approvalComments: `Direct swap from registration ${registrationId}`, eligibility,
     });
+    const newRegId = made!.id;
 
     const outcome = {
       success: true,

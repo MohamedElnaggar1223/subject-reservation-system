@@ -59,6 +59,10 @@ export const AUDIT_ENTITY_TYPES = [
   'qualification_option',
   'board_series',
   'enrolment',
+  // Reservations rework
+  'session_offer',
+  'offer_item',
+  'board_fee',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -96,6 +100,9 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   qualification_option: 'Option Code',
   board_series:   'Board Series',
   enrolment:      'Course Enrolment',
+  session_offer:  'Session Subject (Offer)',
+  offer_item:     'Offer Item',
+  board_fee:      'Board Fee',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -248,6 +255,29 @@ export const AUDIT_ACTIONS = [
   'ENROLMENT_UPDATED',
   'ENROLMENT_ENDED',
   'ENROLMENTS_BULK_CREATED',
+  // Reservations rework (step 1)
+  'REWORK_BACKFILL_SESSION',
+  'REWORK_BACKFILL_OFFER',
+  'REWORK_BACKFILL_FEE',
+  'REWORK_BACKFILL_LINE',
+  'SESSION_COPIED',
+  'SESSION_OFFER_CREATED',
+  'SESSION_OFFER_UPDATED',
+  'SESSION_OFFER_DELETED',
+  'SESSION_OFFER_TEACHER_REPLACED',
+  'OFFER_ITEM_CREATED',
+  'OFFER_ITEM_UPDATED',
+  'OFFER_ITEM_DELETED',
+  'OFFER_ITEM_SERIES_CHANGED',
+  'LINE_SERIES_MOVED',
+  'LINE_TEACHER_REPLACED',
+  'BOARD_FEES_SET',
+  'BOARD_FEES_COPIED',
+  'BOARD_FEES_CONFIRMED',
+  'BOARD_FEES_REPRICED',
+  'LINE_REPRICED',
+  'LINE_DUE_MOVED',
+  'GRADE10_BULK_COMMITTED',
   // Parent-student links (security audit RF-14: access to a child's money
   // and records hangs on these, so every change is recorded)
   'LINK_REQUESTED',
@@ -408,6 +438,28 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   ENROLMENT_UPDATED:          'Course Enrolment Changed',
   ENROLMENT_ENDED:            'Course Enrolment Ended',
   ENROLMENTS_BULK_CREATED:    'Course Enrolments Created in Bulk',
+  REWORK_BACKFILL_SESSION:    'Window Converted to a Session (Migration)',
+  REWORK_BACKFILL_OFFER:      'Subject Converted to an Offer (Migration)',
+  REWORK_BACKFILL_FEE:        'Board Fee Converted (Migration)',
+  REWORK_BACKFILL_LINE:       'Registration Converted to a Line (Migration)',
+  SESSION_COPIED:             'Session Copied From Another',
+  SESSION_OFFER_CREATED:      'Subject Added to a Session',
+  SESSION_OFFER_UPDATED:      'Session Subject Updated',
+  SESSION_OFFER_DELETED:      'Subject Removed From a Session',
+  SESSION_OFFER_TEACHER_REPLACED: 'Teacher Replaced on a Session Subject',
+  OFFER_ITEM_CREATED:         'Item Added to a Subject',
+  OFFER_ITEM_UPDATED:         'Item Updated',
+  OFFER_ITEM_DELETED:         'Item Removed',
+  OFFER_ITEM_SERIES_CHANGED:  'Item Moved to Another Board Series',
+  LINE_SERIES_MOVED:          'Line Moved With Its Item',
+  LINE_TEACHER_REPLACED:      'Line Teacher Replaced',
+  BOARD_FEES_SET:             'Board Fees Set',
+  BOARD_FEES_COPIED:          'Board Fees Copied (Provisional)',
+  BOARD_FEES_CONFIRMED:       'Board Fees Confirmed',
+  BOARD_FEES_REPRICED:        'Unpaid Lines Re-priced',
+  LINE_REPRICED:              'Line Re-priced (Board Fee Confirmed)',
+  LINE_DUE_MOVED:             'Line Due Date Moved',
+  GRADE10_BULK_COMMITTED:     'Grade 10 Registered in Bulk',
 };
 
 // ─── Query Filters ────────────────────────────────────────────────────────────

@@ -62,7 +62,10 @@ import {
 } from './escrow.services';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
-import { sessionOpenFor, sessionWindow, entryDeadlineMessage, schoolDateTime } from './window.services';
+import { sessionOpenFor, sessionWindow, windowRefusal, entryDeadlineMessage, schoolDateTime } from './window.services';
+import { effectiveDeadlinesOf, lineDeadlineSql } from './deadline.services';
+import { getSetting } from './settings.services';
+import { PROVISIONAL_REFUSAL } from './pricing.services';
 import { seriesPastDeadline, seriesDisplayName, windowsOfSeries, seriesDeadlineGroups, mixedDeadlinesSentence } from './series.services';
 import {
   notifyPaymentConfirmed,
@@ -210,18 +213,18 @@ export async function initiatePayment(
   for (const s of sessions) {
     const mine = regs.filter((r) => r.sessionId === s.id);
     if (isPrereg) {
-      // A preregistration past its series' board deadline can never be
-      // entered (MO-10; per board series since F0b).
+      // A preregistration past its line's deadline can never be entered
+      // (MO-10; per line since the rework).
       for (const r of mine) {
-        const w = await sessionWindow(studentId, s.id, r.boardSeriesId);
-        if (w.entryDeadlinePassed) throw new Error(entryDeadlineMessage(w.entryDeadline!));
+        const w = await sessionWindow(studentId, s.id, r);
+        if (w.entryDeadlinePassed) throw new Error(windowRefusal(w));
       }
       if (s.status !== 'draft') wrongState.push(s);
       continue;
     }
-    // Each subject's own series decides (F0b): open for the student, and not past its deadline.
+    // Each line's own deadline decides (per line since the rework): open for the student, and not past it.
     let ok = true;
-    for (const r of mine) if (!(await sessionOpenFor(studentId, s.id, r.boardSeriesId))) ok = false;
+    for (const r of mine) if (!(await sessionOpenFor(studentId, s.id, r))) ok = false;
     if (!ok) wrongState.push(s);
   }
   if (wrongState.length > 0) {
@@ -231,6 +234,12 @@ export async function initiatePayment(
         ? `These sessions have already opened — pay through the normal flow: ${names}`
         : `Registration window is closed for: ${names}`
     );
+  }
+
+  // A line whose board fee is still provisional can be reserved, not paid (§3.4), unless the
+  // school takes payment at the provisional price.
+  if (regs.some((r) => r.priceProvisional) && !(await getSetting('pricing.payOnProvisionalFee'))) {
+    throw new Error(PROVISIONAL_REFUSAL);
   }
 
   // Held-wallet funding is provider money only — no escrow application
@@ -507,6 +516,8 @@ export async function confirmPayment(
             status: registration.status,
             sessionId: registration.sessionId,
             boardSeriesId: registration.boardSeriesId,
+            attempt: registration.attempt,
+            priorSittingSeriesId: registration.priorSittingSeriesId,
             price: registration.priceAtRegistration,
           })
           .from(registration)
@@ -524,17 +535,17 @@ export async function confirmPayment(
     for (const r of regs) {
       if (isPreregPayment) {
         if (r.status === 'preregistered' || r.status === 'pending_payment') {
-          // A preregistration is for a later series; past that series' board
+          // A preregistration is for a later series; past its line's
           // deadline it cannot be entered either (MO-10).
-          const w = await sessionWindow(pay.studentId, r.sessionId, r.boardSeriesId, tx);
-          if (w.entryDeadlinePassed) throw new Error(entryDeadlineMessage(w.entryDeadline!));
+          const w = await sessionWindow(pay.studentId, r.sessionId, r, tx);
+          if (w.entryDeadlinePassed) throw new Error(windowRefusal(w));
           continue;
         }
       } else if (r.status === 'pending_payment') {
-        // F0b: its own board series' deadline decides (MO-10, per series).
-        const w = await sessionWindow(pay.studentId, r.sessionId, r.boardSeriesId, tx);
+        // Its own deadline decides (MO-10, per line since the rework).
+        const w = await sessionWindow(pay.studentId, r.sessionId, r, tx);
         if (w.open || (current.status === 'pending_verification' && !w.entryDeadlinePassed)) continue;
-        if (w.entryDeadlinePassed) throw new Error(entryDeadlineMessage(w.entryDeadline!));
+        if (w.entryDeadlinePassed) throw new Error(windowRefusal(w));
       }
       throw new Error(
         'Payment cannot be confirmed — at least one registration is no longer payable (session closed or already expired).'
@@ -755,7 +766,7 @@ async function failOpenPayment(
     const expired: { id: string; studentId: string; subjectId: string; sessionId: string }[] = [];
     if (opts.expireIfClosed) {
       const regs = await tx
-        .select({ id: registration.id, sessionId: registration.sessionId, boardSeriesId: registration.boardSeriesId })
+        .select({ id: registration.id, sessionId: registration.sessionId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId })
         .from(paymentRegistration)
         .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
         .where(and(eq(paymentRegistration.paymentId, paymentId), eq(registration.status, 'pending_payment')));
@@ -763,7 +774,7 @@ async function failOpenPayment(
         // Still payable only while the window is open for the student, its
         // board series is not past its deadline (F0b), and they may still sit
         // the series (F0a; SO-7).
-        if (await sessionOpenFor(pay.studentId, r.sessionId, r.boardSeriesId, tx) && (await mayRegisterFor(pay.studentId, r.sessionId, tx)).allowed) continue;
+        if (await sessionOpenFor(pay.studentId, r.sessionId, r, tx) && (await mayRegisterFor(pay.studentId, r.sessionId, tx)).allowed) continue;
         expired.push(...await tx
           .update(registration)
           .set({ status: 'expired', updatedAt: new Date() })
@@ -1221,18 +1232,25 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
     }
   }
 
-  // F0b: the deadline is a board series' — each series past its deadline is
-  // closed on its own, so a window feeding two series enforces each at its
-  // own time (MO-10 per series).
+  // The deadline is a line's (§3.3): each series some deadline of which has passed is looked at,
+  // and within it only the lines whose own effective deadline has passed are closed — first
+  // entries at the entry deadline, qualifying retakes at the retake deadline, a series with no
+  // entry deadline at its exams' start (MO-10 per line).
   const pastDeadline = await seriesPastDeadline(now);
   for (const s of pastDeadline) {
     const seriesName = await seriesDisplayName(s.id);
-    const open = await db
-      .selectDistinct({ id: payment.id })
-      .from(payment)
-      .innerJoin(paymentRegistration, eq(paymentRegistration.paymentId, payment.id))
-      .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
-      .where(and(eq(registration.boardSeriesId, s.id), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])));
+    const lineDue = sql`${lineDeadlineSql('r')} <= ${now}`;
+    const open = await db.execute(sql`
+      select distinct p.id from payment p
+      join payment_registration pr on pr.payment_id = p.id
+      join registration r on r.id = pr.registration_id
+      where r.board_series_id = ${s.id} and p.status in ('pending', 'pending_verification') and ${lineDue}`)
+      .then((x) => x.rows as { id: string }[]);
+    const deadlineOf = async (registrationIds: string[]) => {
+      const ds = await effectiveDeadlinesOf(db, registrationIds);
+      const dates = [...ds.values()].map((d) => d.at).filter((d): d is Date => !!d);
+      return dates.length ? new Date(Math.min(...dates.map((d) => d.getTime()))) : (s.entryDeadline ?? now);
+    };
     for (const { id } of open) {
       try {
         // Failed by the system, not rejected: nobody judged the transfer. If it
@@ -1247,7 +1265,8 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
         });
         if (!r) continue;
         paymentsClosedAtDeadline++;
-        await notifyPaymentClosedAtEntryDeadline(id, s.entryDeadline!, r.pay.escrowAmountApplied)
+        const regIds = (await db.select({ id: paymentRegistration.registrationId }).from(paymentRegistration).where(eq(paymentRegistration.paymentId, id))).map((x) => x.id);
+        await notifyPaymentClosedAtEntryDeadline(id, await deadlineOf(regIds), r.pay.escrowAmountApplied)
           .catch((err) => console.error(`[deadlines] Deadline notice for ${id} failed:`, err));
       } catch (err) {
         console.error(`[deadlines] Could not close payment ${id} at the entry deadline:`, err);
@@ -1260,10 +1279,12 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
     // each student is told which subjects, per window, as at the close.
     try {
       const expired = await db.transaction((tx) =>
-        expireWaitingRegistrations(tx, eq(registration.boardSeriesId, s.id), 'entry_deadline', now));
+        expireWaitingRegistrations(tx, and(eq(registration.boardSeriesId, s.id),
+          sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}) <= ${now}`), 'entry_deadline', now));
       registrationsExpiredAtDeadline += expired.length;
       for (const sessionId of new Set(expired.map((r) => r.sessionId))) {
-        await notifyRegistrationsExpiredAtEntryDeadline(sessionId, s.entryDeadline!, expired.filter((r) => r.sessionId === sessionId), seriesName)
+        const mine = expired.filter((r) => r.sessionId === sessionId);
+        await notifyRegistrationsExpiredAtEntryDeadline(sessionId, await deadlineOf(mine.map((r) => r.id)), mine, seriesName)
           .catch((err) => console.error(`[deadlines] Expiry notices for session ${sessionId} failed:`, err));
       }
     } catch (err) {
@@ -1275,11 +1296,11 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
     for (const w of await windowsOfSeries(s.id)) {
       if (w.status !== 'draft') continue;
       try {
-        const refunded = await refundPreregistrationsAtDeadline(w.id, s.id);
+        const refunded = await refundPreregistrationsAtDeadline(w.id, s.id, now);
         preregistrationsRefundedAtDeadline += refunded.filter((r) => r.refunded > 0).length;
         preregistrationsExpiredUnopened += refunded.filter((r) => r.refunded === 0).length;
         if (refunded.length > 0) {
-          await notifyPreregistrationsRefundedAtDeadline(w.id, s.entryDeadline!, refunded)
+          await notifyPreregistrationsRefundedAtDeadline(w.id, s.entryDeadline ?? s.retakeDeadline ?? now, refunded)
             .catch((err) => console.error(`[deadlines] Prereg refund notices for session ${w.id} failed:`, err));
         }
       } catch (err) {
@@ -1391,16 +1412,16 @@ export async function submitInstapayReference(
   }
   const links = await db.query.paymentRegistration.findMany({
     where: (pr, { eq }) => eq(pr.paymentId, paymentId),
-    with: { registration: { columns: { status: true }, with: { boardSeries: { columns: { entryDeadline: true } } } } },
+    with: { registration: { columns: { id: true, status: true } } },
   });
   if (pay.purpose === 'registration' && links.some((l) => l.registration.status !== 'pending_payment')) {
     throw new Error('The registration window has closed for this payment; it can no longer take a transfer reference.');
   }
-  // Registration or preregistration: past the series' board deadline nothing
-  // more can be entered, so no transfer can be taken for it (MO-10; each
-  // registration's own board series since F0b).
-  const passed = links.find((l) => l.registration.boardSeries?.entryDeadline && l.registration.boardSeries.entryDeadline <= new Date());
-  if (passed) throw new Error(entryDeadlineMessage(passed.registration.boardSeries!.entryDeadline!));
+  // Registration or preregistration: past a line's deadline nothing more can be entered, so no
+  // transfer can be taken for it (MO-10; each line's own effective deadline since the rework).
+  const deadlines = await effectiveDeadlinesOf(db, links.map((l) => l.registration.id));
+  const passed = [...deadlines.values()].find((d) => d.at && d.at <= new Date());
+  if (passed) throw new Error(entryDeadlineMessage(passed.at!, passed.kind));
 
   const duplicateReference = 'This transaction reference has already been submitted for another payment. Double-check your InstaPay receipt.';
   // A family's reference set aside when finance recorded the transfer under
@@ -1605,13 +1626,8 @@ export async function reversePayment(
 
   // Past the series' board deadline the reverted registrations cannot be paid
   // again (the next sweep expires them), so the notice must not say "settle again".
-  const pastEntryDeadline = regIds.length > 0 && (
-    await db
-      .select({ entryDeadline: boardSeries.entryDeadline })
-      .from(registration)
-      .innerJoin(boardSeries, eq(boardSeries.id, registration.boardSeriesId))
-      .where(inArray(registration.id, regIds))
-  ).some((r) => r.entryDeadline && r.entryDeadline <= new Date());
+  const pastEntryDeadline = regIds.length > 0 &&
+    [...(await effectiveDeadlinesOf(db, regIds)).values()].some((d) => d.at && d.at <= new Date());
 
   // RF-08: every other money movement tells the family; this one used to
   // void their paper receipt in silence. Fire-and-forget like the rest.

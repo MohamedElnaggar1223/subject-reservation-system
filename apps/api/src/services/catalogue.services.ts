@@ -22,7 +22,8 @@
 
 import {
   db, examBoard, qualification, examUnit, qualificationUnit, qualificationOption, qualificationOptionUnit,
-  subject, subjectUnit, registration, boardSeries, sessionBoardSeries, sessionSubjectSeries, registrationSession, user,
+  subject, subjectUnit, registration, boardSeries, registrationSession, user,
+  sessionOfferItem, sessionOfferItemUnit, sessionOfferItemFeeKey,
   eq, and, inArray, notInArray, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -36,6 +37,8 @@ import { logAction, logActions, type AuditContext } from './audit.services';
 import { getSetting } from './settings.services';
 import { boardSeriesName } from './series.services';
 import { schoolDate } from './window.services';
+import { attachSeries, detachUnusedSeries, defaultSeriesFor } from './offer.services';
+import { effectiveDeadlinesOf } from './deadline.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -444,149 +447,126 @@ function levelWord(level: string): string {
 }
 
 /**
- * Change a subject's board in the caller's transaction (the subject row
- * locked FOR UPDATE by the caller): its live registrations move to their
- * windows' default series of the new board and the windows' routes for it are
- * re-pointed there, each audited; its catalogue links — the old board's award
- * and units — are cleared unless the caller sets new ones. Refused, with
- * nothing changed, by followBoardChange's rules. The subject screen's board
- * field and the Catalogue's mapping both come here.
+ * Change a subject's board in the caller's transaction (the subject row locked FOR UPDATE by
+ * the caller). Since the reservations rework a subject is entered by its items (RESERVATIONS_
+ * REWORK.md §3.3): each item of an open or draft session moves to the default series of the new
+ * board for its session (created with no dates when not on record) with its live lines, and —
+ * the old board's award and units being cleared — enters the subject row itself until it is
+ * mapped again (its fee read for the row). Every move is audited. Refused, with nothing
+ * changed, by followBoardChange's rules (MO-10: a board change never moves an entry across
+ * deadlines). The subject screen's board field and the Catalogue's mapping both come here.
  *
- * Locks, in order: the subject (caller), its live registrations (id order),
- * the windows' routes for it, the windows' series links, the series involved
- * (id order). A registration reads the subject FOR SHARE before routing, and
- * a change to a window's series reads its routed subjects FOR SHARE before
- * its links, so each waits for the other rather than crossing it.
+ * Locks, in order: the subject (caller), the affected students (FOR NO KEY UPDATE, as a
+ * reservation takes them), the items, the lines (id order), the series involved.
  */
 export async function applyBoardChange(
   tx: Tx, s: typeof subject.$inferSelect, newBoard: string, actorId: string | null, names?: Map<string, string>,
 ) {
   const boardNamesNow = names ?? (await boardNames(tx));
   await boardOrThrow(newBoard, tx);
-  const { moved, routes } = await followBoardChange(tx, s, newBoard, boardNamesNow);
+  const plan = await followBoardChange(tx, s, newBoard, boardNamesNow, actorId);
   await tx.update(subject).set({ council: newBoard, qualificationId: null, updatedAt: new Date() }).where(eq(subject.id, s.id));
   await tx.delete(subjectUnit).where(eq(subjectUnit.subjectId, s.id));
   const why = `The subject's board changed to ${boardName(boardNamesNow, newBoard)}`;
+  const now = new Date();
+  for (const it of plan.items) {
+    await attachSeries(tx, it.sessionId, it.to, actorId);
+    await tx.delete(sessionOfferItemUnit).where(eq(sessionOfferItemUnit.itemId, it.id));
+    await tx.delete(sessionOfferItemFeeKey).where(eq(sessionOfferItemFeeKey.itemId, it.id));
+    await tx.insert(sessionOfferItemFeeKey).values({ id: randomUUID(), itemId: it.id, keyKind: 'subject', subjectId: s.id });
+    await tx.update(sessionOfferItem).set({ boardSeriesId: it.to, entersKind: 'subject', qualificationId: null, qualificationOptionId: null, updatedAt: now })
+      .where(eq(sessionOfferItem.id, it.id));
+  }
+  for (const m of plan.moved) {
+    await tx.update(registration).set({ boardSeriesId: m.to, updatedAt: now }).where(eq(registration.id, m.id));
+  }
+  for (const sessionId of new Set(plan.items.map((i) => i.sessionId))) await detachUnusedSeries(tx, sessionId);
   // One row for the change itself, in its transaction, whichever screen made
   // it (the Catalogue's mapping or the Subjects form): a subject the
   // migration re-boarded leaves "Check these" once staff choose its board.
   await logAction(actorId, 'SUBJECT_BOARD_CHANGED', 'subject', s.id, { council: s.council },
-    { council: newBoard, registrationsMoved: moved.length, routesMoved: routes.length }, undefined, tx);
-  if (moved.length) {
-    for (const m of moved) {
-      await tx.update(registration).set({ boardSeriesId: m.to, updatedAt: new Date() }).where(eq(registration.id, m.id));
-    }
-    await logActions(moved.map((m) => ({
+    { council: newBoard, registrationsMoved: plan.moved.length, itemsMoved: plan.items.length }, undefined, tx);
+  if (plan.moved.length) {
+    await logActions(plan.moved.map((m) => ({
       userId: actorId, action: 'REGISTRATION_SERIES_MOVED' as const, entityType: 'registration' as const, entityId: m.id,
       previousData: { boardSeriesId: m.from }, newData: { boardSeriesId: m.to, reason: why },
     })), tx);
   }
-  // A route to the new board's default is no route at all: the default applies.
-  for (const r of routes) {
-    await tx.delete(sessionSubjectSeries).where(and(eq(sessionSubjectSeries.sessionId, r.sessionId), eq(sessionSubjectSeries.subjectId, s.id)));
-  }
-  if (routes.length) {
-    await logActions(routes.map((r) => ({
-      userId: actorId, action: 'SUBJECT_ROUTE_MOVED' as const, entityType: 'session' as const, entityId: r.sessionId,
-      previousData: { subjectId: s.id, boardSeriesId: r.from }, newData: { subjectId: s.id, boardSeriesId: r.to, reason: why },
+  if (plan.items.length) {
+    await logActions(plan.items.map((i) => ({
+      userId: actorId, action: 'OFFER_ITEM_SERIES_CHANGED' as const, entityType: 'offer_item' as const, entityId: i.id,
+      previousData: { boardSeriesId: i.from }, newData: { boardSeriesId: i.to, reason: why },
     })), tx);
   }
-  return moved;
+  return plan.moved;
 }
 
 const sameDeadline = (a: Date | null, b: Date | null) => (a?.getTime() ?? null) === (b?.getTime() ?? null);
 const deadlineText = (d: Date | null) => (d ? schoolDate(d) : 'none set');
 
 /**
- * Where a subject's live registrations and its windows' routes go when its
- * board changes: each window's default series of the new board. Refuses,
- * naming the first obstacle:
- * - a registration's series is past its entry deadline (its entry is made);
- * - a window with a live registration or a route for the subject feeds no
- *   series of the new board;
- * - the series they would go to is past its entry deadline, or has another
- *   deadline than the one they are in (MO-10: as the admin's move refuses a
- *   passed target; a board change also keeps the deadline, so no checkout or
- *   refund is judged against a date the family was not given).
+ * Where a subject's items and their live lines go when its board changes: each item's default
+ * series of the new board in its session. Refuses, naming the first obstacle:
+ * - a live line is past its deadline in the series it is in (its entry is made);
+ * - the series an item with live lines would go to is past its entry deadline, or has another
+ *   entry deadline than the one they are in (MO-10: a board change keeps the deadline, so no
+ *   checkout or refund is judged against a date the family was not given).
  */
-async function followBoardChange(tx: Tx, s: typeof subject.$inferSelect, newBoard: string, names: Map<string, string>) {
-  const live = await tx
-    .select({ id: registration.id, sessionId: registration.sessionId, boardSeriesId: registration.boardSeriesId })
+async function followBoardChange(tx: Tx, s: typeof subject.$inferSelect, newBoard: string, names: Map<string, string>, actorId: string | null) {
+  const items = await tx.execute(sql`
+    select i.id, i.session_id as "sessionId", i.board_series_id as "seriesId", w.session_type as "sessionType", w.series_year as "seriesYear", w.name as "sessionName"
+    from session_offer_item i join session_offer o on o.id = i.offer_id join registration_session w on w.id = i.session_id
+    where o.subject_id = ${s.id} and w.status <> 'closed' and i.board_series_id is not null
+    order by i.id`).then((r) => r.rows as { id: string; sessionId: string; seriesId: string; sessionType: string; seriesYear: number; sessionName: string }[]);
+  if (!items.length) return { items: [], moved: [] };
+  const live = await tx.select({ id: registration.id, studentId: registration.studentId, offerItemId: registration.offerItemId, boardSeriesId: registration.boardSeriesId })
     .from(registration)
-    .where(and(eq(registration.subjectId, s.id), notInArray(registration.status, [...DONE_REGISTRATION_STATUSES])))
-    .orderBy(registration.id)
-    .for('update');
-  const routeRows = await tx.select().from(sessionSubjectSeries).where(eq(sessionSubjectSeries.subjectId, s.id))
-    .orderBy(sessionSubjectSeries.sessionId).for('update');
-  const sessionIds = [...new Set([...live.map((r) => r.sessionId), ...routeRows.map((r) => r.sessionId)])];
-  if (!sessionIds.length) return { moved: [], routes: [] };
-
-  const links = await tx
-    .select({ sessionId: sessionBoardSeries.sessionId, boardSeriesId: sessionBoardSeries.boardSeriesId, isDefault: sessionBoardSeries.isDefault, boardCode: sessionBoardSeries.boardCode })
-    .from(sessionBoardSeries).where(inArray(sessionBoardSeries.sessionId, sessionIds)).for('share');
-  const targets = new Map(links.filter((l) => l.boardCode === newBoard && l.isDefault).map((l) => [l.sessionId, l.boardSeriesId]));
-  // Every series involved, read FOR SHARE: a deadline changing at the same moment waits for this.
-  const seriesIds = [...new Set([
-    ...live.map((r) => r.boardSeriesId), ...routeRows.map((r) => r.boardSeriesId), ...targets.values(),
-  ].filter((x): x is string => !!x))];
-  const seriesRows = seriesIds.length
-    ? await tx.select().from(boardSeries).where(inArray(boardSeries.id, seriesIds)).orderBy(boardSeries.id).for('share')
-    : [];
-  const seriesBy = new Map(seriesRows.map((r) => [r.id, r]));
-  const windowNames = new Map((await tx.select({ id: registrationSession.id, name: registrationSession.name }).from(registrationSession)
-    .where(inArray(registrationSession.id, sessionIds))).map((w) => [w.id, w.name]));
-  const wName = (id: string) => windowNames.get(id) ?? 'A window';
-  const sName = (id: string) => boardSeriesName(names, seriesBy.get(id)!);
+    .where(and(inArray(registration.offerItemId, items.map((i) => i.id)), notInArray(registration.status, [...DONE_REGISTRATION_STATUSES])))
+    .orderBy(registration.id);
+  const students = [...new Set(live.map((l) => l.studentId))].sort();
+  if (students.length) await tx.select({ id: user.id }).from(user).where(inArray(user.id, students)).orderBy(user.id).for('no key update');
+  await tx.select({ id: sessionOfferItem.id }).from(sessionOfferItem).where(inArray(sessionOfferItem.id, items.map((i) => i.id))).orderBy(sessionOfferItem.id).for('update');
+  const lines = live.length ? await tx.select().from(registration).where(inArray(registration.id, live.map((l) => l.id))).orderBy(registration.id).for('update') : [];
   const now = new Date();
-
-  const passed = live
-    .map((r) => (r.boardSeriesId ? seriesBy.get(r.boardSeriesId) : undefined))
-    .find((x) => x?.entryDeadline && x.entryDeadline <= now);
+  const current = await effectiveDeadlinesOf(tx, lines.map((l) => l.id));
+  const passed = lines.find((l) => { const d = current.get(l.id); return !!d?.at && d.at <= now; });
   if (passed) {
+    const [ps] = await tx.select().from(boardSeries).where(eq(boardSeries.id, passed.boardSeriesId!));
     throw new CatalogueError(
-      `${s.name} is already entered with ${boardName(names, passed.boardCode)} in ${boardSeriesName(names, passed)}, whose entry deadline has passed — its board cannot change now. Make a new subject for the new board.`,
+      `${s.name} is already entered with ${boardName(names, ps!.boardCode)} in ${boardSeriesName(names, ps!)}, whose deadline has passed — its board cannot change now. Make a new subject for the new board.`,
       409,
     );
   }
-
+  const plan: { id: string; sessionId: string; from: string; to: string }[] = [];
   const moved: { id: string; from: string | null; to: string }[] = [];
-  const routes: { sessionId: string; from: string; to: string }[] = [];
-  for (const sessionId of sessionIds) {
-    if (!links.some((l) => l.sessionId === sessionId)) continue; // a window feeding no series routes nothing
-    const regs = live.filter((r) => r.sessionId === sessionId);
-    const route = routeRows.find((r) => r.sessionId === sessionId);
-    const target = targets.get(sessionId);
-    if (!target) {
-      throw new CatalogueError(
-        regs.length
-          ? `${wName(sessionId)} has ${regs.length} registration${regs.length === 1 ? '' : 's'} for ${s.name} and feeds no ${boardName(names, newBoard)} series — add one to the window first`
-          : `${wName(sessionId)} enters ${s.name} in ${sName(route!.boardSeriesId)} and feeds no ${boardName(names, newBoard)} series — add one to the window first`,
-        409,
-      );
+  for (const it of items) {
+    const level = s.qualificationLevel === 'igcse' ? 'igcse' : s.qualificationLevel === 'as_level' ? 'as' : 'a_level';
+    let to: string;
+    try {
+      to = await defaultSeriesFor(tx, it, newBoard, level, actorId);
+    } catch (err) {
+      throw new CatalogueError(`${it.sessionName}: ${err instanceof Error ? err.message : 'no series of the new board fits'}`, 409);
     }
-    const t = seriesBy.get(target)!;
-    const sources = [...new Set([
-      ...regs.map((r) => r.boardSeriesId).filter((x): x is string => !!x), ...(route ? [route.boardSeriesId] : []),
-    ])].filter((id) => id !== target);
-    if (sources.length) {
-      if (t.entryDeadline && t.entryDeadline <= now) {
+    const mine = lines.filter((l) => l.offerItemId === it.id);
+    if (mine.length) {
+      const [from, target] = await Promise.all([
+        tx.select().from(boardSeries).where(eq(boardSeries.id, it.seriesId)).for('share').then((r) => r[0]!),
+        tx.select().from(boardSeries).where(eq(boardSeries.id, to)).for('share').then((r) => r[0]!),
+      ]);
+      if (target.entryDeadline && target.entryDeadline <= now) {
+        throw new CatalogueError(`${boardSeriesName(names, target)} is past its entry deadline (${schoolDate(target.entryDeadline)}): ${s.name} cannot be moved into it in ${it.sessionName}`, 409);
+      }
+      if (!sameDeadline(from.entryDeadline, target.entryDeadline)) {
         throw new CatalogueError(
-          `${sName(target)} is past its entry deadline (${schoolDate(t.entryDeadline)}): ${s.name} cannot be moved into it in ${wName(sessionId)}`,
+          `In ${it.sessionName}, ${s.name} is entered in ${boardSeriesName(names, from)} (entry deadline ${deadlineText(from.entryDeadline)}) and would move to ${boardSeriesName(names, target)} (entry deadline ${deadlineText(target.entryDeadline)}): a board change keeps the entry deadline — give the two series the same deadline first`,
           409,
         );
       }
-      const differs = sources.find((id) => !sameDeadline(seriesBy.get(id)!.entryDeadline, t.entryDeadline));
-      if (differs) {
-        throw new CatalogueError(
-          `In ${wName(sessionId)}, ${s.name} is entered in ${sName(differs)} (entry deadline ${deadlineText(seriesBy.get(differs)!.entryDeadline)}) and would move to ${sName(target)} (entry deadline ${deadlineText(t.entryDeadline)}): a board change keeps the entry deadline — give the two series the same deadline first`,
-          409,
-        );
-      }
+      for (const l of mine) moved.push({ id: l.id, from: l.boardSeriesId, to });
     }
-    for (const r of regs) if (r.boardSeriesId !== target) moved.push({ id: r.id, from: r.boardSeriesId, to: target });
-    if (route && route.boardSeriesId !== target) routes.push({ sessionId, from: route.boardSeriesId, to: target });
+    plan.push({ id: it.id, sessionId: it.sessionId, from: it.seriesId, to });
   }
-  return { moved, routes };
+  return { items: plan, moved };
 }
 
 /** A registrable row by the name the school's sheet uses, or its code (F7). */

@@ -288,6 +288,27 @@
       "when": 1790727862029,
       "tag": "0040_catalogue_tier",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1791403580403,
+      "tag": "0041_rework_structure",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1791403589919,
+      "tag": "0042_rework_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1791404015550,
+      "tag": "0043_rework_constraints",
+      "breakpoints": true
     }
   ]
 }
