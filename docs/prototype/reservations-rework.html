@@ -47,7 +47,7 @@
   <a data-page="statement">Statement</a>
   <a data-page="exceptions">Exceptions</a>
   <a data-page="messages">Messages &amp; reminders</a>
-  <span class="note">Static prototype of RESERVATIONS_REWORK.md §4. Fixture data shaped like SCHOOL_FORMS.md §2; teacher and student names are placeholders; course fees are illustrative; board fees are the June 2026 lists.</span>
+  <span class="note">Static prototype (version 3) of RESERVATIONS_REWORK.md §4. Fixture data shaped like SCHOOL_FORMS.md §2; teacher and student names are placeholders; course fees are illustrative; board fees are the June 2026 lists, provisional for June 2027. "Add subject" is a stub.</span>
 </header>
 <main id="main"></main>
 <div class="drawer" id="drawer"></div>
@@ -73,6 +73,9 @@ const boardFees = {
   'pe-j27':  { 'WMA11':4800, 'WMA12':4800, 'WMA13':4800, 'WMA14':4800, 'WME01':4450, 'WST01':4450, 'WBI11':4450, 'WBI12':4450, 'WBI13':4450, 'WBI14':4450, 'WBI15':4450, 'WBI16':4450, '4MA1/1H':4600, '4MA1/2H':4600, 'WAA01':8950, 'WAA02':9350, '9AA1':9350 },
   'ox-j27':  { },
 };
+// grids copied from June 2026 are provisional until the board publishes and the admin confirms
+const provisionalGrids = new Set(['cam-j27']); // Pearson's June 2027 grid is confirmed in this fixture, Cambridge's still provisional
+const isProvisional = o => provisionalGrids.has(o.seriesId);
 const T = n => `Teacher ${n}`;
 const offers = [
   // O.L.
@@ -157,13 +160,15 @@ function itemTeachers(item, o) { return item.teachers || o.teachers || []; }
 function known(student, item) { const keys = Array.isArray(item.enters) ? item.enters : [item.enters]; return student.history.filter(h => keys.includes(h.enters)); }
 function price(item, o, kind, student) {
   const course = courseFeeOf(item, o) || 0, board = boardFeeOf(item, o);
-  const cPct = kind === 'retake_self_study' ? policies.selfStudyCourse : kind === 'retake_taught' ? policies.retakeTaughtCourse : 100;
-  const bPct = kind === 'retake_self_study' ? policies.selfStudyBoard : 100;
+  const selfStudy = kind === 'retake_self_study' || kind === 'first_self_study';
+  const cPct = selfStudy ? policies.selfStudyCourse : kind === 'retake_taught' ? policies.retakeTaughtCourse : 100;
+  const bPct = selfStudy ? policies.selfStudyBoard : 100;
   let c = course * cPct / 100, b = (board || 0) * bPct / 100;
   const ex = (student?.exceptions || []).filter(e => e.policy === 'price.discountPercent' && (!e.offerId || e.offerId === o.id));
   const basisParts = [`course ${fmt(course)} × ${cPct}%`, `board ${board == null ? 'not set' : fmt(board)} × ${bPct}%`];
   for (const e of ex) { c = c * (100 - e.value) / 100; b = b * (100 - e.value) / 100; basisParts.push(`discount ${e.value}% (exception)`); }
-  return { course:c, board:b, total:c + b, basis:basisParts.join(' + '), boardMissing: board == null };
+  if (isProvisional(o)) basisParts.push('board fee provisional');
+  return { course:c, board:b, total:c + b, basis:basisParts.join(' + '), boardMissing: board == null, provisional: isProvisional(o) };
 }
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2600); }
 function openDrawer(html) { const d = $('#drawer'); d.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><b>Offer</b><button class="sm" onclick="closeDrawer()">Close</button></div>` + html; d.classList.add('open'); }
@@ -203,11 +208,11 @@ pages.sessions = () => `
 function newSession() { const el = $('#newSession'); el.style.display = el.style.display === 'none' ? 'block' : 'none'; $('#ns-type').onchange = $('#ns-year').oninput = () => { const t = $('#ns-type').value, y = +$('#ns-year').value; $('#ns-name').textContent = t === 'june' ? `June ${y}` : `November ${y} – January ${y+1}`; }; }
 
 pages.session = () => {
-  const tabs = ['subjects','fees','money','grade10'].map(t => `<a class="${state.tab===t?'on':''}" onclick="go('session','${t}')">${{subjects:'Subjects',fees:'Fees',money:'Money',grade10:'Grade 10'}[t]}</a>`).join('');
+  const tabs = ['subjects','fees','money','grade10','verify'].map(t => `<a class="${state.tab===t?'on':''}" onclick="go('session','${t}')">${{subjects:'Subjects',fees:'Fees',money:'Money',grade10:'Grade 10',verify:'To verify (2)'}[t]}</a>`).join('');
   const head = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><h1>June 2027 <span class="badge ok">open</span></h1>
     <div class="muted">reserve 15 Sep 2026 – 15 Feb 2027 · course starts 20 Sep 2026 · payment due 30 Nov 2026 · refund 100% to week 2, 50% in week 3, 0% from week 4</div>
     <div style="margin-top:6px">${series.slice(0,3).map(s => `<span class="badge ${s.deadline?'ok':'warn'}">${s.name}: entry deadline ${s.deadline || '⚠ not set — set it on Board series'}</span>`).join('')}</div></div>
-    <div><button>Edit</button> <button>Close session</button></div></div><div class="tabs">${tabs}</div>${({subjects:subjectsTab,fees:feesTab,money:moneyTab,grade10:grade10Tab})[state.tab]()}</div>`;
+    <div><button>Edit</button> <button>Close session</button></div></div><div class="tabs">${tabs}</div>${({subjects:subjectsTab,fees:feesTab,money:moneyTab,grade10:grade10Tab,verify:verifyTab})[state.tab]()}</div>`;
   return head;
 };
 function subjectsTab() {
@@ -215,11 +220,19 @@ function subjectsTab() {
     const teachers = o.provider ? `<span class="badge acc">${o.provider} (external)</span>` : o.perUnit ? '<span class="muted">per unit</span>' : (o.teachers||[]).map(t => `<span class="badge">${t.n}${t.mode==='online'?' · online':''}</span>`).join('');
     const items = o.items.map(i => { const bf = boardFeeOf(i, o); return `<span class="badge ${itemAvailability(i,o)==='open'?'':'warn'}">${i.label.replace(/\s\(.*?\)/,'')}${itemAvailability(i,o)!=='open'?' · '+avLabel[itemAvailability(i,o)]:''}${bf==null?' · ⚠ no board fee':''}</span>`; }).join(' ');
     const bf = o.items.map(i => boardFeeOf(i,o)).filter(x => x != null);
-    return `<tr class="click" onclick="openOffer('${o.id}')"><td><b>${o.subject}</b>${o.core?' <span class="badge acc">grade-10 core</span>':''}</td><td>${o.board}<div class="small muted">${offerSeries(o).name}</div></td><td>${teachers}</td><td>${items}</td><td class="num right">${o.courseFee!=null?fmt(o.courseFee):'per item'}</td><td class="num right">${bf.length?fmt(Math.min(...bf))+(bf.length>1?'+':''):'<span class="badge warn">⚠ not set</span>'}</td></tr>`;
+    return `<tr class="click" onclick="openOffer('${o.id}')"><td><b>${o.subject}</b>${o.core?' <span class="badge acc">grade-10 core</span>':''}</td><td>${o.board}<div class="small muted">${offerSeries(o).name}</div></td><td>${teachers}</td><td>${items}</td><td class="num right">${o.courseFee!=null?fmt(o.courseFee):'per item'}</td><td class="num right">${bf.length?fmt(Math.min(...bf))+(bf.length>1?'+':'')+(isProvisional(o)?' <span class="badge warn" title="provisional: copied from June 2026">ⓟ</span>':''):'<span class="badge warn">⚠ not set</span>'}</td></tr>`;
   }).join('');
-  return `<div style="display:flex;justify-content:space-between;align-items:center"><div class="muted">${offers.length} subjects · every row is one line of the school's links sheet</div><div><button onclick="toast('Search the catalogue; the board, the awards and the items come from it')">+ Add subject</button> <button onclick="toast('Copy from June 2026: offers, teachers, items, availability and course fees; board fees per series to enter')">Copy from…</button></div></div>
+  return `<div style="display:flex;justify-content:space-between;align-items:center"><div class="muted">${offers.length} subjects · every row is one line of the school's links sheet</div><div><button onclick="toast('Add subject (stub in this prototype): search the catalogue; the board, the awards and the items come from it; pick the teachers and the course fee')">+ Add subject</button> <button onclick="toast('Copy from June 2026: offers, teachers, items, availability and course fees copied; board fees copied as provisional, to confirm on the Fees tab')">Copy from…</button></div></div>
   <h3>O.L.</h3><table><thead><tr><th>Subject</th><th>Board · series</th><th>Teachers</th><th>What can be entered</th><th class="right">Course fee</th><th class="right">Board fee</th></tr></thead><tbody>${rows('ol')}</tbody></table>
-  <h3>A.S. / A.L.</h3><table><thead><tr><th>Subject</th><th>Board · series</th><th>Teachers</th><th>What can be entered</th><th class="right">Course fee</th><th class="right">Board fee</th></tr></thead><tbody>${rows('al')}</tbody></table>`;
+  <h3>A.S. / A.L.</h3><table><thead><tr><th>Subject</th><th>Board · series</th><th>Teachers</th><th>What can be entered</th><th class="right">Course fee</th><th class="right">Board fee</th></tr></thead><tbody>${rows('al')}</tbody></table>
+  <div class="hint">ⓟ provisional: the board fee was copied from June 2026; families can reserve, and pay once the board publishes and the fee is confirmed on the Fees tab.</div>`;
+}
+function verifyTab() {
+  return `<div class="muted">Retakes declared by a family or at the desk, awaiting the coordinator (or the desk with the board's statement; or F4 from the results). A rejected declaration on an unpaid line expires it and tells the family; on a paid line the line stands and finance adjusts. Unverified at the entry deadline: entered as declared (setting).</div>
+  <table style="margin-top:8px"><thead><tr><th>Student</th><th>Line</th><th>Declared sitting</th><th>Declared by</th><th>Paid</th><th></th></tr></thead><tbody>
+  <tr><td>Student A (11C)</td><td>Mathematics O.L. — whole, retake self-study</td><td>Pearson Edexcel June 2026</td><td>family, 3 Oct</td><td>no</td><td><button class="sm" onclick="toast('Verified; audited')">Verify</button> <button class="sm" onclick="toast('Rejected: the line expires, the family is told it may reserve a first entry')">Reject</button></td></tr>
+  <tr><td>Student J (12B)</td><td>Physics A.S./A.L. — A.2. carry forward, self-study</td><td>Cambridge June 2026 (another centre)</td><td>desk, 5 Oct</td><td>yes</td><td><button class="sm" onclick="toast('Verified: previous centre and candidate number recorded for the entry')">Verify</button> <button class="sm" onclick="toast('Rejected on a paid line: the line stands; finance decides an adjustment')">Reject</button></td></tr>
+  </tbody></table>`;
 }
 function openOffer(id) {
   const o = offers.find(x => x.id === id);
@@ -231,14 +244,14 @@ function openOffer(id) {
   <h3>Teachers this cycle</h3>${o.provider ? `<span class="badge acc">${o.provider} (external)</span>` : (o.teachers||[]).map(t => `<span class="badge">${t.n} · ${t.mode||'in school'}</span>`).join('') || '<span class="muted">per unit (below)</span>'} <button class="sm" onclick="toast('Pick from the subject\\'s teacher pool, or add a teacher to it')">+ Teacher</button>
   <h3>Items (what a family can tick)</h3>
   <table><thead><tr><th>Item</th><th>Series</th><th>Availability</th><th class="right">Course</th><th class="right">Board</th><th>Teachers</th></tr></thead><tbody>
-  ${o.items.map(i => `<tr><td>${i.label}${i.needsPrior?' <span class="badge">names the prior sitting</span>':''}${i.required?' <span class="badge acc">required</span>':''}</td><td><select>${series.filter(s=>s.board===o.board && s.id.endsWith('j27')).map(s=>`<option>${s.name}</option>`).join('')}</select></td><td><select>${Object.entries(avLabel).map(([k,v]) => `<option ${itemAvailability(i,o)===k?'selected':''}>${v}</option>`).join('')}</select></td><td class="right num">${fmt(courseFeeOf(i,o))}</td><td class="right num">${boardFeeOf(i,o)==null?'<span class="badge warn">⚠ set on Fees</span>':fmt(boardFeeOf(i,o))}</td><td>${(i.teachers||[]).map(t=>`<span class="badge">${t.n}${t.mode==='online'?' · online':''}</span>`).join('')||'<span class="muted">the offer\'s</span>'}</td></tr>`).join('')}
+  ${o.items.map(i => `<tr><td>${i.label}${i.needsPrior?' <span class="badge">names the prior sitting</span>':''}${i.required?' <span class="badge acc">required</span>':''}</td><td><select>${series.filter(s=>s.board===o.board && s.id.endsWith('j27')).map(s=>`<option>${s.name}</option>`).join('')}</select></td><td><select>${Object.entries(avLabel).map(([k,v]) => `<option ${itemAvailability(i,o)===k?'selected':''}>${v}</option>`).join('')}</select></td><td class="right num">${fmt(courseFeeOf(i,o))}</td><td class="right num">${boardFeeOf(i,o)==null?'<span class="badge warn">⚠ set on Fees</span>':fmt(boardFeeOf(i,o))+(isProvisional(o)?' <span class="badge warn">ⓟ</span>':'')}</td><td>${(i.teachers||[]).map(t=>`<span class="badge">${t.n}${t.mode==='online'?' · online':''}</span>`).join('')||'<span class="muted">the offer\'s</span>'}</td></tr>`).join('')}
   </tbody></table>
   <div class="hint">Items are generated from the catalogue (the award, its units, its option codes); tick which are open this cycle. A one-paper retake item names the paper and asks the family for the sitting it carries from.</div>
   <div style="margin-top:12px"><button class="primary" onclick="toast('Saved; audited');closeDrawer()">Save</button> <button onclick="closeDrawer()">Cancel</button></div>`);
 }
 function feesTab() {
   return `<div class="muted">One grid per series the session feeds, in the shape of the board's fee list. Paste the PDF's rows (code and amount); unknown codes are listed to map.</div>
-  ${series.slice(0,3).map(s => { const t = boardFees[s.id] || {}; const rows = Object.entries(t); return `<div class="card" style="margin-top:10px"><div style="display:flex;justify-content:space-between"><b>${s.name}</b><div><button class="sm" onclick="toast('Copied ${s.board} June 2026; rows to re-enter highlighted')">Copy from ${s.board} June 2026</button> <button class="sm" onclick="toast('Paste rows like: 0970/CX 10850')">Paste rows</button></div></div>
+  ${series.slice(0,3).map(s => { const t = boardFees[s.id] || {}; const rows = Object.entries(t); const prov = provisionalGrids.has(s.id); return `<div class="card" style="margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center"><div><b>${s.name}</b> ${prov ? '<span class="badge warn">provisional — copied from June 2026; families may reserve, not pay</span>' : rows.length ? '<span class="badge ok">confirmed</span>' : ''}</div><div>${prov ? `<button class="sm primary" onclick="toast('Confirmed ${rows.length} rows at these amounts; lines on them become payable. A changed amount offers Re-price unpaid lines (lines in an open checkout are listed to settle first)')">Confirm all</button> ` : ''}<button class="sm" onclick="toast('Copied ${s.board} June 2026 as provisional rows')">Copy from ${s.board} June 2026</button> <button class="sm" onclick="toast('Paste rows like: 0970/CX 10850')">Paste rows</button></div></div>
     ${rows.length ? `<table><thead><tr><th>What it prices</th><th class="right">EGP</th></tr></thead><tbody>${rows.map(([k,v]) => `<tr><td>${k.startsWith('EAR')?'Enquiry about results — service '+k.split('/')[1]+' ('+(k.endsWith('igcse')?'IGCSE':'AS / A Level')+', per component)':k}</td><td class="right"><input type="number" value="${v}"></td></tr>`).join('')}</tbody></table>` : `<div class="callout" style="margin-top:8px">No fees yet. English as a Second Language cannot be reserved until its fee is set (or set 0 with a reason).</div>`}</div>`; }).join('')}`;
 }
 function moneyTab() {
@@ -260,20 +273,21 @@ function grade10Tab() {
 
 // ───────────────────────── reserve (desk / family) ─────────────────────────
 function pickState(itemId) { return state.picks[itemId] || (state.picks[itemId] = { on:false, kind:null, teacher:null, prior:null }); }
+const isSelfStudy = kind => kind === 'retake_self_study' || kind === 'first_self_study';
 function defaultKind(item, o, student) {
   const av = itemAvailability(item,o), k = known(student,item).length > 0;
-  if (av === 'self_study_only') return 'retake_self_study';
+  if (av === 'self_study_only') return k ? 'retake_self_study' : 'first_self_study';
   if (av === 'retake_only') return itemTeachers(item,o).length ? 'retake_taught' : 'retake_self_study';
   return k ? (itemTeachers(item,o).length ? 'retake_taught' : 'retake_self_study') : 'first_entry';
 }
+// attempt and mode in one list: first/retake × in school/self-study; a retake the system does not know is declared with its sitting (the family may, as on the form; staff verify)
 function kindOptions(item, o, student, mode) {
   const av = itemAvailability(item,o), isKnown = known(student,item).length > 0, hasT = itemTeachers(item,o).length > 0 || o.provider;
   const opts = [];
   if (av === 'open' && !isKnown) opts.push(['first_entry','first entry']);
-  if (av !== 'self_study_only' && hasT) opts.push(['retake_taught','retake, taught (100%)']);
-  opts.push(['retake_self_study','retake, self-study (50% course fee)']);
-  if (mode === 'family' && !isKnown && av === 'open') return opts.filter(x => x[0] === 'first_entry');
-  if (mode === 'family' && !isKnown && av !== 'open') return [];
+  if (av === 'self_study_only' && !isKnown) opts.push(['first_self_study','first entry, self-study (not taught this cycle)']);
+  if (av !== 'self_study_only' && hasT) opts.push(['retake_taught', isKnown ? 'retake, taught (100%)' : 'retake, taught — declare the sitting']);
+  opts.push(['retake_self_study', isKnown ? 'retake, self-study (50% course fee)' : 'retake, self-study — declare the sitting']);
   return opts;
 }
 pages.desk = () => reservePage('desk');
@@ -289,35 +303,38 @@ function reservePage(mode) {
       if (p.on && !p.kind) p.kind = defaultKind(i,o,student);
       if (p.on && !opts.find(x=>x[0]===p.kind)) p.kind = opts[0]?.[0] || null;
       const teachers = itemTeachers(i,o);
-      if (p.on && p.kind !== 'retake_self_study' && !p.teacher && teachers.length === 1) p.teacher = teachers[0].n;
+      if (p.on && !isSelfStudy(p.kind) && !p.teacher && teachers.length === 1) p.teacher = teachers[0].n;
       const pr = p.on && p.kind ? price(i,o,p.kind,student) : null;
-      const needsPrior = p.on && (i.needsPrior || (p.kind !== 'first_entry' && !isKnown.length));
+      const declared = p.on && p.kind && p.kind.startsWith('retake') && !isKnown.length;
+      const needsPrior = p.on && (i.needsPrior || declared);
       const priorOpts = series.filter(s => s.board === o.board && !s.id.endsWith('j27'));
-      if (p.on && pr) lines.push({ o, i, p, pr, needsPrior, priorOk: !needsPrior || p.prior || isKnown.length });
+      if (p.on && pr) lines.push({ o, i, p, pr, needsPrior, declared, priorOk: !needsPrior || p.prior || isKnown.length });
       return `<tr class="${closed?'muted':''}"><td style="width:28px"><input type="checkbox" ${p.on?'checked':''} ${closed?'disabled':''} onchange="pickState('${i.id}').on=this.checked;render()"></td>
-        <td>${i.label}${av!=='open'?` <span class="badge warn">${avLabel[av]}</span>`:''}${isKnown.length?` <span class="badge acc">sat ${seriesById(isKnown[0].seriesId).name.replace(/^\\S+ /,'')}</span>`:''}${closed&&mode==='family'?' <span class="badge">ask the desk</span>':''}</td>
-        <td>${p.on ? (p.kind==='retake_self_study' ? '<span class="muted">— self-study</span>' : (o.provider ? `<span class="badge acc">${o.provider}</span>` : teachers.length ? `<select onchange="pickState('${i.id}').teacher=this.value;render()"><option value="">teacher…</option>${teachers.map(t=>`<option ${p.teacher===t.n?'selected':''}>${t.n}${t.mode==='online'?' (online)':''}</option>`).join('')}</select>` : '')) : ''}</td>
+        <td>${i.label}${av!=='open'?` <span class="badge warn">${avLabel[av]}</span>`:''}${isKnown.length?` <span class="badge acc">sat ${seriesById(isKnown[0].seriesId).name.replace(/^\\S+ /,'')}</span>`:''}${declared?` <span class="badge warn">${mode==='family'?'to be verified by the school':'declared — listed to verify'}</span>`:''}</td>
+        <td>${p.on ? (isSelfStudy(p.kind) ? '<span class="muted">— self-study</span>' : (o.provider ? `<span class="badge acc">${o.provider}</span>` : teachers.length ? `<select onchange="pickState('${i.id}').teacher=this.value;render()"><option value="">${teachers.length>1?'no preference':'teacher…'}</option>${teachers.map(t=>`<option ${p.teacher===t.n?'selected':''}>${t.n}${t.mode==='online'?' (online)':''}</option>`).join('')}</select>` : '')) : ''}</td>
         <td>${p.on ? `<select onchange="pickState('${i.id}').kind=this.value;render()">${opts.map(([k,l])=>`<option value="${k}" ${p.kind===k?'selected':''}>${l}</option>`).join('')}</select>${needsPrior ? ` from <select onchange="pickState('${i.id}').prior=this.value;render()"><option value="">sitting…</option>${priorOpts.map(s=>`<option ${p.prior===s.id?'selected':''} value="${s.id}">${s.name}</option>`).join('')}</select>`:''}` : ''}</td>
-        <td class="right num">${pr ? (pr.boardMissing ? '<span class="badge warn">board fee not set</span>' : `<span title="${pr.basis}">${fmt(pr.total)}</span>`) : ''}</td></tr>`;
+        <td class="right num">${pr ? (pr.boardMissing ? '<span class="badge warn">board fee not set</span>' : `<span title="${pr.basis}">${fmt(pr.total)}</span>${pr.provisional?' <span class="badge warn" title="board fee provisional: payable once confirmed">ⓟ</span>':''}`) : ''}</td></tr>`;
     }).join('');
     return `<tr><td colspan="5" style="background:#fafbfc"><b>${o.subject}</b> <span class="muted">${o.board}${o.perUnit?' · per unit':''}</span></td></tr>${items}`;
   }).join('');
   const olHtml = block('ol'), alHtml = block('al'); // the rows fill `lines`; the summary below reads it
   const total = lines.reduce((a,l)=>a+l.pr.total,0);
-  const ready = lines.length && lines.every(l=>l.priorOk && !l.pr.boardMissing && (l.p.kind==='retake_self_study' || l.p.teacher || l.o.provider || !itemTeachers(l.i,l.o).length)) && (mode==='desk' ? state.consent : (state.consent && state.consent2));
+  const payableNow = lines.filter(l=>!l.pr.provisional).reduce((a,l)=>a+l.pr.total,0);
+  const provisionalCount = lines.filter(l=>l.pr.provisional).length;
+  const ready = lines.length && lines.every(l=>l.priorOk && !l.pr.boardMissing) && (mode==='desk' ? state.consent : (state.consent && state.consent2));
   const byDeadline = {}; for (const l of lines) { const s = offerSeries(l.o); (byDeadline[s.name] = byDeadline[s.name] || []).push(l); }
   return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h1>${mode==='desk'?'Reserve at the desk':'Reserve'} <span class="badge">June 2027</span></h1>
     <div class="row"><div><label>${mode==='desk'?'Student':'Child'}</label><select onchange="state.studentId=this.value;state.picks={};render()">${students.map(s=>`<option value="${s.id}" ${s.id===state.studentId?'selected':''}>${s.name} (${s.section})</option>`).join('')}</select></div><div><label>Session</label><select><option>June 2027</option><option>November 2026 – January 2027</option></select></div></div></div>
     ${student.grade===10 ? '<div class="callout">Grade 10 in June: the core subjects are pre-ticked and locked (A-05).</div>' : ''}
     ${student.exceptions.length ? `<div class="callout">Exceptions on this student: ${student.exceptions.map(e=>`${e.policy} ${e.value}% on ${e.scope}`).join('; ')}</div>` : ''}
-    <div class="hint">${mode==='desk' ? 'A retake is pre-set when the system knows the earlier sitting; for a new family, choose "retake" and name the sitting (recorded and audited). Self-study on a first entry needs an exception.' : 'What you can tick is what the school opened for you this cycle. A retake the school does not know about: ask the desk.'}</div>
+    <div class="hint">${mode==='desk' ? 'A retake is pre-set when the system knows the earlier sitting; for a new family, choose "retake" and name the sitting (recorded, audited, listed on the session\'s To verify tab). Self-study on a first entry of a taught subject needs an exception. A teacher may be left as "no preference" (the coordinator assigns). A line with a provisional board fee (ⓟ) is reserved now and collected once the fee is confirmed.' : 'What you can tick is what the school opened for you this cycle. A retake the school does not know about yet: choose "retake" and name the sitting, as on the form; the school verifies it. A provisional board fee (ⓟ) is confirmed before you pay.'}</div>
     <table style="margin-top:8px"><thead><tr><th></th><th>Subject · item</th><th>Teacher</th><th>Entry</th><th class="right">Price</th></tr></thead><tbody>${olHtml}${alHtml}</tbody></table>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:10px">
-      <div><span class="total">${lines.length} line${lines.length===1?'':'s'} · EGP ${fmt(total)}</span> <span class="muted">· due 30 Nov 2026 · ${Object.keys(byDeadline).length>1?`paid per entry deadline: ${Object.entries(byDeadline).map(([n,ls])=>`${n} ${fmt(ls.reduce((a,l)=>a+l.pr.total,0))}`).join(', ')}`:''}</span>
+      <div><span class="total">${lines.length} line${lines.length===1?'':'s'} · EGP ${fmt(total)}</span> <span class="muted">· due 30 Nov 2026 · ${Object.keys(byDeadline).length>1?`paid per entry deadline: ${Object.entries(byDeadline).map(([n,ls])=>`${n} ${fmt(ls.reduce((a,l)=>a+l.pr.total,0))}`).join(', ')}`:''}${provisionalCount?` · ${provisionalCount} line${provisionalCount===1?'':'s'} on a provisional board fee (EGP ${fmt(total-payableNow)}) payable once confirmed`:''}</span>
         ${lines.some(l=>!l.priorOk)?'<div class="badge bad">name the prior sitting on each retake</div>':''}</div>
       <div>${mode==='desk' ? `<label><input type="checkbox" ${state.consent?'checked':''} onchange="state.consent=this.checked;render()"> Refund policy and declaration read and signed by the parent</label>` : `<label><input type="checkbox" ${state.consent?'checked':''} onchange="state.consent=this.checked;render()"> I have read the refund policy (100% within 2 weeks of the first lesson, 50% in week 3, 0% from week 4)</label><label><input type="checkbox" ${state.consent2?'checked':''} onchange="state.consent2=this.checked;render()"> The information given is true, complete and accurate</label>`}</div>
     </div>
-    <div style="margin-top:10px">${mode==='desk' ? `<button ${ready?'':'disabled'} onclick="toast('${lines.length} lines reserved, awaiting payment; slip printed')">Reserve only</button> <select onchange="state.instrument=this.value"><option value="cash">cash</option><option value="card">card</option><option value="instapay">InstaPay</option></select> <button class="primary" ${ready?'':'disabled'} onclick="toast('Reserved and collected EGP ${fmt(total)} (${Object.keys(byDeadline).length} payment${Object.keys(byDeadline).length===1?'':'s'}, one per entry deadline); ${lines.length} receipts printed')">Reserve and collect EGP ${fmt(total)}</button>` : `<button class="primary" ${ready?'':'disabled'} onclick="toast('Reserved: ${lines.length} lines awaiting payment — pay by exam series on the next screen')">Reserve ${lines.length?lines.length+' lines':''}</button>`}</div>
+    <div style="margin-top:10px">${mode==='desk' ? `<button ${ready?'':'disabled'} onclick="toast('${lines.length} lines reserved, awaiting payment; slip printed with the consent texts')">Reserve only</button> <select onchange="state.instrument=this.value"><option value="cash">cash</option><option value="card">card</option><option value="instapay">InstaPay</option></select> <button class="primary" ${ready && payableNow>0?'':'disabled'} onclick="toast('Reserved ${lines.length} lines; collected EGP ${fmt(payableNow)} (one payment per entry deadline${provisionalCount?'; '+provisionalCount+' provisional line(s) reserved, collected once confirmed':''}); receipts printed')">Reserve and collect EGP ${fmt(payableNow)}${provisionalCount?' now':''}</button>` : `<button class="primary" ${ready?'':'disabled'} onclick="toast('Reserved: ${lines.length} lines awaiting payment — pay by exam series on the next screen${provisionalCount?' once the provisional fees are confirmed':''}')">Reserve ${lines.length?lines.length+' lines':''}</button>`}</div>
   </div>`;
 }
 
@@ -326,15 +343,15 @@ pages.statement = () => {
   const rows = existing.filter(e => e.student === 'Student H' || e.student === 'Student G');
   return `<div class="card"><h1>Statement <span class="badge">Student H (12D)</span></h1>
   <table><thead><tr><th>Line</th><th class="right">Price</th><th class="right">Paid</th><th class="right">Outstanding</th><th>Due</th><th>Receipt</th><th>Why this price</th></tr></thead><tbody>
-  ${existing.filter(e=>e.student==='Student H').map(e => `<tr><td>${e.line}</td><td class="right num">${fmt(e.price)}</td><td class="right num">${fmt(e.paid)}</td><td class="right num">${e.paid?'—':`<span class="badge bad">${fmt(e.price-e.paid)}</span>`}</td><td>${e.due}</td><td>${e.receipt||'—'}</td><td class="small muted">${e.charge?'EAR service 2, AS/A Level rate, 1 component':'course 16,000 × 50% + board 11,400 × 100%'}</td></tr>`).join('')}
+  ${existing.filter(e=>e.student==='Student H').map(e => `<tr><td>${e.line}</td><td class="right num">${fmt(e.price)}</td><td class="right num">${fmt(e.paid)}</td><td class="right num">${e.paid?'—':`<span class="badge bad">${fmt(e.price-e.paid)}</span>`}</td><td>${e.due}</td><td>${e.receipt||'—'}</td><td class="small muted">${e.charge?'enquiry about results, service 2, IGCSE rate, 1 component (the remark\'s own payment)':'course 16,000 × 50% + board 11,400 × 100% (ⓟ provisional)'}</td></tr>`).join('')}
   <tr><td>School fee 2026/27</td><td class="right num">30,000</td><td class="right num">30,000</td><td class="right num">—</td><td>—</td><td>#0988</td><td class="small muted">grade 12 schedule</td></tr>
   </tbody></table>
   <h3>Payments</h3><table><thead><tr><th>Date</th><th>Instrument</th><th class="right">Amount</th><th>Covers</th><th>Receipt</th></tr></thead><tbody>
   <tr><td>2 Sep 2026</td><td>InstaPay</td><td class="right num">30,000</td><td>School fee 2026/27</td><td>#0988</td></tr>
-  <tr><td>12 Oct 2026</td><td>cash (desk)</td><td class="right num">3,820</td><td>Remark, Chemistry O.L. June 2026</td><td>#1060</td></tr>
-  <tr><td>18 Oct 2026</td><td>—</td><td class="right num">+3,720 to escrow</td><td>the remark changed the grade: fee less 100 EGP refunded</td><td></td></tr>
+  <tr><td>12 Oct 2026</td><td>cash (desk)</td><td class="right num">3,820</td><td>Remark, Chemistry O.L. June 2026 (its own payment)</td><td>#1060</td></tr>
+  <tr><td>18 Oct 2026</td><td>—</td><td class="right num">+3,820 to escrow</td><td>the remark changed the grade: refunded by the service's rule (today: the whole fee; Q-21)</td><td></td></tr>
   </tbody></table>
-  <div class="hint">Escrow: 3,720 free · Outstanding: EGP 19,400 due 30 Nov 2026 · Reminders: 23 Nov, 27 Nov, 30 Nov, then every 3 days.</div></div>`;
+  <div class="hint">Escrow: 3,820 free · Outstanding: EGP 19,400 (board fee provisional: due once confirmed, then 30 Nov 2026 or confirmation + 7 days) · Reminders start when the line is payable.</div></div>`;
 };
 
 // ───────────────────────── exceptions ─────────────────────────

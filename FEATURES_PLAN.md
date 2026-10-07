@@ -616,7 +616,7 @@ API and web ports):
 |---|---|---|---|---|
 | F0a Core foundation | yes — docs/features/FOUNDATION.md | Opus 5.5, three rounds; lead review | 29 Sep 2026, `b747d47`, main CI 36613182503 green | owner questions in FOUNDATION §12; A-12/13/14 as settings |
 | F0b Catalogue, series, enrolment | yes — docs/features/CATALOGUE.md | Opus 5.5, three rounds (eleven flags, then six, then two); lead review | 30 Sep 2026, see the trail | owner questions in CATALOGUE §12; F1's 0040 collides with F0b's 0040 |
-| F1 Scheduling | in progress (`feature/scheduling`, from F0b's branch before it merged) | | | |
+| F1 Scheduling | **frozen 7 Oct** at 2c2a910 on `feature/scheduling` (the round-two fixes uncommitted on the agent's disk); resumes on the rework's session model (RESERVATIONS_REWORK.md §9) | Opus 5.5, round one applied (SCHEDULING.md §16); round two (30 Sep, session log) left three flags to fix on resumption: dated teacher clashes checked across intervals, carried covers re-checked after a change, lock and race tests for memberships and covers | | |
 | F4 Exam entries | | | | |
 | F2 Campus leave | | | | |
 | F5 Pathway advisor | | | | |
