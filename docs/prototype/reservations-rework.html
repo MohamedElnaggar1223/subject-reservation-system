@@ -135,12 +135,12 @@ const students = [
 // a few existing lines for the money tab and the statement (all for June 2027)
 const existing = [
   { student:'Student E', section:'11A', family:'Family E', line:'Biology O.L. — whole, first entry', price:24850, paid:24850, due:'30 Nov 2026', receipt:'#1042' },
-  { student:'Student E', section:'11A', family:'Family E', line:'Chemistry O.L. — whole, first entry', price:24850, paid:24850, due:'30 Nov 2026', receipt:'#1042' },
+  { student:'Student E', section:'11A', family:'Family E', line:'Chemistry O.L. — whole, first entry', price:24850, paid:24850, due:'30 Nov 2026', receipt:'#1043' },
   { student:'Student F', section:'11B', family:'Family F', line:'Mathematics O.L. — whole, first entry', price:23200, paid:0, due:'30 Nov 2026', receipt:'' },
   { student:'Student G', section:'12C', family:'Family G', line:'Mathematics A.S./A.L. — P3, first entry', price:9800, paid:9800, due:'30 Nov 2026', receipt:'#1051' },
   { student:'Student G', section:'12C', family:'Family G', line:'Mathematics A.S./A.L. — M1, first entry', price:9450, paid:0, due:'30 Nov 2026', receipt:'' },
-  { student:'Student H', section:'12D', family:'Family H', line:'Physics A.S./A.L. — A.2. carry forward (June 2026), retake self-study', price:19400, paid:0, due:'30 Nov 2026', receipt:'' },
-  { student:'Student H', section:'12D', family:'Family H', line:'Remark: Chemistry O.L. June 2026, service 2 (per component)', price:3820, paid:3820, due:'—', receipt:'#1060', charge:true },
+  { student:'Student H', section:'12D', family:'Family H', line:'Physics A.S./A.L. — A.2. carry forward (from June 2026), first entry self-study', price:19400, paid:0, due:'once the fee is confirmed', receipt:'' },
+  { student:'Student H', section:'12D', family:'Family H', line:'Remark: Chemistry O.L. June 2026, service 2 (per component)', price:3820, paid:3820, due:'—', receipt:'—', charge:true },
 ];
 
 // ───────────────────────── helpers ─────────────────────────
@@ -187,8 +187,8 @@ pages.sessions = () => `
     <tr class="click" onclick="go('session')"><td><b>June 2027</b></td><td><span class="badge ok">open</span></td><td>15 Sep 2026 – 15 Feb 2027</td><td>20 Sep 2026</td><td>30 Nov 2026</td><td>${offers.length} · 3 boards</td>
       <td>${series.slice(0,3).map(s => `<span class="badge ${s.deadline ? 'ok' : 'warn'}">${s.board} ${s.deadline || '⚠ not set'}</span>`).join('')}</td>
       <td class="num">${existing.length} · ${existing.filter(e=>e.paid).length} paid</td><td><button class="sm">Open</button> <button class="sm" onclick="event.stopPropagation();go('session','money')">Money</button></td></tr>
-    <tr class="click"><td><b>November 2026 – January 2027</b></td><td><span class="badge ok">open</span></td><td>1 Sep – 10 Oct 2026</td><td>7 Sep 2026</td><td>5 Oct 2026</td><td>18 · 3 boards</td>
-      <td><span class="badge ok">Pearson Oct 20 Aug</span><span class="badge ok">Cambridge Nov 20 Aug</span><span class="badge ok">Oxford Nov 25 Aug</span><span class="badge ok">Pearson Jan 20 Oct</span></td><td class="num">201 · 160 paid</td><td><button class="sm">Open</button></td></tr>
+    <tr class="click"><td><b>November 2026 – January 2027</b></td><td><span class="badge ok">open</span></td><td>1 Jun – 10 Oct 2026</td><td>7 Sep 2026</td><td>30 Sep 2026</td><td>18 · 3 boards</td>
+      <td><span class="badge">Pearson Oct 28 Aug · passed, 61 lines entered</span><span class="badge">Cambridge Nov 16 Aug · passed; retakes to 21 Sep</span><span class="badge ok">Pearson IGCSE Nov 12 Sep</span><span class="badge ok">Pearson Jan 16 Oct</span></td><td class="num">201 · 160 paid</td><td><button class="sm">Open</button></td></tr>
     <tr class="click muted"><td>June 2026</td><td><span class="badge">closed</span></td><td>15 Sep 2025 – 15 Feb 2026</td><td>20 Sep 2025</td><td>30 Nov 2025</td><td>24 · 3 boards</td><td></td><td class="num">434 · 434 paid</td><td></td></tr>
   </tbody></table>
 </div>
@@ -286,6 +286,7 @@ function kindOptions(item, o, student, mode) {
   const opts = [];
   if (av === 'open' && !isKnown) opts.push(['first_entry','first entry']);
   if (av === 'self_study_only' && !isKnown) opts.push(['first_self_study','first entry, self-study (not taught this cycle)']);
+  if (av === 'closed') return [];
   if (av !== 'self_study_only' && hasT) opts.push(['retake_taught', isKnown ? 'retake, taught (100%)' : 'retake, taught — declare the sitting']);
   opts.push(['retake_self_study', isKnown ? 'retake, self-study (50% course fee)' : 'retake, self-study — declare the sitting']);
   return opts;
@@ -340,15 +341,16 @@ function reservePage(mode) {
 
 // ───────────────────────── statement ─────────────────────────
 pages.statement = () => {
-  const rows = existing.filter(e => e.student === 'Student H' || e.student === 'Student G');
-  return `<div class="card"><h1>Statement <span class="badge">Student H (12D)</span></h1>
+  return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h1>Statement <span class="badge">Student H (12D)</span></h1><button class="sm" onclick="toast('Family statement: every child of this family, lines, charges, payments and escrow together')">Family statement</button></div>
   <table><thead><tr><th>Line</th><th class="right">Price</th><th class="right">Paid</th><th class="right">Outstanding</th><th>Due</th><th>Receipt</th><th>Why this price</th></tr></thead><tbody>
   ${existing.filter(e=>e.student==='Student H').map(e => `<tr><td>${e.line}</td><td class="right num">${fmt(e.price)}</td><td class="right num">${fmt(e.paid)}</td><td class="right num">${e.paid?'—':`<span class="badge bad">${fmt(e.price-e.paid)}</span>`}</td><td>${e.due}</td><td>${e.receipt||'—'}</td><td class="small muted">${e.charge?'enquiry about results, service 2, IGCSE rate, 1 component (the remark\'s own payment)':'course 16,000 × 50% + board 11,400 × 100% (ⓟ provisional)'}</td></tr>`).join('')}
-  <tr><td>School fee 2026/27</td><td class="right num">30,000</td><td class="right num">30,000</td><td class="right num">—</td><td>—</td><td>#0988</td><td class="small muted">grade 12 schedule</td></tr>
+  <tr><td>Mathematics A.S./A.L. — P3, first entry</td><td class="right num">9,800</td><td class="right num">9,800</td><td class="right num">—</td><td>—</td><td>#1051</td><td class="small muted">course 5,000 × 100% + board 4,800 × 100% (Pearson June 2027, confirmed)</td></tr>
+  <tr><td>School fee 2026/27</td><td class="right num">30,000</td><td class="right num">30,000</td><td class="right num">—</td><td>—</td><td>—</td><td class="small muted">grade 12 schedule (its own payment; no paper receipt)</td></tr>
   </tbody></table>
-  <h3>Payments</h3><table><thead><tr><th>Date</th><th>Instrument</th><th class="right">Amount</th><th>Covers</th><th>Receipt</th></tr></thead><tbody>
-  <tr><td>2 Sep 2026</td><td>InstaPay</td><td class="right num">30,000</td><td>School fee 2026/27</td><td>#0988</td></tr>
-  <tr><td>12 Oct 2026</td><td>cash (desk)</td><td class="right num">3,820</td><td>Remark, Chemistry O.L. June 2026 (its own payment)</td><td>#1060</td></tr>
+  <h3>Payments (one per entry deadline or charge group)</h3><table><thead><tr><th>Date</th><th>Instrument</th><th class="right">Amount</th><th>Covers</th><th>Receipts</th></tr></thead><tbody>
+  <tr><td>2 Sep 2026</td><td>InstaPay</td><td class="right num">30,000</td><td>School fee 2026/27</td><td>—</td></tr>
+  <tr><td>12 Oct 2026</td><td>cash (desk)</td><td class="right num">9,800</td><td>Pearson Edexcel June 2027: P3</td><td>#1051</td></tr>
+  <tr><td>12 Oct 2026</td><td>cash (desk)</td><td class="right num">3,820</td><td>Remark, Chemistry O.L. June 2026 (its own payment)</td><td>—</td></tr>
   <tr><td>18 Oct 2026</td><td>—</td><td class="right num">+3,820 to escrow</td><td>the remark changed the grade: refunded by the service's rule (today: the whole fee; Q-21)</td><td></td></tr>
   </tbody></table>
   <div class="hint">Escrow: 3,820 free · Outstanding: EGP 19,400 (board fee provisional: due once confirmed, then 30 Nov 2026 or confirmation + 7 days) · Reminders start when the line is payable.</div></div>`;
