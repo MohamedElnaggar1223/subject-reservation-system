@@ -103,7 +103,7 @@ available until we show her the work again (no questions to her meanwhile); othe
 exist, but "work with what we have for now"; no WhatsApp Business account — postpone the
 integration, keep it in mind; "take your time". Trail: `.audit/school-forms.tsv`.
 
-**Status (7 Oct 2026, 19:10Z).** Phase 1 done: `SCHOOL_FORMS.md`, confirmed by the owner
+**Status (7 Oct 2026, 19:08Z).** Phase 1 done: `SCHOOL_FORMS.md`, confirmed by the owner
 ("let's do it"). Phase 2 done to the review gate: `RESERVATIONS_REWORK.md` version 8 and the
 prototype `docs/prototype/reservations-rework.html`, after six Opus 5.5 reviews and two diff
 checks (its §16), the last verdict "ready for the owner"; the owner's questions Q-15 and Q-19 to
