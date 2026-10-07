@@ -99,33 +99,8 @@ export type ListBoardSeriesQueryType = z.infer<typeof ListBoardSeriesQuery>;
 
 // ─── A window's series ───────────────────────────────────────────────────────
 
-/**
- * The whole set of series a window feeds, replacing what was there (the
- * window's series panel saves in one go):
- * - `series`: each series the window feeds; per board one is the default,
- *   where that board's subjects are entered unless routed elsewhere.
- * - `routes`: a subject entered in another of the window's series of its
- *   board than the default ("Biology papers sit in January").
- *
- * Every series must be in the window's academic year and, like the window,
- * a June series or not (grade 10 sits June only; graduates retake October,
- * November and January), so a student's eligibility has one answer for the
- * whole window (F0a's mayRegisterFor). A series with registrations cannot
- * leave the window; every board with registrations keeps a series.
- */
-export const SetSessionBoardSeries = z.object({
-  series: z
-    .array(z.object({ boardSeriesId: z.string().min(1), isDefault: z.boolean() }))
-    .max(12)
-    .refine((s) => new Set(s.map((x) => x.boardSeriesId)).size === s.length, 'Each series once'),
-  routes: z
-    .array(z.object({ subjectId: z.string().min(1), boardSeriesId: z.string().min(1) }))
-    .max(200)
-    .refine((r) => new Set(r.map((x) => x.subjectId)).size === r.length, 'Each subject once')
-    .default([]),
-  reason: z.string().trim().max(500).optional(),
-});
-export type SetSessionBoardSeriesType = z.infer<typeof SetSessionBoardSeries>;
+// The window's series panel (PUT /sessions/:id/board-series, SetSessionBoardSeries) is gone since the
+// reservations rework: a session's series are attached by its items (RESERVATIONS_REWORK.md §3.3).
 
 /**
  * Move registrations to another series the same window feeds, of the same
