@@ -577,7 +577,7 @@ describe("08n: past a line's own deadline (flags 59, 60)", () => {
 
     // A family reserves and pays A; the board's deadline then passes: the entry is the board's.
     const f = await onboard(officer, `n08x-${RUN}`, 11);
-    const [line] = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, subjectIds: [a.sub], studentId: f.studentId } })))!;
+    const [line] = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, ...(await reservationOf(june, [a.sub])), studentId: f.studentId } })))!;
     const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } })))!.id!;
     await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay }, json: { instrumentUsed: 'cash' } }));
     await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [dated]);
