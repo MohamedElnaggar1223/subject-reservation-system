@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reservations rework — prototype (RESERVATIONS_REWORK.md §13)</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1b1f24; --muted:#5b6470; --line:#e3e6ea; --accent:#1f5eff; --warn:#b45309; --warnbg:#fff7ed; --ok:#15803d; --okbg:#f0fdf4; --bad:#b91c1c; --badbg:#fef2f2; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color:var(--ink); background:var(--bg); }
+  header { background:#fff; border-bottom:1px solid var(--line); padding:10px 20px; display:flex; gap:18px; align-items:center; flex-wrap:wrap; position:sticky; top:0; z-index:5; }
+  header b { margin-right:8px; }
+  header a { color:var(--muted); text-decoration:none; padding:6px 8px; border-radius:6px; cursor:pointer; }
+  header a.on { color:var(--ink); background:#eef2ff; }
+  header .note { margin-left:auto; color:var(--muted); font-size:12px; }
+  main { max-width:1180px; margin:18px auto; padding:0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+  h1 { font-size:20px; margin:0 0 6px; } h2 { font-size:15px; margin:14px 0 8px; } h3 { font-size:13px; margin:10px 0 6px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  .muted { color:var(--muted); } .small { font-size:12px; }
+  table { width:100%; border-collapse:collapse; } th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; } th { font-weight:600; color:var(--muted); font-size:12px; }
+  tr.click { cursor:pointer; } tr.click:hover { background:#fafbff; }
+  .badge { display:inline-block; padding:1px 7px; border-radius:999px; font-size:11px; border:1px solid var(--line); color:var(--muted); background:#fff; margin-right:4px; white-space:nowrap; }
+  .badge.ok { color:var(--ok); background:var(--okbg); border-color:#bbf7d0; } .badge.warn { color:var(--warn); background:var(--warnbg); border-color:#fed7aa; } .badge.bad { color:var(--bad); background:var(--badbg); border-color:#fecaca; } .badge.acc { color:var(--accent); background:#eef2ff; border-color:#c7d2fe; }
+  button { font:inherit; padding:6px 12px; border-radius:7px; border:1px solid var(--line); background:#fff; cursor:pointer; } button.primary { background:var(--accent); color:#fff; border-color:var(--accent); } button.sm { padding:3px 8px; font-size:12px; } button:disabled { opacity:.5; cursor:default; }
+  input, select, textarea { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; } input[type=number] { width:110px; } label { display:block; font-size:12px; color:var(--muted); margin-bottom:3px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; } .row > div { min-width:140px; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:10px 0; } .tabs a { padding:8px 12px; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; } .tabs a.on { color:var(--ink); border-color:var(--accent); }
+  .right { text-align:right; } .num { font-variant-numeric:tabular-nums; }
+  .drawer { position:fixed; top:0; right:0; width:520px; max-width:95vw; height:100vh; background:#fff; border-left:1px solid var(--line); box-shadow:-8px 0 24px rgba(0,0,0,.08); padding:18px; overflow:auto; z-index:9; display:none; } .drawer.open { display:block; }
+  .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#1b1f24; color:#fff; padding:10px 14px; border-radius:8px; display:none; z-index:10; }
+  .sub { padding-left:22px; color:var(--muted); }
+  .total { font-size:16px; font-weight:600; }
+  .callout { background:var(--warnbg); border:1px solid #fed7aa; color:#7c2d12; padding:8px 10px; border-radius:8px; font-size:12px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; } @media (max-width:800px){ .grid2{grid-template-columns:1fr} }
+  .hint { font-size:12px; color:var(--muted); margin-top:4px; }
+  .sentence { background:#eef2ff; border:1px solid #c7d2fe; padding:8px 10px; border-radius:8px; margin:8px 0; }
+  pre { white-space:pre-wrap; font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background:#f3f4f6; padding:8px; border-radius:6px; }
+</style>
+</head>
+<body>
+<header>
+  <b>IGCSE — prototype</b>
+  <a data-page="sessions">Sessions</a>
+  <a data-page="session">Session · June 2027</a>
+  <a data-page="desk">Reserve (desk)</a>
+  <a data-page="family">Reserve (family)</a>
+  <a data-page="statement">Statement</a>
+  <a data-page="exceptions">Exceptions</a>
+  <a data-page="messages">Messages &amp; reminders</a>
+  <span class="note">Static prototype of RESERVATIONS_REWORK.md §4. Fixture data shaped like SCHOOL_FORMS.md §2; teacher and student names are placeholders; course fees are illustrative; board fees are the June 2026 lists.</span>
+</header>
+<main id="main"></main>
+<div class="drawer" id="drawer"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ───────────────────────── fixture ─────────────────────────
+const series = [
+  { id:'cam-j27', board:'Cambridge', name:'Cambridge June 2027', deadline:'20 Feb 2027' },
+  { id:'pe-j27',  board:'Pearson Edexcel', name:'Pearson Edexcel June 2027', deadline:'25 Feb 2027' },
+  { id:'ox-j27',  board:'OxfordAQA', name:'OxfordAQA June 2027', deadline:null },
+  { id:'cam-j26', board:'Cambridge', name:'Cambridge June 2026', deadline:'20 Feb 2026' },
+  { id:'cam-n26', board:'Cambridge', name:'Cambridge November 2026', deadline:'20 Aug 2026' },
+  { id:'cam-n25', board:'Cambridge', name:'Cambridge November 2025', deadline:'20 Aug 2025' },
+  { id:'pe-j26',  board:'Pearson Edexcel', name:'Pearson Edexcel June 2026', deadline:'25 Feb 2026' },
+  { id:'pe-jan26',board:'Pearson Edexcel', name:'Pearson Edexcel January 2026', deadline:'20 Oct 2025' },
+];
+// board fees per series, keyed by what an item enters (unit, option or award code)
+const boardFees = {
+  'cam-j27': { '3180/A':9850, '0970/CX':10850, '0986/AX':9850, '0971/CX':10850, '0653/CX':10850, '0984/AX':9850, '7156/X':12550, '0983/DY':12950, '0972/CX':10850,
+               '9702/S':14100, '9702/BX-CQ':11400, '9702/AX-HX':18600, '9701/S':14100, '9701/AX-HX':18600, '9618/SY':11400, '9618/BY-CT':12450, '9618/AY':16950,
+               'EAR/1/igcse':1650, 'EAR/1/al':1890, 'EAR/1S/igcse':3590, 'EAR/1S/al':3640, 'EAR/2/igcse':3820, 'EAR/2/al':4550, 'EAR/2S/igcse':5760, 'EAR/2S/al':6530 },
+  'pe-j27':  { 'WMA11':4800, 'WMA12':4800, 'WMA13':4800, 'WMA14':4800, 'WME01':4450, 'WST01':4450, 'WBI11':4450, 'WBI12':4450, 'WBI13':4450, 'WBI14':4450, 'WBI15':4450, 'WBI16':4450, '4MA1/1H':4600, '4MA1/2H':4600, 'WAA01':8950, 'WAA02':9350, '9AA1':9350 },
+  'ox-j27':  { },
+};
+const T = n => `Teacher ${n}`;
+const offers = [
+  // O.L.
+  { id:'ar',  level:'ol', subject:'Arabic O.L.', board:'Cambridge', seriesId:'cam-j27', availability:'open', courseFee:12000, teachers:[{n:T(1)},{n:T(2)},{n:T(3)}],
+    items:[ {id:'ar-w', label:'Whole subject (3180, option A)', enters:'3180/A', kind:'award'}, {id:'ar-p1', label:'Paper 1 only (retake)', enters:'3180/A', kind:'paper', availability:'retake_only', needsPrior:true, courseFee:6000}, {id:'ar-p2', label:'Paper 2 only (retake)', enters:'3180/A', kind:'paper', availability:'retake_only', needsPrior:true, courseFee:6000} ] },
+  { id:'bi',  level:'ol', subject:'Biology O.L.', board:'Cambridge', seriesId:'cam-j27', availability:'open', courseFee:14000, teachers:[{n:T(4)},{n:T(5)},{n:T(6)}], core:true,
+    items:[ {id:'bi-w', label:'Whole subject (0970, option CX)', enters:'0970/CX', kind:'award'}, {id:'bi-p4', label:'Paper 4 only (retake)', enters:'0970/CX', kind:'paper', availability:'retake_only', needsPrior:true, courseFee:7000} ] },
+  { id:'bu',  level:'ol', subject:'Business O.L.', board:'Cambridge', seriesId:'cam-j27', availability:'open', courseFee:12000, teachers:[{n:T(7)}],
+    items:[ {id:'bu-w', label:'Whole subject (0986, option AX)', enters:'0986/AX', kind:'award'} ] },
+  { id:'ch',  level:'ol', subject:'Chemistry O.L.', board:'Cambridge', seriesId:'cam-j27', availability:'open', courseFee:14000, teachers:[{n:T(8)},{n:T(9)},{n:T(10)}], core:true,
+    items:[ {id:'ch-w', label:'Whole subject (0971, option CX)', enters:'0971/CX', kind:'award'}, {id:'ch-p4', label:'Paper 4 only (retake)', enters:'0971/CX', kind:'paper', availability:'retake_only', needsPrior:true, courseFee:7000} ] },
+  { id:'cs',  level:'ol', subject:'Computer Science O.L.', board:'Cambridge', seriesId:'cam-j27', availability:'open', courseFee:13000, provider:'External team',
+    items:[ {id:'cs-w', label:'Whole subject (0984, option AX)', enters:'0984/AX', kind:'award'}, {id:'cs-p4', label:'Paper 4 only (retake)', enters:'0984/AX', kind:'paper', availability:'retake_only', needsPrior:true, courseFee:6500} ] },
+  { id:'en',  level:'ol', subject:'English as a Second Language', board:'OxfordAQA', seriesId:'ox-j27', availability:'open', courseFee:11000, teachers:[{n:T(11)},{n:T(12)}], core:true,
+    items:[ {id:'en-w', label:'Whole subject (ESL)', enters:'ESL', kind:'award'} ] },
+  { id:'gp',  level:'ol', subject:'Global Perspectives O.L.', board:'Cambridge', seriesId:'cam-j27', availability:'open', courseFee:9000, teachers:[{n:T(13), mode:'online'}],
+    items:[ {id:'gp-w', label:'Whole subject (0457)', enters:'0457', kind:'award'} ] },
+  { id:'ma',  level:'ol', subject:'Mathematics O.L.', board:'Pearson Edexcel', seriesId:'pe-j27', availability:'open', courseFee:14000, teachers:[{n:T(14)},{n:T(15)},{n:T(16)}], core:true,
+    items:[ {id:'ma-w', label:'Whole subject (4MA1, papers 1H and 2H)', enters:['4MA1/1H','4MA1/2H'], kind:'award'}, {id:'ma-1h', label:'Paper 1H only (retake)', enters:'4MA1/1H', kind:'paper', availability:'retake_only', needsPrior:true, courseFee:7000}, {id:'ma-2h', label:'Paper 2H only (retake)', enters:'4MA1/2H', kind:'paper', availability:'retake_only', needsPrior:true, courseFee:7000} ] },
+  { id:'ph',  level:'ol', subject:'Physics O.L.', board:'Cambridge', seriesId:'cam-j27', availability:'open', courseFee:14000, teachers:[{n:T(17)}],
+    items:[ {id:'ph-w', label:'Whole subject (0972, option CX)', enters:'0972/CX', kind:'award'}, {id:'ph-p4', label:'Paper 4 only (retake)', enters:'0972/CX', kind:'paper', availability:'retake_only', needsPrior:true, courseFee:7000} ] },
+  { id:'ict', level:'ol', subject:'ICT O.L.', board:'Cambridge', seriesId:'cam-j27', availability:'open', courseFee:13000, provider:'External team',
+    items:[ {id:'ict-w', label:'Whole subject (0983, option DY)', enters:'0983/DY', kind:'award'}, {id:'ict-th', label:'Theory paper only (retake)', enters:'0983/DY', kind:'paper', availability:'retake_only', needsPrior:true, courseFee:6500} ] },
+  // A.S. / A.L.
+  { id:'mal', level:'al', subject:'Mathematics A.S./A.L.', board:'Pearson Edexcel', seriesId:'pe-j27', availability:'open', courseFee:null, perUnit:true,
+    items:[ {id:'p1', label:'Pure Mathematics 1 (P1, WMA11)', enters:'WMA11', kind:'unit', courseFee:5000, teachers:[{n:T(18), mode:'online'}]},
+            {id:'p2', label:'Pure Mathematics 2 (P2, WMA12)', enters:'WMA12', kind:'unit', courseFee:5000, teachers:[{n:T(18), mode:'online'}]},
+            {id:'p3', label:'Pure Mathematics 3 (P3, WMA13)', enters:'WMA13', kind:'unit', courseFee:5000, teachers:[{n:T(18)}]},
+            {id:'p4', label:'Pure Mathematics 4 (P4, WMA14)', enters:'WMA14', kind:'unit', courseFee:5000, teachers:[{n:T(18)}]},
+            {id:'m1', label:'Mechanics 1 (M1, WME01)', enters:'WME01', kind:'unit', courseFee:5000, teachers:[{n:T(19)},{n:T(18)}]},
+            {id:'s1', label:'Statistics 1 (S1, WST01)', enters:'WST01', kind:'unit', courseFee:5000, teachers:[{n:T(19)},{n:T(18)}]} ] },
+  { id:'phl', level:'al', subject:'Physics A.S./A.L.', board:'Cambridge', seriesId:'cam-j27', availability:'open', courseFee:null, teachers:[{n:T(17)}],
+    items:[ {id:'ph-as', label:'A.S. (9702, option S1/S2)', enters:'9702/S', kind:'route', courseFee:16000},
+            {id:'ph-a2', label:'A.2. — carry forward the A.S. result (option BX/CQ)', enters:'9702/BX-CQ', kind:'route', availability:'self_study_only', needsPrior:true, courseFee:16000},
+            {id:'ph-al', label:'A Level in one sitting (option AX/HX)', enters:'9702/AX-HX', kind:'route', courseFee:30000} ] },
+  { id:'bil', level:'al', subject:'Biology A.S./A.L.', board:'Pearson Edexcel', seriesId:'pe-j27', availability:'open', courseFee:null, teachers:[{n:T(20)}], perUnit:true,
+    items:[ {id:'wbi15', label:'A.2. Paper 5 (WBI15)', enters:'WBI15', kind:'unit', courseFee:5500},
+            {id:'wbi16', label:'A.2. Paper 6 (WBI16)', enters:'WBI16', kind:'unit', courseFee:5500},
+            {id:'wbi11', label:'A.S. Paper 1 (WBI11)', enters:'WBI11', kind:'unit', courseFee:5500, availability:'self_study_only'},
+            {id:'wbi12', label:'A.S. Paper 2 (WBI12)', enters:'WBI12', kind:'unit', courseFee:5500, availability:'self_study_only'},
+            {id:'wbi13', label:'A.S. Paper 3 (WBI13)', enters:'WBI13', kind:'unit', courseFee:5500, availability:'self_study_only'},
+            {id:'wbi14', label:'A.2. Paper 4 (WBI14)', enters:'WBI14', kind:'unit', courseFee:5500, availability:'self_study_only'} ] },
+  { id:'chl', level:'al', subject:'Chemistry A.S./A.L.', board:'Cambridge', seriesId:'cam-j27', availability:'open', courseFee:null, teachers:[{n:T(8)}],
+    items:[ {id:'ch-as', label:'A.S. (9701, option S1/S2)', enters:'9701/S', kind:'route', courseFee:16000}, {id:'ch-al', label:'A Level in one sitting (option AX/HX)', enters:'9701/AX-HX', kind:'route', courseFee:30000} ] },
+  { id:'arl', level:'al', subject:'Arabic A.L.', board:'Pearson Edexcel', seriesId:'pe-j27', availability:'open', courseFee:null,
+    items:[ {id:'ar-ial', label:'IAL Arabic (YAA01: WAA01 + WAA02)', enters:['WAA01','WAA02'], kind:'award', courseFee:18000, teachers:[{n:T(1)}]}, {id:'ar-gce', label:'GCE Arabic (9AA1)', enters:'9AA1', kind:'award', courseFee:18000, teachers:[{n:T(3)}]} ] },
+  { id:'csl', level:'al', subject:'Computer Science A.S./A.L.', board:'Cambridge', seriesId:'cam-j27', availability:'open', courseFee:null, provider:'External',
+    items:[ {id:'cs-as', label:'A.S. (9618, option SY)', enters:'9618/SY', kind:'route', courseFee:16000}, {id:'cs-a2', label:'A.2. — carry forward the A.S. result (option BY/CT)', enters:'9618/BY-CT', kind:'route', needsPrior:true, courseFee:16000}, {id:'cs-al', label:'A Level in one sitting (option AY)', enters:'9618/AY', kind:'route', courseFee:30000} ] },
+];
+const policies = { selfStudyCourse:50, selfStudyBoard:100, retakeTaughtCourse:100 };
+const students = [
+  { id:'s1', name:'Student A', section:'11C', grade:11, history:[], lines:[], exceptions:[] },
+  { id:'s2', name:'Student B', section:'12A', grade:12, history:[{enters:'0970/CX', seriesId:'cam-j26'}, {enters:'4MA1/1H', seriesId:'pe-j26'}, {enters:'4MA1/2H', seriesId:'pe-j26'}, {enters:'9702/S', seriesId:'cam-j26'}], lines:[], exceptions:[] },
+  { id:'s3', name:'Student C', section:'12B', grade:12, history:[{enters:'WBI11', seriesId:'pe-jan26'},{enters:'WBI12', seriesId:'pe-jan26'}], lines:[], exceptions:[{policy:'price.discountPercent', value:20, scope:'June 2027 · Biology A.S./A.L.', offerId:'bil'}] },
+  { id:'s4', name:'Student D', section:'10A', grade:10, history:[], lines:[], exceptions:[] },
+];
+// a few existing lines for the money tab and the statement (all for June 2027)
+const existing = [
+  { student:'Student E', section:'11A', family:'Family E', line:'Biology O.L. — whole, first entry', price:24850, paid:24850, due:'30 Nov 2026', receipt:'#1042' },
+  { student:'Student E', section:'11A', family:'Family E', line:'Chemistry O.L. — whole, first entry', price:24850, paid:24850, due:'30 Nov 2026', receipt:'#1042' },
+  { student:'Student F', section:'11B', family:'Family F', line:'Mathematics O.L. — whole, first entry', price:23200, paid:0, due:'30 Nov 2026', receipt:'' },
+  { student:'Student G', section:'12C', family:'Family G', line:'Mathematics A.S./A.L. — P3, first entry', price:9800, paid:9800, due:'30 Nov 2026', receipt:'#1051' },
+  { student:'Student G', section:'12C', family:'Family G', line:'Mathematics A.S./A.L. — M1, first entry', price:9450, paid:0, due:'30 Nov 2026', receipt:'' },
+  { student:'Student H', section:'12D', family:'Family H', line:'Physics A.S./A.L. — A.2. carry forward (June 2026), retake self-study', price:19400, paid:0, due:'30 Nov 2026', receipt:'' },
+  { student:'Student H', section:'12D', family:'Family H', line:'Remark: Chemistry O.L. June 2026, service 2 (per component)', price:3820, paid:3820, due:'—', receipt:'#1060', charge:true },
+];
+
+// ───────────────────────── helpers ─────────────────────────
+const $ = s => document.querySelector(s);
+const fmt = n => n == null ? '—' : Math.round(n).toLocaleString('en-EG');
+const seriesById = id => series.find(s => s.id === id);
+const offerSeries = o => seriesById(o.seriesId);
+function boardFeeOf(item, o) {
+  const table = boardFees[o.seriesId] || {};
+  const keys = Array.isArray(item.enters) ? item.enters : [item.enters];
+  let sum = 0; for (const k of keys) { if (table[k] == null) return null; sum += table[k]; }
+  return sum;
+}
+function courseFeeOf(item, o) { return item.courseFee != null ? item.courseFee : o.courseFee; }
+function itemAvailability(item, o) { return item.availability || o.availability; }
+function itemTeachers(item, o) { return item.teachers || o.teachers || []; }
+function known(student, item) { const keys = Array.isArray(item.enters) ? item.enters : [item.enters]; return student.history.filter(h => keys.includes(h.enters)); }
+function price(item, o, kind, student) {
+  const course = courseFeeOf(item, o) || 0, board = boardFeeOf(item, o);
+  const cPct = kind === 'retake_self_study' ? policies.selfStudyCourse : kind === 'retake_taught' ? policies.retakeTaughtCourse : 100;
+  const bPct = kind === 'retake_self_study' ? policies.selfStudyBoard : 100;
+  let c = course * cPct / 100, b = (board || 0) * bPct / 100;
+  const ex = (student?.exceptions || []).filter(e => e.policy === 'price.discountPercent' && (!e.offerId || e.offerId === o.id));
+  const basisParts = [`course ${fmt(course)} × ${cPct}%`, `board ${board == null ? 'not set' : fmt(board)} × ${bPct}%`];
+  for (const e of ex) { c = c * (100 - e.value) / 100; b = b * (100 - e.value) / 100; basisParts.push(`discount ${e.value}% (exception)`); }
+  return { course:c, board:b, total:c + b, basis:basisParts.join(' + '), boardMissing: board == null };
+}
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 2600); }
+function openDrawer(html) { const d = $('#drawer'); d.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><b>Offer</b><button class="sm" onclick="closeDrawer()">Close</button></div>` + html; d.classList.add('open'); }
+function closeDrawer() { $('#drawer').classList.remove('open'); }
+const avLabel = { open:'first entries and retakes', retake_only:'retake only', self_study_only:'self-study only', closed:'closed' };
+
+// ───────────────────────── pages ─────────────────────────
+const pages = {};
+let state = { page:'session', tab:'subjects', studentId:'s2', mode:'desk', picks:{}, consent:false, collect:true, instrument:'cash', granted:[], filter:'all' };
+
+pages.sessions = () => `
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center"><h1>Sessions</h1>
+    <div><button class="primary" onclick="newSession()">New session</button></div></div>
+  <table><thead><tr><th>Session</th><th>Status</th><th>Reserve</th><th>Course starts</th><th>Due</th><th>Subjects</th><th>Deadlines</th><th>Lines</th><th></th></tr></thead><tbody>
+    <tr class="click" onclick="go('session')"><td><b>June 2027</b></td><td><span class="badge ok">open</span></td><td>15 Sep 2026 – 15 Feb 2027</td><td>20 Sep 2026</td><td>30 Nov 2026</td><td>${offers.length} · 3 boards</td>
+      <td>${series.slice(0,3).map(s => `<span class="badge ${s.deadline ? 'ok' : 'warn'}">${s.board} ${s.deadline || '⚠ not set'}</span>`).join('')}</td>
+      <td class="num">${existing.length} · ${existing.filter(e=>e.paid).length} paid</td><td><button class="sm">Open</button> <button class="sm" onclick="event.stopPropagation();go('session','money')">Money</button></td></tr>
+    <tr class="click"><td><b>November 2026 – January 2027</b></td><td><span class="badge ok">open</span></td><td>1 Sep – 10 Oct 2026</td><td>7 Sep 2026</td><td>5 Oct 2026</td><td>18 · 3 boards</td>
+      <td><span class="badge ok">Pearson Oct 20 Aug</span><span class="badge ok">Cambridge Nov 20 Aug</span><span class="badge ok">Oxford Nov 25 Aug</span><span class="badge ok">Pearson Jan 20 Oct</span></td><td class="num">201 · 160 paid</td><td><button class="sm">Open</button></td></tr>
+    <tr class="click muted"><td>June 2026</td><td><span class="badge">closed</span></td><td>15 Sep 2025 – 15 Feb 2026</td><td>20 Sep 2025</td><td>30 Nov 2025</td><td>24 · 3 boards</td><td></td><td class="num">434 · 434 paid</td><td></td></tr>
+  </tbody></table>
+</div>
+<div class="card" id="newSession" style="display:none">
+  <h2>New session</h2>
+  <div class="row">
+    <div><label>Type</label><select id="ns-type"><option value="june">June</option><option value="winter">Winter (October / November and January)</option></select></div>
+    <div><label>Year</label><input type="number" id="ns-year" value="2028"></div>
+    <div><label>Reserve from</label><input type="date" value="2027-09-15"></div>
+    <div><label>Reserve to</label><input type="date" value="2028-02-15"></div>
+    <div><label>Course starts</label><input type="date" value="2027-09-20"></div>
+    <div><label>Payment due</label><input type="date" value="2027-11-30"></div>
+  </div>
+  <div class="hint">Name: <b id="ns-name">June 2028</b> · series attached as subjects are added · refund policy: June (100% to week 2, 50% in week 3, 0% from week 4)</div>
+  <div style="margin-top:10px"><button class="primary" onclick="toast('Session June 2028 created (draft) — add subjects or copy from June 2027')">Create</button> <button onclick="toast('Copied 16 subjects, teachers, items and course fees from June 2027; board fees to enter for 3 series')">Create and copy from June 2027</button></div>
+</div>`;
+function newSession() { const el = $('#newSession'); el.style.display = el.style.display === 'none' ? 'block' : 'none'; $('#ns-type').onchange = $('#ns-year').oninput = () => { const t = $('#ns-type').value, y = +$('#ns-year').value; $('#ns-name').textContent = t === 'june' ? `June ${y}` : `November ${y} – January ${y+1}`; }; }
+
+pages.session = () => {
+  const tabs = ['subjects','fees','money','grade10'].map(t => `<a class="${state.tab===t?'on':''}" onclick="go('session','${t}')">${{subjects:'Subjects',fees:'Fees',money:'Money',grade10:'Grade 10'}[t]}</a>`).join('');
+  const head = `<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><h1>June 2027 <span class="badge ok">open</span></h1>
+    <div class="muted">reserve 15 Sep 2026 – 15 Feb 2027 · course starts 20 Sep 2026 · payment due 30 Nov 2026 · refund 100% to week 2, 50% in week 3, 0% from week 4</div>
+    <div style="margin-top:6px">${series.slice(0,3).map(s => `<span class="badge ${s.deadline?'ok':'warn'}">${s.name}: entry deadline ${s.deadline || '⚠ not set — set it on Board series'}</span>`).join('')}</div></div>
+    <div><button>Edit</button> <button>Close session</button></div></div><div class="tabs">${tabs}</div>${({subjects:subjectsTab,fees:feesTab,money:moneyTab,grade10:grade10Tab})[state.tab]()}</div>`;
+  return head;
+};
+function subjectsTab() {
+  const rows = lvl => offers.filter(o => o.level === lvl).map(o => {
+    const teachers = o.provider ? `<span class="badge acc">${o.provider} (external)</span>` : o.perUnit ? '<span class="muted">per unit</span>' : (o.teachers||[]).map(t => `<span class="badge">${t.n}${t.mode==='online'?' · online':''}</span>`).join('');
+    const items = o.items.map(i => { const bf = boardFeeOf(i, o); return `<span class="badge ${itemAvailability(i,o)==='open'?'':'warn'}">${i.label.replace(/\s\(.*?\)/,'')}${itemAvailability(i,o)!=='open'?' · '+avLabel[itemAvailability(i,o)]:''}${bf==null?' · ⚠ no board fee':''}</span>`; }).join(' ');
+    const bf = o.items.map(i => boardFeeOf(i,o)).filter(x => x != null);
+    return `<tr class="click" onclick="openOffer('${o.id}')"><td><b>${o.subject}</b>${o.core?' <span class="badge acc">grade-10 core</span>':''}</td><td>${o.board}<div class="small muted">${offerSeries(o).name}</div></td><td>${teachers}</td><td>${items}</td><td class="num right">${o.courseFee!=null?fmt(o.courseFee):'per item'}</td><td class="num right">${bf.length?fmt(Math.min(...bf))+(bf.length>1?'+':''):'<span class="badge warn">⚠ not set</span>'}</td></tr>`;
+  }).join('');
+  return `<div style="display:flex;justify-content:space-between;align-items:center"><div class="muted">${offers.length} subjects · every row is one line of the school's links sheet</div><div><button onclick="toast('Search the catalogue; the board, the awards and the items come from it')">+ Add subject</button> <button onclick="toast('Copy from June 2026: offers, teachers, items, availability and course fees; board fees per series to enter')">Copy from…</button></div></div>
+  <h3>O.L.</h3><table><thead><tr><th>Subject</th><th>Board · series</th><th>Teachers</th><th>What can be entered</th><th class="right">Course fee</th><th class="right">Board fee</th></tr></thead><tbody>${rows('ol')}</tbody></table>
+  <h3>A.S. / A.L.</h3><table><thead><tr><th>Subject</th><th>Board · series</th><th>Teachers</th><th>What can be entered</th><th class="right">Course fee</th><th class="right">Board fee</th></tr></thead><tbody>${rows('al')}</tbody></table>`;
+}
+function openOffer(id) {
+  const o = offers.find(x => x.id === id);
+  openDrawer(`<h2 style="margin-top:8px">${o.subject} <span class="badge">${o.board}</span></h2>
+  <div class="row"><div><label>Availability</label><select>${Object.entries(avLabel).map(([k,v]) => `<option ${o.availability===k?'selected':''}>${v}</option>`).join('')}</select></div>
+  <div><label>Course fee (first entry, in school)</label><input type="number" value="${o.courseFee ?? ''}" placeholder="per item"></div>
+  <div><label>Course starts (override)</label><input type="date" placeholder="session's"></div>
+  <div><label>Grade-10 core</label><input type="checkbox" ${o.core?'checked':''}></div></div>
+  <h3>Teachers this cycle</h3>${o.provider ? `<span class="badge acc">${o.provider} (external)</span>` : (o.teachers||[]).map(t => `<span class="badge">${t.n} · ${t.mode||'in school'}</span>`).join('') || '<span class="muted">per unit (below)</span>'} <button class="sm" onclick="toast('Pick from the subject\\'s teacher pool, or add a teacher to it')">+ Teacher</button>
+  <h3>Items (what a family can tick)</h3>
+  <table><thead><tr><th>Item</th><th>Series</th><th>Availability</th><th class="right">Course</th><th class="right">Board</th><th>Teachers</th></tr></thead><tbody>
+  ${o.items.map(i => `<tr><td>${i.label}${i.needsPrior?' <span class="badge">names the prior sitting</span>':''}${i.required?' <span class="badge acc">required</span>':''}</td><td><select>${series.filter(s=>s.board===o.board && s.id.endsWith('j27')).map(s=>`<option>${s.name}</option>`).join('')}</select></td><td><select>${Object.entries(avLabel).map(([k,v]) => `<option ${itemAvailability(i,o)===k?'selected':''}>${v}</option>`).join('')}</select></td><td class="right num">${fmt(courseFeeOf(i,o))}</td><td class="right num">${boardFeeOf(i,o)==null?'<span class="badge warn">⚠ set on Fees</span>':fmt(boardFeeOf(i,o))}</td><td>${(i.teachers||[]).map(t=>`<span class="badge">${t.n}${t.mode==='online'?' · online':''}</span>`).join('')||'<span class="muted">the offer\'s</span>'}</td></tr>`).join('')}
+  </tbody></table>
+  <div class="hint">Items are generated from the catalogue (the award, its units, its option codes); tick which are open this cycle. A one-paper retake item names the paper and asks the family for the sitting it carries from.</div>
+  <div style="margin-top:12px"><button class="primary" onclick="toast('Saved; audited');closeDrawer()">Save</button> <button onclick="closeDrawer()">Cancel</button></div>`);
+}
+function feesTab() {
+  return `<div class="muted">One grid per series the session feeds, in the shape of the board's fee list. Paste the PDF's rows (code and amount); unknown codes are listed to map.</div>
+  ${series.slice(0,3).map(s => { const t = boardFees[s.id] || {}; const rows = Object.entries(t); return `<div class="card" style="margin-top:10px"><div style="display:flex;justify-content:space-between"><b>${s.name}</b><div><button class="sm" onclick="toast('Copied ${s.board} June 2026; rows to re-enter highlighted')">Copy from ${s.board} June 2026</button> <button class="sm" onclick="toast('Paste rows like: 0970/CX 10850')">Paste rows</button></div></div>
+    ${rows.length ? `<table><thead><tr><th>What it prices</th><th class="right">EGP</th></tr></thead><tbody>${rows.map(([k,v]) => `<tr><td>${k.startsWith('EAR')?'Enquiry about results — service '+k.split('/')[1]+' ('+(k.endsWith('igcse')?'IGCSE':'AS / A Level')+', per component)':k}</td><td class="right"><input type="number" value="${v}"></td></tr>`).join('')}</tbody></table>` : `<div class="callout" style="margin-top:8px">No fees yet. English as a Second Language cannot be reserved until its fee is set (or set 0 with a reason).</div>`}</div>`; }).join('')}`;
+}
+function moneyTab() {
+  const f = state.filter;
+  const rows = existing.filter(e => f==='all' || (f==='unpaid' && !e.paid) || (f==='paid' && e.paid));
+  const out = existing.filter(e=>!e.paid).reduce((a,e)=>a+e.price,0);
+  return `<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><b>${existing.length} lines</b> · ${existing.filter(e=>e.paid).length} paid · ${existing.filter(e=>!e.paid).length} unpaid · <b>EGP ${fmt(out)}</b> outstanding · due 30 Nov 2026</div>
+  <div>${['all','unpaid','paid'].map(x=>`<button class="sm ${f===x?'primary':''}" onclick="state.filter='${x}';render()">${x}</button>`).join(' ')} <button class="sm" onclick="toast('Payment reminder sent to the unpaid families (email + in-app); logged')">Remind unpaid</button> <button class="sm">Export</button></div></div>
+  <table style="margin-top:8px"><thead><tr><th>Family</th><th>Student</th><th>Line</th><th class="right">Price</th><th class="right">Paid</th><th class="right">Outstanding</th><th>Due</th><th>Receipt</th></tr></thead><tbody>
+  ${rows.map(e => `<tr><td>${e.family}</td><td>${e.student} <span class="muted">${e.section}</span></td><td>${e.line}</td><td class="right num">${fmt(e.price)}</td><td class="right num">${fmt(e.paid)}</td><td class="right num">${e.paid?'—':`<span class="badge bad">${fmt(e.price-e.paid)}</span>`}</td><td>${e.due}</td><td>${e.receipt||'—'}</td></tr>`).join('')}
+  </tbody></table>`;
+}
+function grade10Tab() {
+  const core = offers.filter(o => o.core);
+  return `<div class="muted">The core subjects grade 10 sits in June (A-05). The school registers grade 10 itself (A-15, Q-10): preview every grade-10 student's lines, commit once; a second commit changes nothing.</div>
+  <table style="margin:8px 0"><thead><tr><th>Core offer</th><th>Item</th><th class="right">Price (first entry)</th></tr></thead><tbody>${core.map(o => { const i = o.items[0]; const p = price(i,o,'first_entry'); return `<tr><td><input type="checkbox" checked> ${o.subject}</td><td>${i.label}</td><td class="right num">${fmt(p.total)}</td></tr>`; }).join('')}</tbody></table>
+  <button onclick="toast('Preview: 112 grade-10 students × ${core.length} lines = ${112*core.length} lines; 3 students already have lines (skipped)')">Preview</button> <button class="primary" onclick="toast('Committed: ${112*core.length} lines awaiting payment; families told; audited')">Register grade 10</button>`;
+}
+
+// ───────────────────────── reserve (desk / family) ─────────────────────────
+function pickState(itemId) { return state.picks[itemId] || (state.picks[itemId] = { on:false, kind:null, teacher:null, prior:null }); }
+function defaultKind(item, o, student) {
+  const av = itemAvailability(item,o), k = known(student,item).length > 0;
+  if (av === 'self_study_only') return 'retake_self_study';
+  if (av === 'retake_only') return itemTeachers(item,o).length ? 'retake_taught' : 'retake_self_study';
+  return k ? (itemTeachers(item,o).length ? 'retake_taught' : 'retake_self_study') : 'first_entry';
+}
+function kindOptions(item, o, student, mode) {
+  const av = itemAvailability(item,o), isKnown = known(student,item).length > 0, hasT = itemTeachers(item,o).length > 0 || o.provider;
+  const opts = [];
+  if (av === 'open' && !isKnown) opts.push(['first_entry','first entry']);
+  if (av !== 'self_study_only' && hasT) opts.push(['retake_taught','retake, taught (100%)']);
+  opts.push(['retake_self_study','retake, self-study (50% course fee)']);
+  if (mode === 'family' && !isKnown && av === 'open') return opts.filter(x => x[0] === 'first_entry');
+  if (mode === 'family' && !isKnown && av !== 'open') return [];
+  return opts;
+}
+pages.desk = () => reservePage('desk');
+pages.family = () => reservePage('family');
+function reservePage(mode) {
+  state.mode = mode;
+  const student = students.find(s => s.id === state.studentId);
+  const lines = [];
+  const block = lvl => offers.filter(o => o.level === lvl).map(o => {
+    const items = o.items.map(i => {
+      const p = pickState(i.id); const opts = kindOptions(i,o,student,mode); const av = itemAvailability(i,o); const isKnown = known(student,i);
+      const closed = opts.length === 0;
+      if (p.on && !p.kind) p.kind = defaultKind(i,o,student);
+      if (p.on && !opts.find(x=>x[0]===p.kind)) p.kind = opts[0]?.[0] || null;
+      const teachers = itemTeachers(i,o);
+      if (p.on && p.kind !== 'retake_self_study' && !p.teacher && teachers.length === 1) p.teacher = teachers[0].n;
+      const pr = p.on && p.kind ? price(i,o,p.kind,student) : null;
+      const needsPrior = p.on && (i.needsPrior || (p.kind !== 'first_entry' && !isKnown.length));
+      const priorOpts = series.filter(s => s.board === o.board && !s.id.endsWith('j27'));
+      if (p.on && pr) lines.push({ o, i, p, pr, needsPrior, priorOk: !needsPrior || p.prior || isKnown.length });
+      return `<tr class="${closed?'muted':''}"><td style="width:28px"><input type="checkbox" ${p.on?'checked':''} ${closed?'disabled':''} onchange="pickState('${i.id}').on=this.checked;render()"></td>
+        <td>${i.label}${av!=='open'?` <span class="badge warn">${avLabel[av]}</span>`:''}${isKnown.length?` <span class="badge acc">sat ${seriesById(isKnown[0].seriesId).name.replace(/^\\S+ /,'')}</span>`:''}${closed&&mode==='family'?' <span class="badge">ask the desk</span>':''}</td>
+        <td>${p.on ? (p.kind==='retake_self_study' ? '<span class="muted">— self-study</span>' : (o.provider ? `<span class="badge acc">${o.provider}</span>` : teachers.length ? `<select onchange="pickState('${i.id}').teacher=this.value;render()"><option value="">teacher…</option>${teachers.map(t=>`<option ${p.teacher===t.n?'selected':''}>${t.n}${t.mode==='online'?' (online)':''}</option>`).join('')}</select>` : '')) : ''}</td>
+        <td>${p.on ? `<select onchange="pickState('${i.id}').kind=this.value;render()">${opts.map(([k,l])=>`<option value="${k}" ${p.kind===k?'selected':''}>${l}</option>`).join('')}</select>${needsPrior ? ` from <select onchange="pickState('${i.id}').prior=this.value;render()"><option value="">sitting…</option>${priorOpts.map(s=>`<option ${p.prior===s.id?'selected':''} value="${s.id}">${s.name}</option>`).join('')}</select>`:''}` : ''}</td>
+        <td class="right num">${pr ? (pr.boardMissing ? '<span class="badge warn">board fee not set</span>' : `<span title="${pr.basis}">${fmt(pr.total)}</span>`) : ''}</td></tr>`;
+    }).join('');
+    return `<tr><td colspan="5" style="background:#fafbfc"><b>${o.subject}</b> <span class="muted">${o.board}${o.perUnit?' · per unit':''}</span></td></tr>${items}`;
+  }).join('');
+  const olHtml = block('ol'), alHtml = block('al'); // the rows fill `lines`; the summary below reads it
+  const total = lines.reduce((a,l)=>a+l.pr.total,0);
+  const ready = lines.length && lines.every(l=>l.priorOk && !l.pr.boardMissing && (l.p.kind==='retake_self_study' || l.p.teacher || l.o.provider || !itemTeachers(l.i,l.o).length)) && (mode==='desk' ? state.consent : (state.consent && state.consent2));
+  const byDeadline = {}; for (const l of lines) { const s = offerSeries(l.o); (byDeadline[s.name] = byDeadline[s.name] || []).push(l); }
+  return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h1>${mode==='desk'?'Reserve at the desk':'Reserve'} <span class="badge">June 2027</span></h1>
+    <div class="row"><div><label>${mode==='desk'?'Student':'Child'}</label><select onchange="state.studentId=this.value;state.picks={};render()">${students.map(s=>`<option value="${s.id}" ${s.id===state.studentId?'selected':''}>${s.name} (${s.section})</option>`).join('')}</select></div><div><label>Session</label><select><option>June 2027</option><option>November 2026 – January 2027</option></select></div></div></div>
+    ${student.grade===10 ? '<div class="callout">Grade 10 in June: the core subjects are pre-ticked and locked (A-05).</div>' : ''}
+    ${student.exceptions.length ? `<div class="callout">Exceptions on this student: ${student.exceptions.map(e=>`${e.policy} ${e.value}% on ${e.scope}`).join('; ')}</div>` : ''}
+    <div class="hint">${mode==='desk' ? 'A retake is pre-set when the system knows the earlier sitting; for a new family, choose "retake" and name the sitting (recorded and audited). Self-study on a first entry needs an exception.' : 'What you can tick is what the school opened for you this cycle. A retake the school does not know about: ask the desk.'}</div>
+    <table style="margin-top:8px"><thead><tr><th></th><th>Subject · item</th><th>Teacher</th><th>Entry</th><th class="right">Price</th></tr></thead><tbody>${olHtml}${alHtml}</tbody></table>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:10px">
+      <div><span class="total">${lines.length} line${lines.length===1?'':'s'} · EGP ${fmt(total)}</span> <span class="muted">· due 30 Nov 2026 · ${Object.keys(byDeadline).length>1?`paid per entry deadline: ${Object.entries(byDeadline).map(([n,ls])=>`${n} ${fmt(ls.reduce((a,l)=>a+l.pr.total,0))}`).join(', ')}`:''}</span>
+        ${lines.some(l=>!l.priorOk)?'<div class="badge bad">name the prior sitting on each retake</div>':''}</div>
+      <div>${mode==='desk' ? `<label><input type="checkbox" ${state.consent?'checked':''} onchange="state.consent=this.checked;render()"> Refund policy and declaration read and signed by the parent</label>` : `<label><input type="checkbox" ${state.consent?'checked':''} onchange="state.consent=this.checked;render()"> I have read the refund policy (100% within 2 weeks of the first lesson, 50% in week 3, 0% from week 4)</label><label><input type="checkbox" ${state.consent2?'checked':''} onchange="state.consent2=this.checked;render()"> The information given is true, complete and accurate</label>`}</div>
+    </div>
+    <div style="margin-top:10px">${mode==='desk' ? `<button ${ready?'':'disabled'} onclick="toast('${lines.length} lines reserved, awaiting payment; slip printed')">Reserve only</button> <select onchange="state.instrument=this.value"><option value="cash">cash</option><option value="card">card</option><option value="instapay">InstaPay</option></select> <button class="primary" ${ready?'':'disabled'} onclick="toast('Reserved and collected EGP ${fmt(total)} (${Object.keys(byDeadline).length} payment${Object.keys(byDeadline).length===1?'':'s'}, one per entry deadline); ${lines.length} receipts printed')">Reserve and collect EGP ${fmt(total)}</button>` : `<button class="primary" ${ready?'':'disabled'} onclick="toast('Reserved: ${lines.length} lines awaiting payment — pay by exam series on the next screen')">Reserve ${lines.length?lines.length+' lines':''}</button>`}</div>
+  </div>`;
+}
+
+// ───────────────────────── statement ─────────────────────────
+pages.statement = () => {
+  const rows = existing.filter(e => e.student === 'Student H' || e.student === 'Student G');
+  return `<div class="card"><h1>Statement <span class="badge">Student H (12D)</span></h1>
+  <table><thead><tr><th>Line</th><th class="right">Price</th><th class="right">Paid</th><th class="right">Outstanding</th><th>Due</th><th>Receipt</th><th>Why this price</th></tr></thead><tbody>
+  ${existing.filter(e=>e.student==='Student H').map(e => `<tr><td>${e.line}</td><td class="right num">${fmt(e.price)}</td><td class="right num">${fmt(e.paid)}</td><td class="right num">${e.paid?'—':`<span class="badge bad">${fmt(e.price-e.paid)}</span>`}</td><td>${e.due}</td><td>${e.receipt||'—'}</td><td class="small muted">${e.charge?'EAR service 2, AS/A Level rate, 1 component':'course 16,000 × 50% + board 11,400 × 100%'}</td></tr>`).join('')}
+  <tr><td>School fee 2026/27</td><td class="right num">30,000</td><td class="right num">30,000</td><td class="right num">—</td><td>—</td><td>#0988</td><td class="small muted">grade 12 schedule</td></tr>
+  </tbody></table>
+  <h3>Payments</h3><table><thead><tr><th>Date</th><th>Instrument</th><th class="right">Amount</th><th>Covers</th><th>Receipt</th></tr></thead><tbody>
+  <tr><td>2 Sep 2026</td><td>InstaPay</td><td class="right num">30,000</td><td>School fee 2026/27</td><td>#0988</td></tr>
+  <tr><td>12 Oct 2026</td><td>cash (desk)</td><td class="right num">3,820</td><td>Remark, Chemistry O.L. June 2026</td><td>#1060</td></tr>
+  <tr><td>18 Oct 2026</td><td>—</td><td class="right num">+3,720 to escrow</td><td>the remark changed the grade: fee less 100 EGP refunded</td><td></td></tr>
+  </tbody></table>
+  <div class="hint">Escrow: 3,720 free · Outstanding: EGP 19,400 due 30 Nov 2026 · Reminders: 23 Nov, 27 Nov, 30 Nov, then every 3 days.</div></div>`;
+};
+
+// ───────────────────────── exceptions ─────────────────────────
+const registry = [
+  { key:'pricing.selfStudyCoursePercent', group:'Price', label:'Self-study course fee %', value:'percent', scopes:['session','offer','line'], roles:'finance admin, admin', s:(v,sc)=>`Charge ${v}% of the course fee instead of 50% on self-study lines ${sc}` },
+  { key:'pricing.selfStudyBoardPercent', group:'Price', label:'Self-study board fee %', value:'percent', scopes:['session','offer','line'], roles:'finance admin, admin', s:(v,sc)=>`Charge ${v}% of the board fee instead of 100% on self-study lines ${sc}` },
+  { key:'price.discountPercent', group:'Price', label:'Discount %', value:'percent', scopes:['session','offer','line'], roles:'finance admin, admin', s:(v,sc)=>`Take ${v}% off the price of lines ${sc}` },
+  { key:'price.discountFixed', group:'Price', label:'Discount EGP', value:'amount', scopes:['line'], roles:'finance admin, admin', s:(v,sc)=>`Take EGP ${v} off the line ${sc}` },
+  { key:'price.custom', group:'Price', label:'Custom price', value:'amount', scopes:['line'], roles:'finance admin, admin', s:(v,sc)=>`Price the line ${sc} at EGP ${v}` },
+  { key:'refund.percent', group:'Refund', label:'Refund %', value:'percent', scopes:['session','offer','line'], roles:'finance admin, admin', s:(v,sc)=>`Refund ${v}% on a drop ${sc}, whatever week it is` },
+  { key:'refund.courseStart', group:'Refund', label:'Course start for this student', value:'date', scopes:['offer','line'], roles:'finance admin, admin', s:(v,sc)=>`Count the refund weeks from ${v} for ${sc} (joined late)` },
+  { key:'deadline.window', group:'Deadlines', label:'Reserve after the session closes', value:'date', scopes:['session'], roles:'finance admin, admin', s:(v,sc)=>`Let this student reserve until ${v} ${sc} (never past the board's entry deadline)` },
+  { key:'deadline.payment', group:'Deadlines', label:'Payment due date', value:'date', scopes:['session','line','charge'], roles:'finance admin, admin', s:(v,sc)=>`Move the due date to ${v} ${sc}; reminders follow it` },
+  { key:'gate.schoolFee', group:'Gates', label:'School fee waiver', value:null, scopes:['year'], roles:'finance admin, admin', s:(v,sc)=>`Let this student reserve without the school fee ${sc}` },
+  { key:'gate.selfStudyFirstEntry', group:'Gates', label:'Self-study on a first entry', value:null, scopes:['offer','line'], roles:'finance admin, admin', s:(v,sc)=>`Allow self-study on a first entry ${sc} (used once)` },
+  { key:'gate.availability', group:'Gates', label:'Reserve an item not open to them', value:null, scopes:['line'], roles:'admin, coordinator', s:(v,sc)=>`Allow the item ${sc} although it is retake-only or closed (used once)` },
+  { key:'gate.requiredItems', group:'Gates', label:'Skip a required paper', value:null, scopes:['offer'], roles:'admin, coordinator', s:(v,sc)=>`Allow a first entry ${sc} without its required items (used once)` },
+  { key:'gate.priorSeries', group:'Gates', label:'Carry forward without a recorded sitting', value:null, scopes:['line'], roles:'admin, coordinator', s:(v,sc)=>`Allow ${sc} without a recorded prior sitting (used once)` },
+  { key:'gate.grade10Core', group:'Gates', label:'Grade 10 without a core subject', value:null, scopes:['session'], roles:'admin, coordinator', s:(v,sc)=>`Let this grade-10 student reserve ${sc} without every core subject` },
+  { key:'eligibility.grade10OtherSeries', group:'Gates', label:'Grade 10: a series other than June', value:null, scopes:['session'], roles:'coordinator, admin', s:(v,sc)=>`Let this grade-10 student sit ${sc}` },
+];
+let ex = { student:'s3', key:'price.discountPercent', scope:'offer', target:'Biology A.S./A.L.', value:'20', until:'', reason:'' };
+pages.exceptions = () => {
+  const r = registry.find(x => x.key === ex.key);
+  const scopeText = { session:'in June 2027', offer:`on ${ex.target} in June 2027`, line:`on the line "${ex.target}" (June 2027)`, charge:'on the charge', year:'for 2026/27' }[ex.scope] || '';
+  const groups = [...new Set(registry.map(x=>x.group))];
+  return `<div class="card"><h1>Exceptions</h1><div class="muted">One screen over every policy, deadline and percentage. The sentence says exactly what the exception does; the scope narrows itself to what the policy accepts; every grant and revocation is audited.</div>
+  <div class="row" style="margin-top:10px">
+    <div><label>Student</label><select onchange="ex.student=this.value;render()">${students.map(s=>`<option value="${s.id}" ${ex.student===s.id?'selected':''}>${s.name} (${s.section})</option>`).join('')}</select></div>
+    <div><label>Policy</label><select onchange="ex.key=this.value;ex.scope=registry.find(x=>x.key===this.value).scopes[0];render()">${groups.map(g=>`<optgroup label="${g}">${registry.filter(x=>x.group===g).map(x=>`<option value="${x.key}" ${ex.key===x.key?'selected':''}>${x.label}</option>`).join('')}</optgroup>`).join('')}</select></div>
+    <div><label>Scope</label><select onchange="ex.scope=this.value;render()">${r.scopes.map(s=>`<option value="${s}" ${ex.scope===s?'selected':''}>${{session:'the session',offer:'a subject of the session',line:'one line',charge:'a charge',year:'the academic year'}[s]}</option>`).join('')}</select></div>
+    ${['offer','line'].includes(ex.scope) ? `<div><label>${ex.scope==='offer'?'Subject':'Line'}</label><select onchange="ex.target=this.value;render()">${(ex.scope==='offer'?offers.map(o=>o.subject):existing.map(e=>e.line)).map(t=>`<option ${ex.target===t?'selected':''}>${t}</option>`).join('')}</select></div>` : ''}
+    ${r.value ? `<div><label>Value (${r.value})</label><input type="${r.value==='date'?'date':'number'}" value="${ex.value}" oninput="ex.value=this.value;render()"></div>` : ''}
+    <div><label>Valid until (optional)</label><input type="date" oninput="ex.until=this.value"></div>
+  </div>
+  <div class="sentence">${r.s(ex.value || '…', scopeText)}. <span class="muted">Granted by: ${r.roles}.</span></div>
+  <div class="row"><div style="flex:1"><label>Reason</label><input style="width:100%" placeholder="why (kept in the audit trail)" oninput="ex.reason=this.value"></div><div><button class="primary" onclick="state.granted.push({...ex, sentence: registry.find(x=>x.key===ex.key).s(ex.value||'', '${scopeText}')});toast('Granted; audited');render()">Grant</button></div></div>
+  <h3>Active</h3><table><thead><tr><th>Student</th><th>Policy</th><th>What it does</th><th>Until</th><th>Status</th><th></th></tr></thead><tbody>
+  <tr><td>Student C (12B)</td><td>price.discountPercent</td><td>Take 20% off the price of lines on Biology A.S./A.L. in June 2027</td><td>—</td><td><span class="badge ok">active</span></td><td><button class="sm">Revoke</button></td></tr>
+  <tr><td>Student D (10A)</td><td>eligibility.grade10OtherSeries</td><td>Let this grade-10 student sit November 2026 – January 2027</td><td>31 Jan 2027</td><td><span class="badge ok">active</span></td><td><button class="sm">Revoke</button></td></tr>
+  ${state.granted.map(g=>`<tr><td>${students.find(s=>s.id===g.student).name}</td><td>${g.key}</td><td>${g.sentence}</td><td>${g.until||'—'}</td><td><span class="badge ok">active</span></td><td><button class="sm">Revoke</button></td></tr>`).join('')}
+  </tbody></table></div>`;
+};
+
+// ───────────────────────── messages & reminders ─────────────────────────
+let msg = { kind:'batch', list:'unpaid', template:'payment_due', channels:['in_app','email'], when:'now' };
+const templates = { payment_due:{ title:'Payment due — {session}', body:'Dear {guardian}, EGP {amount} for {student} is due on {due}. Pay in the app or at the desk.' }, deadline:{ title:'{session}: reservations close on {closes}', body:'Reserve by {closes}; after the board\'s entry deadline nothing more can be entered.' }, free:{ title:'', body:'' } };
+const lists = { unpaid:['Families with unpaid lines in June 2027', 94], section:['Section 11C (parents and students)', 46], group:['Teacher 18\'s P1 group (online)', 19], offer:['Reservers of Mathematics A.S./A.L. in June 2027', 61], charge:['Families with an unpaid pushed school fee 2026/27', 23] };
+pages.messages = () => {
+  const t = templates[msg.template];
+  const count = msg.kind==='broadcast' ? 'all parents: 412' : msg.kind==='direct' ? 'chosen: 2' : lists[msg.list][1];
+  return `<div class="grid2"><div class="card"><h1>New message</h1>
+    <div class="row"><div><label>Audience</label><select onchange="msg.kind=this.value;render()"><option value="broadcast" ${msg.kind==='broadcast'?'selected':''}>Broadcast (all / parents / students / a grade)</option><option value="batch" ${msg.kind==='batch'?'selected':''}>Batch — a list in the system</option><option value="direct" ${msg.kind==='direct'?'selected':''}>Direct — chosen people</option></select></div>
+    ${msg.kind==='batch' ? `<div><label>List</label><select onchange="msg.list=this.value;render()">${Object.entries(lists).map(([k,[l]])=>`<option value="${k}" ${msg.list===k?'selected':''}>${l}</option>`).join('')}</select></div>` : msg.kind==='direct' ? `<div><label>People</label><input placeholder="search families, students, staff…" value="Family F, Family G"></div>` : `<div><label>Group</label><select><option>All parents</option><option>Parents of grade 11</option><option>Parents of grade 12</option><option>All students</option><option>Everyone</option></select></div>`}
+    <div><label>Resolved</label><div class="badge acc">${count} recipients</div></div></div>
+    <div class="row" style="margin-top:8px"><div><label>Template</label><select onchange="msg.template=this.value;render()"><option value="payment_due" ${msg.template==='payment_due'?'selected':''}>Payment due</option><option value="deadline" ${msg.template==='deadline'?'selected':''}>Reservations closing</option><option value="free" ${msg.template==='free'?'selected':''}>Free text</option></select></div>
+    <div><label>Channels</label><label style="display:inline"><input type="checkbox" checked> in-app</label> <label style="display:inline"><input type="checkbox" checked> email</label> <label style="display:inline"><input type="checkbox" disabled> WhatsApp <span class="muted">(no business account yet)</span></label></div>
+    <div><label>When</label><select><option>now</option><option>schedule…</option></select></div></div>
+    <div style="margin-top:8px"><label>Title</label><input style="width:100%" value="${t.title}"></div>
+    <div style="margin-top:8px"><label>Body (variables: {guardian} {student} {session} {amount} {due} {closes})</label><textarea style="width:100%;height:80px">${t.body}</textarea></div>
+    <div style="margin-top:8px"><button class="primary" onclick="toast('Queued for ${count} recipients; deliveries logged per channel')">Send</button></div>
+    <h3>Deliveries (last)</h3><table><thead><tr><th>Sent</th><th>Audience</th><th>Title</th><th>in-app</th><th>email</th></tr></thead><tbody>
+    <tr><td>6 Oct 18:02</td><td>Unpaid in June 2027 (94)</td><td>Payment due — June 2027</td><td><span class="badge ok">94 sent</span></td><td><span class="badge ok">92 sent</span> <span class="badge bad">2 failed</span></td></tr>
+    <tr><td>1 Oct 09:00</td><td>All parents (412)</td><td>June 2027 reservations are open</td><td><span class="badge ok">412</span></td><td><span class="badge ok">405</span> <span class="badge bad">7</span></td></tr></tbody></table></div>
+  <div class="card"><h1>Reminders</h1><div class="muted">Rules run by the scheduler; each sending is claimed once, logged, and shown on the statement. A session can override a rule.</div>
+    <table style="margin-top:8px"><thead><tr><th>Kind</th><th>When</th><th>Repeat</th><th>Channels</th><th>Scope</th><th></th></tr></thead><tbody>
+    <tr><td>Payment due (lines and charges)</td><td>7 and 3 days before, the day, 3 days after</td><td>every 3 days until paid</td><td>in-app, email</td><td>every session</td><td><input type="checkbox" checked></td></tr>
+    <tr><td>Reservations closing</td><td>14, 7, 1 days before</td><td>—</td><td>in-app, email</td><td>every session</td><td><input type="checkbox" checked></td></tr>
+    <tr><td>Board entry deadline (staff)</td><td>14 and 1 days before</td><td>—</td><td>in-app</td><td>every series</td><td><input type="checkbox" checked></td></tr>
+    <tr><td>School fee due</td><td>14, 7, 0 days</td><td>every 7 days until paid</td><td>in-app, email</td><td>2026/27</td><td><input type="checkbox" checked></td></tr>
+    <tr><td>Payment due — June 2027 override</td><td>10, 5, 0 days</td><td>every 2 days until paid</td><td>in-app, email</td><td>June 2027</td><td><input type="checkbox" checked></td></tr></tbody></table>
+    <button class="sm" style="margin-top:8px" onclick="toast('New rule: kind, offsets, repeat, channels, scope')">+ Rule</button>
+    <h3>Sent today</h3><div class="small muted">07:00 — Payment due, −7 days: 61 families (in-app 61, email 60, 1 failed) · 07:00 — School fee due, −14 days: 23 families</div></div></div>`;
+};
+
+// ───────────────────────── router ─────────────────────────
+function go(page, tab) { state.page = page; if (tab) state.tab = tab; history.replaceState(null, '', '#' + page + (page === 'session' ? '/' + state.tab : '')); render(); }
+function render() {
+  document.querySelectorAll('header a').forEach(a => a.classList.toggle('on', a.dataset.page === state.page));
+  $('#main').innerHTML = pages[state.page]();
+}
+document.querySelectorAll('header a').forEach(a => a.onclick = () => go(a.dataset.page));
+// deep links: #sessions, #session/subjects|fees|money|grade10, #desk, #family, #statement, #exceptions, #messages
+(() => { const [p, t] = location.hash.replace('#', '').split('/'); if (p && pages[p]) { state.page = p; if (t) state.tab = t; } })();
+render();
+</script>
+</body>
+</html>
