@@ -692,7 +692,7 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
   // stays behind.
   const closedByConversion = (row: { availability: string; legacy: unknown }) =>
     from.status === 'closed' && row.availability === 'closed' && (row.legacy as { converted?: boolean; no_series?: boolean } | null)?.converted === true
-    && !(row.legacy as { no_series?: boolean }).no_series;
+    && !(row.legacy as { no_series?: boolean; not_routed?: boolean }).no_series && !(row.legacy as { not_routed?: boolean }).not_routed;
   const offers = (await tx.select().from(sessionOffer).where(eq(sessionOffer.sessionId, from.id)).orderBy(sessionOffer.sortOrder, sessionOffer.id))
     .filter((o) => o.availability !== 'closed' || closedByConversion(o));
   const have = new Set((await tx.select({ subjectId: sessionOffer.subjectId }).from(sessionOffer).where(eq(sessionOffer.sessionId, session.id))).map((o) => o.subjectId));
