@@ -437,7 +437,8 @@ export function translateMoneyText(text: string, exact: (t: string) => string | 
     [/^Instalment (\d+) of (\d+)$/, (m) => `القسط ${m[1]} من ${m[2]}`],
     [/^Collected EGP ([\d,.]+) in (\d+) payments, the subjects per entry deadline and the charges on their own\.$/,
       (m) => `تم تحصيل ${m[1]} جنيه في ${m[2]} دفعات: المواد لكل موعد قيد والرسوم كلٌّ على حدة.`],
-    [/^The (\d{4}-\d{4}) school fee collected first \(EGP ([\d,.]+)\)\.$/, (m) => `حُصّلت المصاريف الدراسية ${m[1]} أولًا (${m[2]} جنيه).`],
+    // The year isolated left-to-right (U+2066 … U+2069): bare in Arabic text "2026-2027" reads "2027-2026".
+    [/^The (\d{4}-\d{4}) school fee collected first \(EGP ([\d,.]+)\)\.$/, (m) => `حُصّلت المصاريف الدراسية \u2066${m[1]}\u2069 أولًا (${m[2]} جنيه).`],
     // A policy the caller cannot grant now, as the picker lists it: "label — why".
     [/^(.+) — (not yours to grant|not applied yet|off \(setting\))$/, (m) => `${exact(m[1]!) ?? m[1]} — ${exact(m[2]!) ?? m[2]}`],
     // A student in a picker: "name (Grade 12)".
