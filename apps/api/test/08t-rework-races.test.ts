@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
 import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLock, pauseAtAudit, pauseAtAudits, session, openWindow, runPaymentDeadlines, type Client, reservationOf, CONSENT } from './helpers';
+import { examWorld, type ExamWorld } from './exam-helpers';
 
 /**
  * The reservations rework, step 1 — races (RESERVATIONS_REWORK.md §6, §8; FEATURES_PLAN.md §5:
@@ -1333,5 +1334,58 @@ describe('08t: the rework races — money (step C)', () => {
       expect(await t.wallet()).toEqual({ free: money(settled.released), held: 0 });
       expect(await sql(`select 1 from payment_registration where registration_id = $1`, [t.line])).toEqual([]);
     });
+  });
+});
+
+/**
+ * F4's derivation against "mark as sent" on the same entries (the review of 426d565, item 5). A
+ * derivation that brings drafts up to date (or links a paid cash-in to its award) locks them all in
+ * one statement in id order, as "mark as sent" and every withdrawal lock entries (RESERVATIONS.md
+ * §2.1), so the two never wait on each other in a circle. Forced: the derivation held at its first
+ * audit row with its entries locked, the send queued behind it; before the fix the derivation took
+ * them one by one in its rows' order (by student name), and the send, holding the lower id, deadlocked
+ * with it. The world is F4's own (exam-helpers.ts, tag 'xt').
+ */
+describe('08t: F4 — a derivation bringing drafts up to date while they are marked as sent', () => {
+  let w: ExamWorld;
+  beforeAll(async () => { w = await examWorld('xt'); }, 180_000);
+  afterAll(async () => { await w.close(); });
+
+  it('two drafts brought up to date as both are sent: the send waits for the derivation, nothing deadlocks', async () => {
+    const coord = w.coordinator;
+    const derive = () => apiResponse(coord.api.v1.exams.entries.derive.$post({ json: { boardSeriesId: w.series.cambridgeNov, commit: true } }));
+    const lines: string[] = [];
+    for (const k of ['r1', 'r2']) {
+      const f = await onboard(w.officer, `x-xt-${k}`, 12);
+      const [l] = await w.reserve(f, [{ offerItemId: w.items.sc, attempt: 'retake', mode: 'in_school', teacherId: w.teacherId, priorSitting: { month: 'june', year: Y } }]);
+      lines.push(l!.id);
+    }
+    await derive();
+    // Both declarations rejected: each retake draft is to be brought up to date as a first entry.
+    for (const id of lines) {
+      await apiResponse(coord.api.v1.registrations[':id']['verify-prior'].$post({ param: { id }, json: { outcome: 'rejected', reason: 'race: no such sitting on the statement' } }));
+    }
+    const [low, high] = await sql<{ id: string; student_id: string }>(
+      `select id, student_id from exam_entry where registration_id in ($1, $2) and status = 'draft' order by id`, [lines[0], lines[1]]);
+    // The derivation's rows go by student name: the student of the higher id first, so its order
+    // and the send's (by id) cross.
+    await sql(`update "user" set name = 'Aaa race x-xt' where id = $1`, [high!.student_id]);
+    await sql(`update "user" set name = 'Zzz race x-xt' where id = $1`, [low!.student_id]);
+    const p = await pauseAtAudits(['EXAM_ENTRY_UPDATED']);
+    let results: [Awaited<ReturnType<typeof derive>>, unknown] | null = null;
+    try {
+      const deriving = derive();
+      await p.paused('EXAM_ENTRY_UPDATED');
+      const sending = apiResponse(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [low!.id, high!.id] } }));
+      await lockWaiters(2);
+      await p.release('EXAM_ENTRY_UPDATED');
+      results = await Promise.all([deriving, sending]);
+    } finally {
+      await p.releaseAll();
+    }
+    expect(results![0]).toMatchObject({ updated: 2 });
+    expect(results![1]).toEqual({ submitted: 2, skipped: 0 });
+    expect(await sql(`select is_retake, status from exam_entry where id in ($1, $2)`, [low!.id, high!.id]))
+      .toEqual([{ is_retake: false, status: 'submitted' }, { is_retake: false, status: 'submitted' }]);
   });
 });

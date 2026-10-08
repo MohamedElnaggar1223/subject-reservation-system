@@ -168,9 +168,24 @@ fixes before the merge, with nine more items from the lead. What each now does (
 | 6. a paid cash-in whose award is already entered is never linked | the derivation links it (`link`): the award entry of a whole-award line, or one added by hand without a cash-in, takes the charge (audited); the entry list stops listing the cash-in ("Derive it" while it waits); its reversal is flagged and stops the entry being sent | "a paid cash-in whose award a whole-award line already entered…", "…whose award was entered by hand without it…"; C54 |
 | 7. verifying from results is loose | only a real grade verifies (not absent, pending, withheld: `isRealGrade`); the one who answers is the importer (or the coordinator asking from To verify, with their own role); a failure after the import commits is counted and reported — "Results saved; the verification of n declared sittings failed — answer them on the session's To verify tab" — never a failed import | "an import verifies … with a real grade, as the one who imported them…", "a verification failing after the import commits…"; C50–C52 |
 | 8. recorded, no change | see §10: "withdrawn included" keeps the family's board fee when the board refunded the school; a paid line the school never entered keeps its board fee on a desk drop past the deadline (C's decision 4) | — |
-| 9. cosmetic | C's `entrySentAt` stand-in removed (`refundFor` reads `sentEntriesOf`, the one seam); the line's retake word is the source when history says retake too (`registration`); the withdrawal audit row's key is `withLine` (every path now) | the item-3 scenario's derivation; C55 |
+| 9. cosmetic | C's `entrySentAt` stand-in removed (`refundFor` reads `sentEntriesOf`, the one seam); the withdrawal audit row's key is `withLine` (every path now). The line's retake word as the source when history says retake too was undone by the review of 426d565 (item 3): the history stays the source | C55 (now the history's) |
 | 10. F4's Arabic rules before the rework's | F4's dictionary now loads after A's, B's and C's (a shared word keeps the rework's Arabic: "Session", "Dropped", "Collected"); F4's sentence rules still run before F0b's broad one, but never on a text one of the rework's rules translates; the broad rules narrowed ("… results" needs a series' month and year; "… was withdrawn from …" an entry code and a series; the room's "no longer in use" names the room; the file store's sentences their own kinds); F4's timetable says "Time of day" for a paper's morning or afternoon. A scan of every string outside F4's files found one text F4 took that was not its own (C's escrow sentence); now none | the Reserve, statement and To verify screens driven in Arabic (`screens/review-*`); the trail's row for the order |
 | 11. privacy | the evidence note below | — |
+
+### The review of 426d565 (8 Oct 2026)
+
+The reviewer re-ran 426d565 (585 passed), confirmed all eleven items above and found one deadlock,
+in derivation; "merge after: 1, 2, 3 (with 4 and 5 in the same pass; 6 at the merge)". Item 6 is
+the final merge's (main after D's 0055; F4's migrations as 0056 and 0057).
+
+| Item | Now | Proved by |
+|---|---|---|
+| 1. a unit line verified by an award's result | an award's result is evidence of a sitting of the line only when the line enters that award itself (an award, option or unmapped-subject item) or the award is entered by syllabus option (Cambridge reports per syllabus per series); a line of units of an award cashed in by units (Pearson's P1 under the IAL) needs its unit's result | "an award's result verifies a line that enters the award, never a unit line…"; C56 |
+| 2. a line moved to another series strands its entries | every path that moves a line — the admin's move (`moveRegistrations`), an item's series change (`changeItemSeries`), a subject's board change (`applyBoardChange`) and, the same rule, a session's series correction (`correctSessionSeries`) — calls `entriesFollowMoveInTx` after its lines are locked: a line with an entry already sent refuses the move ("… has already gone to the board in …: withdraw its entries first", naming it), because the board has it; otherwise its drafts are withdrawn with the line (`withdrawn_with_line`) and the next derivation makes them in the series it went to | four scenarios under "a line moved to another series…"; C57–C60 |
+| 3. a retake the history shows unticked after a rejection; staff's values brought back | a retake when the line or the history says so, the history kept as the source when both do (the review of 093dbd1's item 9 undone): a rejected declaration never unticks a retake the school's records show. What staff set by hand — a retake ticked or unticked, a carry forward or its numbers, an option — is recorded on the entry (`exam_entry.staff_set`) and a derivation never compares or brings it back | "a retake the candidate's history here shows stays one…", "a coordinator's untick on a draft stays…", "another centre's candidate number typed by hand on a draft stays…"; C55, C61, C62 |
+| 4. the 09 rule's second clause; entries on unpaid lines | the clause is dropped (not an invariant between a second payment and the next derivation, nor after a coordinator's withdrawal); an entry by hand on a line not paid is refused (409); a derivation and an entry by hand take the lines FOR SHARE after the series, so one racing a drop waits for it and enters nothing on the dropped line | "an entry by hand on a line not paid is refused", "a derivation racing the family's drop of the line…"; C63, C64 |
+| 5. derivation's deadlock with "mark as sent" | the drafts a derivation brings up to date and the entries it links are locked in one statement in id order before any is changed, as "mark as sent" and every withdrawal take entries | 08t "a derivation bringing drafts up to date while they are marked as sent…"; C65 |
+| 7. the verification at declaration attributed to the importer | the one acting is the one declaring (the reservation's actor: the desk, a parent, a student), as `prior_sitting_verified_by` and on the audit row; the reason names the result, who imported it and when | "a retake declared after its sitting is on record is verified at once, by the one declaring it…"; C48, C52 |
 
 **What else changed with the model.** The test world (`exam-helpers.ts`) is a winter session with
 offers and items (an award item for the Cambridge syllabus, a units item for P1, an award item for
@@ -311,7 +326,8 @@ RESERVATIONS.md §2.12 and C's RESERVATIONS_MONEY.md §10):
 | `withdrawEntriesOfLineInTx(tx, lineId, reason, actorId, ctx?)`, `tellWithdrawn(withdrawn, reason)` | `exam-entry.services.ts`, called by every path that ends a paid line (the review of 093dbd1, item 1) | the line's live entries withdrawn in the path's own transaction, after its receipt and line, each `withdrawn_with_line` with its `EXAM_ENTRY_WITHDRAWN` row; the family told after the commit of each that had gone to the board |
 | the calls, file by file | `desk-drop.services.ts` `deskDrop` (C's seam `withdrawEntry`); `swap.services.ts` `executeDirectDrop`, `approveChangeRequest` (a drop or a swap request), `executeDirectSwap`; `payment.services.ts` `reversePayment` (each reverted line, in id order); `verification.services.ts` `verifyPriorSitting` (the rejection after the first-entry deadline) and `holdUnverifiedAtDeadline` (the `hold` drop) | one call each, after the path's drop leg in its transaction, and `tellWithdrawn` after its commit; the four drops and swaps price their refund with `refundFor(tx, …)` after the receipt and the line are locked (item 4); the hold drop passes `neverSent` only when `sentEntriesOf` is empty (item 5) |
 | `verifyDeclaredSittingsFromResults(series, actor, ctx?)` | `exam-result.services.ts` → B's `verifyPriorSitting` | after a results import commits: each open declared sitting of that series with a **real grade** for what its line enters is verified by step B's own answer, the importer answering; a failure is counted (`verificationFailed`), never thrown |
-| `verifyDeclaredAtDeclarationInTx(tx, lineIds)` | `exam-result.services.ts`, called by B's `reserveLines` (`reservation.services.ts`) → B's `recordVerifiedInTx` (`verification.services.ts`, the verified answer as a function of its own) | in the reservation's transaction, a declared sitting with a real grade on record is verified at once, the one who imported the result as `prior_sitting_verified_by` (B's 09 rule: answered by someone) |
+| `verifyDeclaredAtDeclarationInTx(tx, lineIds, actorId)` | `exam-result.services.ts`, called by B's `reserveLines` (`reservation.services.ts`, with the reservation's `requestedBy`) → B's `recordVerifiedInTx` (`verification.services.ts`, the verified answer as a function of its own) | in the reservation's transaction, a declared sitting with a real grade on record is verified at once by the one declaring it (`prior_sitting_verified_by` and the audit row; B's 09 rule: answered by someone), the reason naming the result and who imported it; an award's result only for a line that enters the award, or a Cambridge syllabus |
+| `entriesFollowMoveInTx(tx, lineIds, reason, actorId)` | `exam-entry.services.ts`, called by `series.services.ts` `moveRegistrations`, `offer.services.ts` `changeItemSeries`, `catalogue.services.ts` `applyBoardChange` and `session.services.ts` `correctSessionSeries`, each after its lines are locked (the review of 426d565, item 2) | a line with an entry already sent refuses the move (the sentence returned for the path's own 409 — the subject form's route answers 400); otherwise the line's drafts are withdrawn with it, made again by the next derivation where it goes |
 | `verifyDeclaredOfSession(sessionId, actor)` | `exam-result.services.ts`; `POST /v1/exams/results/verify-declared`; B's To verify tab (`to-verify-tab.client.tsx`, one button) | the session's awaiting declared sittings checked against the results on record, verified by the coordinator who asks |
 
 ## 8. Screens
@@ -372,8 +388,9 @@ at the desk with lines and consent), cases in `05` and rules in `09`. Every Sept
 | a certificate collected once (a race test) | 08x3 "a certificate collected at two desks at once"; 08x2 "collected once at the desk…" |
 | national IDs hidden from roles without the need | 08x1 "national IDs … read only by the coordinator and the admin…"; 05; 09 |
 
-**On the rework's model** (`08x4-exam-entries-rework`, 41 scenarios: §2a's tables — 18 of them
-for the rework's items, 23 for the review of 093dbd1, listed after them):
+**On the rework's model** (`08x4-exam-entries-rework`, 51 scenarios: §2a's tables — 18 of them
+for the rework's items, 23 for the review of 093dbd1 and 10 for the review of 426d565, listed after
+them — and one race in `08t-rework-races`):
 
 | §9 / §10 item | Scenario |
 |---|---|
@@ -394,6 +411,12 @@ for the rework's items, 23 for the review of 093dbd1, listed after them):
 | review items 3, 7, 9: results | "an import verifies the declared sittings it shows with a real grade, as the one who imported them; absent and pending verify nothing"; "a retake declared after its sitting is on record is verified at once, by the importer…" (with the retake source the line's); "a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator" |
 | review item 5: hold and a sent entry | "step B's hold at the deadline…": the sent line keeps its board fee, the draft's gets it back, both withdrawn |
 | review item 6: a cash-in linked to its award | "a paid cash-in whose award a whole-award line already entered is linked to that entry…"; "a paid cash-in that names no line, whose award was entered by hand without it, is linked to that entry" |
+| review of 426d565, item 1 | "an award's result verifies a line that enters the award, never a unit line of an award cashed in by units" |
+| review of 426d565, item 2 | "the admin's move…", "an item's series change…", "a subject's board change…", "a session's series correction…": each refused while a line has a sent entry (named), and, once it is withdrawn, moving the lines with their drafts withdrawn and made again where they went |
+| review of 426d565, item 3 | "a retake the candidate's history here shows stays one after the declaration is rejected…", "a coordinator's untick on a draft stays…", "another centre's candidate number typed by hand on a draft stays…" |
+| review of 426d565, item 4 | "an entry by hand on a line not paid is refused"; "a derivation racing the family's drop of the line: it waits for the line and enters nothing on the dropped line" (the drop held at its audit row with the line) |
+| review of 426d565, item 5 | 08t "two drafts brought up to date as both are sent: the send waits for the derivation, nothing deadlocks" (the derivation held at its first update with its entries locked; the students named so its rows' order and the ids' cross) |
+| review of 426d565, item 7 | "a retake declared after its sitting is on record is verified at once, by the one declaring it…" (the desk officer on the row and as the verifier; the reason names the admin who imported the result and the day) |
 
 Races (08x3): two derivations, two numberings, a withdrawal against an amendment, one seat for two
 candidates, two results imports, a certificate at two desks, two scheduler instances, a failed
@@ -411,7 +434,7 @@ ID in an audit row.
 one trail row each; logs — the vitest summary and the failing tests with their messages — in
 `.audit/exams-evidence/rework/controls/`): each guard undone once, its tests red, restored. C1–C17
 are September's guards on the new code (C1, C2 now the per-entry deadline; C8 the index in 0050);
-C18–C33 the rework's, C34–C55 the review of 093dbd1's (the table below them). September's logs stay in the ignored
+C18–C33 the rework's, C34–C55 the review of 093dbd1's, C56–C65 the review of 426d565's (the table below them). September's logs stay in the ignored
 `.audit/exams-evidence/controls/`.
 
 | Control | Undone | Red |
@@ -456,7 +479,12 @@ C18–C33 the rework's, C34–C55 the review of 093dbd1's (the table below them)
 | C50, C51, C52 | only a real grade verifies; a failure after the import reported, not thrown; the importer answers | 08x4 |
 | C53 | the hold drop's board fee by "sent" | 08x4 |
 | C54 | a paid cash-in linked to its award already entered | 08x4 |
-| C55 | the line's retake as the source when history says so too | 08x4 |
+| C55 | the history kept as a retake's source when the line says retake too (the review of 426d565, item 3; it was the line's until then) | 08x4 |
+| C56 | an award's result verifying only a line that enters the award, or a Cambridge syllabus | 08x4 |
+| C57–C60 | a line's entries following its move: the admin's move; an item's series change; a board change; a series correction | 08x4 |
+| C61, C62 | staff-set values never compared nor brought back; a change by hand recorded as staff-set | 08x4 |
+| C63, C64 | no entry by hand on a line not paid; derivation holding the series' paid lines | 08x4 |
+| C65 | derivation locking its entries in one id-ordered statement | 08t |
 
 ## 10. Decisions and why
 
@@ -534,6 +562,16 @@ After the review of 093dbd1 (8 Oct 2026):
 - **A result on record answers a declaration at once**, in the reservation's transaction, through
   B's own verified answer with the importer as the one who answered (B's 09 rule: answered by
   someone). Only a real grade is evidence of a sitting.
+- **A move takes the drafts and refuses the sent** (the review of 426d565): an entry is made for one
+  series. A line that moves before its deadline takes its drafts away with it (made again where it
+  goes), but an entry the board already has is the board's: the school withdraws it there first,
+  so the app refuses the move and names the entry rather than leave the board with two.
+- **Staff's hand beats the line's answer** (the review of 426d565): a coordinator who unticks a
+  retake or types another centre's number knows something the line does not; the derivation and
+  the check leave such values alone (`staff_set`), as they leave a retake the history shows.
+- **The one who declares answers at declaration** (the review of 426d565): the importer was not
+  acting then; the declaration is what was checked, so its actor is on the row, and the reason
+  says whose import was the evidence.
 - **Recorded, no change (the lead, item 8).** "Withdrawn included" keeps the family's board fee even
   when the board refunded the school for an entry withdrawn in time: the board fee is one amount per
   line, sent once any entry of it went. A paid line the school never entered keeps its board fee on
@@ -663,3 +701,11 @@ On the reservations rework's model (8 Oct 2026, UTC; the trail has a row per ste
   (`.audit/exams-evidence/rework/screens/review-*`); web check-types green.
 - 13:13Z–13:29Z — all 59 controls red once each with their guard undone, restored; api check-types
   green on the final tree.
+- 13:37Z — 426d565 pushed, CI green (run 37784906598).
+- The review of 426d565 (the reviewer: "merge after: 1, 2, 3 (with 4 and 5 in the same pass; 6 at the
+  merge)"): 14:10Z–14:22Z items 1–5 and 7 in the code (migration 0053: `exam_entry.staff_set`), 08x4's
+  ten new scenarios and 08t's race green, controls C56–C65, the dev database at 0053 and the API
+  restarted by its PIDs; 14:35Z–14:42Z the full suite green in local time and in UTC (32 files, 596
+  passed, 1 todo) after one red run (09's series rule now for live entries). The API's session
+  limit stopped the work there; it resumed at 17:00Z from the worktree's state, type-checks green,
+  all 69 controls red once each and restored by 17:30Z.

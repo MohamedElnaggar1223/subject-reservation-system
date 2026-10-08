@@ -1,0 +1,38 @@
+# C57: the admin's move leaves a line's entries in the series it leaves
+# undone in: apps/api/src/services/series.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["the admin's move: a sent entry refuses it"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 1 failed) 24825ms
+   × F4 on the reservations rework > a line moved to another series takes its drafts with it, and a sent entry refuses the move (the review of 426d565, item 2) > the admin's move: a sent entry refuses it, naming the entry; a draft is withdrawn with its line and made again where the line goes 706ms
+     → expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+ Test Files  1 failed (1)
+      Tests  1 failed | 50 passed (51)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 21f62af9-e077-458e-ba4d-0b72ff40baa7: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a line moved to another series takes its drafts with it, and a sent entry refuses the move (the review of 426d565, item 2) > the admin's move: a sent entry refuses it, naming the entry; a draft is withdrawn with its line and made again where the line goes
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "XW97 Biology XW for Student x-xw-mvs has already gone to the board in Cambridge International June 2027 (exams xw move a): withdraw its entries first",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "\"\"",[39m
+[31m+   "status": 200,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:1011:41
+    1009|         param: { id: sess }, json: { registrationIds: [id], boardSerie…
+    1010|       });
+    1011|       expect(await refused(move(p.ls))).toEqual({ status: 409, error: …
+       |                                         ^
+    1012|       expect([await seriesOfLine(p.ls), await statusOf(p.sent.id)]).to…
+    1013|       await apiResponse(move(p.ld));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

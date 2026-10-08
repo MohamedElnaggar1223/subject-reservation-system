@@ -4,19 +4,19 @@
 # expected red: ['a retake rejected after its entry was sent', 'verified at another centre after derivation', 'rejected after derivation: the draft loses']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 4 failed) 21151ms
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it 85ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 4 failed) 27047ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it 52ms
      → expected [ 'missing_candidate_number', …(5) ] to include 'retake_differs_from_line'
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its draft was made: the next derivation brings the draft up to date as a first entry, audited 67ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its draft was made: the next derivation brings the draft up to date as a first entry, audited 40ms
      → expected [ 'missing_candidate_number', …(5) ] to include 'retake_differs_from_line'
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number 30ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number 26ms
      → expected [ 'missing_candidate_number', …(6) ] to include 'carry_forward_differs_from_line'
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > rejected after derivation: the draft loses the carry forward and its option; a sent entry keeps them and is flagged 86ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > rejected after derivation: the draft loses the carry forward and its option; a sent entry keeps them and is flagged 61ms
      → expected [ 'missing_candidate_number', …(6) ] to include 'carry_forward_differs_from_line'
  Test Files  1 failed (1)
-      Tests  4 failed | 37 passed (41)
+      Tests  4 failed | 47 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 23ab6b18-f9fc-4c29-9fab-c3ca74f46433: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 1d30a205-ef34-4f97-bdec-249d712656e5: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it

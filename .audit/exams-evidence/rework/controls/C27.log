@@ -4,13 +4,13 @@
 # expected red: ['the desk drops a paid line past its deadline']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 1 failed) 20479ms
-   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > the desk drops a paid line past its deadline: its entries are withdrawn with it, the board fee kept (sent), the notice naming what was sent 22ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 1 failed) 26276ms
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > the desk drops a paid line past its deadline: its entries are withdrawn with it, the board fee kept (sent), the notice naming what was sent 23ms
      → expected [] to deeply equal [ [ 'XW97', true ] ]
  Test Files  1 failed (1)
-      Tests  1 failed | 40 passed (41)
+      Tests  1 failed | 50 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 34ed0462-1320-4e5d-ab43-c1934530b7f6: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 6103a588-4535-463f-beb8-3b4754f73284: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > the desk drops a paid line past its deadline: its entries are withdrawn with it, the board fee kept (sent), the notice naming what was sent
@@ -27,13 +27,13 @@ AssertionError: expected [] to deeply equal [ [ 'XW97', true ] ]
 [32m- ][39m
 [31m+ [][39m
 
- ❯ test/08x4-exam-entries-rework.test.ts:889:74
-    887|       expect(done).toMatchObject({ boardSent: true, refundBoardPart: 0…
-    888|       expect(done.boardNote).toBe(`The board fee stays with the board:…
-    889|       expect(done.entriesWithdrawn.map((x) => [x.entryCode, x.wasSent]…
+ ❯ test/08x4-exam-entries-rework.test.ts:946:74
+    944|       expect(done).toMatchObject({ boardSent: true, refundBoardPart: 0…
+    945|       expect(done.boardNote).toBe(`The board fee stays with the board:…
+    946|       expect(done.entriesWithdrawn.map((x) => [x.entryCode, x.wasSent]…
        |                                                                          ^
-    890|       const e = await one<{ id: string; status: string; withdrawal_rea…
-    891|       expect(e).toMatchObject({ status: 'withdrawn', withdrawal_reason…
+    947|       const e = await one<{ id: string; status: string; withdrawal_rea…
+    948|       expect(e).toMatchObject({ status: 'withdrawn', withdrawal_reason…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

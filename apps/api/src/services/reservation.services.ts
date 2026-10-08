@@ -326,9 +326,9 @@ export async function reserveLines(
   }
   if (channel) await writeConsents(tx, inserted.map((r) => r.id), { channel, confirmedBy: a.requestedBy });
   // A declared sitting the school's own results show is verified at once (F4; the review of
-  // 093dbd1, item 3), in this transaction: the one who imported the result answers.
+  // 093dbd1, item 3), in this transaction, by the one declaring it (the review of 426d565, item 7).
   const declared = inserted.filter((r) => r.priorSittingSource === 'declared_by_family' || r.priorSittingSource === 'declared_by_desk').map((r) => r.id);
-  if (declared.length) await verifyDeclaredAtDeclarationInTx(tx, declared);
+  if (declared.length) await verifyDeclaredAtDeclarationInTx(tx, declared, a.requestedBy);
   return inserted;
 }
 

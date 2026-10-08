@@ -4,17 +4,17 @@
 # expected red: ['a two-unit line with one unit sent', 'the same line with none sent', "the family's direct drop"]
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 3 failed) 21080ms
-   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when 53ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 3 failed) 27327ms
+   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when 64ms
      → expected [ [ 'submitted', false, null ], …(1) ] to deeply equal [ [ 'withdrawn', true, …(1) ], …(1) ]
-   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > the same line with none sent: the board fee comes back in full 29ms
+   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > the same line with none sent: the board fee comes back in full 30ms
      → expected [ [ 'draft', false, null ], …(1) ] to deeply equal [ [ 'withdrawn', true, …(1) ], …(1) ]
-   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct drop 250ms
+   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct drop 247ms
      → expected { …(6) } to match object { status: 'withdrawn', …(1) }
  Test Files  1 failed (1)
-      Tests  3 failed | 38 passed (41)
+      Tests  3 failed | 48 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 16df0a1c-ba02-405f-a29c-a17ccf46375a: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line ea33b8fa-3e71-475a-9aee-880862b27a85: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when

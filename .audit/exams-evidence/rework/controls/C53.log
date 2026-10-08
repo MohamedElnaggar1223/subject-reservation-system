@@ -4,13 +4,13 @@
 # expected red: ['the school turns hold on, the deadline passes']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 1 failed) 21062ms
-   × F4 on the reservations rework > step B's hold at the deadline drops a paid line and withdraws its entries; a sent one keeps its board fee (the review of 093dbd1, items 1 and 5) > the school turns hold on, the deadline passes: the sent line keeps its board fee and its entry is withdrawn; the unsent one gets it back 188ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 1 failed) 25835ms
+   × F4 on the reservations rework > step B's hold at the deadline drops a paid line and withdraws its entries; a sent one keeps its board fee (the review of 093dbd1, items 1 and 5) > the school turns hold on, the deadline passes: the sent line keeps its board fee and its entry is withdrawn; the unsent one gets it back 165ms
      → expected 1500 to be 1000 // Object.is equality
  Test Files  1 failed (1)
-      Tests  1 failed | 40 passed (41)
+      Tests  1 failed | 50 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 91851dbb-a765-4e5b-8430-89a007976157: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 746ebe11-6f93-4f49-b348-06ef1811d63d: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > step B's hold at the deadline drops a paid line and withdraws its entries; a sent one keeps its board fee (the review of 093dbd1, items 1 and 5) > the school turns hold on, the deadline passes: the sent line keeps its board fee and its entry is withdrawn; the unsent one gets it back
@@ -22,13 +22,13 @@ AssertionError: expected 1500 to be 1000 // Object.is equality
 [32m- 1000[39m
 [31m+ 1500[39m
 
- ❯ test/08x4-exam-entries-rework.test.ts:958:36
-    956|         for (const id of [h1, h2]) expect((await lineOf(id)).status).t…
-    957|         // The board fee stays with the board for the line whose entry…
-    958|         expect(await credited(h1)).toBe(p1.amount);
+ ❯ test/08x4-exam-entries-rework.test.ts:1162:36
+    1160|         for (const id of [h1, h2]) expect((await lineOf(id)).status).t…
+    1161|         // The board fee stays with the board for the line whose entry…
+    1162|         expect(await credited(h1)).toBe(p1.amount);
        |                                    ^
-    959|         expect(await credited(h2)).toBe(p2.amount);
-    960|         expect(p2.amount - p1.amount).toBe(500);
+    1163|         expect(await credited(h2)).toBe(p2.amount);
+    1164|         expect(p2.amount - p1.amount).toBe(500);
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

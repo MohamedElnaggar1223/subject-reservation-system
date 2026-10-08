@@ -41,6 +41,7 @@ import {
   type Executor, type SeriesRow, type Tx,
 } from './exam-shared';
 import { boardSeriesName } from './series.services';
+import { schoolDate } from './window.services';
 import { lineItemsFor } from './line.services';
 import { verifyPriorSitting, recordVerifiedInTx, VerificationError } from './verification.services';
 import { parseDelimited, readXlsx, tableFrom, TabularError } from '../lib/tabular';
@@ -307,7 +308,13 @@ async function sittingMatches(executor: Executor, lineIds: string[]): Promise<Si
     const p = l.priorSitting;
     if (!p) continue;
     const unitIds = new Set(l.enters.units.map((u) => u.id));
-    const award = l.enters.qualification?.id ?? null;
+    // An award's result is evidence of a sitting of this line only when the line enters that award
+    // itself, or the award is entered by syllabus option (Cambridge reports per syllabus per series);
+    // a line of units of an award cashed in by units (Pearson's P1 under the IAL) needs its unit's
+    // result — the award graded in June says nothing of when P1 was sat (the review of 426d565, item 1).
+    const q = l.enters.qualification;
+    const entersAward = l.item.entersKind === 'award' || l.item.entersKind === 'option' || (l.item.entersKind === 'subject' && !l.enters.units.length);
+    const award = q && (entersAward || q.entryMethod === 'syllabus_option') ? q.id : null;
     // The latest report of what the line enters there; it verifies only when it is a real grade.
     const hit = results.find((x) => x.studentId === l.studentId && x.boardSeriesId === p.seriesId
       && ((x.unitId && unitIds.has(x.unitId)) || (award && x.qualificationId === award)));
@@ -391,16 +398,22 @@ export async function verifyDeclaredOfSession(sessionId: string, actor: Actor, c
  * At declaration (the review of 093dbd1, item 3; the owner: a result on record here is a known
  * sitting): inside the reservation's own transaction, a line just made that declares a sitting
  * with a real grade on record for what it enters is verified at once — step B's verified answer
- * (`recordVerifiedInTx`), the one who imported that result as the one who answered, the result as
- * the evidence. A result whose importer's account is gone verifies nothing (the coordinator answers).
+ * (`recordVerifiedInTx`), the result as the evidence. The one acting is the one who declared (the
+ * reservation's actor: the desk, a parent, a student); the reason names the result and who
+ * imported it, who was not acting then (the review of 426d565, item 7).
  */
-export async function verifyDeclaredAtDeclarationInTx(tx: Tx, lineIds: string[], ctx?: AuditContext) {
+export async function verifyDeclaredAtDeclarationInTx(tx: Tx, lineIds: string[], actorId: string, ctx?: AuditContext) {
   const matches = await sittingMatches(tx, lineIds);
   const verified: string[] = [];
+  const importers = new Map((await (matches.some((m) => m.importedBy)
+    ? tx.select({ id: user.id, name: user.name }).from(user).where(inArray(user.id, [...new Set(matches.map((m) => m.importedBy).filter((x): x is string => !!x))]))
+    : Promise.resolve([] as { id: string; name: string }[]))).map((u) => [u.id, u.name]));
   for (const m of matches) {
-    if (!m.importedBy) continue;
+    const by = (m.importedBy && importers.get(m.importedBy)) || 'an account since removed';
     const done = await recordVerifiedInTx(tx, m.registrationId, {
-      actorId: m.importedBy, now: new Date(), reason: matchReason(m, 'results on record at declaration'), evidence: matchEvidence(m),
+      actorId, now: new Date(),
+      reason: `${m.seriesName}'s results on record list ${m.code} for the candidate, imported by ${by} on ${schoolDate(m.importedAt)} (verified at declaration)`,
+      evidence: matchEvidence(m),
     }, ctx);
     if (done) verified.push(m.registrationId);
   }

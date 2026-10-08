@@ -4,17 +4,17 @@
 # expected red: ["a retake comes from the line's attempt"]
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 3 failed) 24717ms
-   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry 296ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 3 failed) 26591ms
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry 174ms
      → expected [ [ 'XW97', true, …(2) ] ] to deeply equal [ [ 'XW97', false, null, …(1) ] ]
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it 78ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it 70ms
      → expected [ 'missing_candidate_number', …(5) ] to include 'retake_differs_from_line'
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its draft was made: the next derivation brings the draft up to date as a first entry, audited 63ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its draft was made: the next derivation brings the draft up to date as a first entry, audited 58ms
      → expected [ 'missing_candidate_number', …(5) ] to include 'retake_differs_from_line'
  Test Files  1 failed (1)
-      Tests  3 failed | 38 passed (41)
+      Tests  3 failed | 48 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 13c97838-da73-4b21-b6a8-1c38cd48dc53: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line bae968fa-4170-49a0-b5dd-3674ca90827b: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry
@@ -30,7 +30,7 @@ AssertionError: expected [ [ 'XW97', true, …(2) ] ] to deeply equal [ [ 'XW97'
 [32m-     null,[39m
 [31m+     true,[39m
 [31m+     "registration",[39m
-[2m      "7637dca4-93c7-481f-b5ad-73d3b9959ade",[22m
+[2m      "63a0850c-df77-49cc-a1af-82be8fc18f17",[22m
 [2m    ],[22m
 [2m  ][22m
 

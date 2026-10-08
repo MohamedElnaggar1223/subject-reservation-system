@@ -18,9 +18,9 @@ os.makedirs(LOGS, exist_ok=True)
 
 S = 'apps/api/src/services/'
 R = 'apps/api/src/routes/'
-X1, X2, X3, X4, O5, I9 = (f'test/{n}' for n in [
+X1, X2, X3, X4, O5, I9, T8 = (f'test/{n}' for n in [
     '08x1-exam-entries.test.ts', '08x2-exam-days-results.test.ts', '08x3-exam-races.test.ts',
-    '08x4-exam-entries-rework.test.ts', '05-object-access.test.ts', '09-money-invariants.test.ts'])
+    '08x4-exam-entries-rework.test.ts', '05-object-access.test.ts', '09-money-invariants.test.ts', '08t-rework-races.test.ts'])
 E = S + 'exam-entry.services.ts'
 
 CONTROLS = [
@@ -86,7 +86,7 @@ CONTROLS = [
      [(S + 'line.services.ts', "    r.entersKind === 'units' ? r.itemUnitIds\n", "    r.entersKind === 'units' ? r.subjectUnitIds\n")],
      [X4], ['two items of one subject are two lines']),
     ('C19', "a retake not read from the line's attempt",
-     [(E, "    if (it.attempt === 'retake') for (const p of planned) Object.assign(p, { isRetake: true, retakeSource: 'registration' });\n", '')],
+     [(E, "    if (it.attempt === 'retake') for (const p of planned) if (!p.isRetake) Object.assign(p, { isRetake: true, retakeSource: 'registration' });\n", '')],
      [X4], ["a retake comes from the line's attempt"]),
     ('C19b', 'a rejected declaration not read as a first entry',
      [(S + 'line.services.ts', "      attempt: (r.declarationRejected ? 'first' : r.attempt) as Attempt,", "      attempt: r.attempt as Attempt,")],
@@ -191,8 +191,8 @@ CONTROLS = [
        "        state: 'confirmed', month: prior.month, year: prior.year,")],
      [X4], ['a carry forward declared and not verified is derived as suggested']),
     ('C48', 'a declared sitting the results on record show is not verified at declaration',
-     [(S + 'reservation.services.ts', "  if (declared.length) await verifyDeclaredAtDeclarationInTx(tx, declared);\n", '')],
-     [X4], ['is verified at once, by the importer']),
+     [(S + 'reservation.services.ts', "  if (declared.length) await verifyDeclaredAtDeclarationInTx(tx, declared, a.requestedBy);\n", '')],
+     [X4], ['is verified at once, by the one declaring it']),
     ('C49', "the To verify tab's check verifies nothing",
      [(S + 'exam-result.services.ts', "  const r = await verifyMatches(open.map((x) => x.id), actor, 'results on record, from the To verify tab', ctx);",
        "  const r = await verifyMatches([], actor, 'results on record, from the To verify tab', ctx);")],
@@ -203,19 +203,50 @@ CONTROLS = [
     ('C51', 'a verification failing after the import commits fails the import',
      [(S + 'exam-result.services.ts', "      if (err instanceof VerificationError && err.status === 409) continue;\n      failed++;", "      throw err;")],
      [X4], ['reads as results saved']),
-    ('C52', 'a sitting verified at declaration is answered by someone other than the importer',
-     [(S + 'exam-result.services.ts', "      actorId: m.importedBy, now: new Date(),", "      actorId: m.studentId, now: new Date(),")],
-     [X4], ['is verified at once, by the importer']),
+    ('C52', "a sitting verified at declaration attributed to the result's importer, not the one declaring (the review of 426d565, item 7)",
+     [(S + 'exam-result.services.ts', "      actorId, now: new Date(),\n      reason: `${m.seriesName}'s results on record list", "      actorId: m.importedBy ?? actorId, now: new Date(),\n      reason: `${m.seriesName}'s results on record list")],
+     [X4], ['is verified at once, by the one declaring it']),
     ('C53', "step B's hold sweep counts every line's board fee not sent",
      [(S + 'verification.services.ts', "        const refund = await refundFor(tx, id, now, { neverSent: sent.length === 0 });", "        const refund = await refundFor(tx, id, now, { neverSent: true });")],
      [X4], ['the school turns hold on, the deadline passes']),
     ('C54', "a paid cash-in whose award is already entered is not linked to it",
      [(E, "    if (owner.chargeId && found && !found.chargeId) state = 'link';\n", '')],
      [X4], ['a whole-award line already entered is linked to that entry', 'entered by hand without it, is linked to that entry']),
-    ('C55', "a retake the history also shows keeps the source 'history' though the line says retake",
-     [(E, "    if (it.attempt === 'retake') for (const p of planned) Object.assign(p, { isRetake: true, retakeSource: 'registration' });",
-       "    if (it.attempt === 'retake') for (const p of planned) if (!p.isRetake) Object.assign(p, { isRetake: true, retakeSource: 'registration' });")],
-     [X4], ['is verified at once, by the importer']),
+    ('C55', "a retake the history also shows takes the line's source, so a rejected declaration unticks it (the review of 426d565, item 3)",
+     [(E, "    if (it.attempt === 'retake') for (const p of planned) if (!p.isRetake) Object.assign(p, { isRetake: true, retakeSource: 'registration' });",
+       "    if (it.attempt === 'retake') for (const p of planned) Object.assign(p, { isRetake: true, retakeSource: 'registration' });")],
+     [X4], ["stays one after the declaration is rejected", 'is verified at once, by the one declaring it']),
+    # ─── The review of 426d565 (8 Oct) ───
+    ('C56', "an award's result verifies a unit line of an award cashed in by units",
+     [(S + 'exam-result.services.ts', "    const award = q && (entersAward || q.entryMethod === 'syllabus_option') ? q.id : null;", "    const award = q ? q.id : null;")],
+     [X4], ["an award's result verifies a line that enters the award"]),
+    ('C57', "the admin's move leaves a line's entries in the series it leaves",
+     [(S + 'series.services.ts', "      const sent = await entriesFollowMoveInTx(tx, moving.map((r) => r.id), 'the line moved to another series', actorId, ctx);\n      if (sent) throw new SeriesError(sent, 409);\n", '')],
+     [X4], ["the admin's move: a sent entry refuses it"]),
+    ('C58', "an item's series change leaves its lines' entries in the series they leave",
+     [(S + 'offer.services.ts', "  const sent = await entriesFollowMoveInTx(tx, lines.map((l) => l.id), \"the line's item moved to another series\", actorId);\n  if (sent) throw new OfferError(sent, 409);\n", '')],
+     [X4], ["an item's series change: refused while a line of it has a sent entry"]),
+    ('C59', "a subject's board change leaves its lines' entries with the old board",
+     [(S + 'catalogue.services.ts', "  const sent = await entriesFollowMoveInTx(tx, plan.moved.map((m) => m.id), \"the subject's board changed\", actorId);\n  if (sent) throw new CatalogueError(sent, 409);\n", '')],
+     [X4], ["a subject's board change: refused while a line has a sent entry"]),
+    ('C60', "a session's series correction leaves its lines' entries in the series they leave",
+     [(S + 'session.services.ts', "      const sent = await entriesFollowMoveInTx(tx, changing, \"the session's series was corrected\", adminId, auditCtx);\n      if (sent) throw new Error(sent);\n", '')],
+     [X4], ["a session's series correction: refused while a line has a sent entry"]),
+    ('C61', "what staff set by hand is brought back to the line's answer by a derivation",
+     [(E, "  const staff = new Set(e.staffSet ?? []);", "  const staff = new Set<string>();")],
+     [X4], ["a coordinator's untick on a draft stays", "typed by hand on a draft stays"]),
+    ('C62', "a change by hand not recorded as staff-set",
+     [(E, "    if (groups.size !== e.staffSet.length) {", "    if (false) {")],
+     [X4], ["a coordinator's untick on a draft stays", "typed by hand on a draft stays"]),
+    ('C63', "an entry by hand on a line not paid",
+     [(E, "      if (r.status !== 'confirmed') throw new ExamError(`That reservation is ${r.status.replace(/_/g, ' ')}: an entry is made only from a paid reservation`, 409);\n", '')],
+     [X4], ['an entry by hand on a line not paid is refused']),
+    ('C64', "derivation does not hold the series' paid lines (a draft on a line being dropped)",
+     [(E, "    await tx.select({ id: registration.id }).from(registration)\n      .where(and(eq(registration.boardSeriesId, locked.id), eq(registration.status, 'confirmed'), data.studentId ? eq(registration.studentId, data.studentId) : undefined))\n      .orderBy(asc(registration.id)).for('share');\n", '')],
+     [X4], ["a derivation racing the family's drop of the line"]),
+    ('C65', "derivation locks the entries it brings up to date one by one in its rows' order",
+     [(E, "    if (touched.length) await tx.select({ id: examEntry.id }).from(examEntry).where(inArray(examEntry.id, touched)).orderBy(asc(examEntry.id)).for('update');\n", '')],
+     [T8], ['a derivation bringing drafts up to date while they are marked as sent']),
 ]
 
 KEEP = re.compile(r'(FAIL|×|✓ test/|Test Files|Tests |AssertionError|Error:|expected|Expected|Received|^\s*[-+] |❯ test/)')

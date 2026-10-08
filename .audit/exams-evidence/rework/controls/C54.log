@@ -4,15 +4,15 @@
 # expected red: ['a whole-award line already entered is linked to that entry', 'entered by hand without it, is linked to that entry']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 2 failed) 20765ms
-   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1) 98ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 2 failed) 24966ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1) 80ms
      → expected { registrationId: null, …(12) } to match object { outcome: 'ready', …(1) }
-   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in that names no line, whose award was entered by hand without it, is linked to that entry 317ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in that names no line, whose award was entered by hand without it, is linked to that entry 307ms
      → expected [ [ …(3) ] ] to deeply equal [ [ …(3) ] ]
  Test Files  1 failed (1)
-      Tests  2 failed | 39 passed (41)
+      Tests  2 failed | 49 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 82912d19-e77e-4758-9d00-1c039b63e681: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 0350c6bd-bc5d-4867-b323-214da8869f75: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1)
@@ -47,14 +47,14 @@ AssertionError: expected [ [ …(3) ] ] to deeply equal [ [ …(3) ] ]
 
 [2m  [[22m
 [2m    [[22m
-[2m      "e988d1d3-af69-4023-83fd-e0f79926cbb4",[22m
+[2m      "e917f59a-442e-473f-a767-c7e17620c313",[22m
 [32m-     "ready",[39m
 [31m+     "entered",[39m
 [2m      [[22m
 [2m        [[22m
 [32m-         "link",[39m
 [31m+         "elsewhere",[39m
-[2m          "21cb20ca-aa6f-4ff4-a9c4-d4282ae705dc",[22m
+[2m          "3b596e8c-88fe-4838-b399-931e35f00a22",[22m
 [2m        ],[22m
 [2m      ],[22m
 [2m    ],[22m

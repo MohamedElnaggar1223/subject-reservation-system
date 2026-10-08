@@ -1,0 +1,1 @@
+ALTER TABLE "exam_entry" ADD COLUMN "staff_set" text[] DEFAULT '{}'::text[] NOT NULL;

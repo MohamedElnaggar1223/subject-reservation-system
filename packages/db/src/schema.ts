@@ -3429,6 +3429,9 @@ export const examEntry = pgTable(
     // Withdrawn because its line ended (a drop, a swap, a reversal, a system drop): a derivation
     // makes it again if the line is paid again — unlike the coordinator's own withdrawal.
     withdrawnWithLine: boolean("withdrawn_with_line").notNull().default(false),
+    // What staff set by hand on the entry, which a derivation never brings back to the line's
+    // answer: 'retake' (ticked or unticked), 'carry' (the carry forward and its numbers), 'option'.
+    staffSet: text("staff_set").array().notNull().default(sql`'{}'::text[]`),
     notes: text("notes"),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

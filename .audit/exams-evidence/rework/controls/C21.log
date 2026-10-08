@@ -4,13 +4,13 @@
 # expected red: ['accepted but not paid']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 1 failed) 24850ms
-   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered 52ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 1 failed) 26739ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered 34ms
      → expected { registrationId: null, …(12) } to match object { outcome: 'awaiting_payment', …(2) }
  Test Files  1 failed (1)
-      Tests  1 failed | 40 passed (41)
+      Tests  1 failed | 50 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line ddb6ddfa-7c99-4d03-8695-e900eaf74c64: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 310bf5ad-2532-44ec-96b5-dbfa80d35f61: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered
@@ -37,7 +37,7 @@ AssertionError: expected { registrationId: null, …(12) } to match object { out
 [31m+       "isRetake": false,[39m
 [31m+       "kind": "award",[39m
 [31m+       "optionCode": null,[39m
-[31m+       "qualificationId": "65ea2fe3-20a6-47cc-ac66-39faa85e793f",[39m
+[31m+       "qualificationId": "0bbac391-4a91-4e0c-a1c9-1941457f5bdb",[39m
 [31m+       "retakeSource": null,[39m
 [31m+       "state": "new",[39m
 [31m+       "tier": null,[39m

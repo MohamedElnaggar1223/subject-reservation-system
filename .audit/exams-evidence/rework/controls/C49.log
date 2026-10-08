@@ -4,14 +4,15 @@
 # expected red: ["the To verify tab's check answers it later"]
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 1 failed) 21093ms
-   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator 77ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 2 failed) 31910ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator 127ms
      → expected [] to deeply equal [ Array(1) ]
+   × F4 on the reservations rework > a line not paid is never entered (the review of 426d565, item 4) > a derivation racing the family's drop of the line: it waits for the line and enters nothing on the dropped line 5360ms
  Test Files  1 failed (1)
-      Tests  1 failed | 40 passed (41)
+      Tests  2 failed | 49 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 007b9249-8bf2-49aa-84be-b97908125dec: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+[results] Could not verify the declared sitting of line 00092f44-7ce2-4ba7-a13c-2b9155a3357a: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator
 AssertionError: expected [] to deeply equal [ Array(1) ]
@@ -20,17 +21,30 @@ AssertionError: expected [] to deeply equal [ Array(1) ]
 [31m+ Received[39m
 
 [32m- [[39m
-[32m-   "007b9249-8bf2-49aa-84be-b97908125dec",[39m
+[32m-   "00092f44-7ce2-4ba7-a13c-2b9155a3357a",[39m
 [32m- ][39m
 [31m+ [][39m
 
- ❯ test/08x4-exam-entries-rework.test.ts:818:61
-    816|       expect((await lineOf(vf)).outcome).toBeNull();
-    817|       const checked = await apiResponse(coord.api.v1.exams.results['ve…
-    818|       expect(checked.verified.map((v) => v.registrationId)).toEqual([v…
+ ❯ test/08x4-exam-entries-rework.test.ts:875:61
+    873|       expect((await lineOf(vf)).outcome).toBeNull();
+    874|       const checked = await apiResponse(coord.api.v1.exams.results['ve…
+    875|       expect(checked.verified.map((v) => v.registrationId)).toEqual([v…
        |                                                             ^
-    819|       expect(checked.failed).toBe(0);
-    820|       expect(checked.awaiting).toBeGreaterThan(1);
+    876|       expect(checked.failed).toBe(0);
+    877|       expect(checked.awaiting).toBeGreaterThan(1);
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a line not paid is never entered (the review of 426d565, item 4) > a derivation racing the family's drop of the line: it waits for the line and enters nothing on the dropped line
+Error: waitFor: timed out
+ ❯ waitFor test/helpers.ts:482:38
+    480|     const v = await probe();
+    481|     if (v) return v;
+    482|     if (Date.now() > deadline) throw new Error('waitFor: timed out');
+       |                                      ^
+    483|     await new Promise((r) => setTimeout(r, 100));
+    484|   }
+ ❯ test/08x4-exam-entries-rework.test.ts:1104:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

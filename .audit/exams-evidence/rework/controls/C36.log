@@ -4,17 +4,17 @@
 # expected red: ['a drop request the parent approves', 'a swap request the parent approves', "a drop request's approval"]
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 3 failed) 21019ms
-   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a drop request the parent approves: the line's entry is withdrawn with it, the family told 38ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 3 failed) 27141ms
+   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a drop request the parent approves: the line's entry is withdrawn with it, the family told 36ms
      → expected [ [ 'submitted', false, null ] ] to deeply equal [ [ 'withdrawn', true, …(1) ] ]
-   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a swap request the parent approves: the old line's draft is withdrawn with it; the new line is the one to enter 82ms
+   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a swap request the parent approves: the old line's draft is withdrawn with it; the new line is the one to enter 69ms
      → expected [ [ 'draft', false, null ] ] to deeply equal [ [ 'withdrawn', true, …(1) ] ]
-   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > a drop request's approval 254ms
+   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > a drop request's approval 257ms
      → expected { …(6) } to match object { status: 'withdrawn', …(1) }
  Test Files  1 failed (1)
-      Tests  3 failed | 38 passed (41)
+      Tests  3 failed | 48 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 59fbe1f3-af65-484c-8be2-29b1a3fde826: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 1eef8ace-c937-4d9c-899d-9f0990d8fde1: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a drop request the parent approves: the line's entry is withdrawn with it, the family told

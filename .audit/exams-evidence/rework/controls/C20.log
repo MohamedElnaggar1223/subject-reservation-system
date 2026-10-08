@@ -4,16 +4,18 @@
 # expected red: ['a sitting at another centre, verified with its centre and candidate number']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 2 failed) 24537ms
-   × F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting at another centre, verified with its centre and candidate number, is carried forward with them 103ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 3 failed) 26704ms
+   × F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting at another centre, verified with its centre and candidate number, is carried forward with them 91ms
      → expected [ [ 'XW9700', 'BY', …(5) ] ] to deeply equal [ [ 'XW9700', 'BY', …(5) ] ]
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number 28ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number 38ms
      → expected [ 'missing_candidate_number', …(6) ] to include 'carry_forward_differs_from_line'
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > another centre's candidate number typed by hand on a draft stays: the next derivation does not overwrite it 368ms
+     → expected [ 'confirmed', 'EG123', null ] to deeply equal [ 'confirmed', 'EG997', '0454' ]
  Test Files  1 failed (1)
-      Tests  2 failed | 39 passed (41)
+      Tests  3 failed | 48 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 7c0e59ac-ed49-4e45-9d76-dd7cd19feca6: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+[results] Could not verify the declared sitting of line 23da7d2c-0bbb-441a-81d5-c48b754c416c: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting at another centre, verified with its centre and candidate number, is carried forward with them
 AssertionError: expected [ [ 'XW9700', 'BY', …(5) ] ] to deeply equal [ [ 'XW9700', 'BY', …(5) ] ]
@@ -37,12 +39,36 @@ AssertionError: expected [ [ 'XW9700', 'BY', …(5) ] ] to deeply equal [ [ 'XW9
  ❯ test/08x4-exam-entries-rework.test.ts:211:10
 
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number
 AssertionError: expected [ 'missing_candidate_number', …(6) ] to include 'carry_forward_differs_from_line'
  ❯ test/08x4-exam-entries-rework.test.ts:696:44
 
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > another centre's candidate number typed by hand on a draft stays: the next derivation does not overwrite it
+AssertionError: expected [ 'confirmed', 'EG123', null ] to deeply equal [ 'confirmed', 'EG997', '0454' ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    "confirmed",[22m
+[32m-   "EG997",[39m
+[32m-   "0454",[39m
+[31m+   "EG123",[39m
+[31m+   null,[39m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:776:79
+    774|       await derive(nov(), ht.studentId);
+    775|       const [e] = await entriesOf(nov(), ht.studentId);
+    776|       expect([e!.carry_forward, e!.cf_centre_number, e!.cf_candidate_n…
+       |                                                                               ^
+    777|       // The statement had it wrong: the coordinator types the number …
+    778|       await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
 

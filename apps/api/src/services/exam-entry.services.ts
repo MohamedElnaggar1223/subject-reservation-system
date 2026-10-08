@@ -130,35 +130,45 @@ type PlannedEntry = {
  * declaration — the sitting no entry may carry from, with the award's carry-forward option codes.
  */
 export type LineExpect = {
+  /** The line's own answer (its attempt as F4 reads it). */
   retake: boolean;
   carry: { state: 'confirmed' | 'suggested'; month: string; year: number; otherCentre: boolean; centre: string | null; number: string | null } | null;
   rejectedFrom: { month: string; year: number; optionCodes: string[] } | null;
 };
 
-type GovernedFields = Pick<EntryRow, 'kind' | 'isRetake' | 'retakeSource' | 'carryForward' | 'cfFromMonth' | 'cfFromYear' | 'cfCentreNumber' | 'cfCandidateNumber' | 'cfOption' | 'optionCode'>;
+/**
+ * What one entry should say: its line's carry forward and rejected sitting, and its own retake —
+ * a retake when the line says so or the candidate's history here does, the history the source
+ * when both do (the review of 426d565, item 3).
+ */
+export type EntryExpect = LineExpect & { retakeSource: 'registration' | 'history' | null };
+
+type GovernedFields = Pick<EntryRow, 'kind' | 'isRetake' | 'retakeSource' | 'carryForward' | 'cfFromMonth' | 'cfFromYear' | 'cfCentreNumber' | 'cfCandidateNumber' | 'cfOption' | 'optionCode' | 'staffSet'>;
 
 /**
  * How an entry differs from what its line says now: `retake` and `carry` are what the board sees
  * (the check flags them; a draft is brought up to date by the next derivation, a sent entry is
  * amended by the coordinator); `confirm` is a suggested carry forward whose sitting has since been
  * verified (a draft is confirmed by the next derivation; `carry_forward_to_confirm` flags it).
- * `patch` is what the derivation writes on a draft. Fields the line does not govern (a retake from
- * history or set by staff, a carry forward suggested from history) are never compared.
+ * `patch` is what the derivation writes on a draft. What staff set by hand (`staff_set`: a retake
+ * ticked or unticked, a carry forward or its numbers typed, an option chosen) is theirs: never
+ * compared, never brought back (the review of 426d565, item 3); a retake the history shows stays.
  */
-export function lineDiff(e: GovernedFields, x: LineExpect) {
-  const retake = (x.retake && !e.isRetake) || (!x.retake && e.isRetake && e.retakeSource === 'registration');
+export function lineDiff(e: GovernedFields, x: EntryExpect) {
+  const staff = new Set(e.staffSet ?? []);
+  const retake = !staff.has('retake') && ((x.retake && !e.isRetake) || (!x.retake && e.isRetake && e.retakeSource === 'registration'));
   let carry = false;
   let confirm = false;
-  if (e.kind === 'award' && x.carry) {
+  if (e.kind === 'award' && x.carry && !staff.has('carry')) {
     if (e.carryForward === 'none' || e.cfFromMonth !== x.carry.month || e.cfFromYear !== x.carry.year) carry = true;
     else if (x.carry.otherCentre && (e.cfCentreNumber !== x.carry.centre || e.cfCandidateNumber !== x.carry.number)) carry = true;
     else if (x.carry.state === 'confirmed' && e.carryForward === 'suggested') confirm = true;
   }
-  const carriesRejected = !!x.rejectedFrom && e.carryForward !== 'none' && e.cfFromMonth === x.rejectedFrom.month && e.cfFromYear === x.rejectedFrom.year;
-  const rejectedOption = !!x.rejectedFrom && !!e.optionCode && x.rejectedFrom.optionCodes.includes(e.optionCode);
+  const carriesRejected = !!x.rejectedFrom && !staff.has('carry') && e.carryForward !== 'none' && e.cfFromMonth === x.rejectedFrom.month && e.cfFromYear === x.rejectedFrom.year;
+  const rejectedOption = !!x.rejectedFrom && !staff.has('option') && !!e.optionCode && x.rejectedFrom.optionCodes.includes(e.optionCode);
   if (e.kind === 'award' && (carriesRejected || rejectedOption)) carry = true;
   const patch: Partial<EntryRow> = {};
-  if (retake) Object.assign(patch, { isRetake: x.retake, retakeSource: x.retake ? 'registration' : null });
+  if (retake) Object.assign(patch, { isRetake: x.retake, retakeSource: x.retake ? (x.retakeSource ?? 'registration') : null });
   if ((carry || confirm) && x.carry) {
     Object.assign(patch, {
       carryForward: x.carry.state, cfFromMonth: x.carry.month, cfFromYear: x.carry.year, cfOption: `${x.carry.month}_carry_forward`,
@@ -446,7 +456,7 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
     if (owner.chargeId && found && !found.chargeId) state = 'link';
     // A draft made from this line, which the line's answer has changed since: brought up to date.
     if (state === 'exists' && found && mine(found) && found.status === 'draft' && expect && owner.registrationId) {
-      const d = lineDiff(found, expect);
+      const d = lineDiff(found, { ...expect, retake: p.isRetake, retakeSource: p.retakeSource });
       if (d.any) { state = 'refresh'; patch = d.patch; }
     }
     return { ...p, state, existingEntryId: found?.id ?? gone?.id ?? null, ...(patch ? { patch } : {}) };
@@ -471,9 +481,10 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
       rows.push({ ...base, outcome: 'not_mapped', note: `${it.subject.name} is not mapped on the Catalogue: say what it enters with ${series.boardName} first`, entries: [] });
       continue;
     }
-    // The line says it is a retake (a rejected declaration reads as a first entry, §3.5): the line's
-    // word is the source even when history says so too (the review of 093dbd1, item 9).
-    if (it.attempt === 'retake') for (const p of planned) Object.assign(p, { isRetake: true, retakeSource: 'registration' });
+    // A retake when the line says so (a rejected declaration reads as a first entry, §3.5) or the
+    // candidate's history here does; the history stays the source when both do, so a rejected
+    // declaration never unticks a retake the school's own records show (the review of 426d565, item 3).
+    if (it.attempt === 'retake') for (const p of planned) if (!p.isRetake) Object.assign(p, { isRetake: true, retakeSource: 'registration' });
     // Carry forward from the line's own prior sitting, where the item carries one forward: suggested
     // while the sitting is declared and not verified, confirmed once known or verified (item 2).
     const carries = !!prior && (it.item.needsPriorSeries || !!it.enters.option?.carryForward) && !it.declarationRejected;
@@ -588,6 +599,12 @@ export async function deriveEntries(data: DeriveEntriesType, actorId: string, ct
     // The series FOR SHARE: a deadline change (FOR UPDATE) waits for this, or this for it.
     const locked = await seriesOrThrow(series.id, tx, 'share');
     await advisoryLock(tx, `exam:derive:${series.id}`);
+    // The series' paid lines (the one student's when asked) FOR SHARE in id order, after the series
+    // (§2.1): a drop, a swap or a reversal holding one FOR UPDATE finishes first, and a line it ended
+    // is not planned — no draft on a dropped line (the review of 426d565, item 4).
+    await tx.select({ id: registration.id }).from(registration)
+      .where(and(eq(registration.boardSeriesId, locked.id), eq(registration.status, 'confirmed'), data.studentId ? eq(registration.studentId, data.studentId) : undefined))
+      .orderBy(asc(registration.id)).for('share');
     const rows = await planDerivation(locked, data.studentId, tx);
     const refusal = refusalOf(locked, rows);
     if (refusal) throw new ExamError(refusal, 409);
@@ -607,12 +624,17 @@ export async function deriveEntries(data: DeriveEntriesType, actorId: string, ct
     }
     // A draft brought up to date with what its line says now (a sitting answered after the entry
     // was made), and a paid cash-in linked to its award already entered — each guarded on the
-    // state it was planned from, each audited.
+    // state it was planned from, each audited. All of them are locked first, in one statement in id
+    // order, as "mark as sent" and every withdrawal lock entries: never one by one in the rows'
+    // order, which deadlocked against a send (the review of 426d565, item 5).
+    const touched = [...new Set(rows.filter((x) => x.outcome === 'ready')
+      .flatMap((r) => r.entries.filter((e) => (e.state === 'refresh' || e.state === 'link') && e.existingEntryId).map((e) => e.existingEntryId!)))];
+    if (touched.length) await tx.select({ id: examEntry.id }).from(examEntry).where(inArray(examEntry.id, touched)).orderBy(asc(examEntry.id)).for('update');
     let updated = 0;
     for (const r of rows.filter((x) => x.outcome === 'ready')) {
       for (const e of r.entries) {
         if (e.state === 'refresh' && e.existingEntryId && e.patch) {
-          const [before] = await tx.select().from(examEntry).where(and(eq(examEntry.id, e.existingEntryId), eq(examEntry.status, 'draft'))).for('update');
+          const [before] = await tx.select().from(examEntry).where(and(eq(examEntry.id, e.existingEntryId), eq(examEntry.status, 'draft')));
           if (!before) continue;
           const [row] = await tx.update(examEntry).set({ ...e.patch, updatedAt: new Date() }).where(and(eq(examEntry.id, before.id), eq(examEntry.status, 'draft'))).returning();
           if (!row) continue;
@@ -663,8 +685,12 @@ export async function createEntry(data: CreateEntryType, actorId: string, ctx?: 
     if (target.boardCode !== series.boardCode) throw new ExamError(`${target.entryCode} is not a ${series.boardName} code`, 400);
     let deadline: EntryDeadline = { at: series.entryDeadline, kind: series.entryDeadline ? 'entry' : null };
     if (data.registrationId) {
-      const [r] = await tx.select({ studentId: registration.studentId, boardSeriesId: registration.boardSeriesId }).from(registration).where(eq(registration.id, data.registrationId));
+      // The line FOR SHARE after the series (§2.1): a drop holding it finishes first (the review of
+      // 426d565, item 4); an entry is made only from a paid line.
+      const [r] = await tx.select({ studentId: registration.studentId, boardSeriesId: registration.boardSeriesId, status: registration.status })
+        .from(registration).where(eq(registration.id, data.registrationId)).for('share');
       if (!r || r.studentId !== data.studentId || r.boardSeriesId !== series.id) throw new ExamError('That registration is not this candidate\'s in this series', 400);
+      if (r.status !== 'confirmed') throw new ExamError(`That reservation is ${r.status.replace(/_/g, ' ')}: an entry is made only from a paid reservation`, 409);
       const d = (await effectiveDeadlinesOf(tx, [data.registrationId])).get(data.registrationId);
       if (d) deadline = { at: d.at, kind: d.kind };
     }
@@ -740,6 +766,18 @@ export async function updateEntry(id: string, data: UpdateEntryType, actorId: st
     if (fields.isRetake !== undefined) set.retakeSource = fields.isRetake ? 'staff' : null;
     const changed = Object.keys(set).filter((k) => JSON.stringify((e as Record<string, unknown>)[k] ?? null) !== JSON.stringify((set as Record<string, unknown>)[k] ?? null));
     if (!changed.length) return { entry: e, amendment: null };
+    // What staff set by hand is theirs: a derivation never brings it back to the line's answer
+    // (the review of 426d565, item 3) — a retake ticked or unticked, a carry forward or its numbers, an option.
+    const groups = new Set(e.staffSet);
+    for (const k of changed) {
+      if (k === 'isRetake') groups.add('retake');
+      else if (k === 'carryForward' || k.startsWith('cf')) groups.add('carry');
+      else if (k === 'optionCode') groups.add('option');
+    }
+    if (groups.size !== e.staffSet.length) {
+      set.staffSet = [...groups].sort();
+      changed.push('staffSet');
+    }
     const boardChange = changed.some((k) => (BOARD_FIELDS as readonly string[]).includes(k));
     let amendment: { feeDue: boolean; sentence: string } | null = null;
     if (e.status !== 'draft' && boardChange) {
@@ -884,6 +922,31 @@ export async function withdrawEntriesOfLineInTx(tx: Tx, lineId: string, reason: 
     out.push({ entry: row, charge, series, wasSent: e.status !== 'draft' });
   }
   return out;
+}
+
+/**
+ * A line moving to another series — an admin's move (series.services `moveRegistrations`), its
+ * item's series change (offer.services `changeItemSeries`), its subject's board change
+ * (catalogue.services `applyBoardChange`), its session's series correction (session.services
+ * `correctSessionSeries`); the review of 426d565, item 2. Its entries were made for the series it
+ * leaves. With the lines held by the caller (FOR UPDATE), their live entries are locked in id
+ * order (§2.1: entries after lines). One already sent refuses the move — the board has it, so it is
+ * withdrawn there first: the sentence is returned for the caller's own refusal and nothing is
+ * withdrawn. Otherwise each draft is withdrawn with its line (`withdrawn_with_line`, audited) and
+ * the next derivation of the series the line goes to makes it there.
+ */
+export async function entriesFollowMoveInTx(tx: Tx, lineIds: string[], reason: string, actorId: string | null, ctx?: AuditContext): Promise<string | null> {
+  if (!lineIds.length) return null;
+  const live = await tx.select().from(examEntry)
+    .where(and(inArray(examEntry.registrationId, lineIds), sql`${examEntry.status} <> 'withdrawn'`)).orderBy(asc(examEntry.id)).for('update');
+  const sent = live.find((e) => e.status !== 'draft');
+  if (sent) {
+    const series = await seriesOrThrow(sent.boardSeriesId, tx);
+    const [who] = await tx.select({ name: user.name }).from(user).where(eq(user.id, sent.studentId));
+    return `${sent.entryCode} ${sent.title} for ${who?.name ?? 'the candidate'} has already gone to the board in ${series.name}: withdraw its entries first`;
+  }
+  for (const lineId of [...new Set(live.map((e) => e.registrationId!))].sort()) await withdrawEntriesOfLineInTx(tx, lineId, reason, actorId, ctx);
+  return null;
 }
 
 /** After a withdrawal commits: a family whose entry had gone to the board is told. */
@@ -1070,10 +1133,18 @@ async function assess(entries: EntryRow[]) {
   // series (one student's when the entries are one student's), so the check compares an entry with
   // its line by the same rule that made it — a sitting answered after the entry was made shows.
   const expectOf = new Map<string, LineExpect>();
+  const entryKey = (registrationId: string, kind: string, id: string | null) => `${registrationId}|${kind}|${id ?? ''}`;
+  const expectOfEntry = new Map<string, EntryExpect>();
   for (const sid of seriesIds.filter((x) => entries.some((e) => e.boardSeriesId === x && e.registrationId && e.status !== 'withdrawn'))) {
     const its = [...new Set(entries.filter((e) => e.boardSeriesId === sid).map((e) => e.studentId))];
     const planned = await planDerivation(await seriesOrThrow(sid), its.length === 1 ? its[0] : undefined, db);
-    for (const r of planned) if (r.registrationId && r.expect) expectOf.set(r.registrationId, r.expect);
+    for (const r of planned) {
+      if (!r.registrationId || !r.expect) continue;
+      expectOf.set(r.registrationId, r.expect);
+      for (const p of r.entries) {
+        expectOfEntry.set(entryKey(r.registrationId, p.kind, p.kind === 'unit' ? p.unitId : p.qualificationId), { ...r.expect, retake: p.isRetake, retakeSource: p.retakeSource });
+      }
+    }
   }
   // Each entry's line: its own, or the line its cash-in names; and each cash-in's state.
   const chargeIds = [...new Set(entries.map((e) => e.chargeId).filter((x): x is string => !!x))];
@@ -1139,7 +1210,13 @@ async function assess(entries: EntryRow[]) {
     // Its line's answer changed what the board should see (retake, carry forward, the previous
     // centre and number) after the entry was made: the coordinator amends it (a draft is brought up
     // to date by the next derivation).
-    const x = e.registrationId ? expectOf.get(e.registrationId) : undefined;
+    const lx = e.registrationId ? expectOf.get(e.registrationId) : undefined;
+    // The entry's own expectation; an entry the line does not plan (one added by hand) is compared
+    // on its carry forward only.
+    const x = e.registrationId
+      ? expectOfEntry.get(entryKey(e.registrationId, e.kind, e.kind === 'unit' ? e.unitId : e.qualificationId))
+        ?? (lx ? { ...lx, retake: e.isRetake, retakeSource: null } : undefined)
+      : undefined;
     if (x) {
       const d = lineDiff(e, x);
       if (d.retake) out.push('retake_differs_from_line');

@@ -691,6 +691,17 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
   order), its answer unchanged; `refund.services.ts` loses the stand-in `entrySentAt`
   (`sentEntriesOf` is the seam). B's To verify tab gains "Check against the results on record" (`POST
   /v1/exams/results/verify-declared`, admin and coordinator). Each is proved in 08x4 with a control.
+- **Changed by F4 after the review of 426d565 (8 Oct 2026; EXAM_ENTRIES.md §2a, §7)** — a line that
+  moves to another series takes F4's entries with it or refuses: `series.services.ts`
+  `moveRegistrations`, `offer.services.ts` `changeItemSeries`, `catalogue.services.ts`
+  `applyBoardChange` and `session.services.ts` `correctSessionSeries` each call
+  `entriesFollowMoveInTx(tx, the moving lines, reason, actor)` after their lines are locked (§2.1:
+  entries after lines): a line with an entry already sent refuses the move with the path's own
+  error ("… has already gone to the board in …: withdraw its entries first"); otherwise its drafts are
+  withdrawn with it and derived again in the series it goes to. F4's derivation and its entry by
+  hand take the series, then the lines FOR SHARE (id order), so a drop holding a line finishes first.
+  `reserveLines` passes its `requestedBy` to `verifyDeclaredAtDeclarationInTx`: the one declaring
+  answers a sitting the school's results show.
 
 ## 3. As built (step 1)
 

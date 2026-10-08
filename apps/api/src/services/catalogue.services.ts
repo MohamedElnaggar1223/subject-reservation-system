@@ -34,6 +34,7 @@ import {
   type UpdateQualificationOptionType, type MapRegistrableType, type StarterSet, type UnitLevel, type LevelCodeReading,
 } from '@repo/validations';
 import { logAction, logActions, type AuditContext } from './audit.services';
+import { entriesFollowMoveInTx } from './exam-entry.services';
 import { getSetting } from './settings.services';
 import { boardSeriesName } from './series.services';
 import { schoolDate } from './window.services';
@@ -479,6 +480,10 @@ export async function applyBoardChange(
   const boardNamesNow = names ?? (await boardNames(tx));
   await boardOrThrow(newBoard, tx);
   const plan = await followBoardChange(tx, s, newBoard, boardNamesNow, actorId, locked);
+  // F4's entries of the lines that move (after the lines, §2.1): a sent one refuses the change, the
+  // drafts are withdrawn with it and made again in the new board's series (the review of 426d565, item 2).
+  const sent = await entriesFollowMoveInTx(tx, plan.moved.map((m) => m.id), "the subject's board changed", actorId);
+  if (sent) throw new CatalogueError(sent, 409);
   await tx.update(subject).set({ council: newBoard, qualificationId: null, updatedAt: new Date() }).where(eq(subject.id, s.id));
   await tx.delete(subjectUnit).where(eq(subjectUnit.subjectId, s.id));
   const why = `The subject's board changed to ${boardName(boardNamesNow, newBoard)}`;

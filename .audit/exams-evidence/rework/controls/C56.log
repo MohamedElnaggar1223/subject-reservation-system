@@ -1,0 +1,36 @@
+# C56: an award's result verifies a unit line of an award cashed in by units
+# undone in: apps/api/src/services/exam-result.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["an award's result verifies a line that enters the award"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 1 failed) 25435ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an award's result verifies a line that enters the award, never a unit line of an award cashed in by units (the review of 426d565, item 1) 97ms
+     → expected [ …(2) ] to deeply equal [ Array(1) ]
+ Test Files  1 failed (1)
+      Tests  1 failed | 50 passed (51)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 08298a1d-cebd-4cc5-baed-67b12ef1de43: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an award's result verifies a line that enters the award, never a unit line of an award cashed in by units (the review of 426d565, item 1)
+AssertionError: expected [ …(2) ] to deeply equal [ Array(1) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[31m+   "a47ea21e-1fbc-4336-8902-15ec08539540",[39m
+[2m    "3f7759ed-b3fa-4cdd-849e-10d47d1fdb22",[22m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:851:66
+    849|         boardSeriesId: june, commit: true, source: { text: `UCI,Unit C…
+    850|       } }));
+    851|       expect(done.sittingsVerified.map((v) => v.registrationId)).toEqu…
+       |                                                                  ^
+    852|       expect((await lineOf(ku)).outcome).toBeNull();
+    853|       expect((await lineOf(kv)).outcome).toBe('verified');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

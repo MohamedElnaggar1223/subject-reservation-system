@@ -4,26 +4,26 @@
 # expected red: ["a retake of the board's previous sitting is still entered and sent"]
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 2 failed) 20330ms
-   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent 37ms
-   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > a declared retake rejected past the first-entry deadline is dropped: its sent entry withdrawn with it, the board fee kept (the review of 093dbd1, item 1) 10ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 2 failed) 26527ms
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent 42ms
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > a declared retake rejected past the first-entry deadline is dropped: its sent entry withdrawn with it, the board fee kept (the review of 093dbd1, item 1) 11ms
      → expected { …(10) } to match object { boardSent: true, boardPart: +0 }
  Test Files  1 failed (1)
-      Tests  2 failed | 39 passed (41)
+      Tests  2 failed | 49 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 04407d4d-acbe-4e90-8226-e46c43991387: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 78601cd3-a4bd-45f2-9836-f705aac933c6: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent
-Error: The entry deadline for Cambridge International June 2027 (exams xw june) (8 October 2026 at 16:17) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)
+Error: The entry deadline for Cambridge International June 2027 (exams xw june) (8 October 2026 at 20:11) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)
  ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
- ❯ test/08x4-exam-entries-rework.test.ts:876:14
-    874|       const deadline = new Date((await one<{ d: string }>(`select entr…
-    875|       expect(new Date(e2!.created_at).getTime()).toBeGreaterThan(deadl…
-    876|       expect(await apiResponse(coord.api.v1.exams.entries.submit.$post…
+ ❯ test/08x4-exam-entries-rework.test.ts:933:14
+    931|       const deadline = new Date((await one<{ d: string }>(`select entr…
+    932|       expect(new Date(e2!.created_at).getTime()).toBeGreaterThan(deadl…
+    933|       expect(await apiResponse(coord.api.v1.exams.entries.submit.$post…
        |              ^
-    877|       // J3's draft is a first entry: sending it now is a late entry.
-    878|       const [e3] = await entriesOf(juneSeries, jf.j3!.studentId);
+    934|       // J3's draft is a first entry: sending it now is a late entry.
+    935|       const [e3] = await entriesOf(juneSeries, jf.j3!.studentId);
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -41,13 +41,13 @@ AssertionError: expected { …(10) } to match object { boardSent: true, boardPar
 [31m+   "boardSent": false,[39m
 [2m  }[22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:901:22
-    899|     it("a declared retake rejected past the first-entry deadline is dr…
-    900|       const before = await refundPreview(jf.j2!, j2);
-    901|       expect(before).toMatchObject({ boardSent: true, boardPart: 0 });
+ ❯ test/08x4-exam-entries-rework.test.ts:958:22
+    956|     it("a declared retake rejected past the first-entry deadline is dr…
+    957|       const before = await refundPreview(jf.j2!, j2);
+    958|       expect(before).toMatchObject({ boardSent: true, boardPart: 0 });
        |                      ^
-    902|       const r = await apiResponse(coord.api.v1.registrations[':id']['v…
-    903|       expect(r).toMatchObject({ outcome: 'rejected', effect: 'dropped'…
+    959|       const r = await apiResponse(coord.api.v1.registrations[':id']['v…
+    960|       expect(r).toMatchObject({ outcome: 'rejected', effect: 'dropped'…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

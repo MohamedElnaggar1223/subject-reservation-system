@@ -4,13 +4,13 @@
 # expected red: ["the family's direct swap"]
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 1 failed) 21119ms
-   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct swap 272ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 1 failed) 27105ms
+   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct swap 288ms
      → expected 1500 to be 1000 // Object.is equality
  Test Files  1 failed (1)
-      Tests  1 failed | 40 passed (41)
+      Tests  1 failed | 50 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 51e67e95-1863-4a12-921b-8288da33588b: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 11ca9374-2773-4373-988e-7793cb03174c: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct swap

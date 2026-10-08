@@ -656,13 +656,6 @@ describe('money invariants over the whole database', () => {
     expect(await sql(`
       select e.id, e.status, r.status as line from exam_entry e join registration r on r.id = e.registration_id
       where e.status <> 'withdrawn' and r.status <> 'confirmed'`)).toEqual([]);
-    // An entry withdrawn with its line belongs to a line that ended, or was paid again and entered
-    // again (a reversal undone): never to a line still confirmed with no live entry of that unit or award.
-    expect(await sql(`
-      select e.id from exam_entry e join registration r on r.id = e.registration_id
-      where e.withdrawn_with_line and r.status = 'confirmed'
-        and not exists (select 1 from exam_entry n where n.registration_id = e.registration_id and n.status <> 'withdrawn'
-          and n.kind = e.kind and n.unit_id is not distinct from e.unit_id and n.qualification_id is not distinct from e.qualification_id)`)).toEqual([]);
     // There was something to check: 08x4 ended paid lines by each path, with entries made and sent.
     expect((await sql(`select 1 from exam_entry where withdrawn_with_line and submitted_at is not null`)).length).toBeGreaterThan(0);
     expect((await sql(`select 1 from exam_entry where withdrawn_with_line and submitted_at is null`)).length).toBeGreaterThan(0);
@@ -687,9 +680,16 @@ describe('money invariants over the whole database', () => {
   });
 
   it("F4: an entry from a registration is that registration's student's, in its series; a result from an entry is that entry's candidate's, in its series", async () => {
+    // A live entry is in its line's series; one withdrawn was made for the series the line was in
+    // then — a line that moves withdraws its drafts and a sent entry refuses the move (the review of
+    // 426d565, item 2), so a live entry is never left behind in the series a line left.
     expect(await sql(`
       select e.id from exam_entry e join registration r on r.id = e.registration_id
-      where e.student_id <> r.student_id or e.board_series_id is distinct from r.board_series_id`)).toEqual([]);
+      where e.student_id <> r.student_id or (e.status <> 'withdrawn' and e.board_series_id is distinct from r.board_series_id)`)).toEqual([]);
+    // There was something to check: lines moved with their drafts withdrawn in the series they left.
+    expect((await sql(`
+      select 1 from exam_entry e join registration r on r.id = e.registration_id
+      where e.withdrawn_with_line and e.board_series_id <> r.board_series_id`)).length).toBeGreaterThan(0);
     expect(await sql(`
       select x.id from exam_result x join exam_entry e on e.id = x.entry_id
       where x.student_id <> e.student_id or x.board_series_id <> e.board_series_id`)).toEqual([]);

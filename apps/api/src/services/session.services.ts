@@ -21,6 +21,7 @@ import { capturePreregistrationsForSession } from './prereg.services';
 import { notifySessionOpened, createNotification, notifyPaymentReferenceDue } from './notification.services';
 import { failPayment, closeStrandedPayments } from './payment.services';
 import { logAction, logActions, type AuditContext } from './audit.services';
+import { entriesFollowMoveInTx } from './exam-entry.services';
 import { expireWaitingRegistrations } from './expiry.services';
 import { lastInstalmentBeingCheckedSql } from './plan.services';
 import { expireIneligibleRegistrations } from './eligibility.services';
@@ -440,6 +441,12 @@ export async function correctSessionSeries(id: string, data: CorrectSessionSerie
       const now = new Date();
       const passed = [...(await effectiveDeadlinesOf(tx, live.map((l) => l.id))).values()].find((d) => d.at && d.at <= now);
       if (passed) throw new Error(`A line of this session is past its deadline (${schoolDate(passed.at!)}): its entry is made, and the session's series can no longer be corrected`);
+      // F4's entries of the lines that change series (after the lines, §2.1): a sent one refuses the
+      // correction (its sentence says "already": a 409), the drafts are withdrawn with it and made
+      // again in the corrected series (the review of 426d565, item 2).
+      const changing = live.filter((l) => (plan.find((p) => p.itemId === l.offerItemId)?.to ?? null) !== l.boardSeriesId).map((l) => l.id);
+      const sent = await entriesFollowMoveInTx(tx, changing, "the session's series was corrected", adminId, auditCtx);
+      if (sent) throw new Error(sent);
       // Out of the old series (items, then their live lines), the old links gone, the session corrected…
       for (const p of plan) await tx.update(sessionOfferItem).set({ boardSeriesId: null }).where(eq(sessionOfferItem.id, p.itemId));
       for (const l of live) await tx.update(registration).set({ boardSeriesId: null }).where(eq(registration.id, l.id));

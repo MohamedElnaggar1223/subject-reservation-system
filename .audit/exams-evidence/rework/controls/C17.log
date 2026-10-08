@@ -4,14 +4,14 @@
 # expected red: ['a candidate with two entries in a Cambridge series lists both']
 # result: RED as expected
 
- ❯ test/08x1-exam-entries.test.ts (17 tests | 5 failed) 4519ms
+ ❯ test/08x1-exam-entries.test.ts (17 tests | 5 failed) 4338ms
    × F4: candidates and entries > the entry list and its check > a candidate with two entries in a Cambridge series lists both, in code order (Cambridge's columns carry no entry code) 25ms
-   × F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > entries go to the board with the fee tier of the day (information only) 11ms
+   × F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > entries go to the board with the fee tier of the day (information only) 10ms
      → expected { submitted: 3, skipped: +0 } to deeply equal { submitted: 2, skipped: +0 }
    × F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > past the deadline a new entry is refused, and a draft cannot be sent; a withdrawal is allowed with the board's fee shown 6ms
-   × F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after 8ms
+   × F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after 6ms
      → expected 2 to be 1 // Object.is equality
-   × F4: candidates and entries > national IDs > are read only by the coordinator and the admin, each read audited without the number; never in a list, a log or an audit row 81ms
+   × F4: candidates and entries > national IDs > are read only by the coordinator and the admin, each read audited without the number; never in a list, a log or an audit row 55ms
  Test Files  1 failed (1)
       Tests  5 failed | 12 passed (17)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x1-exam-entries.test.ts

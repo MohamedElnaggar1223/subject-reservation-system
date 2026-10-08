@@ -4,17 +4,17 @@
 # expected red: ['a carry forward declared and not verified is derived as suggested']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 3 failed) 20912ms
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a carry forward declared and not verified is derived as suggested, not confirmed 24ms
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 3 failed) 26512ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a carry forward declared and not verified is derived as suggested, not confirmed 38ms
      → expected [ 'BY', 'confirmed', 'june', …(2) ] to deeply equal [ 'BY', 'suggested', 'june', …(2) ]
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified here after derivation: the next derivation confirms the suggested carry forward 18ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified here after derivation: the next derivation confirms the suggested carry forward 20ms
      → expected 'confirmed' to be 'suggested' // Object.is equality
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > rejected after derivation: the draft loses the carry forward and its option; a sent entry keeps them and is flagged 33ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > rejected after derivation: the draft loses the carry forward and its option; a sent entry keeps them and is flagged 49ms
      → expected [ Array(4) ] to deeply equal [ Array(4) ]
  Test Files  1 failed (1)
-      Tests  3 failed | 38 passed (41)
+      Tests  3 failed | 48 passed (51)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 77fe0217-7cab-49ab-9746-49324ba0348d: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 98a7bcf5-c3ed-4b7d-88d2-94c3d81df6d8: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a carry forward declared and not verified is derived as suggested, not confirmed

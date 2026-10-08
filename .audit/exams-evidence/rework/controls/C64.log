@@ -1,0 +1,37 @@
+# C64: derivation does not hold the series' paid lines (a draft on a line being dropped)
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["a derivation racing the family's drop of the line"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 1 failed) 27360ms
+   × F4 on the reservations rework > a line not paid is never entered (the review of 426d565, item 4) > a derivation racing the family's drop of the line: it waits for the line and enters nothing on the dropped line 727ms
+     → expected { series: { …(4) }, …(7) } to match object { created: +0 }
+ Test Files  1 failed (1)
+      Tests  1 failed | 50 passed (51)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 35d93d9b-4176-4ee8-bd42-94bef50c2d10: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a line not paid is never entered (the review of 426d565, item 4) > a derivation racing the family's drop of the line: it waits for the line and enters nothing on the dropped line
+AssertionError: expected { series: { …(4) }, …(7) } to match object { created: +0 }
+(15 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "created": 0,[39m
+[31m+   "created": 1,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:1111:23
+    1109|         await p.releaseAll();
+    1110|       }
+    1111|       expect(derived).toMatchObject({ created: 0 });
+       |                       ^
+    1112|       expect((await lineOf(line)).status).toBe('dropped');
+    1113|       expect(await sql(`select id from exam_entry where registration_i…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

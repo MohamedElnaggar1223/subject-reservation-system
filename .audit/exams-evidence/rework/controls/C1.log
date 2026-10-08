@@ -4,39 +4,39 @@
 # expected red: ['past the deadline a new entry is refused', 'F4: no entry was made, or sent to the board, after its own deadline']
 # result: RED as expected
 
- ❯ test/08x1-exam-entries.test.ts (17 tests | 2 failed) 4947ms
-   × F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > past the deadline a new entry is refused, and a draft cannot be sent; a withdrawal is allowed with the board's fee shown 19ms
+ ❯ test/08x1-exam-entries.test.ts (17 tests | 2 failed) 4272ms
+   × F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > past the deadline a new entry is refused, and a draft cannot be sent; a withdrawal is allowed with the board's fee shown 13ms
      → expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
-   × F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after 10ms
+   × F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after 5ms
      → expected 2 to be 1 // Object.is equality
- ❯ test/09-money-invariants.test.ts (54 tests | 14 failed) 413ms
-   × money invariants over the whole database > there is money to check: every kind of movement happened in the suites above 246ms
+ ❯ test/09-money-invariants.test.ts (54 tests | 14 failed) 326ms
+   × money invariants over the whole database > there is money to check: every kind of movement happened in the suites above 215ms
      → reversed: expected 0 to be greater than 0
    × money invariants over the whole database > there are board series to check: windows feeding several, entries in them, entries closed at a deadline 1ms
      → expired_at_a_series_deadline: expected 0 to be greater than 0
    × money invariants over the whole database > no waiting line is still provisional when every fee row it was priced from is confirmed at the amount it recorded (a Confirm reaches every line read from its rows) 1ms
      → expected 0 to be greater than 0
-   × money invariants over the whole database > F0a: nothing waits for, and nothing was captured into, a series its student may not sit 61ms
+   × money invariants over the whole database > F0a: nothing waits for, and nothing was captured into, a series its student may not sit 50ms
      → expected 0 to be greater than 0
    × money invariants over the whole database > F4: no entry was made, or sent to the board, after its own deadline (MO-10, A-08): its line's effective deadline, its cash-in's, else its series' entry deadline 7ms
      → expected [ { …(4) } ] to deeply equal []
-   × money invariants over the whole database > F4: no live entry of a line no longer paid — every path that ends a paid line withdraws its entries in its own transaction (the review of 093dbd1, item 1) 3ms
+   × money invariants over the whole database > F4: no live entry of a line no longer paid — every path that ends a paid line withdraws its entries in its own transaction (the review of 093dbd1, item 1) 1ms
      → expected 0 to be greater than 0
    × money invariants over the whole database > F4: an entry from a cash-in is an award entry of that charge's student, in its series, from a cash-in or late cash-in; one live entry per charge 2ms
      → expected 0 to be greater than or equal to 2
-   × money invariants over the whole database > F4: a declared sitting verified from the board's results had a result for the line's student in that series 3ms
+   × money invariants over the whole database > F4: a declared sitting verified from the board's results had a result for the line's student in that series 2ms
      → expected 0 to be greater than 0
-   × money invariants over the whole database > F4: an entry from a registration is that registration's student's, in its series; a result from an entry is that entry's candidate's, in its series 3ms
+   × money invariants over the whole database > F4: an entry from a registration is that registration's student's, in its series; a result from an entry is that entry's candidate's, in its series 1ms
      → expected 0 to be greater than 0
    × money invariants over the whole database > F4: every withdrawal and every certificate hand-over has exactly one audit row; a certificate is collected once 1ms
      → expected [ Array(1) ] to deeply equal []
-   × money invariants over the whole database > F4: no seat holds two candidates and no candidate has two seats in a sitting; no invigilator is in two rooms of one 5ms
+   × money invariants over the whole database > F4: no seat holds two candidates and no candidate has two seats in a sitting; no invigilator is in two rooms of one 2ms
      → expected 0 to be greater than 0
-   × money invariants over the whole database > there are charges, plans and exceptions to check: every kind happened in the suites above 3ms
+   × money invariants over the whole database > there are charges, plans and exceptions to check: every kind happened in the suites above 1ms
      → charge_payments_completed: expected 0 to be greater than 0
-   × money invariants over the whole database > every line confirmed since the rework has its two consents, the refund policy and the declaration (§3.5, §8) 2ms
+   × money invariants over the whole database > every line confirmed since the rework has its two consents, the refund policy and the declaration (§3.5, §8) 1ms
      → expected 0 to be greater than 0
-   × money invariants over the whole database > a declared sitting is answered once, by someone, and only a paid line stands with its declaration rejected (§3.5) 4ms
+   × money invariants over the whole database > a declared sitting is answered once, by someone, and only a paid line stands with its declaration rejected (§3.5) 3ms
      → expected 0 to be greater than 0
  Test Files  2 failed (2)
       Tests  16 failed | 55 passed (71)
@@ -50,7 +50,7 @@ AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 
 [31m+ Received[39m
 
 [2m  {[22m
-[32m-   "error": "The entry deadline for Cambridge International November 2026 (exams xe) (8 October 2026 at 16:08) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)",[39m
+[32m-   "error": "The entry deadline for Cambridge International November 2026 (exams xe) (8 October 2026 at 20:01) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)",[39m
 [32m-   "status": 409,[39m
 [31m+   "error": "\"\"",[39m
 [31m+   "status": 201,[39m
@@ -132,9 +132,9 @@ AssertionError: expected [ { …(4) } ] to deeply equal []
 [32m- [][39m
 [31m+ [[39m
 [31m+   {[39m
-[31m+     "created_at": "2026-10-08 13:08:39.89611+00",[39m
-[31m+     "deadline": "2026-10-08 13:08:39.885767+00",[39m
-[31m+     "id": "98943610-0fc2-463e-a9d8-3f377524f7f7",[39m
+[31m+     "created_at": "2026-10-08 17:01:36.948624+00",[39m
+[31m+     "deadline": "2026-10-08 17:01:36.943569+00",[39m
+[31m+     "id": "5e0d2689-17fc-4d2b-aa10-4c8c7bc8cede",[39m
 [31m+     "submitted_at": null,[39m
 [31m+   },[39m
 [31m+ ][39m
@@ -151,49 +151,49 @@ AssertionError: expected [ { …(4) } ] to deeply equal []
 
  FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F4: no live entry of a line no longer paid — every path that ends a paid line withdraws its entries in its own transaction (the review of 093dbd1, item 1)
 AssertionError: expected 0 to be greater than 0
- ❯ test/09-money-invariants.test.ts:667:115
-    665|           and n.kind = e.kind and n.unit_id is not distinct from e.uni…
-    666|     // There was something to check: 08x4 ended paid lines by each pat…
-    667|     expect((await sql(`select 1 from exam_entry where withdrawn_with_l…
+ ❯ test/09-money-invariants.test.ts:660:115
+    658|       where e.status <> 'withdrawn' and r.status <> 'confirmed'`)).toE…
+    659|     // There was something to check: 08x4 ended paid lines by each pat…
+    660|     expect((await sql(`select 1 from exam_entry where withdrawn_with_l…
        |                                                                                                                   ^
-    668|     expect((await sql(`select 1 from exam_entry where withdrawn_with_l…
-    669|   });
+    661|     expect((await sql(`select 1 from exam_entry where withdrawn_with_l…
+    662|   });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/16]⎯
 
  FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F4: an entry from a cash-in is an award entry of that charge's student, in its series, from a cash-in or late cash-in; one live entry per charge
 AssertionError: expected 0 to be greater than or equal to 2
- ❯ test/09-money-invariants.test.ts:677:122
-    675|     expect(await sql(`select charge_id from exam_entry where charge_id…
-    676|     // There was something to check: 08x4 entered two cash-ins (one de…
-    677|     expect(Number((await sql<{ n: string }>(`select count(*) as n from…
+ ❯ test/09-money-invariants.test.ts:670:122
+    668|     expect(await sql(`select charge_id from exam_entry where charge_id…
+    669|     // There was something to check: 08x4 entered two cash-ins (one de…
+    670|     expect(Number((await sql<{ n: string }>(`select count(*) as n from…
        |                                                                                                                          ^
-    678|   });
-    679| 
+    671|   });
+    672| 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/16]⎯
 
  FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F4: a declared sitting verified from the board's results had a result for the line's student in that series
 AssertionError: expected 0 to be greater than 0
- ❯ test/09-money-invariants.test.ts:686:182
-    684|       where a.action = 'PRIOR_SITTING_VERIFIED' and a.new_data->>'reas…
-    685|         and not exists (select 1 from exam_result x where x.student_id…
-    686|     expect(Number((await sql<{ n: string }>(`select count(*) as n from…
+ ❯ test/09-money-invariants.test.ts:679:182
+    677|       where a.action = 'PRIOR_SITTING_VERIFIED' and a.new_data->>'reas…
+    678|         and not exists (select 1 from exam_result x where x.student_id…
+    679|     expect(Number((await sql<{ n: string }>(`select count(*) as n from…
        |                                                                                                                                                                                      ^
-    687|   });
-    688| 
+    680|   });
+    681| 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/16]⎯
 
  FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F4: an entry from a registration is that registration's student's, in its series; a result from an entry is that entry's candidate's, in its series
 AssertionError: expected 0 to be greater than 0
- ❯ test/09-money-invariants.test.ts:696:122
+ ❯ test/09-money-invariants.test.ts:692:89
+    690|     expect((await sql(`
+    691|       select 1 from exam_entry e join registration r on r.id = e.regis…
+    692|       where e.withdrawn_with_line and e.board_series_id <> r.board_ser…
+       |                                                                                         ^
+    693|     expect(await sql(`
     694|       select x.id from exam_result x join exam_entry e on e.id = x.ent…
-    695|       where x.student_id <> e.student_id or x.board_series_id <> e.boa…
-    696|     expect(Number((await sql<{ n: string }>(`select count(*) as n from…
-       |                                                                                                                          ^
-    697|   });
-    698| 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/16]⎯
 
@@ -206,7 +206,7 @@ AssertionError: expected [ Array(1) ] to deeply equal []
 [32m- [][39m
 [31m+ [[39m
 [31m+   {[39m
-[31m+     "id": "c306e924-2b95-4d54-8c09-e1f1f8c298f3",[39m
+[31m+     "id": "32c341e4-e46d-4c81-b920-539c6361fab1",[39m
 [31m+   },[39m
 [31m+ ][39m
 
