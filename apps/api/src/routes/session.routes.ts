@@ -54,12 +54,13 @@ import { getSessionMoney } from '../services/session-money.services';
 import { previewGrade10, commitGrade10, Grade10Error } from '../services/grade10.services';
 import { notifySessionOpened, notifySessionClosed, getStudentAndParentBroadcastIds } from '../services/notification.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
+import { StudentsKeptChanging } from '../lib/student-locks';
 
 /** The status a refusal answers with, from the error the service threw. */
 function failure(err: unknown, fallback: string) {
   const message = clientMessage(err, fallback);
   const status = err instanceof sessionService.SessionError || err instanceof seriesService.SeriesError
-    || err instanceof offerService.OfferError || err instanceof Grade10Error
+    || err instanceof offerService.OfferError || err instanceof Grade10Error || err instanceof StudentsKeptChanging
     ? err.status
     : seriesService.seriesRuleSentence(err) ? 409 : 400;
   return { message: seriesService.seriesRuleSentence(err) ?? message, status: status as 400 | 403 | 404 | 409 };
@@ -212,6 +213,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, { ...session, registrationsExpired: expired.length, paymentsClosed });
       } catch (err) {
         const message = clientMessage(err, 'Failed to correct the series');
+        if (err instanceof StudentsKeptChanging) return error(c, message, err.status);
         return error(c, message, message.includes('not found') ? 404 : message.includes('already') ? 409 : 400);
       }
     }

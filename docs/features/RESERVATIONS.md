@@ -613,6 +613,14 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
   the first entry's date later than the retake deadline. And the approval's deadline check (the
   line's student) and `getAvailableSubjects` (the student) pass the student, so a late entry is
   read there.
+- **A change whose students keep changing answers 409** *(changed, the review of F1)*: the writers
+  that lock the students of the lines they move first (`withStudentsFirst`: an item's series
+  change, a board change from the Subjects form or the Catalogue, the session's series correction,
+  and replace-teacher once F1 lands) retry three times when a reservation lands meanwhile; a fourth
+  newcomer throws `StudentsKeptChanging` (`lib/student-locks.ts`), which every such route answers
+  with 409 and "The students with lines here changed while this change was running (new
+  reservations kept arriving): nothing was changed. Try again." (Arabic in `i18n-sessions.ts`). The
+  admin's move does not run the pattern: the students of the lines it is given cannot change.
 - **A swap takes the new line's locks before the old line** *(changed, the review of B)*: §2.1.
   `holdNewLines(tx, { studentId, sessionId, lines })` is exported for any path that holds a line
   before it makes new ones; every reservation's `insertLines` now takes the series' fee grid

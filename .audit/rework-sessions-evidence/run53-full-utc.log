@@ -1,0 +1,41 @@
+# run53-full-utc.log: the proof of this run, as vitest reported it (the full log, 181231 lines, 18755003 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ✓ test/00-harness.test.ts (4 tests) 1520ms
+ ✓ test/01-desk.test.ts (8 tests) 1495ms
+ ✓ test/02-money.test.ts (4 tests) 1551ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 1859ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 5582ms
+ ✓ test/05-object-access.test.ts (16 tests) 3733ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3526ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1643ms
+ ✓ test/08-money-rules.test.ts (51 tests) 10758ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 10774ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 6050ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 7121ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 5327ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 4951ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 8677ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2344ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4055ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 3722ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4448ms
+ ✓ test/08l-board-change.test.ts (7 tests) 2912ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 5406ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 21477ms
+ ✓ test/08o-reservation-lines.test.ts (23 tests) 15069ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 7779ms
+ ✓ test/08q-charges.test.ts (46 tests) 24092ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 8325ms
+ ✓ test/08s-messages-reminders.test.ts (36 tests) 43923ms
+ ✓ test/08t-rework-races.test.ts (44 tests) 39743ms
+ ✓ test/09-money-invariants.test.ts (51 tests) 877ms
+
+## Summary
+[clock] database minus host: 0.5 ms (measured within 2 ms)
+ Test Files  29 passed (29)
+      Tests  546 passed | 1 todo (547)
+   Start at  23:22:27
+   Duration  266.71s (transform 910ms, setup 38ms, collect 3.13s, tests 258.74s, environment 2ms, prepare 849ms)
+utc exit 0
