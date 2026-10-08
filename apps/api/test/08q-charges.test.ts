@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearLabel, academicYearStartOf } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, money, takings, takingsDelta, openWindow, futureWindow,
-  runPaymentDeadlines, seriesOfSession, audited, notificationsFor, reservationOf, type Client,
+  runPaymentDeadlines, seriesOfSession, audited, notificationsFor, reservationOf, CONSENT, type Client,
 } from './helpers';
 
 /**
@@ -843,6 +843,77 @@ describe('08q: instalment plans', () => {
       expect(await statusOf('registration', l!)).toBe('confirmed');
     } finally {
       await setting(false);
+    }
+  });
+
+  it("a declared retake under a plan, its sitting rejected by the school: refused while an instalment payment is in progress; then the line expires and its plan is settled as a drop that day (step B's expiry, step C's settlement)", async () => {
+    const dr = await subject(adm, 'CQP-DR', 'Declared retake (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    const f = await onboard(officer, 'cqp-declared', 12);
+    const it = await one<{ id: string; month: string; year: number }>(
+      `select i.id, bs.month, bs.year from session_offer_item i join session_offer o on o.id = i.offer_id join board_series bs on bs.id = i.board_series_id
+       where o.session_id = $1 and o.subject_id = $2`, [s1, dr]);
+    // The desk declares a sitting the system does not know: the June before the series' year.
+    const [line] = (await apiResponse(officer.api.v1.registrations.desk.$post({ json: {
+      studentId: f.studentId, sessionId: s1, consent: CONSENT,
+      lines: [{ offerItemId: it.id, attempt: 'retake', mode: 'in_school', priorSitting: { month: 'june', year: Number(it.year) - 1 } }],
+    } }))).registrations;
+    const l = line!.id;
+    expect(await one(`select prior_sitting_source as s, status from registration where id = $1`, [l])).toEqual({ s: 'declared_by_desk', status: 'pending_payment' });
+    const p = await plan(f, l, [750, 750]);
+    await payAtDesk(f, [p.i[0]!]);
+    const reject = () => coordinator.api.v1.registrations[':id']['verify-prior'].$post({ param: { id: l }, json: { outcome: 'rejected', reason: 'no result for this candidate' } });
+    // The second instalment's transfer is in progress: a payment of the line in progress.
+    const transfer = await payByTransfer(f, p.i[1]!, `CQP-DR-${f.studentId.slice(0, 6)}`);
+    expect(await refused(reject())).toEqual({ status: 409, error: 'A payment for this line is in progress: confirm or reject it in the Finance Workbench first' });
+    await apiResponse(officer.api.v1.payments[':id'].reject.$post({ param: { id: transfer }, json: { reason: 'not on the bank statement' } }));
+    expect(await statusOf('registration', l)).toBe('pending_payment');
+    // Rejected: the line expires and its plan is settled in the same transaction — week 3 (50%):
+    // a paid drop that day gives back 1,000 of 1,500, so of the 750 paid in the school keeps 500.
+    expect(await apiResponse(reject())).toMatchObject({ outcome: 'rejected', effect: 'expired' });
+    expect(await statusOf('registration', l)).toBe('expired');
+    expect(await expiredFor(l)).toBe('declaration_rejected');
+    expect(await settledOf(l)).toMatchObject({ deposits: '750', kept: '500', released: '250', cause: 'expired' });
+    expect(await statusOf('exception', p.id)).toBe('lapsed');
+    expect(await statusOf('charge', p.i[1]!)).toBe('cancelled');
+    // The held ledger of the line: 750 in, 500 kept and 250 released out (amounts as recorded, by reason).
+    expect(await ledgerOf(l)).toMatchObject({ instalment: 750, plan_forfeit: 500, plan_release: 250 });
+    expect(await wallet(f.studentId)).toEqual({ free: 250, held: 0 });
+  });
+
+  it("a declared retake under a plan still unverified at its deadline under hold: the sweep expires it (hold_unverified) and settles its plan, once", async () => {
+    const s = await session(adm, 'November (AS, plans hold)', 'november', 'as_level', { ...openWindow(), activate: true });
+    await week3(s);
+    const dh = await subject(adm, 'CQP-DH', 'Declared hold (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    const f = await onboard(officer, 'cqp-hold', 12);
+    const it = await one<{ id: string; series: string; year: number }>(
+      `select i.id, bs.id as series, bs.year from session_offer_item i join session_offer o on o.id = i.offer_id join board_series bs on bs.id = i.board_series_id
+       where o.session_id = $1 and o.subject_id = $2`, [s, dh]);
+    const [line] = (await apiResponse(officer.api.v1.registrations.desk.$post({ json: {
+      studentId: f.studentId, sessionId: s, consent: CONSENT,
+      lines: [{ offerItemId: it.id, attempt: 'retake', mode: 'in_school', priorSitting: { month: 'june', year: Number(it.year) - 1 } }],
+    } }))).registrations;
+    const l = line!.id;
+    const p = await plan(f, l, [750, 750]);
+    await payAtDesk(f, [p.i[0]!]);
+    const verification = (value: 'hold' | 'enter_as_declared') => apiResponse(adm.api.v1.settings[':key'].$put({
+      param: { key: 'verification.unverifiedAtDeadline' }, json: { value, reason: value === 'hold' ? 'the school holds unverified sittings (Q-22)' : 'back to the default' },
+    }));
+    await verification('hold');
+    try {
+      // Hold on since before the line's deadline passed (45 seconds ago; the deadline, 30).
+      await sql(`update audit_log set created_at = now() - interval '45 seconds' where id = (select id from audit_log where action = 'SETTING_CHANGED' and entity_id = 'verification.unverifiedAtDeadline' order by created_at desc limit 1)`);
+      await sql(`update board_series set entry_deadline = now() - interval '30 seconds', retake_deadline = now() - interval '30 seconds' where id = $1`, [it.series]);
+      expect(await runPaymentDeadlines()).toMatchObject({ unverifiedExpired: 1 });
+      expect(await expiredFor(l)).toBe('hold_unverified');
+      expect(await settledOf(l)).toMatchObject({ deposits: '750', kept: '500', released: '250', cause: 'expired' });
+      expect(await statusOf('exception', p.id)).toBe('lapsed');
+      expect(await statusOf('charge', p.i[1]!)).toBe('cancelled');
+      expect(await wallet(f.studentId)).toEqual({ free: 250, held: 0 });
+      // Once: the next tick finds nothing.
+      expect(await runPaymentDeadlines()).toMatchObject({ unverifiedExpired: 0 });
+      expect(Number((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'PLAN_SETTLED' and entity_id = $1`, [l])).n)).toBe(1);
+    } finally {
+      await verification('enter_as_declared');
     }
   });
 

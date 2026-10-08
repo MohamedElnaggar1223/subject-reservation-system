@@ -1,7 +1,8 @@
 # Reservations rework — step C (agent C): money changes, charges, exceptions
 
 Branch `feature/rework-money`, from `origin/feature/rework-sessions` (agent A's step 1, merged
-again at 977848d). The design is `RESERVATIONS_REWORK.md` version 8 (accepted 7 Oct 2026 with
+again at 977848d), with main merged at c6ab55f (A's step 1) and at 42cbf2c (step 2's B, main at
+84d60ca). The design is `RESERVATIONS_REWORK.md` version 8 (accepted 7 Oct 2026 with
 its §17 defaults); this step is its §3.6, §3.7, §3.9, §3.10 items 1–9, §4.7, the School fees
 push and the desk-drop of §3.3. A's contract is `docs/features/RESERVATIONS.md` §2 (§2.1 the
 lock order, §2.8 the adapter this step replaces, §2.10 what is not mine to touch, §2.11 what
@@ -14,15 +15,20 @@ the failing tests and their messages (CLAUDE.md, Git). The progress log is the l
 
 ## 1. The data model
 
-Everything is in `packages/db/src/schema.ts`. Migrations after main's 0044 (A's follow-ups):
-`0045_rework_money_structure` (generated, additive), `0046_rework_money_backfill` (custom,
+Everything is in `packages/db/src/schema.ts`. Migrations after B's 0046 (main's last):
+`0047_rework_money_structure` (generated, additive), `0048_rework_money_backfill` (custom,
 idempotent: run twice on the dev copy, the second run inserts nothing), and
-`0047_rework_money_constraints` (what the backfill makes true). Renumbered from 0044–0046 when
-main took A's 0044; each journal `when` is later than main's last, so the migrator applies them
-after it on a database that already has main's (drizzle applies only newer entries).
+`0049_rework_money_constraints` (what the backfill makes true). Renumbered twice: from 0044–0046
+when main took A's 0044, and from 0045–0047 when main took B's 0045 and 0046. Each journal `when`
+is later than main's last (B's 0046's, 1791429312401) in order — 1791437758565, 1791437759565,
+1791437760565 — so the migrator applies them after B's on a database that already has them
+(drizzle applies only entries newer than the last applied one). The snapshots are mine merged
+three ways with B's 0046 over A's 0044 (no key both changed) and chained after B's 0046;
+`drizzle-kit generate` reports no schema change.
 
-**Proved** (evidence `proof/*.json`, `dev-drizzle-migrations.txt`): the dev copy migrated at
-origin/main first, then at the branch, records step C's three as rows 46–48; F0a's richer copy and
+**Proved** (evidence `proof/*.json`, `dev-drizzle-migrations*.txt`): the dev copy migrated at
+origin/main first, then at the branch, records step C's three as rows 46–48 (after A, 3 Oct) and
+as rows 48–50 after B's 46–47 (the final merge, `dev-drizzle-migrations-after-b.txt`); F0a's richer copy and
 the synthetic school shape, each migrated at main with V3's refund rules seeded (a session window
 today, a year's window, a past window, a V3 custom refund percent), give the same refund preview
 for every live line before (main's `refundPercentage`) and after (`refundFor`): 50, 30, 0 and 90.
@@ -31,7 +37,7 @@ for every live line before (main's `refundPercentage`) and after (`refundFor`): 
 
 One row lifts one policy of the registry for one holder, optionally narrowed.
 
-- **The policy**: `policy_key` (not null after 0047), a key of `POLICIES`
+- **The policy**: `policy_key` (not null after 0049), a key of `POLICIES`
   (`packages/validations/src/exception/policies.ts`). `type` stays for V3's eight types (null on
   a new-shape row).
 - **The holder**: `student_id` **or** `family_id` (a parent account: every child linked to it,
@@ -41,12 +47,12 @@ One row lifts one policy of the registry for one holder, optionally narrowed.
   `board_series_id`, `academic_year`. What no scope means is the policy's `nullScope`.
 - **The value**, in its type's column: `value_number` (a percent or an amount), `value_date`,
   `value_json` (a plan's schedule). `value` (V3's) is kept: a V3-shaped insert is filled by the
-  trigger `exception_legacy_fill` (0046) exactly as the backfill maps it.
+  trigger `exception_legacy_fill` (0048) exactly as the backfill maps it.
 - **The life**: `status` (`active`, `revoked`, `lapsed`, `used` — a one-shot gate used by the
   reservation it let through, `used_at`, `used_for.registrationIds`), `valid_until`,
   `revoke_reason`; `check_reason` / `confirmed_at` / `confirmed_by` for "Check these".
 
-The eight V3 types map in 0046 (`exception_policy_from_legacy`): `discount_percent` →
+The eight V3 types map in 0048 (`exception_policy_from_legacy`): `discount_percent` →
 `price.discountPercent`, `discount_fixed` → `price.discountFixed`, `custom_price` →
 `price.custom`, `fee_waiver` → `gate.schoolFee`, `deadline_extension` and `late_registration` →
 `deadline.window` with `value_date` = their `valid_until`, `custom_refund_percent` →
@@ -67,9 +73,9 @@ moved exception.
   until the owner answers Q-21.
 - `board_service_fee` — the fee per series × service × level (`igcse` or `as_a_level`),
   `provisional` until confirmed, `copied_from_default` when it came from V3's
-  `remark_fee_schedule` (0046 copies each V3 remark fee, provisional, into every open or
+  `remark_fee_schedule` (0048 copies each V3 remark fee, provisional, into every open or
   future series of that board at both levels, with `REWORK_BACKFILL_SERVICE` rows).
-- `board_service_deadline` — the board's last date for a service in a series. 0046 moves each
+- `board_service_deadline` — the board's last date for a service in a series. 0048 moves each
   V3 `remark_deadline` (board × window × service) onto the series the window's items sit in;
   two windows feeding one series keep the earlier date.
 - `remark_request` gains `board_service_id` and `service_level`.
@@ -92,7 +98,7 @@ fee, a preregistration, a remark). `payment_method` gains `held_deposits` (a pla
 
 ### 1.4 Receipts and the ledger
 
-- `receipt.registration_id` is nullable and `receipt.charge_id` added (unique); 0047's
+- `receipt.registration_id` is nullable and `receipt.charge_id` added (unique); 0049's
   `receipt_one_subject` checks a receipt is for exactly one line or one charge. A charge's
   receipt is `RCP-C…` (`-R` when reissued after a reversal).
 - `escrow_transaction.related_charge_id` (a charge's refund). New ledger reasons: `instalment`
@@ -142,7 +148,7 @@ before any held sum is read.
 | The overdue expiry (`expireOverdueLines`) | waiting lines past due by the setting's days expire `overdue`, a live plan settled | `REGISTRATION_EXPIRED` (`overdue`), `PLAN_SETTLED` | the line (status-filtered `FOR UPDATE`, so two ticks expire it once) |
 | Plans lapsing (`lapsePlans`) | the plan `lapsed`, its line expired `plan_lapsed`, settled | `EXCEPTION_LAPSED`, `REGISTRATION_EXPIRED`, `PLAN_SETTLED` | the line, then the plan's status-guarded claim |
 | A service fee set or confirmed (`putServiceFees`) | the fee row; the open charges priced from it (no payment open or made) re-priced to it | `SERVICE_FEES_SET` (with `chargesRepriced`), `CHARGE_REPRICED` each | the series `FOR SHARE`, the fee rows, then those charges (a payment locks charges and only reads the fee row) |
-| The desk's one action (`collectAtDesk`, reserve-and-collect) | the year's school fee first (its own payment; the registration gate asks for it), then the lines per entry deadline, then the charges per deadline or plan line; what cannot be taken after the fee is listed "not collected" | the paths' own rows | the fee's path; then every line it touches — the lines it pays and the instalments' plan lines — `FOR UPDATE` in one id-ordered pass, then the charges in id order (decision 25) |
+| The desk's one action (`collectAtDesk`, reserve-and-collect) | the year's school fee first (its own payment; the registration gate asks for it), then the lines per entry deadline (since B: through `reserveLines` with the desk's consent, a line on a provisional fee reserved and not collected; a school-reserved line's family consent written with its collection), then the charges per deadline or plan line; what cannot be taken after the fee is listed "not collected" | the paths' own rows | the fee's path; then every line it touches — the lines it pays and the instalments' plan lines — `FOR UPDATE` in one id-ordered pass, then the charges in id order (decision 25) |
 | The desk-drop (`deskDrop`) | a confirmed line past its effective deadline dropped through the receipt-gated drop with `refundFor` (board fee kept when sent); F4's withdrawal is a seam | `DESK_DROP_EXECUTED` (and the drop's own rows) | the line, its receipt (the core drop's locks) |
 | A drop's refund (`refundFor` in every drop path) | course fee by the policy's week, board fee until the entry is sent | the drop's rows | the drop's |
 | Grant / revoke an exception | the row; a line-scoped price exception re-prices the unpaid line (and back on revoke); a charge-scoped one re-prices a charge awaiting payment; `deadline.payment` re-dates; a plan creates its instalments, re-dates the line; a waiver cancels open pushes; a plan revoked expires and settles its line | `EXCEPTION_GRANTED` / `EXCEPTION_REVOKED`, `LINE_REPRICED`, `CHARGE_REPRICED`, `LINE_DUE_MOVED`, `CHARGE_CREATED` | the students it covers, the line or charge it rests on, the exception |
@@ -272,6 +278,34 @@ line under a live plan it answers the plan's last date first.
     row and the receipt print derive their types from the fetcher (`Awaited<ReturnType<…>>`), as
     CLAUDE.md's Hono RPC rule says — the hand-written types were how a charge's receipt crashed
     them; the bank-transfer list (`/admin/payments`) lists a charge payment's charges.
+29. **After B (the final merge, 42cbf2c and after)**: B's two direct expiries — a declaration
+    rejected on an unpaid line (`verifyPriorSitting`) and `hold` at the deadline
+    (`holdUnverifiedAtDeadline`) — settle a live plan on the line in the same transaction
+    (`settlePlansOfExpiredLines`, the line already locked receipt-first by B's `lockLine`, then
+    the plan, its charges, the wallet: the plan's order). B's raw update is kept (it also covers
+    an unfunded preregistration, which `expireWaitingRegistrations` does not take); the
+    settlement is the one every system expiry runs.
+30. **B's `paymentState` counts an instalment payment in progress** as a payment of the line in
+    progress: a rejection is refused while one is open (as for a line's own payment), and the
+    hold step leaves the line to the deadline sweep that tick.
+31. **B's `refundForSystemDrop` is replaced by `refundFor`**: the rejection after the first-entry
+    deadline reads the per-line sent rule (`boardSent` and the board fee kept come from the
+    quote), the hold step passes `neverSent`. B's 08o keeps its amounts; its "half back" puts the
+    session in week 3 of its policy, since V3's windows count only for converted lines (§3.9).
+32. **B's `declaration_rejected` in every money reader of a line's deadline**:
+    `chargeDeadline` (TypeScript) and `charge_effective_deadline` (SQL, 0048), `refundFor`'s
+    sent rule, the dead plan's line, 09's desk-drop rule. A live plan sits on an unpaid line, and a
+    rejection on an unpaid line expires it, so no instalment's line is ever rejected-and-live: no
+    test can tell the flag from its absence there; it is passed for the rule's sake (as B's hold
+    query does).
+33. **The window by subject reads the lines' items** since B (every reservation path takes lines):
+    `subjectsOfItems` in window.services gives `sessionWindow` a new reservation's subjects.
+34. **The desk's reservation card is B's `Reserve`**: "Also collect now" (the year's fee and the
+    charges beside a reservation) is not rendered there — the component is B's; the API still
+    takes `collectNow.schoolFeeYear` and `chargeIds` (08q proves the fee-first order). The desk
+    takes the fee and the charges in "To collect now", which now also carries B's two rules
+    (lines on a provisional fee listed, not collected; the parent's consent for school-reserved
+    lines). *For the lead.*
 
 ---
 
@@ -369,7 +403,17 @@ Step C's own rules:
   lines' fees are re-priced: no deadlock. Controls (red, restored): the desk's second pass
   (`deadlock detected`), the line scope back, the tab's old count, `chargeDeadline` without the
   student, any charge as a payment history.
-- `08r-exceptions-registry.test.ts` (14, with the same exception twice): the policies per caller; grant checks; a family's
+- After B (the final merge): 08q — a declared retake under a plan, its sitting rejected:
+  refused while an instalment transfer is open, then expired (`declaration_rejected`) and
+  settled in week 3 (750 paid: 500 kept, 250 back), the plan lapsed, the unpaid instalment
+  cancelled; the same line still unverified at its deadline under `hold`: expired
+  (`hold_unverified`) and settled once. 08r — B's teacher change to self-study on a first entry
+  asks the real registry's one-shot gate: refused without it; with it, the change goes through,
+  the gate is `used` by that line with one `EXCEPTION_USED` row, and the next line is refused.
+  Controls (red, restored): each expiry's settlement removed, the instalment payments not
+  counted in `paymentState`, the window without the lines' subjects, the teacher change's
+  `markUsed` removed.
+- `08r-exceptions-registry.test.ts` (15, with the same exception twice): the policies per caller; grant checks; a family's
   exception for every child and no one else; a one-shot gate used once; a line's price
   exception and its revocation; a charge's; `deadline.payment` re-dated and back; the eight V3
   types as the trigger maps them; Check these (a subject-scoped refund percent applies only
@@ -406,8 +450,9 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
   collect what is ticked with the instrument (a pushed fee on its own path), refund to escrow
   (finance admin), add a board service, a price adjustment or another charge.
 - **The desk's Student 360**: "To collect now" — subjects waiting, charges and the year's fee,
-  ticked and taken in one action; beside a reservation, "Also collect now" (the fee, collected
-  first, and the charges). Each line shows the exceptions that touched it, and finance opens the
+  ticked and taken in one action (with B's rules: a line on a provisional fee listed, not
+  collected; the parent's consent tick for a line the school reserved). The reservation card is
+  B's Reserve since the final merge; "Also collect now" beside it is not rendered (decision 34). Each line shows the exceptions that touched it, and finance opens the
   grant form on it.
 - **Board services** (`/exams/services`: admin and coordinator for the catalogue and dates,
   finance admin for the fees and the refund rule; in the Exams nav and the finance admin's):
@@ -452,20 +497,13 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
 - **Charges on the Statement** (B's page): B renders `listChargesFor(studentId)` beside the
   lines, and each line's `exceptions` (the Student 360 returns them per line;
   `exceptionsOfLines` in `line-exceptions-read.services.ts` for B's own endpoint).
-- **At my final merge, after B** (the review of 1cb38de, items 1 and 2):
-  - B's two expiry paths (`verification.services.ts`: a declaration rejected, a hold left
-    unverified) expire a waiting line with a raw update: they go through
-    `expireWaitingRegistrations` (or `settlePlansOfExpiredLines`), so a plan line ended there is
-    settled — its deposits released or kept, its plan ended — not left with its deposits held;
-  - B's `paymentState` counts an instalment payment in progress, not only `payment_registration`;
-  - B's `refundForSystemDrop` (`reservation.services.ts`) is replaced by
-    `refundFor(…, { neverSent })`;
-  - an 08q case: a declared plan line rejected, then settled;
-  - `charge_effective_deadline` and `chargeDeadline` pass B's `registration.declaration_rejected`
-    (A's §2.6 names the place);
-  - the migrations renamed 0047–0049, after B's 0045 and 0046, each journal `when` later than B's
-    0046's (1791429312401) in order, the snapshots chained after B's 0046, and proved on a copy
-    migrated at main (with B) first and then at my branch (`__drizzle_migrations` rows).
+- ~~At my final merge, after B~~ — done (decisions 29–33, §1, §7): both expiries settle a plan,
+  `paymentState` counts instalments, `refundFor` replaces B's stand-in, the flag in both charge
+  deadlines, the 08q cases, the migrations 0047–0049 proved after B's.
+- **The Statement's charges**: B's `statementFor` has a `charges` array (empty) and its page
+  renders it. Filling it needs one rule first — a plan line's instalments are the line's money
+  (counted as the line's paid, not as charges beside it, or the statement counts them twice) —
+  so it is not filled in this merge. *For the lead.*
 - `exception.value`'s drop; reminders per instalment (step D, §3.8).
 
 ---
@@ -487,18 +525,22 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
 6. **Arabic pages log a hydration mismatch** on every page (A's Sessions too): the
    `I18nProvider` reads the language from `localStorage` in its initial state on the client.
    Not this step's; worth one fix in the provider.
-7. **Migration numbers**: renumbered 0045–0047 after main's 0044 (A's follow-ups; the
-   snapshots re-chained, `drizzle-kit generate` reports no change). B's 0045 and 0046 land before
-   mine and their journal `when`s (1791429270826, 1791429312401) are **later** than mine
-   (1791429221338–1791429223338): renumbering alone would make every database already at B skip
-   all three of mine. At my final merge they become 0047–0049, each `when` later than B's 0046's
-   in order, the snapshots chained after B's 0046, proved on a copy migrated at main (with B)
-   first and then at my branch (§10).
+7. **Migration numbers** — done at the final merge: 0047–0049 after B's 0045 and 0046, each
+   `when` later than B's 0046's in order (1791437758565, 1791437759565, 1791437760565; before,
+   mine were earlier than B's and a database at B would have skipped them), the snapshots chained
+   after B's 0046, proved on the dev copy migrated at main (A and B) first and then at the branch
+   (§1).
 8. **A plan whose `valid_until` passed but whose lapse has not run** is still live for a
    confirmation until the next tick claims it (the plan is live while its exception is
    `active`, §3.6). The tick runs every minute.
 9. **For B**: render each line's `exceptions` and the student's charges on the Statement and the
    Reserve pages (§10).
+10. **"Also collect now" at the desk's reservation** (decision 34): B's Reserve could take the
+    year's fee and the student's charges in its "Reserve and collect" with one optional prop
+    passing `collectNow.schoolFeeYear` and `chargeIds` (the API takes them). B's component, so
+    not changed here; until then the desk takes them in "To collect now", one more action.
+11. **The Statement's charges** (§10): B's `statementFor` hook is empty until the plan line rule
+    is decided.
 
 ---
 
@@ -556,3 +598,10 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
   receipt screens typed from their routes and the bank-transfer list's charges; remarks paid at
   the copied fee (documented); five controls red, restored. The web dev server restarted after a
   control's rebuild of validations broke its compile (trail incident row).
+- 05:28–06:10 — the final merge: main with B (88c8d5a, then 84d60ca for B's nits) merged by hand
+  (42cbf2c; 18 files in conflict, each listed in the commit); the migrations renamed 0047–0049
+  after B's, `when`s after B's 0046's, snapshots merged three ways; C's tests on B's lines; B's
+  `refundForSystemDrop` replaced by `refundFor` (08o's amounts kept, its half-back by the policy's
+  week); then the after-B items: both of B's expiries settle a plan, `paymentState` counts
+  instalments, the flag in the charge deadlines, the 08q and 08r cases; five controls red,
+  restored; the dev copy recreated and migrated main first (rows 48–50 are step C's).

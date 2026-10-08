@@ -37,7 +37,7 @@ describe('08r: the exceptions registry', () => {
     officer = await staff(adm, 'finance_officer', 'xr');
     finadmin = await staff(adm, 'finance_admin', 'xr');
     coordinator = await staff(adm, 'coordinator', 'xr');
-    for (let i = 1; i <= 12; i++) {
+    for (let i = 1; i <= 14; i++) {
       subj[`S${i}`] = await subject(adm, `XR-${i}`, `Subject ${i} (AS, registry)`, { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
     }
     june = await session(adm, 'June (AS, registry)', 'june', 'as_level', { ...openWindow(), activate: true });
@@ -271,6 +271,20 @@ describe('08r: the exceptions registry', () => {
     await apiResponse(finadmin.api.v1.exceptions[':id'].confirm.$post({ param: { id: ex.id }, json: { note: 'keep it on the old row' } }));
     expect((await apiResponse(finadmin.api.v1.exceptions['check-these'].$get())).some((e) => e.id === ex.id)).toBe(false);
     await sql(`delete from session_offer_item_unit where item_id = $1 and unit_id = $2`, [item, unit]);
+  });
+
+  it("step B's teacher change to self-study on a first entry asks the real registry's one-shot gate: locked, used once, by that line", async () => {
+    const f = await onboard(officer, 'xr-teach', 12);
+    const [a, b] = await deskPaid(f.studentId, [subj.S13!, subj.S14!]);
+    const toSelfStudy = (id: string) => coordinator.api.v1.registrations[':id'].teacher.$put({ param: { id }, json: { teacherId: null, mode: 'self_study', reason: 'studies abroad this term' } });
+    const taught = (name: string) => ({ status: 409, error: `${name} is a first entry the school teaches: it is taken in school unless the student holds the self-study exception` });
+    expect(await refused(toSelfStudy(a!))).toEqual(taught('Subject 13 (AS, registry)'));
+    const gate = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'gate.selfStudyFirstEntry', studentId: f.studentId, reason: 'studies abroad this term' } }));
+    expect(await apiResponse(toSelfStudy(a!))).toMatchObject({ mode: 'self_study', teacherId: null });
+    expect(await one(`select status, used_for as used from exception where id = $1`, [gate.id])).toEqual({ status: 'used', used: { registrationIds: [a] } });
+    expect(Number((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'EXCEPTION_USED' and entity_id = $1`, [gate.id])).n)).toBe(1);
+    // Used: the next line is refused.
+    expect(await refused(toSelfStudy(b!))).toEqual(taught('Subject 14 (AS, registry)'));
   });
 
   // ─── With A's step on main: the pricing policies, the window by subject, the late entry ─────

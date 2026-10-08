@@ -903,7 +903,7 @@ describe('money invariants over the whole database', () => {
     const early = await sql(`
       select a.entity_id from audit_log a join registration r on r.id = a.entity_id
       where a.action = 'DESK_DROP_EXECUTED'
-        and coalesce(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) > a.created_at, true)
+        and coalesce(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) > a.created_at, true)
     `);
     expect(early).toEqual([]);
   });

@@ -1,7 +1,7 @@
 -- Reservations rework, step C — the policy registry, board services and charges
 -- (RESERVATIONS_REWORK.md §3.6, §3.7, §7 step 2; docs/features/RESERVATIONS_MONEY.md §1).
--- Hand-written, between the additive structure (0044) and the constraints that need the
--- backfilled values (0046). Idempotent: every step converts only rows not yet converted. Nothing
+-- Hand-written, between the additive structure (0047) and the constraints that need the
+-- backfilled values (0049). Idempotent: every step converts only rows not yet converted. Nothing
 -- is dropped: exception.type and exception.value, remark_fee_schedule and remark_deadline are kept
 -- one release (§7 step 3).
 --
@@ -87,7 +87,7 @@ SELECT gen_random_uuid()::text, NULL, 'REWORK_BACKFILL_EXCEPTION', 'exception', 
 FROM converted c;
 --> statement-breakpoint
 
--- A V3 type with no key would leave policy_key empty; 0046's NOT NULL would then refuse. Say which.
+-- A V3 type with no key would leave policy_key empty; 0049's NOT NULL would then refuse. Say which.
 DO $$
 DECLARE bad text;
 BEGIN
@@ -99,11 +99,12 @@ END $$;
 --> statement-breakpoint
 
 -- 2. A charge's deadline (§3.10 items 1 and 4): an instalment follows its line's effective
---    deadline; a board service's charge its series' service deadline; anything else none.
+--    deadline (with step B's declaration_rejected: a rejected declared retake is a first entry);
+--    a board service's charge its series' service deadline; anything else none.
 CREATE OR REPLACE FUNCTION charge_effective_deadline(p_kind text, p_registration text, p_series text, p_service text) RETURNS timestamptz
 LANGUAGE sql STABLE AS $$
   SELECT CASE
-    WHEN p_kind = 'instalment' THEN (SELECT line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) FROM registration r WHERE r.id = p_registration)
+    WHEN p_kind = 'instalment' THEN (SELECT line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) FROM registration r WHERE r.id = p_registration)
     WHEN p_series IS NOT NULL AND p_service IS NOT NULL THEN (SELECT d.deadline FROM board_service_deadline d WHERE d.board_series_id = p_series AND d.board_service_id = p_service)
     ELSE NULL
   END

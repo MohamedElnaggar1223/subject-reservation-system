@@ -22,6 +22,11 @@
  *   under `hold` the deadline sweep expires a waiting line (`hold_unverified`) and drops a paid
  *   one through the receipt-gated drop with that day's refund, the board fee counted not sent.
  *
+ * A waiting line that ends here under a live instalment plan (step C, §3.6) has its plan settled
+ * in the same transaction, as every system expiry does (`settlePlansOfExpiredLines`: the school
+ * keeps what a paid drop that day would have kept, the rest goes back to escrow); an instalment
+ * payment in progress counts as a payment in progress of the line.
+ *
  * Locks: the line's receipt first (when it has one), then the line — MA-16's order, the one a
  * payment reversal, a receipt's void (ST-14) and return, the receipt-gated drop and a parent's
  * approval of a change request all take (the lead's decision of 8 Oct: receipt first
@@ -31,7 +36,7 @@
  */
 
 import {
-  db, registration, receipt, paymentRegistration, payment, parentStudentLink, schoolSetting,
+  db, registration, receipt, paymentRegistration, payment, paymentCharge, charge, parentStudentLink, schoolSetting,
   and, eq, inArray, sql,
 } from '@repo/db';
 import { hasRole, ROLES, FINANCE_ROLES, type VerifyPriorSittingType } from '@repo/validations';
@@ -41,6 +46,7 @@ import { executeReceiptGatedDrop } from './receipt.services';
 import { getSetting } from './settings.services';
 import { createNotification } from './notification.services';
 import { refundFor } from './refund.services';
+import { settlePlansOfExpiredLines } from './plan.services';
 import { schoolDate } from './window.services';
 import { formatSeriesName } from './statement.services';
 
@@ -195,7 +201,16 @@ async function paymentState(tx: Tx, registrationId: string) {
   const rows = await tx.select({ status: payment.status }).from(paymentRegistration)
     .innerJoin(payment, eq(payment.id, paymentRegistration.paymentId))
     .where(eq(paymentRegistration.registrationId, registrationId));
-  return { funded: rows.some((r) => r.status === 'completed'), open: rows.some((r) => (OPEN as readonly string[]).includes(r.status)) };
+  // A line under an instalment plan is paid by its instalments (charges, step C §3.6): one in
+  // progress is a payment of the line in progress too.
+  const instalments = await tx.select({ status: payment.status }).from(charge)
+    .innerJoin(paymentCharge, eq(paymentCharge.chargeId, charge.id))
+    .innerJoin(payment, eq(payment.id, paymentCharge.paymentId))
+    .where(and(eq(charge.registrationId, registrationId), eq(charge.kind, 'instalment')));
+  return {
+    funded: rows.some((r) => r.status === 'completed'),
+    open: [...rows, ...instalments].some((r) => (OPEN as readonly string[]).includes(r.status)),
+  };
 }
 
 // ─── Verify or reject ────────────────────────────────────────────────────────
@@ -257,6 +272,8 @@ export async function verifyPriorSitting(
         .where(and(eq(registration.id, registrationId), inArray(registration.status, [...WAITING]))).returning({ id: registration.id });
       if (!expired) throw new VerificationError('The line changed while this was open: try again', 409);
       await logActions(expiryEntries([{ id: registrationId, from: line.status }], 'declaration_rejected'), tx);
+      // A live instalment plan on it ends with it: settled as a drop that day (step C, §3.6).
+      await settlePlansOfExpiredLines(tx, [registrationId], now, 'declaration_rejected');
       await logAction(actor.id, 'PRIOR_SITTING_REJECTED', 'registration', registrationId, { status: line.status },
         { outcome: 'rejected', effect: 'expired', priorSittingSeriesId: line.priorSittingSeriesId, ...why }, ctx, tx);
       return { outcome: 'rejected', effect: 'expired' };
@@ -360,6 +377,8 @@ export async function holdUnverifiedAtDeadline(now: Date = new Date()) {
             .where(and(eq(registration.id, id), eq(registration.status, line.status))).returning({ id: registration.id });
           if (!row) return null;
           await logActions(expiryEntries([{ id, from: line.status }], 'hold_unverified'), tx);
+          // A live instalment plan on it ends with it: settled as a drop that day (step C, §3.6).
+          await settlePlansOfExpiredLines(tx, [id], now, 'hold_unverified');
           return { line, effect: 'expired' as const, deadline: d.at };
         }
         if (line.status !== 'confirmed') return null;
