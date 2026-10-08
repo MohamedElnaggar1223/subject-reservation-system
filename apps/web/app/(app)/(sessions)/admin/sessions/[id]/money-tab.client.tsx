@@ -14,6 +14,7 @@ import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
 import { downloadCsv, toCsv } from '~/lib/csv';
+import { SessionCharges } from './session-charges.client';
 import {
   fetchMoney, moneyKey, Money, Day, INPUT_CLASS, LINE_STATUS_LABEL, LINE_STATUS_TONE, type SessionDetail,
 } from '../sessions-shared';
@@ -117,6 +118,8 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
           </table>
         </div>
       )}
+      {/* Step C (RESERVATIONS_MONEY.md §8): the session's charges beside its lines. */}
+      <SessionCharges sessionId={session.id} />
     </div>
   );
 }

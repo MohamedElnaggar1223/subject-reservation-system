@@ -83,6 +83,8 @@ export type DeskOnboardFamilyType = z.infer<typeof DeskOnboardFamily>;
  * officer just took. `collectNow` omitted = register only (family pays
  * later, rows sit at pending_payment).
  */
+const AcademicYearLabel = z.string().regex(/^\d{4}-\d{4}$/, 'Academic year must look like 2026-2027');
+
 export const DeskRegistration = z.object({
   studentId: z.string().min(1, 'Pick a student'),
   sessionId: z.string().min(1, 'Pick a session'),
@@ -96,6 +98,10 @@ export const DeskRegistration = z.object({
       instrumentUsed: z.enum(['cash', 'card', 'instapay', 'other']),
       escrowAmountToApply: z.number().min(0).max(1_000_000).refine(isWholePiastres, PIASTRES_MESSAGE).default(0),
       notes: z.string().max(500).optional(),
+      // The reservations rework (§3.10 item 1): in the same action, the year's school fee (first —
+      // the registration gate asks for it) and the student's charges, each its own payment.
+      schoolFeeYear: AcademicYearLabel.optional(),
+      chargeIds: z.array(z.string().min(1)).max(20).default([]),
     })
     .optional(),
 });
@@ -112,10 +118,12 @@ export const DeskCollect = z.object({
   // The reservations rework (§3.10 item 1): the student's charges, collected in the same action —
   // one payment per group (lines per entry deadline, charges per service deadline).
   chargeIds: z.array(z.string().min(1)).max(20).default([]),
+  // The year's school fee (a pushed one included), collected first, in a payment of its own.
+  schoolFeeYear: AcademicYearLabel.optional(),
   instrumentUsed: z.enum(['cash', 'card', 'instapay', 'other']),
   escrowAmountToApply: z.number().min(0).max(1_000_000).refine(isWholePiastres, PIASTRES_MESSAGE).default(0),
   notes: z.string().max(500).optional(),
-}).refine((d) => d.registrationIds.length + d.chargeIds.length > 0, { message: 'Select at least one subject', path: ['registrationIds'] });
+}).refine((d) => d.registrationIds.length + d.chargeIds.length > 0 || !!d.schoolFeeYear, { message: 'Select something to collect', path: ['registrationIds'] });
 export type DeskCollectType = z.infer<typeof DeskCollect>;
 
 /** Desk school-fee collection: officer takes the money, gate unlocks now */

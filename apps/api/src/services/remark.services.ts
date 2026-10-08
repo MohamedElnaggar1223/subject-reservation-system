@@ -623,6 +623,8 @@ export async function getRemarkRequests(scope: {
           session: { columns: { id: true, name: true } },
         },
       },
+      // The reservations rework (§3.6): the board's own service the request was made for.
+      boardService: { columns: { id: true, label: true } },
     },
     orderBy: (r, { desc }) => [desc(r.createdAt)],
   });

@@ -386,29 +386,59 @@ const chargeColumns = {
 export async function listCharges(filters: ListChargesQueryType, viewer: { id: string; role: string | null | undefined }) {
   const students = await chargeStudentsFor(viewer, filters.studentId);
   if (students !== 'any' && students.length === 0) return [];
-  return db.query.charge.findMany({
+  const rows = await db.query.charge.findMany({
     where: (c, { and: a, eq: e, inArray: inArr }) => {
       const conds = [];
       if (students !== 'any') conds.push(inArr(c.studentId, students));
       if (filters.status) conds.push(e(c.status, filters.status));
       if (filters.kind) conds.push(e(c.kind, filters.kind));
+      // A session's charges: its lines' and the services asked in the series its items sit in.
+      if (filters.sessionId) {
+        conds.push(sql`(${c.registrationId} in (select r.id from registration r where r.session_id = ${filters.sessionId})
+          or ${c.boardSeriesId} in (select i.board_series_id from session_offer_item i where i.session_id = ${filters.sessionId} and i.board_series_id is not null))`);
+      }
       return conds.length ? a(...conds) : undefined;
     },
     columns: chargeColumns,
     with: {
-      student: { columns: { id: true, name: true } },
+      // The family (the approved parents): the desk and the Charges screen group by it.
+      student: {
+        columns: { id: true, name: true },
+        with: { linkRequestsAsStudent: { where: (l, { eq: e }) => e(l.status, 'approved'), columns: { id: true }, with: { parent: { columns: { id: true, name: true } } } } },
+      },
+      registration: { columns: { id: true }, with: { subject: { columns: { name: true } }, session: { columns: { id: true, name: true } } } },
       boardService: { columns: { id: true, label: true, kind: true } },
       receipt: { columns: { id: true, receiptNumber: true, status: true } },
-      paymentCharges: { with: { payment: { columns: { id: true, status: true, amount: true, escrowAmountApplied: true, paymentMethod: true, confirmedAt: true, metadata: true } } } },
+      paymentCharges: { with: { payment: { columns: { id: true, status: true, amount: true, escrowAmountApplied: true, paymentMethod: true, instrumentUsed: true, confirmedAt: true, metadata: true } } } },
     },
     orderBy: (c, { desc: d }) => [d(c.createdAt)],
   });
+  return rows.map((c) => {
+    const { linkRequestsAsStudent, ...student } = c.student;
+    return { ...withPaymentState(c), student, family: linkRequestsAsStudent.map((l) => l.parent) };
+  });
 }
 
-/**
- * A student's charges for the Statement (§4.5; step B's page): each with what it costs, what was
- * paid and when, the receipt or deposit slip, what is outstanding and when it is due.
- */
+/** What a charge's payments say: paid when and how, a payment still open, the deposit slip, what is owed. */
+function withPaymentState<T extends {
+  status: string; amount: number;
+  paymentCharges: { payment: { id: string; status: string; confirmedAt: Date | null; paymentMethod: string; instrumentUsed?: string | null; metadata: unknown } }[];
+}>(c: T) {
+  const paid = c.paymentCharges.map((pc) => pc.payment).find((p) => p.status === 'completed') ?? null;
+  const open = c.paymentCharges.map((pc) => pc.payment).find((p) => p.status === 'pending' || p.status === 'pending_verification') ?? null;
+  const slip = (paid?.metadata as { depositSlip?: string } | null)?.depositSlip ?? null;
+  const outstanding = c.status === 'pending_payment' || c.status === 'requested' ? c.amount : 0;
+  return {
+    ...c,
+    paidAt: paid?.confirmedAt ?? null,
+    paidBy: paid?.instrumentUsed ?? paid?.paymentMethod ?? null,
+    paymentId: paid?.id ?? null,
+    openPaymentId: open?.id ?? null,
+    depositSlip: slip,
+    outstanding,
+  };
+}
+
 export async function listChargesFor(studentId: string) {
   const rows = await db.query.charge.findMany({
     where: (c, { eq: e }) => e(c.studentId, studentId),
@@ -419,21 +449,7 @@ export async function listChargesFor(studentId: string) {
     },
     orderBy: (c, { asc: a }) => [a(c.dueAt), a(c.createdAt)],
   });
-  return rows.map((c) => {
-    const paid = c.paymentCharges.map((pc) => pc.payment).find((p) => p.status === 'completed') ?? null;
-    const open = c.paymentCharges.map((pc) => pc.payment).find((p) => p.status === 'pending' || p.status === 'pending_verification') ?? null;
-    const slip = (paid?.metadata as { depositSlip?: string } | null)?.depositSlip ?? null;
-    const outstanding = c.status === 'pending_payment' || c.status === 'requested' ? c.amount : 0;
-    return {
-      ...c,
-      paidAt: paid?.confirmedAt ?? null,
-      paidBy: paid?.instrumentUsed ?? paid?.paymentMethod ?? null,
-      paymentId: paid?.id ?? null,
-      openPaymentId: open?.id ?? null,
-      depositSlip: slip,
-      outstanding,
-    };
-  });
+  return rows.map(withPaymentState);
 }
 
 /** The charges a payment covers, for the checkout and the workbench. */

@@ -85,6 +85,8 @@ const EXAMS_SECTION: NavSection = {
   items: [
     { labelKey: 'nav.catalogue', href: '/exams/catalogue', icon: 'documents' },
     { labelKey: 'nav.boardSeries', href: '/exams/series', icon: 'calendar' },
+    // The reservations rework, step C (§3.6): the boards' services, their fees and deadlines per series.
+    { labelKey: 'nav.boardServices', href: '/exams/services', icon: 'audit' },
   ],
 };
 
@@ -150,6 +152,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
           { labelKey: 'nav.payments', href: '/admin/payments', icon: 'payments' },
           { labelKey: 'nav.escrow', href: '/admin/escrow', icon: 'adminEscrow' },
           { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'checkout' },
+          { labelKey: 'nav.charges', href: '/charges', icon: 'payments' },
           { labelKey: 'nav.schoolFees', href: '/admin/school-fees', icon: 'escrow' },
           { labelKey: 'nav.exceptions', href: '/admin/exceptions', icon: 'approvals' },
           { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
@@ -183,6 +186,8 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
           { labelKey: 'nav.students', href: '/students', icon: 'students' },
           ...teaching,
           { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'payments' },
+          // The reservations rework, step C (§3.6, §3.10): charges by family and status.
+          { labelKey: 'nav.charges', href: '/charges', icon: 'checkout' },
           // The reservations rework (§4.2, §4.6): the sessions' fees and money.
           { labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' },
           { labelKey: 'nav.dailyTakings', href: '/takings', icon: 'escrow' },
@@ -196,6 +201,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
               titleKey: 'nav.management' as const,
               items: [
                 { labelKey: 'nav.schoolFees' as const, href: '/admin/school-fees', icon: 'escrow' as const },
+                { labelKey: 'nav.boardServices' as const, href: '/exams/services', icon: 'audit' as const },
                 { labelKey: 'nav.exceptions' as const, href: '/admin/exceptions', icon: 'approvals' as const },
                 { labelKey: 'nav.settings' as const, href: '/settings', icon: 'settings' as const },
               ],

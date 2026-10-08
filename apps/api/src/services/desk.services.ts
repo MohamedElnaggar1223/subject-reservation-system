@@ -185,6 +185,43 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     throw new Error('Some subjects are already registered for this session');
   }
 
+  // The reservations rework (§3.10 item 1): the year's school fee collected in the same action,
+  // first — the registration's gate asks for it — in a payment of its own.
+  const schoolFee = data.collectNow?.schoolFeeYear
+    ? await collectSchoolFeeAtDesk(staffId, data.studentId, data.collectNow.instrumentUsed, data.collectNow.notes, data.collectNow.schoolFeeYear, auditCtx)
+    : null;
+  try {
+    const registered = await registerAtDeskAfterChecks(staffId, data, eligibility, auditCtx);
+    // Then the student's charges, each group its own payment; what cannot be taken is listed.
+    const chargeIds = data.collectNow?.chargeIds ?? [];
+    let charges: Awaited<ReturnType<typeof collectLinesAndCharges>> | null = null;
+    let chargesNotCollected: { paymentId: string; series: string[]; amount: number; reason: string }[] = [];
+    if (data.collectNow && chargeIds.length) {
+      try {
+        charges = await collectLinesAndCharges(staffId, { studentId: data.studentId, registrationIds: [], chargeIds, instrumentUsed: data.collectNow.instrumentUsed, escrowAmountToApply: 0, notes: data.collectNow.notes }, auditCtx);
+      } catch (err) {
+        chargesNotCollected = [{ paymentId: '', series: ['The charges'], amount: await outstandingOf({ registrationIds: [], chargeIds }), reason: err instanceof Error ? err.message : 'Not collected' }];
+      }
+    }
+    return {
+      ...registered,
+      payments: [...registered.payments, ...(charges?.payments ?? [])],
+      notCollected: [...registered.notCollected, ...(charges?.notCollected ?? []), ...chargesNotCollected],
+      collected: round2(registered.collected + (charges?.collected ?? 0) + (schoolFee?.amount ?? 0)),
+      receipts: [...registered.receipts, ...(charges?.receipts ?? []).map((r) => ({ id: r.id, registrationId: r.registrationId, receiptNumber: r.receiptNumber, status: r.status }))],
+      schoolFee,
+    };
+  } catch (err) {
+    if (!schoolFee) throw err;
+    throw new Error(`The ${schoolFee.academicYear} school fee (EGP ${schoolFee.amount.toFixed(2)}) was collected; the subjects were not registered: ${err instanceof Error ? err.message : 'refused'}`);
+  }
+}
+
+/** The desk's registration once its inputs are checked (the school fee, if asked, already in). */
+async function registerAtDeskAfterChecks(
+  staffId: string, data: DeskRegistrationType, eligibility: Awaited<ReturnType<typeof assertMayRegisterFor>>, auditCtx?: AuditContext,
+) {
+
   // The school-fee gate, then each subject as a line (its whole item, attempt from history,
   // mode, teacher). Checked, priced and entered in its item's series by insertLines, in the
   // transaction (the grade-10 core rule included).
@@ -401,6 +438,36 @@ async function confirmDeskPayment(
  * once through confirmPayment (receipts, notifications, audit rows).
  */
 export async function collectAtDesk(staffId: string, data: DeskCollectType, auditCtx?: AuditContext) {
+  // The year's school fee first, in a payment of its own (the registration gate asks for it; a
+  // pushed fee is settled by it).
+  const schoolFee = data.schoolFeeYear
+    ? await collectSchoolFeeAtDesk(staffId, data.studentId, data.instrumentUsed, data.notes, data.schoolFeeYear, auditCtx)
+    : null;
+  if (!data.registrationIds.length && !data.chargeIds.length) {
+    return { paymentId: schoolFee!.paymentId, payments: [], notCollected: [], collected: schoolFee!.amount, escrowApplied: 0, receipts: [], schoolFee };
+  }
+  try {
+    const rest = await collectLinesAndCharges(staffId, data, auditCtx);
+    return { ...rest, collected: round2(rest.collected + (schoolFee?.amount ?? 0)), schoolFee };
+  } catch (err) {
+    if (!schoolFee) throw err;
+    // The fee is in; the rest was not taken: say so in the officer's words.
+    return {
+      paymentId: schoolFee.paymentId, payments: [], escrowApplied: 0, receipts: [], schoolFee, collected: schoolFee.amount,
+      notCollected: [{ paymentId: '', series: ['The subjects and charges'], amount: await outstandingOf(data), reason: err instanceof Error ? err.message : 'Not collected' }],
+    };
+  }
+}
+
+/** What the lines and charges asked for would have cost (for a "not collected" line). */
+async function outstandingOf(data: { registrationIds: string[]; chargeIds: string[] }) {
+  const lines = data.registrationIds.length
+    ? await db.select({ p: registration.priceAtRegistration }).from(registration).where(inArray(registration.id, data.registrationIds)) : [];
+  const charges = data.chargeIds.length ? await db.select({ a: charge.amount }).from(charge).where(inArray(charge.id, data.chargeIds)) : [];
+  return round2(lines.reduce((s, l) => s + l.p, 0) + charges.reduce((s, c) => s + c.a, 0));
+}
+
+async function collectLinesAndCharges(staffId: string, data: DeskCollectType, auditCtx?: AuditContext) {
   const lineIds = data.registrationIds;
   const regs = lineIds.length ? await db.query.registration.findMany({
     where: (r, { inArray }) => inArray(r.id, lineIds),

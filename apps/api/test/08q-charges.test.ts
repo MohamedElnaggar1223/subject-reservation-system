@@ -747,3 +747,94 @@ describe('08q: instalment plans', () => {
     expect(await wallet(f.studentId)).toEqual({ free: 0, held: 700 });
   });
 });
+
+// ─── The desk collects lines, charges and the year's fee in one action (§3.10 item 1) ───────────
+
+describe("08q: the desk collects lines, charges and the year's school fee in one action", () => {
+  let adm: Client, officer: Client, finadmin: Client;
+  let june: string, scheduleId: string;
+  const subj: Record<string, string> = {};
+  const year = academicYearLabel(academicYearStartOf());
+  type Family = Awaited<ReturnType<typeof onboard>>;
+  let g: Family;
+  let gLine: string;
+  const custom = async (f: Family, amount: number, extra: Record<string, unknown> = {}) =>
+    (await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: f.studentId, kind: 'custom', amount, reason: 'a replacement ID card', ...extra } }))).id;
+  const paymentsOf = async (studentId: string) =>
+    sql<{ purpose: string; status: string; amount: string }>(`select purpose, status, amount from payment where student_id = $1 order by purpose`, [studentId]);
+
+  beforeAll(async () => {
+    adm = await admin('cqd');
+    officer = await staff(adm, 'finance_officer', 'cqd');
+    finadmin = await staff(adm, 'finance_admin', 'cqd');
+    for (let i = 1; i <= 3; i++) {
+      subj[`D${i}`] = await subject(adm, `CQD-${i}`, `Subject ${i} (AS, desk)`, { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    }
+    june = await session(adm, 'June (AS, desk collect)', 'june', 'as_level', { ...openWindow(), activate: true });
+    // A line waiting for payment, reserved before the year's school fee opened.
+    g = await onboard(officer, 'cqd-g', 12);
+    gLine = (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId: g.studentId, sessionId: june, subjectIds: [subj.D1!] } }))).registrations[0]!.id;
+    // This year's school fee: it gates every registration of this year while this block runs.
+    scheduleId = (await apiResponse(finadmin.api.v1['school-fees'].schedules.$post({ json: { academicYear: year, amount: 3000, opensAt: inDays(-1).toISOString() } }))).id;
+  });
+  afterAll(async () => {
+    if (scheduleId) await sql(`delete from school_fee_schedule where id = $1`, [scheduleId]);
+  });
+
+  it("reserve and collect: the year's fee first (the gate asks for it), the lines, then the student's charges — each its own payment", async () => {
+    const f = await onboard(officer, 'cqd-f', 12);
+    const card = await custom(f, 250);
+    const reserve = (collectNow: Record<string, unknown>) =>
+      officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId: june, subjectIds: [subj.D2!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0, ...collectNow } } });
+    // Without the fee the gate refuses, and nothing is taken.
+    expect((await refused(reserve({}))).error).toContain('school fee');
+    expect(await paymentsOf(f.studentId)).toEqual([]);
+    const r = await apiResponse(reserve({ schoolFeeYear: year, chargeIds: [card] }));
+    expect(r.schoolFee).toMatchObject({ academicYear: year, amount: 3000 });
+    expect(r.collected).toBe(4750);
+    expect((await paymentsOf(f.studentId)).map((p) => [p.purpose, p.status, money(p.amount)]))
+      .toEqual([['charge', 'completed', 250], ['registration', 'completed', 1500], ['school_fee', 'completed', 3000]]);
+    expect(await statusOf('registration', r.registrations[0]!.id)).toBe('confirmed');
+    expect(await statusOf('charge', card)).toBe('paid');
+    expect(r.receipts.map((x) => x.receiptNumber).some((n) => n.startsWith('RCP-C'))).toBe(true);
+  });
+
+  it("on the Student 360: a waiting line, a charge and the pushed fee in one action — the push settled by the fee's payment", async () => {
+    await apiResponse(finadmin.api.v1['school-fees'].push.$post({ json: { academicYear: year, studentIds: [g.studentId], dueAt: inDays(10) } }));
+    const card = await custom(g, 200);
+    const r = await apiResponse(officer.api.v1.registrations.desk.collect.$post({
+      json: { studentId: g.studentId, registrationIds: [gLine], chargeIds: [card], schoolFeeYear: year, instrumentUsed: 'card' },
+    }));
+    expect(r.collected).toBe(4700);
+    expect(r.payments.map((p) => [p.registrationIds.length, p.chargeIds.length])).toEqual([[1, 0], [0, 1]]);
+    const push = await one<{ status: string; settled: string }>(
+      `select status, settled_by_payment_id as settled from charge where kind = 'school_fee_push' and student_id = $1 and academic_year = $2`, [g.studentId, year]);
+    expect(push).toEqual({ status: 'paid', settled: r.schoolFee!.paymentId });
+    expect((await paymentsOf(g.studentId)).map((p) => p.purpose)).toEqual(['charge', 'registration', 'school_fee']);
+  });
+
+  it('the fee alone; and when the rest cannot be taken, the fee stays collected and the rest is listed as not collected', async () => {
+    const h = await onboard(officer, 'cqd-h', 12);
+    const alone = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: h.studentId, schoolFeeYear: year, instrumentUsed: 'cash' } }));
+    expect(alone).toMatchObject({ collected: 3000, payments: [], schoolFee: { amount: 3000 } });
+    const k = await onboard(officer, 'cqd-k', 12);
+    const gone = await custom(k, 150);
+    await apiResponse(finadmin.api.v1.charges[':id'].cancel.$post({ param: { id: gone }, json: { reason: 'issued in error' } }));
+    const part = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: k.studentId, chargeIds: [gone], schoolFeeYear: year, instrumentUsed: 'cash' } }));
+    expect(part.collected).toBe(3000);
+    expect(part.notCollected).toMatchObject([{ amount: 150 }]);
+    expect(part.notCollected[0]!.reason).toContain('cancelled');
+    expect((await paymentsOf(k.studentId)).map((p) => [p.purpose, p.status])).toEqual([['school_fee', 'completed']]);
+  });
+
+  it("a session's charges: its lines' (an adjustment) and none of another's; each with the family it belongs to", async () => {
+    const adj = await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: g.studentId, kind: 'price_adjustment', registrationId: gLine, amount: 120, reason: 'the board raised its fee' } }));
+    const elsewhere = await custom(g, 90);
+    const list = await apiResponse(finadmin.api.v1.charges.$get({ query: { sessionId: june } }));
+    expect(list.some((c) => c.id === adj.id)).toBe(true);
+    expect(list.some((c) => c.id === elsewhere)).toBe(false);
+    const row = list.find((c) => c.id === adj.id)!;
+    expect(row.family.map((p) => p.id)).toEqual([g.parent.id]);
+    expect(row).toMatchObject({ outstanding: 120, registration: { subject: { name: 'Subject 1 (AS, desk)' } } });
+  });
+});

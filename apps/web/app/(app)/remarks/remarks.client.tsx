@@ -21,6 +21,7 @@ import {
 } from '@repo/validations';
 import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
+import { RemarkServicePicker, type PickedService } from './remark-service-picker.client';
 
 type RemarkItem = {
   id: string;
@@ -33,6 +34,7 @@ type RemarkItem = {
 type RemarkRow = {
   id: string;
   serviceType: string;
+  boardService: { id: string; label: string } | null;
   status: string;
   feeCharged: number;
   feeRefunded: boolean;
@@ -57,8 +59,6 @@ type ResultedRegistration = {
   subject: { id: string; name: string; code: string; council: string };
   session: { id: string; name: string };
 };
-
-type FeeRow = { council: string; serviceType: string; amountPerPaper: number };
 
 type PaymentResult = {
   id: string;
@@ -85,7 +85,8 @@ export default function RemarksClient({ userRole, userId }: { userRole: string; 
 
   const [showCreate, setShowCreate] = useState(false);
   const [createRegId, setCreateRegId] = useState('');
-  const [createService, setCreateService] = useState<(typeof REMARK_SERVICE_TYPES)[number]>('review_of_marking');
+  // The board's own service for the line's series (the reservations rework §3.6).
+  const [picked, setPicked] = useState<PickedService>(null);
   const [papers, setPapers] = useState<{ paperCode: string; paperName: string }[]>([{ paperCode: '', paperName: '' }]);
   const [createError, setCreateError] = useState('');
   const [actionError, setActionError] = useState('');
@@ -110,15 +111,9 @@ export default function RemarksClient({ userRole, userId }: { userRole: string; 
   });
   const resulted = registrations.filter((r) => r.status === 'confirmed' && r.gradeReceived);
 
-  const { data: fees = [] } = useQuery<FeeRow[]>({
-    queryKey: ['remarks', 'fees'],
-    queryFn: async () => (await apiResponse(api.v1.remarks.fees.$get())) as FeeRow[],
-  });
 
   const selectedReg = resulted.find((r) => r.id === createRegId);
-  const feePerPaper = selectedReg
-    ? fees.find((f) => f.council === selectedReg.subject.council && f.serviceType === createService)?.amountPerPaper ?? null
-    : null;
+  const feePerPaper = selectedReg ? picked?.feePerPaper ?? null : null;
   const validPapers = papers.filter((p) => p.paperCode.trim());
 
   const refresh = () => {
@@ -131,7 +126,7 @@ export default function RemarksClient({ userRole, userId }: { userRole: string; 
         api.v1.remarks.$post({
           json: {
             registrationId: createRegId,
-            serviceType: createService,
+            boardServiceId: picked?.id,
             papers: validPapers.map((p) => ({
               paperCode: p.paperCode.trim(),
               paperName: p.paperName.trim() || null,
@@ -249,18 +244,7 @@ export default function RemarksClient({ userRole, userId }: { userRole: string; 
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Service</label>
-            <select
-              value={createService}
-              onChange={(e) => setCreateService(e.target.value as typeof createService)}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-            >
-              {REMARK_SERVICE_TYPES.map((sv) => (
-                <option key={sv} value={sv}>{REMARK_SERVICE_LABELS[sv]}</option>
-              ))}
-            </select>
-          </div>
+          <RemarkServicePicker registrationId={createRegId} familyAsks value={picked?.id ?? ''} onChange={setPicked} />
 
           <div>
             <label className="block text-sm font-medium text-foreground mb-2">Papers</label>
@@ -310,7 +294,7 @@ export default function RemarksClient({ userRole, userId }: { userRole: string; 
 
           <Button
             className="w-full"
-            disabled={createMutation.isPending || !createRegId || validPapers.length === 0}
+            disabled={createMutation.isPending || !createRegId || !picked || validPapers.length === 0}
             onClick={() => createMutation.mutate()}
           >
             {createMutation.isPending
@@ -342,7 +326,7 @@ export default function RemarksClient({ userRole, userId }: { userRole: string; 
                     <span className="text-xs text-muted-foreground ml-2 font-mono">{r.registration.subject.code}</span>
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
-                    {r.registration.session.name} · {REMARK_SERVICE_LABELS[r.serviceType as keyof typeof REMARK_SERVICE_LABELS] ?? r.serviceType}
+                    {r.registration.session.name} · {r.boardService?.label ?? REMARK_SERVICE_LABELS[r.serviceType as keyof typeof REMARK_SERVICE_LABELS] ?? r.serviceType}
                     {isParent && r.student && <> · {r.student.name}</>}
                     {' · '}Grade: {r.registration.gradeReceived ?? '—'}
                   </div>

@@ -136,6 +136,9 @@ export type RefundChargeType = z.infer<typeof RefundCharge>;
 
 export const ListChargesQuery = z.object({
   studentId: z.string().min(1).optional(),
+  // A session's charges: those of its lines (instalments, adjustments, a line's service) and the
+  // services asked in the series its items sit in.
+  sessionId: z.string().min(1).optional(),
   status: z.enum(CHARGE_STATUSES).optional(),
   kind: ChargeKindSchema.optional(),
 });

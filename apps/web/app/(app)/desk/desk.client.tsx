@@ -28,6 +28,7 @@ import { Button } from '~/components/ui/button';
 import { ReasonModal } from '~/components/ui/reason-modal';
 import { Badge, StandingBadge } from '~/components/ui/tone';
 import { StudentAcademicPanel } from '~/components/student-academic-panel';
+import { DeskCollectPanel, AlsoCollect, type Extras } from './desk-collect.client';
 
 // ─── Types, derived from their fetchers (CLAUDE.md: Hono RPC everywhere) ──────
 
@@ -111,16 +112,6 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
         })
       ),
     onSuccess: (d) => done(`School fee collected (${formatPrice((d as unknown as { amount: number }).amount)}). Registration unlocked.`),
-    onError: fail,
-  });
-
-  const collectMutation = useMutation({
-    mutationFn: (v: { registrationIds: string[]; instrumentUsed: (typeof IN_SCHOOL_INSTRUMENTS)[number] }) =>
-      apiResponse(api.v1.registrations.desk.collect.$post({ json: { studentId: studentId!, ...v, escrowAmountToApply: 0 } })),
-    onSuccess: (d) =>
-      done(
-        `Collected ${formatPrice(d.collected)}. Receipts ready to hand over${d.receipts.length ? `: ${d.receipts.map((r) => r.receiptNumber).join(', ')}` : ''}.${paymentsLine(d)}`
-      ),
     onError: fail,
   });
 
@@ -365,37 +356,11 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
             />
           )}
 
-          {/* Subjects registered and waiting for payment (MA-18): after a
-              reversal, a rejected transfer, a cancelled checkout or a
-              register-only visit, the money is taken here in one click. */}
-          {(() => {
-            const unpaid = summary.registrations.filter((r) => r.status === 'pending_payment');
-            if (unpaid.length === 0) return null;
-            const total = unpaid.reduce((s, r) => s + r.priceAtRegistration, 0);
-            return (
-              <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    {unpaid.length} subject{unpaid.length === 1 ? '' : 's'} waiting for payment — {formatPrice(total)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{unpaid.map((r) => r.subject.name).join(' · ')}</p>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  {IN_SCHOOL_INSTRUMENTS.slice(0, 3).map((inst) => (
-                    <Button
-                      key={inst}
-                      size="sm"
-                      variant="outline"
-                      disabled={collectMutation.isPending}
-                      onClick={() => collectMutation.mutate({ registrationIds: unpaid.map((r) => r.id), instrumentUsed: inst })}
-                    >
-                      Collect — {IN_SCHOOL_INSTRUMENT_LABELS[inst]}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          {/* Everything owed now (MA-18 and the reservations rework §3.10 item 1): subjects waiting
+              for payment after a reversal, a rejected transfer, a cancelled checkout or a
+              register-only visit, the student's charges and the year's school fee — ticked and
+              taken in one action, each part its own payment. */}
+          <DeskCollectPanel studentId={summary.student.id} summary={summary} onDone={refresh} />
 
           {/* Registrations with receipts */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -739,6 +704,8 @@ function DeskRegisterCard({
   const [instrument, setInstrument] = useState<'cash' | 'card' | 'instapay' | 'other'>('cash');
   const [escrowApply, setEscrowApply] = useState('');
   const [localError, setLocalError] = useState('');
+  // The reservations rework (§3.10 item 1): the student's charges and the year's fee in the same action.
+  const [extras, setExtras] = useState<Extras>({ chargeIds: [], total: 0 });
 
   const { data: sessions = [] } = useQuery<SessionRow[]>({
     queryKey: ['sessions', 'active'],
@@ -783,6 +750,8 @@ function DeskRegisterCard({
               ? {
                   instrumentUsed: instrument,
                   escrowAmountToApply: parseFloat(escrowApply) > 0 ? parseFloat(escrowApply) : 0,
+                  chargeIds: extras.chargeIds,
+                  ...(extras.schoolFeeYear ? { schoolFeeYear: extras.schoolFeeYear } : {}),
                 }
               : undefined,
           },
@@ -936,6 +905,8 @@ function DeskRegisterCard({
             </div>
           )}
 
+          {collect && <AlsoCollect studentId={studentId} value={extras} onChange={setExtras} />}
+
           {localError && <p className="mb-3 text-sm text-destructive">{localError}</p>}
 
           <Button
@@ -946,7 +917,7 @@ function DeskRegisterCard({
             {mutation.isPending
               ? 'Processing…'
               : collect
-                ? `Register & Collect ${formatPrice(Math.max(0, total - (parseFloat(escrowApply) > 0 ? parseFloat(escrowApply) : 0)))}`
+                ? `Register & Collect ${formatPrice(Math.max(0, total + extras.total - (parseFloat(escrowApply) > 0 ? parseFloat(escrowApply) : 0)))}`
                 : `Register ${selected.size} Subject${selected.size === 1 ? '' : 's'} (pay later)`}
           </Button>
         </>
