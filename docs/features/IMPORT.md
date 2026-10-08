@@ -738,6 +738,7 @@ records it.
   real sheet's counts unchanged (privately); New session driven in English and Arabic (`f7c-*.png`).
 - 18:48–19:06Z — on d2fa2cd: types green; the suites side by side green (569 passed, 1 todo each);
   every control with its own row: 52 red, C44 green as since 7003e74 (C60 covers it).
+- 19:15Z — pushed e513992 (one push from a326890); CI 37829496639 green (569 passed, 1 todo).
 - Next: the reviewer confirms items 1 and 2 on the diff; the final merge waits for F4 on main (main
   has D at c2d7a78, its migrations to 0054): origin/main merged as its own commit, 0050_import
   regenerated after main's last migration with a later stamp and its snapshot chained, the order
