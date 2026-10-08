@@ -36,7 +36,7 @@ export type FeeGrid = Awaited<ReturnType<typeof fetchFeeGrid>>;
 export type FeeRow = FeeGrid['rows'][number];
 
 export const fetchMoney = (id: string, query: Partial<SessionMoneyQueryType>) =>
-  apiResponse(api.v1.sessions[':id'].money.$get({ param: { id }, query: { filter: query.filter ?? 'all', ...(query.offerId ? { offerId: query.offerId } : {}) } }));
+  apiResponse(api.v1.sessions[':id'].money.$get({ param: { id }, query: { filter: query.filter ?? 'all', ...(query.offerId ? { offerId: query.offerId } : {}), ...(query.sectionId ? { sectionId: query.sectionId } : {}) } }));
 export type MoneyData = Awaited<ReturnType<typeof fetchMoney>>;
 
 export const SESSIONS_KEY = ['sessions'] as const;

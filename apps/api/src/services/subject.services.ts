@@ -10,7 +10,7 @@
  */
 
 import { db, subject, subjectTeacher, subjectUnit, eq, and, or, ilike } from '@repo/db';
-import { applyBoardChange, lockStudentsOfSubject } from './catalogue.services';
+import { applyBoardChange, lockStudentsOfSubject, tellBoardChangePrices } from './catalogue.services';
 import { withStudentsFirst } from '../lib/student-locks';
 import { randomUUID } from 'crypto';
 import type { CreateSubjectType, UpdateSubjectType } from '@repo/validations';
@@ -136,7 +136,8 @@ export async function getSubjectById(id: string) {
  * Returns the updated subject or undefined if not found.
  */
 export async function updateSubject(id: string, data: UpdateSubjectType, actorId?: string) {
-  return withStudentsFirst((extra) => db.transaction(async (tx) => {
+  let repriced: Awaited<ReturnType<typeof applyBoardChange>>['repriced'] = [];
+  const updatedRow = await withStudentsFirst((extra) => db.transaction(async (tx) => {
     // A board change moves lines into series: their students before the subject (§6).
     const locked = data.council ? await lockStudentsOfSubject(tx, id, extra) : new Set<string>();
     const [current] = await tx.select().from(subject).where(eq(subject.id, id)).for('update');
@@ -151,7 +152,7 @@ export async function updateSubject(id: string, data: UpdateSubjectType, actorId
     // the old board's catalogue links (catalogue.services.ts applyBoardChange).
     const { council, ...rest } = data;
     if (council && council !== current.council) {
-      await applyBoardChange(tx, current, council, actorId ?? null, locked);
+      repriced = (await applyBoardChange(tx, current, council, actorId ?? null, locked)).repriced;
     }
     // A new level no longer fits the old award and units: they are cleared,
     // for the Catalogue screen to map again.
@@ -171,6 +172,8 @@ export async function updateSubject(id: string, data: UpdateSubjectType, actorId
 
     return updated;
   }));
+  await tellBoardChangePrices(repriced);
+  return updatedRow;
 }
 
 /**

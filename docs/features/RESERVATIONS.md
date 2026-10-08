@@ -245,8 +245,10 @@ session does not offer the subject or offers it only as units or routes ("choose
 ### 2.5 The rules on lines — `assertLineRules` (`apps/api/src/services/line-rules.services.ts`)
 
 ```ts
-assertLineRules(tx, { studentId, sessionId, eligibility }, lines: RuleLine[]): Promise<{ usedExceptionIds: string[] }>
-// RuleLine = { offerItemId, attempt, mode, priorSittingSeriesId: string | null }
+assertLineRules(tx, { studentId, sessionId, eligibility }, lines: RuleLine[], opts?: { excludeLineIds?: string[]; recheck?: boolean }): Promise<{ usedExceptionIds: string[] }>
+// RuleLine = { offerItemId, attempt, mode, priorSittingSeriesId: string | null, priorSittingSource?: string | null }
+//   (changed: 8 Oct, the review of 977848d) priorSittingSource 'legacy' lets a converted retake with no known sitting through gate.retakeDeclared
+recheckLines(tx, lineIds): Promise<void>   // lines already made, checked again where they now are (§2.12)
 ```
 
 Throws `LineRuleError` (400, the rule's sentence, `policyKey`) on the first rule broken:
@@ -423,10 +425,66 @@ series of the last two years for a declaration.
   from registrations gives a line of an item entering units one enrolment per unit, with the
   line's teacher; `getTeachingDemand` groups per (subject, unit, teacher) and returns `unitId`,
   `unitCode` (F1's contract, §10).
-- **The past-deadline change refusal** (`swap.services.ts`): a family is told to ask the desk; a
-  staff caller is told it cannot be changed or dropped here — the desk-drop past the deadline
-  (`POST /registrations/:id/desk-drop`, with the receipt gate and the "sent" refund) is step
-  B/C's.
+- **The past-deadline change refusal** (`swap.services.ts`): a family is told to ask the desk.
+  *(changed: 8 Oct, the review of 977848d)* — there is no staff refusal: every path through
+  today's change check is a family's (a student's request, its approval by the parent, a
+  parent's own drop or swap), so the promise of a staff sentence is withdrawn. The desk's drop
+  past the deadline (`POST /registrations/:id/desk-drop`, with the receipt gate and the "sent"
+  refund) is step C's.
+
+### 2.12 Changed after the review of 977848d (read before merging B or C)
+
+Each point is marked *(changed)* where the code now differs from what §2 promised before.
+
+- **Approving a change asks the line's deadline** *(changed)*: `approveChangeRequest` refuses a
+  drop or swap asked before the line's effective deadline once that deadline has passed (checked
+  before, and again under the line's lock with its series held), with the family's sentence.
+- **Lines that move series are checked and re-priced** *(changed)*: an item's series change, the
+  admin's move, a subject's board change and the session's series correction call
+  `recheckLines(tx, lineIds)` — `assertLineRules` with `recheck: true` and the moved lines left out
+  of the student's own: the same entry once in the target series (any key: an award, a unit, an
+  unmapped subject row), the required items there, the carry-forward period; what governs a new
+  line (availability, self-study, a declared retake, exclusive groups, the grade-10 core) is not
+  asked again. Then `carryFeeRows(tx, itemId, fromSeriesId, actorId, why)` brings the old series'
+  fee rows into the new one, **provisional**, where finance has none, and
+  `repriceMovedLines(tx, lineIds, actorId, why)` re-prices every waiting line with no payment
+  history on its board part against the new series' rows (the course part and the exceptions its
+  basis recorded stay; `LINE_REPRICED`), so the new series' Confirm and Re-price reach it.
+  `tellPriceChanged(lines, because)` tells each family after the commit
+  (`apps/api/src/services/line-moves.services.ts`). A line with a payment keeps its price and its
+  record. Any new path that moves lines into a series (F7's import, C's plans if they move lines)
+  calls the same three.
+- **Confirm, Re-price and the fee grid find lines by the fee rows their basis records**
+  *(changed)*, wherever the line is entered now (they read `board_series_id` before).
+- **Capture asks the line rules again** *(changed)*: `capturePreregistrationsForSession` runs
+  `recheckLines` on each row after the deadline and eligibility; a row a rule now refuses is held
+  as an ineligible row is (`PREREG_HELD_INELIGIBLE`, code `line_rule`), the owner deciding.
+- **`priceLine(..., { lock: true })` reads the student's exceptions `FOR SHARE`** *(changed)*, as
+  §2.1 said; `insertLines` passes it.
+- **`insertLines` requires a prior sitting's source** *(changed)*: a line with
+  `priorSittingSeriesId` and no `priorSittingSource` is refused ("Say where the earlier sitting is
+  known from…"); nothing is assumed `known`. B passes `known`, `declared_by_desk`,
+  `declared_by_family` or `legacy`.
+- **`GET /registrations/offers` is open per attempt** *(changed)*: `item.open` is
+  `{ first, retake }` — a first entry until the entry deadline (or the exams' start), a retake of
+  the board's previous sitting until the retake deadline where set — each price row carries its
+  attempt's `open`, and `item.retakeDeadline` is the qualifying retake's cut-off.
+- **The admin's move** takes a retake of the previous sitting into a series past its entry
+  deadline while the retake deadline is ahead (per line, as `insertLines`).
+- **Re-price** records `LINE_PRICE_KEPT` on each listed line whose provisional mark it clears.
+- **Copy-from** brings an open subject with no active teacher across **closed** ("who teaches
+  it?"); `SESSION_COPIED` counts them (`closedNoTeacher`).
+- **`generateItems`** adds an IGCSE award's one-paper retake items: one per component the
+  catalogue says it requires (its own or its option's), `one_paper`, entering that component,
+  read for the qualification (Q-13), in the exclusive group `entry` with the whole subject,
+  `needs_prior_series` on a Cambridge syllabus, **closed** until the school opens the ones it
+  offers.
+- **The Money tab** (`GET /sessions/:id/money`): `unpaid` is what is owed (waiting for payment,
+  and preregistrations not yet paid) — not a line still waiting for the parent's approval
+  (`awaitingApproval`); `paid` includes a paid preregistration; the section is the student's in
+  the session's academic year; `sections` lists them and `sectionId` filters.
+- **0042 runs twice safely**: offers, items, units, fee keys and fees are made only where none
+  exist; its triggers are dropped before they are made again (proved on converted copies).
 
 ## 3. As built (step 1)
 
@@ -493,21 +551,73 @@ re-price with what it will skip), Money (lines only: totals, filters, subject, e
 editors); Board series gains the retake deadline. Arabic for all of it in
 `apps/web/lib/i18n-sessions.ts` (data marked `data-i18n-skip`), checked right to left.
 
+**Conversion (corrected after the review of 977848d).** Copies (never the originals) of
+`igcse_template_dev`, `igcse_foundation_dev`, `igcse_catalogue_rich_dev`, `igcse_catalogue_synth`
+and `igcse_catalogue_synth_closed`, each migrated to main (41 migrations), probed with main's code,
+migrated to the branch (44), probed with the branch's code: every line's status, price, course and
+board parts, series and payments, every wallet, every session's status, the eligibility answer of
+every waiting line and the refund preview of every live line — **0 differences on each**. What
+that proves, plainly: the template, foundation and catalogue_rich copies are **one data set** for
+everything the probe reads (identical before-probes: 3 sessions, 8 lines, 5 waiting, 6 live); they
+differ only in users and two teachers with no subject links. The synthetic pair is the second
+shape (9 sessions, 16 lines, 24 subjects, 13 and 14 series). A scratch case on a copy of
+catalogue_rich adds what none of them holds — a window whose lines sit in two series (one routed,
+one moved and dropped) and subjects with linked teachers: 0 differences; the routed subject gets
+its open item, the moved-and-dropped line keeps a closed `not_routed` item, the offers carry their
+two teachers. 0042 run a second time on the scratch and both synthetic copies: every table's row
+count and the probe unchanged. **09 over each converted copy fails exactly what main's 09 fails on
+the same data before conversion** (the coverage counts the small data sets cannot reach, the SO-1
+audit rows the demo and synthetic data never had, the synthetic data's own paid-twice and receipt
+gaps, F0a's held-preregistration count) **plus one more: the new basis rule's coverage count** (a
+converted database has no line priced by `priceLine` yet); every rule this step added passes on
+converted rows.
+
+**Gaps closed after the review of 977848d.** The Session screen now sets up what §3.2/§4.2
+describe: one-paper retake items are generated from the catalogue (unticked until the school
+opens them); "Add an item" takes what it enters (papers or units, the award, an option code, the
+subject row), the board fee read for the qualification on a one-paper item (Q-13), "needs an
+earlier sitting carried forward", the exclusive group, required in a first entry and its own
+teachers; every item card has its own teacher picker (an IAL subject names a teacher per unit)
+and the carry-forward tick.
+
+**The step counts, measured on the screen (§11).** On `igcse_rwa_dev` in headless Chrome
+(`.audit/rework-sessions-evidence/screens/measure-counts*.json`), every fill, select and tick an
+input, every press a click. From scratch, June 2029 with the database's 17 IGCSE subjects, one
+teacher each, course fees as the subjects', one series: new session 6 inputs and 2 clicks; the 17
+subjects 16 inputs and 67 clicks (4 clicks a subject: Add subject, the subject, "Show every
+teacher" when the teacher is not yet in its pool, Add — 3 when they are); the fee list pasted and
+published 1 input and 4 clicks; the series' deadline 2 inputs and 2 clicks (plus 2 to choose a
+far academic year on the Board series page) — **25–27 inputs and 75 clicks**. Copied from it
+(June 2031 from June 2030): new session 5 inputs and 2 clicks; Confirm all 2 clicks; the
+deadline 2 inputs and 2 clicks — **7 inputs and 6 clicks** (plus the year choice), the 17
+subjects arriving open with their teachers. Against §11's "about 150 and 70; about 20 and 10":
+inputs far fewer than counted (the dev database has no A.S./A.L. subject, no one-paper item and
+one teacher a subject — §11 counted about 26 teacher picks, 10 one-paper fees and 30 per-unit
+inputs), clicks about the same, because each subject is added through its own dialog. Not
+measured: the A.S./A.L. and one-paper inputs (no such subjects in the dev data).
+
 **Tests.** 08n (17: sessions, copy, a winter session's per-item cut-off and retake deadline,
 IGCSE never October/January, the defaults, capture's four cases, the line rules, a family's drop
 past the deadline, the exams' start as the cut-off, the per-unit enrolment, grade 10 twice, due
-dates), 08p (6: A-16, one-paper retake, settings for new lines
+dates; then, after the review of 977848d, 11 more: approval past a deadline, Biology units moved
+October to January with provisional fees, the sweep at the exams' start and at the retake
+deadline, the admin's move of a qualifying retake, replace teacher, the scheduler opening after
+a deadline, the same award in a converted and a new session, the same entry on a move, one-paper
+generation, the Money tab's counts), 08p (6: A-16, one-paper retake, settings for new lines
 only, exceptions in order, provisional fee, confirm higher and re-price), 08t (10 races), a 05
 cross-family case for `/registrations/offers`, the authz rows, 09's rules (§8). Six guards shown
 red when undone (trail rows `control`).
 
 ## 4. Decisions made while building (for the lead)
 
-1. **Two F0b assertions changed outside the brief's explicit list**, both in the scenario class
+1. **Three F0b assertions changed outside the brief's explicit list**, all in the scenario class
    it pre-authorised: 08's MO-10 test (a deadline before the window's close was refused, now
-   accepted; the database no longer rejects it) and 08k's first race (a change to a window's
-   series was refused once a registration landed; an item's series change now carries the line,
-   its student locked first). Trail rows `assertion`, 21:00:24Z and 21:25:07Z.
+   accepted; the database no longer rejects it), 08's "a window cannot be moved to close on or
+   after its board entry deadline" (refused 400, now accepted — its trail row was missing until
+   the review of 977848d, flag 6) and 08k's first race (a change to a window's series was refused
+   once a registration landed; an item's series change now carries the line, its student locked
+   first). Trail rows `assertion` at 21:00:24Z (two) and 21:25:07Z. The lead kept all three
+   (8 Oct).
 2. **Writers that move lines take the students first** and run again when a student appeared
    while they waited (`lib/student-locks.ts`), rather than locking students after their own rows
    (a deadlock with a reservation).
@@ -558,6 +668,12 @@ red when undone (trail rows `control`).
 - 22:50Z — the Sessions and Session screens, settings and the series' retake deadline; driven
   in headless Chrome on igcse_rwa_dev (API 3121, web 3120) in English and Arabic; three defects
   found by driving and fixed. Commit 19570e6 pushed; CI green.
-- 23:05Z — conversion proved on copies of four databases (0 differences; 09 as before plus the
-  new basis rule's coverage count); 0042 now routes new lines as F0b did. Commit 5360b1c pushed.
+- 23:05Z — conversion run on copies of four databases (0 differences); 0042 now routes new
+  lines as F0b did. Commit 5360b1c pushed. *Corrected after the review of 977848d:* the
+  template and foundation copies are the same data for everything the probe reads (identical
+  before-probes), so that run proved two shapes, not four — see §3's "Conversion".
 - 23:20Z — §3–§5 above; the per-unit enrolment test in 08n.
+- 8 Oct, after the review of 977848d — flags 1 and 2 (approval past a deadline; moved lines
+  re-priced from the new series' grid), 3–9 and the cheap minors fixed, each with its test or
+  trail row; §2.12 lists the contract changes; the conversion re-run on five copies with the
+  final 0042 and stated as two shapes plus a scratch case; the step counts measured.

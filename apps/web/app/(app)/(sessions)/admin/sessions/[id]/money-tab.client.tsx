@@ -25,9 +25,10 @@ const FILTER_LABEL: Record<Filter, string> = { all: 'All', unpaid: 'Unpaid', ove
 export default function MoneyTab({ session }: { session: SessionDetail }): React.JSX.Element {
   const [filter, setFilter] = useState<Filter>('all');
   const [offerId, setOfferId] = useState('');
+  const [sectionId, setSectionId] = useState('');
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: [...moneyKey(session.id), filter, offerId],
-    queryFn: () => fetchMoney(session.id, { filter, ...(offerId ? { offerId } : {}) }),
+    queryKey: [...moneyKey(session.id), filter, offerId, sectionId],
+    queryFn: () => fetchMoney(session.id, { filter, ...(offerId ? { offerId } : {}), ...(sectionId ? { sectionId } : {}) }),
   });
   // The subject filter: the subjects this session's lines are of (finance reads no offer list).
   const { data: all } = useQuery({ queryKey: [...moneyKey(session.id), 'all', ''], queryFn: () => fetchMoney(session.id, { filter: 'all' }) });
@@ -46,7 +47,8 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
       <div className="grid gap-3 sm:grid-cols-4">
         <Stat label="Lines" value={<span>{t.lines}</span>} />
         <Stat label="Paid" value={<><span>{t.paid}</span> · <Money amount={t.paidAmount} /></>} />
-        <Stat label="Unpaid" value={<><span>{t.unpaid}</span> · <Money amount={t.outstanding} /></>} hint={<><span>{t.families}</span> <span>families</span></>} />
+        <Stat label="Unpaid" value={<><span>{t.unpaid}</span> · <Money amount={t.outstanding} /></>}
+          hint={<><span>{t.families}</span> <span>families</span>{t.awaitingApproval > 0 && <> · <span>{t.awaitingApproval}</span> <span>awaiting the parent</span></>}</>} />
         <Stat label="Overdue" value={<><span>{t.overdue}</span> · <Money amount={t.overdueAmount} /></>} hint={t.provisional ? <><span>{t.provisional}</span> <span>provisional (not payable yet)</span></> : undefined} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -57,6 +59,12 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
                 className={`rounded-md px-3 py-1.5 ${filter === f ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>{FILTER_LABEL[f]}</button>
             ))}
           </div>
+          {(all?.sections.length ?? 0) > 1 && (
+            <select aria-label="Section" className={INPUT_CLASS.replace('w-full', 'w-48')} value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
+              <option value="">Every section</option>
+              {all!.sections.map((x) => <option key={x.id} value={x.id} data-i18n-skip="true">{x.name}</option>)}
+            </select>
+          )}
           {subjects.length > 1 && (
             <select aria-label="Subject" className={INPUT_CLASS.replace('w-full', 'w-64')} value={offerId} onChange={(e) => setOfferId(e.target.value)}>
               <option value="">Every subject</option>

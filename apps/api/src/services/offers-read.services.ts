@@ -93,16 +93,21 @@ export async function offersForStudent(studentId: string, sessionId: string) {
         if (!c.selfStudyOnly) combos.push({ attempt: 'retake', mode: 'in_school' });
         combos.push({ attempt: 'retake', mode: 'self_study' });
       }
+      // Open per attempt (the review of 977848d): a first entry until the entry deadline (or the
+      // exams' start with none); a retake of the board's previous sitting until the retake deadline
+      // where the board gives one. A retake of an older sitting is a first entry's date.
+      const firstDeadline = seriesId ? await effectiveDeadlineFor(db, { boardSeriesId: seriesId, attempt: 'first', priorSittingSeriesId: null }) : { at: null, kind: null };
+      const retakeUntil = i.retakeDeadline ? new Date(i.retakeDeadline as string) : firstDeadline.at;
+      const openFor = { first: !!firstDeadline.at && firstDeadline.at > now, retake: !!retakeUntil && retakeUntil > now };
       const prices = [];
       for (const k of combos) {
         try {
           const p = await priceLine(db, { item: { id: i.id as string }, attempt: k.attempt, mode: k.mode, studentId, sessionId });
-          prices.push({ ...k, total: p.total, courseFee: p.courseFee, registrationFee: p.registrationFee, provisional: p.provisional, noFee: false });
+          prices.push({ ...k, open: openFor[k.attempt], total: p.total, courseFee: p.courseFee, registrationFee: p.registrationFee, provisional: p.provisional, noFee: false });
         } catch {
-          prices.push({ ...k, total: null, courseFee: null, registrationFee: null, provisional: false, noFee: true });
+          prices.push({ ...k, open: openFor[k.attempt], total: null, courseFee: null, registrationFee: null, provisional: false, noFee: true });
         }
       }
-      const firstDeadline = seriesId ? await effectiveDeadlineFor(db, { boardSeriesId: seriesId, attempt: 'first', priorSittingSeriesId: null }) : { at: null, kind: null };
       const ownTeachers = teachers.filter((t) => t.itemId === i.id);
       its.push({
         id: i.id as string,
@@ -113,9 +118,10 @@ export async function offersForStudent(studentId: string, sessionId: string) {
           id: seriesId, month: i.month as string, year: i.year as number, label: i.seriesLabel as string,
           entryDeadline: i.entryDeadline as Date | null, retakeDeadline: i.retakeDeadline as Date | null, examsStart: i.examsStart as string | null,
         } : null,
-        // A first entry's cut-off; a retake of the board's previous sitting runs to the retake deadline where set.
+        // A first entry's cut-off, and a qualifying retake's; whether each is still open.
         firstEntryDeadline: firstDeadline.at,
-        open: !!firstDeadline.at && firstDeadline.at > now || (!!i.retakeDeadline && new Date(i.retakeDeadline as string) > now),
+        retakeDeadline: retakeUntil,
+        open: openFor,
         availability: i.availability as string,
         constraints: c,
         exclusiveGroup: i.exclusiveGroup as string | null,

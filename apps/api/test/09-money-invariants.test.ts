@@ -489,17 +489,10 @@ describe('money invariants over the whole database', () => {
     expect(broken).toEqual([]);
   });
 
-  it('a registration expired at an entry deadline was in a series whose deadline had passed (MO-10 per series)', async () => {
-    const broken = await sql(`
-      select r.id, r.board_series_id, b.entry_deadline, a.created_at
-      from audit_log a
-      join registration r on r.id = a.entity_id
-      left join board_series b on b.id = r.board_series_id
-      where a.action = 'REGISTRATION_EXPIRED' and a.new_data->>'reason' = 'entry_deadline'
-        and (b.id is null or b.entry_deadline is null or b.entry_deadline > a.created_at)
-    `);
-    expect(broken).toEqual([]);
-  });
+  // Changed by the review of 977848d (flag 3; trail row "assertion"): F0b's rule "a registration
+  // expired at an entry deadline was in a series whose entry deadline had passed" is replaced by the
+  // rule above — the line's effective deadline (a retake's retake deadline, a series with no entry
+  // deadline its exams' start) — which it contradicted for a series with no entry deadline.
 
   it("every open payment's registrations share one entry deadline (F0b: the sweep closes a payment at its series' deadline)", async () => {
     // Changed by the reservations rework (pre-authorised; trail row "assertion"): the deadline is

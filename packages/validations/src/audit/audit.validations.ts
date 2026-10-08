@@ -281,6 +281,8 @@ export const AUDIT_ACTIONS = [
   'BOARD_FEES_CONFIRMED',
   'BOARD_FEES_REPRICED',
   'LINE_REPRICED',
+  // A re-price left a line's price as it was (it has a payment) and cleared its provisional mark.
+  'LINE_PRICE_KEPT',
   'LINE_DUE_MOVED',
   'GRADE10_BULK_COMMITTED',
   // Reservations rework, step C: charges, plans, the registry, board services, the desk-drop
@@ -487,6 +489,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   BOARD_FEES_CONFIRMED:       'Board Fees Confirmed',
   BOARD_FEES_REPRICED:        'Unpaid Lines Re-priced',
   LINE_REPRICED:              'Line Re-priced (Board Fee Confirmed)',
+  LINE_PRICE_KEPT: 'Line price kept (fee confirmed)',
   LINE_DUE_MOVED:             'Line Due Date Moved',
   GRADE10_BULK_COMMITTED:     'Grade 10 Registered in Bulk',
   CHARGE_CREATED: 'Charge Added',

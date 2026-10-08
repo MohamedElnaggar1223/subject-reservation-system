@@ -40,7 +40,9 @@ import { schoolDate } from './window.services';
 import { attachSeries, detachUnusedSeries, defaultSeriesFor, findOrCreateSeries } from './offer.services';
 import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
 import { effectiveDeadlinesOf, effectiveDeadlineFor, redateLines } from './deadline.services';
-import { itemBoardFees } from './pricing.services';
+import { itemBoardFees, PricingError } from './pricing.services';
+import { repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
+import { recheckLines, LineRuleError } from './line-rules.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -395,7 +397,8 @@ export async function updateOption(id: string, data: UpdateQualificationOptionTy
  */
 export async function mapRegistrable(subjectId: string, data: MapRegistrableType, actorId: string, ctx?: AuditContext) {
   const names = await boardNames();
-  return withStudentsFirst((extra) => db.transaction(async (tx) => {
+  let repricedOut: RepricedLine[] = [];
+  const result = await withStudentsFirst((extra) => db.transaction(async (tx) => {
     const locked = await lockStudentsOfSubject(tx, subjectId, extra);
     const [s] = await tx.select().from(subject).where(eq(subject.id, subjectId)).for('update');
     if (!s) throw new CatalogueError('Subject not found', 404);
@@ -432,7 +435,9 @@ export async function mapRegistrable(subjectId: string, data: MapRegistrableType
 
     const before = await tx.select({ unitId: subjectUnit.unitId }).from(subjectUnit).where(eq(subjectUnit.subjectId, subjectId));
     // The board changes: its live registrations follow it (IS-14).
-    const moved = s.council !== data.boardCode ? await applyBoardChange(tx, s, data.boardCode, actorId, locked, names) : [];
+    const change = s.council !== data.boardCode ? await applyBoardChange(tx, s, data.boardCode, actorId, locked, names) : { moved: [], repriced: [] as RepricedLine[] };
+    const moved = change.moved;
+    repricedOut = change.repriced;
     await tx.update(subject).set({ qualificationId: q?.id ?? null, updatedAt: new Date() }).where(eq(subject.id, subjectId));
     await tx.delete(subjectUnit).where(eq(subjectUnit.subjectId, subjectId));
     if (data.unitIds.length) await tx.insert(subjectUnit).values(data.unitIds.map((unitId) => ({ subjectId, unitId })));
@@ -443,6 +448,8 @@ export async function mapRegistrable(subjectId: string, data: MapRegistrableType
       ctx, tx);
     return { subjectId, boardCode: data.boardCode, qualificationId: q?.id ?? null, unitIds: data.unitIds, registrationsMoved: moved.length };
   }));
+  await tellBoardChangePrices(repricedOut);
+  return result;
 }
 
 function levelWord(level: string): string {
@@ -499,6 +506,16 @@ export async function applyBoardChange(
   for (const m of plan.moved) {
     await tx.update(registration).set({ boardSeriesId: m.to, updatedAt: now }).where(eq(registration.id, m.id));
   }
+  // Each student's lines checked again where they now are (§6), then priced from the new board's
+  // grid (the old board's fee came across provisional above where finance has none).
+  let repriced: RepricedLine[] = [];
+  try {
+    await recheckLines(tx, plan.moved.map((m) => m.id));
+    repriced = await repriceMovedLines(tx, plan.moved.map((m) => m.id), actorId, why);
+  } catch (err) {
+    if (err instanceof LineRuleError || err instanceof PricingError) throw new CatalogueError(err.message, 409);
+    throw err;
+  }
   await redateLines(tx, plan.moved.map((m) => m.id), actorId, why);
   for (const sessionId of new Set(plan.items.map((i) => i.sessionId))) await detachUnusedSeries(tx, sessionId);
   // One row for the change itself, in its transaction, whichever screen made
@@ -518,8 +535,12 @@ export async function applyBoardChange(
       previousData: { boardSeriesId: i.from }, newData: { boardSeriesId: i.to, reason: why },
     })), tx);
   }
-  return plan.moved;
+  return { moved: plan.moved, repriced };
 }
+
+/** After a board change commits: each family whose price it changed is told. */
+export const tellBoardChangePrices = (repriced: RepricedLine[]) =>
+  tellPriceChanged(repriced, "The subject's exam board changed, and with it the board fee");
 
 const sameDeadline = (a: Date | null, b: Date | null) => (a?.getTime() ?? null) === (b?.getTime() ?? null);
 const deadlineText = (d: Date | null) => (d ? schoolDate(d) : 'none set');

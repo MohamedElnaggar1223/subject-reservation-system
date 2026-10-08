@@ -83,7 +83,7 @@ export async function getFeeGrid(seriesId: string) {
     select f.id as fee_id, r.id, r.status, (fr->>'amount')::numeric as recorded,
       exists (select 1 from payment_registration pr where pr.registration_id = r.id) as has_payment
     from board_fee f
-    join registration r on r.board_series_id = f.board_series_id and r.pricing_basis is not null
+    join registration r on r.pricing_basis is not null
     cross join lateral jsonb_array_elements(r.pricing_basis->'feeRows') fr
     where f.board_series_id = ${seriesId} and fr->>'id' = f.id`).then((x) => x.rows as { fee_id: string; id: string; status: string; recorded: string; has_payment: boolean }[]) : [];
   const out = rows.map((r) => {
@@ -203,12 +203,17 @@ export async function copyFees(seriesId: string, fromSeriesId: string, actorId: 
  * before anything about their payments is read (§3.4: a checkout committing while this waits is
  * then seen).
  */
-async function lockLinesOfFees(tx: Tx, seriesId: string, feeIds: string[]) {
+/**
+ * The lines priced from these rows, locked in id order: found by the rows their pricing basis
+ * recorded, wherever the line is entered now (a line that moved with a payment keeps its record,
+ * and its old series' Confirm and Re-price still reach it — the review of 977848d, flag 2).
+ */
+async function lockLinesOfFees(tx: Tx, _seriesId: string, feeIds: string[]) {
   if (!feeIds.length) return [];
   const ids = await tx.execute(sql`
     select distinct r.id from registration r
     cross join lateral jsonb_array_elements(coalesce(r.pricing_basis->'feeRows', '[]'::jsonb)) fr
-    where r.board_series_id = ${seriesId} and r.status in ('pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt')
+    where r.status in ('pending_approval', 'pending_payment', 'preregistered', 'confirmed', 'dropped_pending_receipt')
       and fr->>'id' in (${sql.join(feeIds.map((id) => sql`${id}`), sql`, `)})`).then((x) => (x.rows as { id: string }[]).map((r) => r.id));
   if (!ids.length) return [];
   return tx.select().from(registration).where(inArray(registration.id, ids)).orderBy(registration.id).for('update');
@@ -297,7 +302,12 @@ export async function repriceLines(seriesId: string, data: RepriceBoardFeesType,
       if (!basis || withHistory.has(l.id) || !waiting) {
         listed.push({ id: l.id, studentId: l.studentId, status: l.status, price: l.priceAtRegistration,
           reason: !basis ? 'converted line (no pricing basis)' : withHistory.has(l.id) ? 'has a payment (open, failed or paid)' : `is ${l.status}` });
-        if (l.priceProvisional) await tx.update(registration).set({ priceProvisional: false, updatedAt: now }).where(eq(registration.id, l.id));
+        if (l.priceProvisional) {
+          await tx.update(registration).set({ priceProvisional: false, updatedAt: now }).where(eq(registration.id, l.id));
+          // Its price stands (finance adjusts it); the mark it loses is recorded per line.
+          await logAction(actorId, 'LINE_PRICE_KEPT', 'registration', l.id, { priceAtRegistration: l.priceAtRegistration, provisional: true },
+            { priceAtRegistration: l.priceAtRegistration, provisional: false, reason: data.reason, why: listed[listed.length - 1]!.reason }, ctx, tx);
+        }
         continue;
       }
       const next = await repriceBoardPart(tx, { offerItemId: l.offerItemId, pricingBasis: basis });
