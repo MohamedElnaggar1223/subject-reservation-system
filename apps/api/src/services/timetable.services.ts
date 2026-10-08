@@ -42,7 +42,6 @@ import {
 } from './scheduling-shared.services';
 import { sectionsBetween } from './academic.services';
 import { generateInWorker } from './generator-runner';
-import { versionWindows, versionTeacherClashes, settleClashes } from './timetable-clash.services';
 import { todayAtSchool } from '../lib/clock';
 
 // ─── Loading ─────────────────────────────────────────────────────────────────
@@ -87,6 +86,10 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
   const inTerm = today < term.startsOn ? term.startsOn : today > term.endsOn ? term.endsOn : today;
   const asOf = opts.from ?? (tt.effectiveFrom && tt.effectiveFrom > inTerm ? tt.effectiveFrom : inTerm);
   const teacherOn = await teachersOn(groupIds, asOf, executor);
+  // Every teacher who teaches these groups on some day from then to the term's end (a dated change of
+  // teacher included): two groups one teacher has on a common day never meet at one time
+  // (teacherOverlaps below, SCHEDULING.md §16 round two, flag 1).
+  const taughtLater = await groupTeachersBetween(groupIds, asOf, term.endsOn, executor);
   const rawGroups = groupIds.length
     ? await executor.select({
       g: teachingGroup,
@@ -98,7 +101,9 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
       .where(inArray(teachingGroup.id, groupIds))
     : [];
   const teacherIds = [...new Set([...teacherOn.values()].filter((x): x is string => !!x))];
-  const teachers = teacherIds.length ? await executor.select().from(teacher).where(inArray(teacher.id, teacherIds)) : [];
+  const laterIds = [...new Set(taughtLater.map((x) => x.teacherId).filter((x): x is string => !!x && !teacherIds.includes(x)))];
+  const allTeacherIds = [...teacherIds, ...laterIds];
+  const teachers = allTeacherIds.length ? await executor.select().from(teacher).where(inArray(teacher.id, allTeacherIds)) : [];
   const groups = rawGroups.map((x) => {
     const teacherId = teacherOn.has(x.g.id) ? teacherOn.get(x.g.id)! : null;
     return { ...x, g: { ...x.g, teacherId }, teacherName: teachers.find((t) => t.id === teacherId)?.name ?? null };
@@ -120,6 +125,7 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
     : [];
   const rooms = await executor.select().from(room).orderBy(asc(room.name));
   const unavailable = await executor.select().from(scheduleUnavailability).where(eq(scheduleUnavailability.academicYearId, tt.academicYearId));
+  const teacherOverlaps = teacherOverlapsOf(taughtLater, new Map(rawGroups.map((x) => [x.g.id, x.g.archivedOn])), teacherOn);
   const dayRules = groupIds.length
     ? await executor.select().from(groupDayRule).where(and(eq(groupDayRule.academicYearId, tt.academicYearId), inArray(groupDayRule.groupAId, groupIds), inArray(groupDayRule.groupBId, groupIds)))
     : [];
@@ -157,6 +163,8 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
         roomFeatures: g.roomFeatures,
         roomId: g.roomId,
         preferredRoomId: sectionRoomId ?? homeroomOf(g.id),
+        // Online (the offer teacher's mode): timetabled without a room.
+        ...(g.delivery === 'online' ? { noRoom: true } : {}),
       };
     }).sort((a, b) => a.id.localeCompare(b.id)),
     lessons: lessons.map((l) => ({ id: l.id, groupId: l.groupId, seq: l.seq, length: l.length, weekday: l.weekday, period: l.period, roomId: l.roomId, locked: l.locked })),
@@ -165,6 +173,7 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
       const lim = limits.find((x) => x.teacherId === t.id);
       return { id: t.id, name: t.name, maxPerDay: lim?.maxPerDay ?? null, maxPerWeek: lim?.maxPerWeek ?? null };
     }).sort((a, b) => a.id.localeCompare(b.id)),
+    ...(teacherOverlaps.length ? { teacherOverlaps } : {}),
     unavailable: unavailable
       .filter((u) => !u.teacherId || teacherIds.includes(u.teacherId))
       .map((u) => ({ teacherId: u.teacherId, roomId: u.roomId, weekday: u.weekday, period: u.period })),
@@ -192,14 +201,14 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
           bySection.get(sec.id)!.count++;
         }
         return {
-          id: g.id, name: g.name, kind: g.kind, subjectId: g.subjectId, subjectName, subjectCode, teacherId: g.teacherId, teacherName,
+          id: g.id, name: g.name, kind: g.kind, subjectId: g.subjectId, unitId: g.unitId, delivery: g.delivery, subjectName, subjectCode, teacherId: g.teacherId, teacherName,
           sectionId: g.sectionId, sectionName, weeklyPeriods: g.weeklyPeriods, doublePeriods: g.doublePeriods, roomType: g.roomType,
           roomFeatures: g.roomFeatures, roomId: g.roomId, archivedOn: g.archivedOn, memberIds: ids.sort(),
           sections: [...bySection.values()].sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true })),
         };
       }).sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true })),
       students: students.map((s) => ({ ...s, section: sectionOf.get(s.id) ?? null })),
-      teachers: teachers.map((t) => ({ id: t.id, name: t.name, isActive: t.isActive })).sort((a, b) => a.name.localeCompare(b.name)),
+      teachers: teachers.filter((t) => teacherIds.includes(t.id)).map((t) => ({ id: t.id, name: t.name, isActive: t.isActive })).sort((a, b) => a.name.localeCompare(b.name)),
     },
   };
 }
@@ -229,6 +238,48 @@ function studentPeriodsOf(members: { studentId: string; groupId: string; from: s
     out[studentId] = most;
   }
   return out;
+}
+
+/**
+ * Pairs of groups one teacher teaches on a common day of the version's time
+ * though not both from its first day: a group's teacher is dated, so a change
+ * later in the term gives the incoming teacher the group's lessons from then
+ * (round two, flag 1: judged across every dated interval, not the first day's
+ * teacher alone). A retired group is not taught from the day it is retired.
+ * Pairs the first day's teacher already joins are left out: the engine sees
+ * those through the group's own teacher.
+ */
+function teacherOverlapsOf(
+  taught: { groupId: string; teacherId: string | null; from: string; to: string }[],
+  archivedOn: Map<string, string | null>,
+  firstDay: Map<string, string | null>,
+): NonNullable<EngineInput['teacherOverlaps']> {
+  const live = taught
+    .filter((x): x is { groupId: string; teacherId: string; from: string; to: string } => !!x.teacherId)
+    .map((x) => { const a = archivedOn.get(x.groupId); return a ? { ...x, to: x.to < addDays(a, -1) ? x.to : addDays(a, -1) } : x; })
+    .filter((x) => x.from <= x.to);
+  const byTeacher = new Map<string, typeof live>();
+  for (const x of live) {
+    if (!byTeacher.has(x.teacherId)) byTeacher.set(x.teacherId, []);
+    byTeacher.get(x.teacherId)!.push(x);
+  }
+  const found = new Map<string, { a: string; b: string; teacherId: string; from: string }>();
+  for (const [teacherId, list] of [...byTeacher.entries()].sort((p, q) => p[0].localeCompare(q[0]))) {
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const p = list[i]!;
+      const q = list[j]!;
+      if (p.groupId === q.groupId) continue;
+      const from = p.from > q.from ? p.from : q.from;
+      const to = p.to < q.to ? p.to : q.to;
+      if (from > to) continue;
+      if ((firstDay.get(p.groupId) ?? null) === teacherId && (firstDay.get(q.groupId) ?? null) === teacherId) continue;
+      const [a, b] = [p.groupId, q.groupId].sort() as [string, string];
+      const key = `${a}|${b}|${teacherId}`;
+      const prev = found.get(key);
+      if (!prev || from < prev.from) found.set(key, { a, b, teacherId, from });
+    }
+  }
+  return [...found.values()].sort((x, y) => x.a.localeCompare(y.a) || x.b.localeCompare(y.b) || x.teacherId.localeCompare(y.teacherId));
 }
 
 // ─── Versions ────────────────────────────────────────────────────────────────
@@ -331,15 +382,6 @@ export async function getTimetable(id: string) {
   if (!model.grid.days.length) problems.push(model.grid.bellScheduleName ? 'The default bell schedule has no lesson periods on the school days' : 'This year has no default bell schedule — set one up on the Bell schedules screen');
   const noTeacher = model.display.groups.filter((g) => !g.teacherId);
   if (noTeacher.length) problems.push(`${noTeacher.length} ${noTeacher.length === 1 ? 'group has' : 'groups have'} no teacher yet: ${noTeacher.map((g) => g.name).join(', ')}`);
-  // A group's teacher changed at a date later in the term: the grid judges the teachers of its first
-  // day, so the lessons the incoming teacher would meet are listed here (and judged again at publish).
-  if (model.timetable.status === 'draft') {
-    const seen = new Set(clashes.filter((c) => c.kind === 'teacher_busy').map((c) => [...c.lessonIds].sort().join('|')));
-    for (const c of await versionTeacherClashes(db, { id, name: model.timetable.name }, model.asOf, model.term.endsOn)) {
-      if (seen.has([c.lessonAId, c.lessonBId].sort().join('|'))) continue;
-      problems.push(`${c.message.replace(/ \([^()]*\)$/, '')}, after a change of teacher: move one of the two lessons, or change the date of the change`);
-    }
-  }
   return {
     timetable: model.timetable,
     term: model.term,
@@ -542,34 +584,31 @@ export async function publishTimetable(id: string, data: PublishTimetableType, a
     const publishedAt = new Date();
     await tx.update(timetable).set({ status: 'published', effectiveFrom: data.effectiveFrom, publishedBy: actorId, publishedAt, publishNote: data.note ?? null, updatedAt: publishedAt })
       .where(eq(timetable.id, id));
-    // A group's teacher changed at a date inside this version's time teaches its lessons from then: the
-    // engine judged the teachers of its first day, so the rest are judged here — refused with the
-    // clashes, or recorded against this version when the coordinator confirms exactly those.
-    const window = (await versionWindows(tx, data.effectiveFrom)).find((w) => w.id === id);
-    const teacherClashes = window ? await versionTeacherClashes(tx, { id, name: t.name }, window.from, window.to) : [];
-    const clashesAccepted = await settleClashes(tx, teacherClashes, { anyway: data.anyway, clashToken: data.clashToken, cause: `Published ${t.name}`, actorId });
     const changedGroups = await changedGroupsSince(tx, previous?.id ?? null, id);
-    const covers = await carryCoversOver(tx, id, term.id, data.effectiveFrom, t.name, actorId);
+    const carried = await carryCoversOver(tx, id, term.id, data.effectiveFrom, t.name, actorId);
+    // Each cover carried over is judged again against this version, inside this transaction (round two,
+    // flag 2): a cover teacher who now teaches then, or would pass their periods that day, loses it.
+    const cover = await import('./cover.services');
+    const lost = await cover.recheckCovers(tx, carried.moved, actorId, `${t.name} takes effect from ${readableDate(data.effectiveFrom)}`, ctx);
+    const covers = { moved: carried.moved.filter((c) => !lost.includes(c)), removed: carried.removed, lost };
     await logAction(actorId, 'TIMETABLE_PUBLISHED', 'timetable', id, { status: 'draft' },
       { status: 'published', effectiveFrom: data.effectiveFrom, replaces: previous?.id ?? null, lessons: model.input.lessons.length, unplaced: unplaced.length, changedGroups: changedGroups.length, note: data.note ?? null,
-        coversMoved: covers.moved, coversRemoved: covers.removed, clashesAccepted: clashesAccepted.map((c) => c.message) }, ctx, tx);
-    return { term, previous, changedGroups, name: t.name, unplaced: unplaced.length, covers, clashesAccepted: clashesAccepted.map((c) => c.message) };
+        coversMoved: covers.moved, coversRemoved: covers.removed, coversLost: covers.lost }, ctx, tx);
+    return { term, previous, changedGroups, name: t.name, unplaced: unplaced.length, covers };
   });
   // After the commit: tell the people whose timetable this is (or changed for), and those whose cover is gone.
   const notified = await notifyPublished(id, result.term, data.effectiveFrom, result.changedGroups, !!result.previous)
     .catch((err) => { console.error('[timetable] publish notices failed:', err); return { students: 0, parents: 0, teachers: 0 }; });
   const cover = await import('./cover.services');
-  // Each cover carried over is judged again against this version: a cover teacher who now teaches at
-  // that time, is away, or would pass their day's limit loses it (and is told, as is the class).
-  const lost = await cover.recheckCarriedCovers(result.covers.moved, actorId, result.name)
-    .catch((err) => { console.error('[timetable] re-judging carried cover failed:', err); return [] as string[]; });
-  const moved = result.covers.moved.filter((c) => !lost.includes(c));
-  const removed = [...result.covers.removed, ...lost];
-  await cover.coverChangeNotices(removed, 'timetable_changed', { effectiveFrom: data.effectiveFrom })
+  await cover.coverChangeNotices(result.covers.removed, 'timetable_changed', { effectiveFrom: data.effectiveFrom })
+    .catch((err) => console.error('[timetable] cover notices failed:', err));
+  await cover.coverChangeNotices(result.covers.lost, 'no_longer_holds')
     .catch((err) => console.error('[timetable] cover notices failed:', err));
   return {
     id, effectiveFrom: data.effectiveFrom, replaces: result.previous?.id ?? null, changedGroups: result.changedGroups.length, unplaced: result.unplaced, notified,
-    coversMoved: await cover.describeCovers(moved), coversRemoved: await cover.describeCovers(removed), clashesAccepted: result.clashesAccepted,
+    coversMoved: await cover.describeCovers(result.covers.moved),
+    // Carried over and then judged again: no longer held by this version, or the cover teacher no longer free.
+    coversRemoved: await cover.describeCovers([...result.covers.removed, ...result.covers.lost]),
   };
 }
 

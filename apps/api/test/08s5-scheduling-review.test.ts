@@ -109,13 +109,24 @@ describe('F1: the review round — changes after publishing, dated teachers, cov
   // ─── Flag 3: changes after publishing ──────────────────────────────────────
 
   it('a student added to a group after publishing, into a lesson at the time of one they have: refused with the clash; going ahead anyway records it and lists it until it no longer happens', async () => {
-    const add = (anyway?: boolean) => coordinator.api.v1.scheduling.groups[':id'].members.$post({ param: { id: gid['Physics R']! }, json: { studentIds: [s['4']!.studentId], startsOn: D0, anyway } });
+    const add = (anyway?: boolean, clashToken?: string) => coordinator.api.v1.scheduling.groups[':id'].members.$post({ param: { id: gid['Physics R']! }, json: { studentIds: [s['4']!.studentId], startsOn: D0, anyway, clashToken } });
     const r = await refused(add());
     expect(r.status).toBe(409);
     expect(r.error).toMatch(/^In the published timetable, this would add a clash: Student rev-4 would be in Arabic R R-11B and Physics R at Sunday period 1 from Sunday,? \d+ October \d{4} \(R — first\)\. Change it, or confirm to go ahead anyway/);
     expect(await sql(`select id from teaching_group_member where group_id = $1 and student_id = $2`, [gid['Physics R'], s['4']!.studentId])).toEqual([]);
 
-    const went = await apiResponse(add(true));
+    // Round two, flag 5: going ahead covers exactly the clashes shown — the refusal carries their
+    // code; "anyway" without it, or with a code of other clashes, is refused with the list again.
+    const code = r.error.match(/\[confirm ([0-9a-f]+)\]$/)?.[1];
+    expect(code).toMatch(/^[0-9a-f]{12}$/);
+    for (const wrong of [undefined, '0123456789ab']) {
+      const again = await refused(add(true, wrong));
+      expect(again).toEqual({ status: 409, error: expect.stringContaining('The clashes are not the ones confirmed (they changed since they were shown); here they are now.') });
+      expect(again.error).toContain(`[confirm ${code}]`);
+    }
+    expect(await sql(`select id from teaching_group_member where group_id = $1 and student_id = $2`, [gid['Physics R'], s['4']!.studentId])).toEqual([]);
+
+    const went = await apiResponse(add(true, code));
     expect(went).toMatchObject({ added: 1, clashesAccepted: [expect.stringMatching(/^Student rev-4 would be in Arabic R R-11B and Physics R at Sunday period 1/)] });
     const listed = await clashes();
     expect(listed).toHaveLength(1);

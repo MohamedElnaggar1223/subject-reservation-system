@@ -185,7 +185,7 @@ async function judgeCandidate(
   const reasons: string[] = [];
   const qualified = qualifiedIds === null || qualifiedIds.has(teacherId);
   if (!qualified) reasons.push(`does not teach ${subjectName}`);
-  const day = await getScheduleFor({ teacherId }, date);
+  const day = await getScheduleFor({ teacherId }, date, executor);
   const theirs = day.lessons.filter((l) => l.lessonId !== exceptLessonId);
   const busy = theirs.filter((l) => (l.status === 'scheduled' || l.status === 'covering' || l.status === 'uncovered') && l.periods.some((p) => periods.includes(p)));
   for (const b of busy) reasons.push(b.status === 'covering' ? `covers ${b.groupName} then` : `teaches ${b.groupName} then`);
@@ -302,45 +302,90 @@ export async function removeCover(id: string, data: RemoveCoverType, actorId: st
   });
 }
 
-// ─── Cover carried over to a new version ─────────────────────────────────────
+// ─── Cover judged again after a change ───────────────────────────────────────
 
 /**
- * After a version is published, each cover it carried over is judged again
- * against it, as a new assignment would be (the cover teacher's own lessons
- * in the new version, their covers, an absence, a period they cannot teach,
- * their day's limit). One that no longer holds is removed ('timetable_changed')
- * and returned, for the confirmation and the notices.
+ * Live arrangements a change may have broken, judged again inside the
+ * change's own transaction, as a new arrangement would be: the lesson still
+ * held that day (the version in force), its own teacher that day (a dated
+ * change of teacher included) still recorded away, and for a cover the cover
+ * teacher still free — not the lesson's own teacher, not teaching or covering
+ * then, not away, not unavailable by the year's rules, within their periods
+ * that day. Called by publishing (each cover it carries over), a group's
+ * change of teacher, and a change of a teacher's rules. One that no longer
+ * holds is removed ('no_longer_holds', with the reason) and audited in the
+ * same transaction, so no committed state holds a cover against its teacher's
+ * own lesson (09b); the caller tells the people after its commit
+ * (`coverChangeNotices`). Locks: the arrangements' rows FOR UPDATE in id order
+ * — after the teachers in F1's order (docs/features/SCHEDULING.md §17).
  */
-export async function recheckCarriedCovers(ids: string[], actorId: string, versionName: string): Promise<string[]> {
+export async function recheckCovers(tx: Tx, ids: string[], actorId: string, cause: string, ctx?: AuditContext): Promise<string[]> {
+  const wanted = [...new Set(ids)].sort();
+  if (!wanted.length) return [];
+  const rows = await tx.select().from(coverAssignment).where(inArray(coverAssignment.id, wanted)).orderBy(asc(coverAssignment.id)).for('update');
   const lost: string[] = [];
-  for (const id of ids) {
-    await db.transaction(async (tx) => {
-      const [c] = await tx.select().from(coverAssignment).where(eq(coverAssignment.id, id)).for('update');
-      if (!c || c.status !== 'assigned' || !c.coverTeacherId) return;
-      const [t] = await tx.select().from(teacher).where(eq(teacher.id, c.coverTeacherId)).for('update');
-      const held = await lessonOnDate(c.lessonId, c.date);
-      let reasons: string[];
-      if (!held) reasons = ['the lesson is not held that day'];
-      else {
-        const lessonPeriods = held.day.periods.filter((p) => p.kind === 'lesson');
-        const periods = Array.from({ length: held.lesson.length }, (_, k) => held.lesson.period! + k).filter((p) => p <= lessonPeriods.length);
-        const [term] = held.day.term ? await tx.select({ startsOn: academicTerm.startsOn }).from(academicTerm).where(eq(academicTerm.id, held.day.term.id)) : [];
-        const judged = await judgeCandidate(t!.id, t!.name, c.date, periods, held.lesson.weekday!, held.group.academicYearId, null, null, term?.startsOn ?? c.date, tx, c.lessonId);
-        reasons = judged.reasons.filter((r) => !r.startsWith('does not teach'));
-      }
-      if (!reasons.length) return;
-      await tx.update(coverAssignment).set({
-        status: 'removed', removal: 'timetable_changed', removeReason: `${versionName}: ${t?.name ?? 'the cover teacher'} ${reasons.join('; ')}`, removedAt: new Date(), removedBy: actorId,
-      }).where(eq(coverAssignment.id, id));
-      lost.push(id);
-    });
+  for (const c of rows) {
+    if (c.status === 'removed') continue;
+    const reasons = await whyCoverNoLongerHolds(tx, c);
+    if (!reasons.length) continue;
+    const removeReason = `${cause}: ${reasons.join('; ')}`;
+    await tx.update(coverAssignment).set({ status: 'removed', removal: 'no_longer_holds', removeReason, removedAt: new Date(), removedBy: actorId })
+      .where(eq(coverAssignment.id, c.id));
+    await logAction(actorId, 'COVER_REMOVED', 'cover_assignment', c.id, { status: c.status, coverTeacherId: c.coverTeacherId },
+      { status: 'removed', removal: 'no_longer_holds', reason: removeReason }, ctx, tx);
+    lost.push(c.id);
   }
   return lost;
 }
 
+async function whyCoverNoLongerHolds(tx: Tx, c: typeof coverAssignment.$inferSelect): Promise<string[]> {
+  const held = await lessonOnDate(c.lessonId, c.date, tx);
+  if (!held) return ['the lesson is not held that day'];
+  const lessonPeriods = held.day.periods.filter((p) => p.kind === 'lesson');
+  const periods = Array.from({ length: held.lesson.length }, (_, k) => held.lesson.period! + k).filter((p) => p <= lessonPeriods.length);
+  const reasons: string[] = [];
+  const ownerId = held.teacherId;
+  if (ownerId) {
+    const away = await tx.select().from(teacherAbsence)
+      .where(and(eq(teacherAbsence.teacherId, ownerId), isNull(teacherAbsence.cancelledAt), lte(teacherAbsence.startsOn, c.date), gte(teacherAbsence.endsOn, c.date)));
+    if (!away.some((a) => !a.periods || a.periods.some((p) => periods.includes(p)))) {
+      const [o] = await tx.select({ name: teacher.name }).from(teacher).where(eq(teacher.id, ownerId));
+      reasons.push(`its teacher that day, ${o?.name ?? 'the teacher'}, is not recorded as away then`);
+    }
+  }
+  if (c.status === 'assigned' && c.coverTeacherId) {
+    const [t] = await tx.select({ id: teacher.id, name: teacher.name }).from(teacher).where(eq(teacher.id, c.coverTeacherId));
+    if (c.coverTeacherId === ownerId) reasons.push(`${t?.name ?? 'The cover teacher'} is now the lesson's own teacher`);
+    else if (t) {
+      const [term] = held.day.term ? await tx.select({ startsOn: academicTerm.startsOn }).from(academicTerm).where(eq(academicTerm.id, held.day.term.id)) : [];
+      const judged = await judgeCandidate(t.id, t.name, c.date, periods, held.lesson.weekday!, held.group.academicYearId, null, null, term?.startsOn ?? c.date, tx, c.lessonId);
+      const blocking = judged.reasons.filter((r) => !r.startsWith('does not teach'));
+      if (blocking.length) reasons.push(`${t.name} ${blocking.join('; ')}`);
+    }
+  }
+  return reasons;
+}
+
+/**
+ * The live arrangements from a day on that a change of who teaches may break:
+ * those on these groups' lessons, and those these teachers give.
+ */
+export async function liveCoversFrom(tx: Tx, opts: { groupIds?: string[]; teacherIds?: string[]; from: string }): Promise<string[]> {
+  const groupIds = [...new Set(opts.groupIds ?? [])];
+  const teacherIds = [...new Set(opts.teacherIds ?? [])];
+  if (!groupIds.length && !teacherIds.length) return [];
+  const rows = await tx.select({ id: coverAssignment.id }).from(coverAssignment).where(and(
+    ne(coverAssignment.status, 'removed'), gte(coverAssignment.date, opts.from),
+    groupIds.length && teacherIds.length
+      ? sql`(${inArray(coverAssignment.groupId, groupIds)} OR ${inArray(coverAssignment.coverTeacherId, teacherIds)})`
+      : groupIds.length ? inArray(coverAssignment.groupId, groupIds) : inArray(coverAssignment.coverTeacherId, teacherIds),
+  ));
+  return rows.map((r) => r.id);
+}
+
 // ─── Telling people an arrangement is gone ───────────────────────────────────
 
-type Removal = 'by_hand' | 'absence_withdrawn' | 'cover_teacher_away' | 'timetable_changed';
+type Removal = 'by_hand' | 'absence_withdrawn' | 'cover_teacher_away' | 'timetable_changed' | 'no_longer_holds';
 
 /** The removed arrangements, as the screens list them. */
 export async function describeCovers(ids: string[]) {
@@ -379,6 +424,7 @@ export async function coverChangeNotices(ids: string[], removal: Removal, extra?
       const why = removal === 'absence_withdrawn' ? `${r.originalName ?? 'Its teacher'} is not away after all`
         : removal === 'cover_teacher_away' ? 'you are recorded as away then'
         : removal === 'timetable_changed' ? `the timetable changes from ${readableDate(extra?.effectiveFrom ?? r.c.date)}`
+        : removal === 'no_longer_holds' ? (r.c.removeReason ?? 'it no longer holds')
         : 'the arrangement was changed';
       await createBulkNotifications([r.coverUserId], 'COVER_CHANGED', `No longer covering ${r.groupName}`, `You no longer cover ${r.groupName} on ${when}: ${why}.`, { date: r.c.date, link: '/today' });
     }
@@ -387,6 +433,7 @@ export async function coverChangeNotices(ids: string[], removal: Removal, extra?
     const body = removal === 'absence_withdrawn' ? `${r.groupName} on ${when} takes place with ${r.originalName ?? 'its own teacher'} after all.`
       : removal === 'cover_teacher_away' ? `${r.groupName} on ${when}: ${r.coverName ?? 'the cover teacher'} cannot take it after all; new cover is being arranged.`
       : removal === 'timetable_changed' ? `${r.groupName} on ${when}: the timetable changes from ${readableDate(extra?.effectiveFrom ?? r.c.date)}, so the arrangement made for this lesson no longer applies. Look at your timetable for that day.`
+      : removal === 'no_longer_holds' ? `${r.groupName} on ${when}: the arrangement made for this lesson no longer applies. Look at your timetable for that day.`
       : `${r.groupName} on ${when}: the arrangement made for this lesson was changed. Look at your timetable for that day.`;
     await createBulkNotifications(students, 'COVER_CHANGED', `${r.groupName}: cover changed`, body, { date: r.c.date, link: '/my-timetable' });
   }

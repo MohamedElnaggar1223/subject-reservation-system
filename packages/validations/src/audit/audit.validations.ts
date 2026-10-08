@@ -336,6 +336,8 @@ export const AUDIT_ACTIONS = [
   'TEACHING_GROUP_SPLIT',
   'TEACHING_GROUPS_MERGED',
   'TEACHING_GROUP_ARCHIVED',
+  // F1 on the rework's model: "no preference" lines given their teacher from Teaching groups
+  'TEACHING_GROUP_TEACHER_ASSIGNED',
   'SCHEDULE_RULES_SET',
   'TIMETABLE_CREATED',
   'TIMETABLE_UPDATED',
@@ -569,6 +571,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   TEACHING_GROUP_SPLIT:       'Teaching Group Split',
   TEACHING_GROUPS_MERGED:     'Teaching Groups Merged',
   TEACHING_GROUP_ARCHIVED:    'Teaching Group Retired',
+  TEACHING_GROUP_TEACHER_ASSIGNED: 'Teacher Assigned to Students',
   SCHEDULE_RULES_SET:         'Timetable Rules Set',
   TIMETABLE_CREATED:          'Timetable Draft Created',
   TIMETABLE_UPDATED:          'Timetable Renamed',

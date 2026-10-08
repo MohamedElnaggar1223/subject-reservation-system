@@ -13,6 +13,11 @@ const Period = z.number().int().min(1).max(20);
 const Reason = z.string().trim().min(3, 'Give a reason (a few words)').max(500);
 const GroupName = z.string().trim().min(1, 'Name the group').max(120);
 
+/** How a group is taught (the offer teacher's mode, RESERVATIONS_REWORK.md §3.2): online takes no room. */
+export const GROUP_DELIVERIES = ['in_school', 'online'] as const;
+export const GroupDeliverySchema = z.enum(GROUP_DELIVERIES);
+export type GroupDelivery = z.infer<typeof GroupDeliverySchema>;
+
 // ─── Teaching groups ─────────────────────────────────────────────────────────
 
 export const YearQuery = z.object({ academicYearId: Id });
@@ -64,7 +69,10 @@ export const CreateGroup = z
     academicYearId: Id,
     name: GroupName,
     subjectId: Id.nullable().optional(),
+    /** The unit taught (a group per unit, as the enrolments per unit are); needs the subject. */
+    unitId: Id.nullable().optional(),
     teacherId: Id.nullable().optional(),
+    delivery: GroupDeliverySchema.optional(),
     studentIds: z.array(Id).max(500).optional(),
     startsOn: DateOnlySchema.optional(),
     ...RoomNeeds,
@@ -84,9 +92,27 @@ export const UpdateGroup = z.object({
   clashToken: z.string().max(32).nullable().optional(),
   weeklyPeriods: z.number().int().min(0).max(30).optional(),
   doublePeriods: z.number().int().min(0).max(15).optional(),
+  /** Online: timetabled without a room (its room needs are cleared). */
+  delivery: GroupDeliverySchema.optional(),
   ...RoomNeeds,
 });
 export type UpdateGroupType = z.infer<typeof UpdateGroup>;
+
+/**
+ * "No preference" assigned later (RESERVATIONS_REWORK.md §3.5, §10): the
+ * coordinator gives these students of a subject (or unit) a teacher; each of
+ * their live in-school lines with no teacher entering it this year takes the
+ * teacher by the line's own rules, and the enrolment and the group follow.
+ */
+export const AssignGroupTeacher = z.object({
+  academicYearId: Id,
+  subjectId: Id,
+  unitId: Id.nullable().optional(),
+  studentIds: z.array(Id).min(1, 'Choose at least one student').max(500),
+  teacherId: Id,
+  reason: Reason,
+});
+export type AssignGroupTeacherType = z.infer<typeof AssignGroupTeacher>;
 
 export const AddGroupMembers = z.object({
   studentIds: z.array(Id).min(1, 'Choose at least one student').max(500),
@@ -202,10 +228,6 @@ export const PublishTimetable = z.object({
   note: z.string().max(500).nullable().optional(),
   /** Publish although some lessons are not on the grid (they are not taught until a later version places them). */
   acceptUnplaced: z.boolean().optional(),
-  /** Publish although a teacher changed during the version's time would teach two of its lessons at once (recorded). */
-  anyway: z.boolean().optional(),
-  /** The confirmation code of the clashes shown (from the refusal): going ahead covers exactly those. */
-  clashToken: z.string().max(32).nullable().optional(),
 });
 export type PublishTimetableType = z.infer<typeof PublishTimetable>;
 

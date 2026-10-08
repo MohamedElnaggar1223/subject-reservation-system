@@ -107,6 +107,10 @@ export function canonicalInput(input: EngineInput): string {
     dayRules: [...input.dayRules].map((r) => [r.a, r.b].sort().join('|')).sort(),
     roomsRequired: input.roomsRequired,
     studentPeriods: input.studentPeriods ? Object.entries(input.studentPeriods).sort((a, b) => a[0].localeCompare(b[0])) : null,
+    // Only when there are any, so an input without dated teacher changes hashes as before.
+    ...(input.teacherOverlaps?.length
+      ? { teacherOverlaps: input.teacherOverlaps.map((o) => `${[o.a, o.b].sort().join('|')}|${o.teacherId}|${o.from}`).sort() }
+      : {}),
   });
 }
 
@@ -188,6 +192,18 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     overlapCount.get(b)!.set(a, o.students);
   }
   const conflictsOf: Int32Array[] = groups.map((_, i) => Int32Array.from([...(overlapCount.get(i)?.keys() ?? [])].sort((a, b) => a - b)));
+  // Groups a dated change of teacher gives one teacher on a later day: never at the same time either.
+  const teacherConflict = new Map<number, Set<number>>();
+  for (const o of input.teacherOverlaps ?? []) {
+    const a = gi.get(o.a);
+    const b = gi.get(o.b);
+    if (a === undefined || b === undefined || a === b) continue;
+    if (!teacherConflict.has(a)) teacherConflict.set(a, new Set());
+    if (!teacherConflict.has(b)) teacherConflict.set(b, new Set());
+    teacherConflict.get(a)!.add(b);
+    teacherConflict.get(b)!.add(a);
+  }
+  const teacherConflictsOf: Int32Array[] = groups.map((_, i) => Int32Array.from([...(teacherConflict.get(i) ?? [])].sort((a, b) => a - b)));
   const sameDayOf: Int32Array[] = groups.map(() => new Int32Array(0));
   const selfSameDay = new Uint8Array(G);
   {
@@ -224,6 +240,7 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     && g.roomFeatures.every((f) => r.features.includes(f))
     && (r.capacity === null || g.size <= r.capacity);
   const roomsOf: number[][] = groups.map((g) => {
+    if (g.noRoom) return [];
     const order = compareRoomsFor(g);
     return rooms
       .map((r, i) => ({ r, i }))
@@ -231,7 +248,8 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
       .sort((a, b) => order(a.r, b.r))
       .map(({ i }) => i);
   });
-  const needsRoom = input.roomsRequired;
+  // An online group takes no room (it is timetabled all the same).
+  const needsRoomOf = groups.map((g) => input.roomsRequired && !g.noRoom);
 
   // Lesson facts.
   const lGroup = new Int32Array(L);
@@ -360,7 +378,7 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     for (const r of roomsOf[g]!) {
       if (cs.every((c) => roomAt[r * C + c] === 0 && roomOff[r * C + c] === 0)) return r;
     }
-    return needsRoom ? -1 : -2;
+    return needsRoomOf[g] ? -1 : -2;
   };
 
   /** Why a lesson (not placed) cannot start at a cell, or null with the room it would take. */
@@ -379,6 +397,9 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
       }
       if (teacherDayLoad[t * D + d]! + len > maxDay[t]!) return { why: { k: 'day_limit' }, room: -1 };
       if (teacherWeekLoad[t]! + len > maxWeek[t]!) return { why: { k: 'week_limit' }, room: -1 };
+    }
+    for (const c of cs) for (const h of teacherConflictsOf[g]!) if (groupAt[h * C + c]! > 0) {
+      return { why: { k: 'teacher_busy', other: cellLessons[c]!.find((o) => lGroup[o] === h)! }, room: -1 };
     }
     for (const c of cs) {
       if (groupAt[g * C + c]! > 0) return { why: { k: 'students_busy', other: cellLessons[c]!.find((o) => lGroup[o] === g)! }, room: -1 };
@@ -424,7 +445,7 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
   const staticOptions = new Int32Array(L);
   const degree = new Int32Array(G);
   for (let g = 0; g < G; g++) {
-    let n = conflictsOf[g]!.length;
+    let n = conflictsOf[g]!.length + teacherConflictsOf[g]!.length;
     if (groupTeacher[g]! >= 0) n += groups.filter((_, h) => h !== g && groupTeacher[h] === groupTeacher[g]).length;
     degree[g] = n;
   }
@@ -436,7 +457,7 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
       if (!shapeOk(lLen[l]!, s)) continue;
       const cs = cellsOf(lLen[l]!, s);
       if (t >= 0 && cs.some((c) => teacherOff[t * C + c])) continue;
-      if (needsRoom && !roomsOf[g]!.some((r) => cs.every((c) => roomOff[r * C + c] === 0))) continue;
+      if (needsRoomOf[g] && !roomsOf[g]!.some((r) => cs.every((c) => roomOff[r * C + c] === 0))) continue;
       n++;
     }
     staticOptions[l] = n;
@@ -482,7 +503,7 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
       const blockers = new Set<number>();
       for (const c of cs) for (const o of cellLessons[c]!) {
         const og = lGroup[o]!;
-        if ((t >= 0 && groupTeacher[og] === t) || og === g || (overlapCount.get(g)?.has(og) ?? false)) blockers.add(o);
+        if ((t >= 0 && groupTeacher[og] === t) || og === g || (overlapCount.get(g)?.has(og) ?? false) || (teacherConflict.get(g)?.has(og) ?? false)) blockers.add(o);
       }
       const d = Math.floor(s / P);
       if (selfSameDay[g]) for (const o of lessonsOfGroupOnDay(g, d)) blockers.add(o);
@@ -627,7 +648,7 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     // What no slot could fix.
     if (!starts.length) reasons.push('The bell schedule has no lesson periods on the school days');
     if (lLen[l] === 2 && !starts.some((s) => shapeOk(2, s))) reasons.push('A double needs two lesson periods in a row with no break between them, and the bell schedule has none');
-    if (needsRoom && roomsOf[g]!.length === 0) {
+    if (needsRoomOf[g] && roomsOf[g]!.length === 0) {
       const need = [grp.roomType ? roomTypeWords(grp.roomType) : 'a room', ...grp.roomFeatures.map(featureWords)].join(' with ');
       reasons.push(grp.roomId
         ? `${grp.name} is always in ${input.rooms.find((r) => r.id === grp.roomId)?.name ?? 'its room'}, which does not suit it (out of use, too small or missing what it needs)`
@@ -667,7 +688,7 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     const of = (k: string) => `${n(k)} of the ${starts.length} periods`;
     const sentences: [string, number][] = [];
     if (n('teacher_off')) sentences.push([`${tName} is unavailable at ${of('teacher_off')}`, n('teacher_off')]);
-    if (n('teacher_busy')) sentences.push([`${tName} already teaches at ${of('teacher_busy')}: ${top('teacher_busy')}`, n('teacher_busy')]);
+    if (n('teacher_busy')) sentences.push([`${tName ?? 'Its teacher'} already teaches at ${of('teacher_busy')}: ${top('teacher_busy')}`, n('teacher_busy')]);
     if (n('students_busy')) sentences.push([`its students have another lesson at ${of('students_busy')}: ${top('students_busy')}`, n('students_busy')]);
     if (n('same_day')) sentences.push([`a rule keeps it off the day at ${of('same_day')}: ${top('same_day')}`, n('same_day')]);
     if (n('day_limit')) sentences.push([`${tName} would pass their periods per day at ${of('day_limit')}`, n('day_limit')]);

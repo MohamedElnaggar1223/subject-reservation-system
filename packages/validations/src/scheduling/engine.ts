@@ -15,11 +15,14 @@
  * between (`joinsNext`). On a day that runs on another bell schedule (a short
  * day) the nth lesson period of that schedule stands for period n.
  *
- * Hard rules (a clash): a teacher in two places; students in two lessons at
+ * Hard rules (a clash): a teacher in two places — the teacher of the
+ * version's first day, or one a dated change of teacher gives two groups on a
+ * later day (`teacherOverlaps`); students in two lessons at
  * once — groups overlap by student, not by section; a room holding two
  * lessons; a teacher or room unavailable; a teacher over their periods per day
  * or per week; a room of the wrong type, missing a feature, too small, out of
- * use or not the group's fixed room; no room when the school has rooms; two
+ * use or not the group's fixed room; no room when the school has rooms (an
+ * online group takes none, and no room rule applies to it); two
  * lessons a rule keeps off the same day; a period that does not exist or a
  * double split by a break.
  */
@@ -52,6 +55,12 @@ export type EngineGroup = {
   roomId: string | null;
   /** Tried first when choosing a room (a section's homeroom). */
   preferredRoomId: string | null;
+  /**
+   * Taught online (the offer teacher's mode, RESERVATIONS_REWORK.md §3.2): its
+   * lessons are timetabled — its students and teacher are busy then — but take
+   * no room, so no room rule applies to it. Absent: it needs a room as any.
+   */
+  noRoom?: boolean;
 };
 
 export type EngineLesson = {
@@ -76,6 +85,14 @@ export type EngineUnavailable = { teacherId: string | null; roomId: string | nul
 /** Two groups that share students on some day of the term: never at the same time. */
 export type EngineOverlap = { a: string; b: string; students: number };
 
+/**
+ * Two groups one teacher teaches on a common day of the version's time though
+ * not both from its first day (a group's teacher is dated: a change of teacher
+ * later in the term). From `from`, the first such day, their lessons are never
+ * at the same time — the teacher's side of what `overlaps` is for students.
+ */
+export type EngineTeacherOverlap = { a: string; b: string; teacherId: string; from: string };
+
 /** Lessons of these groups never fall on the same day (a = b: the group's own lessons). */
 export type EngineDayRule = { a: string; b: string };
 
@@ -87,6 +104,8 @@ export type EngineInput = {
   teachers: EngineTeacher[];
   unavailable: EngineUnavailable[];
   overlaps: EngineOverlap[];
+  /** Pairs of groups a dated change of teacher gives one teacher (see the type). */
+  teacherOverlaps?: EngineTeacherOverlap[];
   dayRules: EngineDayRule[];
   /** The school has rooms in use, so every placed lesson needs one. */
   roomsRequired: boolean;
@@ -185,6 +204,7 @@ type Index = {
   lesson: Map<string, EngineLesson>;
   day: Map<number, GridDay>;
   overlap: Map<string, Map<string, number>>;
+  teacherOverlap: Map<string, Map<string, EngineTeacherOverlap>>;
   dayRulesOf: Map<string, Set<string>>;
   teacherOff: Set<string>;
   roomOff: Set<string>;
@@ -202,6 +222,18 @@ function indexOf(input: EngineInput): Index {
     if (o.a === o.b) continue;
     link(o.a, o.b, o.students);
     link(o.b, o.a, o.students);
+  }
+  // The earliest shared day wins when one pair shares two teachers.
+  const teacherOverlap = new Map<string, Map<string, EngineTeacherOverlap>>();
+  const tlink = (a: string, b: string, o: EngineTeacherOverlap) => {
+    if (!teacherOverlap.has(a)) teacherOverlap.set(a, new Map());
+    const prev = teacherOverlap.get(a)!.get(b);
+    if (!prev || o.from < prev.from || (o.from === prev.from && o.teacherId < prev.teacherId)) teacherOverlap.get(a)!.set(b, o);
+  };
+  for (const o of input.teacherOverlaps ?? []) {
+    if (o.a === o.b) continue;
+    tlink(o.a, o.b, o);
+    tlink(o.b, o.a, o);
   }
   const dayRulesOf = new Map<string, Set<string>>();
   for (const r of input.dayRules) {
@@ -224,6 +256,7 @@ function indexOf(input: EngineInput): Index {
     lesson: new Map(input.lessons.map((l) => [l.id, l])),
     day: new Map(input.days.map((d) => [d.weekday, d])),
     overlap,
+    teacherOverlap,
     dayRulesOf,
     teacherOff,
     roomOff,
@@ -246,6 +279,27 @@ function periodsAt(ix: Index, length: number, weekday: number, period: number): 
 }
 
 const teacherName = (ix: Index, id: string | null) => (id ? ix.teacher.get(id)?.name ?? 'The teacher' : 'The teacher');
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] as const;
+/** "12 November 2051" for a YYYY-MM-DD date (the engine knows no clock or locale). */
+export const dayMonthYear = (date: string) => {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  return `${d} ${MONTH_NAMES[m - 1] ?? m} ${y}`;
+};
+
+/**
+ * The teacher two groups' lessons at one time would put in two places: the
+ * one both have from the version's first day, else one a dated change of
+ * teacher gives both (with the day it starts).
+ */
+function sharedTeacher(ix: Index, a: EngineGroup, b: EngineGroup): { teacherId: string; from: string | null } | null {
+  if (a.teacherId && a.teacherId === b.teacherId) return { teacherId: a.teacherId, from: null };
+  const dated = ix.teacherOverlap.get(a.id)?.get(b.id);
+  return dated ? { teacherId: dated.teacherId, from: dated.from } : null;
+}
+
+function teacherBusyMessage(ix: Index, shared: { teacherId: string; from: string | null }, a: EngineGroup, b: EngineGroup, where: string) {
+  return `${teacherName(ix, shared.teacherId)} teaches ${a.name} and ${b.name} at ${where}${shared.from ? ` from ${dayMonthYear(shared.from)}` : ''}`;
+}
 const groupName = (ix: Index, id: string) => ix.group.get(id)?.name ?? 'another group';
 const roomName = (ix: Index, id: string | null) => (id ? ix.room.get(id)?.name ?? 'the room' : 'the room');
 const ROOM_TYPE_WORDS: Record<string, string> = {
@@ -306,6 +360,7 @@ export function compareRoomsFor(g: EngineGroup) {
 }
 
 function suitableRoomsIx(ix: Index, g: EngineGroup): EngineRoom[] {
+  if (g.noRoom) return [];
   return ix.input.rooms.filter((r) => roomMisfit(ix, g, r) === null).sort(compareRoomsFor(g));
 }
 
@@ -354,7 +409,9 @@ export function evaluate(input: EngineInput): { clashes: Clash[]; unplaced: stri
     if (g.teacherId && p.periods.some((q) => isOff(ix.teacherOff, g.teacherId!, p.weekday, q))) {
       clashes.push({ kind: 'teacher_unavailable', lessonIds: [l.id], weekday: p.weekday, period: p.periods[0]!, message: `${teacherName(ix, g.teacherId)} is unavailable at ${where} (${g.name})` });
     }
-    if (l.roomId) {
+    if (g.noRoom) {
+      // Online: no room rule applies (a room left on its lesson is not used).
+    } else if (l.roomId) {
       const r = ix.room.get(l.roomId);
       if (r) {
         const misfit = roomMisfit(ix, g, r);
@@ -385,9 +442,10 @@ export function evaluate(input: EngineInput): { clashes: Clash[]; unplaced: stri
       const b = here[j]!;
       const pairKey = (kind: string) => `${kind}|${[a.lesson.id, b.lesson.id].sort().join('|')}`;
       const where = slotName(input.days, wd, per);
-      if (a.group.teacherId && a.group.teacherId === b.group.teacherId && !seen.has(pairKey('t'))) {
+      const teacherShared = sharedTeacher(ix, a.group, b.group);
+      if (teacherShared && !seen.has(pairKey('t'))) {
         seen.add(pairKey('t'));
-        clashes.push({ kind: 'teacher_busy', lessonIds: [a.lesson.id, b.lesson.id], weekday: wd, period: per, message: `${teacherName(ix, a.group.teacherId)} teaches ${a.group.name} and ${b.group.name} at ${where}` });
+        clashes.push({ kind: 'teacher_busy', lessonIds: [a.lesson.id, b.lesson.id], weekday: wd, period: per, message: teacherBusyMessage(ix, teacherShared, a.group, b.group, where) });
       }
       const shared = a.group.id === b.group.id ? a.group.size : ix.overlap.get(a.group.id)?.get(b.group.id);
       if (shared && !seen.has(pairKey('s'))) {
@@ -399,7 +457,7 @@ export function evaluate(input: EngineInput): { clashes: Clash[]; unplaced: stri
             : `${shared} ${shared === 1 ? 'student is' : 'students are'} in both ${a.group.name} and ${b.group.name} at ${where}`,
         });
       }
-      if (a.lesson.roomId && a.lesson.roomId === b.lesson.roomId && !seen.has(pairKey('r'))) {
+      if (a.lesson.roomId && a.lesson.roomId === b.lesson.roomId && !a.group.noRoom && !b.group.noRoom && !seen.has(pairKey('r'))) {
         seen.add(pairKey('r'));
         clashes.push({ kind: 'room_busy', lessonIds: [a.lesson.id, b.lesson.id], weekday: wd, period: per, message: `${roomName(ix, a.lesson.roomId)} holds ${a.group.name} and ${b.group.name} at ${where}` });
       }
@@ -543,7 +601,9 @@ function judgeAt(ix: Index, base: EngineLesson, weekday: number, period: number,
   if (g.teacherId && at.periods.some((q) => isOff(ix.teacherOff, g.teacherId!, weekday, q))) {
     reasons.push({ kind: 'teacher_unavailable', lessonIds: [l.id], weekday, period: at.periods[0]!, message: `${teacherName(ix, g.teacherId)} is unavailable at ${where} (${g.name})` });
   }
-  if (l.roomId) {
+  if (g.noRoom) {
+    // Online: no room rule applies.
+  } else if (l.roomId) {
     const r = ix.room.get(l.roomId);
     if (r) {
       const misfit = roomMisfit(ix, g, r);
@@ -566,8 +626,9 @@ function judgeAt(ix: Index, base: EngineLesson, weekday: number, period: number,
     const cell = Math.min(...common);
     const [a, b] = order(me.lesson, o.lesson) <= 0 ? [me, o] : [o, me];
     const w = slotName(days, weekday, cell);
-    if (g.teacherId && g.teacherId === o.group.teacherId) {
-      pairs.push({ cell, at: oi, kindRank: 0, clash: { kind: 'teacher_busy', lessonIds: [a.lesson.id, b.lesson.id], weekday, period: cell, message: `${teacherName(ix, g.teacherId)} teaches ${a.group.name} and ${b.group.name} at ${w}` } });
+    const teacherShared = sharedTeacher(ix, a.group, b.group);
+    if (teacherShared) {
+      pairs.push({ cell, at: oi, kindRank: 0, clash: { kind: 'teacher_busy', lessonIds: [a.lesson.id, b.lesson.id], weekday, period: cell, message: teacherBusyMessage(ix, teacherShared, a.group, b.group, w) } });
     }
     const shared = g.id === o.group.id ? g.size : ix.overlap.get(g.id)?.get(o.group.id);
     if (shared) {
@@ -578,7 +639,7 @@ function judgeAt(ix: Index, base: EngineLesson, weekday: number, period: number,
         },
       });
     }
-    if (l.roomId && l.roomId === o.lesson.roomId) {
+    if (l.roomId && l.roomId === o.lesson.roomId && !g.noRoom && !o.group.noRoom) {
       pairs.push({ cell, at: oi, kindRank: 2, clash: { kind: 'room_busy', lessonIds: [a.lesson.id, b.lesson.id], weekday, period: cell, message: `${roomName(ix, l.roomId)} holds ${a.group.name} and ${b.group.name} at ${w}` } });
     }
   }
@@ -615,6 +676,7 @@ function judgeAt(ix: Index, base: EngineLesson, weekday: number, period: number,
 }
 
 function bestFreeRoom(ix: Index, l: EngineLesson, g: EngineGroup, weekday: number, period: number): string | null {
+  if (g.noRoom) return null;
   const at = periodsAt(ix, l.length, weekday, period);
   if ('problem' in at) return l.roomId;
   const busy = new Set<string>();

@@ -3244,7 +3244,15 @@ export const teachingGroup = pgTable(
     // teaches outside the exam catalogue (a national subject, PE). Fixed once
     // the group exists (members carry it: one open group per subject).
     subjectId: text("subject_id").references(() => subject.id, { onDelete: "restrict" }),
+    // The unit taught, when the enrolments it comes from are per unit (the
+    // reservations rework, §3.2 and §10: a Pearson IAL paper, its own teacher
+    // each); null for the subject as a whole. Fixed once the group exists.
+    unitId: text("unit_id").references(() => examUnit.id, { onDelete: "restrict" }),
     teacherId: text("teacher_id").references(() => teacher.id, { onDelete: "set null" }),
+    // 'in_school' | 'online' (the offer teacher's mode, §3.2): an online group
+    // is timetabled (its students and teacher are busy then) without a room.
+    // A group a provider teaches (teacher.kind 'provider') has no lessons.
+    delivery: text("delivery").notNull().default("in_school"),
     // 'enrolment' (formed from the course enrolment), 'section' (a homeroom
     // section taught together: its students are the section's on each date),
     // 'manual' (made by hand, or by a split).
@@ -3278,6 +3286,12 @@ export const teachingGroup = pgTable(
     check("teaching_group_kind_valid", sql`${table.kind} IN ('enrolment', 'section', 'manual')`),
     check("teaching_group_section_kind", sql`(${table.kind} = 'section') = (${table.sectionId} IS NOT NULL)`),
     check("teaching_group_periods", sql`${table.weeklyPeriods} BETWEEN 0 AND 30 AND ${table.doublePeriods} >= 0 AND ${table.doublePeriods} * 2 <= ${table.weeklyPeriods}`),
+    index("teachingGroup_unitId_idx").on(table.unitId),
+    check("teaching_group_delivery_valid", sql`${table.delivery} IN ('in_school', 'online')`),
+    // A unit belongs to a subject's teaching; a section's group teaches no unit.
+    check("teaching_group_unit_has_subject", sql`${table.unitId} IS NULL OR (${table.subjectId} IS NOT NULL AND ${table.kind} <> 'section')`),
+    // An online group has no room to need.
+    check("teaching_group_online_no_room", sql`${table.delivery} <> 'online' OR (${table.roomId} IS NULL AND ${table.roomType} IS NULL)`),
   ]
 );
 
@@ -3288,9 +3302,11 @@ export const teachingGroupMember = pgTable(
     groupId: text("group_id").notNull().references(() => teachingGroup.id, { onDelete: "restrict" }),
     studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
     academicYearId: text("academic_year_id").notNull().references(() => academicYear.id, { onDelete: "restrict" }),
-    // The group's subject, kept here so the database holds the rule: one open
-    // group per student per subject and year.
+    // The group's subject and unit, kept here so the database holds the rule:
+    // one open group per student and unit a year when the unit is set, per
+    // student and subject when it is not (the enrolment's two keys, §10).
     subjectId: text("subject_id").references(() => subject.id, { onDelete: "restrict" }),
+    unitId: text("unit_id").references(() => examUnit.id, { onDelete: "restrict" }),
     // The enrolment it came from (formed or refreshed from the course enrolment).
     enrolmentId: text("enrolment_id").references(() => courseEnrolment.id, { onDelete: "set null" }),
     startedOn: date("started_on", { mode: "string" }).notNull(),
@@ -3309,8 +3325,12 @@ export const teachingGroupMember = pgTable(
     uniqueIndex("teachingGroupMember_one_open_idx").on(table.groupId, table.studentId).where(sql`ended_on IS NULL`),
     uniqueIndex("teachingGroupMember_one_subject_idx")
       .on(table.studentId, table.subjectId, table.academicYearId)
-      .where(sql`ended_on IS NULL AND subject_id IS NOT NULL`),
+      .where(sql`ended_on IS NULL AND subject_id IS NOT NULL AND unit_id IS NULL`),
+    uniqueIndex("teachingGroupMember_one_unit_idx")
+      .on(table.studentId, table.unitId, table.academicYearId)
+      .where(sql`ended_on IS NULL AND unit_id IS NOT NULL`),
     check("teaching_group_member_dates_ordered", sql`${table.endedOn} IS NULL OR ${table.endedOn} >= ${table.startedOn} - 1`),
+    check("teaching_group_member_unit_has_subject", sql`${table.unitId} IS NULL OR ${table.subjectId} IS NOT NULL`),
   ]
 );
 
@@ -3652,6 +3672,7 @@ export const publishedClash = pgTable(
 export const teachingGroupRelations = relations(teachingGroup, ({ one, many }) => ({
   academicYear: one(academicYear, { fields: [teachingGroup.academicYearId], references: [academicYear.id] }),
   subject: one(subject, { fields: [teachingGroup.subjectId], references: [subject.id] }),
+  unit: one(examUnit, { fields: [teachingGroup.unitId], references: [examUnit.id] }),
   teacher: one(teacher, { fields: [teachingGroup.teacherId], references: [teacher.id] }),
   section: one(section, { fields: [teachingGroup.sectionId], references: [section.id] }),
   room: one(room, { fields: [teachingGroup.roomId], references: [room.id] }),

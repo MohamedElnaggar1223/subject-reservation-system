@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   IdParam, YearQuery, FormGroups, CreateSectionGroups, CreateGroup, UpdateGroup, AddGroupMembers, EndGroupMembers, SplitGroup, MergeGroups,
-  ArchiveGroup, PutTeacherConstraints, PutRoomConstraints, CreateDayRule,
+  ArchiveGroup, PutTeacherConstraints, PutRoomConstraints, CreateDayRule, AssignGroupTeacher,
 } from '@repo/validations';
 import { z } from 'zod';
 import { success, error, clientMessage } from '../lib/response';
@@ -34,6 +34,28 @@ export const schedulingRoutes = new Hono<HonoEnv>()
       return success(c, await groups.listGroups(c.req.valid('query').academicYearId));
     } catch (err) {
       const f = fail(err, 'Failed to load the teaching groups');
+      return error(c, f.message, f.status);
+    }
+  })
+  /**
+   * GET /groups/waiting — who is not in the group their enrolment says (with the group a Move would
+   * take them to), groups whose every member is enrolled with another teacher, and the students with
+   * no teacher yet per subject or unit with the teachers their lines may take (RESERVATIONS_REWORK.md §10).
+   */
+  .get('/groups/waiting', zValidator('query', YearQuery), async (c) => {
+    try {
+      return success(c, await groups.groupsWaiting(c.req.valid('query').academicYearId));
+    } catch (err) {
+      const f = fail(err, 'Failed to load who waits for a group');
+      return error(c, f.message, f.status);
+    }
+  })
+  /** POST /groups/assign-teacher — "no preference" assigned: the students' lines take the teacher, their enrolments and groups follow. */
+  .post('/groups/assign-teacher', zValidator('json', AssignGroupTeacher), async (c) => {
+    try {
+      return success(c, await groups.assignGroupTeacher(c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
+    } catch (err) {
+      const f = fail(err, 'Failed to assign the teacher');
       return error(c, f.message, f.status);
     }
   })

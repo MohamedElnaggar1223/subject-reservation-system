@@ -16,12 +16,18 @@
  * version's lesson ids), so it is shown as still happening while any version
  * in force still has it.
  *
- * Publishing uses the same check for a group's teacher changed at a date
- * inside the version's time (the engine judges the teachers of its first day).
+ * A version being published judges its own dated teacher changes itself: the
+ * engine is given every teacher of its groups over its time
+ * (`teacherOverlaps`, timetable.services), so the grid, the generator and
+ * publishing refuse them as any clash.
  *
- * Concurrency: the teachers a change concerns are locked (in id order) before
- * anything is read, so two changes giving one teacher two lessons at once
- * cannot both pass; students are locked by the paths that move them.
+ * Concurrency (docs/features/SCHEDULING.md §17, the lock order): before
+ * anything is read, the check takes every term still running from the change's
+ * day FOR SHARE (a publication holds its term FOR UPDATE: a change and a
+ * publication run one after the other, and the second sees the first), then
+ * the teachers the change concerns FOR UPDATE in id order (two changes giving
+ * one teacher two lessons at once cannot both pass); students and groups are
+ * locked by the paths that move them, before this.
  */
 import {
   db, timetable, timetableLesson, teachingGroup, academicTerm, publishedClash, user, teacher,
@@ -31,7 +37,7 @@ import { randomUUID, createHash } from 'crypto';
 import { WEEKDAY_NAMES } from '@repo/validations';
 import {
   SchedulingError, addDays, minDate, maxDate, readableDate, groupMembersBetween, candidateGroupsOfStudent, groupsTaughtBetween,
-  groupTeachersBetween, type Executor, type Tx, type TeacherInterval,
+  type Executor, type Tx, type TeacherInterval,
 } from './scheduling-shared.services';
 import { todayAtSchool } from '../lib/clock';
 
@@ -207,29 +213,6 @@ export async function publishedClashesFor(executor: Executor, persons: { student
   return sorted(found);
 }
 
-/**
- * The teacher clashes of one version's own lessons over its days: every
- * teacher who teaches its groups on some day then (a change of teacher dated
- * inside the version's time included), two of their lessons at one time.
- * Publishing checks it for the version being published; the editor lists it
- * for a draft.
- */
-export async function versionTeacherClashes(executor: Executor, version: { id: string; name: string }, from: string, to: string): Promise<ClashFound[]> {
-  if (to < from) return [];
-  const windows: Window[] = [{ id: version.id, name: version.name, from, to }];
-  const lessonsOf = await lessonsOfWindows(executor, windows);
-  const groupIds = [...new Set([...lessonsOf.values()].flat().map((l) => l.groupId))];
-  const taught = await withoutRetired(executor, (await groupTeachersBetween(groupIds, from, to, executor)).filter((x) => !!x.teacherId));
-  const teacherIds = [...new Set(taught.map((x) => x.teacherId!))];
-  const names = new Map(teacherIds.length ? (await executor.select({ id: teacher.id, name: teacher.name }).from(teacher).where(inArray(teacher.id, teacherIds))).map((t) => [t.id, t.name]) : []);
-  const found = new Map<string, ClashFound>();
-  for (const t of teacherIds) {
-    const mine = taught.filter((x) => x.teacherId === t);
-    for (let i = 0; i < mine.length; i++) for (let j = i + 1; j < mine.length; j++) judgePair(found, windows, lessonsOf, 'teacher_busy', t, names.get(t) ?? 'A teacher', mine[i]!, mine[j]!);
-  }
-  return sorted(found);
-}
-
 /** A short code for exactly these clashes: a confirmation carries it back, so it covers only what was shown. */
 export function clashConfirmation(clashes: ClashFound[]): string {
   return createHash('sha256').update(clashes.map((c) => c.key).sort().join('\n')).digest('hex').slice(0, 12);
@@ -261,11 +244,15 @@ export async function settleClashes(tx: Tx, fresh: ClashFound[], opts: GoAhead):
 }
 
 /**
- * Before a change: lock the teachers it concerns (in id order) and note the
- * clashes already there; `settle` after the change refuses or records what it
- * added. For changes whose body is not one function (the roll-over).
+ * Before a change: lock the running terms (shared) and the teachers it
+ * concerns (in id order), and note the clashes already there; `settle` after
+ * the change refuses or records what it added. For changes whose body is not
+ * one function (the roll-over, the enrolment's follow-up of a group).
  */
 export async function checkpointPublished(tx: Tx, persons: { studentIds?: string[]; teacherIds?: string[] }, from: string) {
+  // Every term still running from that day, shared: a publication of any of them (FOR UPDATE on its
+  // term) waits for this change, or this change waits for it and then judges the new version.
+  await tx.select({ id: academicTerm.id }).from(academicTerm).where(sql`${academicTerm.endsOn} >= ${from}`).orderBy(asc(academicTerm.id)).for('share');
   const teacherIds = [...new Set(persons.teacherIds ?? [])].sort();
   if (teacherIds.length) {
     await tx.select({ id: teacher.id }).from(teacher).where(inArray(teacher.id, teacherIds)).orderBy(asc(teacher.id)).for('update');

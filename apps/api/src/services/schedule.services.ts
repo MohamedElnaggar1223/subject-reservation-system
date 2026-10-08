@@ -40,7 +40,7 @@ import { logAction, type AuditContext } from './audit.services';
 import { gridOfYear } from './timetable.services';
 import {
   SchedulingError, addDays, maxDate, minDate, weekStartOf, cairoInstant, readableDate, groupMembersBetween, candidateGroupsOfStudent,
-  groupTeachersBetween, groupsTaughtBetween, teachersOn, type MemberInterval, type TeacherInterval,
+  groupTeachersBetween, groupsTaughtBetween, teachersOn, type MemberInterval, type TeacherInterval, type Executor,
 } from './scheduling-shared.services';
 import { todayAtSchool } from '../lib/clock';
 
@@ -57,11 +57,11 @@ type Person = SchedulePerson;
  * `from` to `to` (at most 400 days). The one reader every view, the cover
  * screen, the calendar feed, F2 and F3 go through.
  */
-export async function getScheduleRange(target: ScheduleTarget, from: string, to: string): Promise<DaySchedule[]> {
+export async function getScheduleRange(target: ScheduleTarget, from: string, to: string, executor: Executor = db): Promise<DaySchedule[]> {
   const days = await getSchoolDays(from, to);
   const termIds = [...new Set(days.map((d) => d.term?.id).filter((x): x is string => !!x))];
   const versions = termIds.length
-    ? await db.select().from(timetable).where(and(inArray(timetable.termId, termIds), eq(timetable.status, 'published')))
+    ? await executor.select().from(timetable).where(and(inArray(timetable.termId, termIds), eq(timetable.status, 'published')))
     : [];
   const versionOn = (termId: string | undefined, date: string) => versions
     .filter((v) => v.termId === termId && v.effectiveFrom! <= date)
@@ -75,25 +75,25 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
   let leavings: LeavingPeriod[] = [];
   let sectionStudentsOn: ((date: string) => Set<string>) | null = null;
   if ('studentId' in target) {
-    leavings = await leavingPeriodsOf([target.studentId]);
-    const candidates = await candidateGroupsOfStudent(target.studentId, from, to);
-    memberIntervals = (await groupMembersBetween(candidates, from, to)).filter((m) => m.studentId === target.studentId);
+    leavings = await leavingPeriodsOf([target.studentId], executor);
+    const candidates = await candidateGroupsOfStudent(target.studentId, from, to, executor);
+    memberIntervals = (await groupMembersBetween(candidates, from, to, executor)).filter((m) => m.studentId === target.studentId);
   } else if ('teacherId' in target) {
     coverTeacherId = target.teacherId;
-    taught = await groupsTaughtBetween(target.teacherId, from, to);
+    taught = await groupsTaughtBetween(target.teacherId, from, to, executor);
   } else if ('sectionId' in target) {
-    const [sec] = await db.select().from(section).where(eq(section.id, target.sectionId));
+    const [sec] = await executor.select().from(section).where(eq(section.id, target.sectionId));
     if (!sec) throw new SchedulingError('Section not found', 404);
-    const yearGroups = await db.select({ id: teachingGroup.id }).from(teachingGroup).where(eq(teachingGroup.academicYearId, sec.academicYearId));
-    memberIntervals = await groupMembersBetween(yearGroups.map((g) => g.id), from, to);
+    const yearGroups = await executor.select({ id: teachingGroup.id }).from(teachingGroup).where(eq(teachingGroup.academicYearId, sec.academicYearId));
+    memberIntervals = await groupMembersBetween(yearGroups.map((g) => g.id), from, to, executor);
     // The section's students on a date: F0a's single reading of "which section on a date".
-    const everIn = await db.selectDistinct({ studentId: sectionMembership.studentId }).from(sectionMembership).where(eq(sectionMembership.sectionId, sec.id));
-    const intervals = (await sectionsBetween(everIn.map((r) => r.studentId), from, to)).filter((i) => i.sectionId === sec.id);
+    const everIn = await executor.selectDistinct({ studentId: sectionMembership.studentId }).from(sectionMembership).where(eq(sectionMembership.sectionId, sec.id));
+    const intervals = (await sectionsBetween(everIn.map((r) => r.studentId), from, to, executor)).filter((i) => i.sectionId === sec.id);
     sectionStudentsOn = (date: string) => new Set(intervals.filter((i) => i.from <= date && i.to >= date).map((i) => i.studentId));
   }
 
   const lessons = usedVersionIds.length
-    ? await db.select({
+    ? await executor.select({
       l: timetableLesson, groupName: teachingGroup.name, archivedOn: teachingGroup.archivedOn,
       subjectId: subject.id, subjectName: subject.name, subjectCode: subject.code, roomName: room.name,
     }).from(timetableLesson)
@@ -104,7 +104,7 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
     : [];
   const lessonIds = lessons.map((x) => x.l.id);
   const covers = lessonIds.length || coverTeacherId
-    ? await db.select().from(coverAssignment).where(and(
+    ? await executor.select().from(coverAssignment).where(and(
       gte(coverAssignment.date, from), lte(coverAssignment.date, to), ne(coverAssignment.status, 'removed'),
       coverTeacherId
         ? or(inArray(coverAssignment.lessonId, lessonIds.concat('__none__')), eq(coverAssignment.coverTeacherId, coverTeacherId))
@@ -113,14 +113,14 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
     : [];
   // Arrangements lost because the cover teacher is away themselves: that lesson needs new cover.
   const lost = lessonIds.length
-    ? await db.select({ lessonId: coverAssignment.lessonId, date: coverAssignment.date }).from(coverAssignment).where(and(
+    ? await executor.select({ lessonId: coverAssignment.lessonId, date: coverAssignment.date }).from(coverAssignment).where(and(
       gte(coverAssignment.date, from), lte(coverAssignment.date, to), eq(coverAssignment.status, 'removed'),
       eq(coverAssignment.removal, 'cover_teacher_away'), inArray(coverAssignment.lessonId, lessonIds)))
     : [];
   // Lessons a teacher covers may belong to groups not loaded yet (their own version is loaded above).
   const extraIds = covers.map((c) => c.lessonId).filter((id) => !lessonIds.includes(id));
   if (extraIds.length) {
-    lessons.push(...await db.select({
+    lessons.push(...await executor.select({
       l: timetableLesson, groupName: teachingGroup.name, archivedOn: teachingGroup.archivedOn,
       subjectId: subject.id, subjectName: subject.name, subjectCode: subject.code, roomName: room.name,
     }).from(timetableLesson)
@@ -130,21 +130,21 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
       .where(inArray(timetableLesson.id, extraIds)));
   }
   // Who teaches each group on each date (a mid-term change of teacher does not rewrite earlier weeks).
-  const teaching = await groupTeachersBetween([...new Set(lessons.map((x) => x.l.groupId))], from, to);
+  const teaching = await groupTeachersBetween([...new Set(lessons.map((x) => x.l.groupId))], from, to, executor);
   const teacherOn = (groupId: string, date: string) => teaching.find((t) => t.groupId === groupId && t.from <= date && t.to >= date)?.teacherId ?? null;
   const teacherIds = [...new Set([
     ...teaching.map((t) => t.teacherId), ...covers.map((c) => c.coverTeacherId), ...covers.map((c) => c.originalTeacherId),
   ].filter((x): x is string => !!x))];
-  const teachers = new Map((teacherIds.length ? await db.select({ id: teacher.id, name: teacher.name }).from(teacher).where(inArray(teacher.id, teacherIds)) : []).map((t) => [t.id, t]));
+  const teachers = new Map((teacherIds.length ? await executor.select({ id: teacher.id, name: teacher.name }).from(teacher).where(inArray(teacher.id, teacherIds)) : []).map((t) => [t.id, t]));
   const absences = teacherIds.length
-    ? await db.select().from(teacherAbsence).where(and(inArray(teacherAbsence.teacherId, teacherIds), isNull(teacherAbsence.cancelledAt), lte(teacherAbsence.startsOn, to), gte(teacherAbsence.endsOn, from)))
+    ? await executor.select().from(teacherAbsence).where(and(inArray(teacherAbsence.teacherId, teacherIds), isNull(teacherAbsence.cancelledAt), lte(teacherAbsence.startsOn, to), gte(teacherAbsence.endsOn, from)))
     : [];
   const absent = (teacherId: string | null, date: string, periods: number[]) => !!teacherId && absences.some((a) =>
     a.teacherId === teacherId && a.startsOn <= date && a.endsOn >= date && (!a.periods || a.periods.some((p) => periods.includes(p))));
   // The weekdays the year's grid teaches on (an extra school day on another weekday has no lessons).
   const gridWeekdays = new Map<string, Set<number>>();
   for (const v of versions) {
-    if (!gridWeekdays.has(v.academicYearId)) gridWeekdays.set(v.academicYearId, new Set((await gridOfYear(v.academicYearId)).days.map((d) => d.weekday)));
+    if (!gridWeekdays.has(v.academicYearId)) gridWeekdays.set(v.academicYearId, new Set((await gridOfYear(v.academicYearId, executor)).days.map((d) => d.weekday)));
   }
 
   const out: DaySchedule[] = [];
@@ -224,9 +224,13 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
   return out;
 }
 
-/** One date's schedule — the contract F2 and F3 call. */
-export async function getScheduleFor(target: { studentId: string } | { teacherId: string }, date: string): Promise<DaySchedule> {
-  return (await getScheduleRange(target, date, date))[0]!;
+/**
+ * One date's schedule — the contract F2 and F3 call. `executor`: a transaction
+ * that has just changed the timetable (a version published, a teacher changed)
+ * reads it as it now stands (cover re-judged inside it, cover.services).
+ */
+export async function getScheduleFor(target: { studentId: string } | { teacherId: string }, date: string, executor: Executor = db): Promise<DaySchedule> {
+  return (await getScheduleRange(target, date, date, executor))[0]!;
 }
 
 // ─── Views ───────────────────────────────────────────────────────────────────
@@ -298,15 +302,15 @@ export async function ownTarget(viewer: { id: string; role?: string | null }): P
 // ─── A lesson on a date, and who may see its students ───────────────────────
 
 /** The lesson as held on a date (from the version in force), or null when it does not take place then. */
-export async function lessonOnDate(lessonId: string, date: string) {
-  const [x] = await db.select({ l: timetableLesson, t: timetable, g: teachingGroup }).from(timetableLesson)
+export async function lessonOnDate(lessonId: string, date: string, executor: Executor = db) {
+  const [x] = await executor.select({ l: timetableLesson, t: timetable, g: teachingGroup }).from(timetableLesson)
     .innerJoin(timetable, eq(timetable.id, timetableLesson.timetableId))
     .innerJoin(teachingGroup, eq(teachingGroup.id, timetableLesson.groupId))
     .where(eq(timetableLesson.id, lessonId));
   if (!x || x.t.status !== 'published' || x.l.weekday === null) return null;
   const day = (await getSchoolDays(date, date))[0]!;
   if (!day.isSchoolDay || day.kind === 'exam_only' || day.term?.id !== x.t.termId || day.weekday !== x.l.weekday) return null;
-  const [inForce] = await db.select({ id: timetable.id }).from(timetable)
+  const [inForce] = await executor.select({ id: timetable.id }).from(timetable)
     .where(and(eq(timetable.termId, x.t.termId), eq(timetable.status, 'published'), sql`${timetable.effectiveFrom} <= ${date}`))
     .orderBy(sql`${timetable.effectiveFrom} desc`, sql`${timetable.publishedAt} desc`).limit(1);
   if (inForce?.id !== x.t.id) return null;
@@ -314,7 +318,7 @@ export async function lessonOnDate(lessonId: string, date: string) {
   const lessonPeriods = day.periods.filter((p) => p.kind === 'lesson');
   if (x.l.period! > lessonPeriods.length) return null;
   // The group's teacher on that date (a mid-term change of teacher does not reach back).
-  const teacherId = (await teachersOn([x.g.id], date)).get(x.g.id) ?? null;
+  const teacherId = (await teachersOn([x.g.id], date, executor)).get(x.g.id) ?? null;
   return { lesson: x.l, timetable: x.t, group: x.g, day, teacherId };
 }
 

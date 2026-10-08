@@ -123,7 +123,9 @@ CREATE TABLE "teaching_group" (
 	"academic_year_id" text NOT NULL,
 	"name" text NOT NULL,
 	"subject_id" text,
+	"unit_id" text,
 	"teacher_id" text,
+	"delivery" text DEFAULT 'in_school' NOT NULL,
 	"kind" text NOT NULL,
 	"section_id" text,
 	"weekly_periods" integer DEFAULT 4 NOT NULL,
@@ -139,7 +141,10 @@ CREATE TABLE "teaching_group" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "teaching_group_kind_valid" CHECK ("teaching_group"."kind" IN ('enrolment', 'section', 'manual')),
 	CONSTRAINT "teaching_group_section_kind" CHECK (("teaching_group"."kind" = 'section') = ("teaching_group"."section_id" IS NOT NULL)),
-	CONSTRAINT "teaching_group_periods" CHECK ("teaching_group"."weekly_periods" BETWEEN 0 AND 30 AND "teaching_group"."double_periods" >= 0 AND "teaching_group"."double_periods" * 2 <= "teaching_group"."weekly_periods")
+	CONSTRAINT "teaching_group_periods" CHECK ("teaching_group"."weekly_periods" BETWEEN 0 AND 30 AND "teaching_group"."double_periods" >= 0 AND "teaching_group"."double_periods" * 2 <= "teaching_group"."weekly_periods"),
+	CONSTRAINT "teaching_group_delivery_valid" CHECK ("teaching_group"."delivery" IN ('in_school', 'online')),
+	CONSTRAINT "teaching_group_unit_has_subject" CHECK ("teaching_group"."unit_id" IS NULL OR ("teaching_group"."subject_id" IS NOT NULL AND "teaching_group"."kind" <> 'section')),
+	CONSTRAINT "teaching_group_online_no_room" CHECK ("teaching_group"."delivery" <> 'online' OR ("teaching_group"."room_id" IS NULL AND "teaching_group"."room_type" IS NULL))
 );
 --> statement-breakpoint
 CREATE TABLE "teaching_group_member" (
@@ -148,6 +153,7 @@ CREATE TABLE "teaching_group_member" (
 	"student_id" text NOT NULL,
 	"academic_year_id" text NOT NULL,
 	"subject_id" text,
+	"unit_id" text,
 	"enrolment_id" text,
 	"started_on" date NOT NULL,
 	"ended_on" date,
@@ -155,7 +161,8 @@ CREATE TABLE "teaching_group_member" (
 	"added_by" text,
 	"ended_by" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "teaching_group_member_dates_ordered" CHECK ("teaching_group_member"."ended_on" IS NULL OR "teaching_group_member"."ended_on" >= "teaching_group_member"."started_on" - 1)
+	CONSTRAINT "teaching_group_member_dates_ordered" CHECK ("teaching_group_member"."ended_on" IS NULL OR "teaching_group_member"."ended_on" >= "teaching_group_member"."started_on" - 1),
+	CONSTRAINT "teaching_group_member_unit_has_subject" CHECK ("teaching_group_member"."unit_id" IS NULL OR "teaching_group_member"."subject_id" IS NOT NULL)
 );
 --> statement-breakpoint
 CREATE TABLE "teaching_group_teacher" (
@@ -261,6 +268,7 @@ ALTER TABLE "teacher_load_limit" ADD CONSTRAINT "teacher_load_limit_teacher_id_t
 ALTER TABLE "teacher_load_limit" ADD CONSTRAINT "teacher_load_limit_updated_by_user_id_fk" FOREIGN KEY ("updated_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "teaching_group" ADD CONSTRAINT "teaching_group_academic_year_id_academic_year_id_fk" FOREIGN KEY ("academic_year_id") REFERENCES "public"."academic_year"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "teaching_group" ADD CONSTRAINT "teaching_group_subject_id_subject_id_fk" FOREIGN KEY ("subject_id") REFERENCES "public"."subject"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "teaching_group" ADD CONSTRAINT "teaching_group_unit_id_exam_unit_id_fk" FOREIGN KEY ("unit_id") REFERENCES "public"."exam_unit"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "teaching_group" ADD CONSTRAINT "teaching_group_teacher_id_teacher_id_fk" FOREIGN KEY ("teacher_id") REFERENCES "public"."teacher"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "teaching_group" ADD CONSTRAINT "teaching_group_section_id_section_id_fk" FOREIGN KEY ("section_id") REFERENCES "public"."section"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "teaching_group" ADD CONSTRAINT "teaching_group_room_id_room_id_fk" FOREIGN KEY ("room_id") REFERENCES "public"."room"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -270,6 +278,7 @@ ALTER TABLE "teaching_group_member" ADD CONSTRAINT "teaching_group_member_group_
 ALTER TABLE "teaching_group_member" ADD CONSTRAINT "teaching_group_member_student_id_user_id_fk" FOREIGN KEY ("student_id") REFERENCES "public"."user"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "teaching_group_member" ADD CONSTRAINT "teaching_group_member_academic_year_id_academic_year_id_fk" FOREIGN KEY ("academic_year_id") REFERENCES "public"."academic_year"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "teaching_group_member" ADD CONSTRAINT "teaching_group_member_subject_id_subject_id_fk" FOREIGN KEY ("subject_id") REFERENCES "public"."subject"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "teaching_group_member" ADD CONSTRAINT "teaching_group_member_unit_id_exam_unit_id_fk" FOREIGN KEY ("unit_id") REFERENCES "public"."exam_unit"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "teaching_group_member" ADD CONSTRAINT "teaching_group_member_enrolment_id_course_enrolment_id_fk" FOREIGN KEY ("enrolment_id") REFERENCES "public"."course_enrolment"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "teaching_group_member" ADD CONSTRAINT "teaching_group_member_added_by_user_id_fk" FOREIGN KEY ("added_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "teaching_group_member" ADD CONSTRAINT "teaching_group_member_ended_by_user_id_fk" FOREIGN KEY ("ended_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -303,10 +312,12 @@ CREATE INDEX "teachingGroup_subjectId_idx" ON "teaching_group" USING btree ("sub
 CREATE INDEX "teachingGroup_teacherId_idx" ON "teaching_group" USING btree ("teacher_id");--> statement-breakpoint
 CREATE INDEX "teachingGroup_sectionId_idx" ON "teaching_group" USING btree ("section_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "teachingGroup_year_name_idx" ON "teaching_group" USING btree ("academic_year_id",lower("name")) WHERE archived_on IS NULL;--> statement-breakpoint
+CREATE INDEX "teachingGroup_unitId_idx" ON "teaching_group" USING btree ("unit_id");--> statement-breakpoint
 CREATE INDEX "teachingGroupMember_groupId_idx" ON "teaching_group_member" USING btree ("group_id");--> statement-breakpoint
 CREATE INDEX "teachingGroupMember_studentId_idx" ON "teaching_group_member" USING btree ("student_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "teachingGroupMember_one_open_idx" ON "teaching_group_member" USING btree ("group_id","student_id") WHERE ended_on IS NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "teachingGroupMember_one_subject_idx" ON "teaching_group_member" USING btree ("student_id","subject_id","academic_year_id") WHERE ended_on IS NULL AND subject_id IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "teachingGroupMember_one_subject_idx" ON "teaching_group_member" USING btree ("student_id","subject_id","academic_year_id") WHERE ended_on IS NULL AND subject_id IS NOT NULL AND unit_id IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "teachingGroupMember_one_unit_idx" ON "teaching_group_member" USING btree ("student_id","unit_id","academic_year_id") WHERE ended_on IS NULL AND unit_id IS NOT NULL;--> statement-breakpoint
 CREATE INDEX "teachingGroupTeacher_groupId_idx" ON "teaching_group_teacher" USING btree ("group_id");--> statement-breakpoint
 CREATE INDEX "teachingGroupTeacher_teacherId_idx" ON "teaching_group_teacher" USING btree ("teacher_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "teachingGroupTeacher_one_open_idx" ON "teaching_group_teacher" USING btree ("group_id") WHERE ended_on IS NULL;--> statement-breakpoint

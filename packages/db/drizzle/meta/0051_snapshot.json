@@ -1,6 +1,6 @@
 {
-  "id": "c060443d-a65b-4be2-bed5-b192f2f4c985",
-  "prevId": "e3821cd7-bfd1-450a-991d-2999a755c0a8",
+  "id": "d08e30f7-a4ee-4f8f-9dcb-e3e991fc64ae",
+  "prevId": "dc659b3b-dcd1-4ae9-9798-ca80b9a50bcf",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -11419,11 +11419,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "unit_id": {
+          "name": "unit_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "teacher_id": {
           "name": "teacher_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "delivery": {
+          "name": "delivery",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'in_school'"
         },
         "kind": {
           "name": "kind",
@@ -11591,6 +11604,21 @@
           "method": "btree",
           "where": "archived_on IS NULL",
           "concurrently": false
+        },
+        "teachingGroup_unitId_idx": {
+          "name": "teachingGroup_unitId_idx",
+          "columns": [
+            {
+              "expression": "unit_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
         }
       },
       "foreignKeys": {
@@ -11614,6 +11642,19 @@
             "subject_id"
           ],
           "tableTo": "subject",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "restrict"
+        },
+        "teaching_group_unit_id_exam_unit_id_fk": {
+          "name": "teaching_group_unit_id_exam_unit_id_fk",
+          "tableFrom": "teaching_group",
+          "columnsFrom": [
+            "unit_id"
+          ],
+          "tableTo": "exam_unit",
           "columnsTo": [
             "id"
           ],
@@ -11701,6 +11742,18 @@
         "teaching_group_periods": {
           "name": "teaching_group_periods",
           "value": "\"teaching_group\".\"weekly_periods\" BETWEEN 0 AND 30 AND \"teaching_group\".\"double_periods\" >= 0 AND \"teaching_group\".\"double_periods\" * 2 <= \"teaching_group\".\"weekly_periods\""
+        },
+        "teaching_group_delivery_valid": {
+          "name": "teaching_group_delivery_valid",
+          "value": "\"teaching_group\".\"delivery\" IN ('in_school', 'online')"
+        },
+        "teaching_group_unit_has_subject": {
+          "name": "teaching_group_unit_has_subject",
+          "value": "\"teaching_group\".\"unit_id\" IS NULL OR (\"teaching_group\".\"subject_id\" IS NOT NULL AND \"teaching_group\".\"kind\" <> 'section')"
+        },
+        "teaching_group_online_no_room": {
+          "name": "teaching_group_online_no_room",
+          "value": "\"teaching_group\".\"delivery\" <> 'online' OR (\"teaching_group\".\"room_id\" IS NULL AND \"teaching_group\".\"room_type\" IS NULL)"
         }
       },
       "isRLSEnabled": false
@@ -11735,6 +11788,12 @@
         },
         "subject_id": {
           "name": "subject_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unit_id": {
+          "name": "unit_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -11861,7 +11920,35 @@
           "isUnique": true,
           "with": {},
           "method": "btree",
-          "where": "ended_on IS NULL AND subject_id IS NOT NULL",
+          "where": "ended_on IS NULL AND subject_id IS NOT NULL AND unit_id IS NULL",
+          "concurrently": false
+        },
+        "teachingGroupMember_one_unit_idx": {
+          "name": "teachingGroupMember_one_unit_idx",
+          "columns": [
+            {
+              "expression": "student_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "unit_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "academic_year_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "where": "ended_on IS NULL AND unit_id IS NOT NULL",
           "concurrently": false
         }
       },
@@ -11918,6 +12005,19 @@
           "onUpdate": "no action",
           "onDelete": "restrict"
         },
+        "teaching_group_member_unit_id_exam_unit_id_fk": {
+          "name": "teaching_group_member_unit_id_exam_unit_id_fk",
+          "tableFrom": "teaching_group_member",
+          "columnsFrom": [
+            "unit_id"
+          ],
+          "tableTo": "exam_unit",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "restrict"
+        },
         "teaching_group_member_enrolment_id_course_enrolment_id_fk": {
           "name": "teaching_group_member_enrolment_id_course_enrolment_id_fk",
           "tableFrom": "teaching_group_member",
@@ -11965,6 +12065,10 @@
         "teaching_group_member_dates_ordered": {
           "name": "teaching_group_member_dates_ordered",
           "value": "\"teaching_group_member\".\"ended_on\" IS NULL OR \"teaching_group_member\".\"ended_on\" >= \"teaching_group_member\".\"started_on\" - 1"
+        },
+        "teaching_group_member_unit_has_subject": {
+          "name": "teaching_group_member_unit_has_subject",
+          "value": "\"teaching_group_member\".\"unit_id\" IS NULL OR \"teaching_group_member\".\"subject_id\" IS NOT NULL"
         }
       },
       "isRLSEnabled": false
