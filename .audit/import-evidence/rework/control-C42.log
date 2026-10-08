@@ -1,15 +1,88 @@
 # C42: findOffer: a unit line finds the offer whose item enters the unit it names
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (53 tests | 3 failed) 10624ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); Papers 1 and 2 wait for staff to choose 49ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line whose family's confirmation is not on the sheet is an error: the import records the sheet's confirmation as the consent 38ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the student lock lets one through (gate.sameEntryOnce) 498ms
+ ❯ test/08n-import.test.ts (55 tests | 3 failed) 10812ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); Papers 1 and 2 wait for staff to choose 70ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line whose family's confirmation is not on the sheet is an error: the import records the sheet's confirmation as the consent 54ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce) 474ms
  Test Files  1 failed (1)
-      Tests  3 failed | 50 passed (53)
-   Duration  12.36s (transform 692ms, setup 2ms, collect 267ms, tests 10.62s, environment 0ms, prepare 34ms)
- ❯ test/08n-import.test.ts:902:46
- ❯ test/08n-import.test.ts:930:27
- ❯ test/08n-import.test.ts:952:110
+      Tests  3 failed | 52 passed (55)
+   Duration  12.95s (transform 725ms, setup 3ms, collect 265ms, tests 10.81s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:931:46
+ ❯ test/08n-import.test.ts:959:27
+ ❯ test/08n-import.test.ts:982:110
 
 # failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); Papers 1 and 2 wait for staff to choose
+AssertionError: expected null to match object { …(5) }
+
+- Expected: 
+{
+  "found": "unit",
+  "itemLabel": "P1",
+  "offerItemId": "fcf40577-f07b-47f5-b502-6d589adb14b3",
+  "price": {
+    "boardFee": 4800,
+    "courseFee": 900,
+    "total": 5700,
+  },
+  "subjectName": "Mathematics A.S./A.L. (imp)",
+}
+
++ Received: 
+null
+
+ ❯ test/08n-import.test.ts:931:46
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line whose family's confirmation is not on the sheet is an error: the import records the sheet's confirmation as the consent
+AssertionError: expected null to match object { itemLabel: 'M1', …(1) }
+
+- Expected: 
+{
+  "itemLabel": "M1",
+  "offerItemId": "0bd7aaad-ed77-4354-ae7a-65e95a383623",
+}
+
++ Received: 
+null
+
+ ❯ test/08n-import.test.ts:959:27
+    957|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
+    958|       const r = rowAt(await fetchView(adm, id), 'NoConfirm', 3);
+    959|       expect(r.plan.line).toMatchObject({ itemLabel: 'M1', offerItemId…
+       |                           ^
+    960|       expect(r.problems.find((p) => p.code === 'consent_missing')).toE…
+    961|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce)
+AssertionError: expected [ { code: 'not_offered', …(2) } ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   {
++     "code": "not_offered",
++     "detail": "November 2026 – January 2027 — t4-pia2 offers no subject for \"Pure Mathematics 1 (P1)\"",
++     "severity": "error",
++   },
++ ]
+
+ ❯ test/08n-import.test.ts:982:110
+    980|       ] }]), 'race.xlsx', 'school_sheet');
+    981|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
+    982|       expect(rowAt(await fetchView(adm, id), 'Lock race', 3).problems.…
+       |                                                                                                              ^
+    983|       // The import is held inside its family's transaction, its line …
+    984|       // IMPORT_REGISTRATION row); the desk reserves the same unit for…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

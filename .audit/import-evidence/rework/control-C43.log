@@ -1,11 +1,36 @@
 # C43: the review asks the rules on lines as the commit will (assertLineRules, rolled back)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (53 tests | 1 failed) 10335ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); Papers 1 and 2 wait for staff to choose 93ms
+ ❯ test/08n-import.test.ts (55 tests | 1 failed) 11696ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); Papers 1 and 2 wait for staff to choose 112ms
  Test Files  1 failed (1)
-      Tests  1 failed | 52 passed (53)
-   Duration  12.45s (transform 737ms, setup 3ms, collect 328ms, tests 10.34s, environment 0ms, prepare 43ms)
- ❯ test/08n-import.test.ts:905:92
+      Tests  1 failed | 54 passed (55)
+   Duration  13.78s (transform 705ms, setup 2ms, collect 282ms, tests 11.70s, environment 0ms, prepare 36ms)
+ ❯ test/08n-import.test.ts:934:92
 
 # failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); Papers 1 and 2 wait for staff to choose
+AssertionError: expected undefined to deeply equal { code: 'registration_refused', …(2) }
+
+- Expected: 
+{
+  "code": "registration_refused",
+  "detail": "Mathematics A.S./A.L. (imp) — P2 takes retakes only this cycle",
+  "severity": "error",
+}
+
++ Received: 
+undefined
+
+ ❯ test/08n-import.test.ts:934:92
+    932|       expect(codes(rowAt(v, 'Units', 3))).toEqual(['unit_row']);
+    933|       expect(rowAt(v, 'Units', 4).plan.line).toMatchObject({ itemLabel…
+    934|       expect(rowAt(v, 'Units', 4).problems.find((p) => p.code === 'reg…
+       |                                                                                            ^
+    935|         code: 'registration_refused', severity: 'error', detail: 'Math…
+    936|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

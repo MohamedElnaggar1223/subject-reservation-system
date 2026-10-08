@@ -1,11 +1,31 @@
 # C37: the lead's Q2: a retake that names no sitting is an error (retake_sitting_missing)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (53 tests | 1 failed) 10563ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 194ms
+ ❯ test/08n-import.test.ts (55 tests | 1 failed) 10989ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 212ms
  Test Files  1 failed (1)
-      Tests  1 failed | 52 passed (53)
-   Duration  12.19s (transform 650ms, setup 2ms, collect 239ms, tests 10.56s, environment 0ms, prepare 36ms)
- ❯ test/08n-import.test.ts:625:93
+      Tests  1 failed | 54 passed (55)
+   Duration  12.96s (transform 705ms, setup 3ms, collect 265ms, tests 10.99s, environment 0ms, prepare 36ms)
+ ❯ test/08n-import.test.ts:642:93
 
 # failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is
+AssertionError: expected undefined to deeply equal { Object (code, severity, ...) }
+
+- Expected: 
+{
+  "code": "retake_sitting_missing",
+  "detail": "\"Retake in School 100% fees (All Papers)\": name the sitting it follows on the line, or make it a first entry",
+  "severity": "error",
+}
+
++ Received: 
+undefined
+
+ ❯ test/08n-import.test.ts:642:93
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

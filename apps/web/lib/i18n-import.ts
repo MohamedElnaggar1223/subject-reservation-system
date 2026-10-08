@@ -449,7 +449,8 @@ export const importArabic: Record<string, string> = {
   'Grade outside 9–12': 'صف خارج 9–12',
   'The school’s grades are 10–12 (9: starts grade 10 next year). Fix it on the row.': 'صفوف المدرسة 10–12 (9: يبدأ الصف العاشر العام القادم). صحّحه في السطر.',
   'Subject not in the catalogue': 'المادة غير موجودة في الدليل',
-  'Map it to a catalogue row (or add it): until then history keeps the sheet’s words, and no enrolment or registration is made for it.': 'طابقها مع صف في الدليل (أو أضفها): حتى ذلك الحين يحفظ السجل السابق كلمات الجدول، ولا يُنشأ لها التحاق ولا تسجيل.',
+  'Map it to a catalogue row (or add it): until then history keeps the sheet’s words and no enrolment is made for it. A line in a session is still found on the session’s subjects by its words.':
+    'طابقها مع صف في الدليل (أو أضفه): حتى ذلك يحفظ السجل السابق كلمات الجدول ولا يُنشأ لها التحاق. ويُعثر على سطر الجلسة في مواد الجلسة بكلماته.',
   'No teacher named': 'لم يُذكر معلم',
   'Enrolled with no teacher yet.': 'التحاق بلا معلم بعد.',
   'A teacher named on a self-study row': 'معلم مذكور في سطر دراسة ذاتية',
@@ -615,7 +616,6 @@ export const importArabic: Record<string, string> = {
   'No preference yet': 'بلا تفضيل بعد',
   'Price': 'السعر',
   'course': 'التدريس',
-  'at': 'بنسبة',
   '+ board': '+ المجلس',
   'Board fee provisional': 'رسوم المجلس مؤقتة',
   'Not priced: the series’ grid has no fee for it': 'غير مسعَّر: لا رسوم له في جدول الدورة',
@@ -639,6 +639,8 @@ export const importArabic: Record<string, string> = {
   'a first entry in self-study, by the student’s exception': 'قيد أول بدراسة ذاتية، باستثناء الطالب',
   'choose the session for this series on the Mapping tab': 'اختر جلسة هذه الدورة في تبويب المطابقة',
   'no item fits': 'لا يطابق أي بند',
+  'Retake, in school': 'إعادة، في المدرسة',
+  'Retake, self-study': 'إعادة، دراسة ذاتية',
 };
 
 /** The import's sentences with a name, a number, a code or a year in them. */
@@ -683,7 +685,7 @@ export function translateImportText(text: string): string | null {
     [/^Add (.+)$/, (m) => `أضف ${m[1]}`],
     [/^(.+) is taught at school$/, (m) => `${m[1]} تُدرَّس في المدرسة`],
     // The reservations rework: the lines a row makes in a session, and the refusals the session gives.
-    [/^Lines awaiting payment in (.+) \((.+)\)$/, (m) => `سطور بانتظار الدفع في ${m[1]} (${m[2]})`],
+    [/^Lines awaiting payment in (.+) \((closed|draft)\)$/, (m) => `سطور بانتظار الدفع في ${m[1]} (${m[2] === 'closed' ? 'مغلقة' : 'مسودة'})`],
     [/^Lines awaiting payment in (.+)$/, (m) => `سطور بانتظار الدفع في ${m[1]}`],
     [/^(.+) offers no subject for "(.+)"$/, (m) => `لا تقدّم ${m[1]} مادة لـ "${m[2]}"`],
     [/^a retake of (\w+) (\d{4}) \(the student’s history\)$/, (m) => `إعادة لدورة ${monthAr(m[1]!)} ${m[2]} (سجل الطالب)`],

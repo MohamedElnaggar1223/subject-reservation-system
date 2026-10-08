@@ -1,31 +1,43 @@
-# F7 — Day-one import (as built)
+# F7 — Day-one import (as built, on the reservations rework)
 
-Branch `feature/import`, started from `origin/main` e5da650 (F0a and F0b merged), merged with
-`origin/main` 20d87c8 (the walkthrough's format in the plan) at 332ef18. The plan is
-FEATURES_PLAN.md §1 "F7 — Day-one import" and §5's rules. The evidence behind it:
+Branch `feature/import`. Started from `origin/main` e5da650 (F0a and F0b merged); frozen on 7 Oct 2026 at
+e58324b while the reservations rework was designed and built; resumed on 8 Oct 2026 by merging
+`origin/main` 2a26557 (the rework's steps A, B and C and the lead's step 4) as its own commit
+(2226d03) and moving the import onto sessions, offers, items, the fee grids and reservation lines
+(RESERVATIONS_REWORK.md §9's F7 list and §10's row). The plan is FEATURES_PLAN.md §1 "F7 — Day-one
+import" and §5's rules. The evidence behind it:
 - IMPORT_SPIKE.md (IS-01 to IS-14);
 - DISCOVERY.md (A-02, A-03, A-04, Q-02, Q-03, Q-05, Q-09, F-01);
-- DISCOVERY_RESEARCH.md §1.
+- DISCOVERY_RESEARCH.md §1; SCHOOL_FORMS.md §2 and §3 (the forms' options, the fee lists);
+- RESERVATIONS_REWORK.md §3.2–§3.5 and docs/features/RESERVATIONS.md, RESERVATIONS_LINES.md,
+  RESERVATIONS_MONEY.md (the contracts the import uses).
 
-The trail is `.audit/import.tsv`. The evidence is in `.audit/import-evidence/` (git-ignored):
-suite logs, control logs, the real-sheet runs' counts, and screenshots of synthetic data. The
-progress log is the last section.
+The trail is `.audit/import.tsv`. The evidence of the work on the new model is in
+`.audit/import-evidence/rework/` (force-added, every file under 300 KB: control logs kept as the
+failing tests and the vitest summary, the gates' summaries, the drive's scripts and their
+synthetic outputs, the screenshots). Evidence from before the freeze stayed on the implementer's
+disk (it held full suite logs of 2.7 MB and the private real-sheet reports) and is not committed.
+The progress log is the last section.
 
 **The school's real sheet never enters the repository, a test, a screenshot or a log.** It is
 cited by row numbers and counts only; tests build synthetic sheets with the same shapes
-(`apps/api/test/import-fixtures.ts`).
+(`apps/api/test/import-fixtures.ts`), with placeholder names. On 8 Oct the 64 full names quoted in
+the fixtures, tests, this document and the trail were checked privately against the sheet: none is
+a student's, parent's or teacher's name there (§10).
 
 F7 is how the school goes live. It gives three things:
 - **A staged review.** Staff check the school's own sheet before anything is made: every problem
-  the spike found is flagged on its line; people and families are worked out; staff fix, merge
-  or skip line by line; the coordinator's pending answers are settings.
+  the spike found is flagged on its line; people and families are worked out; each line of a
+  series the admin maps to its session shows the reservation line it would be — its subject and
+  item, its entry, the sitting it follows and its price from the session's fee grid; staff fix,
+  merge or skip line by line; the coordinator's pending answers are settings.
 - **A commit that makes exactly what the review showed.** One family per transaction. Every row
   it makes points back to its line, and running the same file again changes nothing.
 - **Two templates** for what the school does not have yet: SCL's grade-9 roster, and the money
   record.
 
 Money from before the system is history only: nothing here makes a payment, a receipt or a
-balance.
+balance. The lines it makes in a session wait for payment like any other line.
 
 ---
 
@@ -33,608 +45,523 @@ balance.
 
 | Kind | What it is | How it is read |
 |---|---|---|
-| `school_sheet` | The school's registration workbook (.xlsx): session tabs such as "2024" (the November 2026 form) and "Sheet1" (June 2023), plus hand-made per-unit roster tabs. | A tab is a **session tab** when a header row has "student name", "subject" and "student email". Unlabelled columns are given their role by what most of their cells hold: the series (a date serial or text), the confirmation, self-study, the fee note, and the parent's name, which is the column after the student's email. The tab's title row ("Nov. 2026 Session") gives its main series. Roster tabs (no emails) are listed and not imported (note `roster_tab_ignored`, A-04). |
-| `scl_roster` | SCL's export at the grade 9→10 boundary (DISCOVERY.md Q-09: SCL claims a CSV export). The template is `SCL_ROSTER_TEMPLATE`, downloadable on the upload screen. | CSV (RFC 4180; comma, semicolon or tab; BOM stripped). Headers: `student_name, student_email, student_phone, scl_student_id, grade, grade10_section, parent_name, parent_email, parent_phone, second_parent_name, second_parent_email, second_parent_phone`. Required: `student_name, student_email, grade, parent_email`; a file without them is refused, naming the missing columns. `grade` is the grade in the year the review's "grades are in" setting names: grade 9 means the student starts grade 10 the year after. `grade10_section` places them in that year's section. |
-| `money_record` | The money record before the system (DISCOVERY.md F-01, not yet seen). The template is `MONEY_RECORD_TEMPLATE`. | CSV. Headers: `student, date, amount_egp, direction, kind, percent, method, receipt_number, series, subject, note`. Required: `student, kind`. `student` is an email or school ID of an account that exists. Dates are YYYY-MM-DD, DD/MM/YYYY (day first, as in Egypt) or an Excel serial. Each line becomes a `money_history` row, and nothing else. |
+| `school_sheet` | The school's registration workbook (.xlsx): session tabs such as "2024" (the November 2026 form) and "Sheet1" (June 2023), plus hand-made per-unit roster tabs. | A tab is a **session tab** when a header row has "student name", "subject" and "student email". Unlabelled columns are given their role by what most of their cells hold: the series (a date serial or text — never a fee note that names a sitting), the confirmation, the self-study answer, the fee note, and the parent's name, which is the column after the student's email. The tab's title row ("Nov. 2026 Session") gives its main series. Roster tabs (no emails) are listed and not imported (note `roster_tab_ignored`, A-04). |
+| `scl_roster` | SCL's export at the grade 9→10 boundary (DISCOVERY.md Q-09). The template is `SCL_ROSTER_TEMPLATE`, downloadable on the upload screen. | CSV (RFC 4180; comma, semicolon or tab; BOM stripped). Headers: `student_name, student_email, student_phone, scl_student_id, grade, grade10_section, parent_name, parent_email, parent_phone, second_parent_name, second_parent_email, second_parent_phone`. Required: `student_name, student_email, grade, parent_email`; a file without them is refused, naming the missing columns. |
+| `money_record` | The money record before the system (DISCOVERY.md F-01, not yet seen). The template is `MONEY_RECORD_TEMPLATE`. | CSV. Headers: `student, date, amount_egp, direction, kind, percent, method, receipt_number, series, subject, note`. Required: `student, kind`. Each line becomes a `money_history` row, and nothing else. |
 
-The reader is `apps/api/src/lib/xlsx.ts`, hardened from the spike's:
-- zip offsets are checked against the buffer;
-- only the workbook's own parts are inflated, each capped at 64 MB;
-- the spike script now uses the same reader.
-
-The CSV reader is `apps/api/src/lib/csv.ts`; source reading is `services/import/source.ts`.
+The reader is `apps/api/src/lib/xlsx.ts` (zip offsets checked; only the workbook's own parts are
+inflated; at most 2000 parts and 128 MB inflated in total — review flag 10). The CSV reader is
+`apps/api/src/lib/csv.ts`; source reading is `services/import/source.ts`.
 
 **Normalising** (`services/import/normalise.ts`):
-- **Phones.** Egyptian mobiles as `01xxxxxxxxx`. A leading 0 lost to a number cell is restored,
-  and `+20` / `0020` is stripped. Anything else is left off the account and flagged.
-- **Names.** Non-breaking, trailing and doubled spaces are removed.
+- **Phones.** Egyptian mobiles as `01xxxxxxxxx`; a leading 0 lost to a number cell restored.
+- **Names.** Non-breaking, trailing and doubled spaces removed.
 - **Classes.** "11A" gives the grade and the section.
 - **Level codes.** O.L., A.S., A.2., A.L., and the combined codes.
-- **Series.** Read from the row's series column (a date serial or text), otherwise from the tab's
-  title.
-- **Fee notes and drops.** "Dropped 20% School fees" gives a percentage; "I will drop the course"
-  is read as a drop the family intended.
-- **Carry forward.** "Carry forward on June 2022" in the Signature column is read, with the
-  series it came from.
-- **Column drift.** A value in another value's column is read by what it says, and flagged
-  (IS-11).
+- **Series.** From the row's series column, otherwise the tab's title.
+- **The fee note and the self-study answer** (IS-03, IS-08, and §9 of the rework: *the fee note
+  gives the attempt and the mode*). A note is read for: self-study (or the external rate); a
+  retake or a second entry ("Retake …", "ONLY 2nd entry"); one paper only; the sitting it names
+  ("From June 2026"); a drop and its percentage. Self-study is the yes/no answer or a note that
+  says so; **a note that says self-study against an explicit "No" is read as self-study and
+  flagged** `self_study_contradiction` (warning, review flag 7) — staff set the line's self-study
+  themselves when the answer is right.
+- **Carry forward.** "Carry forward on June 2022" in the Signature column, with its series.
+- **Column drift.** A value in another value's column is read by what it says, and flagged (IS-11).
 
-## 2. Data model (migration 0041)
+## 2. Data model (migration 0050_import)
 
-All in `packages/db/src/schema.ts`.
+All in `packages/db/src/schema.ts`. The migration is generated DDL only. It was 0041 on the frozen
+branch; at the merge of main it was deleted and generated again on main's journal (review flag 8,
+FEATURES_PLAN §3) as `0050_import`, the same statements, its journal time after 0049's; the order was
+proven on a copy of the dev template migrated with main's migrations first (50 rows, no import
+tables), then with the branch's (51 rows). Step D (messages and reminders) lands its own migrations
+first, so the import's is generated once more at its merge.
 
 | Table | What it holds | Rules |
 |---|---|---|
-| `import_batch` | One staged file: kind, the uploaded file (F0a's uploads, purpose `import_file`), name, SHA-256, status (`staged`, `committing`, `committed`, `partial`, `discarded`), the source's tabs, the mapping settings, the last summary, the commit's result, who staged, claimed, committed or discarded it and when. | The status moves only through the commit's claim (§5) and discard. |
-| `import_row` | One line of the file: tab, row number (as Excel numbers it), the raw cells as `[header, value]` pairs, the staff's edits, the decision (`import`/`skip`, with a note and who decided), status (`pending`, `committed`, `failed`), what the commit made for it (`outcome`) and its error. | Unique (batch, tab, row). A committed row does not change. |
-| `import_person` | A student or parent of the file, keyed by email: the name and phone staff chose, a merge into another key, "different people", "one child", skip; after the commit, the account it became. | Unique (batch, role, key). |
-| `registration_history` | A registration the school recorded before the system: student, subject (when mapped) and the sheet's words, level code, series, in school or self-study, the teacher, the outcome (`registered`, `dropped`, `drop_intended`), a carried-forward reading, a note, a fingerprint, the batch and row it came from, and `source_ref` ("file — tab row n"). | Unique (student, fingerprint): the same line imported twice makes one row. |
-| `money_history` | Money before the system, as history: kind (`payment`, `refund`, `drop`, `self_study_rate`, `external_rate`, `carried_forward`, `other`), direction, amount, percent, date, method, receipt number, series and subject as written, note, fingerprint, source. | Unique (student, fingerprint); amount ≥ 0; percent 0–100. No link to payments, escrow or receipts. |
+| `import_batch` | One staged file: kind, the uploaded file (purpose `import_file`), name, SHA-256, status (`staged`, `committing`, `committed`, `partial`, `discarded`), the source's tabs, the mapping settings, the last summary, the commit's result, who staged, claimed, committed or discarded it and when. | The status moves only through the commit's claim (§5) and discard. |
+| `import_row` | One line of the file: tab, row number, the raw cells as `[header, value]` pairs, the staff's edits, the decision, status (`pending`, `committed`, `failed`), what the commit made for it (`outcome`) and its error. | Unique (batch, tab, row). A committed row does not change. |
+| `import_person` | A student or parent of the file, keyed by email: the staff's decisions; after the commit, the account it became. | Unique (batch, role, key). |
+| `registration_history` | A registration the school recorded before the system: student, subject (when mapped) and the sheet's words, level code, series, in school or self-study, the teacher, the outcome (`registered`, `dropped`, `drop_intended`), a carried-forward reading, a fingerprint, the batch and row, `source_ref`. | Unique (student, fingerprint). |
+| `money_history` | Money before the system, as history (kind, direction, amount, percent, date, method, receipt number, series, subject, note), fingerprint, source. | Unique (student, fingerprint); no link to payments, escrow or receipts. |
+
+The lines the import makes in a session are ordinary `registration` rows (RESERVATIONS.md §1.6)
+with their two `registration_consent` rows on the `imported` channel; nothing of the rework's
+schema is added or changed by F7.
 
 ## 3. The staged model
 
 **1. Stage** (`POST /v1/imports`, admin or coordinator)
-- The uploaded file is read into its tabs and lines, and one `import_row` is written per line.
-  Nothing else in the school changes; 08n asserts it.
-- The file's SHA-256 is recorded. When the same file (same kind) was staged before and not
-  discarded, the latest such batch's settings, row edits and decisions, and person decisions are
-  carried over. A re-run is then reviewed exactly as it was left (`sameFileBefore` names that
-  batch).
+- The uploaded file is read into its tabs and lines; one `import_row` per line. Nothing else in the
+  school changes (08n asserts it).
+- **What staff decided before is carried over** (review flag 3), from every earlier file of the
+  same kind that was not discarded, whatever its bytes:
+  - a line's fixes and decision go with **what the line says** (its cells, and which of several
+    identical lines it is), never with where it sits, from the newest earlier file that has it;
+  - a person's decisions (name and phone chosen, merge, "different people", "one child", skip) go
+    with their role and email, from the newest earlier file that decided them;
+  - the mapping comes from the same bytes staged before, or — for the school's sheet — from the
+    newest earlier file with the same session tabs (the same names and titles: the same sheet
+    exported again). Another sheet starts from the defaults.
+  - `IMPORT_STAGED` records what was carried and from where.
 
-**2. Review** (`GET /v1/imports/:id`)
-- The review is **worked out each time it is read** (`services/import/view.ts`, which never
-  writes). Its inputs are the raw lines, the staff's edits and decisions, the mapping settings
-  and the database as it is now.
-- Only the staff's own input is stored. Nothing the review works out can go stale: when another
-  desk adds a family, or the admin adds a subject, the next read shows it.
-- The review returns:
-  - each line with its reading, its problems and its plan (what a commit would make, such as
-    `student: create|match` or `registration: history|live|history_exists|live_exists`);
-  - the people, the families and the mapping;
-  - the file-wide notes;
-  - a summary.
+**2. Review** (`GET /v1/imports/:id`) — worked out each time it is read (`services/import/view.ts`,
+which writes nothing; the rules on lines are asked in a transaction that is rolled back, §4.5).
+Only the staff's own input is stored.
 
 **3. Fix, merge, skip** (each change audited as `IMPORT_REVIEWED`)
-- `PUT /:id/rows` (one line or many):
-  - edits: name, email, phone, parent, "no parent on file", class, level code, subject, teacher,
-    series, self-study, and the self-study answer for that line;
-  - clearing an edit;
-  - `import` / `skip`, with a note.
-- `PUT /:id/people`:
-  - the name or phone to use;
-  - merge into another person, or undo the merge;
-  - "different people";
-  - "one child";
-  - skip.
+- `PUT /:id/rows`: edits (name, email, phone, parent, "no parent on file", class, level code,
+  subject, teacher, series, self-study, the self-study answer for the line, **the item of the
+  session** `offerItemId`, **first entry or retake** `attempt`, **the sitting a retake follows**
+  `priorSitting`), clearing an edit, `import` / `skip` with a note, confirming a link to an
+  existing account.
+- `PUT /:id/people`: the name or phone; merge into another person **or into an account already in
+  the system of the same role**; undo; "different people"; "one child"; skip.
 - `PUT /:id/settings`: the mapping (§4.3).
 
-**4. Commit** (`POST /:id/commit`)
-- Every family with nothing left to fix is committed, each in its own transaction (§5).
-- The families still held wait. The batch becomes `partial` and can be committed again once they
-  are fixed.
+**4. Commit** (`POST /:id/commit`) — every family with nothing left to fix, each in its own
+transaction (§5). The held ones wait; the batch becomes `partial`.
 
 **Discard** (`POST /:id/discard`) puts a file aside. What it already committed stays.
 
 ### Families
 
-A family is the set of students and parents the importing lines join: a union-find over student
-and parent keys, after merges. It is the unit of a commit.
-- A family is **held** while any line in it has an error.
-- A family is **ready** when nothing in it is an error. Warnings and notes do not hold it.
-- Its other statuses are `committed`, `partly_committed` and `failed` (with the reason).
+A family is the set of students and parents the importing lines join (union-find over student and
+parent keys, after merges) — the unit of a commit. **Held** while any line in it has an error;
+**ready** otherwise; then `committed`, `partly_committed` or `failed` (with the reason).
 
 ## 4. The review
 
-### 4.1 Every problem the spike found, flagged
+### 4.1 Every problem, flagged
 
-Each code is defined in `IMPORT_PROBLEMS` (`@repo/validations`), with its severity, its finding,
-a title and what it means. The Problems tab groups them by code.
+Each code is defined in `IMPORT_PROBLEMS` (`@repo/validations`) with its severity, its finding, a
+title and what it means. The Problems tab groups them by code.
 
 | Finding | Codes |
 |---|---|
-| IS-01 units and level codes | `unit_row` (info), `level_code_combined_on_unit` (info), `level_code_differs` (info; the catalogue's derived code against the sheet's), `level_code_al` (info), `level_code_unknown` (error) |
-| IS-02 carry forward | `carry_forward` (warning; read by the `import.carryForward` setting) |
-| IS-03 self-study on a taught subject | `self_study_on_taught` (error on a first attempt registered in a window under today's rule; info otherwise), `self_study_retake`, `self_study_not_taught` |
-| IS-04 classes and sections | `class_unreadable` (error), `grade_out_of_range` (error), `section_differs` (warning); the sections to make are listed on the Mapping tab |
-| IS-05 two series in one tab | `series_other_than_tab` (warning; the line goes to its own series' mapping), note `two_series_one_tab`, `series_missing` (error) |
-| IS-06 email is not identity | errors: `email_student_missing`, `email_parent_missing`, `email_student_is_parent`, `student_email_shared` (two children under one email), `email_taken` (the email is a staff account, or the other role); warnings: `duplicate_student` (the same child under two emails), `duplicate_parent`; info: `student_two_parents`, `name_variants` |
-| IS-07 no money | note `no_money` |
-| IS-08 fee notes and drops | `fee_note` (info; money history), `dropped` (warning; history, never live), `drop_intent` (warning; history "meant to drop") |
-| IS-09 phones | `phone_restored` (info), `phone_unusable` (warning; the account is made without it) |
-| IS-10 names | `name_cleaned` (info) |
-| IS-11 drifted columns | `column_drift` (warning) |
-| IS-12 Signature column | `signature` (info; not imported, Q-03) |
-| IS-13 duplicate rows | `duplicate_row` (warning; the later line is left out by default) |
-| IS-14 two boards in one series | `boards_in_series` (info; each registration is routed to its board's series by F0b) |
+| IS-01 units and level codes | `unit_row`, `level_code_combined_on_unit`, `level_code_differs`, `level_code_al` (info); `level_code_unknown` (error) |
+| IS-02 carry forward | `carry_forward` (warning; the `import.carryForward` setting) |
+| IS-03 self-study | `self_study_on_taught` (error on a line in a session: a first entry in self-study of a taught item, "Self-study on a first entry needs the exception: grant it on the Exceptions page or make it a retake with its sitting"; info when the coordinator's answer, the line's choice or the student's exception settles it, and on history), `self_study_retake`, `self_study_not_taught` (info), `self_study_contradiction` (warning, review flag 7) |
+| IS-04 classes | `class_unreadable`, `grade_out_of_range` (error); `section_differs` (warning) |
+| IS-05 two series in one tab | `series_other_than_tab` (warning), note `two_series_one_tab`, `series_missing` (error) |
+| IS-06 identity | errors: `email_student_missing`, `email_parent_missing`, `email_student_is_parent`, `student_email_shared`, `email_taken`, `link_to_existing_account` (review flag 6), `duplicate_account` (review flag 3: someone not matched by email looks like an account already in the system — the same name and a parent, or the same phone; accounts the same file's commit made are its own people and stay the in-file warnings); warnings: `duplicate_student`, `duplicate_parent`; info: `student_two_parents`, `name_variants` |
+| IS-07, IS-08 money | note `no_money`; `fee_note` (info), `dropped`, `drop_intent` (warning) |
+| IS-09, IS-10 | `phone_restored` (info), `phone_unusable` (warning), `name_cleaned` (info) |
+| IS-11 to IS-14 | `column_drift` (warning), `signature` (info), `duplicate_row` (warning), `boards_in_series` (info) |
 
-Other codes:
-- the mapping and the live database: `subject_unmapped`, `teacher_missing`,
-  `teacher_on_self_study`, `registration_refused` (the window's own refusal, word for word),
-  `cohort_differs`, `graduated`, `left_school`, `already_imported`;
-- the money record: `student_not_found`, `amount_unreadable`, `date_unreadable`.
+**The lines in a session** (the rework; §4.5):
+
+| Code | Severity | When |
+|---|---|---|
+| `not_offered` | error | no subject of the session fits the line's words |
+| `item_unclear` | error | the words fit none, or more than one, of the subject's items; the candidates are named |
+| `fee_missing` | error | the item has no row in its series' fee grid; the detail is priceLine's sentence naming the grid |
+| `price_provisional` | info | the grid's row is provisional: the line is priced at it and marked provisional |
+| `retake_sitting_missing` | error | the note says a retake or a second entry and neither the history nor the line names the sitting |
+| `consent_missing` | error | the sheet does not show the family's "I confirm my registration" |
+| `teacher_not_on_offer` | warning | the teacher named does not teach the subject in the session |
+| `registration_refused` | error | the session would refuse it: eligibility, the school fee, the session or series closed or past its effective deadline, a rule on lines (the sentence word for word), grade 10's core subjects |
+
+Others: `subject_unmapped`, `subject_inactive`, `teacher_missing`, `teacher_on_self_study`,
+`cohort_differs`, `graduated`, `left_school`, `already_imported`; the money record's
+`student_not_found`, `amount_unreadable`, `date_unreadable`.
 
 ### 4.2 People
 
-For each person the review shows:
-- the lines that name them;
-- the name spellings, with the most used one chosen;
-- the phone;
-- the cohort, from class and year;
-- the account it matches, when there is one;
-- the family.
+As before: the lines that name each person, the name spellings, the phone, the cohort, the account
+matched by email, the family; two children under one email hold their family until split or said
+to be one child; the same child or parent under two emails is a warning to merge or call
+different; a staff email or the other role's is an error; an existing account with the same email
+and role is matched, never recreated or renamed. New since flag 3: a person not matched by email who
+looks like an account already in the system is `duplicate_account` until staff merge them into it
+or say they are different people.
 
-The review stops the IS-06 cases from becoming wrong accounts:
-- **Two children under one student email** (different first names, or different classes) hold
-  the family. Staff either give one child's lines their own email ("split") or say they are one
-  child.
-- **The same child under two emails** (same name, a shared parent) is a warning. Staff merge the
-  two emails or say they are different people. A merge keeps the lines and points one key at the
-  other.
-- **A parent under two emails** (a shared phone, or a shared name and children): the same choice.
-- **An email that is a staff account**, or a parent's email given for a student (or the other
-  way round), is an error. The account is never reused across roles.
-- An existing account with the same email and role is **matched**. It is never recreated or
-  renamed, and its password stays.
-
-### 4.3 Mapping settings: the coordinator's pending answers, with today's assumption as default
+### 4.3 Mapping settings
 
 | Setting | Values (default first) | Where it is kept |
 |---|---|---|
 | Per tab: include, and the academic year its classes are in | included; the year of the tab's main series | the batch |
-| Per series and level ("november-2026-igcse") | `history` (what the student sat before the system), `window` (registrations awaiting payment in an open window: the admin's), `skip` | the batch; the matching open window is suggested |
-| Per subject as the sheet writes it, with its level | the best-scoring catalogue row (words, then level), or none (history keeps the sheet's words) | the batch; the admin can add every missing row at once (`POST /:id/subjects`) |
-| Per teacher name | an exact match, otherwise "create" | the batch; made in the commit's reference-data step |
-| Make the sections the sheet names | on | the batch |
-| Course enrolments for the class year | on (F0b's `upsertEnrolments`, source `import`) | the batch |
-| Self-study on a taught subject (IS-03, A-02) | `retake_only` (today's rule: a first attempt waits for staff), `in_school`, `enrol_only` | the school-wide setting `import.selfStudyOnTaught`, overridable per batch and per line |
-| "Carry forward" (IS-02, Q-02) | `note_only` (kept as written), `result` (an AS result carried into this entry), `payment` (money history) | the school-wide setting `import.carryForward`, overridable per batch |
-| Graduates (finished grade 12 by now) | `import` (with their history), `skip` | the batch |
-| SCL roster: the year the grades are in | this academic year | the batch |
-
-The two school-wide settings live in F0a's settings store, in the "Import" group, which admin
-and coordinator can edit. The Mapping tab also shows the level-code readings (F0b's
-`catalogue.levelCodeReading`): how many lines each reading agrees with.
+| Per series and level ("november-2026-igcse") | `history`; **lines awaiting payment in the session of that series** (stored as `window`; the admin's); `skip` | the batch. The sessions offered are those of the series' cycle (June Y; winter Y for October and November Y; winter Y−1 for January Y); the only open one is suggested |
+| Per subject as the sheet writes it, with its level | the best-scoring catalogue row, or none | the batch; the admin can add every missing row at once (`POST /:id/subjects`: active, **no fees** — §11) |
+| Per teacher name | an exact match, otherwise "create" | the batch |
+| Make the sections the sheet names; course enrolments for the class year | on | the batch |
+| Self-study on a taught subject (IS-03, A-02) | `retake_only` (the forms' "ONLY 2nd entry"), `in_school`, `enrol_only` | `import.selfStudyOnTaught`, overridable per batch and per line |
+| "Carry forward" (IS-02, Q-02) | `note_only`, `result` (an AS result carried: the line's sitting), `payment` | `import.carryForward`, overridable per batch |
+| Graduates; SCL's grade year | `import`; this academic year | the batch |
 
 ### 4.4 What a commit would make
 
-The summary counts, over the families that are ready:
-- students and parents to create or match;
-- links;
-- section places and new sections;
-- enrolments;
-- history rows;
-- registrations;
-- money-history rows.
+The summary counts, over the ready families: students and parents to create or match, links,
+section places and new sections, enrolments, history rows, **lines awaiting payment**, money-history
+rows. Each line shows its own plan; a line in a session also carries **its line** (`plan.line`,
+`ImportLinePlan` in `@repo/validations`): the session, the offer and item and how they were found,
+the board series, the attempt and mode, the sitting it follows with its month, year, source and
+origin (history, the note, the line, a carry forward), the teacher, and the price with its course
+and board parts, their bases and percents and the provisional mark.
 
-Each line shows its own plan. A line whose everything exists already says `already_imported`.
+### 4.5 A line in a session (RESERVATIONS_REWORK.md §9's F7 list)
+
+For a line whose series and level the admin mapped to its session (`lineOf` in view.ts):
+
+1. **Offer and item.** `findOffer(sessionId, term, { subjectId })` and `findItem(offerId, label,
+   { month, year })` (added to A's `offer.services.ts`, §6): the offer of the mapped catalogue row,
+   else the subject named by name or code (or without its bracket), else the one offer with an item
+   entering a unit the words name ("Pure Mathematics 1 (P1)" → the IAL Mathematics offer's P1 item);
+   the item labelled so, else the one entering exactly the unit or paper named, else the whole
+   subject; among several, the one in the sheet's month and year. Staff may choose the item on the
+   line (`offerItemId`, one of the session's items).
+2. **Attempt, mode and the sitting** (the lead's rules of 8 Oct, MO-25's interim rule):
+   - mode: self-study from the answer or the note, or when the item or offer is self-study only;
+   - a **retake with source `legacy`** when the student's history has the subject in an earlier
+     series of the item's board **that had ended when it was committed** (the history row's
+     creation; a history line of the same file counts as committed now) — the latest such;
+   - a **retake with source `declared_by_desk`** when the sheet names the sitting ("From June
+     2026"; "Carry forward on …" read as a result) or staff name it on the line; listed on the
+     session's To verify tab;
+   - a carried-forward route (`needs_prior_series`) is a first entry carrying the sitting named;
+   - a note that says a retake with neither: `retake_sitting_missing` (error) — never `legacy`
+     without a series;
+   - self-study on a first entry of a taught item: `self_study_on_taught` (error) unless the
+     coordinator's answer (`in_school`: taught; `enrol_only`: enrolment, no line), the line's
+     choice, or the student's `gate.selfStudyFirstEntry` exception;
+   - B's known sittings (`knownSittingsOf`) are **not** extended to `registration_history`: at the
+     desk a sitting not on record is declared and verified.
+3. **The teacher**: the one the sheet names when the item or offer has them; else its only one;
+   else none yet ("no preference").
+4. **The price**: `priceLine(item, attempt, mode, student, session)` from the series' fee grid now —
+   a missing row is `fee_missing` with priceLine's sentence naming the grid; a provisional row is
+   `price_provisional` and the line priced at it, **never 0** (MO-9).
+5. **The session's own checks**: `sessionWindow` with the line (open, or the student's extension),
+   the effective deadline (`effectiveDeadlineFor`; a series with no dates takes no line), the
+   student's eligibility (`mayRegisterFor`, or `judgeEligibility` for a student the import will
+   make), the school-fee gate, the family's confirmation.
+6. **The rules on lines**: `assertLineRules` per student and session in a transaction that is
+   rolled back — each line against the student's lines in the system and the file's earlier ones
+   (availability, a retake's sitting, exclusive items, the same entry once across sessions, the
+   items a first entry requires, the carry-forward period; a sitting not on record is made inside
+   the rollback to be checked); grade 10's core subjects over the student's lines together.
 
 ## 5. The commit
 
 `services/import/commit.ts`, `commitImport(batchId, actor)`:
 
-1. **The claim.** A status-guarded `UPDATE` moves `staged|partial → committing`.
-   - A second commit at the same moment is refused with 409, naming who is committing.
-   - A claim older than 15 minutes (a process that stopped) can be taken over.
-   - On any error the status returns to what it was.
-2. **The admin's part.** A non-admin commit that would make a live registration is refused with
-   403: registering families is the admin's, because registrations wait for money. Adding
-   catalogue rows is also the admin's (they carry prices). Changing a series to `window` is
-   refused to the coordinator at the settings step too.
-3. **Reference data**, in one transaction under an advisory lock (`import:reference`):
-   - teachers the ready lines name, looked for again by name under the lock;
-   - the sections the ready lines place students in, when the year is set up.
+1. **The claim.** A status-guarded `UPDATE` moves `staged|partial → committing`; a second commit
+   at the same moment is refused with 409 naming who is committing; a claim older than 15 minutes
+   can be taken over, and a commit taken over writes neither its final status nor a reset (review
+   flag 5).
+2. **The admin's part.** A non-admin commit that would make a line in a session is refused with 403
+   ("Reserving lines for families in a session is the admin's …"); mapping a series to a session is
+   refused to the coordinator at the settings step too; adding catalogue rows is the admin's.
+3. **Reference data**, in one transaction under an advisory lock: teachers the ready lines name, and
+   the sections they place students in.
+4. **Each ready family in its own transaction** (its view worked out again):
+   - its `import_row`s held `FOR UPDATE`, only lines not yet committed taken;
+   - sections locked, then accounts (no password: "Forgot password" sets one), links (a link to an
+     existing account only once confirmed on its line), section places, `registration_history`,
+     course enrolments (`upsertEnrolments`, source `import`);
+   - **lines in a session** (`reserveImportLines`), per student and session: the student held first
+     (`assertMayRegisterForInTx`, `FOR NO KEY UPDATE`, as every reservation path); a line the
+     student holds already on the item is not made again; each line's window and effective
+     deadline; a sitting named but not on record made as a board series with no dates
+     (`findOrCreateSeries`, audited); the school-fee gate; then **`insertLines`** — the rework's
+     locks in their order, `assertLineRules`, `priceLine` from the grid, the due date, the teacher —
+     status `pending_payment`, `[IMPORT] file — tab row n` in its comments; then
+     **`writeConsents(…, { channel: 'imported' })`**: the sheet's "I confirm my registration" is the
+     family's consent to the refund policy and the declaration, and freezes the session's refund
+     steps on the line as B's consent does; `IMPORT_REGISTRATION` lists each line with its row,
+     item, attempt, mode, sitting source, price and provisional mark;
+   - money history (fee notes; carried-forward payments under that reading);
+   - each line marked committed with what it made; `IMPORT_FAMILY_COMMITTED`.
+5. **A family that fails rolls back whole**; its lines say why. A unique violation (an email taken
+   meanwhile) retries the family once.
+6. The batch becomes `committed` or `partial`; `IMPORT_COMMITTED` in the same transaction.
 
-   Both are audited (`SECTION_CREATED` via import, `IMPORT_REFERENCE_DATA_CREATED`). The teacher
-   ids are written back into the batch's settings.
-4. **Each ready family in its own transaction:**
-   - the family's `import_row`s are held `FOR UPDATE`, and only lines not yet committed are taken;
-   - the students' sections are locked first, then the accounts are inserted. There is no
-     password: the family sets one through "Forgot password"; better-auth creates the credential,
-     and 08n proves the sign-in. Each account is audited as `IMPORT_ACCOUNT_CREATED` and
-     `STUDENT_COHORT_RECORDED` (how: import);
-   - links are made approved (`LINK_APPROVED` via import);
-   - section places, through `addSectionMembersInTx`, F0a's own checks;
-   - `registration_history` rows;
-   - course enrolments, through `upsertEnrolments(..., { source: 'import' })` with
-     `source_ref` = `import:<batch>:<tab>!<row>`;
-   - registrations in an open window, through the desk's own path: `assertMayRegisterForInTx`,
-     the window, core subjects in grade 10 June, the teacher link, `prepareRegistrationInputs`
-     (price, retake, school-fee gate) and `insertRoutedRegistrations` (F0b's board series).
-     They are `pending_payment`, with `[IMPORT] file — tab row n` in their comments, and
-     audited as `IMPORT_REGISTRATION`;
-   - fee notes and carried-forward payments as `money_history`;
-   - finally, each line is marked committed with what it made, the persons are recorded, and
-     `IMPORT_FAMILY_COMMITTED` lists what the family made.
+The import does not move existing lines (RESERVATIONS.md §2.11–§2.12's three calls for a move of
+lines do not apply): it makes new ones, through the reservation paths' own function.
 
-   Every audit row is written inside the family's transaction.
-5. **A family that fails rolls back whole.** Its lines say why, and the others stand.
-   - An email taken at the same moment by someone else (a unique violation) makes the family be
-     worked out again and retried once, and that account is then matched.
-   - A database refusal is logged on the server and shown to staff as a plain sentence.
-6. The batch becomes `committed`, or `partial` while held families remain, with the result: the
-   families committed and failed, what was made, and the teachers and sections created.
-   `IMPORT_COMMITTED` is written in the same transaction.
+**Running it again changes nothing**: what exists is found; the unique keys stop a second copy
+(users by email, links, open enrolments, history and money history by fingerprint, the live line
+per student, session and item).
 
-**Running it again changes nothing.** What exists is found (the plan says `match`, `exists`,
-`history_exists`, `live_exists`). The database's unique keys stop a second copy of anything:
-- users by email;
-- links;
-- open enrolments;
-- `registration_history` and `money_history` by (student, fingerprint);
-- active registrations.
-
-A re-staged file carries its review over, so the same families are ready. 08n and the real
-sheet both show a re-run making nothing.
-
-**Money.** `commit.ts` imports no payment, escrow or receipt table. 08n checks this structurally,
-and control C4 makes it red.
+**Money.** `commit.ts` imports no payment, escrow or receipt table (08n checks it; C4). The lines it
+makes are priced and wait for payment; nothing is paid.
 
 ## 6. Changes outside the import
 
-- **A subject recorded before the system is a sitting** (V3 §6.9).
-  - `getRetakeSubjectIds` reads `registration_history` (outcome registered or dropped, subject
-    mapped) as well as confirmed or dropped registrations in other windows.
-  - A retake allows outside school at the outside rate, so this is a money path, with 08n
-    scenarios.
-  - **History counts only when its series is earlier than the window's** (`seriesOrder` in
-    `@repo/validations`). History of the window's own series is the same sitting, and a later
-    series has not happened yet.
-  - The first version counted any history. The real sheet's re-run showed it: 30 self-study
-    lines were called retakes of the history just written for their own series. At the desk that
-    was a half-price retake, reproduced red in 08n first (§9, C13 and C14).
-  - **Interim rule (the lead's decision on the review, flag 2): history counts only when its
-    series had already ended when the file was committed.** A series is over once its month is
-    (`seriesEndsOn` / `seriesEndedBy`, the school's day): every board's January, June, October
-    and November papers end within that month, so this is never earlier than the board's last
-    paper. The time is the history row's own creation, which is the family's commit.
-  - The rule applies at the desk, in the commit and in the review alike. November Y history
-    committed on 15 November is not a sitting before a June Y+1 window; committed on 1 December,
-    it is (08n "the interim retake rule", controls C21 and C22).
-  - Whether sheet history, with no payment behind it, may unlock the outside-school price at
-    all is the owner's (§13, question 9; MONEY_AUDIT.md MO-25).
-- `prepareRegistrationInputs(..., executor)`. The import reads inside its family's transaction,
-  which holds the teacher links and the history it has just written. Every other caller reads
-  committed data, as before.
-- `addSectionMembersInTx(tx, ...)`, split out of `addSectionMembers`, which now wraps it with the
-  same locks and checks.
-- The settings store gains the "Import" group with two keys, and the Settings screen now shows the
-  "catalogue" and "import" groups. F0b's `levelCodeReading` was missing from the screen and now
-  shows too.
-- Audit actions:
-  - `IMPORT_STAGED`, `IMPORT_REVIEWED`, `IMPORT_REFERENCE_DATA_CREATED`, `IMPORT_ACCOUNT_CREATED`;
-  - `IMPORT_FAMILY_COMMITTED`, `IMPORT_REGISTRATION`, `IMPORT_COMMITTED`, `IMPORT_DISCARDED`;
-  - the entity type `import`.
+- **`findOffer` and `findItem`** (`apps/api/src/services/offer.services.ts`, A's service; the
+  smallest addition: nothing on main served them — `resolveItem` gives a subject's whole item
+  only). Named in RESERVATIONS.md §2.12.
+- **03-v3-flows**: F7's scenario of review flag 1b restated on the new model (an item with no fee row
+  in its series refused on the student's request, the parent's direct reservation and the desk,
+  naming the grid; reserved at its price once finance sets the row).
+- **09-money-invariants**: F7's money-history rule also covers charges and charge payments; a new
+  rule over every line the import made (§9).
+- Gone with main's merge: F7's changes to `getRetakeSubjectIds` (sheet history as a sitting at the
+  desk, the interim rule there) and to `prepareRegistrationInputs` (the no-price refusal, its
+  executor) — both functions are gone on main; their purposes are kept by the import's own lines
+  (§4.5) and by priceLine's refusal on every path.
+- Kept from before: `addSectionMembersInTx`, the settings store's "Import" group and the Settings
+  screen's catalogue and import groups, the audit actions (`IMPORT_*`, entity `import`).
+- **Arabic**: the import's dictionary (`apps/web/lib/i18n-import.ts`) gains patterns for the rework's
+  refusals a line can carry (priceLine's missing grid row, the rules on lines, the deadline
+  sentences); the import's translator runs first for every screen, so these read in Arabic on the
+  Reserve pages too.
 
 ## 7. Roles and endpoints
 
-All endpoints sit under `/v1/imports`, behind `requireAuth` and `requireAcademic` (admin and
-coordinator), and are gzipped (`hono/compress`).
-
-| Endpoint | Who | What |
-|---|---|---|
-| `GET /` | admin, coordinator | every file, its state and counts |
-| `POST /` | admin, coordinator | stage an uploaded file |
-| `GET /:id` | admin, coordinator | the review |
-| `PUT /:id/settings` | admin, coordinator (`window` mode: admin) | the mapping |
-| `PUT /:id/rows` | admin, coordinator | fix, skip, include lines |
-| `PUT /:id/people` | admin, coordinator | name, phone, merge, different, one child, skip |
-| `POST /:id/subjects` | admin | add the missing catalogue rows at once |
-| `POST /:id/commit` | admin, coordinator (live registrations: admin) | commit every ready family |
-| `POST /:id/discard` | admin, coordinator | put the file aside |
-
-`authz-policy.tsv` has a row for each endpoint across all nine principals. The coordinator's
-grants are in `lib/role-grants.ts`. The uploaded file's content (`GET /v1/files/:id/content`,
-F0a) is refused to every family and every other staff role (05).
+All under `/v1/imports`, behind `requireAuth` and `requireAcademic` (admin and coordinator), gzipped.
+Unchanged by the rework: `GET /`, `POST /`, `GET /:id`, `PUT /:id/settings` (session mode: admin),
+`PUT /:id/rows`, `PUT /:id/people`, `POST /:id/subjects` (admin; no fees now), `POST /:id/commit`
+(lines in a session: admin), `POST /:id/discard`. `authz-policy.tsv` has a row for each across all
+nine principals; 05's "F7 a staged file is staff-only" stands.
 
 ## 8. Screens
 
-The screens are at `/imports` and `/imports/:id`, in the nav under Management → Import for the
-admin and School → Import for the coordinator. They use the existing components and CSS
-variables. Every string goes through `lib/i18n.tsx`, in English and Arabic
-(`lib/i18n-import.ts`), with right to left checked. Rows of data are marked `data-i18n-skip`.
-There is no new `useQuery` generic: the count is 32. Row types are derived from the fetchers.
+`/imports` and `/imports/:id` (Management → Import for the admin; School → Import for the
+coordinator, beside Sessions and Exceptions). Existing components and CSS variables; every string
+through `lib/i18n.tsx` in English and Arabic; rows of data `data-i18n-skip`; the sheet's own words
+in a problem's detail are data. No new `useQuery` generic.
 
-Each screen against the Excel version of the task (UX_AUDIT.md §4):
+Against the Excel version of the task (UX_AUDIT.md §4), as before (upload, problems, rows, people,
+mapping, commit and result), with the rework's additions:
 
-- **Upload** (`/imports`).
-  - *Excel:* there is no import. Going live means typing every family into the system at the
-    desk: 245 students and 246 parents in the real sheet, each one a sign-up, a link and a
-    registration, with the sheet open beside it.
-  - *Here:*
-    - three source cards (the school's sheet, SCL's roster, the money record), each template
-      downloadable;
-    - a drop zone and "Stage for review";
-    - the list of every file with its state and counts.
-- **The staged review** (`/imports/:id`). A summary strip shows lines, importing, left out,
-  families ready and held, and errors; "About this file" holds the notes.
-  - **Problems.**
-    - *Excel:* reading 654 lines by eye for shared emails and drifted columns.
-    - *Here:* one group per problem, with how many lines it touches, what it means, and the first
-      lines with a Fix button.
-  - **Rows.**
-    - Filters are kept in the address: to fix, with a problem, a tab, and a search.
-    - Bulk skip and include.
-    - A virtualised list: 460 lines draw 16 rows, with keyboard navigation.
-    - "Open line" shows the editor. The field a problem is about is highlighted and focused, and
-      Enter saves. The self-study answer is two buttons. It shows the decision, the plan and the
-      outcome, and the raw line "As the sheet has it".
-  - **People and conflicts.**
-    - *Excel:* noticing that two lines are one child.
-    - *Here:* conflicts first. Split a shared email, merge, "different people", "one child",
-      another email, choose the name or phone, skip or bring back, undo a merge. Then come
-      Students, Parents, Accounts found, and Merged or left out.
-  - **Mapping.**
-    - Tabs and their class year, and the SCL grade year.
-    - Each series and level: history, window (admin only) or leave out, with the open windows.
-    - Subjects mapped to the catalogue. "Add missing subjects" is the admin's; the default board
-      is Pearson for units and Cambridge otherwise.
-    - Teachers, and the sections toggle.
-    - The coordinator's answers as radio buttons, the enrolment toggle, and the level-code
-      readings.
-- **Commit and its summary.**
-  - *Excel:* none. A half-typed family stays half-typed.
-  - *Here:* "Commit N families?" says what will be made. The Result tab shows each family
-    committed or failed with its reason, what was made, and the teachers and sections created.
-    Every line keeps its outcome.
+- **Mapping → Series and levels.** *Excel:* the desk reads the sheet and types each family's
+  reservation into the system at the desk. *Here:* one choice per series and level: history, or
+  "Lines awaiting payment in <session>" (the admin's), the open session of the cycle suggested.
+  Review flag 9: the suggestion is one translatable sentence for each role ("A session of this
+  series is open" / "… — the admin can reserve these lines").
+- **The row editor → The line in the session.** *Excel:* the desk works out the subject's paper,
+  first entry or retake, the sitting, the teacher and the fee by hand. *Here:* the session, the
+  subject and item, the board series, the entry, the sitting with its source (from the student's
+  history / declared by the desk, listed to verify), the teacher and the price with its basis
+  ("course 12,000 × 50% + board 10,850 × 100%", provisional marked); three choices: the item (the
+  session's items), first entry or retake, and the sitting a retake follows.
+- **After the commit** the lines are on the session's Money tab (unpaid, provisional counted), the
+  declared ones on its To verify tab, and each on the family's Statement ("from Cambridge
+  International June 2026 (before the system)" for a legacy sitting; "(declared at the desk) to be
+  verified by the school").
 
-The screens were driven in headless Chrome on synthetic data as the coordinator and the admin:
-- upload, problems, a problem opened, rows, the editor;
-- people before and after split and merge;
-- mapping for both roles;
-- the commit dialog and the result;
-- the list, problems, rows, the editor, people and mapping in Arabic, right to left.
-
-The screenshots are `.audit/import-evidence/screens/f7-*.png`.
-
-**400+ lines** (`perf-460-rows.json`, a synthetic 460-line sheet):
-
-| Measure | Result |
-|---|---|
-| Staging and the first view | 1.0 s |
-| The review request | 32 ms |
-| The review's size | 1.1 MB of JSON, 74 KB gzipped |
-| The Rows tab to its first row | 145 ms |
-| Rows drawn | 16 |
-| A scroll across all 460 | median 17 ms, p95 17 ms, max 34 ms |
-| A search | 16 ms |
+Driven headless (Chrome, `playwright-core`) on the dev system (3091/3090, `igcse_import_dev` from
+the template) as the admin, in English and in Arabic (right to left), each on its own synthetic
+sheet of placeholder families (`.audit/import-evidence/rework/drive/`: `seed.mts` builds the
+session, subjects, teacher, items and fee grids — one row missing, one provisional, IAL Mathematics
+by unit; `sheet.mts` the sheets; `drive.mjs` the drive): upload, staged review, mapping to the
+session, the problems, the line of a legacy retake, of a declared sitting, of a self-study first
+entry (then "Taught in school instead"), of a provisional fee, of a missing grid row (then left
+out), of a retake naming no sitting (then the sitting named), of a unit, of a line whose item staff
+choose, the commit dialog, the result, the session's Money and To verify tabs, and the statement.
+Screenshots: `.audit/import-evidence/rework/screens/f7r-{en,ar}-*.png` (40). In Arabic every page of
+the app reports one React hydration error (the language is read from local storage after the first
+render); it is the same on pages F7 does not touch (`drive/hydration-check.mjs`) and is not F7's.
 
 ## 9. Tests
 
-`apps/api/test/08n-import.test.ts` (35 tests), with its fixtures in `import-fixtures.ts`: a
-minimal xlsx writer, and synthetic sheets with the real sheet's shapes.
+`apps/api/test/08n-import.test.ts` (55 tests), fixtures in `import-fixtures.ts`.
 
-| Scenario (FEATURES_PLAN F7) | Test |
+| Scenario | Test |
 |---|---|
-| a sheet with the spike's known problems staged with every problem flagged | "a sheet with the spike's known problems…": tabs read by their headers; one test per IS finding (IS-01 … IS-14); the mapping's suggestions and plan counts; staging changes nothing in the school |
-| a commit creating exactly the reviewed rows | "the review, then a commit…": fix (a typed email, a split, a parent's own email, a class), merge and skip, carry forward read as an AS result, then the commit's exact users, links, sections, enrolments, history, money history and audit counts, each traceable to its line; an imported parent signs in after "Forgot password" |
-| a re-run changing nothing | "a re-run of the same file changes nothing": staged again, the review carries over, everything is found, the commit makes nothing |
-| registrations (the admin's) | an open window suggested; each line checked as the desk would (level, price, board series, eligibility, the school-fee gate for a new family, grade-10 June core subjects); the coordinator refused; the admin's commit makes `pending_payment` registrations in their board series, never paid; a retake of imported history at the outside rate; **history of the window's own series or a later one is not a retake**, at the desk or in the review; **the interim rule**: November Y history committed before November ended is not a sitting before a June Y+1 window, committed after it is |
-| SCL template | a CSV missing columns refused with what is missing; the cohort that starts grade 10 next year, two parents, the grade-10 section in that year; the SCL id in the audit row |
-| money record | history only; no payment, receipt or balance moves; the same file again adds nothing; the structural check that the commit touches no payment, escrow or receipt table |
-| the race | two staff commit the same staged file while the claim row is held: [200, 409], each family made once (8 users, 4 `IMPORT_FAMILY_COMMITTED`, 1 `IMPORT_COMMITTED`) |
+| a sheet with the spike's known problems staged with every problem flagged | "a sheet with the spike's known problems…", one test per IS finding |
+| a commit creating exactly the reviewed rows | "the review, then a commit…" |
+| a re-run changing nothing; the same sheet re-exported; the money record with a line inserted (flag 3) | "a re-run of the same file changes nothing" (four tests) |
+| a look-alike inside one file stays a warning at the commit | "look-alikes inside one file…" |
+| **§9: a row mapped to an offer and item** | "lines in a session…": each line's offer, item, series, attempt, mode, sitting, teacher and price; "a unit line finds the IAL subject's item…": P1 by its unit |
+| **§9: the fee note to attempt and mode** | the same: self-study first entry refused (the lead's sentence); not taught → first entry in self-study at 50% / 100%; a retake of history (legacy) and of a sitting the note names (declared_by_desk), both at the self-study share; a retake naming no sitting refused (its sentence); staff naming the sitting; the coordinator's answer; the student's exception (and used) |
+| **§9: a row refused for a missing fee grid, naming the grid** | the gridless subject (and priced once finance sets the row); the import-added subject (add-subjects test); 03 on every path |
+| **§9: a provisional grid prices the line provisional, never 0** | the provisional subject: 1600 = 1000 + 600, provisional |
+| **§9: consent 'imported' and the sitting's source on the line** | "the admin commits…": both consents `imported`, `prior_sitting_source` legacy / declared_by_desk, the series of the sitting; "a line whose family's confirmation is not on the sheet…" |
+| **§9: the statement and the Money tab show imported lines right** | "the statement and the session's Money tab…"; the To verify tab lists the declared ones, not the legacy one; B's known sittings do not read sheet history |
+| the rules on lines in the review | P2 (retakes only) refused as the commit refuses it; a paper set waits for staff's item |
+| the interim rule (MO-25) | committed on 15 November: a first entry; on 1 December: a legacy retake of Cambridge November Y; never for a line of November itself |
+| the race: the import and the desk on one unit in one series from two sessions | forced with a pause at IMPORT_REGISTRATION: one live line, the desk refused (gate.sameEntryOnce) |
+| two staff committing one file; a commit taken over; the re-read under the lock | as before (flag 5) |
+| SCL template; money record; files not read whole; series order | as before |
 
-Also:
-- **authz-policy.tsv:** a row for each of the 9 endpoints across the 9 principals.
-- **05:** "F7 a staged file is staff-only". The parents and students of both families, the
-  finance officer, the finance admin, the teacher and the gate get 403 on the review, the list,
-  rows, people, commit and discard, and 404 on the file's content; nothing changes.
-- **09:** "F7: money from before the system is history only". Every `money_history` row traces to
-  a committed `import_row`, and none shares a transaction (`xmin`) with an escrow movement, a
-  payment registration, a payment or a receipt.
-- **08f:** the coordinator's editable settings gain the two import keys.
+Also: **authz-policy.tsv** (9 endpoints × 9 principals); **05** "F7 a staged file is staff-only";
+**09** "F7: money from before the system is history only" (now with charges and charge payments) and
+"F7: every line the import made is a line like any other" (its basis equals its price with its fee
+rows, both consents on the imported channel, its committed import line names it, a sitting sourced
+`legacy` or `declared_by_desk`, confirmed only by a completed payment); **03** the flag-1b scenario
+on the new model; **08f** the import settings.
 
-**Controls**
-(`.audit/import-evidence/controls.py`, logs `control-C*.log`, a trail row each). Each guard was
-undone once, run, and restored:
+**Controls** on the new model (`.audit/import-evidence/rework/controls.py`, logs `control-C*.log`,
+a trail row each). Each guard undone once, run, restored:
 
 | Control | What was undone | Result |
 |---|---|---|
-| C1 | the commit claim | red, the race answers [200, 200] |
-| C2 | the carried-over review | red |
-| C3 | imported history read as a sitting | red |
-| C4 | the commit module importing `payment` | red |
-| C5 | the coordinator's `window` refusal | red |
-| C6 | the school-fee gate for a new student | red |
-| C7 | column drift flagged | red |
-| C8 | the duplicate line left out | red |
-| C9 | two children under one email | red |
-| C10 | the routes' role gate | red in 05 |
-| C11 | the family's lines re-read under the lock | **green**: the claim already serializes commits of a file. It stays as defence in depth for a claim taken over as stale |
-| C12 | C1 and C11 together | red |
-| C13 | `getRetakeSubjectIds` counting all history | red |
-| C14 | the review counting all history | red |
+| C26, C27 | flag 3: a line's / a person's decisions carried from every earlier file (not only the same bytes) | red |
+| C28 | flag 3: `duplicate_account` | red |
+| C29 | flag 3: the money fingerprint without the position | red |
+| C30 | flag 7: `self_study_contradiction` | red |
+| C31 | the review's `fee_missing` | red |
+| C32 | priceLine's refusal of a missing fee row (A's; flag 1b on the new model) | red in 03 and 08n |
+| C33 | priceLine counting provisional rows (a provisional line priced without its board fee) | red |
+| C34 | consent on the imported channel | red |
+| C35 | `consent_missing` | red |
+| C36 | a history sitting's source `legacy` | red |
+| C37 | `retake_sitting_missing` | red |
+| C38 | a self-study first entry as an error | red |
+| C39 | the student's `gate.selfStudyFirstEntry` exception read | red |
+| C40 | the interim rule in the review | red |
+| C41 | history before the item's series only | red (green at first: the interim rule covered every case built; a scenario where only the order tells was added) |
+| C42 | findOffer by a unit's code | red |
+| C43 | the rules on lines asked in the review | red |
+| C44 | the commit's student lock | red (green at first: the race was unforced, and a section place also held the student; the race is now forced and touches only the lines) |
+| C45 | the commit's 403 for lines in a session | red |
+| C1, C4, C5, C6, C9, C11, C25 | the earlier guards, run again on the new base | red |
+
+The earlier controls whose code main removed (C3, C13, C14, C19–C22: `getRetakeSubjectIds`,
+`prepareRegistrationInputs`, inactive import subjects) are superseded by C32, C36–C41.
 
 ## 10. Proof on the school's real sheet (privately)
 
-`apps/api/scripts/import-real-sheet/counts.ts` runs the real sheet through the API exactly as
-staff would:
-1. stage the sheet;
-2. the admin adds the missing catalogue rows (no prices);
-3. the coordinator commits;
-4. stage the same file again and commit it.
+`apps/api/scripts/import-real-sheet/counts.ts` runs the real sheet through the API exactly as staff
+would — stage; the admin adds the missing catalogue rows (active, no fees); the live tab mapped to
+its session with nothing offered, then back to history; the coordinator commits; stage again and
+commit — on a throwaway database (`igcse_import_real_test`), dropped at the end with the uploaded
+copy (in a directory the script makes itself). The report is written outside the repository with
+counts and row numbers only (other tabs as a count, staff as a count, ids hidden, emails masked).
 
-It runs on a throwaway database (`igcse_import_real_test`), dropped at the end together with the
-uploaded copy, even on failure. The uploaded copy goes to a directory the script makes itself
-under a fixed scratch root, and only that directory is deleted.
+**Data-rule incident (30 Sep).** The first run wrote the eight real teacher names and the run
+admin's id into its report and the implementer printed it before redacting it; the names remain in
+that session's transcript; `counts.ts` redacts before writing since. The trail's `incident` row
+records it.
 
-**Data-rule incident.** The first run (on 9f8bd13) was not counts only. It wrote the eight real
-teacher names, and the run admin's id, into `real-sheet-run.md`, in the commit block's list of
-teachers created. The implementer then printed that file into the session before redacting it.
-- The names were replaced in the file by a count.
-- `counts.ts` now redacts before it writes: staff as a count, ids hidden, an error's emails
-  masked.
-- The file is ignored by the repository and was never committed, but the names remain in the
-  session transcript.
-- The trail's `incident` row records it.
-
-Later runs' reports hold counts and row numbers only. The runs were:
-- on 9f8bd13 (`real-sheet-run.md`, redacted afterwards);
-- on c0a70a3, after the retake fix (`real-sheet-run-2.md`).
-
-**Staged**
-- 654 lines, from tabs "2024" (220 lines, November 2026) and "Sheet1" (434 lines, June 2023);
-  seven roster tabs were listed and left alone.
-- 649 lines importing; 5 left out (duplicates).
-- 244 families: 222 ready, 22 held by 74 error lines.
-
-**The 74 error lines**
-
-| Problem | Lines |
-|---|---|
-| two children under one email | 53 |
-| a student's email is a parent's | 12 |
-| parent email missing | 8 |
-| student email missing | 3 |
-
-**Warnings**
-
-| Problem | Count |
-|---|---|
-| subject not in the catalogue (before the admin added 52 rows) | 649 lines |
-| carry forward | 19 lines |
-| a series other than its tab's | 18 lines |
-| "I will drop the course" | 9 lines |
-| dropped | 6 lines |
-| unusable phone | 5 lines |
-| duplicate line | 5 lines |
-| column drift | 5 lines: Sheet1!329, 330, 349, 428, 429, as the spike found |
-| the same parent under two emails? | 49 people |
-| the same child under two emails? | 25 people |
-| cohort differs | 6 people |
-
-**Information**
-
-| Note | Count |
-|---|---|
-| phone restored | 639 lines |
-| name cleaned | 286 lines |
-| unit lines | 208 |
-| Signature | 157 lines |
-| "A.S./A.2." on a unit | 82 lines |
-| "A.L." | 42 lines |
-| fee notes | 40 lines |
-| self-study on a taught subject | 35 lines |
-| self-study, not taught | 9 lines |
-| name variants | 52 people |
-| graduated | 149 people |
-| a child with two parents | 26 people |
-
-**The commit** (the coordinator, history only)
-
-| Committed | Count |
-|---|---|
-| families | 222 (0 failed) |
-| students | 245 |
-| parents | 246 |
-| links | 269 |
-| section places | 114 |
-| enrolments | 200 |
-| history rows | 567 |
-| money-history rows (fee notes) | 40 |
-| teachers | 8 |
-| sections (11A–E and 12A–D) | 9 |
-| registrations | 0 |
-| payments | 0 |
-
-**The re-run.** The review carried over and found the 567 history rows there; the commit made
-nothing, and no table changed. On the first run the re-run's review called 30 self-study lines
-retakes of their own series' history. That was the bug fixed in c0a70a3; on the second run the
-re-run reads as the first staging.
+**On the new model (8 Oct, after the look-alike fix):**
+- Staged: 654 lines, 649 importing, 5 left out (duplicates); 244 families: 222 ready, 22 held by 74
+  error lines (two children under one email 53, a student's email is a parent's 12, parent email
+  missing 8, student email missing 3) — as before.
+- The commit (the coordinator, history only): 222 families, 0 failed; 245 students, 246 parents,
+  269 links, 114 section places, 200 enrolments, 567 history rows, 40 money-history rows, 8
+  teachers, 9 sections, 0 lines, 0 payments — as before.
+- The re-run: the review carried over (222 ready, 22 held, 74 error lines) and no table changed.
+- **Found on the run**: before the fix one family failed in the commit although the review had
+  called it ready (§11, the look-alike decision); reproduced in 08n, fixed, run again.
+- **The live tab mapped to the winter 2026 session** with nothing offered yet: 5 series groups
+  (November 2026 at three levels, January 2027 at two), 219 lines that would be lines in the
+  session, each `not_offered` until the school offers its subject there — 16 distinct subjects as
+  the sheet writes them with their level — besides the identity errors already held.
+- **Self-study, reconciled with the spike (review flag 7).** 44 self-study lines importing = the
+  "2024" tab's 13 (its yes/no column holds 14 Yes; one of those lines is left out as a duplicate,
+  IS-13) + Sheet1's 31 = the 23 "Self Study" fee notes the spike read + 7 Yes answers of Sheet1's
+  own unlabelled yes/no column with no note (rows 29, 166, 208, 213, 214, 402, 427) + row 172,
+  whose note gives the external rate. The spike's 37 was 14 + 23. Three lines carry a self-study
+  note against an explicit No (Sheet1 rows 97, 172, 433): flagged `self_study_contradiction`.
 
 ## 11. Decisions and why
 
-- **The review is computed, not stored.** Stored state is only what staff decided. Everything
-  else follows the database as it is when staff look, so a family onboarded at the desk during
-  the review is matched rather than duplicated.
-- **One transaction per family, not per file.** A file of 244 families should not wait on one
-  shared email. Each family is whole or absent, and the held ones wait for their fixes.
-- **Email is the key, and the review refuses what email cannot tell apart** (IS-06). Two children
-  under one email are never made one account. A staff email is never reused as a family's.
-- **A live series defaults to history.** Registering families makes money owed, so it is the
-  admin's choice per series and level, and every live line faces the desk's own checks. The
-  coordinator can bring the whole school in as history without that power.
-- **No money is imported as money.** A fee note, a carried-forward payment or a money-record line
-  is `money_history`. The module that commits cannot import the money tables. Registrations the
-  import makes wait for payment like any other (F-01: how pre-system payments become confirmed
-  is the owner's).
-- **History is a sitting only before the window's series.** The same series is the same sitting;
-  otherwise the default history import would make the live tab's subjects half-price "retakes".
-- **Imported accounts have no password.** The school vouches for the email, as a desk-made
-  account does (verified). The family sets its password through "Forgot password", whose link
-  only the email's owner receives.
-- **Idempotency lives in the database**, in unique keys over fingerprints. A re-run is safe even
-  without the carried review.
-- **Teachers are matched by exact name only.** Near matches are left to staff on the Mapping tab,
-  because a wrong teacher is worse than a new one.
+- **The review is computed, not stored**; **one transaction per family**; **email is the key, and
+  the review refuses what email cannot tell apart**; **idempotency lives in the database**;
+  **teachers matched by exact name only** — as before.
+- **A series maps to its cycle's session; each line finds its offer and item** (RESERVATIONS_REWORK
+  §9, §10). The sheet's words are the school's; the session is the links sheet; findOffer and
+  findItem join them, and staff choose where the words cannot tell. A line is made by
+  `insertLines`, the reservation paths' own function, so every rule, lock and price of a reservation
+  applies to it.
+- **Subjects the import adds are active, with no fees** (the lead's answer to flag 1 on the new
+  model, 8 Oct). A subject carries no price since the rework: a line is priced from its offer's
+  course fee and its series' grid, priceLine refuses a missing row on every path naming the grid,
+  and a new session lists every active subject closed — so an active subject with no price cannot
+  be reserved for free (**MO-9**: a line is never priced 0 for want of a fee). 08n keeps a row of
+  such a subject refused, naming the grid, until its offer has a fee row.
+- **A retake only from a legacy history series or a sitting named on the sheet** (the lead's answer
+  Q2, 8 Oct; MONEY_AUDIT.md MO-25). History counts only when its series had ended when it was
+  committed and is before the item's series; its source is `legacy` with that series on the
+  item's board. A sitting named on the sheet or the line is the desk's declaration, verified on To
+  verify. A retake or self-study note with neither is an error on the line; never `legacy` without a
+  series (that would let sheet text alone unlock the 50% self-study course price, unverified).
+  B's known sittings are not extended to `registration_history`.
+- **Self-study on a first entry is an error on the line, never priced at the share silently** (the
+  lead's addition): `gate.selfStudyFirstEntry` refuses it without the student's exception; the
+  import shows it before the commit, with the way out.
+- **The sheet's confirmation is the family's consent** (RESERVATIONS_REWORK.md §3.5: "an imported
+  line records the sheet's confirmation column on the imported channel"); a line without it is an
+  error, not a line made without consent. The consent freezes the session's refund steps on the
+  line, so a session the import reserved in has its refund policy fixed, as after any family's
+  consent.
+- **The rules on lines are asked in the review in a rolled-back transaction**, line by line against
+  the file's earlier lines, so the review judges as the commit will; grade 10's core rule is asked
+  over the student's lines together (asked per line it would blame every line).
+- **An account the same file's commit made is the file's own person** (found on the real sheet):
+  `duplicate_account` compares with accounts already in the system, not with the families this
+  commit has just made — their look-alikes are the review's warnings, which do not hold a family.
 
 ## 12. Deferred, and why
 
-- **The SCL student id is not stored on the user.** It is kept in the audit row. Whether the
-  school wants it as an identifier is a question (Q-05, Q-09).
-- **No invitation emails.** The commit does not email families: the school decides when go-live
-  is announced. "Forgot password" works today.
-- **Registrations paid before go-live cannot be marked paid by the import.** They are history, or
-  `pending_payment` in a window (F-01).
-- **F4 and F5 do not read `registration_history` yet.** F4's `getSittings` and F5's advisor
-  should (§2 contract).
-- **The commit works the review out again per family.** It is correct under concurrent change.
-  The real sheet's whole run (staging, the review, adding subjects, and committing 222
-  families) took 13 s; it would be slow only at thousands of families.
-- **The money record's own format** waits for the real record (F-01). The template is the
-  mapping target.
+- **The SCL student id is not stored on the user** (audit row only; Q-05, Q-09).
+- **No invitation emails** at the commit (the school decides when go-live is announced).
+- **Lines paid before go-live cannot be marked paid by the import** (F-01): they are history, or
+  lines awaiting payment.
+- **A line that names two papers** ("Biology (Paper 3 & Paper 4)") is one sheet line and one
+  reservation line: staff choose its item, or reserve the second at the desk. Splitting a row is
+  not built.
+- **The import does not create offers, items or fee rows**: the school's links sheet and fee lists
+  are the session's (the admin's Subjects and Fees tabs). The real run shows 16 subjects the
+  winter session must offer before the live tab can become lines.
+- **F4 and F5 do not read `registration_history` yet** (§14).
+- **The money record's own format** waits for the real record (F-01).
 
 ## 13. Questions for the owner (through the coordinator)
 
-1. **Shared and missing emails** (IS-06, Q-05): 53 lines where two children share an email, 12
-   where a student's email is a parent's, 11 missing. Staff can split them in the review, but
-   which email belongs to whom is the family's. Should the desk collect a proper email per
-   child before go-live?
-2. **Registrations paid before go-live** (F-01): how they become confirmed in the system (a
-   money record the finance admin posts, or registrations created paid by the admin with a
-   receipt).
+1. **Shared and missing emails** (IS-06, Q-05): should the desk collect a proper email per child
+   before go-live?
+2. **Lines paid before go-live** (F-01): how they become confirmed.
 3. **Carry forward** (IS-02, Q-02): a result or a payment. Today: kept as a note.
-4. **Self-study on a taught subject** (IS-03, A-02): today's rule allows it only on a retake.
-   Should the 35 real lines be in school, enrolment only, or allowed?
-5. **Boards and level codes** (IS-01, IS-14): which board each subject and unit is entered with;
-   what "A.S./A.2." on a single unit means; whether "A.L." is "A.2.".
-6. **Graduates:** import the 149 students who have finished grade 12, with their history
-   (today's default), or leave them out.
-7. **The SCL id:** store it on the student as an identifier?
-8. **Invitations:** email every imported family at go-live, or let the desk hand out "Forgot
-   password"?
-9. **A retake from sheet history** (a pricing decision; MONEY_AUDIT.md MO-25): may a subject the
-   school's sheet says was sat before the system unlock the outside-school price of a retake,
-   with no payment for that sitting in the system? Until the owner answers, the lead's interim
-   rule holds: only history of a series that had ended when the file was committed counts (§6).
+4. **Self-study on a taught subject** (IS-03, A-02): the forms say "ONLY 2nd entry"; should the 35
+   real first-entry lines be in school, enrolment only, or allowed by exception?
+5. **Boards and level codes** (IS-01, IS-14).
+6. **Graduates:** import the 149 students who have finished grade 12, or leave them out.
+7. **The SCL id:** store it on the student?
+8. **Invitations:** email every imported family at go-live, or "Forgot password" at the desk?
+9. **A retake from sheet history** (MONEY_AUDIT.md MO-25): may a subject the sheet says was sat
+   before the system make a line a retake — which unlocks self-study at its share — with no payment
+   for that sitting in the system? Until the owner answers, the lead's interim rule holds: only
+   history of a series that had ended when the file was committed, before the line's series, and
+   the line says so (`legacy`); a sitting the sheet only names is the desk's declaration and is
+   verified.
 
 ## 14. Contracts for later features
 
-- `registration_history` (student, subject, series, outcome, mode, teacher, source): what a
-  student sat before the system. `getRetakeSubjectIds` reads it; F4's sittings and F5's advisor
+- `registration_history` (student, subject, series, outcome, mode, teacher, source): what a student
+  sat before the system. The import's own lines read it (§4.5); F4's sittings and F5's advisor
   should read it too.
 - `money_history`: money before the system, for finance's history views; never balances.
 - The settings `import.selfStudyOnTaught` and `import.carryForward`.
+- **`findOffer(executor, sessionId, term, { subjectId? })` and `findItem(executor, offerId, label,
+  { month?, year? })`** (offer.services.ts; RESERVATIONS_REWORK.md §10's F7 row): the offer and item
+  a school's words name in a session, for any later path that reads the school's own sheets.
+- Lines made by the import: ordinary lines with consent channel `imported`, `prior_sitting_source`
+  `legacy` (with its series) or `declared_by_desk`, `[IMPORT]` in their comments, and an
+  `IMPORT_REGISTRATION` row naming each.
 
 ## 15. Progress log
 
-- 2026-09-30 02:47Z — started on `feature/import` from origin/main e5da650; baseline suite green
-  on `igcse_import_test` (22 files, 308 passed, 1 todo).
-- 03:14Z — schema (0041), validations, reader, staging, review, commit, routes (86a524b).
-- 03:24Z — 08n: the three named scenarios and the race (82a2e35).
-- 03:30Z — registrations in a window, SCL roster, money record, authz rows, 05, 09; suite green
-  in local time (23 files, 343 passed) (ea1f744).
-- 03:45Z — the screens: /imports and /imports/:id (7f154bf); driven once end to end in headless
-  Chrome on synthetic data as the coordinator (upload, fixes, split, merge, skip, commit).
-- After a spend-limit stop — Arabic dictionary, compact summary, editor focus (2b25624).
-- 03:46–04:20Z — screens driven in English and Arabic; 460 lines measured; the review gzipped
-  (0a9d8d1).
-- 04:25–04:27Z — controls C1–C12 (5c24ef7).
-- 04:29Z — the real sheet, privately (9f8bd13).
-- 04:45–04:51Z — the retake fix found writing this document: reproduced red, controls C13–C14,
-  fixed (c0a70a3); the real sheet run again (ddccc18); 08n proves an imported account's first
-  sign-in (3b3ce38).
-- Merged origin/main 20d87c8 (332ef18).
-- 05:10–05:14Z — gates green on b6d57d0: API and web check-types; the suite on
-  `igcse_import_test` in local time and with TZ=UTC (23 files, 345 passed, 1 todo).
-- 05:16–05:20Z — pushed `feature/import` (0036d64); CI run 36672632642 green.
-- Next: the Opus 5.5 review, then the lead's.
+- 2026-09-30 02:47Z — started on `feature/import` from origin/main e5da650; baseline green.
+- 03:14Z–04:20Z — schema (0041), validations, reader, staging, review, commit, routes; 08n; the
+  screens in English and Arabic; 460 lines measured; the review gzipped.
+- 04:25–04:27Z — controls C1–C12. 04:29Z — the real sheet, privately (§10's incident).
+- 04:45–04:51Z — the retake fix (history before the window's series), C13–C14; the real sheet again.
+- 05:10–05:20Z — gates green on b6d57d0; CI 36672632642 green on 0036d64.
+- 05:56Z — the Opus 5.5 review: don't merge yet, ten flags.
+- 06:11–06:53Z — flags 10, 1, 2, 5, 6 fixed with controls C15–C25 (trail); flag 3 fixed, its suite
+  green on the old base at 07:18Z, uncommitted when the spend limit stopped the session.
+- 2026-10-07 — frozen at e58324b for the reservations rework.
+- 2026-10-08 08:20Z — resumed (Opus 5.5). Flag 3 committed as found (9dc764b). origin/main 2a26557
+  merged by hand, 14 conflicts, the rework's side winning; 0041_import regenerated as 0050_import
+  (2226d03, flag 8).
+- 08:37Z — the lead's answers: subjects added active with no fees; retake only from legacy history
+  or a named sitting; a self-study first entry an error on the line; findOffer and findItem in A's
+  service.
+- 09:11Z — F7 on lines (39b524b): findOffer, findItem, the review's line, the commit through
+  insertLines and the imported consent, flags 7 and 9, 03 and 08n restated; CI 37755012370 green.
+- 09:25Z — new scenarios (flag 7, units and items, the rules in the review, the consent, the race)
+  and 09's rule over imported lines (adda155); the migration order proven on a copy.
+- 09:41Z — controls on the new model; C41 and C44 made to tell (the same-series scenario; the race
+  forced at IMPORT_REGISTRATION, touching only the lines).
+- 09:52Z — the real sheet on the new model: one family failed although ready — the look-alike case
+  reproduced, fixed, run again: 222 committed, re-run unchanged; flag 7's 44 reconciled with 37.
+- 10:01Z–10:28Z — the screens driven in English and Arabic on synthetic sheets, 40 screenshots;
+  the line section's wording made one sentence per entry and basis for Arabic.
+- 10:35Z — every control run again on the final code: 27 red (C26–C45, and C1, C4, C5, C6,
+  C9, C11, C25 re-run); this document, the plan's F7 contract row, MO-25's text and RESERVATIONS.md
+  §2.12's line for findOffer and findItem.

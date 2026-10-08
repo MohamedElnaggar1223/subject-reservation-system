@@ -1,11 +1,32 @@
 # C11: the family's rows re-read under the lock (re-run on the new base)
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (53 tests | 1 failed) 10061ms
-   × F7: the day-one import > a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder > the re-read under the lock: a family the other commit made while this one waited for its rows is not made again 376ms
+ ❯ test/08n-import.test.ts (55 tests | 1 failed) 10484ms
+   × F7: the day-one import > a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder > the re-read under the lock: a family the other commit made while this one waited for its rows is not made again 405ms
  Test Files  1 failed (1)
-      Tests  1 failed | 52 passed (53)
-   Duration  11.88s (transform 648ms, setup 2ms, collect 264ms, tests 10.06s, environment 0ms, prepare 37ms)
- ❯ test/08n-import.test.ts:1320:120
+      Tests  1 failed | 54 passed (55)
+   Duration  12.31s (transform 650ms, setup 2ms, collect 242ms, tests 10.48s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:1357:120
 
 # failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder > the re-read under the lock: a family the other commit made while this one waited for its rows is not made again
+AssertionError: expected [ Array(2) ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/08n-import.test.ts:1357:120
+    1355|         releaseRow = null;
+    1356|         const [a, b] = await Promise.all([refused(first), refused(seco…
+    1357|         expect(await sql(`select 1 from audit_log where action = 'IMPO…
+       |                                                                                                                        ^
+    1358|         // The line still says what the first commit made for it (the …
+    1359|         const made = await sql<{ id: string }>(`select id from registr…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

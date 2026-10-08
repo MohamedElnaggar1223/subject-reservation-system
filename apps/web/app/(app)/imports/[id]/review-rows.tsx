@@ -297,6 +297,15 @@ const OUTCOME_WORDS: Record<string, string> = {
   registration: 'Line', money: 'Money history',
 };
 
+/** The entry as one sentence (the reservation pages' words). */
+const ENTRY_WORDS: Record<string, string> = {
+  'first|in_school': 'First entry, in school', 'first|self_study': 'First entry, self-study',
+  'retake|in_school': 'Retake, in school', 'retake|self_study': 'Retake, self-study',
+};
+
+/** Problems whose detail is the sheet's own words (data, never translated). */
+const DATA_DETAILS = new Set(['fee_note', 'dropped', 'self_study_contradiction', 'subject_unmapped', 'level_code_unknown', 'class_unreadable', 'column_drift']);
+
 type SaveRows = { mutate: (json: Parameters<typeof api.v1.imports[':id']['rows']['$put']>[0]['json']) => void; isPending: boolean };
 
 /**
@@ -317,12 +326,12 @@ function LineSection({ v, row, editable, save }: { v: ImportView; row: ImportRow
       <h3 id="row-line" className="mb-2 text-sm font-semibold text-foreground">The line in the session</h3>
       {line ? (
         <dl className="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[10rem_1fr]">
-          <dt className="text-muted-foreground">Session</dt><dd><bdi data-i18n-skip="true">{line.sessionName}</bdi></dd>
+          <dt className="text-muted-foreground">Session</dt><dd><bdi>{line.sessionName}</bdi></dd>
           <dt className="text-muted-foreground">Subject and item</dt>
           <dd><bdi data-i18n-skip="true">{line.subjectName} — {line.itemLabel}</bdi> {line.found === 'staff' && <Badge tone="warning">Chosen on the line</Badge>}</dd>
           <dt className="text-muted-foreground">Board series</dt><dd><bdi data-i18n-skip="true">{line.series ?? '—'}</bdi></dd>
           <dt className="text-muted-foreground">Entry</dt>
-          <dd>{line.attempt === 'retake' ? 'Retake' : 'First entry'}{', '}{line.mode === 'self_study' ? 'self-study' : 'in school'}</dd>
+          <dd>{ENTRY_WORDS[`${line.attempt}|${line.mode}`]}</dd>
           <dt className="text-muted-foreground">Sitting it follows</dt>
           <dd>
             {line.priorSitting ? (
@@ -340,7 +349,7 @@ function LineSection({ v, row, editable, save }: { v: ImportView; row: ImportRow
             {line.price ? (
               <>
                 <span className="tabular-nums">EGP {egp(line.price.total)}</span>{' '}
-                <span className="text-muted-foreground">(<span>course</span> <span className="tabular-nums">{egp(line.price.courseFee)}</span> <span>at</span> <span className="tabular-nums">{line.price.coursePercent}%</span> <span>+ board</span> <span className="tabular-nums">{egp(line.price.boardFee)}</span> <span>at</span> <span className="tabular-nums">{line.price.boardPercent}%</span>)</span>
+                <span className="block text-xs text-muted-foreground">{`course ${egp(line.price.courseFeeBase)} × ${line.price.coursePercent}% + board ${egp(line.price.boardFeeBase)} × ${line.price.boardPercent}%`}</span>
                 {line.price.provisional && <> <Badge tone="warning">Board fee provisional</Badge></>}
               </>
             ) : <span className="text-muted-foreground">Not priced: the series’ grid has no fee for it</span>}
@@ -439,7 +448,7 @@ export function RowEditor({ id, v, row, editable, onClose }: { id: string; v: Im
                     <SeverityDot severity={p.severity} />
                     <span>
                       <span className="font-medium text-foreground">{problemTitle(p.code)}</span>
-                      {p.detail && <> <span className="text-muted-foreground">—</span> <bdi className="text-muted-foreground">{p.detail}</bdi></>}
+                      {p.detail && <> <span className="text-muted-foreground">—</span> <bdi className="text-muted-foreground" {...(DATA_DETAILS.has(p.code) ? { 'data-i18n-skip': 'true' } : {})}>{p.detail}</bdi></>}
                       <span className="block text-xs text-muted-foreground">{problemMeaning(p.code)}</span>
                     </span>
                   </li>

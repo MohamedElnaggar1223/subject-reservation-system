@@ -1,13 +1,46 @@
 # C45: reserving lines in a session is the admin's (the commit's 403)
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (53 tests | 2 failed) 10451ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > staff settle each line: the self-study answer, the fee row set on the Fees tab, the sitting named; the coordinator may not commit lines 869ms
+ ❯ test/08n-import.test.ts (55 tests | 2 failed) 10488ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > staff settle each line: the self-study answer, the fee row set on the Fees tab, the sitting named; the coordinator may not commit lines 781ms
    × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 5ms
  Test Files  1 failed (1)
-      Tests  2 failed | 51 passed (53)
-   Duration  12.41s (transform 732ms, setup 2ms, collect 271ms, tests 10.45s, environment 0ms, prepare 35ms)
- ❯ test/08n-import.test.ts:661:107
- ❯ test/08n-import.test.ts:669:19
+      Tests  2 failed | 53 passed (55)
+   Duration  12.50s (transform 692ms, setup 2ms, collect 274ms, tests 10.49s, environment 0ms, prepare 37ms)
+ ❯ test/08n-import.test.ts:678:107
+ ❯ test/08n-import.test.ts:686:19
 
 # failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > staff settle each line: the self-study answer, the fee row set on the Fees tab, the sitting named; the coordinator may not commit lines
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 403, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "Reserving lines for families in a session is the admin’s: ask the admin to commit this import, or set those series to \"History only\"",
+-   "status": 403,
++   "error": "\"\"",
++   "status": 200,
+  }
+
+ ❯ test/08n-import.test.ts:678:107
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid
+Error: This import is already committed
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08n-import.test.ts:686:19
+    684|     it('the admin commits: lines through insertLines, priced from the …
+    685|       const payments = Number((await one<{ n: string }>(`select count(…
+    686|       const out = await apiResponse(adm.api.v1.imports[':id'].commit.$…
+       |                   ^
+    687|       expect(out.result.created).toMatchObject({ students: 2, parents:…
+    688|       const lines = await sql<{
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

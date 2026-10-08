@@ -644,7 +644,7 @@ describe('F7: the day-one import', () => {
       });
       // 10: a provisional fee row prices the line provisional, at its amount — never 0.
       expect(rowAt(v, 'Live', 10).problems).toEqual([{ code: 'price_provisional', severity: 'info', detail: `board fee 600 in ${seriesName}` }]);
-      expect(lineOf(rowAt(v, 'Live', 10)).price).toEqual({ total: 1600, courseFee: 1000, boardFee: 600, provisional: true, coursePercent: 100, boardPercent: 100 });
+      expect(lineOf(rowAt(v, 'Live', 10)).price).toEqual({ total: 1600, courseFee: 1000, boardFee: 600, provisional: true, courseFeeBase: 1000, coursePercent: 100, boardFeeBase: 600, boardPercent: 100 });
       expect(rowAt(v, 'Past', 3).plan).toMatchObject({ registration: 'history', line: null });
     });
 

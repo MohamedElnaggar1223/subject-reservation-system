@@ -4,6 +4,7 @@ are run (red expected), and the source is restored. Usage: python3 controls.py [
 Each log keeps the run's proof only (CLAUDE.md, the evidence rule): the failing tests with their
 messages and the vitest summary — never the request log of the run."""
 import os
+import re
 import subprocess
 import sys
 
@@ -95,8 +96,11 @@ CONTROLS = {
 }
 
 
+ANSI = re.compile(r'\x1b\[[0-9;]*m')
+
+
 def trim(log: str) -> str:
-    lines = log.splitlines()
+    lines = ANSI.sub('', log).splitlines()
     keep = [l for l in lines if l.strip().startswith(('✓ test', '× ', '❯ test', 'Test Files', 'Tests ', 'Duration'))]
     start = next((i for i, l in enumerate(lines) if 'Failed Tests' in l), None)
     end = next((i for i, l in enumerate(lines) if start is not None and i > start and l.strip().startswith('Test Files')), len(lines))

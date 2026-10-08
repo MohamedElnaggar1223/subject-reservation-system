@@ -1,13 +1,64 @@
 # C9: two children under one email hold their family (re-run on the new base)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (53 tests | 2 failed) 10403ms
+ ❯ test/08n-import.test.ts (55 tests | 2 failed) 11183ms
    × F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > IS-06 identity: a missing email, two children under one email, a duplicate family, one email for student and parent, a child with two parents, a staff email 6ms
    × F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > the mapping suggests the catalogue rows and teachers; what a commit would do is counted 2ms
  Test Files  1 failed (1)
-      Tests  2 failed | 51 passed (53)
-   Duration  12.23s (transform 702ms, setup 2ms, collect 261ms, tests 10.40s, environment 0ms, prepare 36ms)
+      Tests  2 failed | 53 passed (55)
+   Duration  12.89s (transform 658ms, setup 2ms, collect 255ms, tests 11.18s, environment 0ms, prepare 35ms)
  ❯ test/08n-import.test.ts:196:43
  ❯ test/08n-import.test.ts:255:25
 
 # failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > IS-06 identity: a missing email, two children under one email, a duplicate family, one email for student and parent, a child with two parents, a staff email
+AssertionError: expected [] to deeply equal [ 'student_email_shared' ]
+
+- Expected
++ Received
+
+- [
+-   "student_email_shared",
+- ]
++ []
+
+ ❯ test/08n-import.test.ts:196:43
+    194|     it('IS-06 identity: a missing email, two children under one email,…
+    195|       expect(codes(rowAt(v, '2024', 13))).toEqual(['email_student_miss…
+    196|       expect(codes(rowAt(v, '2024', 14))).toEqual(['student_email_shar…
+       |                                           ^
+    197|       expect(codes(rowAt(v, '2024', 15))).toEqual(['student_email_shar…
+    198|       expect(codes(person(v, 'student', `mostafa.kids${D}`))).toEqual(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > the mapping suggests the catalogue rows and teachers; what a commit would do is counted
+AssertionError: expected { rows: 24, importing: 23, …(11) } to match object { rows: 24, importing: 23, …(4) }
+(46 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+    "families": 12,
+-   "heldFamilies": 5,
++   "heldFamilies": 4,
+    "importing": 23,
+-   "readyFamilies": 7,
++   "readyFamilies": 8,
+    "rows": 24,
+    "skipped": 1,
+  }
+
+ ❯ test/08n-import.test.ts:255:25
+    253|         ['Mr Karim', null, true], ['Mr Wael', null, true], ['Ms Mona',…
+    254|       ]);
+    255|       expect(v.summary).toMatchObject({ rows: 24, importing: 23, skipp…
+       |                         ^
+    256|     });
+    257| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

@@ -1,13 +1,66 @@
 # C29: flag 3: the money-record fingerprint without the line's position
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (53 tests | 2 failed) 10337ms
-   × F7: the day-one import > the money record (F-01): history only, never a payment > recorded on the students as history; no payment, receipt or balance moves; the same file again adds nothing 81ms
+ ❯ test/08n-import.test.ts (55 tests | 2 failed) 10670ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > recorded on the students as history; no payment, receipt or balance moves; the same file again adds nothing 115ms
    × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 27ms
  Test Files  1 failed (1)
-      Tests  2 failed | 51 passed (53)
-   Duration  12.14s (transform 665ms, setup 2ms, collect 233ms, tests 10.34s, environment 0ms, prepare 31ms)
- ❯ test/08n-import.test.ts:1032:113
- ❯ test/08n-import.test.ts:1045:101
+      Tests  2 failed | 53 passed (55)
+   Duration  12.59s (transform 682ms, setup 2ms, collect 292ms, tests 10.67s, environment 0ms, prepare 33ms)
+ ❯ test/08n-import.test.ts:1069:113
+ ❯ test/08n-import.test.ts:1082:101
 
 # failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the money record (F-01): history only, never a payment > recorded on the students as history; no payment, receipt or balance moves; the same file again adds nothing
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/08n-import.test.ts:1069:113
+    1067|       const again = await stage(coordinator, moneyRecord(), 'money-rec…
+    1068|       v = await fetchView(coordinator, again);
+    1069|       expect(v.rows.filter((r) => r.decision === 'import').every((r) =…
+       |                                                                                                                 ^
+    1070|       await apiResponse(coordinator.api.v1.imports[':id'].commit.$post…
+    1071|       expect(await snapshot()).toEqual({ ...before, money: before.mone…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out
+AssertionError: expected [ [ 2, 'create' ], …(2) ] to deeply equal [ [ 2, 'create' ], …(2) ]
+
+- Expected
++ Received
+
+@@ -3,12 +3,12 @@
+      2,
+      "create",
+    ],
+    [
+      3,
+-     "exists",
++     "create",
+    ],
+    [
+      4,
+-     "exists",
++     "create",
+    ],
+  ]
+
+ ❯ test/08n-import.test.ts:1082:101
+    1080|       // Every later line moved down one: what staff decided goes with…
+    1081|       expect(v.rows.find((r) => r.rowNumber === 5)).toMatchObject({ de…
+    1082|       expect(v.rows.filter((r) => r.decision === 'import').map((r) => …
+       |                                                                                                     ^
+    1083|       const out = await apiResponse(coordinator.api.v1.imports[':id'].…
+    1084|       expect(out.result.created).toMatchObject({ money: 1 });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

@@ -898,7 +898,10 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     let price: ImportLinePlan['price'] = null;
     try {
       const p = await priceLine(db, { item: { id: t.offerItemId }, attempt, mode: out.mode, studentId: sid ?? NEW_STUDENT, sessionId: sess.id });
-      price = { total: p.total, courseFee: p.courseFee, boardFee: p.registrationFee, provisional: p.provisional, coursePercent: p.basis.coursePercent, boardPercent: p.basis.boardPercent };
+      price = {
+        total: p.total, courseFee: p.courseFee, boardFee: p.registrationFee, provisional: p.provisional,
+        courseFeeBase: p.basis.courseFeeBase, coursePercent: p.basis.coursePercent, boardFeeBase: p.basis.boardFeeBase, boardPercent: p.basis.boardPercent,
+      };
       if (p.provisional) w.problems.push({ code: 'price_provisional', severity: 'info', detail: `board fee ${p.basis.boardFeeBase} in ${t.seriesName ?? 'its series'}` });
     } catch (err) {
       if (!(err instanceof PricingError)) throw err;

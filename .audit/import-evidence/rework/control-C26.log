@@ -1,13 +1,61 @@
 # C26: flag 3: a line's fixes and decision carried from earlier files whatever their bytes (by what the line says)
 # undone in apps/api/src/services/import.services.ts
 # summary
- ❯ test/08n-import.test.ts (53 tests | 2 failed) 11160ms
-   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 48ms
-   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 31ms
+ ❯ test/08n-import.test.ts (55 tests | 2 failed) 11019ms
+   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 43ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 28ms
  Test Files  1 failed (1)
-      Tests  2 failed | 51 passed (53)
-   Duration  13.82s (transform 784ms, setup 3ms, collect 329ms, tests 11.16s, environment 0ms, prepare 46ms)
+      Tests  2 failed | 53 passed (55)
+   Duration  13.36s (transform 667ms, setup 2ms, collect 253ms, tests 11.02s, environment 0ms, prepare 36ms)
  ❯ test/08n-import.test.ts:488:41
- ❯ test/08n-import.test.ts:1044:53
+ ❯ test/08n-import.test.ts:1081:53
 
 # failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing
+AssertionError: expected { kind: 'sheet', …(32) } to match object { Object (studentEmail) }
+(34 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "studentEmail": "farid@import.test.local",
++   "studentEmail": "",
+  }
+
+ ❯ test/08n-import.test.ts:488:41
+    486|       // The earlier files' decisions, found by what each line says: t…
+    487|       // email, the class, the confirmed link, the skip; the merge by …
+    488|       expect(rowAt(v, '2024', 13).data).toMatchObject({ studentEmail: …
+       |                                         ^
+    489|       expect(rowAt(v, '2024', 15).data).toMatchObject({ studentEmail: …
+    490|       expect(rowAt(v, '2024', 18).data).toMatchObject({ parentEmail: `…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out
+AssertionError: expected { …(25) } to match object { decision: 'skip', …(1) }
+(43 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "decision": "skip",
+-   "decisionSource": "staff",
++   "decision": "import",
++   "decisionSource": "default",
+  }
+
+ ❯ test/08n-import.test.ts:1081:53
+    1079|       const v = await fetchView(coordinator, id);
+    1080|       // Every later line moved down one: what staff decided goes with…
+    1081|       expect(v.rows.find((r) => r.rowNumber === 5)).toMatchObject({ de…
+       |                                                     ^
+    1082|       expect(v.rows.filter((r) => r.decision === 'import').map((r) => …
+    1083|       const out = await apiResponse(coordinator.api.v1.imports[':id'].…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

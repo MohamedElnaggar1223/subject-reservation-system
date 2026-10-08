@@ -132,7 +132,7 @@ export type ImportLinePlan = {
   /** The sitting it follows: the student's legacy history (an earlier, ended series), or named on the sheet or the line (the desk's declaration). */
   priorSitting: { month: 'january' | 'june' | 'october' | 'november'; year: number; source: 'legacy' | 'declared_by_desk'; from: 'history' | 'note' | 'line' | 'carry_forward' } | null;
   teacherId: string | null;
-  price: { total: number; courseFee: number; boardFee: number; provisional: boolean; coursePercent: number; boardPercent: number } | null;
+  price: { total: number; courseFee: number; boardFee: number; provisional: boolean; courseFeeBase: number; coursePercent: number; boardFeeBase: number; boardPercent: number } | null;
 };
 
 /** What a commit would do with a row. */

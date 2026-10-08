@@ -1,11 +1,36 @@
 # C30: flag 7: a self-study note against an explicit "No" is flagged (self_study_contradiction)
 # undone in apps/api/src/services/import/normalise.ts
 # summary
- ❯ test/08n-import.test.ts (53 tests | 1 failed) 10189ms
-   × F7: the day-one import > the note and the self-study answer (review flag 7), and the family's confirmation on a line > a fee note that says self-study against an explicit "No" is read as self-study and flagged; the same "No" with no note, or "Yes" with it, is not 31ms
+ ❯ test/08n-import.test.ts (55 tests | 1 failed) 11415ms
+   × F7: the day-one import > the note and the self-study answer (review flag 7), and the family's confirmation on a line > a fee note that says self-study against an explicit "No" is read as self-study and flagged; the same "No" with no note, or "Yes" with it, is not 37ms
  Test Files  1 failed (1)
-      Tests  1 failed | 52 passed (53)
-   Duration  11.99s (transform 686ms, setup 2ms, collect 252ms, tests 10.19s, environment 0ms, prepare 36ms)
- ❯ test/08n-import.test.ts:840:96
+      Tests  1 failed | 54 passed (55)
+   Duration  13.40s (transform 679ms, setup 4ms, collect 272ms, tests 11.41s, environment 0ms, prepare 37ms)
+ ❯ test/08n-import.test.ts:869:96
 
 # failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the note and the self-study answer (review flag 7), and the family's confirmation on a line > a fee note that says self-study against an explicit "No" is read as self-study and flagged; the same "No" with no note, or "Yes" with it, is not
+AssertionError: expected undefined to deeply equal { …(3) }
+
+- Expected: 
+{
+  "code": "self_study_contradiction",
+  "detail": "Self Study 50% School fees",
+  "severity": "warning",
+}
+
++ Received: 
+undefined
+
+ ❯ test/08n-import.test.ts:869:96
+    867|       ] }]), 'notes.xlsx', 'school_sheet');
+    868|       const v = await fetchView(coordinator, id);
+    869|       expect(rowAt(v, 'Notes', 3).problems.find((p) => p.code === 'sel…
+       |                                                                                                ^
+    870|       expect(rowAt(v, 'Notes', 3).data).toMatchObject({ selfStudy: tru…
+    871|       expect(codes(rowAt(v, 'Notes', 4))).not.toContain('self_study_co…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -1,11 +1,36 @@
 # C35: s9: a line with no confirmation on the sheet is an error (consent_missing)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (53 tests | 1 failed) 10693ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line whose family's confirmation is not on the sheet is an error: the import records the sheet's confirmation as the consent 68ms
+ ❯ test/08n-import.test.ts (55 tests | 1 failed) 10972ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line whose family's confirmation is not on the sheet is an error: the import records the sheet's confirmation as the consent 70ms
  Test Files  1 failed (1)
-      Tests  1 failed | 52 passed (53)
-   Duration  12.50s (transform 677ms, setup 2ms, collect 264ms, tests 10.69s, environment 0ms, prepare 33ms)
- ❯ test/08n-import.test.ts:931:68
+      Tests  1 failed | 54 passed (55)
+   Duration  12.85s (transform 684ms, setup 3ms, collect 271ms, tests 10.97s, environment 1ms, prepare 38ms)
+ ❯ test/08n-import.test.ts:960:68
 
 # failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line whose family's confirmation is not on the sheet is an error: the import records the sheet's confirmation as the consent
+AssertionError: expected undefined to deeply equal { code: 'consent_missing', …(2) }
+
+- Expected: 
+{
+  "code": "consent_missing",
+  "detail": null,
+  "severity": "error",
+}
+
++ Received: 
+undefined
+
+ ❯ test/08n-import.test.ts:960:68
+    958|       const r = rowAt(await fetchView(adm, id), 'NoConfirm', 3);
+    959|       expect(r.plan.line).toMatchObject({ itemLabel: 'M1', offerItemId…
+    960|       expect(r.problems.find((p) => p.code === 'consent_missing')).toE…
+       |                                                                    ^
+    961|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
+    962|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

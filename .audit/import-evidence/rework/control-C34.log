@@ -1,13 +1,78 @@
 # C34: s9: the sheet's confirmation is the line's consent on the imported channel
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (53 tests | 2 failed) 10325ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 439ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 20ms
+ ❯ test/08n-import.test.ts (55 tests | 2 failed) 11089ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 417ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 13ms
  Test Files  1 failed (1)
-      Tests  2 failed | 51 passed (53)
-   Duration  12.28s (transform 666ms, setup 2ms, collect 257ms, tests 10.33s, environment 0ms, prepare 34ms)
- ❯ test/08n-import.test.ts:698:28
- ❯ test/08n-import.test.ts:724:68
+      Tests  2 failed | 53 passed (55)
+   Duration  12.88s (transform 691ms, setup 2ms, collect 248ms, tests 11.09s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:715:28
+ ❯ test/08n-import.test.ts:741:68
 
 # failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid
+AssertionError: expected [ 'declaration/desk', …(1) ] to deeply equal [ 'declaration/imported', …(1) ]
+
+- Expected
++ Received
+
+  [
+-   "declaration/imported",
+-   "refund_policy/imported",
++   "declaration/desk",
++   "refund_policy/desk",
+  ]
+
+ ❯ test/08n-import.test.ts:715:28
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent
+AssertionError: expected [ [ 'Live Subject A', …(9) ], …(1) ] to deeply equal [ [ 'Live Subject A', …(9) ], …(1) ]
+
+- Expected
++ Received
+
+@@ -8,12 +8,12 @@
+      1000,
+      false,
+      "course 1,000 × 50% + board 500 × 100%",
+      "declared_by_desk",
+      [
+-       "imported",
+-       "imported",
++       "desk",
++       "desk",
+      ],
+    ],
+    [
+      "Live Subject B",
+      "retake",
+@@ -23,10 +23,10 @@
+      1000,
+      false,
+      "course 1,000 × 50% + board 500 × 100%",
+      "legacy",
+      [
+-       "imported",
+-       "imported",
++       "desk",
++       "desk",
+      ],
+    ],
+  ]
+
+ ❯ test/08n-import.test.ts:741:68
+    739|       const lines = st.students[0]!.sessions.find((s) => s.id === wind…
+    740|       expect(lines.map((l) => [l.subject, l.attempt, l.mode, l.price, …
+    741|         .sort((a, b) => String(a[0]).localeCompare(String(b[0])))).toE…
+       |                                                                    ^
+    742|         ['Live Subject A', 'retake', 'self_study', 1000, 0, 1000, fals…
+    743|         ['Live Subject B', 'retake', 'self_study', 1000, 0, 1000, fals…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

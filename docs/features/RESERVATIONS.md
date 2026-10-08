@@ -660,6 +660,16 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
   each unit its item enters (or in the subject for an item entering none), not the student's other
   units of the subject taught through another session (§2.11).
 
+Added by F7 (the day-one import, 8 Oct; docs/features/IMPORT.md §4.5, §14):
+
+- **`findOffer(executor, sessionId, term, { subjectId? })` and `findItem(executor, offerId, label,
+  { month?, year? })`** (`offer.services.ts`; RESERVATIONS_REWORK.md §10's F7 row): the offer and
+  item the school's words name in a session — the mapped catalogue row's offer, else the subject
+  named by name or code, else the one offer with an item entering a unit the words name; the item
+  labelled so, else the one entering exactly the units or paper named, else the whole subject,
+  preferring the sheet's month and year; `candidates` when none or several fit. Nothing on main
+  served them (`resolveItem` gives a subject's whole item only); no existing path changes.
+
 ## 3. As built (step 1)
 
 Commits on `feature/rework-sessions`: 7e83d60 (schema, migrations, services), d56ef27 (the F0b

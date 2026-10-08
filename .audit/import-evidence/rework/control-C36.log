@@ -1,19 +1,154 @@
 # C36: the lead's Q2: a sitting from the student's history is the legacy source
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (53 tests | 5 failed) 10390ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 205ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 552ms
+ ❯ test/08n-import.test.ts (55 tests | 5 failed) 10968ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 200ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 485ms
    × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the declared sittings are on the session's To verify tab; the legacy one is not; the desk's offers read does not take sheet history as a known sitting 8ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 13ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed after November had ended: a past sitting, so June takes it as a legacy retake in self-study, at the self-study share 65ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 12ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed after November had ended: a past sitting, so June takes it as a legacy retake in self-study, at the self-study share 81ms
  Test Files  1 failed (1)
-      Tests  5 failed | 48 passed (53)
-   Duration  12.41s (transform 683ms, setup 2ms, collect 249ms, tests 10.39s, environment 0ms, prepare 34ms)
- ❯ test/08n-import.test.ts:616:44
- ❯ test/08n-import.test.ts:684:56
- ❯ test/08n-import.test.ts:708:111
- ❯ test/08n-import.test.ts:724:68
- ❯ test/08n-import.test.ts:820:71
+      Tests  5 failed | 50 passed (55)
+   Duration  12.93s (transform 694ms, setup 2ms, collect 282ms, tests 10.97s, environment 0ms, prepare 36ms)
+ ❯ test/08n-import.test.ts:633:44
+ ❯ test/08n-import.test.ts:701:56
+ ❯ test/08n-import.test.ts:725:111
+ ❯ test/08n-import.test.ts:741:68
+ ❯ test/08n-import.test.ts:837:71
 
 # failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is
+AssertionError: expected [ { code: 'self_study_retake', …(2) } ] to deeply equal [ { code: 'self_study_retake', …(2) } ]
+
+- Expected
++ Received
+
+  [
+    {
+      "code": "self_study_retake",
+-     "detail": "a retake of June 2026 (the student’s history)",
++     "detail": "a retake of June 2026 (named on the sheet or the line, to verify)",
+      "severity": "info",
+    },
+  ]
+
+ ❯ test/08n-import.test.ts:633:44
+    631|       expect(lineOf(rowAt(v, 'Live', 6)).price).toBeNull();
+    632|       // 7: Live Two sat B last June (the Past tab, over by now): a re…
+    633|       expect(rowAt(v, 'Live', 7).problems).toEqual([{ code: 'self_stud…
+       |                                            ^
+    634|       expect(lineOf(rowAt(v, 'Live', 7))).toMatchObject({
+    635|         attempt: 'retake', mode: 'self_study', priorSitting: { month: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid
+AssertionError: expected [ [ 'live.one', …(12) ], …(7) ] to deeply equal [ [ 'live.one', …(12) ], …(7) ]
+
+- Expected
++ Received
+
+@@ -111,11 +111,11 @@
+      "self_study",
+      1000,
+      500,
+      500,
+      false,
+-     "legacy",
++     "declared_by_desk",
+      "pearson_edexcel june 2026",
+      null,
+      50,
+      100,
+    ],
+
+ ❯ test/08n-import.test.ts:701:56
+    699|          left join teacher t on t.id = r.teacher_id where r.session_id…
+    700|       expect(lines.map((r) => [r.email.replace(D, ''), r.subject, r.at…
+    701|         r.basis.coursePercent, r.basis.boardPercent])).toEqual([
+       |                                                        ^
+    702|         ['live.one', 'Live Subject A', 'first', 'in_school', 1500, 100…
+    703|         ['live.one', 'Live Subject B', 'first', 'in_school', 1500, 100…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the declared sittings are on the session's To verify tab; the legacy one is not; the desk's offers read does not take sheet history as a known sitting
+AssertionError: expected [ [ 'Live One', …(3) ], …(2) ] to deeply equal [ [ 'Live One', …(3) ], …(1) ]
+
+- Expected
++ Received
+
+@@ -9,6 +9,12 @@
+      "Live Two",
+      "Live Subject A",
+      "Pearson Edexcel November 2025",
+      "desk",
+    ],
++   [
++     "Live Two",
++     "Live Subject B",
++     "Pearson Edexcel June 2026",
++     "desk",
++   ],
+  ]
+
+ ❯ test/08n-import.test.ts:725:111
+    723|       const list = await apiResponse(coordinator.api.v1.sessions[':id'…
+    724|       const mine = list.lines.filter((l) => l.student.name.startsWith(…
+    725|       expect(mine.map((l) => [l.student.name, l.line.subject, l.sittin…
+       |                                                                                                               ^
+    726|         ['Live One', 'Live Subject C', `Pearson Edexcel June ${Y}`, 'd…
+    727|         ['Live Two', 'Live Subject A', `Pearson Edexcel November ${Y -…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent
+AssertionError: expected [ [ 'Live Subject A', …(9) ], …(1) ] to deeply equal [ [ 'Live Subject A', …(9) ], …(1) ]
+
+- Expected
++ Received
+
+@@ -21,11 +21,11 @@
+      1000,
+      0,
+      1000,
+      false,
+      "course 1,000 × 50% + board 500 × 100%",
+-     "legacy",
++     "declared_by_desk",
+      [
+        "imported",
+        "imported",
+      ],
+    ],
+
+ ❯ test/08n-import.test.ts:741:68
+    739|       const lines = st.students[0]!.sessions.find((s) => s.id === wind…
+    740|       expect(lines.map((l) => [l.subject, l.attempt, l.mode, l.price, …
+    741|         .sort((a, b) => String(a[0]).localeCompare(String(b[0])))).toE…
+       |                                                                    ^
+    742|         ['Live Subject A', 'retake', 'self_study', 1000, 0, 1000, fals…
+    743|         ['Live Subject B', 'retake', 'self_study', 1000, 0, 1000, fals…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed after November had ended: a past sitting, so June takes it as a legacy retake in self-study, at the self-study share
+AssertionError: expected { code: 'self_study_retake', …(2) } to deeply equal { code: 'self_study_retake', …(2) }
+
+- Expected
++ Received
+
+  {
+    "code": "self_study_retake",
+-   "detail": "a retake of November 2026 (the student’s history)",
++   "detail": "a retake of November 2026 (named on the sheet or the line, to verify)",
+    "severity": "info",
+  }
+
+ ❯ test/08n-import.test.ts:837:71
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+

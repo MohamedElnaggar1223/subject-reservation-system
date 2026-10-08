@@ -183,7 +183,7 @@ export const IMPORT_PROBLEMS = {
   grade_out_of_range: { severity: 'error', title: 'Grade outside 9–12', meaning: 'The school’s grades are 10–12 (9: starts grade 10 next year). Fix it on the row.' },
   // Mapping
   subject_inactive: { severity: 'warning', title: 'The subject is not active', meaning: 'The catalogue row is turned off on Subjects: history keeps it, but no enrolment or line is made for it until it is turned on again.' },
-  subject_unmapped: { severity: 'warning', title: 'Subject not in the catalogue', meaning: 'Map it to a catalogue row (or add it): until then history keeps the sheet’s words, and no enrolment or registration is made for it.' },
+  subject_unmapped: { severity: 'warning', title: 'Subject not in the catalogue', meaning: 'Map it to a catalogue row (or add it): until then history keeps the sheet’s words and no enrolment is made for it. A line in a session is still found on the session’s subjects by its words.' },
   teacher_missing: { severity: 'info', title: 'No teacher named', meaning: 'Enrolled with no teacher yet.' },
   teacher_on_self_study: { severity: 'info', title: 'A teacher named on a self-study row', meaning: 'Self-study is not taught: the teacher is not recorded on it.' },
   teacher_not_on_offer: { severity: 'warning', title: 'The teacher named does not teach it in the session', meaning: 'The line takes the subject’s only teacher in the session, or none yet (the coordinator assigns one later). Add the teacher to the subject on the session’s Subjects tab if the sheet is right.' },
