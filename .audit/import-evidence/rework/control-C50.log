@@ -1,11 +1,11 @@
 # C50: item 3: a dropped course in the file is not a sitting
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (64 tests | 1 failed) 14315ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > a course the student dropped is not a sitting: a self-study line after it is a first entry, refused without the exception — history in the system as in the file (the review of 8 Oct, item 3) 144ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 14256ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > a course the student dropped is not a sitting: a self-study line after it is a first entry, refused without the exception — history in the system as in the file (the review of 8 Oct, item 3) 133ms
  Test Files  1 failed (1)
-      Tests  1 failed | 63 passed (64)
-   Duration  16.34s (transform 713ms, setup 2ms, collect 315ms, tests 14.32s, environment 0ms, prepare 36ms)
+      Tests  1 failed | 66 passed (67)
+   Duration  16.68s (transform 740ms, setup 4ms, collect 317ms, tests 14.26s, environment 0ms, prepare 47ms)
  ❯ test/08n-import.test.ts:883:30
 
 # failures (messages)

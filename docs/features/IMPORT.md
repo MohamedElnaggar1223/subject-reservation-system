@@ -413,7 +413,9 @@ Screenshots: `.audit/import-evidence/rework/screens/f7r-{en,ar}-*.png` (40), and
 items 2 and 4 `f7s-*.png` (`drive/f7s-drive.mjs`, `sheet-split.mts`, `f7s-family.mjs`,
 `seed-family.mts`): a split line, a code chosen by staff, the result's split rows, and the family's
 Reserve page in Arabic — a placeholder family, the session closed by the admin while the page is open,
-the refusal in A's own Arabic ("نافذة التسجيل غير مفتوحة"). In Arabic every page of
+the refusal in A's own Arabic ("نافذة التسجيل غير مفتوحة"). For the review of 2ca07a4 `f7o-*.png`
+(`drive/f7o-drive.mjs`, `seed-onepaper.mts`): the forms' one-paper retake as its "Paper 4 only
+(retake)" line, and Add subject at a course fee of 0 as self-study only asking why. In Arabic every page of
 the app reports one React hydration error (the language is read from local storage after the first
 render); it is the same on pages F7 does not touch (`drive/hydration-check.mjs`) and is not F7's.
 
@@ -488,7 +490,7 @@ gives for each):
 | C46 | item 1: the carried sitting of a first entry on an item needing a prior series | red |
 | C47, C48 | item 2: the split (findItemsByCode); the commit making every line of a split row | red |
 | C49 | item 2: findOffer taking the offer entering any unit named | red |
-| C59 | item 2: a "one paper" note never split | red |
+| C59 | item 2: a "one paper" note never split (since 2ca07a4's item 1 the note's own early return; the guard it undid at first became dead code and was removed, C59 green on 20be67b showed it) | red |
 | C50, C51 | item 3: a dropped course not a sitting, in the file and in the system | red |
 | C52, C53 | item 4: the deleted "… is not open" pattern; "Add …" only as the import's own | red |
 | C54 | item 5: every student locked before the first line (since 2ca07a4's item 3, both `lockStudents` calls undone) | red (in the order where the student held is second) |
@@ -696,6 +698,14 @@ records it.
 - 13:34–13:38Z — the split driven in English and Arabic, and the family's Reserve page in Arabic with
   a session closed while open (`f7s-*.png`); the servers left running on 3091/3090 for the lead.
 - 13:47Z — pushed ed02c2b; CI 37786206839 green (564 passed, 1 todo).
+- 14:09Z — the review of 2ca07a4 (merge after: 1): /tmp/f7/real deleted (item 5).
+- 14:21Z — items 1-4 fixed with their 08n cases (67 tests); 20be67b.
+- 14:24–14:40Z — types green on 20be67b; the suite with TZ=UTC green (567 passed); in local time red
+  once (the import-and-desk race: the desk's line first, not explained, recorded in the trail), green
+  when run again, and 08n five times green after it; the one-paper line and Add subject at 0 driven in
+  English and Arabic (`f7o-*.png`).
+- 17:03–17:17Z — every control on 20be67b with its own row: 46 red, C44 green as before, C59 green — the
+  one-paper note's early return made the guard C59 undid dead; removed, C59 pointed at the early return.
 - Next: the reviewer confirms items 1 and 2 on the diff; the final merge waits for F4 on main (main
   has D at c2d7a78, its migrations to 0054): origin/main merged as its own commit, 0050_import
   regenerated after main's last migration with a later stamp and its snapshot chained, the order

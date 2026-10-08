@@ -1,12 +1,12 @@
 # C58: item 7: findOffer's name fallback matches the row's level
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (64 tests | 1 failed) 15049ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a row of the A.S. level never lands on an IGCSE subject of the same name: unmapped, it is not offered until the session offers the A.S. one 147ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 14139ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a row of the A.S. level never lands on an IGCSE subject of the same name: unmapped, it is not offered until the session offers the A.S. one 81ms
  Test Files  1 failed (1)
-      Tests  1 failed | 63 passed (64)
-   Duration  17.01s (transform 740ms, setup 3ms, collect 318ms, tests 15.05s, environment 0ms, prepare 37ms)
- ❯ test/08n-import.test.ts:1055:84
+      Tests  1 failed | 66 passed (67)
+   Duration  16.19s (transform 700ms, setup 2ms, collect 309ms, tests 14.14s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:1100:84
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -17,14 +17,14 @@ AssertionError: expected undefined to deeply equal { code: 'not_offered', …(2)
 - Expected: 
 {
   "code": "not_offered",
-  "detail": "November 2026 – January 2027 — t4-bkb3 offers no subject for \"Level Physics (imp)\"",
+  "detail": "November 2026 – January 2027 — t4-46y4 offers no subject for \"Level Physics (imp)\"",
   "severity": "error",
 }
 
 + Received: 
 undefined
 
- ❯ test/08n-import.test.ts:1055:84
+ ❯ test/08n-import.test.ts:1100:84
 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

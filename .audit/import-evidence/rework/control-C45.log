@@ -1,12 +1,12 @@
 # C45: reserving lines in a session is the admin's (the commit's 403)
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (64 tests | 2 failed) 13854ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > staff settle each line: the self-study answer, the fee row set on the Fees tab, the sitting named; the coordinator may not commit lines 775ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 4ms
+ ❯ test/08n-import.test.ts (67 tests | 2 failed) 14773ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > staff settle each line: the self-study answer, the fee row set on the Fees tab, the sitting named; the coordinator may not commit lines 889ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 6ms
  Test Files  1 failed (1)
-      Tests  2 failed | 62 passed (64)
-   Duration  16.01s (transform 717ms, setup 2ms, collect 297ms, tests 13.85s, environment 0ms, prepare 34ms)
+      Tests  2 failed | 65 passed (67)
+   Duration  16.82s (transform 716ms, setup 2ms, collect 303ms, tests 14.77s, environment 0ms, prepare 33ms)
  ❯ test/08n-import.test.ts:682:107
  ❯ test/08n-import.test.ts:690:19
 

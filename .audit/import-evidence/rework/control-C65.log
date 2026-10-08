@@ -1,0 +1,32 @@
+# C65: 2ca07a4 item 3: the family's students held before any row that names a subject
+# undone in apps/api/src/services/import/commit.ts
+# summary
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 14527ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds a family's students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3) 439ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 66 passed (67)
+   Duration  16.36s (transform 736ms, setup 2ms, collect 306ms, tests 14.53s, environment 0ms, prepare 36ms)
+ ❯ test/08n-import.test.ts:1227:22
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds a family's students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3)
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/08n-import.test.ts:1227:22
+    1225|         catch (err) { if ((err as { code?: string }).code === '55P03')…
+    1226|         finally { await c.query('rollback').catch(() => {}); await c.e…
+    1227|         expect(held).toBe(true);
+       |                      ^
+    1228|         await release();
+    1229|         expect((await apiResponse(commit)).result.created).toMatchObje…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

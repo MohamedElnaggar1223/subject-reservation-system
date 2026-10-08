@@ -1,11 +1,11 @@
 # C49: item 2: findOffer takes the one offer entering any unit named when none enters them all (the code left for staff)
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (64 tests | 1 failed) 13892ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 44ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 14422ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 59ms
  Test Files  1 failed (1)
-      Tests  1 failed | 63 passed (64)
-   Duration  15.80s (transform 723ms, setup 2ms, collect 298ms, tests 13.89s, environment 0ms, prepare 36ms)
+      Tests  1 failed | 66 passed (67)
+   Duration  16.50s (transform 812ms, setup 2ms, collect 420ms, tests 14.42s, environment 0ms, prepare 52ms)
  ❯ test/08n-import.test.ts:1002:28
 
 # failures (messages)
@@ -18,7 +18,7 @@ AssertionError: expected null to deeply equal [ { code: 'p1', …(2) }, …(1) ]
   {
     "code": "p1",
     "itemLabel": "P1",
-    "offerItemId": "9e85ff84-9133-4f10-9dc2-974296e51377",
+    "offerItemId": "aa4f0048-d092-4464-a954-52dce12e1651",
   },
   {
     "code": "p5",

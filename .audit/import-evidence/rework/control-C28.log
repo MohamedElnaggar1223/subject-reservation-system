@@ -1,11 +1,11 @@
 # C28: flag 3: a possible duplicate of an account already in the system holds its family (duplicate_account)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (64 tests | 1 failed) 14164ms
-   × F7: the day-one import > a re-run of the same file changes nothing > a child under a new email who is already an account in the system holds the family until staff say which 39ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 13769ms
+   × F7: the day-one import > a re-run of the same file changes nothing > a child under a new email who is already an account in the system holds the family until staff say which 40ms
  Test Files  1 failed (1)
-      Tests  1 failed | 63 passed (64)
-   Duration  16.23s (transform 716ms, setup 2ms, collect 306ms, tests 14.16s, environment 0ms, prepare 34ms)
+      Tests  1 failed | 66 passed (67)
+   Duration  15.68s (transform 705ms, setup 2ms, collect 277ms, tests 13.77s, environment 0ms, prepare 35ms)
  ❯ test/08n-import.test.ts:517:70
 
 # failures (messages)

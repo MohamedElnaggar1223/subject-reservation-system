@@ -1,22 +1,22 @@
 # C1: the commit claim (re-run on the new base)
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (64 tests | 6 failed) 13787ms
-   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the import is committed: nothing more changes it 21ms
-   × F7: the day-one import > a re-run of the same file changes nothing > staged again, it carries the review over and finds everything already there 44ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 279ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > the list of imports: every file, its state and its counts 6ms
-   × F7: the day-one import > two staff committing the same staged file at the same moment > one commit runs, the other is refused while it does; each family is made once 281ms
-   × F7: the day-one import > a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder > a claim under 15 minutes old is refused, naming who holds it; an older one is taken over and the commit runs 80ms
+ ❯ test/08n-import.test.ts (67 tests | 6 failed) 14602ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the import is committed: nothing more changes it 19ms
+   × F7: the day-one import > a re-run of the same file changes nothing > staged again, it carries the review over and finds everything already there 46ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 284ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the list of imports: every file, its state and its counts 10ms
+   × F7: the day-one import > two staff committing the same staged file at the same moment > one commit runs, the other is refused while it does; each family is made once 304ms
+   × F7: the day-one import > a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder > a claim under 15 minutes old is refused, naming who holds it; an older one is taken over and the commit runs 112ms
  Test Files  1 failed (1)
-      Tests  6 failed | 58 passed (64)
-   Duration  15.55s (transform 693ms, setup 2ms, collect 272ms, tests 13.79s, environment 0ms, prepare 33ms)
+      Tests  6 failed | 61 passed (67)
+   Duration  16.94s (transform 772ms, setup 2ms, collect 314ms, tests 14.60s, environment 0ms, prepare 36ms)
  ❯ test/08n-import.test.ts:448:108
  ❯ test/08n-import.test.ts:464:67
- ❯ test/08n-import.test.ts:1475:104
- ❯ test/08n-import.test.ts:1484:21
- ❯ test/08n-import.test.ts:1513:60
- ❯ test/08n-import.test.ts:1534:88
+ ❯ test/08n-import.test.ts:1554:104
+ ❯ test/08n-import.test.ts:1610:21
+ ❯ test/08n-import.test.ts:1639:60
+ ❯ test/08n-import.test.ts:1660:88
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
@@ -51,7 +51,7 @@ AssertionError: expected [ [ …(2) ] ] to deeply equal [ [ …(2) ] ]
 
   [
     [
-      "f160daa6-09ef-41aa-9c72-8a11719ea8a4",
+      "ca87eacc-fced-4a20-9386-b9f7e3dbdd9c",
 -     "committed",
 +     "partial",
     ],
@@ -73,13 +73,13 @@ AssertionError: expected 'Nothing is ready to commit: every fam…' to be 'This 
 Expected: "This import was discarded"
 Received: "Nothing is ready to commit: every family left has a problem to fix first"
 
- ❯ test/08n-import.test.ts:1475:104
-    1473|       // Put aside: nothing it would make is made, and it takes no mor…
-    1474|       expect(await apiResponse(coordinator.api.v1.imports[':id'].disca…
-    1475|       expect((await refused(coordinator.api.v1.imports[':id'].commit.$…
+ ❯ test/08n-import.test.ts:1554:104
+    1552|       // Put aside: nothing it would make is made, and it takes no mor…
+    1553|       expect(await apiResponse(coordinator.api.v1.imports[':id'].disca…
+    1554|       expect((await refused(coordinator.api.v1.imports[':id'].commit.$…
        |                                                                                                        ^
-    1476|       expect((await refused(putSettings(coordinator, id, { enrol: fals…
-    1477|       expect(await sql(`select 1 from "user" where email = $1`, [`extr…
+    1555|       expect((await refused(putSettings(coordinator, id, { enrol: fals…
+    1556|       expect(await sql(`select 1 from "user" where email = $1`, [`extr…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
 
@@ -99,13 +99,13 @@ AssertionError: expected { …(15) } to match object { kind: 'school_sheet', …
 +   "status": "partial",
   }
 
- ❯ test/08n-import.test.ts:1484:21
-    1482|       const list = await apiResponse(coordinator.api.v1.imports.$get()…
-    1483|       const first = list.find((b) => b.id === firstBatch)!;
-    1484|       expect(first).toMatchObject({ kind: 'school_sheet', fileName: 'N…
+ ❯ test/08n-import.test.ts:1610:21
+    1608|       const list = await apiResponse(coordinator.api.v1.imports.$get()…
+    1609|       const first = list.find((b) => b.id === firstBatch)!;
+    1610|       expect(first).toMatchObject({ kind: 'school_sheet', fileName: 'N…
        |                     ^
-    1485|       expect(list.some((b) => b.status === 'discarded')).toBe(true);
-    1486|     });
+    1611|       expect(list.some((b) => b.status === 'discarded')).toBe(true);
+    1612|     });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
 
@@ -118,7 +118,7 @@ AssertionError: expected 'Another commit took this import over …' to match /^A
 + Received: 
 "Another commit took this import over while this one was running: look at the import again to see what each made"
 
- ❯ test/08n-import.test.ts:1513:60
+ ❯ test/08n-import.test.ts:1639:60
 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
@@ -136,13 +136,13 @@ AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 
 +   "status": 200,
   }
 
- ❯ test/08n-import.test.ts:1534:88
-    1532|       // A commit that stopped part-way (its process gone): the batch …
-    1533|       await sql(`update import_batch set status = 'committing', commit…
-    1534|       expect(await refused(adm.api.v1.imports[':id'].commit.$post({ pa…
+ ❯ test/08n-import.test.ts:1660:88
+    1658|       // A commit that stopped part-way (its process gone): the batch …
+    1659|       await sql(`update import_batch set status = 'committing', commit…
+    1660|       expect(await refused(adm.api.v1.imports[':id'].commit.$post({ pa…
        |                                                                                        ^
-    1535|         status: 409, error: 'coordinator imp is committing this import…
-    1536|       });
+    1661|         status: 409, error: 'coordinator imp is committing this import…
+    1662|       });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
 

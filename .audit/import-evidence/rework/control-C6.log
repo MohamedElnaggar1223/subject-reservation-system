@@ -1,11 +1,11 @@
 # C6: a new student's line faces the school-fee gate (re-run on the new base)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (64 tests | 1 failed) 13843ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the school-fee gate is the session's own: a new family owes the year's fee first 84ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 14157ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the school-fee gate is the session's own: a new family owes the year's fee first 78ms
  Test Files  1 failed (1)
-      Tests  1 failed | 63 passed (64)
-   Duration  15.61s (transform 690ms, setup 2ms, collect 274ms, tests 13.84s, environment 0ms, prepare 34ms)
+      Tests  1 failed | 66 passed (67)
+   Duration  16.16s (transform 702ms, setup 2ms, collect 282ms, tests 14.16s, environment 0ms, prepare 32ms)
  ❯ test/08n-import.test.ts:661:90
 
 # failures (messages)

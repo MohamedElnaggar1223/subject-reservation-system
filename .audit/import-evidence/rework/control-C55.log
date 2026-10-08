@@ -1,12 +1,12 @@
 # C55: item 5: the review's dry run reads the exception rows without a lock (a GET holds none)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (64 tests | 1 failed) 18076ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction 4392ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 18729ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction 4363ms
  Test Files  1 failed (1)
-      Tests  1 failed | 63 passed (64)
-   Duration  19.91s (transform 741ms, setup 2ms, collect 294ms, tests 18.08s, environment 0ms, prepare 35ms)
- ❯ test/08n-import.test.ts:1175:26
+      Tests  1 failed | 66 passed (67)
+   Duration  20.68s (transform 684ms, setup 2ms, collect 297ms, tests 18.73s, environment 0ms, prepare 33ms)
+ ❯ test/08n-import.test.ts:1250:26
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -17,13 +17,13 @@ AssertionError: expected 'waited' to be 'answered' // Object.is equality
 Expected: "answered"
 Received: "waited"
 
- ❯ test/08n-import.test.ts:1175:26
-    1173|       try {
-    1174|         const answered = await Promise.race([fetchView(adm, id).then((…
-    1175|         expect(answered).toBe('answered');
+ ❯ test/08n-import.test.ts:1250:26
+    1248|       try {
+    1249|         const answered = await Promise.race([fetchView(adm, id).then((…
+    1250|         expect(answered).toBe('answered');
        |                          ^
-    1176|       } finally {
-    1177|         await release();
+    1251|       } finally {
+    1252|         await release();
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

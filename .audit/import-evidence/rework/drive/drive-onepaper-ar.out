@@ -1,0 +1,87 @@
+staged a45a2f30-ca74-4be7-9aa0-b0f56114271b
+shot 01-one-paper-row
+ROW:
+Nov 2026، السطر 3
+إغلاق
+المشكلات
+ملاحظة رسوم — Retake in School 100% fees (One paper ONLY) From June 2026
+تُحفظ في السجل المالي السابق (نسبة، وليست دفعة أبدًا).
+السطر في الجلسة
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Physics — Paper 4 only (retake)
+دورات المجالس
+Cambridge International November 2026
+القيد
+إعادة، في المدرسة
+الدورة التي يتبعها
+يونيو 2026 صرّح بها المكتب — مدرجة للتحقق
+معلم
+Teacher Demo A
+السعر
+جنيه 22,850
+التدريس 12,000 × 100% + المجلس 10,850 × 100%
+البند
+كما تجده كلمات الجدول
+Demo Astronomy — Whole subject · Cambridge International نوفمبر 2026
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History — Whole subject · Cambridge International نوفمبر 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P2 · Pearson Edexcel نوفمبر 2026
+Demo Physics — Paper 4 only (retake) · Cambridge International نوفمبر 2026
+Demo Physics — Whole subject · Cambridge International نوفمبر 2026
+القيد
+قيد أول
+إعادة
+كما يقول الجدول
+الدورة التي تتبعها الإعادة (تصريح المكتب، ويُتحقق منها في «للتحقق»)
+يناير
+يونيو
+أكتوبر
+نوفمبر
+سمِّ هذه الدورة
+كما قُرئ — صحّح أي حقل، ويحفظ Enter
+اسم الطالب
+بريد الطالب
+هاتف الطالب
+اسم ول
+discard 200
+fee prefilled: ""
+shot 02-add-subject-reason-asked
+DIALOG:
+أضف مادة
+المادة
+Demo Cosmology DEMO-COSMO
+اربطها في الكتالوج
+رسوم التدريس
+الإتاحة
+مفتوح
+إعادات فقط
+دراسة ذاتية فقط
+سبب أن رسوم التدريس 0
+
+دراسة ذاتية فقط برسوم 0: تُسعَّر سطورها برسوم المجلس وحدها.
+
+المعلمون
+
+لا معلم في قائمة هذه المادة بعد.
+
+أظهر كل المعلمين
+
+ما يمكن قيده ودورته من الكتالوج؛ غيّرهما من صف المادة بعد ذلك.
+
+إلغاء
+إضافة مادة
+shot 03-added-self-study-at-0
+after add, dialog open: 0
+ERRORS: 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 

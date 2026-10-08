@@ -1,15 +1,17 @@
 # C56: item 6: an open offer with no course fee is refused at creation, naming the subject (MO-9)
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (64 tests | 1 failed) 13978ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 146ms
+ ❯ test/08n-import.test.ts (67 tests | 2 failed) 14243ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 144ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 83ms
  Test Files  1 failed (1)
-      Tests  1 failed | 63 passed (64)
-   Duration  16.07s (transform 774ms, setup 2ms, collect 344ms, tests 13.98s, environment 0ms, prepare 34ms)
- ❯ test/08n-import.test.ts:1451:125
+      Tests  2 failed | 65 passed (67)
+   Duration  16.32s (transform 706ms, setup 2ms, collect 298ms, tests 14.24s, environment 0ms, prepare 35ms)
+ ❯ test/08n-import.test.ts:1530:125
+ ❯ test/08n-import.test.ts:1577:73
 
 # failures (messages)
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not
 AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 400, …(1) }
@@ -24,13 +26,36 @@ AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 
 +   "status": 201,
   }
 
- ❯ test/08n-import.test.ts:1451:125
-    1449|       });
-    1450|       const noFee = 'Astronomy has no course fee: set the school\'s co…
-    1451|       expect(await refused(adm.api.v1.sessions[':id'].offers.$post({ p…
+ ❯ test/08n-import.test.ts:1530:125
+    1528|       });
+    1529|       const noFee = 'Astronomy has no course fee: set the school\'s co…
+    1530|       expect(await refused(adm.api.v1.sessions[':id'].offers.$post({ p…
        |                                                                                                                             ^
-    1452|       const offer = await apiResponse(adm.api.v1.sessions[':id'].offer…
-    1453|       const putOffer = (json: { availability?: 'open' | 'closed'; cour…
+    1531|       const offer = await apiResponse(adm.api.v1.sessions[':id'].offer…
+    1532|       const putOffer = (json: { availability?: 'open' | 'closed'; cour…
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2)
+AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 400, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "Fee Rule Taught (imp) has no course fee: set the school's course fee before it is open in this session (a line is never priced without one)",
+-   "status": 400,
++   "error": "\"\"",
++   "status": 201,
+  }
+
+ ❯ test/08n-import.test.ts:1577:73
+    1575|       // Open and retakes-only: refused at 0, naming the subject.
+    1576|       const noFee = 'Fee Rule Taught (imp) has no course fee: set the …
+    1577|       expect(await refused(post(winter, offerJson(taught, 'open', 0)))…
+       |                                                                         ^
+    1578|       expect(await refused(post(winter, offerJson(taught, 'retake_only…
+    1579|       // Self-study only: 0 needs a reason, as a board fee of 0 does; …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

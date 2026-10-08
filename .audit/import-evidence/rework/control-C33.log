@@ -1,21 +1,19 @@
 # C33: s9: a provisional fee row prices the line provisional at its amount, never 0 (priceLine reads provisional rows)
 # undone in apps/api/src/services/pricing.services.ts
 # summary
- ❯ test/08n-import.test.ts (64 tests | 4 failed) 14275ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 200ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 459ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 18ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce) 611ms
+ ❯ test/08n-import.test.ts (67 tests | 3 failed) 14055ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 171ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 401ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 15ms
  Test Files  1 failed (1)
-      Tests  4 failed | 60 passed (64)
-   Duration  16.47s (transform 768ms, setup 2ms, collect 305ms, tests 14.27s, environment 0ms, prepare 35ms)
+      Tests  3 failed | 64 passed (67)
+   Duration  16.45s (transform 740ms, setup 3ms, collect 355ms, tests 14.05s, environment 0ms, prepare 33ms)
  ❯ test/08n-import.test.ts:650:45
  ❯ test/08n-import.test.ts:705:56
  ❯ test/08n-import.test.ts:753:63
- ❯ test/08n-import.test.ts:1231:23
 
 # failures (messages)
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is
 AssertionError: expected [ { code: 'price_provisional', …(2) } ] to deeply equal [ { code: 'price_provisional', …(2) } ]
@@ -26,8 +24,8 @@ AssertionError: expected [ { code: 'price_provisional', …(2) } ] to deeply equ
   [
     {
       "code": "price_provisional",
--     "detail": "board fee 600 in Pearson Edexcel November 2026 (t1-5gov)",
-+     "detail": "board fee 0 in Pearson Edexcel November 2026 (t1-5gov)",
+-     "detail": "board fee 600 in Pearson Edexcel November 2026 (t1-cmvh)",
++     "detail": "board fee 0 in Pearson Edexcel November 2026 (t1-cmvh)",
       "severity": "info",
     },
   ]
@@ -35,7 +33,7 @@ AssertionError: expected [ { code: 'price_provisional', …(2) } ] to deeply equ
  ❯ test/08n-import.test.ts:650:45
 
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid
 AssertionError: expected [ [ 'live.one', …(12) ], …(7) ] to deeply equal [ [ 'live.one', …(12) ], …(7) ]
@@ -68,7 +66,7 @@ AssertionError: expected [ [ 'live.one', …(12) ], …(7) ] to deeply equal [ [
     706|         ['live.one', 'Live Subject A', 'first', 'in_school', 1500, 100…
     707|         ['live.one', 'Live Subject B', 'first', 'in_school', 1500, 100…
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent
 AssertionError: expected 9950 to be 10550 // Object.is equality
@@ -87,28 +85,5 @@ AssertionError: expected 9950 to be 10550 // Object.is equality
     754|       expect(imported.filter((l) => l.provisional).map((l) => [l.subje…
     755|     });
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
-
- FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce)
-AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]
-
-- Expected
-+ Received
-
-  [
-    {
--     "session_id": "3c0b3667-224b-4017-bb40-2193def24c7f",
-+     "session_id": "e07154ce-7db9-4694-9405-d00f750d7608",
-    },
-  ]
-
- ❯ test/08n-import.test.ts:1231:23
-    1229|         const lines = await sql<{ session_id: string }>(`select r.sess…
-    1230|           where r.student_id = $1 and r.board_series_id = $2 and i.lab…
-    1231|         expect(lines).toEqual([{ session_id: sess }]);
-       |                       ^
-    1232|         expect(c.status).toBe(200);
-    1233|         expect(d.status).toBe(409);
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
 

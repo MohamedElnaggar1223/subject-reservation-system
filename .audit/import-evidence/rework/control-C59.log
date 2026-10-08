@@ -1,15 +1,17 @@
-# C59: item 2: a "one paper" note is one line, never split by the papers the subject names
+# C59: item 2: a "one paper" note is one line, never split by the papers the subject names (the early return since 2ca07a4's item 1)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (64 tests | 1 failed) 14167ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a "one paper" note on a row naming two papers is one line: never split; staff choose the one paper 84ms
+ ❯ test/08n-import.test.ts (67 tests | 2 failed) 13650ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a "one paper" note on a row naming two papers is one line: never split; staff choose the one paper 63ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 108ms
  Test Files  1 failed (1)
-      Tests  1 failed | 63 passed (64)
-   Duration  16.19s (transform 711ms, setup 4ms, collect 295ms, tests 14.17s, environment 0ms, prepare 36ms)
+      Tests  2 failed | 65 passed (67)
+   Duration  15.57s (transform 678ms, setup 2ms, collect 277ms, tests 13.65s, environment 0ms, prepare 32ms)
  ❯ test/08n-import.test.ts:1025:44
+ ❯ test/08n-import.test.ts:1068:93
 
 # failures (messages)
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a "one paper" note on a row naming two papers is one line: never split; staff choose the one paper
 AssertionError: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ null, [] ]
@@ -24,12 +26,12 @@ AssertionError: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ null, [] ]
 +     {
 +       "code": "paper 1",
 +       "itemLabel": "Paper 1",
-+       "offerItemId": "88348019-6ee8-4ca7-84e9-02838cd8d0f7",
++       "offerItemId": "27518e77-d4ab-430a-9e8d-68f5e6f13cf5",
 +     },
 +     {
 +       "code": "paper 2",
 +       "itemLabel": "Paper 2",
-+       "offerItemId": "1ff49779-3637-4f34-b724-0f6a409aa5fe",
++       "offerItemId": "a0b17ca9-0cd5-4d0f-86bc-186055377cb1",
 +     },
 +   ],
 +   [
@@ -40,8 +42,8 @@ AssertionError: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ null, [] ]
 +       "found": "unit",
 +       "itemLabel": "Paper 1",
 +       "mode": "in_school",
-+       "offerId": "c930cbff-6d7d-431b-b9e9-a0b0e7da901e",
-+       "offerItemId": "88348019-6ee8-4ca7-84e9-02838cd8d0f7",
++       "offerId": "6fa804d4-0b03-4ec1-ba4e-fd82476274e0",
++       "offerItemId": "27518e77-d4ab-430a-9e8d-68f5e6f13cf5",
 +       "price": {
 +         "boardFee": 4800,
 +         "boardFeeBase": 4800,
@@ -53,11 +55,11 @@ AssertionError: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ null, [] ]
 +         "total": 5700,
 +       },
 +       "priorSitting": null,
-+       "series": "Pearson Edexcel November 2026 (t4-iftj)",
-+       "sessionId": "a517e378-3d99-4f56-9512-934749864d19",
-+       "sessionName": "November 2026 – January 2027 — t4-iftj",
++       "series": "Pearson Edexcel November 2026 (t4-yxg3)",
++       "sessionId": "64f66bfb-72e3-48a4-8020-c898a1f3e656",
++       "sessionName": "November 2026 – January 2027 — t4-yxg3",
 +       "subjectName": "Biology A.S./A.L. (imp)",
-+       "teacherId": "da7f602b-2c16-4877-9266-d68a7c7ca968",
++       "teacherId": "f59f0fcc-8841-44c4-8670-e71421a249a5",
 +     },
 +     {
 +       "attempt": "retake",
@@ -66,8 +68,8 @@ AssertionError: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ null, [] ]
 +       "found": "unit",
 +       "itemLabel": "Paper 2",
 +       "mode": "in_school",
-+       "offerId": "c930cbff-6d7d-431b-b9e9-a0b0e7da901e",
-+       "offerItemId": "1ff49779-3637-4f34-b724-0f6a409aa5fe",
++       "offerId": "6fa804d4-0b03-4ec1-ba4e-fd82476274e0",
++       "offerItemId": "a0b17ca9-0cd5-4d0f-86bc-186055377cb1",
 +       "price": {
 +         "boardFee": 4800,
 +         "boardFeeBase": 4800,
@@ -79,22 +81,40 @@ AssertionError: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ null, [] ]
 +         "total": 5700,
 +       },
 +       "priorSitting": null,
-+       "series": "Pearson Edexcel November 2026 (t4-iftj)",
-+       "sessionId": "a517e378-3d99-4f56-9512-934749864d19",
-+       "sessionName": "November 2026 – January 2027 — t4-iftj",
++       "series": "Pearson Edexcel November 2026 (t4-yxg3)",
++       "sessionId": "64f66bfb-72e3-48a4-8020-c898a1f3e656",
++       "sessionName": "November 2026 – January 2027 — t4-yxg3",
 +       "subjectName": "Biology A.S./A.L. (imp)",
-+       "teacherId": "da7f602b-2c16-4877-9266-d68a7c7ca968",
++       "teacherId": "f59f0fcc-8841-44c4-8670-e71421a249a5",
 +     },
 +   ],
   ]
 
  ❯ test/08n-import.test.ts:1025:44
-    1023|       let r = rowAt(await fetchView(adm, id), 'One paper', 3);
-    1024|       expect(r.data).toMatchObject({ noteOnePaper: true });
-    1025|       expect([r.plan.split, r.plan.lines]).toEqual([null, []]);
-       |                                            ^
-    1026|       expect(r.problems.find((p) => p.code === 'item_unclear')).toEqua…
-    1027|       await putRows(adm, id, { rowIds: [r.id], edits: { offerItemId: i…
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1)
+AssertionError: expected { code: 'item_unclear', …(2) } to deeply equal { code: 'item_unclear', …(2) }
+
+- Expected
++ Received
+
+  {
+    "code": "item_unclear",
+-   "detail": "Imp Physics Two: the note says one paper — choose which (Paper 4 only (retake) · Paper 5 only (retake))",
++   "detail": "Imp Physics Two: Paper 4 only (retake) · Paper 5 only (retake) · Whole subject",
+    "severity": "error",
+  }
+
+ ❯ test/08n-import.test.ts:1068:93
+    1066|       // Two: staff choose which; none: staff choose the item, the not…
+    1067|       expect(rowAt(v, 'One paper only', 4).plan.lines).toEqual([]);
+    1068|       expect(rowAt(v, 'One paper only', 4).problems.find((p) => p.code…
+       |                                                                                             ^
+    1069|         code: 'item_unclear', severity: 'error', detail: 'Imp Physics …
+    1070|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

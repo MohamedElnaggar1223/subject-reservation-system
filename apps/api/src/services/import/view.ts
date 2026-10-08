@@ -797,13 +797,14 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     const f = findCache.get(key)!;
     if (!f) return { targets: [], offerName: null, unclear: null, split: null };
     if (f.item) return { targets: [{ target: f.item, code: null, found: f.how! }], offerName: f.offerName, unclear: null, split: null };
+    // A "one paper" note is one line of one paper, whatever papers the words name: never split.
     if (d.noteOnePaper) {
       return { targets: [], offerName: f.offerName, split: null, unclear: f.onePaper.length
         ? `${f.offerName}: the note says one paper — choose which (${f.onePaper.map((x) => x.label).join(' · ')})`
         : `${f.offerName}: the note says one paper, and none of its items is one paper — choose the item (${f.candidates.join(' · ') || 'no item'})` };
     }
-    // A "one paper" note is one line of one paper, whatever papers the subject's words name: staff choose it.
-    const parts = d.noteOnePaper ? null : await findItemsByCode(db, f.offerId, label, { ...where, chosen: e.codeItems ?? null });
+    // (A "one paper" note never reaches here: it is one line of one paper, above.)
+    const parts = await findItemsByCode(db, f.offerId, label, { ...where, chosen: e.codeItems ?? null });
     if (!parts) return { targets: [], offerName: f.offerName, unclear: `${f.offerName}: ${f.candidates.join(' · ') || 'no item fits'}`, split: null };
     const split = parts.map((p) => ({ code: p.code, offerItemId: p.item?.id ?? null, itemLabel: p.item?.label ?? null }));
     const missing = parts.filter((p) => !p.item);

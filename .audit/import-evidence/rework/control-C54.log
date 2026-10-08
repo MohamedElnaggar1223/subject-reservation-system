@@ -1,15 +1,17 @@
-# C54: item 5: every student with lines held FOR NO KEY UPDATE in id order before the first line
+# C54: item 5: every student with lines held FOR NO KEY UPDATE in id order before the first line (both lockStudents calls undone since 2ca07a4's item 3 added the early one)
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (64 tests | 1 failed) 13216ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders) 850ms
+ ❯ test/08n-import.test.ts (67 tests | 2 failed) 15114ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders) 1794ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds a family's students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3) 435ms
  Test Files  1 failed (1)
-      Tests  1 failed | 63 passed (64)
-   Duration  15.36s (transform 720ms, setup 3ms, collect 294ms, tests 13.22s, environment 0ms, prepare 37ms)
- ❯ test/08n-import.test.ts:1149:62
+      Tests  2 failed | 65 passed (67)
+   Duration  17.13s (transform 716ms, setup 2ms, collect 284ms, tests 15.11s, environment 0ms, prepare 33ms)
+ ❯ test/08n-import.test.ts:1194:62
+ ❯ test/08n-import.test.ts:1227:22
 
 # failures (messages)
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders)
 AssertionError: expected [ false, true ] to deeply equal [ true, true ]
@@ -23,13 +25,32 @@ AssertionError: expected [ false, true ] to deeply equal [ true, true ]
     true,
   ]
 
- ❯ test/08n-import.test.ts:1149:62
-    1147|             `select count(*) as n from pg_locks l join pg_stat_activit…
-    1148|           // Waiting for the held student, the commit holds neither ch…
-    1149|           expect([await free(fees.P1), await free(fees.M1)]).toEqual([…
+ ❯ test/08n-import.test.ts:1194:62
+    1192|             `select count(*) as n from pg_locks l join pg_stat_activit…
+    1193|           // Waiting for the held student, the commit holds neither ch…
+    1194|           expect([await free(fees.P1), await free(fees.M1)]).toEqual([…
        |                                                              ^
-    1150|           await hold.query('commit');
-    1151|           const out = await apiResponse(commit);
+    1195|           await hold.query('commit');
+    1196|           const out = await apiResponse(commit);
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds a family's students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3)
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/08n-import.test.ts:1227:22
+    1225|         catch (err) { if ((err as { code?: string }).code === '55P03')…
+    1226|         finally { await c.query('rollback').catch(() => {}); await c.e…
+    1227|         expect(held).toBe(true);
+       |                      ^
+    1228|         await release();
+    1229|         expect((await apiResponse(commit)).result.created).toMatchObje…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 
