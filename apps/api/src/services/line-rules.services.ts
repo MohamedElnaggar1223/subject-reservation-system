@@ -75,8 +75,23 @@ export async function assertLineRules(
   tx: Tx,
   ctx: { studentId: string; sessionId: string; eligibility: Pick<Eligibility, 'grade' | 'series'> },
   lines: RuleLine[],
+  opts: {
+    /**
+     * Lines already made that these are (a move or a capture checks them again where they now
+     * are): left out of the student's live lines, so a line does not collide with itself.
+     */
+    excludeLineIds?: string[];
+    /**
+     * Check again only what a move can change — the carry-forward period, the same entry once in
+     * the series, the required items there. What governs a new line (availability, self-study,
+     * a declared retake, exclusive groups, the grade-10 core) was asked when it was made.
+     */
+    recheck?: boolean;
+  } = {},
 ): Promise<{ usedExceptionIds: string[] }> {
   const used: string[] = [];
+  const recheck = !!opts.recheck;
+  const excluded = new Set(opts.excludeLineIds ?? []);
   const items = await loadItems(tx, [...new Set(lines.map((l) => l.offerItemId))]);
   for (const l of lines) {
     const it = items.get(l.offerItemId);
@@ -96,14 +111,16 @@ export async function assertLineRules(
     const it = items.get(l.offerItemId)!;
     const c = availabilityConstraints(it.offer_availability, it.availability);
     const name = it.kind === 'whole' ? it.subject_name : `${it.subject_name} — ${it.label}`;
-    if (c.closed) await gate('gate.availability', scopeOf(it), `${name} is closed in this session`);
+    if (recheck) {
+      // Only the carry-forward period below.
+    } else if (c.closed) await gate('gate.availability', scopeOf(it), `${name} is closed in this session`);
     else if (c.retakeOnly && l.attempt !== 'retake') await gate('gate.availability', scopeOf(it), `${name} takes retakes only this cycle`);
     else if (c.selfStudyOnly && l.mode !== 'self_study') await gate('gate.availability', scopeOf(it), `${name} is self-study only: the school does not teach it this cycle`);
-    if (l.mode === 'self_study' && l.attempt === 'first' && !c.selfStudyOnly) {
+    if (!recheck && l.mode === 'self_study' && l.attempt === 'first' && !c.selfStudyOnly) {
       // The forms' "Self Study … (ONLY 2nd entry)" (G-09); the old sentence kept.
       await gate('gate.selfStudyFirstEntry', scopeOf(it), 'Subjects can only be taken outside school when retaking or when the school does not offer them');
     }
-    if (l.attempt === 'retake' && !l.priorSittingSeriesId && l.priorSittingSource !== 'legacy') {
+    if (!recheck && l.attempt === 'retake' && !l.priorSittingSeriesId && l.priorSittingSource !== 'legacy') {
       throw new LineRuleError(`A retake of ${name} names the sitting it follows`, 'gate.retakeDeclared');
     }
     if (it.needs_prior_series) {
@@ -139,7 +156,7 @@ export async function assertLineRules(
     join subject s on s.id = o.subject_id
     join registration_session rs on rs.id = r.session_id
     where r.student_id = ${ctx.studentId} and r.status not in ('rejected', 'expired', 'dropped')`);
-  const existing = r.rows as {
+  const existing = (r.rows as { id: string }[]).filter((x) => !excluded.has(x.id)) as unknown as {
     id: string; session_id: string; offer_item_id: string; board_series_id: string | null; offer_id: string; exclusive_group: string | null;
     enters_kind: string; qualification_id: string | null; kind: string; label: string; subject_id: string; subject_name: string; session_name: string; units: string[];
   }[];
@@ -150,7 +167,7 @@ export async function assertLineRules(
     const k = `${e.offer_id}|${e.exclusive_group}`;
     groups.set(k, [...(groups.get(k) ?? []), e.kind === 'whole' ? e.subject_name : `${e.subject_name} — ${e.label}`]);
   }
-  for (const l of lines) {
+  for (const l of recheck ? [] : lines) {
     const it = items.get(l.offerItemId)!;
     if (!it.exclusive_group) continue;
     const k = `${it.offer_id}|${it.exclusive_group}`;
@@ -195,7 +212,7 @@ export async function assertLineRules(
   }
 
   // Grade 10 in June registers every core offer of the session (A-05).
-  if (ctx.eligibility.grade === 10 && ctx.eligibility.series.sessionType === 'june') {
+  if (!recheck && ctx.eligibility.grade === 10 && ctx.eligibility.series.sessionType === 'june') {
     const core = await tx.execute(sql`
       select o.id, s.name from session_offer o join subject s on s.id = o.subject_id
       where o.session_id = ${ctx.sessionId} and o.grade10_core and o.availability <> 'closed' order by s.name`);
@@ -209,4 +226,34 @@ export async function assertLineRules(
     }
   }
   return { usedExceptionIds: used };
+}
+
+/**
+ * Lines already made, checked again where they now are, per student (§6: every path that puts a
+ * line into a series runs the rules — an item's series change, the admin's move, a board change,
+ * the series correction, preregistration capture). Each student's lines are left out of their own
+ * live lines; only what a move can change is asked (`recheck`). The caller holds the students.
+ */
+export async function recheckLines(tx: Tx, lineIds: string[]) {
+  if (!lineIds.length) return;
+  const r = await tx.execute(sql`
+    select r.id, r.student_id, r.session_id, r.offer_item_id, r.attempt, r.mode, r.prior_sitting_series_id, r.prior_sitting_source, w.session_type
+    from registration r join registration_session w on w.id = r.session_id
+    where r.id in (${sql.join(lineIds.map((id) => sql`${id}`), sql`, `)})
+    order by r.student_id, r.id`);
+  const rows = r.rows as {
+    id: string; student_id: string; session_id: string; offer_item_id: string; attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study';
+    prior_sitting_series_id: string | null; prior_sitting_source: string | null; session_type: string;
+  }[];
+  const groups = new Map<string, typeof rows>();
+  for (const x of rows) groups.set(`${x.student_id}|${x.session_id}`, [...(groups.get(`${x.student_id}|${x.session_id}`) ?? []), x]);
+  for (const g of groups.values()) {
+    const first = g[0]!;
+    await assertLineRules(tx, {
+      studentId: first.student_id, sessionId: first.session_id,
+      eligibility: { grade: null, series: { sessionType: first.session_type } } as unknown as Pick<Eligibility, 'grade' | 'series'>,
+    }, g.map((x) => ({
+      offerItemId: x.offer_item_id, attempt: x.attempt, mode: x.mode, priorSittingSeriesId: x.prior_sitting_series_id, priorSittingSource: x.prior_sitting_source,
+    })), { excludeLineIds: g.map((x) => x.id), recheck: true });
+  }
 }

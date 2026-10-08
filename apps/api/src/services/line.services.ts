@@ -95,6 +95,10 @@ async function teachersOf(executor: Executor, itemId: string, offerId: string) {
 export async function insertLines(tx: Tx, input: InsertLinesInput) {
   const now = input.now ?? new Date();
   if (!input.lines.length) throw new LineError('Choose at least one item');
+  // A prior sitting says where it is known from (B passes it: the student's record, the desk's or the
+  // family's declaration); it is never assumed known (the review of 977848d).
+  const unsourced = input.lines.find((l) => l.priorSittingSeriesId && !l.priorSittingSource);
+  if (unsourced) throw new LineError('Say where the earlier sitting is known from: the record, the desk or the family');
   const itemIds = [...new Set(input.lines.map((l) => l.offerItemId))];
   if (itemIds.length !== input.lines.length) throw new LineError('Each item once');
   await lockForLines(tx, input.sessionId, itemIds);
@@ -128,7 +132,7 @@ export async function insertLines(tx: Tx, input: InsertLinesInput) {
   const records: (typeof registration.$inferInsert)[] = [];
   for (const l of input.lines) {
     const it = byId.get(l.offerItemId)!;
-    const price = await priceLine(tx, { item: { id: it.item.id }, attempt: l.attempt, mode: l.mode, studentId: input.studentId, sessionId: input.sessionId });
+    const price = await priceLine(tx, { item: { id: it.item.id }, attempt: l.attempt, mode: l.mode, studentId: input.studentId, sessionId: input.sessionId }, { lock: true });
     // The teacher: one of the item's (or the offer's); none in self-study; "no preference" allowed.
     let teacherId: string | null = null;
     if (l.mode === 'in_school' && l.teacherId) {
@@ -156,7 +160,7 @@ export async function insertLines(tx: Tx, input: InsertLinesInput) {
       isRetake: l.attempt === 'retake',
       takenOutsideSchool: l.mode === 'self_study',
       priorSittingSeriesId: l.priorSittingSeriesId ?? null,
-      priorSittingSource: l.priorSittingSource ?? (l.priorSittingSeriesId ? 'known' : null),
+      priorSittingSource: l.priorSittingSource ?? null,
       priceAtRegistration: price.total,
       courseFeeAtRegistration: price.courseFee,
       registrationFeeAtRegistration: price.registrationFee,

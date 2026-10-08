@@ -205,6 +205,8 @@ export const sessionsArabic: Record<string, string> = {
   'Rejected': 'مرفوض',
   'course + board': 'التدريس + المجلس',
   'Export': 'تصدير',
+  'Every section': 'كل الفصول',
+  'awaiting the parent': 'بانتظار ولي الأمر',
 
   // ── Grade 10 tab ──
   'The core': 'المواد الأساسية',

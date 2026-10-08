@@ -155,7 +155,9 @@ export async function priceLine(
     ? (await lineExceptions.byIds(executor, opts.exceptionIds)).filter((e) => (PRICE_KEYS as readonly string[]).includes(e.policyKey))
     : await lineExceptions.active(executor, input.studentId, [...PRICE_KEYS], {
         sessionId: input.sessionId, subjectId: fee.subjectId, offerId: fee.item.offerId, offerItemId: fee.item.id,
-      });
+        // Inside a creating transaction the exceptions it reads are held FOR SHARE (§2.1), so a
+        // revocation at the same moment waits for the line, or the line for the revocation.
+      }, opts.lock ? { lock: 'share' } : undefined);
   const priced = applyPriceExceptions(course, board, exc);
   const basis: PricingBasis = {
     v: 1,

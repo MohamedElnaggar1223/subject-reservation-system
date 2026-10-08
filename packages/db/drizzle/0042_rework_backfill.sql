@@ -233,6 +233,8 @@ LEFT JOIN LATERAL (
   ) AS board_series_id
 ) rt ON true
 WHERE o.legacy->>'converted' = 'true'
+  -- Re-runnable: an offer that has its items (converted, or changed since) gets none again.
+  AND NOT EXISTS (SELECT 1 FROM session_offer_item x WHERE x.offer_id = o.id)
 ON CONFLICT (id) DO NOTHING;
 --> statement-breakpoint
 INSERT INTO session_offer_item_unit (item_id, unit_id)
@@ -241,6 +243,7 @@ FROM session_offer_item i
 JOIN session_offer o ON o.id = i.offer_id
 JOIN subject_unit su ON su.subject_id = o.subject_id
 WHERE i.enters_kind = 'units' AND i.legacy->>'converted' = 'true'
+  AND NOT EXISTS (SELECT 1 FROM session_offer_item_unit x WHERE x.item_id = i.id)
 ON CONFLICT DO NOTHING;
 --> statement-breakpoint
 -- A converted item's fee is the subject row's (its registration fee was the price).
@@ -249,6 +252,7 @@ SELECT md5('rework-fee-key:' || i.id)::uuid::text, i.id, 'subject', o.subject_id
 FROM session_offer_item i
 JOIN session_offer o ON o.id = i.offer_id
 WHERE i.legacy->>'converted' = 'true'
+  AND NOT EXISTS (SELECT 1 FROM session_offer_item_fee_key k WHERE k.item_id = i.id)
 ON CONFLICT DO NOTHING;
 --> statement-breakpoint
 INSERT INTO board_fee (id, board_series_id, key_kind, subject_id, amount, provisional, confirmed_at, zero_reason, created_at, updated_at)
@@ -261,6 +265,7 @@ FROM session_offer_item i
 JOIN session_offer o ON o.id = i.offer_id
 JOIN subject s ON s.id = o.subject_id
 WHERE i.board_series_id IS NOT NULL AND i.legacy->>'converted' = 'true'
+  AND EXISTS (SELECT 1 FROM session_offer_item_fee_key k WHERE k.item_id = i.id AND k.key_kind = 'subject')
 ORDER BY i.board_series_id, o.subject_id
 ON CONFLICT DO NOTHING;
 --> statement-breakpoint
@@ -423,6 +428,8 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
+--> statement-breakpoint
+DROP TRIGGER IF EXISTS session_offer_item_series_check ON session_offer_item;
 --> statement-breakpoint
 CREATE TRIGGER session_offer_item_series_check BEFORE INSERT OR UPDATE OF board_series_id, qualification_id, offer_id ON session_offer_item
 FOR EACH ROW EXECUTE FUNCTION rework_offer_item_check();

@@ -31,6 +31,9 @@ import { effectiveDeadlineFor, effectiveDeadlinesOf, deadlinePassedSentence, red
 import { itemBoardFees } from './pricing.services';
 import { schoolDate } from './window.services';
 import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
+import { carryFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
+import { recheckLines, LineRuleError } from './line-rules.services';
+import { PricingError } from './pricing.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -488,7 +491,7 @@ async function itemForChange(tx: Tx, offerId: string, itemId: string) {
  */
 export async function updateItem(sessionId: string, offerId: string, itemId: string, data: UpdateOfferItemType, actorId: string, ctx?: AuditContext) {
   try {
-    return await withStudentsFirst((extra) => db.transaction(async (tx) => {
+    const out = await withStudentsFirst((extra) => db.transaction(async (tx) => {
       // A series change puts lines into a series: the students first (§6; lib/student-locks.ts).
       let locked = new Set<string>();
       if (data.boardSeriesId) {
@@ -500,17 +503,19 @@ export async function updateItem(sessionId: string, offerId: string, itemId: str
       const { offer, subjectRow } = await offerForChange(tx, sessionId, offerId);
       const item = await itemForChange(tx, offerId, itemId);
       const { reason, teachers, feeKeys, boardSeriesId, ...fields } = data;
-      const moved = boardSeriesId && boardSeriesId !== item.boardSeriesId
+      const { lines: moved, repriced } = boardSeriesId && boardSeriesId !== item.boardSeriesId
         ? await changeItemSeries(tx, session, subjectRow, item, boardSeriesId, actorId, reason ?? null, locked)
-        : [];
+        : { lines: [], repriced: [] as RepricedLine[] };
       if (teachers !== undefined) await writeItemTeachers(tx, itemId, teachers?.length ? await resolveTeachers(tx, offer.subjectId, teachers, actorId) : []);
       if (feeKeys) await writeFeeKeys(tx, itemId, feeKeys);
       const [updated] = await tx.update(sessionOfferItem).set({ ...fields, updatedAt: new Date() }).where(eq(sessionOfferItem.id, itemId)).returning();
       await logAction(actorId, 'OFFER_ITEM_UPDATED', 'offer_item', itemId,
         { label: item.label, availability: item.availability, courseFee: item.courseFee, boardSeriesId: item.boardSeriesId, exclusiveGroup: item.exclusiveGroup, requiredInSeries: item.requiredInSeries },
         { ...fields, ...(boardSeriesId ? { boardSeriesId } : {}), ...(feeKeys ? { feeKeys } : {}), ...(teachers !== undefined ? { teachers } : {}), linesMoved: moved.length, reason: reason ?? null }, ctx, tx);
-      return { ...updated!, linesMoved: moved.length };
+      return { item: { ...updated!, linesMoved: moved.length, linesRepriced: repriced.length }, repriced };
     }));
+    await tellPriceChanged(out.repriced, 'The subject is now entered in another exam series, with its own board fee');
+    return out.item;
   } catch (err) {
     if (err instanceof OfferError) throw err;
     rethrow(err);
@@ -551,21 +556,12 @@ async function changeItemSeries(
   await attachSeries(tx, session.id, targetId, actorId);
   await tx.update(sessionOfferItem).set({ boardSeriesId: targetId, updatedAt: now }).where(eq(sessionOfferItem.id, item.id));
   for (const l of lines) await tx.update(registration).set({ boardSeriesId: targetId, updatedAt: now }).where(eq(registration.id, l.id));
-  // The same unit or award once per student in the target series (gate.sameEntryOnce).
-  if (lines.length) {
-    const clash = await tx.execute(sql`
-      select r.id, u.name from registration r join "user" u on u.id = r.student_id
-      where r.board_series_id = ${targetId} and r.status not in ('rejected', 'expired', 'dropped')
-        and r.offer_item_id <> ${item.id}
-        and r.student_id in (${sql.join(lines.map((l) => sql`${l.studentId}`), sql`, `)})
-        and exists (
-          select 1 from session_offer_item i2 where i2.id = r.offer_item_id and (
-            (i2.qualification_id is not null and i2.enters_kind in ('award', 'option') and i2.qualification_id = ${item.qualificationId} and ${item.entersKind} in ('award', 'option'))
-            or exists (select 1 from session_offer_item_unit a join session_offer_item_unit b on a.unit_id = b.unit_id where a.item_id = i2.id and b.item_id = ${item.id})))
-      limit 1`);
-    const c = clash.rows[0] as { name: string } | undefined;
-    if (c) throw new OfferError(`${c.name} already has a line entering the same in ${boardSeriesName(names, target)}: move or drop it first`, 409);
-  }
+  // Each student's lines checked again where they now are (§6): the same entry once in the target
+  // series (any entry key, an unmapped row's too), its required items, the carry-forward period.
+  await moveRules(() => recheckLines(tx, lines.map((l) => l.id)));
+  // What they cost there: the new series' fee rows (carried provisional where finance has none).
+  await carryFeeRows(tx, item.id, item.boardSeriesId, actorId, 'Its item moved to another series');
+  const repriced = await moveRules(() => repriceMovedLines(tx, lines.map((l) => l.id), actorId, 'its item moved to another series'));
   const spanning = await openCheckoutsSpanningDeadlines(tx, { registrationIds: lines.map((l) => l.id) });
   if (spanning > 0) {
     throw new OfferError(`${spanning} checkout${spanning === 1 ? '' : 's'} still open would pay for two deadlines after this move — confirm or cancel ${spanning === 1 ? 'it' : 'them'} first`, 409);
@@ -578,7 +574,17 @@ async function changeItemSeries(
   })), tx);
   await redateLines(tx, lines.map((l) => l.id), actorId, 'its item moved to another series');
   await detachUnusedSeries(tx, session.id);
-  return lines;
+  return { lines, repriced };
+}
+
+/** A rule or a missing fee refusing a move, as the screen's refusal (409). */
+async function moveRules<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (err) {
+    if (err instanceof LineRuleError || err instanceof PricingError) throw new OfferError(err.message, 409);
+    throw err;
+  }
 }
 
 /**
@@ -698,19 +704,24 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
   const have = new Set((await tx.select({ subjectId: sessionOffer.subjectId }).from(sessionOffer).where(eq(sessionOffer.sessionId, session.id))).map((o) => o.subjectId));
   let copied = 0;
   let feesCopied = 0;
+  let closedNoTeacher = 0;
   for (const o of offers) {
     if (have.has(o.subjectId)) continue;
     const [s] = await tx.select().from(subject).where(eq(subject.id, o.subjectId));
     if (!s || !s.isActive) continue;
     const offerId = randomUUID();
-    const availability = closedByConversion(o) ? (s.isOfferedAtSchool ? 'open' : 'self_study_only') : o.availability;
+    const ts = await tx.select().from(sessionOfferTeacher).where(eq(sessionOfferTeacher.offerId, o.id));
+    const activeTeachers = ts.length ? await tx.select({ id: teacher.id }).from(teacher).where(and(inArray(teacher.id, ts.map((t) => t.teacherId)), eq(teacher.isActive, true))) : [];
+    const keep = ts.filter((t) => activeTeachers.some((a) => a.id === t.teacherId));
+    const wanted = closedByConversion(o) ? (s.isOfferedAtSchool ? 'open' : 'self_study_only') : o.availability;
+    // "Who teaches it?" (§3.2): an open subject with no active teacher comes across closed, to be
+    // opened once it names one — never open with nobody to teach it.
+    const availability = wanted === 'open' && keep.length === 0 ? 'closed' : wanted;
+    if (availability !== wanted) closedNoTeacher++;
     await tx.insert(sessionOffer).values({
       id: offerId, sessionId: session.id, subjectId: o.subjectId, availability, courseFee: o.courseFee,
       grade10Core: o.grade10Core, notes: o.notes, sortOrder: o.sortOrder, createdBy: actorId,
     });
-    const ts = await tx.select().from(sessionOfferTeacher).where(eq(sessionOfferTeacher.offerId, o.id));
-    const activeTeachers = ts.length ? await tx.select({ id: teacher.id }).from(teacher).where(and(inArray(teacher.id, ts.map((t) => t.teacherId)), eq(teacher.isActive, true))) : [];
-    const keep = ts.filter((t) => activeTeachers.some((a) => a.id === t.teacherId));
     if (keep.length) await tx.insert(sessionOfferTeacher).values(keep.map((t) => ({ id: randomUUID(), offerId, teacherId: t.teacherId, mode: t.mode, sortOrder: t.sortOrder })));
     const items = (await tx.select().from(sessionOfferItem).where(eq(sessionOfferItem.offerId, o.id)).orderBy(sessionOfferItem.sortOrder, sessionOfferItem.id))
       .filter((it) => it.availability !== 'closed' || closedByConversion(it));
@@ -723,7 +734,7 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
       const id = randomUUID();
       await tx.insert(sessionOfferItem).values({
         id, offerId, sessionId: session.id, label: it.label, kind: it.kind, entersKind: it.entersKind, qualificationId: it.qualificationId,
-        qualificationOptionId: it.qualificationOptionId, boardSeriesId: seriesId, availability: closedByConversion(it) ? availability : it.availability, courseFee: it.courseFee,
+        qualificationOptionId: it.qualificationOptionId, boardSeriesId: seriesId, availability: closedByConversion(it) ? wanted : it.availability, courseFee: it.courseFee,
         needsPriorSeries: it.needsPriorSeries, requiredInSeries: it.requiredInSeries, exclusiveGroup: it.exclusiveGroup, sortOrder: it.sortOrder, createdBy: actorId,
       });
       const us = await tx.select().from(sessionOfferItemUnit).where(eq(sessionOfferItemUnit.itemId, it.id));
@@ -747,8 +758,8 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
     }
     copied++;
   }
-  await logAction(actorId, 'SESSION_COPIED', 'session', session.id, null, { fromSessionId: from.id, from: from.name, offers: copied, feesCopiedProvisional: feesCopied }, undefined, tx);
-  return { offers: copied, feesCopied };
+  await logAction(actorId, 'SESSION_COPIED', 'session', session.id, null, { fromSessionId: from.id, from: from.name, offers: copied, feesCopiedProvisional: feesCopied, closedNoTeacher }, undefined, tx);
+  return { offers: copied, feesCopied, closedNoTeacher };
 }
 
 // ─── Reading ─────────────────────────────────────────────────────────────────

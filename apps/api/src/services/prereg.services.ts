@@ -20,6 +20,7 @@ import { db, registration, auditLog, eq, and, sql } from '@repo/db';
 import type { PreregisterRegistrationType } from '@repo/validations';
 import { prepareLegacyLines, getExistingRegistrationSubjectIds } from './registration.services';
 import { insertLines } from './line.services';
+import { recheckLines, LineRuleError } from './line-rules.services';
 import { effectiveDeadlineFor } from './deadline.services';
 import { creditHeld, debitHeld, getEscrowBalance } from './escrow.services';
 import { executeReceiptGatedDrop } from './receipt.services';
@@ -318,13 +319,26 @@ export async function capturePreregistrationsForSession(sessionId: string): Prom
         }
 
         const { funded } = await preregPaymentState(reg.id, tx);
-        if (!eligibility.allowed) {
+        // The line rules asked again where the row is (§6: capture puts it into its series): a rule
+        // it now breaks holds it, as an ineligible student's row is held (SO-4: the owner decides).
+        let ruleRefusal: string | null = null;
+        if (eligibility.allowed) {
+          try {
+            await recheckLines(tx, [reg.id]);
+          } catch (err) {
+            if (!(err instanceof LineRuleError)) throw err;
+            ruleRefusal = err.message;
+          }
+        }
+        if (!eligibility.allowed || ruleRefusal) {
           // Recorded once: the recovery sweep asks again every tick.
           if (held) return 'held' as const;
           const heldAmount = funded ? reg.priceAtRegistration : 0;
+          const code = ruleRefusal ? 'line_rule' : eligibility.code;
+          const reason = ruleRefusal ?? eligibility.reason;
           await logAction(null, 'PREREG_HELD_INELIGIBLE', 'registration', reg.id, { status: 'preregistered' },
-            { status: 'preregistered', heldAmount, code: eligibility.code, reason: eligibility.reason }, undefined, tx);
-          newlyHeld.push({ registrationId: reg.id, held: heldAmount, reason: eligibility.reason ?? eligibility.code });
+            { status: 'preregistered', heldAmount, code, reason }, undefined, tx);
+          newlyHeld.push({ registrationId: reg.id, held: heldAmount, reason: reason ?? code ?? 'held' });
           return 'held' as const;
         }
         await tx

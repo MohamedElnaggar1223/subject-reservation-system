@@ -33,6 +33,9 @@ import {
 import { logAction, logActions, type AuditContext } from './audit.services';
 import { schoolDate, entryDeadlineMessage } from './window.services';
 import { lineDeadlineSql, effectiveDeadlinesOf, deadlinePassedSentence, redateLines, redateSeriesLines } from './deadline.services';
+import { carryFeeRows, repriceMovedLines, tellPriceChanged } from './line-moves.services';
+import { recheckLines, LineRuleError } from './line-rules.services';
+import { PricingError } from './pricing.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -426,7 +429,7 @@ export async function windowChangeMisfit(
 export async function moveRegistrations(sessionId: string, data: MoveRegistrationsToSeriesType, actorId: string, ctx?: AuditContext) {
   const { names } = await boardNameMap();
   try {
-    return await db.transaction(async (tx) => {
+    const out = await db.transaction(async (tx) => {
       const regs0 = await tx.select({ studentId: registration.studentId }).from(registration).where(inArray(registration.id, data.registrationIds));
       const students = [...new Set(regs0.map((r) => r.studentId))].sort();
       if (students.length) await tx.execute(sql`select id from "user" where id in (${sql.join(students.map((s) => sql`${s}`), sql`, `)}) order by id for no key update`);
@@ -438,8 +441,6 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
       if (!link) throw new SeriesError('This session has no item in that series', 404);
       const target = link.series;
       const now = new Date();
-      // A series past its entry deadline takes no more entries (MO-10), as before the rework.
-      if (target.entryDeadline && target.entryDeadline <= now) throw new SeriesError(entryDeadlineMessage(target.entryDeadline));
       const regs = await tx
         .select({ id: registration.id, sessionId: registration.sessionId, status: registration.status, boardSeriesId: registration.boardSeriesId,
           offerItemId: registration.offerItemId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId,
@@ -450,6 +451,14 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
         .for('update', { of: registration });
       if (regs.length !== data.registrationIds.length || regs.some((r) => r.sessionId !== sessionId)) {
         throw new SeriesError('One or more registrations are not in this session', 404);
+      }
+      // A series past a line's own deadline takes no more of it (MO-10 per line): past the entry
+      // deadline, a retake of the board's previous sitting still goes in until the retake deadline.
+      for (const r of regs) {
+        const d = await tx.execute(sql`select line_effective_deadline(${r.attempt}, ${r.priorSittingSeriesId}, ${target.id}) as at,
+          line_effective_deadline_kind(${r.attempt}, ${r.priorSittingSeriesId}, ${target.id}) as kind`);
+        const row = d.rows[0] as { at: string | Date | null; kind: 'entry' | 'retake' | 'exams_start' | null };
+        if (row.at && new Date(row.at) <= now && r.boardSeriesId !== target.id) throw new SeriesError(entryDeadlineMessage(new Date(row.at), row.kind));
       }
       const done = regs.find((r) => (DONE as readonly string[]).includes(r.status));
       if (done) throw new SeriesError(`${done.subjectName} is ${done.status}: its registration is history and stays where it was`, 409);
@@ -477,12 +486,18 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
         if (!toItem) {
           throw new SeriesError(`${r.subjectName} has no item entering the same in ${boardSeriesName(names, target)} — add one to the subject (or move the item's series) first`, 409);
         }
-        const d = await tx.execute(sql`select line_effective_deadline(${r.attempt}, ${r.priorSittingSeriesId}, ${target.id}) as at`);
-        const at = (d.rows[0] as { at: string | Date | null }).at;
-        if (at && new Date(at) <= now) {
-          throw new SeriesError(deadlinePassedSentence({ at: new Date(at), kind: 'entry' }, schoolDate), 409);
-        }
         await tx.update(registration).set({ offerItemId: toItem, boardSeriesId: target.id, updatedAt: now }).where(eq(registration.id, r.id));
+        // What it costs there: the sibling item's rows in the target (carried provisional where none).
+        await carryFeeRows(tx, toItem, r.boardSeriesId, actorId, 'A line moved to another series');
+      }
+      // Each student's lines checked again where they now are (§6), then priced from the new grid.
+      let repriced: Awaited<ReturnType<typeof repriceMovedLines>> = [];
+      try {
+        await recheckLines(tx, moving.map((r) => r.id));
+        repriced = await repriceMovedLines(tx, moving.map((r) => r.id), actorId, 'moved to another series');
+      } catch (err) {
+        if (err instanceof LineRuleError || err instanceof PricingError) throw new SeriesError(err.message, 409);
+        throw err;
       }
       // A registration paid for with another in an open checkout may not move to a series with
       // another deadline: the checkout would span two.
@@ -499,8 +514,10 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
       })), tx);
       await redateLines(tx, moving.map((r) => r.id), actorId, 'moved to another series');
 
-      return { moved: moving.length, alreadyThere: regs.length - moving.length, boardSeriesId: target.id, series: boardSeriesName(names, target) };
+      return { result: { moved: moving.length, repriced: repriced.length, alreadyThere: regs.length - moving.length, boardSeriesId: target.id, series: boardSeriesName(names, target) }, repriced };
     });
+    await tellPriceChanged(out.repriced, 'The subject is now entered in another exam series, with its own board fee');
+    return out.result;
   } catch (err) {
     const sentence = seriesRuleSentence(err);
     if (sentence) throw new SeriesError(sentence, 409);
