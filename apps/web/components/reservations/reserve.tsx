@@ -67,6 +67,9 @@ const AVAILABILITY: Record<string, string> = { retake_only: 'Retakes only', self
 
 const entryKey = (p: { attempt: string; mode: string }) => `${p.attempt}|${p.mode}`;
 const isKnown = (it: Item) => it.knownSittings.length > 0;
+/** Open per attempt (docs/features/RESERVATIONS.md §2.12): a first entry to the entry deadline, a retake of the previous sitting to the retake deadline. */
+const reservable = (it: Item) => it.open.first || it.open.retake;
+const usable = (p: Price) => !p.noFee && p.open;
 
 /** The entry choices as the forms word them: the attempt and the mode in one list. */
 function entryLabel(p: Price, known: boolean): string {
@@ -77,7 +80,7 @@ function entryLabel(p: Price, known: boolean): string {
 
 /** The entry a tick starts with: a retake when the system knows the earlier sitting (§4.3). */
 function defaultEntry(it: Item): string | null {
-  const keys = it.prices.filter((p) => !p.noFee).map(entryKey);
+  const keys = it.prices.filter(usable).map(entryKey);
   const taught = it.teachers.length > 0;
   const want = isKnown(it)
     ? [taught ? 'retake|in_school' : 'retake|self_study', 'retake|self_study', 'retake|in_school']
@@ -128,7 +131,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
     setPicks((prev) => {
       const next = { ...prev };
       for (const o of data.offers.filter((x) => x.grade10Core)) {
-        const it = o.items.find((i) => i.open && !i.held && defaultEntry(i));
+        const it = o.items.find((i) => reservable(i) && !i.held && defaultEntry(i));
         if (it && !next[it.id]?.on) next[it.id] = { on: true, entry: defaultEntry(it), teacherId: undefined, sitting: '' };
       }
       return next;
@@ -379,12 +382,12 @@ function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings }: {
       </tr>
       {o.items.map((it) => {
         const p = pickOf(it);
-        const options = it.prices.filter((x) => !x.noFee);
-        const unavailable = !it.open || !!it.held || options.length === 0;
+        const options = it.prices.filter(usable);
+        const unavailable = !reservable(it) || !!it.held || options.length === 0;
         const [attempt, mode] = (p.entry ?? '|').split('|');
         const price = it.prices.find((x) => entryKey(x) === p.entry && !x.noFee) ?? null;
         const needsSitting = p.on && (attempt === 'retake' || it.needsPriorSeries) && !isKnown(it);
-        const noFee = it.prices.length > 0 && options.length === 0;
+        const noFee = it.prices.length > 0 && it.prices.every((x) => x.noFee);
         return (
           <tr key={it.id} className={unavailable ? 'text-muted-foreground' : ''}>
             <td className="px-3 py-2 align-top">
@@ -396,7 +399,8 @@ function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings }: {
               {it.availability !== 'open' && AVAILABILITY[it.availability] && <> <Badge tone="warning">{AVAILABILITY[it.availability]}</Badge></>}
               {isKnown(it) && <> <Badge tone="info"><span>sat</span>&nbsp;<bdi data-i18n-skip="true">{it.knownSittings[0]!.series}</bdi></Badge></>}
               {it.held && <> <Badge tone="success">already reserved</Badge></>}
-              {!it.open && !it.held && <> <Badge tone="neutral">closed for new entries</Badge></>}
+              {!reservable(it) && !it.held && <> <Badge tone="neutral">closed for new entries</Badge></>}
+              {!it.open.first && it.open.retake && !it.held && <> <Badge tone="warning">retakes of the previous sitting only</Badge></>}
               {noFee && <> <Badge tone="warning">board fee not set yet</Badge></>}
               {needsSitting && (attempt === 'retake') && <> <Badge tone="warning">{desk ? 'declared — listed to verify' : 'to be verified by the school'}</Badge></>}
               {it.series && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{seriesName(o, it)}</bdi></div>}

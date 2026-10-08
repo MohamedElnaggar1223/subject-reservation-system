@@ -814,7 +814,7 @@ describe('08n: the review of 977848d', () => {
     await fee(series, 'subject', sub, 300);
     await offer(june, sub, [whole(series)]);
     const f = await onboard(officer, `n08v-drop-${RUN}`, 11);
-    const [line] = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, subjectIds: [sub], studentId: f.studentId } })))!;
+    const [line] = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, ...(await reservationOf(june, [sub])), studentId: f.studentId } })))!;
     await pay(f, [line!.id]);
     const cr = (await apiResponse(f.student.api.v1.registrations[':id']['request-drop'].$post({ param: { id: line!.id }, json: { reason: 'asked before the deadline' } })))!;
     await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [series]);
@@ -940,7 +940,7 @@ describe('08n: the review of 977848d', () => {
     await offer(d, subA, [whole(s1)]);
     await offer(d, subB, [whole(s2)]);
     const f = await onboard(officer, `n08v-sch-${RUN}`, 11);
-    const prereg = async (subjectId: string) => (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: d, subjectIds: [subjectId], studentId: f.studentId } })))![0]!.id;
+    const prereg = async (subjectId: string) => (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: d, ...(await reservationOf(d, [subjectId])), studentId: f.studentId } })))![0]!.id;
     const ra = await prereg(subA);
     const rb = await prereg(subB);
     await pay(f, [ra]);

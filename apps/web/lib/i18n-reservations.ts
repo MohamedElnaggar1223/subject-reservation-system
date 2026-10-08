@@ -38,6 +38,7 @@ export const reservationsArabic: Record<string, string> = {
   '(payable once confirmed)': '(تُدفع حين تُؤكَّد)',
   'Paid per entry deadline:': 'يُدفع لكل موعد قيد:',
   '(retake deadline)': '(موعد الإعادة)',
+  'retakes of the previous sitting only': 'إعادات الدورة السابقة فقط',
   'Name the earlier sitting on each retake': 'سمِّ الدورة السابقة لكل إعادة',
   'Refund policy and declaration read and signed by the parent': 'قرأ ولي الأمر سياسة الاسترداد والإقرار ووقّع عليهما',
   'Refund policy and declaration read and signed by the parent.': 'قرأ ولي الأمر سياسة الاسترداد والإقرار ووقّع عليهما.',

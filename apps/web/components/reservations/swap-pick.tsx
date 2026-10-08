@@ -28,9 +28,9 @@ const ENTRY: Record<string, string> = {
 export function useSwapChoices(sessionId: string, studentId: string, currentItemId: string | null) {
   const q = useQuery({ queryKey: reserveOffersKey(sessionId, studentId), queryFn: () => fetchReserveOffers(sessionId, studentId), retry: false });
   const choices = (q.data?.offers ?? []).flatMap((o) => o.items
-    .filter((it) => it.id !== currentItemId && it.open && !it.held)
+    .filter((it) => it.id !== currentItemId && (it.open.first || it.open.retake) && !it.held)
     .flatMap((it) => it.prices
-      .filter((p) => !p.noFee && (p.attempt === 'first' || it.knownSittings.length > 0) && (!it.needsPriorSeries || it.knownSittings.length > 0))
+      .filter((p) => !p.noFee && p.open && (p.attempt === 'first' || it.knownSittings.length > 0) && (!it.needsPriorSeries || it.knownSittings.length > 0))
       .map((p) => {
         const line: SwapLine = { offerItemId: it.id, attempt: p.attempt, mode: p.mode, expectedPrice: p.total ?? undefined };
         if (p.mode === 'in_school' && it.teachers.length > 1) line.teacherId = null;
