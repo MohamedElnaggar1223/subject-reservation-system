@@ -143,6 +143,11 @@ Set these before the first deployment; each one is a control this audit relies o
   In production without them the API refuses uploads rather than writing to the local disk
   (`LOCAL_UPLOAD_DIR` is for development and tests only).
 - Run one API process: the scheduler assumes it is the only one (STATE_AUDIT.md SO-5).
+- Turn on automatic reminders (Settings › Reminders, `reminders.enabled`) after the first sessions
+  and fees are checked: they are off when the system is installed, and the first minute after they
+  are turned on sends each family its latest reminder only (docs/features/RESERVATIONS_MESSAGES.md).
+  The 24-hour "reservations close tomorrow" reminder (NOT-002) is one of them now, so until the
+  switch is on no family is told a session is about to close.
 
 ---
 

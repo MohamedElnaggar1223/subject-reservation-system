@@ -10,7 +10,8 @@
  *   so a broken email config cannot crash a critical operation.
  * - Parent auto-CC (NOT-010) is handled by the `notifyParentsOfStudent` helper,
  *   which is called by every trigger that involves a student's action.
- * - Bulk announcements (NOT-011) fan out to all matching users via `createBulkNotifications`.
+ * - Messages and reminders (step D) write these same notification rows through
+ *   message.services.ts, with a delivery row per recipient and channel.
  *
  * Integration: import the relevant exported trigger function into the
  * service that performs the action (registration, payment, escrow, swap).
@@ -21,22 +22,17 @@ import {
   notification,
   user,
   parentStudentLink,
-  scheduledAnnouncement,
   eq,
   isNull,
   and,
   or,
   desc,
-  lte,
   inArray,
   sql,
   gradeTodaySql,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
-import type {
-  NotificationType,
-  BulkAnnouncementType,
-} from '@repo/validations';
+import type { NotificationType } from '@repo/validations';
 import {
   sendSessionOpenedEmail,
   sendSessionClosingSoonEmail,
@@ -53,12 +49,10 @@ import {
   sendDirectDropSwapEmail,
   sendEscrowBalanceChangedEmail,
   sendWithdrawalFulfilledEmail,
-  sendBulkAnnouncementEmail,
   sendGradeChangedEmail,
   sendLinkRequestEmail,
   sendLinkDecisionEmail,
 } from '../integrations/email';
-import { clientMessage } from '../lib/response';
 import { gradeLabel } from '@repo/validations';
 import { schoolDate, schoolDateTime } from './window.services';
 
@@ -1399,278 +1393,13 @@ export async function notifyGradeChanged(data: {
   }
 }
 
-/**
- * NOT-011: Admin sends a bulk announcement to a recipient group.
- * Called from notification.routes.ts → POST /admin/notifications/announce.
- *
- * If `scheduledAt` is provided and in the future, the announcement is stored
- * in the scheduled_announcement table for later dispatch by the cron job.
- * Otherwise, it is sent immediately (current behavior).
+/*
+ * NOT-011 (the admin's bulk announcement) and its scheduled queue moved to messages (step D,
+ * RESERVATIONS_REWORK.md §3.8): message.services.ts sends a broadcast as BULK_ANNOUNCEMENT
+ * notifications, as before, with a delivery row per recipient and channel; the scheduler's
+ * message step sends a scheduled one. scheduled_announcement is kept one release, its rows moved
+ * to messages by migration 0051.
  */
-export async function sendAdminAnnouncement(
-  payload: BulkAnnouncementType,
-  createdBy?: string
-): Promise<{
-  notificationCount: number;
-  emailResult: { success: boolean; stubbed?: boolean };
-  scheduled?: boolean;
-  scheduledAt?: Date;
-}> {
-  // Check if this should be scheduled for the future
-  if (payload.scheduledAt) {
-    const scheduledTime = new Date(payload.scheduledAt);
-    const now = new Date();
-
-    if (scheduledTime > now) {
-      // Store for future dispatch
-      await db.insert(scheduledAnnouncement).values({
-        id: randomUUID(),
-        title: payload.title,
-        body: payload.body,
-        recipients: payload.recipients,
-        sendEmail: payload.sendEmail,
-        scheduledAt: scheduledTime,
-        status: 'pending',
-        createdBy: createdBy ?? 'system',
-      });
-
-      return {
-        notificationCount: 0,
-        emailResult: { success: true },
-        scheduled: true,
-        scheduledAt: scheduledTime,
-      };
-    }
-    // scheduledAt is in the past — send immediately (fall through)
-  }
-
-  return dispatchAnnouncement(payload);
-}
-
-/**
- * Core announcement dispatch logic.
- * Separated from sendAdminAnnouncement so the cron job can also call it.
- */
-async function dispatchAnnouncement(
-  payload: Pick<BulkAnnouncementType, 'title' | 'body' | 'recipients' | 'sendEmail'>
-): Promise<{ notificationCount: number; emailResult: { success: boolean; stubbed?: boolean } }> {
-  // Determine the target user query based on recipient group.
-  // All branches exclude banned accounts and accounts stuck at role=null or
-  // role='user' (incomplete sign-up) — URD "all users" / "active" semantics.
-  const notBanned = or(eq(user.banned, false), isNull(user.banned));
-  const hasRealRole = inArray(user.role, ['student', 'parent', 'admin']);
-
-  let targetUsers: { id: string; email: string; name: string }[] = [];
-
-  if (payload.recipients === 'all') {
-    targetUsers = await db.select({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-    }).from(user).where(and(hasRealRole, notBanned));
-  } else if (payload.recipients === 'students') {
-    targetUsers = await db.select({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-    }).from(user).where(and(eq(user.role, 'student'), notBanned, isNull(user.leftOn)));
-  } else if (payload.recipients === 'parents') {
-    targetUsers = await db.select({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-    }).from(user).where(and(eq(user.role, 'parent'), notBanned));
-  } else {
-    // grade_10, grade_11, grade_12
-    const grade = parseInt(payload.recipients.split('_')[1] ?? '0', 10);
-    targetUsers = await db.select({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-    }).from(user).where(
-      // Today's grade (Cairo time), from the cohort (F0a); a student who
-      // left the school is not in a grade.
-      and(eq(user.role, 'student'), sql`${gradeTodaySql(user.cohortYear)} = ${grade}`, notBanned, isNull(user.leftOn))
-    );
-  }
-
-  if (targetUsers.length === 0) {
-    return { notificationCount: 0, emailResult: { success: true } };
-  }
-
-  // Create in-app notifications — keep the created rows so we can mark
-  // emailSentAt per-recipient as each email actually goes out (M-17).
-  const created = await createBulkNotifications(
-    targetUsers.map((u) => u.id),
-    'BULK_ANNOUNCEMENT',
-    payload.title,
-    payload.body
-  );
-
-  // Send emails if requested. Tracks emailSentAt per notification on success.
-  let emailResult: { success: boolean; stubbed?: boolean } = { success: true };
-  if (payload.sendEmail) {
-    const emailByUser = new Map(targetUsers.map((u) => [u.id, u.email]));
-    const successfullySent: string[] = [];
-    let failed = 0;
-    let stubbed = false;
-    for (const n of created) {
-      const email = emailByUser.get(n.userId);
-      if (!email) continue;
-      const result = await sendBulkAnnouncementEmail(email, {
-        title: payload.title,
-        body: payload.body,
-      });
-      if (result.success) {
-        successfullySent.push(n.id);
-      } else {
-        failed++;
-      }
-      if (result.stubbed) stubbed = true;
-    }
-    if (successfullySent.length > 0) {
-      await db
-        .update(notification)
-        .set({ emailSentAt: new Date() })
-        .where(inArray(notification.id, successfullySent))
-        .catch((err) => console.error('[notification] BULK_ANNOUNCEMENT emailSentAt update failed:', err));
-    }
-    emailResult = { success: failed === 0, stubbed };
-  }
-
-  return { notificationCount: targetUsers.length, emailResult };
-}
-
-/**
- * L-6: Admin read — list every scheduled announcement (pending, sent,
- * failed, cancelled). Ordered by scheduledAt descending so the soonest
- * upcoming and most-recently-sent rows rise to the top.
- */
-export async function getScheduledAnnouncements() {
-  return db.query.scheduledAnnouncement.findMany({
-    orderBy: (s, { desc: descOp }) => [descOp(s.scheduledAt)],
-    with: {
-      createdByUser: { columns: { id: true, name: true, email: true } },
-    },
-  });
-}
-
-/**
- * L-6: Admin cancels a pending scheduled announcement. Returns undefined
- * if the row isn't found or has already transitioned out of 'pending'
- * (sent, failed, or already cancelled). The status-guarded UPDATE means
- * two admins clicking "Cancel" simultaneously don't both "win".
- */
-export async function cancelScheduledAnnouncement(id: string) {
-  const [updated] = await db
-    .update(scheduledAnnouncement)
-    .set({
-      status: 'cancelled',
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(scheduledAnnouncement.id, id),
-        eq(scheduledAnnouncement.status, 'pending'),
-      )
-    )
-    .returning();
-  return updated;
-}
-
-/**
- * Process all scheduled announcements whose scheduledAt has arrived.
- * Called by the session-closer cron job on each tick (every 60 seconds).
- *
- * Finds all 'pending' scheduled announcements where scheduledAt <= now,
- * dispatches each one, and updates the record status to 'sent' or 'failed'.
- */
-export async function processScheduledAnnouncements(): Promise<number> {
-  const now = new Date();
-
-  const pending = await db
-    .select()
-    .from(scheduledAnnouncement)
-    .where(
-      and(
-        eq(scheduledAnnouncement.status, 'pending'),
-        lte(scheduledAnnouncement.scheduledAt, now)
-      )
-    );
-
-  if (pending.length === 0) return 0;
-
-  let dispatched = 0;
-
-  for (const ann of pending) {
-    // Claim it before sending, and only while it is still pending: an admin's
-    // cancel in between used to be overwritten, a second scheduler instance
-    // sent it twice, and a failure after sending marked it failed (state
-    // audit ST-12). A crash after the claim leaves it marked sent — never
-    // sent twice.
-    const [claimed] = await db
-      .update(scheduledAnnouncement)
-      .set({ status: 'sent', sentAt: new Date() })
-      .where(and(eq(scheduledAnnouncement.id, ann.id), eq(scheduledAnnouncement.status, 'pending')))
-      .returning({ id: scheduledAnnouncement.id });
-    if (!claimed) continue;
-    try {
-      const result = await dispatchAnnouncement({
-        title: ann.title,
-        body: ann.body,
-        recipients: ann.recipients as BulkAnnouncementType['recipients'],
-        sendEmail: ann.sendEmail,
-      });
-
-      await db
-        .update(scheduledAnnouncement)
-        .set({ notificationCount: result.notificationCount })
-        .where(eq(scheduledAnnouncement.id, ann.id));
-
-      // L-7: Audit the actual dispatch (not just the scheduling).
-      // Imported lazily to avoid a circular dependency between the
-      // notification service and the audit service.
-      try {
-        const { logAction } = await import('./audit.services');
-        await logAction(
-          ann.createdBy ?? null,
-          'ADMIN_ANNOUNCEMENT',
-          'notification',
-          ann.id,
-          { status: 'pending', scheduledAt: ann.scheduledAt } as Record<string, unknown>,
-          {
-            status: 'sent',
-            recipients: ann.recipients,
-            sendEmail: ann.sendEmail,
-            notificationCount: result.notificationCount,
-            dispatchedBy: 'scheduler',
-          },
-        );
-      } catch (auditErr) {
-        console.error(`[audit] ADMIN_ANNOUNCEMENT (cron) failed for ${ann.id}:`, auditErr);
-      }
-
-      dispatched++;
-    } catch (err) {
-      // The stored text can reach an admin screen, so it gets the same guard
-      // as a client response (RF-07): a driver error is logged in full here
-      // and stored as a generic sentence.
-      console.error(`[notification] Failed to dispatch scheduled announcement ${ann.id}:`, err);
-      const errorMsg = clientMessage(err, 'Announcement could not be sent');
-
-      await db
-        .update(scheduledAnnouncement)
-        .set({
-          status: 'failed',
-          sentAt: null,
-          errorMessage: errorMsg.slice(0, 500),
-        })
-        .where(and(eq(scheduledAnnouncement.id, ann.id), eq(scheduledAnnouncement.status, 'sent')));
-    }
-  }
-
-  return dispatched;
-}
 
 // ─── AUTH-003: Parent-Student Link Request Received ───────────────────────────
 

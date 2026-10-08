@@ -32,6 +32,8 @@ const GROUPS: { id: string; title: string; hint: string }[] = [
   { id: 'refund', title: 'Refunds', hint: 'What a new session’s refund policy is.' },
   // Step C (RESERVATIONS_REWORK.md §3.7): what an exception may lift beyond the registry's own rules.
   { id: 'exceptions', title: 'Exceptions', hint: 'What the school allows an exception to lift.' },
+  // Step D (RESERVATIONS_REWORK.md §3.8): the reminders' switch and hour; the rules are on Messages > Reminders.
+  { id: 'reminders', title: 'Reminders', hint: 'Whether the reminder rules on Messages > Reminders go out, and at what hour of their day.' },
 ];
 
 /** The value as a person reads it. */
@@ -41,7 +43,7 @@ function describeValue(s: Setting, value: unknown): string {
   if (s.input === 'weekdays' && Array.isArray(value)) {
     return [...(value as number[])].sort((a, b) => a - b).map((d) => WEEKDAY_LABELS[d] ?? String(d)).join(', ');
   }
-  if (s.input === 'number' && typeof value === 'number') return s.unit === 'percent' ? `${value}%` : s.unit === 'days' ? `${value} ${value === 1 ? 'day' : 'days'}` : String(value);
+  if (s.input === 'number' && typeof value === 'number') return s.unit === 'percent' ? `${value}%` : s.unit === 'days' ? `${value} ${value === 1 ? 'day' : 'days'}` : s.unit === 'hour' ? `${String(value).padStart(2, '0')}:00 Cairo time` : String(value);
   if (s.input === 'refundPolicy') {
     const p = RefundPolicySchema.safeParse(value);
     return p.success ? refundPolicySentence(p.data) : JSON.stringify(value);
@@ -226,7 +228,7 @@ function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (save
                   onChange={(e) => setDraft(e.target.value === '' ? null : Number(e.target.value))}
                   className="w-28 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
-                {s.unit && <span>{s.unit === 'percent' ? '%' : 'days'}</span>}
+                {s.unit && <span>{s.unit === 'percent' ? '%' : s.unit === 'hour' ? ':00, Cairo time' : 'days'}</span>}
               </label>
             )}
             {s.input === 'refundPolicy' && <RefundPolicyEditor value={draft as RefundPolicy} onChange={setDraft} />}

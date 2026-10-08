@@ -1,0 +1,122 @@
+drive-d4.mjs on 3130/3131 (igcse_rwd_dev), 8 Oct 2026, 12:20-12:23Z. In order: Settings > Reminders
+(admin, en and ar); the families' PAYMENT_REMINDER counts before; Remind under All (officer, en) with
+the second POST /v1/messages dropped once, then "Send the rest"; the counts after (+1 for each
+family: D7's parent and student the overdue part, D5/D9/D10 the due part); the same in Arabic. The
+Arabic retry was driven twice: the first run read "أُرسل بالفعل إلى شخصان" (the dual after a
+preposition must be genitive) and showed the browser's "Failed to fetch" in English; both fixed in
+i18n-messages.ts, the second run is the one below, and each Arabic run added one reminder per family
+(3 -> 4 after en, 5 after the first ar run, 6 after the second).
+
+SETTINGS en:
+Reminders
+
+Whether the reminder rules on Messages > Reminders go out, and at what hour of their day.
+
+Send reminders automatically
+
+Off when the system is installed: turn it on once the first sessions and fees are checked. On: the scheduler sends the reminder rules on Messages > Reminders (payments due, reservations closing, board deadlines, the school fee, declared retakes to verify); the first minute after it is turned on sends each family only its latest reminder, never a backlog. Off again: nothing goes out until it is turned on, the reminder the day before a session's reservations close included.
+
+Off
+School default
+Never changed · Who may change it: Admin
+Change
+Hour the day's reminders go out
+
+Each reminder is due on its day (seven days before a payment's due date, the day itself, three days after…) at this hour, Cairo time, from 1 to 23 (midnight does not exist on the day summer time starts). A day whose hour passed while the system was down goes out at the next minute, once.
+
+09:00 Cairo time
+School default
+Never changed · Who may change it: Admin, Finance Admin
+Change
+SETTINGS ar:
+التذكيرات
+
+هل تُرسل قواعد التذكير في الرسائل > التذكيرات، وفي أي ساعة من يومها.
+
+إرسال التذكيرات تلقائيًا
+
+متوقف عند تثبيت النظام: شغِّله بعد مراجعة أول الجلسات والرسوم. تشغيل: يرسل المجدول قواعد التذكير في الرسائل > التذكيرات (مواعيد الدفع، انتهاء الحجز، مواعيد المجالس، الرسوم المدرسية، الإعادات المعلنة للتحقق)؛ وفي أول دقيقة بعد تشغيله تتلقى كل أسرة آخر تذكير لها فقط، ولا يُرسل ما فات دفعة واحدة أبدًا. إيقاف من جديد: لا يُرسل شيء حتى يُشغَّل، بما في ذلك تذكير اليوم السابق لانتهاء الحجز في الجلسة.
+
+متوقف
+الإعداد الافتراضي للمدرسة
+لم يتغير من قبل · من يحق له تغييره: مدير النظام
+تغيير
+ساعة إرسال تذكيرات اليوم
+
+يُستحق كل تذكير في يومه (قبل موعد الدفع بسبعة أيام، ويوم الموعد نفسه، وبعده بثلاثة أيام…) في هذه الساعة بتوقيت القاهرة، من 1 إلى 23 (منتصف الليل لا وجود له في يوم بدء التوقيت الصيفي). واليوم الذي فاتت ساعته والنظام متوقف يُرسل في الدقيقة التالية مرة واحدة.
+
+09:00 بتوقيت القاهرة
+الإعداد الافتراضي للمدرسة
+لم يتغير من قبل · من يحق له تغييره: مدير النظام, مدير مالي
+تغيير
+ERRORS: none
+== igcse_rwd_dev
+    name     | reminders 
+-------------+-----------
+ Parent D10  |         3
+ Parent D5   |         3
+ Parent D7   |         3
+ Parent D8   |         0
+ Parent D9   |         3
+ Student D10 |         3
+ Student D5  |         3
+ Student D7  |         3
+ Student D9  |         3
+(9 rows)
+
+ messages 
+----------
+       13
+(1 row)
+
+en BEFORE: button "Remind 4 families"
+en PARTIAL:
+Failed to fetch
+Already sent to 2 people. Sending again sends only the rest.
+en ticks disabled: true
+en DONE:
+Sent to 8 people. The deliveries are in Messages.
+en POSTS: [{"part":"overdue","outcome":"201"},{"part":"due","outcome":"dropped"},{"part":"due","outcome":"201"}]
+en delivered POSTs per part: overdue 1, due 1; dropped due
+ERRORS: none
+== igcse_rwd_dev
+    name     | reminders 
+-------------+-----------
+ Parent D10  |         4
+ Parent D5   |         4
+ Parent D7   |         4
+ Parent D8   |         0
+ Parent D9   |         4
+ Student D10 |         4
+ Student D5  |         4
+ Student D7  |         4
+ Student D9  |         4
+(9 rows)
+
+ERR: ERROR:  column m.audience_label does not exist
+LINE 1: select m.id, m.status, m.audience_label, m.people, m.created...
+                               ^
+ar BEFORE: button "تذكير 4 أسر"
+ar PARTIAL:
+أُرسل بالفعل إلى شخصين. الإرسال من جديد يرسل الباقي فقط.
+إرسال الباقي
+ar ticks disabled: true
+ar DONE:
+أُرسلت إلى 8 أشخاص. التوصيلات في صفحة الرسائل.
+ar POSTS: [{"part":"overdue","outcome":"201"},{"part":"due","outcome":"dropped"},{"part":"due","outcome":"201"}]
+ar delivered POSTs per part: overdue 1, due 1; dropped due
+ERRORS: none
+== igcse_rwd_dev
+    name     | reminders 
+-------------+-----------
+ Parent D10  |         6
+ Parent D5   |         6
+ Parent D7   |         6
+ Parent D8   |         0
+ Parent D9   |         6
+ Student D10 |         6
+ Student D5  |         6
+ Student D7  |         6
+ Student D9  |         6
+(9 rows)
+

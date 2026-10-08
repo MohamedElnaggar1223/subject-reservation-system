@@ -1,0 +1,11 @@
+Controls restored: every guard back (no CONTROL marker in apps/api/src, packages/validations/src, packages/db/drizzle); 08s and 08t run together on igcse_rwd_test, local time
+
+Files:
+ ✓ test/08s-messages-reminders.test.ts (22 tests) 11663ms
+ ✓ test/08t-rework-races.test.ts (39 tests) 33044ms
+
+ Test Files  2 passed (2)
+      Tests  61 passed (61)
+   Start at  11:36:29
+   Duration  46.70s (transform 631ms, setup 3ms, collect 347ms, tests 44.71s, environment 0ms, prepare 62ms)
+

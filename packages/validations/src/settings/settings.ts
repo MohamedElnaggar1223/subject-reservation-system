@@ -21,7 +21,7 @@ import { ROLES, type Role } from '../roles';
 import { LevelCodeReadingSchema, LEVEL_CODE_READINGS, LEVEL_CODE_READING_LABELS } from '../catalogue/level-code';
 import { RefundPolicySchema, DEFAULT_REFUND_POLICIES } from '../session/session.validations';
 
-export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar' | 'catalogue' | 'pricing' | 'payment' | 'refund' | 'exceptions' | 'verification';
+export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar' | 'catalogue' | 'pricing' | 'payment' | 'refund' | 'exceptions' | 'verification' | 'reminders';
 
 export type SettingDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   schema: S;
@@ -39,7 +39,7 @@ export type SettingDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   /** For a number: its bounds and unit as the screen shows them. */
   min?: number;
   max?: number;
-  unit?: 'percent' | 'days';
+  unit?: 'percent' | 'days' | 'hour';
 };
 
 const percentSetting = (label: string, description: string, def: number, source?: string) =>
@@ -235,6 +235,35 @@ export const SETTINGS = {
       { value: 'enter_as_declared', label: 'Enter as declared' },
       { value: 'hold', label: 'Hold: expire or drop at the deadline' },
     ],
+  }),
+  // Reservations rework, step D (RESERVATIONS_REWORK.md §3.8): the reminders' two school-wide
+  // settings. The rules themselves (which days, how often, which channels) are on Messages >
+  // Reminders, one per kind for every session and a session's own where it overrides.
+  'reminders.enabled': defineSetting({
+    schema: z.boolean(),
+    // Off when the system is installed (decided by the lead, 8 Oct 2026): nothing goes out until the
+    // admin has checked the first sessions and fees and turns it on.
+    default: false,
+    group: 'reminders',
+    label: 'Send reminders automatically',
+    description:
+      'Off when the system is installed: turn it on once the first sessions and fees are checked. On: the scheduler sends the reminder rules on Messages > Reminders (payments due, reservations closing, board deadlines, the school fee, declared retakes to verify); the first minute after it is turned on sends each family only its latest reminder, never a backlog. Off again: nothing goes out until it is turned on, the reminder the day before a session\'s reservations close included.',
+    editableBy: [ROLES.ADMIN],
+    input: 'boolean',
+  }),
+  'reminders.sendAtHour': defineSetting({
+    // 1 to 23: Egypt's summer time starts at midnight, so a midnight hour would not exist on that day.
+    schema: z.number().int().min(1).max(23),
+    default: 9,
+    group: 'reminders',
+    label: 'Hour the day\'s reminders go out',
+    description:
+      'Each reminder is due on its day (seven days before a payment\'s due date, the day itself, three days after…) at this hour, Cairo time, from 1 to 23 (midnight does not exist on the day summer time starts). A day whose hour passed while the system was down goes out at the next minute, once.',
+    editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
+    input: 'number',
+    min: 1,
+    max: 23,
+    unit: 'hour',
   }),
 } as const;
 

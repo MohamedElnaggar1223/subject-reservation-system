@@ -66,6 +66,11 @@ export const AUDIT_ENTITY_TYPES = [
   // Reservations rework, step C: charges and board services
   'charge',
   'board_service',
+  // Reservations rework, step D: messages and reminders
+  'message',
+  'message_template',
+  'reminder_rule',
+  'message_audience',
 ] as const;
 
 export const AuditEntityTypeSchema = z.enum(AUDIT_ENTITY_TYPES);
@@ -108,6 +113,10 @@ export const AUDIT_ENTITY_TYPE_LABELS: Record<AuditEntityType, string> = {
   board_fee:      'Board Fee',
   charge:         'Charge',
   board_service:  'Board Service',
+  message:        'Message',
+  message_template: 'Message Template',
+  reminder_rule:  'Reminder Rule',
+  message_audience: 'Saved Audience',
 };
 
 // ─── Action Types ─────────────────────────────────────────────────────────────
@@ -327,6 +336,16 @@ export const AUDIT_ACTIONS = [
   'REMARK_PAYMENT_CONFIRMED',
   // Admin
   'ADMIN_ANNOUNCEMENT',
+  // Reservations rework, step D: messages and reminders (RESERVATIONS_REWORK.md §3.8)
+  'MESSAGE_SENT',
+  'MESSAGE_SCHEDULED',
+  'MESSAGE_CANCELLED',
+  'MESSAGE_FAILED',
+  'REMINDERS_SENT',
+  'REMINDER_RULE_SET',
+  'MESSAGE_TEMPLATE_SAVED',
+  'MESSAGE_AUDIENCE_SAVED',
+  'REWORK_BACKFILL_MESSAGE',
 ] as const;
 
 export const AuditActionSchema = z.enum(AUDIT_ACTIONS);
@@ -418,6 +437,15 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   REMARK_PAYMENT_INITIATED:   'Remark Payment Initiated',
   REMARK_PAYMENT_CONFIRMED:   'Remark Fee Confirmed — Awaiting Submission',
   ADMIN_ANNOUNCEMENT:         'Admin Announcement Sent',
+  MESSAGE_SENT:               'Message Sent',
+  MESSAGE_SCHEDULED:          'Message Scheduled',
+  MESSAGE_CANCELLED:          'Scheduled Message Cancelled',
+  MESSAGE_FAILED:             'Message Could Not Be Sent',
+  REMINDERS_SENT:             'Reminders Sent',
+  REMINDER_RULE_SET:          'Reminder Rule Set',
+  MESSAGE_TEMPLATE_SAVED:     'Message Template Saved',
+  MESSAGE_AUDIENCE_SAVED:     'Audience Saved',
+  REWORK_BACKFILL_MESSAGE:    'Announcement Moved to Messages',
   STUDENT_COHORT_CORRECTED:   'Student Cohort Corrected',
   STUDENT_COHORT_INFERRED:    'Student Cohort Inferred (Backfill)',
   STUDENT_COHORT_RECORDED:    'Student Grade Recorded at First Setup',

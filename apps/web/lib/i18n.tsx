@@ -13,6 +13,7 @@ import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
 import { sessionsArabic, translateSessionsText } from './i18n-sessions';
 import { moneyArabic, translateMoneyText } from './i18n-money';
 import { reservationsArabic, translateReservationsText } from './i18n-reservations';
+import { messagesArabic, translateMessagesText } from './i18n-messages';
 
 export type Language = 'en' | 'ar';
 
@@ -45,6 +46,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.schoolFees': 'School Fees',
     'nav.schoolFee': 'School Fee',
     'nav.announcements': 'Announcements',
+    'nav.messages': 'Messages',
     'nav.exceptions': 'Exceptions',
     'nav.remarks': 'Remarks',
     'nav.desk': 'The Desk',
@@ -218,6 +220,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.schoolFees': 'المصاريف الدراسية',
     'nav.schoolFee': 'المصاريف الدراسية',
     'nav.announcements': 'الإعلانات',
+    'nav.messages': 'الرسائل',
     'nav.exceptions': 'الاستثناءات',
     'nav.remarks': 'إعادة التصحيح',
     'nav.desk': 'المكتب',
@@ -1510,6 +1513,8 @@ for (const [en, ar] of Object.entries(sessionsArabic)) if (!(en in autoArabicTex
 for (const [en, ar] of Object.entries(moneyArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // Step B's screens (lib/i18n-reservations.ts): Reserve, the statement, To verify, the slip.
 for (const [en, ar] of Object.entries(reservationsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// Step D's screens (lib/i18n-messages.ts): Messages, reminders, the Money tab's Remind, the notification types.
+for (const [en, ar] of Object.entries(messagesArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1597,6 +1602,9 @@ function translateDynamicText(text: string): string | null {
   // Step B: the Reserve page's results, the pricing basis, the consent and the refusals.
   const reservationText = translateReservationsText(text);
   if (reservationText) return reservationText;
+  // Step D: the messages screens' sentences with a name, a number or a variable in them.
+  const messagesText = translateMessagesText(text, translateExactText);
+  if (messagesText) return messagesText;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

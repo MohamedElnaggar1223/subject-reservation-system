@@ -55,7 +55,7 @@ export async function listSettings(role: string | null | undefined) {
       // A number's bounds and unit, as the screen shows them (the reservations rework's pricing and payment settings).
       min: 'min' in def ? (def.min as number) : null,
       max: 'max' in def ? (def.max as number) : null,
-      unit: 'unit' in def ? (def.unit as 'percent' | 'days') : null,
+      unit: 'unit' in def ? (def.unit as 'percent' | 'days' | 'hour') : null,
       editableBy: [...def.editableBy] as string[],
       canEdit: hasRole(role, ...def.editableBy),
       value: (parsed?.success ? parsed.data : def.default) as unknown,
