@@ -25,6 +25,11 @@ export const LIVE_CHANNELS = ['in_app', 'email'] as const;
 export const MessageChannelSchema = z.enum(MESSAGE_CHANNELS);
 export const CHANNEL_LABELS: Record<MessageChannel, string> = { in_app: 'In the app', email: 'Email', whatsapp: 'WhatsApp' };
 export const WHATSAPP_REFUSAL = 'WhatsApp is not connected yet: the school has no WhatsApp Business account, so nothing can be sent there';
+/**
+ * The refusal of a message sent now to an audience that has nobody in it (409). The Money tab's
+ * "Remind" reads it as "this part is done": the families it named paid meanwhile.
+ */
+export const NOTHING_TO_SEND = 'Nobody is in this audience now: there is nothing to send';
 
 const Channels = z.array(MessageChannelSchema).min(1, 'Choose at least one channel').max(3)
   .refine((c) => new Set(c).size === c.length, 'Each channel once')

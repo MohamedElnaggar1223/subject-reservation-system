@@ -247,7 +247,7 @@ export const SETTINGS = {
     group: 'reminders',
     label: 'Send reminders automatically',
     description:
-      'Off when the system is installed: turn it on once the first sessions and fees are checked. On: the scheduler sends the reminder rules on Messages > Reminders (payments due, reservations closing, board deadlines, the school fee, declared retakes to verify); the first minute after it is turned on sends each family only its latest reminder, never a backlog. Off again: nothing goes out until it is turned on.',
+      'Off when the system is installed: turn it on once the first sessions and fees are checked. On: the scheduler sends the reminder rules on Messages > Reminders (payments due, reservations closing, board deadlines, the school fee, declared retakes to verify); the first minute after it is turned on sends each family only its latest reminder, never a backlog. Off again: nothing goes out until it is turned on, the reminder the day before a session\'s reservations close included.',
     editableBy: [ROLES.ADMIN],
     input: 'boolean',
   }),

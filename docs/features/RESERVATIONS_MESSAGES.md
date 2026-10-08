@@ -152,8 +152,17 @@ Resolved when the message is sent (a grade is today's; the unpaid are those owin
   every live one; a pushed fee by its year). Each reaches the parents, the students or both.
 - **Direct**: chosen people, any role.
 - A **money list** (a session's unpaid, a charge's holders) is per child: one delivery about each
-  student, carrying `{amount}` (what that student owes), `{due}` (the earliest date), `{items}`. Any
-  other list is per person: a parent hears once, `{student}` naming their children in the list.
+  student, carrying what falls due on the **first day** that student owes anything (the school's
+  day, Cairo): `{amount}` the sum of those items, `{items}` their names, `{due}` that day. What falls
+  due later is not in that message: the step reminds it on its own days, and a second "Remind" after
+  the first is paid names it (the review of 9e7a4d6, item 1: a plan's two instalments of 750 read
+  "EGP 1,500 … is due on" the first one's date). Any other list is per person: a parent hears once,
+  `{student}` naming their children in the list.
+- **Overdue** (the session's unpaid list's `filter`, and so Remind's two texts) is past the **due
+  instant**: an hour after it, the overdue text ("was due on … and is still unpaid"); an hour before
+  it, the due text. The Money tab keeps its own count, whole days ("1 day overdue" from 24 hours
+  after the instant), for its badge and its Overdue filter; under that filter the dialog also lists a
+  line due within the last day, marked overdue (the review of 9e7a4d6, item 5).
 - **Variables**: `{guardian}` (a parent recipient's name; for a student's copy, the parents'),
   `{student}`, `{session}` and `{closes}` (the list's session, or the one the composer names),
   `{amount}`, `{due}`, `{items}` (money lists), `{series}`, `{count}` (staff reminders). A text
@@ -256,8 +265,11 @@ Every minute, each part logging its own failure and the next part still running:
   (POST /v1/messages, the payment-list path the finance officer may use) — **per line**: what is past
   its due date with the overdue text, what is not yet due with the due text, one message each (a
   family with both gets one of each). What cannot be paid now (provisional, a payment in progress,
-  past its deadline) and plan lines are not in it; a plan's instalments are.
-- **Settings**: a Reminders group (on/off, the hour, Cairo time).
+  past its deadline) and plan lines are not in it; a plan's instalments are. The dialog records
+  which part went: when the second fails, the ticks and the email choice are frozen, it says
+  "Already sent to N people. Sending again sends only the rest.", and "Send the rest" sends only
+  that part; a part refused because nobody is in it now (they paid meanwhile) is done.
+- **Settings**: a Reminders group (on/off, the hour, Cairo time), in English and Arabic.
 - **The families' notifications**: unchanged, but a message in two languages reads as two
   paragraphs, each in its own direction. There is no delete anywhere.
 - Arabic for all of it in `apps/web/lib/i18n-messages.ts`, merged in `lib/i18n.tsx` as A's, B's and
@@ -315,6 +327,14 @@ amount and the date filled in.
   leaver's pending charge neither listed nor reminded; a text a session's rule sends cannot be
   switched off (the refusal names the rule); Remind per line (the overdue and the due parts, each
   with its text).
+- **08s, after the review of 9e7a4d6**, each with the literal text in both languages: a plan of 750
+  and 750 (12 and 19 days ahead) reads "EGP 750 for Student … (Instalment 1 of 2 — Biology …) is
+  due on" the first day, and once that is paid the next "Remind" names the second on its own day; a
+  line and a charge due the same day read "EGP 1,700 … (Biology … and A lab coat) is due on" that
+  day, the charge due five days later left out; a line due an hour ago is overdue and gets the
+  overdue text, one due in an hour the due text, the tab's count 0 for both; every label and text of
+  the Reminders settings has its Arabic key. The retry of Remind is driven in the browser
+  (`screens/drive-d4.mjs`): the second POST failed once, the retry sends the second part only.
 - **05**: B's parent and student cannot mark or list A's copies of a message, reach its deliveries,
   the log, an audience naming A's student, or send; finance cannot read a direct message's
   deliveries or send one.
@@ -333,7 +353,11 @@ amount and the date filled in.
   and after the review: Remind's payable-now narrowing; finance's unpaid-only charge list; the
   sessions before the lines; the claimed-target filter; one a day (filter and index); the leaver;
   the text in use; Remind's two parts; the hour 1–23 — twenty-four in all, the earlier fifteen run
-  again on the fixed code.
+  again on the fixed code; after the review of 9e7a4d6: the first day's items (the whole remainder
+  fails both item-1 cases), the due instant (whole days fails the boundary), the Arabic keys (the old
+  English fails the Arabic test) — twenty-seven; and one in the browser: the dialog's "skip a part
+  that went" undone, the same drive POSTs the overdue part twice and Parent D7 gets two reminders
+  (`screens/control-remind-retry.out`).
 - **The migration** (`migration/`): two copies (the template's and F0a's richer copy), each
   migrated with main's migrations and then seeded **through main's own API, before step D's code**
   (placeholder families; announcements sent at once, scheduled and sent by main's tick, pending,
@@ -397,7 +421,9 @@ amount and the date filled in.
     off — so a fresh and a production database start off with no setting row to seed and no audit
     gap — and the admin turns it on once the first sessions and fees are checked; the first minute
     after that sends each target its latest day only, never a backlog (decision 6). The suites turn it
-    on where they run the step.
+    on where they run the step. NOT-002's 24-hour closing reminder is now the reservations-closing
+    rule's day −1, so until the switch is on no family is told a session closes tomorrow, as the
+    setting's own text says (the review of 9e7a4d6, item 3).
 18. **One definition of "owed and payable now"** (`payable-now.services.ts`), read by the step and by
     every money list (the review of 5c2f2bf: "Remind" asked a family whose InstaPay transfer was being
     checked to pay).
@@ -408,6 +434,20 @@ amount and the date filled in.
     log, rather than one text that is wrong for half the lines.
 21. **Arabic counts agree with their number** (1, 2, 3–10, 11–99, hundreds): a count and its noun are
     one text on the screens, so the translator sees them together.
+22. **A money list names the first day's items** (the review of 9e7a4d6, item 1): per student, what
+    falls due on the first Cairo day it owes anything, their sum and that day — not every item with
+    its own date. The school's sentence "{amount} … is due on {due}" stays literally true in both
+    languages with no new variable or text; it is what the step does (each target on its own days);
+    and the family reads one sum under the date it belongs to. The cost: a family behind on two
+    dates hears the first; the step and the next "Remind" name the second.
+23. **Overdue from the due instant** (item 5): the texts follow whether the date has passed, the tab's
+    badge how late it is; the two are allowed to differ for the first 24 hours.
+24. **Remind records what went** (item 4): the two parts are two messages; a retry sends only the
+    part that did not go, and a part refused as empty (`NOTHING_TO_SEND`, one constant for the API
+    and the dialog) is done. A family is never sent the same part twice from one dialog.
+25. **The Arabic of a setting is keyed to its English** (item 2): `i18n-messages.ts` is keyed by the
+    exact sentence `settings.ts` writes, so 08s checks that every Reminders setting's label and text
+    has its key; changing the English fails the suite, not the Arabic screen.
 
 ---
 
@@ -466,3 +506,9 @@ amount and the date filled in.
   setting's default, the production checklist); Remind per line; the hour 1–23; Arabic counts; a
   text a live rule sends kept on. Twenty-four controls red, restored. One correction row for the
   nine decision rows that shared 08:35:35Z.
+- 11:58–12:40 — the second review of 9e7a4d6 (via the lead: "merge after 1, 2"): a money list names
+  the first day's items and their sum (decision 22); the Reminders settings' Arabic re-keyed and a
+  test that holds it; NOT-002's day −1 behind the switch said in decision 17 and SECURITY_AUDIT.md
+  §6; Remind records the parts that went and sends only the rest (driven with the second POST
+  failed once, in English and Arabic; the Arabic dual after "to" made genitive on the way); overdue
+  from the due instant. Three more controls red and one in the browser, restored.

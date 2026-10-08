@@ -13,7 +13,7 @@
 
 import { db, sql, user, parentStudentLink, registrationSession, eq, and, inArray, or, isNull, gradeTodaySql } from '@repo/db';
 import {
-  STAFF_ROLES, ROLES, broadcastLabel, isPaymentList, BATCH_LIST_LABELS, WHO_LABELS, CHARGE_KIND_LABELS,
+  STAFF_ROLES, ROLES, broadcastLabel, isPaymentList, anchorDay, BATCH_LIST_LABELS, WHO_LABELS, CHARGE_KIND_LABELS,
   type AudienceDefinitionType, type AudienceWho, type MessageVariable, type BatchList,
 } from '@repo/validations';
 import { getSessionMoney } from './session-money.services';
@@ -192,19 +192,47 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 /** A line (alias r) a completed payment funded: a paid preregistration counts as paid. */
 const FUNDED = sql`exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed')`;
 
-function addOwed(map: Map<string, Owed | null>, studentId: string, add: { amount: number; dueAt: Date; item: string; sessionId: string | null; sessionName: string | null; lineId?: string; chargeId?: string }) {
-  const o = map.get(studentId) ?? { amount: 0, dueAt: add.dueAt, items: [], sessionId: add.sessionId, sessionName: add.sessionName, lineIds: [], chargeIds: [] };
-  o.amount = round2(o.amount + add.amount);
-  if (add.dueAt < o.dueAt) o.dueAt = add.dueAt;
-  if (!o.items.includes(add.item)) o.items.push(add.item);
-  if (add.lineId) o.lineIds.push(add.lineId);
-  if (add.chargeId) o.chargeIds.push(add.chargeId);
-  map.set(studentId, o);
+type OwedPart = { amount: number; dueAt: Date; item: string; sessionId: string | null; sessionName: string | null; lineId?: string; chargeId?: string };
+
+/**
+ * What one student owes, as a money list's text says it: the items due on the **first** day they
+ * owe anything (the school's day, Cairo), their sum as {amount}, that day as {due} — never the whole
+ * remainder under the earliest date (the review of 9e7a4d6, item 1: a plan's two instalments of 750,
+ * due 20 and 27 October, read "EGP 1,500 … is due on 20 October"). The sentence "{amount} … is due
+ * on {due}" stays literally true; what falls due later is reminded by the step on its own days, and
+ * a second "Remind" after the first is paid names the next.
+ */
+function firstDayOwed(parts: Map<string, OwedPart[]>): Map<string, Owed | null> {
+  const owed = new Map<string, Owed | null>();
+  for (const [studentId, list] of parts) {
+    if (!list.length) continue;
+    const first = list.map((p) => anchorDay(p.dueAt)).sort()[0]!;
+    const today = list.filter((p) => anchorDay(p.dueAt) === first);
+    const o: Owed = {
+      amount: 0, dueAt: today[0]!.dueAt, items: [], sessionId: today[0]!.sessionId, sessionName: today[0]!.sessionName, lineIds: [], chargeIds: [],
+    };
+    for (const p of today) {
+      o.amount = round2(o.amount + p.amount);
+      if (p.dueAt < o.dueAt) o.dueAt = p.dueAt;
+      if (!o.items.includes(p.item)) o.items.push(p.item);
+      if (p.lineId) o.lineIds.push(p.lineId);
+      if (p.chargeId) o.chargeIds.push(p.chargeId);
+    }
+    owed.set(studentId, o);
+  }
+  return owed;
 }
 
-const DAY = 86_400_000;
-/** Past its due date as the Money tab counts it (a whole day late): the overdue text applies. */
-const isOverdue = (due: Date, now: Date) => Math.floor((now.getTime() - due.getTime()) / DAY) > 0;
+function addOwed(parts: Map<string, OwedPart[]>, studentId: string, add: OwedPart) {
+  parts.set(studentId, [...(parts.get(studentId) ?? []), add]);
+}
+
+/**
+ * Past its due instant: the overdue text applies from the moment the due date has passed (the review
+ * of 9e7a4d6, item 5) — not after a whole day as the Money tab counts its "days overdue", which would
+ * send "is due on" with a date already gone during the first 24 hours.
+ */
+const isOverdue = (due: Date, now: Date) => due.getTime() < now.getTime();
 
 /**
  * A session's unpaid families, as the Money tab shows them (A's getSessionMoney with its subject
@@ -212,12 +240,13 @@ const isOverdue = (due: Date, now: Date) => Math.floor((now.getTime() - due.getT
  * predicates the reminder step reads (payable-now.services.ts): what each student owes and can pay
  * now — not a line on a provisional board fee (unless the school takes payment on one), one paid by
  * its instalment plan, one with a payment open or past its effective deadline, nor a charge being
- * paid or that C's rules refuse. `filter`: everything owed, only what is overdue, or only what is
- * not yet overdue (the Money tab's "Remind" sends the overdue text to the first, the due text to
- * the second).
+ * paid or that C's rules refuse. `filter`: everything owed, only what is overdue (its due instant
+ * passed), or only what is not yet (the Money tab's "Remind" sends the overdue text to the first,
+ * the due text to the second). Per student, the items of the first day they owe anything
+ * (firstDayOwed).
  */
 async function sessionUnpaid(executor: Executor, def: Extract<AudienceDefinitionType, { list: 'session_unpaid' }>, now: Date) {
-  const owed = new Map<string, Owed | null>();
+  const owed = new Map<string, OwedPart[]>();
   const [session] = await executor.select({ id: registrationSession.id, name: registrationSession.name }).from(registrationSession).where(eq(registrationSession.id, def.sessionId));
   if (!session) throw new AudienceError('Session not found', 404);
   const only = def.studentIds?.length ? new Set(def.studentIds) : null;
@@ -244,7 +273,7 @@ async function sessionUnpaid(executor: Executor, def: Extract<AudienceDefinition
       addOwed(owed, c.studentId, { amount: c.amount, dueAt: new Date(c.dueAt), item: c.description, sessionId: session.id, sessionName: session.name, chargeId: c.id });
     }
   }
-  return owed;
+  return firstDayOwed(owed);
 }
 
 /**
@@ -252,7 +281,7 @@ async function sessionUnpaid(executor: Executor, def: Extract<AudienceDefinition
  * the admin only — of any live one, awaiting payment or paid.
  */
 async function chargeHolders(executor: Executor, def: Extract<AudienceDefinitionType, { list: 'charge_holders' }>, now: Date) {
-  const owed = new Map<string, Owed | null>();
+  const owed = new Map<string, OwedPart[]>();
   const rows = await executor.execute(sql`
     select c.id, c.student_id as "studentId", c.amount, c.due_at as "dueAt", c.description, r.session_id as "sessionId", s.name as "sessionName"
     from charge c
@@ -263,16 +292,13 @@ async function chargeHolders(executor: Executor, def: Extract<AudienceDefinition
       ${def.academicYear ? sql`and c.academic_year = ${def.academicYear}` : sql``}
     order by c.student_id, c.due_at`);
   const found = rows.rows as { id: string; studentId: string; amount: string; dueAt: string; description: string; sessionId: string | null; sessionName: string | null }[];
-  if (!def.unpaidOnly) {
-    for (const c of found) owed.set(c.studentId, null);
-    return owed;
-  }
+  if (!def.unpaidOnly) return new Map(found.map((c) => [c.studentId, null as Owed | null]));
   const payable = await payableCharges(executor, found.map((c) => c.id), now);
   for (const c of found) {
     if (!payable.has(c.id)) continue;
     addOwed(owed, c.studentId, { amount: Number(c.amount), dueAt: new Date(c.dueAt), item: c.description, sessionId: c.sessionId, sessionName: c.sessionName, chargeId: c.id });
   }
-  return owed;
+  return firstDayOwed(owed);
 }
 
 async function studentsOf(executor: Executor, query: ReturnType<typeof sql>) {

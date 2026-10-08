@@ -218,6 +218,9 @@ export const messagesArabic: Record<string, string> = {
   // ── The Money tab's "Remind" ──
   'Remind': 'تذكير',
   'Remind these families': 'تذكير هذه الأسر',
+  'Send the rest': 'إرسال الباقي',
+  'Nobody was left to remind: the families paid meanwhile.': 'لم يبقَ أحد للتذكير: سددت الأسر في الأثناء.',
+  'Sending again sends only the rest.': 'الإرسال من جديد يرسل الباقي فقط.',
   'The payment reminder, now, to the parents and the student of each family ticked: what they owe in this session and by when.':
     'تذكير الدفع الآن إلى أولياء الأمور والطالب في كل أسرة محددة: ما عليهم في هذه الجلسة وموعده.',
   'No family here owes anything that can be paid now.': 'لا توجد هنا أسرة عليها ما يمكن دفعه الآن.',
@@ -229,11 +232,13 @@ export const messagesArabic: Record<string, string> = {
   // ── Settings: the Reminders group ──
   'Whether the reminder rules on Messages > Reminders go out, and at what hour of their day.': 'هل تُرسل قواعد التذكير في الرسائل > التذكيرات، وفي أي ساعة من يومها.',
   'Send reminders automatically': 'إرسال التذكيرات تلقائيًا',
-  "On: the scheduler sends the reminder rules on Messages > Reminders (payments due, reservations closing, board deadlines, the school fee, declared retakes to verify). Off: no reminder goes out until it is turned on again; nothing missed meanwhile is sent as a backlog, only each reminder's latest day.":
-    'تشغيل: يرسل المجدول قواعد التذكير في الرسائل > التذكيرات (مواعيد الدفع، انتهاء الحجز، مواعيد المجالس، الرسوم المدرسية، الإعادات المعلنة للتحقق). إيقاف: لا يُرسل أي تذكير حتى يُشغَّل من جديد؛ ولا يُرسل ما فات دفعة واحدة، بل آخر يوم لكل تذكير فقط.',
+  // Keyed to the exact English of settings.ts (reminders.enabled, reminders.sendAtHour): a change
+  // there leaves the Arabic page in English until this key follows it (the review of 9e7a4d6, item 2).
+  "Off when the system is installed: turn it on once the first sessions and fees are checked. On: the scheduler sends the reminder rules on Messages > Reminders (payments due, reservations closing, board deadlines, the school fee, declared retakes to verify); the first minute after it is turned on sends each family only its latest reminder, never a backlog. Off again: nothing goes out until it is turned on, the reminder the day before a session's reservations close included.":
+    'متوقف عند تثبيت النظام: شغِّله بعد مراجعة أول الجلسات والرسوم. تشغيل: يرسل المجدول قواعد التذكير في الرسائل > التذكيرات (مواعيد الدفع، انتهاء الحجز، مواعيد المجالس، الرسوم المدرسية، الإعادات المعلنة للتحقق)؛ وفي أول دقيقة بعد تشغيله تتلقى كل أسرة آخر تذكير لها فقط، ولا يُرسل ما فات دفعة واحدة أبدًا. إيقاف من جديد: لا يُرسل شيء حتى يُشغَّل، بما في ذلك تذكير اليوم السابق لانتهاء الحجز في الجلسة.',
   "Hour the day's reminders go out": 'ساعة إرسال تذكيرات اليوم',
-  "Each reminder is due on its day (seven days before a payment's due date, the day itself, three days after…) at this hour, Cairo time. A day whose hour passed while the system was down goes out at the next minute, once.":
-    'يُستحق كل تذكير في يومه (قبل موعد الدفع بسبعة أيام، ويوم الموعد نفسه، وبعده بثلاثة أيام…) في هذه الساعة بتوقيت القاهرة. واليوم الذي فاتت ساعته والنظام متوقف يُرسل في الدقيقة التالية مرة واحدة.',
+  "Each reminder is due on its day (seven days before a payment's due date, the day itself, three days after…) at this hour, Cairo time, from 1 to 23 (midnight does not exist on the day summer time starts). A day whose hour passed while the system was down goes out at the next minute, once.":
+    'يُستحق كل تذكير في يومه (قبل موعد الدفع بسبعة أيام، ويوم الموعد نفسه، وبعده بثلاثة أيام…) في هذه الساعة بتوقيت القاهرة، من 1 إلى 23 (منتصف الليل لا وجود له في يوم بدء التوقيت الصيفي). واليوم الذي فاتت ساعته والنظام متوقف يُرسل في الدقيقة التالية مرة واحدة.',
   ':00, Cairo time': ':00 بتوقيت القاهرة',
 
   // ── The notification types families see ──
@@ -245,6 +250,8 @@ export const messagesArabic: Record<string, string> = {
   "Finance sends to a payment list only: a session's unpaid families or the holders of an unpaid charge": 'ترسل المالية إلى قوائم الدفع فقط: الأسر غير المسددة في جلسة أو أصحاب رسم غير مسدد',
   "Finance reads the deliveries of money lists and payment reminders only": 'تقرأ المالية توصيلات قوائم الأموال وتذكيرات الدفع فقط',
   'Nobody is in this audience now: there is nothing to send': 'لا أحد ضمن هذا الجمهور الآن: لا يوجد ما يُرسل',
+  // The browser's own sentence when a request never reached the API (the network dropped it).
+  'Failed to fetch': 'تعذّر الوصول إلى الخادم: تحقق من الاتصال ثم أعد المحاولة',
   'WhatsApp is not connected yet: the school has no WhatsApp Business account, so nothing can be sent there': 'واتساب غير متصل بعد: لا تملك المدرسة حساب واتساب للأعمال، فلا يمكن الإرسال عليه',
   'Choose a template or write a title and a text': 'اختر نصًا أو اكتب عنوانًا ورسالة',
   'The Arabic text needs both its title and its text': 'يحتاج النص العربي إلى عنوانه ورسالته معًا',
@@ -317,9 +324,11 @@ export function translateMessagesText(text: string, exact: (t: string) => string
     [/^A template is already called "(.+)"$/, (m) => `يوجد نص باسم «${m[1]}» بالفعل`],
     [/^(\d+ days?) (before|after)$/, (m) => DAYS_AR(m[0])],
     [COUNT, (m) => countAr(m[0])!],
-    [/^Send to (.+)$/, (m) => `إرسال إلى ${countAr(m[1]!) ?? m[1]}`],
-    [/^Sent to (.+)$/, (m) => `أُرسلت إلى ${countAr(m[1]!) ?? m[1]}`],
-    [/^Remind (\d+ famil(?:y|ies))$/, (m) => `تذكير ${countAr(m[1]!)}`],
+    // After a preposition or as the object of "تذكير" the dual is genitive ("إلى شخصين", "تذكير أسرتين").
+    [/^Send to (.+)$/, (m) => `إرسال إلى ${countAr(m[1]!, true) ?? m[1]}`],
+    [/^Sent to (.+)$/, (m) => `أُرسلت إلى ${countAr(m[1]!, true) ?? m[1]}`],
+    [/^Already sent to (.+)$/, (m) => `أُرسل بالفعل إلى ${countAr(m[1]!, true) ?? m[1]}`],
+    [/^Remind (\d+ famil(?:y|ies))$/, (m) => `تذكير ${countAr(m[1]!, true)}`],
     [/^(\d+ messages?), one about each child$/, (m) => `${countAr(m[1]!)}، واحدة عن كل طفل`],
     [/^then every (\d+ days?) (until .+)$/, (m) => `ثم كل ${countAr(m[1]!, true)} ${word(m[2]!)}`],
     [/^1 day before$/, () => 'قبل يوم واحد'],

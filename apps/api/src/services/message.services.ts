@@ -19,7 +19,7 @@ import {
 } from '@repo/db';
 import {
   AudienceDefinition, isPaymentList, ROLES, CHARGE_KINDS, CHARGE_KIND_LABELS, variablesIn, renderMessage, messageDate, messageAmount, messageList,
-  MESSAGE_VARIABLE_LABELS, REMINDER_KIND_LABELS, academicYearStartOf,
+  MESSAGE_VARIABLE_LABELS, REMINDER_KIND_LABELS, academicYearStartOf, NOTHING_TO_SEND,
   type AudienceDefinitionType, type CreateMessageType, type MessageTexts, type MessageVars, type MessageVariable, type MessageLanguage,
   type MessageLanguageChoice, type NotificationType, type SaveTemplateType, type ReminderKind,
 } from '@repo/validations';
@@ -174,7 +174,7 @@ export async function createMessage(input: CreateMessageType, viewer: Viewer, ct
   const context = { sessionId: input.context?.sessionId ?? null };
   const resolved = await resolveAudience(def, context, db, now);
   assertFillable(texts, resolved.fills);
-  if (!scheduled && resolved.members.length === 0) throw new MessageError('Nobody is in this audience now: there is nothing to send', 409);
+  if (!scheduled && resolved.members.length === 0) throw new MessageError(NOTHING_TO_SEND, 409);
   const notificationType = notificationTypeOf(def);
   const out = await db.transaction(async (tx) => {
     const audienceId = randomUUID();

@@ -9,13 +9,20 @@
  * lists the families with what each owes, all ticked; untick any; one click sends. It goes through
  * POST /v1/messages, the payment-list path the finance officer may use. A line that cannot be paid
  * now (a provisional board fee, a payment already in progress, a plan line, past its deadline) is
- * not in it; a plan's instalments are.
+ * not in it; a plan's instalments are. Per family, each part names what falls due on its first day
+ * (the review of 9e7a4d6, item 1); "overdue" is past the due instant, while the tab's badge counts
+ * whole days (item 5).
+ *
+ * The two parts are two messages (two POSTs). The dialog records which went: when the second fails,
+ * the list and the email choice are frozen, the button reads "Send the rest", and a retry sends only
+ * what did not go (the review of 9e7a4d6, item 4). A part refused because nobody is in it now (the
+ * families paid meanwhile, NOTHING_TO_SEND) is done, with nobody sent to.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, renderMessage } from '@repo/validations';
+import { apiResponse, renderMessage, NOTHING_TO_SEND } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { LoadingState } from '~/components/ui/query-state';
@@ -66,19 +73,33 @@ function RemindDialog({ sessionId, filter, offerId, sectionId, onClose }: { sess
   const chosen = list.filter((f) => !unticked.has(f.id));
   const chosenIn = (p: Part) => (found.data?.[p]?.students ?? []).map((s) => s.id).filter((id) => !unticked.has(id));
 
+  // The parts that went, with the people each reached: a retry sends only the others.
+  const [sent, setSent] = useState<Partial<Record<Part, number>>>({});
+  const sentRef = useRef(sent);
+  const toSend = parts.filter((p) => sent[p] === undefined && chosenIn(p).length > 0 && templateOf(p));
+  const started = Object.keys(sent).length > 0;
+  const finished = started && toSend.length === 0;
+  const people = Object.values(sent).reduce((n, x) => n + (x ?? 0), 0);
+
   const send = useMutation({
     mutationFn: async () => {
-      let people = 0;
       for (const p of parts) {
+        if (sentRef.current[p] !== undefined) continue;
         const ids = chosenIn(p);
         const t = templateOf(p);
         if (!ids.length || !t) continue;
-        const r = await apiResponse(api.v1.messages.$post({
-          json: { audience: { definition: { ...definition(p), studentIds: ids } }, templateId: t.id, channels: email ? ['in_app', 'email'] : ['in_app'] },
-        }));
-        people += r.people;
+        let reached = 0;
+        try {
+          reached = (await apiResponse(api.v1.messages.$post({
+            json: { audience: { definition: { ...definition(p), studentIds: ids } }, templateId: t.id, channels: email ? ['in_app', 'email'] : ['in_app'] },
+          }))).people;
+        } catch (e) {
+          // Nobody is left in this part (they paid meanwhile): it is done. Anything else stops here.
+          if ((e as Error).message !== NOTHING_TO_SEND) throw e;
+        }
+        sentRef.current = { ...sentRef.current, [p]: reached };
+        setSent(sentRef.current);
       }
-      return { people };
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: MESSAGES_KEY }),
   });
@@ -105,7 +126,7 @@ function RemindDialog({ sessionId, filter, offerId, sectionId, onClose }: { sess
                 <li key={f.id}>
                   <label className="flex items-center justify-between gap-3 px-3 py-2">
                     <span className="inline-flex items-center gap-2">
-                      <input type="checkbox" checked={!unticked.has(f.id)}
+                      <input type="checkbox" checked={!unticked.has(f.id)} disabled={started}
                         onChange={(e) => { const next = new Set(unticked); if (e.target.checked) next.delete(f.id); else next.add(f.id); setUnticked(next); }} />
                       <bdi data-i18n-skip="true">{f.name}</bdi>
                     </span>
@@ -125,15 +146,20 @@ function RemindDialog({ sessionId, filter, offerId, sectionId, onClose }: { sess
               <div className="mt-1 space-y-2 text-foreground" data-i18n-skip="true">{preview.body.split(/\n{2,}/).map((p, i) => <p key={i} dir="auto">{p}</p>)}</div>
             </div>
           )}
-          <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={email} onChange={(e) => setEmail(e.target.checked)} /> <span>Also by email</span></label>
+          <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={email} disabled={started} onChange={(e) => setEmail(e.target.checked)} /> <span>Also by email</span></label>
           {send.isError && <Notice tone="danger">{(send.error as Error).message}</Notice>}
-          {send.isSuccess && <Notice tone="success"><span>{`Sent to ${countWords(send.data.people, 'person')}`}</span>. <span>The deliveries are in Messages.</span></Notice>}
+          {started && !finished && !send.isPending && (
+            <Notice tone="info"><span>{`Already sent to ${countWords(people, 'person')}`}</span>. <span>Sending again sends only the rest.</span></Notice>
+          )}
+          {finished && (people > 0
+            ? <Notice tone="success"><span>{`Sent to ${countWords(people, 'person')}`}</span>. <span>The deliveries are in Messages.</span></Notice>
+            : <Notice tone="info">Nobody was left to remind: the families paid meanwhile.</Notice>)}
         </div>
         <div className="flex justify-end gap-2 border-t border-border px-6 py-3">
-          <Button variant="outline" onClick={onClose}>{send.isSuccess ? 'Close' : 'Cancel'}</Button>
-          {!send.isSuccess && (
+          <Button variant="outline" onClick={onClose}>{finished ? 'Close' : 'Cancel'}</Button>
+          {!finished && (
             <Button onClick={() => send.mutate()} disabled={!templates.data || chosen.length === 0 || send.isPending}>
-              {send.isPending ? 'Sending…' : `Remind ${countWords(chosen.length, 'family')}`}
+              {send.isPending ? 'Sending…' : started ? 'Send the rest' : `Remind ${countWords(chosen.length, 'family')}`}
             </Button>
           )}
         </div>
