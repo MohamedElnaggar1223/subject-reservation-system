@@ -688,7 +688,11 @@ Added by F7 (the day-one import, 8 Oct; docs/features/IMPORT.md §4.5, §14):
   0: say why (its lines are priced at the board fee alone)"; an offer already self-study only at 0 is
   edited without giving it again. A closed offer may wait for its fee. **`copyOffersFrom`** applies
   the same rule: an offer it would open at 0 that is not self-study only comes across closed, named
-  in the copy's summary (`closedNoFee`, also on `SESSION_COPIED`; the Copy dialog lists them). The
+  in the copy's summary (`closedNoFee`, also on `SESSION_COPIED`); a self-study-only offer at 0
+  comes across as it is with its reason recorded in the summary and on `SESSION_COPIED`
+  (`zeroFeeSelfStudy`: "converted from <session>; priced at the board fee alone" for an offer a
+  conversion closed, "copied from …" otherwise). The Copy dialog and the New session screen show
+  both, and the subjects closed for want of a teacher, before the session opens (`CopySummary`). The
   Add subject dialog shows the field empty for a catalogue row with no fee, never 0, and asks the
   reason when self-study only at 0, as the offer's drawer does.
 

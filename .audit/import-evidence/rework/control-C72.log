@@ -1,0 +1,37 @@
+# C72: a326890 item 3: a copy records the reason of a self-study-only offer it brings at 0 (converted or copied)
+# undone in apps/api/src/services/offer.services.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13672ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 173ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 passed (68)
+   Duration  15.61s (transform 649ms, setup 2ms, collect 274ms, tests 13.67s, environment 0ms, prepare 33ms)
+ ❯ test/08n-import.test.ts:1635:39
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2)
+AssertionError: expected [] to deeply equal [ { …(2) } ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "reason": "copied from November 2026 – January 2027 — t7-vz3u; priced at the board fee alone",
+-     "subject": "Fee Rule Untaught (imp)",
+-   },
+- ]
++ []
+
+ ❯ test/08n-import.test.ts:1635:39
+    1633|       const winterName = (await one<{ name: string }>(`select name fro…
+    1634|       const copiedFrom = { subject: 'Fee Rule Untaught (imp)', reason:…
+    1635|       expect(copied.zeroFeeSelfStudy).toEqual([copiedFrom]);
+       |                                       ^
+    1636|       expect(await one(`select new_data->'zeroFeeSelfStudy' as z from …
+    1637|       for (const id of [winter, next]) await apiResponse(adm.api.v1.se…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

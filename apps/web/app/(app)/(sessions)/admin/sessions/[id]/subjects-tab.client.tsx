@@ -21,6 +21,7 @@ import { fetchBoardSeries, fetchTeachers, useCatalogue } from '~/app/(app)/exams
 import {
   fetchOffers, fetchAddable, fetchSessions, offersKey, SESSIONS_KEY, Money, Modal, Drawer, Field, INPUT_CLASS, ErrorLine, errorText,
   AVAILABILITY_SHORT, type SessionDetail, type OfferRow, type ItemRow,
+  CopySummary,
 } from '../sessions-shared';
 
 const WARNING_LABEL: Record<string, string> = {
@@ -634,23 +635,16 @@ function CopyFrom({ session, onClose }: { session: SessionDetail; onClose: () =>
     mutationFn: async () => apiResponse(api.v1.sessions[':id']['copy-from'].$post({ param: { id: session.id }, json: { fromSessionId: from || choices[0]!.id } })),
     onSuccess: async (r) => {
       await Promise.all([queryClient.invalidateQueries({ queryKey: offersKey(session.id) }), queryClient.invalidateQueries({ queryKey: SESSIONS_KEY })]);
-      if (!r.closedNoTeacher && !r.closedNoFee.length) onClose();
+      if (!r.closedNoTeacher && !r.closedNoFee.length && !r.zeroFeeSelfStudy.length) onClose();
     },
   });
-  const done = go.data && (go.data.closedNoTeacher > 0 || go.data.closedNoFee.length > 0) ? go.data : null;
+  const done = go.data && (go.data.closedNoTeacher > 0 || go.data.closedNoFee.length > 0 || go.data.zeroFeeSelfStudy.length > 0) ? go.data : null;
   return (
     <Modal title="Copy subjects from another session" onClose={onClose}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Its subjects, teachers, items and course fees come across (the subjects this session has are kept); its board fees come across provisional.</p>
         <ErrorLine message={go.error ? errorText(go.error) : null} />
-        {done && (
-          <Notice tone="warning" title="Copied; some subjects came across closed">
-            {done.closedNoTeacher > 0 && <p><span>No teacher to teach them:</span> <span className="tabular-nums">{done.closedNoTeacher}</span></p>}
-            {done.closedNoFee.length > 0 && (
-              <p><span>No course fee (open them once it is set):</span> <bdi data-i18n-skip="true">{done.closedNoFee.join(', ')}</bdi></p>
-            )}
-          </Notice>
-        )}
+        {done && <CopySummary copied={done} />}
         {choices.length === 0 ? <Notice tone="neutral">No other session of this kind to copy from.</Notice> : (
           <Field label="From" htmlFor="cf-from">
             <select id="cf-from" className={INPUT_CLASS} value={from || choices[0]!.id} onChange={(e) => setFrom(e.target.value)}>

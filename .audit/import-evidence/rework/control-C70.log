@@ -1,0 +1,37 @@
+# C70: a326890 item 1: "(Theory Paper ONLY)" is a one-paper retake (the ICT form)
+# undone in apps/api/src/services/import/normalise.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13491ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 149ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 passed (68)
+   Duration  15.22s (transform 654ms, setup 2ms, collect 275ms, tests 13.49s, environment 0ms, prepare 31ms)
+ ❯ test/08n-import.test.ts:1100:24
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1)
+AssertionError: expected { kind: 'sheet', …(32) } to match object { noteOnePaper: true, …(2) }
+(34 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "noteOnePaper": true,
++   "noteOnePaper": false,
+    "noteRetake": true,
+    "selfStudy": true,
+  }
+
+ ❯ test/08n-import.test.ts:1100:24
+    1098|       // "(Theory Paper ONLY)": the theory paper, a self-study retake …
+    1099|       const ict = rowAt(v, 'One paper only', 6);
+    1100|       expect(ict.data).toMatchObject({ noteOnePaper: true, noteRetake:…
+       |                        ^
+    1101|       expect(ict.plan.lines).toMatchObject([{ subjectName: 'Imp ICT Th…
+    1102|         priorSitting: { month: 'june', year: Y, source: 'declared_by_d…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

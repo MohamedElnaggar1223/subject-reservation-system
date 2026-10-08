@@ -167,6 +167,14 @@ Others: `subject_unmapped`, `subject_inactive`, `teacher_missing`, `teacher_on_s
 `cohort_differs`, `graduated`, `left_school`, `already_imported`; the money record's
 `student_not_found`, `amount_unreadable`, `date_unreadable`.
 
+**The fee note's column** (the review of a326890, item 2): the unlabelled column whose cells read
+as fee notes ("school fees", self-study, retake, one paper…), among the columns not already given a
+role (the series, the parent's name, the confirmation, the self-study answer), and only when most
+of its matching cells carry a fee marker (a percentage, "fees", a refund) — a forms export's
+entry-type column ("Retake", "First entry") or a parent named "… Paper …" is never taken for it. A
+line's note is its cell in that column; else, drifted (IS-11), another answer's cell that carries a
+marker. On the real sheet the counts did not move (§10).
+
 ### 4.2 People
 
 As before: the lines that name each person, the name spellings, the phone, the cohort, the account
@@ -226,7 +234,8 @@ For a line whose series and level the admin mapped to its session (`lineOf` in v
      line's item is the subject's one-paper item when it has exactly one (a unit counts: it is one
      paper) and the words name no other paper; else the line is `item_unclear` — "<subject>: the note
      says one paper — choose which (Paper 4 only (retake) · Paper 5 only (retake))", or "…, and none
-     of its items is one paper — choose the item (…)".
+     of its items is one paper — choose the item (…)". A note says one paper with "one paper" or
+     "paper only" — the ICT form's "(Theory Paper ONLY)" among them (the review of a326890, item 1).
 2. **Attempt, mode and the sitting** (the lead's rules of 8 Oct, MO-25's interim rule):
    - mode: self-study from the answer or the note, or when the item or offer is self-study only;
    - a **retake with source `legacy`** when the student's history has the subject **sat** (not
@@ -445,6 +454,7 @@ render); it is the same on pages F7 does not touch (`drive/hydration-check.mjs`)
 | **the course fee, decided** (review of 2ca07a4, item 2) | open and retakes-only at 0 refused; self-study only at 0 refused without a reason, made with one (the reason on its audit row), edited without it again, made retakes-only at 0 refused; copied into the next session, an open offer at 0 comes across closed and named, the self-study one as it is |
 | **students before subjects** (review of 2ca07a4, item 3) | a subject held FOR UPDATE (a board change): the commit waiting on it already holds the family's student; released, the history row is made |
 | **the level** (review item 7) | an unmapped A.S. line never finds the IGCSE offer of the same name; it finds the A.S. one once offered |
+| **a326890's round** | the ICT form's "(Theory Paper ONLY)" a one-paper retake; a forms export whose parent names and entry-type column say "Retake" keeps its fee notes in the fee column; a copy records the reason of a self-study-only offer at 0 (copied, and converted while closed, through New session) |
 | **the harness's pause** (found by the race's red runs) | 00-harness: `pauseAtAudits().paused` does not count a transaction of another database waiting on the same key (the suites run side by side on one server) |
 | **the Arabic** (review item 4) | translateImportText on A's and B's sentences (none caught; A's two have their own keys; the grade-10 core sentence and MO-9's are A's translator's; other screens' "Add …" untouched) and on the import's own |
 | the interim rule (MO-25) | committed on 15 November: a first entry; on 1 December: a legacy retake of Cambridge November Y; never for a line of November itself |
@@ -504,6 +514,10 @@ gives for each):
 | C65 | 2ca07a4 item 3: the students held before any row naming a subject | red |
 | C66 | 2ca07a4 item 4: "The item for …" only as the import's own | red |
 | C67 | the harness: a race's pause counts only its own database's wait | red |
+| C68 | a326890 item 2: the fee column's cells carry a fee marker | red |
+| C70 | a326890 item 1: "(Theory Paper ONLY)" a one-paper retake | red |
+| C71 | a326890 item 2: a drifted fee note carries a fee marker | red |
+| C72 | a326890 item 3: a copy records a self-study-only offer's reason at 0 | red |
 
 The earlier controls whose code main removed (C3, C13, C14, C19–C22: `getRetakeSubjectIds`,
 `prepareRegistrationInputs`, inactive import subjects) are superseded by C32, C36–C41.
@@ -536,6 +550,9 @@ records it.
   (November 2026 at three levels, January 2027 at two), 219 lines that would be lines in the
   session, each `not_offered` until the school offers its subject there — 16 distinct subjects as
   the sheet writes them with their level — besides the identity errors already held.
+- **The fee note's column (the review of a326890, item 2), 8 Oct 18:44Z:** the counts did not move —
+  654 / 649 / 5, 222 ready and 22 held on 74 error lines, 44 self-study lines (13 + 31), 40 fee notes,
+  6 dropped, 5 drifted, the commit's tables as before.
 - **The split (the review of 8 Oct, item 2).** Of the 219 lines, 26 name two or more units or
   papers (all two; November 2026 17, January 2027 9) and make 52 lines once the session offers
   those papers as items; the reviewer's 27 is the same count with live-tab row 124, which the
@@ -716,6 +733,9 @@ records it.
 - 17:33–17:50Z — on ee83d29: types green; the suites side by side green (568 passed, 1 todo each);
   every control with its own row: 48 red, C44 green as since 7003e74 (C60 covers it).
 - 18:00Z — pushed 9d17f74 (one push from 2ca07a4); CI 37819862101 green (568 passed, 1 todo).
+- 18:41–18:45Z — the review of a326890 (merge after: 1): the ICT one-paper wording, the fee note's
+  column, a copy's self-study offers at 0 and the New session summary (08n 68); C68, C70-C72 red; the
+  real sheet's counts unchanged (privately); New session driven in English and Arabic (`f7c-*.png`).
 - Next: the reviewer confirms items 1 and 2 on the diff; the final merge waits for F4 on main (main
   has D at c2d7a78, its migrations to 0054): origin/main merged as its own commit, 0050_import
   regenerated after main's last migration with a later stamp and its snapshot chained, the order

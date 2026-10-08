@@ -141,6 +141,17 @@ CONTROLS = {
     'C67': ('the harness: pauseAtAudits().paused counts a wait in its own database only', '../api/test/helpers.ts',
             "\n        and database = (select oid from pg_database where datname = current_database())`, [keys.get(action)!]);",
             "`, [keys.get(action)!]);", ['00-harness']),
+    # The review of a326890 (items 1 to 3)
+    'C68': ('a326890 item 2: the fee note\'s column carries a fee marker in most of its matching cells (an entry-type column says retake, no fee)', N,
+            ' && hits.filter((v) => FEE_MARKER.test(v)).length > hits.length / 2) { fee = c; feeN = hits.length; }',
+            ') { fee = c; feeN = hits.length; }', ['08n-import']),
+    'C70': ('a326890 item 1: "(Theory Paper ONLY)" is a one-paper retake (the ICT form)', N,
+            'const ONE_PAPER_RE = /one\\s*paper|\\bpaper\\s+only\\b/i;', 'const ONE_PAPER_RE = /one\\s*paper/i;', ['08n-import']),
+    'C71': ('a326890 item 2: a drifted fee note carries a fee marker (never an entry-type answer)', N,
+            "    ?? answerCells.find(([k, v]) => k !== roles.fee && isFeeNote(v) && FEE_MARKER.test(cleanText(v)));",
+            "    ?? answerCells.find(([k, v]) => k !== roles.fee && isFeeNote(v));", ['08n-import']),
+    'C72': ('a326890 item 3: a copy records the reason of a self-study-only offer it brings at 0 (converted or copied)', O,
+            "    if (availability === 'self_study_only' && !(Number(o.courseFee) > 0)) {", '    if (false) {', ['08n-import']),
     # F7's earlier controls, run again on the new base (their guards unchanged)
     'C1': ('the commit claim (re-run on the new base)', C,
            "sql`(${importBatch.status} in ('staged', 'partial') or (${importBatch.status} = 'committing' and ${importBatch.commitStartedAt} < now() - make_interval(mins => ${STALE_CLAIM_MINUTES})))`",

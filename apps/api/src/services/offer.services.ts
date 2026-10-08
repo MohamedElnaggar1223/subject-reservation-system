@@ -793,6 +793,10 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
   const feesToCopy: { seriesId: string; src: typeof boardFee.$inferSelect }[] = [];
   let closedNoTeacher = 0;
   const closedNoFee: string[] = [];
+  // Self-study only at a course fee of 0 comes across as it is, with the reason the rule asks for
+  // recorded on the copy's audit row (the review of 2ca07a4's round, item 3): an offer converted while
+  // closed never had one asked.
+  const zeroFeeSelfStudy: { subject: string; reason: string }[] = [];
   for (const o of offers) {
     if (have.has(o.subjectId)) continue;
     const [s] = await tx.select().from(subject).where(eq(subject.id, o.subjectId));
@@ -811,6 +815,9 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
     // school sets its fee.
     const availability = taught !== 'closed' && taught !== 'self_study_only' && !(Number(o.courseFee) > 0) ? 'closed' : taught;
     if (availability !== taught) closedNoFee.push(s.name);
+    if (availability === 'self_study_only' && !(Number(o.courseFee) > 0)) {
+      zeroFeeSelfStudy.push({ subject: s.name, reason: `${closedByConversion(o) ? 'converted' : 'copied'} from ${from.name}; priced at the board fee alone` });
+    }
     await tx.insert(sessionOffer).values({
       id: offerId, sessionId: session.id, subjectId: o.subjectId, availability, courseFee: o.courseFee,
       grade10Core: o.grade10Core, notes: o.notes, sortOrder: o.sortOrder, createdBy: actorId,
@@ -856,8 +863,9 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
     }).onConflictDoNothing().returning({ id: boardFee.id });
     feesCopied += made.length;
   }
-  await logAction(actorId, 'SESSION_COPIED', 'session', session.id, null, { fromSessionId: from.id, from: from.name, offers: copied, feesCopiedProvisional: feesCopied, closedNoTeacher, closedNoFee }, undefined, tx);
-  return { offers: copied, feesCopied, closedNoTeacher, closedNoFee };
+  await logAction(actorId, 'SESSION_COPIED', 'session', session.id, null,
+    { fromSessionId: from.id, from: from.name, offers: copied, feesCopiedProvisional: feesCopied, closedNoTeacher, closedNoFee, zeroFeeSelfStudy }, undefined, tx);
+  return { offers: copied, feesCopied, closedNoTeacher, closedNoFee, zeroFeeSelfStudy };
 }
 
 // ─── Reading ─────────────────────────────────────────────────────────────────

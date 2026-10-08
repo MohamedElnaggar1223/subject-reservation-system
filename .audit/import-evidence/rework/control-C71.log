@@ -1,0 +1,39 @@
+# C71: a326890 item 2: a drifted fee note carries a fee marker (never an entry-type answer)
+# undone in apps/api/src/services/import/normalise.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13442ms
+   × F7: the day-one import > the note and the self-study answer (review flag 7), and the family's confirmation on a line > the fee note's column is never the parent's name nor an entry-type answer: a column already given a role is left out, and a fee column's cells carry a fee marker (the review of 2ca07a4's round, item 2) 30ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 passed (68)
+   Duration  15.30s (transform 668ms, setup 2ms, collect 281ms, tests 13.44s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:907:43
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the note and the self-study answer (review flag 7), and the family's confirmation on a line > the fee note's column is never the parent's name nor an entry-type answer: a column already given a role is left out, and a fee column's cells carry a fee marker (the review of 2ca07a4's round, item 2)
+AssertionError: expected { kind: 'sheet', …(32) } to match object { …(4) }
+(31 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "feeNote": null,
+-   "noteRetake": false,
++   "feeNote": "Retake",
++   "noteRetake": true,
+    "parentName": "Retake Paperwork Two",
+    "selfStudy": false,
+  }
+
+ ❯ test/08n-import.test.ts:907:43
+    905|       const v = await fetchView(coordinator, id);
+    906|       expect(rowAt(v, 'Columns', 3).data).toMatchObject({ parentName: …
+    907|       expect(rowAt(v, 'Columns', 4).data).toMatchObject({ parentName: …
+       |                                           ^
+    908|       expect(rowAt(v, 'Columns', 5).data).toMatchObject({ feeNote: `Re…
+    909|       for (const n of [3, 4, 5]) expect(codes(rowAt(v, 'Columns', n)))…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

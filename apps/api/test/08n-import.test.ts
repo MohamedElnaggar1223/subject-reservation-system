@@ -890,6 +890,26 @@ describe('F7: the day-one import', () => {
   });
 
   describe('the note and the self-study answer (review flag 7), and the family\'s confirmation on a line', () => {
+    it('the fee note\'s column is never the parent\'s name nor an entry-type answer: a column already given a role is left out, and a fee column\'s cells carry a fee marker (the review of 2ca07a4\'s round, item 2)', async () => {
+      // A forms export's columns: the parent's name (unlabelled, after the student's email), the
+      // confirmation, an entry-type answer ("Retake" / "First entry"), the self-study answer, the fee note.
+      const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', '', '', ''];
+      const row = (n: number, parent: string, entry: string, self: 'Yes' | 'No', note: string): Cell[] =>
+        [`Column Child ${n}`, '11K', 'O.L.', 'Combined Science', self === 'No' ? 'Ms Salma' : '', `0107575757${n}`, `column.child${n}${D}`, parent, `column.parent${n}${D}`, `0107676767${n}`,
+          'I confirm my registration', entry, self, note];
+      const id = await stage(coordinator, workbook([{ name: 'Columns', rows: [[`Nov. ${Y} Session`], header,
+        row(1, 'Retake Paperwork One', 'Retake', 'Yes', 'Self Study 50% School fees'),
+        row(2, 'Retake Paperwork Two', 'Retake', 'No', ''),
+        row(3, 'Retake Paperwork Three', 'Retake', 'No', `Retake in School 100% fees (All Papers) From June ${Y}`),
+      ] }]), 'columns.xlsx', 'school_sheet');
+      const v = await fetchView(coordinator, id);
+      expect(rowAt(v, 'Columns', 3).data).toMatchObject({ parentName: 'Retake Paperwork One', feeNote: 'Self Study 50% School fees', selfStudy: true, noteRetake: false });
+      expect(rowAt(v, 'Columns', 4).data).toMatchObject({ parentName: 'Retake Paperwork Two', feeNote: null, selfStudy: false, noteRetake: false });
+      expect(rowAt(v, 'Columns', 5).data).toMatchObject({ feeNote: `Retake in School 100% fees (All Papers) From June ${Y}`, noteRetake: true, noteSitting: { type: 'june', year: Y } });
+      for (const n of [3, 4, 5]) expect(codes(rowAt(v, 'Columns', n))).not.toContain('column_drift');
+      await apiResponse(coordinator.api.v1.imports[':id'].discard.$post({ param: { id } }));
+    });
+
     it('a fee note that says self-study against an explicit "No" is read as self-study and flagged; the same "No" with no note, or "Yes" with it, is not', async () => {
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', '', ''];
       const row = (n: number, self: 'Yes' | 'No', note: string): Cell[] =>
@@ -1015,7 +1035,7 @@ describe('F7: the day-one import', () => {
     it('a "one paper" note on a row naming two papers is one line: never split; staff choose the one paper', async () => {
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', '', ''];
       const id = await stage(adm, workbook([{ name: 'One paper', rows: [[`Nov. ${Y} Session`], header,
-        ['Paper Child', '11K', 'A.S.', 'Biology (Paper 1 & Paper 2)', 'Teacher of the IAL units (imp)', '01071717171', `paper.child${D}`, 'Paper Parent', `paper.parent${D}`, '01072727272', 'I confirm my registration', 'No', 'One paper only'],
+        ['Paper Child', '11K', 'A.S.', 'Biology (Paper 1 & Paper 2)', 'Teacher of the IAL units (imp)', '01071717171', `paper.child${D}`, 'Paper Parent', `paper.parent${D}`, '01072727272', 'I confirm my registration', 'No', 'Retake in School 100% fees (One paper ONLY)'],
       ] }]), 'one-paper.xlsx', 'school_sheet');
       let v = await fetchView(adm, id);
       const key = v.mapping.subjects.find((x) => x.subject === 'Biology (Paper 1 & Paper 2)')!.key;
@@ -1048,12 +1068,15 @@ describe('F7: the day-one import', () => {
       await offerOf('Imp Chemistry One', 'IMP-ONE-CHE', ['Paper 4 only (retake)']);
       await offerOf('Imp Physics Two', 'IMP-ONE-PHY', ['Paper 4 only (retake)', 'Paper 5 only (retake)']);
       await offerOf('Imp Geography None', 'IMP-ONE-GEO', []);
+      await offerOf('Imp ICT Theory', 'IMP-ONE-ICT', ['Paper 1 only (retake)']);
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', '', ''];
       // The forms' own wording of a one-paper retake (SCHOOL_FORMS.md §2).
       const note = `Retake in School 100% fees (One paper ONLY) From June ${Y}`;
-      const row = (subject: string): Cell[] => ['Third Child', '11K', 'A.S.', subject, 'Teacher of the IAL units (imp)', '01073737373', `onepaper.child${D}`, 'Third Parent', `onepaper.parent${D}`, '01074747474', 'I confirm my registration', 'No', note];
+      const row = (subject: string, self: 'Yes' | 'No' = 'No', n = note): Cell[] => ['Third Child', '11K', 'A.S.', subject, self === 'Yes' ? '' : 'Teacher of the IAL units (imp)', '01073737373', `onepaper.child${D}`, 'Third Parent', `onepaper.parent${D}`, '01074747474', 'I confirm my registration', self, n];
       const id = await stage(adm, workbook([{ name: 'One paper only', rows: [[`Nov. ${Y} Session`], header,
         row('Imp Chemistry One'), row('Imp Physics Two'), row('Imp Geography None'),
+        // The ICT form's own wording (SCHOOL_FORMS.md §2, form 14): one paper too.
+        row('Imp ICT Theory', 'Yes', `Retake Self Study 50% fees (Theory Paper ONLY) From June ${Y}`),
       ] }]), 'one-paper-only.xlsx', 'school_sheet');
       expect((await putSettings(adm, id, { series: { [`november-${Y}-as_level`]: { mode: 'window', sessionId: sess } }, enrol: false, createSections: false })).status).toBe(200);
       const v = await fetchView(adm, id);
@@ -1072,6 +1095,11 @@ describe('F7: the day-one import', () => {
       expect(rowAt(v, 'One paper only', 5).problems.find((p) => p.code === 'item_unclear')).toEqual({
         code: 'item_unclear', severity: 'error', detail: 'Imp Geography None: the note says one paper, and none of its items is one paper — choose the item (Whole subject)',
       });
+      // "(Theory Paper ONLY)": the theory paper, a self-study retake of June Y — not every paper of ICT.
+      const ict = rowAt(v, 'One paper only', 6);
+      expect(ict.data).toMatchObject({ noteOnePaper: true, noteRetake: true, selfStudy: true });
+      expect(ict.plan.lines).toMatchObject([{ subjectName: 'Imp ICT Theory', itemLabel: 'Paper 1 only (retake)', found: 'paper', attempt: 'retake', mode: 'self_study',
+        priorSitting: { month: 'june', year: Y, source: 'declared_by_desk', from: 'note' } }]);
       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
     });
 
@@ -1601,7 +1629,36 @@ describe('F7: the day-one import', () => {
         { name: 'Fee Rule Untaught (imp)', availability: 'self_study_only', fee: 0 },
       ]);
       await audited([next], ['SESSION_CREATED', 'SESSION_COPIED']);
+      // The self-study one at 0 comes across with the reason the rule asks for, on the copy's audit row (2ca07a4's round, item 3).
+      const winterName = (await one<{ name: string }>(`select name from registration_session where id = $1`, [winter])).name;
+      const copiedFrom = { subject: 'Fee Rule Untaught (imp)', reason: `copied from ${winterName}; priced at the board fee alone` };
+      expect(copied.zeroFeeSelfStudy).toEqual([copiedFrom]);
+      expect(await one(`select new_data->'zeroFeeSelfStudy' as z from audit_log where action = 'SESSION_COPIED' and entity_id = $1`, [next])).toEqual({ z: [copiedFrom] });
       for (const id of [winter, next]) await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id }, json: { reason: 'import scenario done' } }));
+
+      // A session converted while closed (migration 0042: its offers closed with it, not by choice): its
+      // untaught subject comes across self-study only at 0 — the reason never asked there, recorded now as
+      // converted — and a new session made from it says so (the New session screen shows the summary).
+      const old = await session(adm, 'Winter session (import, course fee, converted)', 'november', 'igcse', { ...openWindow(), activate: true, seriesYear: seriesYearInAcademicYear('november', Y) });
+      const oldCambridge = await seriesOfSession(old, 'cambridge');
+      const converted = await subjectOf('Fee Rule Converted (imp)', 'IMP-FEE-C');
+      await sql(`update subject set is_offered_at_school = false where id = $1`, [converted]);
+      const conv = await apiResponse(post(old, { ...offerJson(converted, 'self_study_only', 0, 'made to be converted'),
+        items: [{ label: 'Whole subject', kind: 'whole' as const, enters: { kind: 'subject' as const }, boardSeriesId: oldCambridge, availability: 'open' as const, requiredInSeries: false }] }));
+      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: old }, json: { reason: 'converted while closed (scenario)' } }));
+      await sql(`update session_offer set availability = 'closed', legacy = '{"converted": true}' where id = $1`, [conv.id]);
+      await sql(`update session_offer_item set availability = 'closed', legacy = '{"converted": true}' where offer_id = $1`, [conv.id]);
+      const oldName = (await one<{ name: string }>(`select name from registration_session where id = $1`, [old])).name;
+      const day = 86_400_000;
+      const made = await apiResponse(adm.api.v1.sessions.$post({ json: {
+        type: 'winter', year: seriesYearInAcademicYear('november', Y), label: `fee-conv-${Date.now() % 1_000_000}`,
+        startDate: new Date(Date.now() - day).toISOString(), endDate: new Date(Date.now() + 30 * day).toISOString(),
+        courseStartsOn: new Date().toISOString().slice(0, 10), paymentDueAt: new Date(Date.now() + 30 * day).toISOString(), copyFromSessionId: old,
+      } }));
+      expect(made.copied?.zeroFeeSelfStudy).toEqual([{ subject: 'Fee Rule Converted (imp)', reason: `converted from ${oldName}; priced at the board fee alone` }]);
+      expect(await one(`select o.availability, o.course_fee::float as fee from session_offer o where o.session_id = $1 and o.subject_id = $2`, [made.id, converted]))
+        .toEqual({ availability: 'self_study_only', fee: 0 });
+      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: made.id }, json: { reason: 'import scenario done' } }));
     });
 
     it('the list of imports: every file, its state and its counts', async () => {

@@ -94,7 +94,11 @@ export const seriesText = (s: Series) => `${s.type[0]!.toUpperCase()}${s.type.sl
 const CONFIRM_RE = /confirm my registration|drop the course/i;
 // The staff's note and the forms' own options (SCHOOL_FORMS.md §2.5): "Self Study 50% School fees",
 // "Retake in School 100% fees (All Papers)", "… (One paper ONLY) From June 2026", "Dropped 20% School fees".
-const FEE_RE = /school fees|refund\s*\d|self\s*study|external|retake|2nd entry|second entry|one paper/i;
+const FEE_RE = /school fees|refund\s*\d|self\s*study|external|retake|2nd entry|second entry|one paper|\bpaper\s+only\b/i;
+/** What a fee note carries and a name or an entry-type answer does not: a percentage, "fees", a refund. */
+const FEE_MARKER = /\d+(?:\.\d+)?\s*%|\bfees?\b|refund/i;
+/** A one-paper retake: "(One paper ONLY)", and the ICT form's "(Theory Paper ONLY)" (SCHOOL_FORMS.md §2, form 14). */
+const ONE_PAPER_RE = /one\s*paper|\bpaper\s+only\b/i;
 const YESNO_RE = /^(yes|no)$/i;
 
 /** A fee note (IS-08): its kind and percentage. */
@@ -121,7 +125,7 @@ export function readEntryNote(note: string | null): { retake: boolean; onePaper:
   const from = /\bfrom\s+((?:jan|june?|may|oct|nov)[a-z]*\.?\s*\d{4})/i.exec(note);
   return {
     retake: /retake|2nd entry|second entry/i.test(note),
-    onePaper: /one\s*paper/i.test(note),
+    onePaper: ONE_PAPER_RE.test(note),
     sitting: from ? readSeries(from[1]!) : null,
   };
 }
@@ -161,16 +165,24 @@ export function tabRoles(tab: SourceTab, lines: SourceLine[]): Roles {
   };
   const emailCol = tab.columns.findIndex((c) => c.toLowerCase() === 'student email');
   const afterEmail = emailCol >= 0 ? tab.columns[emailCol + 1] : undefined;
-  return {
-    byName,
-    // A note that names a sitting ("… From June 2026") is the fee note, not the series column.
-    series: dominant((v) => readSeries(v) !== null && /^\d{5}$|\d{4}/.test(v) && !FEE_RE.test(v)),
-    parentName: byName.get('parent name') ?? (afterEmail && isUnlabeled(afterEmail) ? afterEmail : null),
-    confirm: dominant((v) => CONFIRM_RE.test(v)),
-    fee: dominant((v) => FEE_RE.test(v)),
-    yesno: dominant((v) => YESNO_RE.test(v)),
-    titleSeries: readSeries(tab.title),
-  };
+  // A note that names a sitting ("… From June 2026") is the fee note, not the series column.
+  const series = dominant((v) => readSeries(v) !== null && /^\d{5}$|\d{4}/.test(v) && !FEE_RE.test(v));
+  const parentName = byName.get('parent name') ?? (afterEmail && isUnlabeled(afterEmail) ? afterEmail : null);
+  const confirm = dominant((v) => CONFIRM_RE.test(v));
+  const yesno = dominant((v) => YESNO_RE.test(v));
+  // The fee note's column (the review of 2ca07a4's round, item 2): never a column already given a
+  // role (a parent named "… Paper …" or "Retake …"), and one whose matching cells mostly carry a fee
+  // marker — a forms export's entry-type column ("Retake", "First entry") says retake but no fee.
+  const taken = new Set([series, parentName, confirm, yesno].filter((c): c is string => !!c));
+  let fee: string | null = null;
+  let feeN = 0;
+  for (const c of unlabeled) {
+    if (taken.has(c)) continue;
+    const vs = values(c);
+    const hits = vs.filter((v) => FEE_RE.test(v) && !CONFIRM_RE.test(v));
+    if (hits.length > feeN && hits.length >= vs.length / 2 && hits.filter((v) => FEE_MARKER.test(v)).length > hits.length / 2) { fee = c; feeN = hits.length; }
+  }
+  return { byName, series, parentName, confirm, fee, yesno, titleSeries: readSeries(tab.title) };
 }
 
 /** One line of the school's sheet, read, with the staff's fixes over it. */
@@ -194,7 +206,12 @@ export function readSheetLine(line: SourceLine, roles: Roles, edits: ImportRowEd
   const unlabeledCells = line.raw.filter(([k]) => isUnlabeled(k));
   const find = (re: RegExp) => unlabeledCells.find(([, v]) => re.test(cleanText(v)));
   const confirmCell = find(CONFIRM_RE);
-  const feeCell = unlabeledCells.find(([, v]) => FEE_RE.test(cleanText(v)) && !CONFIRM_RE.test(cleanText(v)));
+  // The fee note: the fee column's cell; else, drifted (IS-11), another answer's cell that reads as a
+  // fee note and carries a fee marker — never the parent's name or the series.
+  const isFeeNote = (v: string) => FEE_RE.test(cleanText(v)) && !CONFIRM_RE.test(cleanText(v));
+  const answerCells = unlabeledCells.filter(([k]) => k !== roles.parentName && k !== roles.series);
+  const feeCell = (roles.fee ? answerCells.find(([k, v]) => k === roles.fee && isFeeNote(v)) : undefined)
+    ?? answerCells.find(([k, v]) => k !== roles.fee && isFeeNote(v) && FEE_MARKER.test(cleanText(v)));
   const yesnoCell = find(YESNO_RE);
   const drift: string[] = [];
   if (confirmCell && roles.confirm && confirmCell[0] !== roles.confirm) drift.push('the confirmation');
