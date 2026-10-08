@@ -24,6 +24,7 @@ import { boardSeriesName } from './series.services';
 import { repriceBoardPart, round2 } from './pricing.services';
 import { dueDateFor } from './deadline.services';
 import { createNotification } from './notification.services';
+import { lockFeeGrids } from '../lib/fee-grid-lock';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -140,14 +141,19 @@ async function assertKeysOfBoard(tx: Tx, boardCode: string, rows: { keyKind: str
 /**
  * Set rows of a grid: a new key is added (provisional when typed before the board publishes), a
  * provisional row's amount changes; a confirmed row changes only by "Confirm" at another amount.
+ * A provisional row put as published (the grid's "published fees" save, a pasted published list)
+ * is confirmed as Confirm confirms it: the lines priced from it are settled the same way.
+ * The series' fee grid is taken exclusive first (§2.1: a move into it waits, or it waits for one).
  */
 export async function putFees(seriesId: string, data: PutBoardFeesType, actorId: string, ctx?: AuditContext) {
   return db.transaction(async (tx) => {
     const [s] = await tx.select().from(boardSeries).where(eq(boardSeries.id, seriesId)).for('share');
     if (!s) throw new BoardFeeError('Board series not found', 404);
+    await lockFeeGrids(tx, [seriesId], 'write');
     await assertKeysOfBoard(tx, s.boardCode, data.rows);
     const now = new Date();
     const changed: Record<string, unknown>[] = [];
+    const confirmedByPut: string[] = [];
     for (const r of data.rows) {
       if (r.amount === 0 && !r.zeroReason) throw new BoardFeeError('A fee of 0 needs a reason (why the board charges nothing)');
       const [cur] = await tx.select().from(boardFee).where(and(eq(boardFee.boardSeriesId, seriesId), eq(boardFee.keyKind, r.keyKind), eq(boardFee.keyId, r.keyId))).for('update');
@@ -170,10 +176,16 @@ export async function putFees(seriesId: string, data: PutBoardFeesType, actorId:
         amount: r.amount, zeroReason: r.amount === 0 ? r.zeroReason ?? null : null, updatedAt: now,
         ...(toConfirm ? { provisional: false, confirmedAt: now, confirmedBy: actorId } : {}),
       }).where(eq(boardFee.id, cur.id));
+      if (toConfirm) confirmedByPut.push(cur.id);
       changed.push({ id: cur.id, keyKind: r.keyKind, keyId: r.keyId, amount: r.amount, before: cur.amount, provisional: !toConfirm && cur.provisional });
     }
-    if (changed.length) await logAction(actorId, 'BOARD_FEES_SET', 'board_series', seriesId, null, { rows: changed, reason: data.reason ?? null }, ctx, tx);
-    return { changed: changed.length };
+    // Confirmed by the put: its lines settled as Confirm settles them (the rows, then the lines).
+    const settled = await settleLinesOfConfirmed(tx, confirmedByPut, actorId, now);
+    if (changed.length) {
+      await logAction(actorId, 'BOARD_FEES_SET', 'board_series', seriesId, null,
+        { rows: changed, reason: data.reason ?? null, linesNoLongerProvisional: settled.cleared, dueDatesMoved: settled.moved }, ctx, tx);
+    }
+    return { changed: changed.length, linesNoLongerProvisional: settled.cleared };
   });
 }
 
@@ -183,6 +195,7 @@ export async function copyFees(seriesId: string, fromSeriesId: string, actorId: 
     const [to] = await tx.select().from(boardSeries).where(eq(boardSeries.id, seriesId)).for('share');
     const [from] = await tx.select().from(boardSeries).where(eq(boardSeries.id, fromSeriesId));
     if (!to || !from) throw new BoardFeeError('Board series not found', 404);
+    await lockFeeGrids(tx, [seriesId], 'write');
     if (to.boardCode !== from.boardCode) throw new BoardFeeError('Copy from a series of the same board');
     const rows = await tx.select().from(boardFee).where(eq(boardFee.boardSeriesId, fromSeriesId));
     let copied = 0;
@@ -208,7 +221,7 @@ export async function copyFees(seriesId: string, fromSeriesId: string, actorId: 
  * recorded, wherever the line is entered now (a line that moved with a payment keeps its record,
  * and its old series' Confirm and Re-price still reach it — the review of 977848d, flag 2).
  */
-async function lockLinesOfFees(tx: Tx, _seriesId: string, feeIds: string[]) {
+async function lockLinesOfFees(tx: Tx, feeIds: string[]) {
   if (!feeIds.length) return [];
   const ids = await tx.execute(sql`
     select distinct r.id from registration r
@@ -228,6 +241,9 @@ export async function confirmFees(seriesId: string, data: ConfirmBoardFeesType, 
   return db.transaction(async (tx) => {
     const [s] = await tx.select().from(boardSeries).where(eq(boardSeries.id, seriesId)).for('share');
     if (!s) throw new BoardFeeError('Board series not found', 404);
+    // The series' fee grid, exclusive, before its rows (§2.1): a move into this series waits for
+    // the Confirm, or the Confirm for the move — never inside it.
+    await lockFeeGrids(tx, [seriesId], 'write');
     const ids = [...new Set(data.rows.map((r) => r.feeId))].sort();
     const rows = await tx.select().from(boardFee).where(and(eq(boardFee.boardSeriesId, seriesId), inArray(boardFee.id, ids))).orderBy(boardFee.id).for('update');
     if (rows.length !== ids.length) throw new BoardFeeError('One or more fee rows are not in this series', 404);
@@ -239,35 +255,47 @@ export async function confirmFees(seriesId: string, data: ConfirmBoardFeesType, 
       await tx.update(boardFee).set({ amount, provisional: false, confirmedAt: now, confirmedBy: actorId, updatedAt: now }).where(eq(boardFee.id, r.id));
       confirmed.push({ id: r.id, keyKind: r.keyKind, keyId: r.keyId, before: r.amount, amount, wasProvisional: r.provisional });
     }
-    const lines = await lockLinesOfFees(tx, seriesId, ids);
-    const moved: { id: string; from: Date; to: Date }[] = [];
-    const cleared: string[] = [];
-    for (const l of lines) {
-      if (!l.priceProvisional) continue;
-      const basis = l.pricingBasis as PricingBasis | null;
-      const feeRows = basis?.feeRows ?? [];
-      const now2 = await tx.select({ id: boardFee.id, amount: boardFee.amount, provisional: boardFee.provisional }).from(boardFee).where(inArray(boardFee.id, feeRows.map((f) => f.id)));
-      const allConfirmedSame = feeRows.every((f) => { const n = now2.find((x) => x.id === f.id); return n && !n.provisional && n.amount === f.amount; });
-      if (!allConfirmedSame) continue;
-      await tx.update(registration).set({ priceProvisional: false, updatedAt: now }).where(eq(registration.id, l.id));
-      cleared.push(l.id);
-      if ((WAITING as readonly string[]).includes(l.status)) {
-        const due = await dueDateFor(tx, { kind: 'line', lineId: l.id });
-        if (due.getTime() !== l.dueAt.getTime()) {
-          await tx.update(registration).set({ dueAt: due }).where(eq(registration.id, l.id));
-          moved.push({ id: l.id, from: l.dueAt, to: due });
-        }
+    const settled = await settleLinesOfConfirmed(tx, ids, actorId, now);
+    await logAction(actorId, 'BOARD_FEES_CONFIRMED', 'board_series', seriesId, null,
+      { rows: confirmed, linesNoLongerProvisional: settled.cleared, dueDatesMoved: settled.moved, reason: data.reason ?? null }, ctx, tx);
+    const differing = confirmed.filter((c) => c.before !== c.amount).length;
+    return { confirmed: confirmed.length, differing, linesNoLongerProvisional: settled.cleared, dueDatesMoved: settled.moved };
+  });
+}
+
+/**
+ * After rows are confirmed (Confirm, or the grid's put of a published fee over a provisional row),
+ * in the caller's transaction, the rows already locked: each line priced from them (found by its
+ * basis, locked FOR UPDATE in id order) whose rows are now all confirmed at the amounts it recorded
+ * is no longer provisional, and a waiting one's due date moves (§3.1, `LINE_DUE_MOVED`); a line
+ * whose recorded amount differs stays provisional until "Re-price".
+ */
+async function settleLinesOfConfirmed(tx: Tx, feeIds: string[], actorId: string, now: Date) {
+  const lines = await lockLinesOfFees(tx, feeIds);
+  const moved: { id: string; from: Date; to: Date }[] = [];
+  let cleared = 0;
+  for (const l of lines) {
+    if (!l.priceProvisional) continue;
+    const basis = l.pricingBasis as PricingBasis | null;
+    const feeRows = basis?.feeRows ?? [];
+    const now2 = await tx.select({ id: boardFee.id, amount: boardFee.amount, provisional: boardFee.provisional }).from(boardFee).where(inArray(boardFee.id, feeRows.map((f) => f.id)));
+    const allConfirmedSame = feeRows.every((f) => { const n = now2.find((x) => x.id === f.id); return n && !n.provisional && n.amount === f.amount; });
+    if (!allConfirmedSame) continue;
+    await tx.update(registration).set({ priceProvisional: false, updatedAt: now }).where(eq(registration.id, l.id));
+    cleared++;
+    if ((WAITING as readonly string[]).includes(l.status)) {
+      const due = await dueDateFor(tx, { kind: 'line', lineId: l.id });
+      if (due.getTime() !== l.dueAt.getTime()) {
+        await tx.update(registration).set({ dueAt: due }).where(eq(registration.id, l.id));
+        moved.push({ id: l.id, from: l.dueAt, to: due });
       }
     }
-    await logAction(actorId, 'BOARD_FEES_CONFIRMED', 'board_series', seriesId, null,
-      { rows: confirmed, linesNoLongerProvisional: cleared.length, dueDatesMoved: moved.length, reason: data.reason ?? null }, ctx, tx);
-    await logActions(moved.map((m) => ({
-      userId: actorId, action: 'LINE_DUE_MOVED' as const, entityType: 'registration' as const, entityId: m.id,
-      previousData: { dueAt: m.from.toISOString() }, newData: { dueAt: m.to.toISOString(), reason: 'board fee confirmed' },
-    })), tx);
-    const differing = confirmed.filter((c) => c.before !== c.amount).length;
-    return { confirmed: confirmed.length, differing, linesNoLongerProvisional: cleared.length, dueDatesMoved: moved.length };
-  });
+  }
+  await logActions(moved.map((m) => ({
+    userId: actorId, action: 'LINE_DUE_MOVED' as const, entityType: 'registration' as const, entityId: m.id,
+    previousData: { dueAt: m.from.toISOString() }, newData: { dueAt: m.to.toISOString(), reason: 'board fee confirmed' },
+  })), tx);
+  return { cleared, moved: moved.length };
 }
 
 /**
@@ -286,7 +314,7 @@ export async function repriceLines(seriesId: string, data: RepriceBoardFeesType,
     const prov = rows.find((r) => r.provisional);
     if (prov) throw new BoardFeeError('Confirm a fee before re-pricing the lines read from it');
     // The lines first, locked; their payment history after (a checkout committing meanwhile is seen).
-    const lines = await lockLinesOfFees(tx, seriesId, ids);
+    const lines = await lockLinesOfFees(tx, ids);
     const histories = lines.length
       ? await tx.select({ registrationId: paymentRegistration.registrationId }).from(paymentRegistration).where(inArray(paymentRegistration.registrationId, lines.map((l) => l.id)))
       : [];

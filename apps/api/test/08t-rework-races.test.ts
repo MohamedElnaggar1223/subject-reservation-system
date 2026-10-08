@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
-import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLock, pauseAtAudit, type Client } from './helpers';
+import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLock, pauseAtAudit, pauseAtAudits, type Client } from './helpers';
 
 /**
  * The reservations rework, step 1 — races (RESERVATIONS_REWORK.md §6, §8; FEATURES_PLAN.md §5:
@@ -23,7 +23,11 @@ import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLo
  *   provisional on a confirmed row (the review of 40c1447);
  * - a parent's approval of a drop against a reversal of the payment for the same line, both
  *   orders: the approval takes the line's receipt before the line, as the reversal does (MA-16),
- *   so nothing deadlocks.
+ *   so nothing deadlocks;
+ * - a fee row that exists nowhere when a move begins, created and confirmed by finance around it,
+ *   both orders: the move holds the target series' fee grid (shared) and finance's create and
+ *   Confirm take it exclusive, so the two never overlap and no moved line is left provisional on a
+ *   confirmed row (lib/fee-grid-lock.ts).
  */
 
 const days = (n: number) => n * 86_400_000;
@@ -430,6 +434,115 @@ describe('08t: the rework races', () => {
       expect(a.status).toBeLessThan(500);
       expect(await errorOf(a)).toMatch(/already processed/);
       expect(await state(s)).toEqual({ line: 'pending_payment', payment: 'refunded', request: 'pending_approval' });
+    });
+  });
+
+  describe("a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid)", () => {
+    /**
+     * The line reads the subject's row in `from`; the item of its offer in `to` reads the
+     * qualification's row, which neither series has: nothing is carried, and the row the move
+     * prices from is the one finance creates during the race.
+     */
+    const setUp = async (tag: string) => {
+      const sub = await subject(adm, `RWT-G${tag}-${RUN}`, `Race fee grid ${tag} (08t ${RUN})`, { course: 1000, registration: 500 });
+      const q = (await apiResponse(adm.api.v1.catalogue.qualifications.$post({
+        json: { boardCode: 'cambridge', code: `T08G${tag}-${RUN}`, title: `Race grid award ${tag} (08t ${RUN})`, level: 'igcse', suite: 'Cambridge IGCSE', subjectArea: 'Test', entryMethod: 'qualification' },
+      })))!.id;
+      const mk = async (label: string) => (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label, entryDeadline: new Date(Date.now() + days(50)) } })))!.id;
+      const from = await mk(`t08-g${tag}a-${RUN}`);
+      const to = await mk(`t08-g${tag}b-${RUN}`);
+      await feeFor(from, sub, 500, false);
+      const o = await offerOf(s1, sub, [whole(from), whole(to, { label: 'Whole subject, the other series', feeKeys: [{ kind: 'qualification', id: q }] })]);
+      const f = await onboard(officer, `t08-g${tag}-${RUN}`, 11);
+      const [line] = await reserve(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
+      return {
+        line: line!.id, from, to,
+        move: () => adm.api.v1.sessions[':id']['board-series'].move.$post({ param: { id: s1 }, json: { registrationIds: [line!.id], boardSeriesId: to, reason: 'race: sat in the other series' } }),
+        create: () => finadmin.api.v1['board-fees'].$put({ query: { seriesId: to }, json: { rows: [{ keyKind: 'qualification', keyId: q, amount: 600, provisional: true }], reason: 'race: typed before the board publishes' } }),
+        feeId: async () => (await one<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_kind = 'qualification' and key_id = $2`, [to, q])).id,
+        confirm: (feeId: string) => finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: to }, json: { rows: [{ feeId }], reason: 'race: the board published' } }),
+      };
+    };
+    /** 09's rule, for one line: provisional while every fee row its basis names is confirmed at the amount it recorded. */
+    const stuck = async (id: string) => (await one<{ stuck: boolean }>(`
+      select r.price_provisional and not exists (
+        select 1 from jsonb_array_elements(r.pricing_basis->'feeRows') fr left join board_fee f on f.id = fr->>'id'
+        where f.id is null or f.provisional or f.amount <> (fr->>'amount')::numeric) as stuck
+      from registration r where r.id = $1`, [id])).stuck;
+    const lineState = (id: string) => one<{ s: string; p: boolean; price: number }>(
+      `select board_series_id as s, price_provisional as p, price_at_registration::float as price from registration where id = $1`, [id]);
+    const errorOf = async (r: Res) => (r.status >= 400 ? (await r.json() as { error: string }).error : null);
+    /** A release that may be called again (the finally). */
+    const once = (f: () => Promise<void>) => { let p: Promise<void> | undefined; return () => (p ??= f()); };
+
+    it('the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after', async () => {
+      const s = await setUp('a');
+      const pause = await pauseAtAudits(['LINE_REPRICED']);
+      const held = once(await holdRowLock('registration', s.line));
+      let moving: Promise<Res> | undefined;
+      let creating: Promise<Res> | undefined;
+      let confirming: Promise<Res> | undefined;
+      try {
+        // The move holds the target's fee grid and waits for its line (held).
+        moving = s.move();
+        await lockWaiters(1);
+        // Finance creates the fee meanwhile: it waits for the move (before the fix it landed at once).
+        creating = s.create();
+        await Promise.race([creating, lockWaiters(2).catch(() => undefined)]);
+        await held();
+        // The move goes on: refused for the missing fee (before the fix it priced from the new row
+        // and stopped at its LINE_REPRICED write).
+        await Promise.race([moving, pause.paused('LINE_REPRICED').catch(() => undefined)]);
+        await creating;
+        // The Confirm of the new row (before the fix it landed inside the move).
+        confirming = s.confirm(await s.feeId());
+        await Promise.race([confirming, lockWaiters(2).catch(() => undefined)]);
+      } finally {
+        await held();
+        await pause.releaseAll();
+      }
+      const [m, c, cf] = await Promise.all([moving!, creating!, confirming!]);
+      expect(await stuck(s.line)).toBe(false);
+      expect([m.status, await errorOf(m)]).toEqual([409, expect.stringMatching(/has no board fee in .+ yet/)]);
+      expect(c.status).toBe(200);
+      expect(cf.status).toBe(200);
+      expect(await lineState(s.line)).toEqual({ s: s.from, p: false, price: 1500 });
+    });
+
+    it('finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line', async () => {
+      const s = await setUp('b');
+      const pause = await pauseAtAudits(['BOARD_FEES_SET', 'LINE_REPRICED']);
+      const held = once(await holdRowLock('registration', s.line));
+      let creating: Promise<Res> | undefined;
+      let moving: Promise<Res> | undefined;
+      let confirming: Promise<Res> | undefined;
+      try {
+        // Finance is creating the row (stopped at its audit write, the row not yet committed).
+        creating = s.create();
+        await pause.paused('BOARD_FEES_SET');
+        // The move starts: it waits for the fee grid (before the fix it went on, saw no row, and
+        // waited for its line).
+        moving = s.move();
+        await lockWaiters(2);
+        await pause.release('BOARD_FEES_SET');
+        await creating;
+        // The move goes on and prices the line from the new, provisional row.
+        await held();
+        await pause.paused('LINE_REPRICED');
+        // The board publishes: the Confirm waits for the move (before the fix it landed inside it).
+        confirming = s.confirm(await s.feeId());
+        await Promise.race([confirming, lockWaiters(2).catch(() => undefined)]);
+      } finally {
+        await held();
+        await pause.releaseAll();
+      }
+      const [c, m, cf] = await Promise.all([creating!, moving!, confirming!]);
+      expect(await stuck(s.line)).toBe(false);
+      expect(c.status).toBe(200);
+      expect([m.status, await errorOf(m)]).toEqual([200, null]);
+      expect(cf.status).toBe(200);
+      expect((await cf.json() as { data: { linesNoLongerProvisional: number } }).data.linesNoLongerProvisional).toBe(1);
+      expect(await lineState(s.line)).toEqual({ s: s.to, p: false, price: 1600 });
     });
   });
 

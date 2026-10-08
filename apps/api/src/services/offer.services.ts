@@ -31,6 +31,7 @@ import { effectiveDeadlineFor, effectiveDeadlinesOf, deadlinePassedSentence, red
 import { itemBoardFees } from './pricing.services';
 import { schoolDate } from './window.services';
 import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
+import { lockFeeGrids } from '../lib/fee-grid-lock';
 import { lockMoveFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
 import { PricingError } from './pricing.services';
@@ -756,6 +757,7 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
   const have = new Set((await tx.select({ subjectId: sessionOffer.subjectId }).from(sessionOffer).where(eq(sessionOffer.sessionId, session.id))).map((o) => o.subjectId));
   let copied = 0;
   let feesCopied = 0;
+  const feesToCopy: { seriesId: string; src: typeof boardFee.$inferSelect }[] = [];
   let closedNoTeacher = 0;
   for (const o of offers) {
     if (have.has(o.subjectId)) continue;
@@ -796,19 +798,24 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
       const its = await tx.select().from(sessionOfferItemTeacher).where(eq(sessionOfferItemTeacher.itemId, it.id));
       const itsActive = its.length ? await tx.select({ id: teacher.id }).from(teacher).where(and(inArray(teacher.id, its.map((t) => t.teacherId)), eq(teacher.isActive, true))) : [];
       await writeItemTeachers(tx, id, its.filter((t) => itsActive.some((a) => a.id === t.teacherId)).map((t) => ({ teacherId: t.teacherId, mode: t.mode as 'in_school' | 'online' })));
-      // The fee rows the item reads, copied provisional where this series has none yet.
+      // The fee rows the item reads, copied provisional where this series has none yet (below).
       for (const k of keys) {
         const [src] = await tx.select().from(boardFee).where(and(eq(boardFee.boardSeriesId, it.boardSeriesId), eq(boardFee.keyKind, k.keyKind), eq(boardFee.keyId, k.keyId)));
-        if (!src) continue;
-        const made = await tx.insert(boardFee).values({
-          id: randomUUID(), boardSeriesId: seriesId, keyKind: src.keyKind, unitId: src.unitId, qualificationOptionId: src.qualificationOptionId,
-          qualificationId: src.qualificationId, subjectId: src.subjectId, amount: src.amount, provisional: true, confirmedAt: null,
-          zeroReason: src.zeroReason, copiedFromFeeId: src.id, createdBy: actorId,
-        }).onConflictDoNothing().returning({ id: boardFee.id });
-        feesCopied += made.length;
+        if (src) feesToCopy.push({ seriesId, src });
       }
     }
     copied++;
+  }
+  // The fees, once the series' fee grids are held exclusive in id order (§2.1: a fee row is
+  // created in a series only while no move into it is under way).
+  await lockFeeGrids(tx, feesToCopy.map((f) => f.seriesId), 'write');
+  for (const { seriesId, src } of feesToCopy) {
+    const made = await tx.insert(boardFee).values({
+      id: randomUUID(), boardSeriesId: seriesId, keyKind: src.keyKind, unitId: src.unitId, qualificationOptionId: src.qualificationOptionId,
+      qualificationId: src.qualificationId, subjectId: src.subjectId, amount: src.amount, provisional: true, confirmedAt: null,
+      zeroReason: src.zeroReason, copiedFromFeeId: src.id, createdBy: actorId,
+    }).onConflictDoNothing().returning({ id: boardFee.id });
+    feesCopied += made.length;
   }
   await logAction(actorId, 'SESSION_COPIED', 'session', session.id, null, { fromSessionId: from.id, from: from.name, offers: copied, feesCopiedProvisional: feesCopied, closedNoTeacher }, undefined, tx);
   return { offers: copied, feesCopied, closedNoTeacher };

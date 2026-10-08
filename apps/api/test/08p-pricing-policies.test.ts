@@ -236,6 +236,33 @@ describe('08p: pricing policies', () => {
     expect(money((await one<{ amount: string }>(`select amount from payment where id = $1`, [pay!.id!])).amount)).toBe(10000);
   });
 
+  it("a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price", async () => {
+    const mk = async (label: string) => (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label, entryDeadline: new Date(Date.now() + days(50)) } })))!.id;
+    const s = await mk(`p08-put-${RUN}`);
+    const same = await subject(adm, `RWP-PS-${RUN}`, `Published same (08p ${RUN})`, { course: 1000, registration: 700 });
+    const other = await subject(adm, `RWP-PO-${RUN}`, `Published other (08p ${RUN})`, { course: 1000, registration: 700 });
+    await fee(s, [{ keyKind: 'subject', keyId: same, amount: 700, provisional: true }, { keyKind: 'subject', keyId: other, amount: 700, provisional: true }]);
+    const item = async (subjectId: string) => (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+      param: { id: session }, json: { subjectId, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: s, availability: 'open', requiredInSeries: false }] },
+    })))!.items[0]!;
+    const f = await onboard(officer, `p08-put-${RUN}`, 11);
+    const [a, b] = await reserve(f.studentId, session, [
+      { offerItemId: await item(same), attempt: 'first', mode: 'in_school', teacherId }, { offerItemId: await item(other), attempt: 'first', mode: 'in_school', teacherId },
+    ]);
+    expect([(await priceOf(a!.id)).provisional, (await priceOf(b!.id)).provisional]).toEqual([true, true]);
+    // The board's list pasted as published: one row at the amount the lines read, one at another.
+    const put = await apiResponse(finadmin.api.v1['board-fees'].$put({
+      query: { seriesId: s }, json: { rows: [{ keyKind: 'subject', keyId: same, amount: 700, provisional: false }, { keyKind: 'subject', keyId: other, amount: 750, provisional: false }], reason: 'the board published' },
+    }));
+    expect(put).toMatchObject({ changed: 2, linesNoLongerProvisional: 1 });
+    expect(await priceOf(a!.id)).toMatchObject({ price: 1700, provisional: false });
+    expect(await priceOf(b!.id)).toMatchObject({ price: 1700, provisional: true });
+    const pay = (ids: string[]) => f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: ids, paymentMethod: 'in_school', escrowAmountToApply: 0 } });
+    expect((await pay([a!.id])).status).toBe(201);
+    const { PROVISIONAL_REFUSAL } = await import('../src/services/pricing.services');
+    expect((await refused(pay([b!.id]))).error).toBe(PROVISIONAL_REFUSAL);
+  });
+
   it('confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told', async () => {
     const sub = await subject(adm, `RWP-H-${RUN}`, `Re-priced (08p ${RUN})`, { course: 1000, registration: 9000 });
     const s = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `p08-hi-${RUN}`, entryDeadline: new Date(Date.now() + days(50)) } })))!.id;
