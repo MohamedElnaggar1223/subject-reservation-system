@@ -109,13 +109,21 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
     onError: fail,
   });
 
+  // A subject the school reserved (grade 10) carries the school's consent only: the parent's own,
+  // read and signed, goes with its collection (RESERVATIONS_REWORK.md §3.5).
+  const [collectConsent, setCollectConsent] = useState(false);
   const collectMutation = useMutation({
     mutationFn: (v: { registrationIds: string[]; instrumentUsed: (typeof IN_SCHOOL_INSTRUMENTS)[number] }) =>
-      apiResponse(api.v1.registrations.desk.collect.$post({ json: { studentId: studentId!, ...v, escrowAmountToApply: 0 } })),
-    onSuccess: (d) =>
+      apiResponse(api.v1.registrations.desk.collect.$post({ json: {
+        studentId: studentId!, ...v, escrowAmountToApply: 0,
+        ...(collectConsent ? { consent: { refundPolicy: true as const, declaration: true as const } } : {}),
+      } })),
+    onSuccess: (d) => {
+      setCollectConsent(false);
       done(
         `Collected ${formatPrice(d.collected)}. Receipts ready to hand over${d.receipts.length ? `: ${d.receipts.map((r) => r.receiptNumber).join(', ')}` : ''}.${paymentsLine(d)}`
-      ),
+      );
+    },
     onError: fail,
   });
 
@@ -369,19 +377,37 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
               reversal, a rejected transfer, a cancelled checkout or a
               register-only visit, the money is taken here in one click. */}
           {(() => {
-            const unpaid = summary.registrations.filter((r) => r.status === 'pending_payment');
-            if (unpaid.length === 0) return null;
+            const waiting = summary.registrations.filter((r) => r.status === 'pending_payment');
+            if (waiting.length === 0) return null;
+            // A line on a provisional board fee is collected once the fee is confirmed (§3.4).
+            const unpaid = waiting.filter((r) => r.payableNow);
+            const provisional = waiting.filter((r) => !r.payableNow);
             const total = unpaid.reduce((s, r) => s + r.priceAtRegistration, 0);
             return (
               <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap">
                 <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    {unpaid.length} subject{unpaid.length === 1 ? '' : 's'} waiting for payment — {formatPrice(total)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{unpaid.map((r) => r.subject.name).join(' · ')}</p>
+                  {unpaid.length > 0 && (
+                    <>
+                      <p className="text-sm font-semibold text-foreground">
+                        {unpaid.length} subject{unpaid.length === 1 ? '' : 's'} waiting for payment — {formatPrice(total)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{unpaid.map((r) => r.subject.name).join(' · ')}</p>
+                    </>
+                  )}
+                  {provisional.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      <span>On a provisional board fee, collected once the fee is confirmed:</span> <bdi data-i18n-skip="true">{provisional.map((r) => r.subject.name).join(' · ')}</bdi>
+                    </p>
+                  )}
+                  {unpaid.length > 0 && (
+                    <label className="mt-1 flex items-center gap-2 text-xs text-foreground">
+                      <input type="checkbox" className="h-3.5 w-3.5" checked={collectConsent} onChange={(e) => setCollectConsent(e.target.checked)} />
+                      <span>Refund policy and declaration read and signed by the parent (asked for subjects the school reserved)</span>
+                    </label>
+                  )}
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  {IN_SCHOOL_INSTRUMENTS.slice(0, 3).map((inst) => (
+                  {unpaid.length > 0 && IN_SCHOOL_INSTRUMENTS.slice(0, 3).map((inst) => (
                     <Button
                       key={inst}
                       size="sm"

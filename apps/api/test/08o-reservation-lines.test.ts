@@ -502,10 +502,22 @@ describe('08o: reservation lines (step B)', () => {
         from payment_registration pr join registration r on r.id = pr.registration_id where pr.payment_id = $1`, [p.id]);
       expect(ds).toHaveLength(1);
     }
+    // Not owed now while provisional: the desk's "owes now" and the family's home leave it out,
+    // so neither offers to collect what the checkout would refuse.
+    const deskView = await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: f.studentId } }));
+    const onlyId = only.registrations[0]!.id;
+    expect(deskView.owing).toBe(8000); // the reserve-only line, not the provisional one
+    expect(deskView.registrations.find((r) => r.id === prvLine.id)).toMatchObject({ status: 'pending_payment', payableNow: false });
+    const homeView = await apiResponse(f.parent.api.v1.users.me['home-summary'].$get());
+    expect(homeView.children[0]).toMatchObject({ owing: 8000, owingRegistrationIds: [onlyId] });
     // Not collectable while provisional; collected once the fee is confirmed.
     expect((await refused(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [prvLine.id], instrumentUsed: 'cash', escrowAmountToApply: 0 } }))).error)
       .toContain('Board fee provisional');
     await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: peaP }, json: { rows: [{ feeId: prvFee }] } }));
+    expect((await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: f.studentId } }))).owing).toBe(18000);
+    const owed = (await apiResponse(f.parent.api.v1.users.me['home-summary'].$get())).children[0]!;
+    expect(owed.owing).toBe(18000);
+    expect([...owed.owingRegistrationIds].sort()).toEqual([onlyId, prvLine.id].sort());
     const later = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [prvLine.id], instrumentUsed: 'cash', escrowAmountToApply: 0 } }));
     expect(later.collected).toBe(10000);
     expect((await lineOf(prvLine.id)).status).toBe('confirmed');

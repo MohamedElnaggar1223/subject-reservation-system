@@ -83,7 +83,7 @@ function defaultEntry(it: Item): string | null {
   return want.find((k) => keys.includes(k)) ?? keys[0] ?? null;
 }
 
-const seriesName = (o: Offer, it: Item) => (it.series ? `${o.subject.boardName} ${MONTH[it.series.month] ?? it.series.month} ${it.series.year}` : null);
+const seriesName = (o: Offer, it: Item) => (it.series ? `${o.subject.boardName} ${MONTH[it.series.month] ?? it.series.month} ${it.series.year}${it.series.label ? ` (${it.series.label})` : ''}` : null);
 const sittingName = (s: Sitting) => `${s.boardName} ${MONTH[s.month] ?? s.month} ${s.year}`;
 const sittingValue = (s: Sitting) => (s.seriesId ? `id:${s.seriesId}` : `my:${s.month}|${s.year}`);
 
@@ -188,7 +188,8 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
       return reserveDirect({ sessionId, studentId, lines, consent });
     },
     onSuccess: (made) => {
-      setPicks({});
+      // A consent belongs to the lines it was given for; the next reservation asks again.
+      setPicks({}); setRefundTick(false); setDeclTick(false);
       qc.invalidateQueries({ queryKey: ['registrations'] });
       onDone({
         registrationIds: made.map((r) => r.id),
@@ -208,7 +209,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
       ...(collect ? { collectNow: { instrumentUsed: instrument, escrowAmountToApply: Number(escrow) > 0 ? Number(escrow) : 0 } } : {}),
     }),
     onSuccess: (r) => {
-      setPicks({});
+      setPicks({}); setDeskTick(false);
       qc.invalidateQueries({ queryKey: ['registrations'] });
       qc.invalidateQueries({ queryKey: ['desk'] });
       qc.invalidateQueries({ queryKey: ['finance'] });
@@ -384,11 +385,11 @@ function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings }: {
             <td className="px-3 py-2 align-top">
               {p.on && (
                 <div className="space-y-1.5">
-                  <select aria-label="Entry" className={INPUT_CLASS.replace('w-full', 'w-64')} value={p.entry ?? ''} onChange={(e) => setPick(it, { entry: e.target.value, sitting: '' })}>
+                  <select aria-label="Entry" className={INPUT_CLASS.replace('w-full', 'w-72')} value={p.entry ?? ''} onChange={(e) => setPick(it, { entry: e.target.value, sitting: '' })}>
                     {options.map((x) => <option key={entryKey(x)} value={entryKey(x)}>{entryLabel(x, isKnown(it))}</option>)}
                   </select>
                   {needsSitting && (
-                    <select aria-label="The sitting it follows" className={INPUT_CLASS.replace('w-full', 'w-64')} value={p.sitting} onChange={(e) => setPick(it, { sitting: e.target.value })}>
+                    <select aria-label="The sitting it follows" className={INPUT_CLASS.replace('w-full', 'w-72')} value={p.sitting} onChange={(e) => setPick(it, { sitting: e.target.value })}>
                       <option value="">{it.needsPriorSeries ? 'Carried from the sitting…' : 'From the sitting…'}</option>
                       {sittings.map((s) => <option key={sittingValue(s)} value={sittingValue(s)}>{sittingName(s)}</option>)}
                     </select>

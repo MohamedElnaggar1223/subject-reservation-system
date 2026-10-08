@@ -705,10 +705,12 @@ export async function getStudentSummary(studentId: string) {
   const currentStanding = await getSchoolFeeStanding(studentId, student.grade, academicYear);
   const fee = currentStanding.fee;
 
-  // What does the family owe right now?
-  const owing = registrations
-    .filter((r) => r.status === 'pending_payment')
-    .reduce((sum, r) => sum + r.priceAtRegistration, 0);
+  // What does the family owe right now? A line on a provisional board fee is reserved, not
+  // payable, until the fee is confirmed (§3.4) — unless the school takes payment at that price.
+  const payOnProvisional = await getSetting('pricing.payOnProvisionalFee');
+  const payableNow = (r: (typeof registrations)[number]) =>
+    r.status === 'pending_payment' && (!r.priceProvisional || payOnProvisional);
+  const owing = registrations.filter(payableNow).reduce((sum, r) => sum + r.priceAtRegistration, 0);
 
   // The academic record (F0a): grade, cohort, section, status.
   const today = standingToday(student);
@@ -743,6 +745,7 @@ export async function getStudentSummary(studentId: string) {
     owing,
     registrations: registrations.map((r) => ({
       ...r,
+      payableNow: payableNow(r),
       receipt: receiptByReg.get(r.id) ?? null,
     })),
     payments,

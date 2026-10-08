@@ -146,7 +146,7 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
                         {l.priorSitting && (
                           <div className="mt-0.5 text-xs text-muted-foreground">
                             <span>from</span> <bdi data-i18n-skip="true">{l.priorSitting.name}</bdi>{' '}
-                            <span>({SOURCE[l.priorSitting.source ?? ''] ?? l.priorSitting.source})</span>
+                            <span>{`(${SOURCE[l.priorSitting.source ?? ''] ?? l.priorSitting.source})`}</span>
                             {l.priorSitting.outcome === 'verified' && <> <Badge tone="success">verified</Badge></>}
                             {l.priorSitting.outcome === 'rejected' && <> <Badge tone="danger">not confirmed</Badge></>}
                             {!l.priorSitting.outcome && (l.priorSitting.source === 'declared_by_family' || l.priorSitting.source === 'declared_by_desk') && <> <Badge tone="warning">to be verified by the school</Badge></>}

@@ -74,6 +74,8 @@ export const reservationsArabic: Record<string, string> = {
   'Nothing is offered in this session yet': 'لا شيء معروض في هذه الجلسة بعد',
   'Print the reservation slip': 'اطبع قسيمة الحجز',
   'Receipts to hand over:': 'الإيصالات المطلوب تسليمها:',
+  'On a provisional board fee, collected once the fee is confirmed:': 'على رسوم مجلس مؤقتة، تُحصَّل حين تُؤكَّد الرسوم:',
+  'Refund policy and declaration read and signed by the parent (asked for subjects the school reserved)': 'قرأ ولي الأمر سياسة الاسترداد والإقرار ووقّع عليهما (يُطلب للمواد التي حجزتها المدرسة)',
   'Statement': 'كشف الحساب',
   'Hide statement': 'إخفاء كشف الحساب',
   // ── The family's page ──
