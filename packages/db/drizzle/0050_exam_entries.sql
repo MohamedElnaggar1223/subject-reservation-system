@@ -23,7 +23,6 @@ CREATE TABLE "exam_board_rule" (
 	"amendment_fee_note" text,
 	"withdrawal_refund_until" text DEFAULT 'entry_deadline' NOT NULL,
 	"withdrawal_fee_note" text,
-	"carry_forward_months" integer,
 	"results_key" text DEFAULT 'candidate_number' NOT NULL,
 	"notes" text,
 	"updated_by" text,
@@ -31,8 +30,7 @@ CREATE TABLE "exam_board_rule" (
 	CONSTRAINT "exam_board_rule_amendment_valid" CHECK ("exam_board_rule"."amendment_after_deadline" IN ('allowed_with_fee', 'refused')),
 	CONSTRAINT "exam_board_rule_amendment_from_valid" CHECK ("exam_board_rule"."amendment_fee_from" IN ('entry_deadline', 'late_fee_from', 'high_late_fee_from')),
 	CONSTRAINT "exam_board_rule_refund_valid" CHECK ("exam_board_rule"."withdrawal_refund_until" IN ('entry_deadline', 'late_fee_from', 'high_late_fee_from', 'never')),
-	CONSTRAINT "exam_board_rule_results_key_valid" CHECK ("exam_board_rule"."results_key" IN ('candidate_number', 'uci')),
-	CONSTRAINT "exam_board_rule_cf_months" CHECK ("exam_board_rule"."carry_forward_months" IS NULL OR "exam_board_rule"."carry_forward_months" BETWEEN 1 AND 60)
+	CONSTRAINT "exam_board_rule_results_key_valid" CHECK ("exam_board_rule"."results_key" IN ('candidate_number', 'uci'))
 );
 --> statement-breakpoint
 CREATE TABLE "exam_candidate" (
@@ -131,6 +129,7 @@ CREATE TABLE "exam_entry" (
 	"board_series_id" text NOT NULL,
 	"board_code" text NOT NULL,
 	"registration_id" text,
+	"charge_id" text,
 	"kind" text NOT NULL,
 	"unit_id" text,
 	"qualification_id" text,
@@ -167,6 +166,7 @@ CREATE TABLE "exam_entry" (
 	"created_by" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "exam_entry_charge_award" CHECK ("exam_entry"."charge_id" IS NULL OR "exam_entry"."kind" = 'award'),
 	CONSTRAINT "exam_entry_kind_valid" CHECK ("exam_entry"."kind" IN ('unit', 'award')),
 	CONSTRAINT "exam_entry_kind_target" CHECK (("exam_entry"."kind" = 'unit' AND "exam_entry"."unit_id" IS NOT NULL AND "exam_entry"."qualification_id" IS NULL) OR ("exam_entry"."kind" = 'award' AND "exam_entry"."qualification_id" IS NOT NULL AND "exam_entry"."unit_id" IS NULL)),
 	CONSTRAINT "exam_entry_status_valid" CHECK ("exam_entry"."status" IN ('draft', 'submitted', 'amended', 'withdrawn')),
@@ -343,6 +343,7 @@ ALTER TABLE "exam_deadline_reminder" ADD CONSTRAINT "exam_deadline_reminder_boar
 ALTER TABLE "exam_entry" ADD CONSTRAINT "exam_entry_student_id_user_id_fk" FOREIGN KEY ("student_id") REFERENCES "public"."user"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_entry" ADD CONSTRAINT "exam_entry_board_series_id_board_series_id_fk" FOREIGN KEY ("board_series_id") REFERENCES "public"."board_series"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_entry" ADD CONSTRAINT "exam_entry_registration_id_registration_id_fk" FOREIGN KEY ("registration_id") REFERENCES "public"."registration"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "exam_entry" ADD CONSTRAINT "exam_entry_charge_id_charge_id_fk" FOREIGN KEY ("charge_id") REFERENCES "public"."charge"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_entry" ADD CONSTRAINT "exam_entry_unit_id_exam_unit_id_fk" FOREIGN KEY ("unit_id") REFERENCES "public"."exam_unit"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_entry" ADD CONSTRAINT "exam_entry_qualification_id_qualification_id_fk" FOREIGN KEY ("qualification_id") REFERENCES "public"."qualification"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "exam_entry" ADD CONSTRAINT "exam_entry_forecast_by_user_id_fk" FOREIGN KEY ("forecast_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -394,6 +395,7 @@ CREATE UNIQUE INDEX "examClashNote_unique_idx" ON "exam_clash_note" USING btree 
 CREATE INDEX "examEntry_studentId_idx" ON "exam_entry" USING btree ("student_id");--> statement-breakpoint
 CREATE INDEX "examEntry_boardSeriesId_idx" ON "exam_entry" USING btree ("board_series_id");--> statement-breakpoint
 CREATE INDEX "examEntry_registrationId_idx" ON "exam_entry" USING btree ("registration_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "examEntry_one_live_charge_idx" ON "exam_entry" USING btree ("charge_id") WHERE status <> 'withdrawn' AND charge_id IS NOT NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX "examEntry_one_live_unit_idx" ON "exam_entry" USING btree ("student_id","board_series_id","unit_id") WHERE status <> 'withdrawn' AND unit_id IS NOT NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX "examEntry_one_live_award_idx" ON "exam_entry" USING btree ("student_id","board_series_id","qualification_id") WHERE status <> 'withdrawn' AND qualification_id IS NOT NULL;--> statement-breakpoint
 CREATE UNIQUE INDEX "examInvigilation_teacher_idx" ON "exam_invigilation" USING btree ("exam_date","session","teacher_id");--> statement-breakpoint

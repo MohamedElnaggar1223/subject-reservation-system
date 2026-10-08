@@ -257,7 +257,10 @@ export const DeriveEntries = z.object({
 });
 export type DeriveEntriesType = z.infer<typeof DeriveEntries>;
 
-/** An entry the coordinator adds by hand: a cash-in (award) with no unit sat, or a unit. */
+/**
+ * An entry the coordinator adds by hand: a cash-in (award) with no unit sat — with the paid cash-in
+ * charge it comes from (the reservations rework, §3.6) when its line did not say which award — or a unit.
+ */
 export const CreateEntry = z
   .object({
     studentId: z.string().min(1),
@@ -265,6 +268,7 @@ export const CreateEntry = z
     unitId: z.string().min(1).optional(),
     qualificationId: z.string().min(1).optional(),
     registrationId: z.string().min(1).optional(),
+    chargeId: z.string().min(1).optional(),
     optionCode: z.string().trim().max(20).nullable().optional(),
     tier: TierSchema.nullable().optional(),
     notes: z.string().trim().max(1000).nullable().optional(),
@@ -338,6 +342,11 @@ export const ENTRY_PROBLEMS = [
   'carry_forward_to_confirm',
   'registration_not_confirmed',
   'access_arrangements_unapproved',
+  // The reservations rework (§3.5, §3.6): a declared earlier sitting the school has not verified —
+  // entered as declared, or held, as `verification.unverifiedAtDeadline` says; a cash-in no longer paid.
+  'prior_sitting_unverified',
+  'prior_sitting_held',
+  'cash_in_not_paid',
 ] as const;
 export type EntryProblem = (typeof ENTRY_PROBLEMS)[number];
 export const ENTRY_PROBLEM_LABELS: Record<EntryProblem, string> = {
@@ -354,6 +363,9 @@ export const ENTRY_PROBLEM_LABELS: Record<EntryProblem, string> = {
   carry_forward_to_confirm: 'Carry forward suggested — confirm it',
   registration_not_confirmed: 'Its registration is no longer confirmed — withdraw the entry',
   access_arrangements_unapproved: 'Access arrangements without a board approval, or expired',
+  prior_sitting_unverified: 'Declared earlier sitting not verified yet — entered as declared (the To verify tab)',
+  prior_sitting_held: 'Declared earlier sitting not verified — held, not sent until it is (the To verify tab)',
+  cash_in_not_paid: 'Its cash-in is no longer paid — collect it again or withdraw the entry',
 };
 
 /**

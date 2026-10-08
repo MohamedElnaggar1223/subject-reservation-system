@@ -1,16 +1,17 @@
 /**
- * F4's demo data for a running dev system (docs/features/EXAM_ENTRIES.md,
- * "Running it"): staff, the catalogue's components and option codes, two
- * windows feeding Cambridge November and Pearson IAL January, families
- * registered and paid at the desk, course enrolment, candidates, entries,
- * forecasts, the timetable, a seated sitting, and an earlier series' results
- * and certificates. Everything goes through the API over HTTP, as the
- * screens do (made-up names; never the school's sheet).
+ * F4's demo data for a running dev system (docs/features/EXAM_ENTRIES.md, "Running it"), on the
+ * reservations rework's model: staff, the catalogue's components and option codes, a winter
+ * session whose offers' items enter Cambridge IGCSE syllabi (November) and Pearson IAL units
+ * (January), fee grids, families reserved and paid at the desk (lines and consent — a declared
+ * self-study retake and a declared unit retake among them), a paid cash-in, course enrolment from
+ * the lines, candidates, entries, forecasts, the timetable, a seated sitting, and an earlier
+ * series' results (which verify a declared sitting) and certificates. Everything goes through the
+ * API over HTTP, as the screens do (made-up names; never the school's sheet).
  *
  *   API_URL=http://localhost:3043 WEB_ORIGIN=http://localhost:3040 \
  *     pnpm --filter @repo/api exec tsx scripts/exams-demo/seed-exams.ts
  *
- * Run it once on a fresh copy of the template dev database.
+ * Run it once on a fresh copy of the template dev database migrated to the branch.
  */
 import { hc } from 'hono/client';
 import { apiResponse } from '@repo/validations';
@@ -19,6 +20,7 @@ import type { AppType } from '../../src/app';
 const API = process.env.API_URL ?? 'http://localhost:3043';
 const ORIGIN = process.env.WEB_ORIGIN ?? 'http://localhost:3040';
 const PW = 'TestPass1';
+const CONSENT = { refundPolicy: true, declaration: true } as const;
 
 async function signIn(email: string, password = PW) {
   const res = await fetch(`${API}/api/auth/sign-in/email`, {
@@ -26,17 +28,18 @@ async function signIn(email: string, password = PW) {
   });
   if (res.status !== 200) throw new Error(`sign-in ${email}: ${res.status} ${await res.text()}`);
   const cookie = (res.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ');
-  cookies.set(email, cookie);
   return hc<AppType>(API, { headers: { Cookie: cookie, Origin: ORIGIN } });
 }
-const cookies = new Map<string, string>();
 type Api = Awaited<ReturnType<typeof signIn>>;
+type Line = { offerItemId: string; attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study'; teacherId?: string; priorSitting?: { month: 'january' | 'june' | 'october' | 'november'; year: number } };
 
-const iso = (s: string) => new Date(s).toISOString();
+const cairoDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
+const DAY = 86_400_000;
 
 async function main() {
   const admin = await signIn('admin@igcse.local', 'AdminPass1');
   const officer = await signIn('officer.mona@igcse.local');
+  const finadmin = await signIn('finadmin.rana@igcse.local');
 
   // ─── Staff ─────────────────────────────────────────────────────────────────
   const users = await apiResponse(admin.v1.users.$get({ query: {} }));
@@ -93,58 +96,89 @@ async function main() {
   const xma = cat.qualifications.find((q) => q.code === 'XMA01')!.id;
   const subjects = await apiResponse(admin.v1.subjects.$get({ query: {} }));
   const sid = (code: string) => subjects.find((s) => s.code === code)?.id;
-  const ial = async (code: string, name: string, unitCode: string) => {
-    const id = sid(code) ?? (await apiResponse(admin.v1.subjects.$post({ json: {
-      name, code, council: 'pearson_edexcel', courseFee: 2400, registrationFee: 1600, qualificationLevel: 'as_level', isOfferedAtSchool: true, isCore: false,
-    } }))).id;
-    await apiResponse(coord.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: id }, json: { boardCode: 'pearson_edexcel', qualificationId: xma, unitIds: [unit(unitCode)] } }));
-    return id;
-  };
-  const p1 = await ial('IAL-P1', 'Pure Mathematics 1', 'WMA11');
-  const p2 = await ial('IAL-P2', 'Pure Mathematics 2', 'WMA12');
-  const m1 = await ial('IAL-M1', 'Mechanics 1', 'WME01');
+  // The rework's shape (RESERVATIONS_REWORK.md §3.2): one parent subject, an item per unit.
+  const ialMaths = sid('IAL-MATHS') ?? (await apiResponse(admin.v1.subjects.$post({ json: {
+    name: 'Mathematics (IAL)', code: 'IAL-MATHS', council: 'pearson_edexcel', courseFee: 2400, registrationFee: 1600, qualificationLevel: 'as_level', isOfferedAtSchool: true, isCore: false,
+  } }))).id;
+  await apiResponse(coord.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: ialMaths }, json: { boardCode: 'pearson_edexcel', qualificationId: xma, unitIds: [] } }));
 
-  // ─── Windows and series ────────────────────────────────────────────────────
+  // ─── Series and their dates ────────────────────────────────────────────────
   const series = await apiResponse(admin.v1['board-series'].$get({ query: {} }));
-  const camNov = series.find((s) => s.boardCode === 'cambridge' && s.month === 'november' && s.year === 2026)!.id;
-  const camJun = series.find((s) => s.boardCode === 'cambridge' && s.month === 'june' && s.year === 2026)!.id;
-  // The window's PUT reads its body by the window's state, so it is sent as the screen sends it.
-  const ext = await fetch(`${API}/v1/sessions/sess_november-2026`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: cookies.get('admin@igcse.local')!, Origin: ORIGIN },
-    body: JSON.stringify({ endDate: '2026-10-04T20:59:00.000Z', reason: 'extended for the exam-entries demo' }),
-  });
-  if (ext.status !== 200) console.warn('window extension:', ext.status, await ext.text());
+  const camNov = series.find((s) => s.boardCode === 'cambridge' && s.month === 'november' && s.year === 2026 && !s.label)!.id;
+  const camJun = series.find((s) => s.boardCode === 'cambridge' && s.month === 'june' && s.year === 2026 && !s.label)!.id;
+  const now = Date.now();
   await apiResponse(admin.v1['board-series'][':id'].$put({ param: { id: camNov }, json: {
-    entryDeadline: new Date('2026-10-08T15:00:00Z'), reason: 'the school\'s date for the demo', forecastGradesDue: '2026-10-20', accessArrangementsDue: '2026-10-10',
-    examsStart: '2026-10-26', examsEnd: '2026-11-20', resultsOn: '2027-01-13', certificatesOn: '2027-03-31', lateFeeFrom: '2026-10-09', lateEntriesClose: '2026-10-21',
+    entryDeadline: new Date(now + 14 * DAY), reason: 'the school\'s date for the exam-entries demo', forecastGradesDue: cairoDate(new Date(now + 20 * DAY)),
+    accessArrangementsDue: cairoDate(new Date(now + 10 * DAY)), examsStart: '2026-10-26', examsEnd: '2026-11-20', resultsOn: '2027-01-13', certificatesOn: '2027-03-31',
+    lateFeeFrom: cairoDate(new Date(now + 15 * DAY)), lateEntriesClose: cairoDate(new Date(now + 21 * DAY)),
   } }));
   await apiResponse(admin.v1['board-series'][':id'].$put({ param: { id: camJun }, json: { resultsOn: '2026-08-11', certificatesOn: '2026-10-31', examsStart: '2026-04-27', examsEnd: '2026-06-10' } }));
-  const pearsonJan = series.find((s) => s.boardCode === 'pearson_edexcel' && s.month === 'january' && s.year === 2027)?.id
+  const pearsonJan = series.find((s) => s.boardCode === 'pearson_edexcel' && s.month === 'january' && s.year === 2027 && !s.label)?.id
     ?? (await apiResponse(admin.v1['board-series'].$post({ json: {
-      boardCode: 'pearson_edexcel', month: 'january', year: 2027, label: '', entryDeadline: new Date('2026-10-16T15:00:00Z'),
-      lateFeeFrom: '2026-10-17', highLateFeeFrom: '2026-11-14', examsStart: '2027-01-05', examsEnd: '2027-01-28', resultsOn: '2027-03-05', certificatesOn: '2027-05-20',
+      boardCode: 'pearson_edexcel', month: 'january', year: 2027, label: '', entryDeadline: new Date(now + 9 * DAY),
+      lateFeeFrom: cairoDate(new Date(now + 10 * DAY)), highLateFeeFrom: cairoDate(new Date(now + 37 * DAY)), examsStart: '2027-01-05', examsEnd: '2027-01-28', resultsOn: '2027-03-05', certificatesOn: '2027-05-20',
     } }))).id;
-  const sessions = await apiResponse(admin.v1.sessions.$get({ query: {} }));
-  const janWindow = sessions.find((s) => s.name === 'January 2027 (AS)')?.id
-    ?? (await apiResponse(admin.v1.sessions.$post({ json: {
-      name: 'January 2027 (AS)', sessionType: 'january', seriesYear: 2027, qualificationLevel: 'as_level',
-      startDate: iso(new Date(Date.now() - 3600_000).toISOString()), endDate: iso('2026-10-04T20:59:00Z'),
-    } }))).id;
-  await apiResponse(admin.v1.sessions[':id']['board-series'].$put({ param: { id: janWindow }, json: { series: [{ boardSeriesId: pearsonJan, isDefault: true }], routes: [] } }));
 
-  // ─── Families, registered and paid at the desk ─────────────────────────────
-  const fams: [string, string, 11 | 12, string[], string[]][] = [
-    ['Youssef Mahmoud', 'youssef.mahmoud', 11, ['0610', '0580', '0620'], []],
-    ['Mariam Khaled', 'mariam.khaled', 11, ['0610', '0580', '0500'], []],
-    ['Omar Tarek', 'omar.tarek', 11, ['0610', '0620', '0625'], []],
-    ['Nour Hassan', 'nour.hassan', 11, ['0580', '0625', '0500'], []],
-    ['Hana Ibrahim', 'hana.ibrahim', 12, ['0620'], ['IAL-P1', 'IAL-M1']],
-    ['Adam Sherif', 'adam.sherif', 12, [], ['IAL-P1', 'IAL-P2']],
-    ['Laila Mostafa', 'laila.mostafa', 12, ['0610'], ['IAL-P1']],
-    ['Ziad Fouad', 'ziad.fouad', 12, [], ['IAL-P2', 'IAL-M1']],
+  // ─── The fee grids ─────────────────────────────────────────────────────────
+  const igcse = ['0610', '0620', '0580', '0625', '0500'];
+  await apiResponse(admin.v1['board-fees'].$put({ query: { seriesId: camNov }, json: {
+    rows: igcse.map((c) => ({ keyKind: 'qualification' as const, keyId: qual(c).id, amount: 2600, provisional: false })), reason: 'Cambridge November 2026 fee list (demo)',
+  } }));
+  await apiResponse(admin.v1['board-fees'].$put({ query: { seriesId: pearsonJan }, json: {
+    rows: ['WMA11', 'WMA12', 'WME01'].map((c) => ({ keyKind: 'unit' as const, keyId: unit(c), amount: 1600, provisional: false })), reason: 'Pearson January 2027 fee list (demo)',
+  } }));
+  await apiResponse(finadmin.v1['board-services'].fees.$put({ json: {
+    boardSeriesId: pearsonJan, rows: [{ boardServiceId: 'svc-pearson-ci', level: 'as_a_level', amount: 700, provisional: false }], reason: 'Pearson January 2027 cash-in fee (demo)',
+  } }));
+
+  // ─── The session and its offers (the links sheet) ──────────────────────────
+  const sessions = await apiResponse(admin.v1.sessions.$get({ query: {} }));
+  const sessionId = sessions.find((s) => s.label === 'exams demo')?.id
+    ?? (await apiResponse(admin.v1.sessions.$post({ json: {
+      type: 'winter', year: 2026, label: 'exams demo', startDate: new Date(now - 3600_000).toISOString(), endDate: new Date(now + 8 * DAY).toISOString(),
+      courseStartsOn: cairoDate(new Date(now)), paymentDueAt: new Date(now + 7 * DAY).toISOString(),
+    } }))).id;
+  const offers = await apiResponse(admin.v1.sessions[':id'].offers.$get({ param: { id: sessionId } }));
+  const teach: Record<string, string> = { '0610': 'Karim Adel', '0620': 'Karim Adel', '0580': 'Dina Fathy', '0625': 'Youssef Hamed', '0500': 'Youssef Hamed', 'IAL-MATHS': 'Dina Fathy' };
+  const itemOf: Record<string, string> = {};
+  for (const code of igcse) {
+    const subjectId = sid(code)!;
+    const existing = offers.offers.find((o) => o.subjectId === subjectId);
+    itemOf[code] = existing?.items[0]?.id ?? (await apiResponse(admin.v1.sessions[':id'].offers.$post({ param: { id: sessionId }, json: {
+      subjectId, courseFee: 9000, teachers: [{ teacherId: tId(teach[code]!), mode: 'in_school' }],
+      items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'award', qualificationId: qual(code).id }, boardSeriesId: camNov, availability: 'open', requiredInSeries: false }],
+    } }))).items[0]!;
+  }
+  const mathsOffer = offers.offers.find((o) => o.subjectId === ialMaths);
+  if (mathsOffer) for (const it of mathsOffer.items) itemOf[it.label] = it.id;
+  else {
+    const made = await apiResponse(admin.v1.sessions[':id'].offers.$post({ param: { id: sessionId }, json: {
+      subjectId: ialMaths, courseFee: 2400, teachers: [{ teacherId: tId('Dina Fathy'), mode: 'in_school' }],
+      items: (['P1', 'P2', 'M1'] as const).map((label, i) => ({
+        label, kind: 'unit' as const, enters: { kind: 'units' as const, unitIds: [unit({ P1: 'WMA11', P2: 'WMA12', M1: 'WME01' }[label])] },
+        boardSeriesId: pearsonJan, availability: 'open' as const, requiredInSeries: false, sortOrder: i,
+      })),
+    } }));
+    (['P1', 'P2', 'M1'] as const).forEach((label, i) => { itemOf[label] = made.items[i]!; });
+  }
+
+  // ─── Families, reserved and paid at the desk ───────────────────────────────
+  const first = (code: string): Line => ({ offerItemId: itemOf[code]!, attempt: 'first', mode: 'in_school' });
+  const fams: [string, string, 11 | 12, Line[]][] = [
+    ['Youssef Mahmoud', 'youssef.mahmoud', 11, [first('0610'), first('0580'), first('0620')]],
+    ['Mariam Khaled', 'mariam.khaled', 11, [first('0610'), first('0580'), first('0500')]],
+    ['Omar Tarek', 'omar.tarek', 11, [first('0610'), first('0620'), first('0625')]],
+    // A self-study retake of June 2026's Mathematics, declared at the desk: June's results verify it.
+    ['Nour Hassan', 'nour.hassan', 11, [{ offerItemId: itemOf['0580']!, attempt: 'retake', mode: 'self_study', priorSitting: { month: 'june', year: 2026 } }, first('0625'), first('0500')]],
+    ['Hana Ibrahim', 'hana.ibrahim', 12, [first('0620'), first('P1'), first('M1')]],
+    ['Adam Sherif', 'adam.sherif', 12, [first('P1'), first('P2')]],
+    ['Laila Mostafa', 'laila.mostafa', 12, [first('0610'), first('P1')]],
+    // A retake of P2 from January 2026, declared: not verified, so the entry check lists it.
+    ['Ziad Fouad', 'ziad.fouad', 12, [{ offerItemId: itemOf.P2!, attempt: 'retake', mode: 'in_school', priorSitting: { month: 'january', year: 2026 } }, first('M1')]],
   ];
   const students: Record<string, string> = {};
-  for (const [name, slug, grade, igcse, ial] of fams) {
+  const lineIds: Record<string, string[]> = {};
+  for (const [name, slug, grade, lines] of fams) {
     const existing = await apiResponse(officer.v1.users.search.$get({ query: { search: `student.${slug}` } }));
     let studentId = existing.find((u) => u.email === `student.${slug}@igcse.local`)?.id;
     if (!studentId) {
@@ -153,24 +187,21 @@ async function main() {
         student: { email: `student.${slug}@igcse.local`, name, password: PW, phone: '01111111111', grade },
       } }));
       studentId = r.student.id;
-      if (igcse.length) {
-        await apiResponse(officer.v1.registrations.desk.$post({ json: { studentId, sessionId: 'sess_november-2026', subjectIds: igcse.map((c) => sid(c)!), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } } }));
-      }
-      if (ial.length) {
-        await apiResponse(officer.v1.registrations.desk.$post({ json: { studentId, sessionId: janWindow, subjectIds: ial.map((c) => ({ 'IAL-P1': p1, 'IAL-P2': p2, 'IAL-M1': m1 } as Record<string, string>)[c]!), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } } }));
-      }
+      const made = await apiResponse(officer.v1.registrations.desk.$post({ json: { studentId, sessionId, lines, consent: CONSENT, collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } } }));
+      lineIds[slug] = made.registrations.map((x) => x.id);
     }
     students[slug] = studentId;
   }
 
-  // ─── Who teaches whom ──────────────────────────────────────────────────────
-  const teach: Record<string, string> = { '0610': 'Karim Adel', '0620': 'Karim Adel', '0580': 'Dina Fathy', 'IAL-P1': 'Dina Fathy', 'IAL-P2': 'Dina Fathy', 'IAL-M1': 'Dina Fathy', '0625': 'Youssef Hamed', '0500': 'Youssef Hamed' };
-  for (const [, slug, , igcse, ialCodes] of fams) {
-    for (const code of [...igcse, ...ialCodes]) {
-      const subjectId = code.startsWith('IAL') ? ({ 'IAL-P1': p1, 'IAL-P2': p2, 'IAL-M1': m1 } as Record<string, string>)[code]! : sid(code)!;
-      await coord.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: students[slug]!, subjectId, teacherId: tId(teach[code]!) } });
-    }
+  // A cash-in for Adam's Mathematics AS (P1 and P2 sat; the line's item says the award), paid at the desk.
+  const adamP1 = lineIds['adam.sherif']?.[0];
+  if (adamP1) {
+    const ci = await apiResponse(officer.v1.charges.$post({ json: { studentId: students['adam.sherif']!, kind: 'cash_in', boardServiceId: 'svc-pearson-ci', registrationId: adamP1 } }));
+    await apiResponse(officer.v1.registrations.desk.collect.$post({ json: { studentId: students['adam.sherif']!, chargeIds: [ci.id], instrumentUsed: 'cash' } }));
   }
+
+  // ─── Who teaches whom: enrolment from the lines (per unit for the IAL items) ─
+  await apiResponse(coord.v1.enrolments.bulk.$post({ json: { academicYearId: yearId, source: 'registrations', studentIds: Object.values(students), commit: true } }));
 
   // ─── Candidates ────────────────────────────────────────────────────────────
   const legal: Record<string, [string, string, string, 'female' | 'male', string | null]> = {
@@ -195,6 +226,23 @@ async function main() {
     value: { cambridge: { centreNumber: 'EG123', route: 'direct' }, pearson_edexcel: { centreNumber: '91234', route: 'british_council' } }, reason: 'the demo school\'s centre numbers',
   } }));
 
+  // ─── June 2026: results (Nour's declared sitting verified by them) and certificates ─
+  const june = [['0301', 'laila.mostafa', '0625', 'A'], ['0302', 'hana.ibrahim', '0625', 'B'], ['0303', 'adam.sherif', '0500', 'A*'], ['0304', 'nour.hassan', '0580', 'D']] as const;
+  for (const [num, slug] of june) {
+    await coord.v1.exams['candidate-numbers'].$put({ json: { studentId: students[slug]!, boardSeriesId: camJun, number: num } });
+  }
+  const col = (code: string) => ({ '0625': '0625 Physics', '0500': '0500 English Language', '0580': '0580 Mathematics' } as Record<string, string>)[code]!;
+  const broadsheet = ['Cambridge International — June 2026 results', 'Centre EG123', `Candidate No,Candidate Name,${col('0625')},${col('0500')},${col('0580')}`,
+    ...june.map(([n, slug, code, g]) => `${n},${legal[slug]![1].toUpperCase()} ${legal[slug]![0]},${code === '0625' ? g : ''},${code === '0500' ? g : ''},${code === '0580' ? g : ''}`)].join('\n');
+  await apiResponse(coord.v1.exams.results.import.$post({ json: { boardSeriesId: camJun, source: { text: broadsheet, name: 'June 2026 broadsheet' }, commit: true, saveMappingAs: 'Cambridge broadsheet' } }));
+  await apiResponse(coord.v1.exams.results.publish.$post({ json: { boardSeriesId: camJun } }));
+  await apiResponse(coord.v1.exams.certificates.receive.$post({ json: { boardSeriesId: camJun, receivedOn: '2026-09-28', commit: true } }));
+  const certs = await apiResponse(officer.v1.exams.certificates.$get({ query: { boardSeriesId: camJun } }));
+  const laila = certs.certificates.find((c) => c.studentId === students['laila.mostafa']);
+  if (laila && laila.status === 'received') {
+    await apiResponse(officer.v1.exams.certificates[':id'].collect.$post({ param: { id: laila.id }, json: { collectorName: 'Laila Mostafa', collectorRelation: 'candidate', collectorIdChecked: 'school_id' } }));
+  }
+
   // ─── Numbers, entries, options, forecasts ──────────────────────────────────
   for (const s of [camNov, pearsonJan]) {
     await apiResponse(coord.v1.exams['candidate-numbers'].assign.$post({ json: { boardSeriesId: s, commit: true } }));
@@ -211,7 +259,7 @@ async function main() {
     if (f.studentName !== 'Mariam Khaled') await apiResponse(karim.v1.exams.entries[':id'].forecast.$put({ param: { id: f.entryId }, json: { grade: 'B' } }));
   }
   const pj = await apiResponse(coord.v1.exams.entries.$get({ query: { boardSeriesId: pearsonJan } }));
-  await apiResponse(coord.v1.exams.entries.submit.$post({ json: { entryIds: pj.filter((e) => e.studentName !== 'Laila Mostafa').map((e) => e.id) } }));
+  await apiResponse(coord.v1.exams.entries.submit.$post({ json: { entryIds: pj.filter((e) => e.studentName !== 'Laila Mostafa' && e.status === 'draft').map((e) => e.id) } }));
 
   // ─── The timetable, a seated sitting ───────────────────────────────────────
   const tt = [
@@ -243,20 +291,6 @@ async function main() {
   await apiResponse(coord.v1.exams.sittings.seat.$post({ json: { ...sitting, commit: true } }));
   await apiResponse(coord.v1.exams.invigilation.$put({ json: { ...sitting, roomId: hall, teacherIds: [tId('Youssef Hamed')], leadTeacherId: tId('Youssef Hamed') } }));
 
-  // ─── June 2026: results and certificates ───────────────────────────────────
-  const june = [['0301', 'laila.mostafa', '0625', 'A'], ['0302', 'hana.ibrahim', '0625', 'B'], ['0303', 'adam.sherif', '0500', 'A*']] as const;
-  for (const [num, slug] of june) {
-    await coord.v1.exams['candidate-numbers'].$put({ json: { studentId: students[slug]!, boardSeriesId: camJun, number: num } });
-  }
-  const broadsheet = ['Cambridge International — June 2026 results', 'Centre EG123', 'Candidate No,Candidate Name,0625 Physics,0500 English Language', ...june.map(([n, slug, code, g]) => `${n},${legal[slug]![1].toUpperCase()} ${legal[slug]![0]},${code === '0625' ? g : ''},${code === '0500' ? g : ''}`)].join('\n');
-  await apiResponse(coord.v1.exams.results.import.$post({ json: { boardSeriesId: camJun, source: { text: broadsheet, name: 'June 2026 broadsheet' }, commit: true, saveMappingAs: 'Cambridge broadsheet' } }));
-  await apiResponse(coord.v1.exams.results.publish.$post({ json: { boardSeriesId: camJun } }));
-  await apiResponse(coord.v1.exams.certificates.receive.$post({ json: { boardSeriesId: camJun, receivedOn: '2026-09-28', commit: true } }));
-  const certs = await apiResponse(officer.v1.exams.certificates.$get({ query: { boardSeriesId: camJun } }));
-  const laila = certs.certificates.find((c) => c.studentId === students['laila.mostafa']);
-  if (laila && laila.status === 'received') {
-    await apiResponse(officer.v1.exams.certificates[':id'].collect.$post({ param: { id: laila.id }, json: { collectorName: 'Laila Mostafa', collectorRelation: 'candidate', collectorIdChecked: 'school_id' } }));
-  }
   console.log('F4 demo data ready:', Object.keys(students).length, 'families');
 }
 

@@ -3260,8 +3260,8 @@ export const examBoardRule = pgTable(
     // Up to which date a withdrawn entry is refunded by the board ('never': not at all).
     withdrawalRefundUntil: text("withdrawal_refund_until").notNull().default("entry_deadline"),
     withdrawalFeeNote: text("withdrawal_fee_note"),
-    // Cambridge carries an AS result forward within 13 months; null: not by months.
-    carryForwardMonths: integer("carry_forward_months"),
+    // The carry-forward period is the board's own column since the reservations rework
+    // (exam_board.carry_forward_months, step A; the line rules read it too): F4 reads and edits it there.
     // How the board's results file names a candidate: 'candidate_number' | 'uci'.
     resultsKey: text("results_key").notNull().default("candidate_number"),
     notes: text("notes"),
@@ -3273,7 +3273,6 @@ export const examBoardRule = pgTable(
     check("exam_board_rule_amendment_from_valid", sql`${table.amendmentFeeFrom} IN ('entry_deadline', 'late_fee_from', 'high_late_fee_from')`),
     check("exam_board_rule_refund_valid", sql`${table.withdrawalRefundUntil} IN ('entry_deadline', 'late_fee_from', 'high_late_fee_from', 'never')`),
     check("exam_board_rule_results_key_valid", sql`${table.resultsKey} IN ('candidate_number', 'uci')`),
-    check("exam_board_rule_cf_months", sql`${table.carryForwardMonths} IS NULL OR ${table.carryForwardMonths} BETWEEN 1 AND 60`),
   ]
 );
 
@@ -3370,9 +3369,10 @@ export const examCandidateNumber = pgTable(
  * One entry with a board: a unit (a Pearson W unit, a paper) or an award (a
  * Cambridge syllabus with its option code, a Pearson cash-in or International
  * GCSE) for one candidate in one board series — derived from a confirmed
- * registration through F0b's entryItemsFor, or added by the coordinator (a
- * cash-in with no unit sat). Status: draft → submitted → amended; any →
- * withdrawn. One live entry per candidate, series and unit or award.
+ * line through lineItemsFor (what its item enters, since the reservations
+ * rework), or from a paid cash-in charge, or added by the coordinator.
+ * Status: draft → submitted → amended; any → withdrawn. One live entry per
+ * candidate, series and unit or award, and per cash-in charge.
  */
 export const examEntry = pgTable(
   "exam_entry",
@@ -3382,6 +3382,9 @@ export const examEntry = pgTable(
     boardSeriesId: text("board_series_id").notNull().references(() => boardSeries.id, { onDelete: "restrict" }),
     boardCode: text("board_code").notNull(),
     registrationId: text("registration_id").references(() => registration.id, { onDelete: "restrict" }),
+    // The reservations rework (§3.6): the cash-in (or late cash-in) charge an award entry was made
+    // from — the family's paid request to the board to award the qualification (G-22).
+    chargeId: text("charge_id").references(() => charge.id, { onDelete: "restrict" }),
     // 'unit' | 'award'
     kind: text("kind").notNull(),
     unitId: text("unit_id").references(() => examUnit.id, { onDelete: "restrict" }),
@@ -3435,6 +3438,9 @@ export const examEntry = pgTable(
     index("examEntry_studentId_idx").on(table.studentId),
     index("examEntry_boardSeriesId_idx").on(table.boardSeriesId),
     index("examEntry_registrationId_idx").on(table.registrationId),
+    // A cash-in charge becomes one live award entry.
+    uniqueIndex("examEntry_one_live_charge_idx").on(table.chargeId).where(sql`status <> 'withdrawn' AND charge_id IS NOT NULL`),
+    check("exam_entry_charge_award", sql`${table.chargeId} IS NULL OR ${table.kind} = 'award'`),
     uniqueIndex("examEntry_one_live_unit_idx")
       .on(table.studentId, table.boardSeriesId, table.unitId)
       .where(sql`status <> 'withdrawn' AND unit_id IS NOT NULL`),
@@ -3794,6 +3800,7 @@ export const examEntryRelations = relations(examEntry, ({ one }) => ({
   registration: one(registration, { fields: [examEntry.registrationId], references: [registration.id] }),
   unit: one(examUnit, { fields: [examEntry.unitId], references: [examUnit.id] }),
   qualification: one(qualification, { fields: [examEntry.qualificationId], references: [qualification.id] }),
+  charge: one(charge, { fields: [examEntry.chargeId], references: [charge.id] }),
 }));
 
 export const examPaperRelations = relations(examPaper, ({ one }) => ({

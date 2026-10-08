@@ -26,8 +26,15 @@ import { logger } from '../lib/logger';
 const DAY = 86_400_000;
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
 
-type Field = 'entryDeadline' | BoardSeriesDateField;
-const LABEL: Record<Field, string> = { entryDeadline: 'Entry deadline (the school\'s hard stop)', ...BOARD_SERIES_DATE_LABELS };
+// The entry deadline and, since the reservations rework, the retake deadline are instants (the
+// school's hard stops: a first entry by the one, a retake of the board's previous sitting by the
+// other, RESERVATIONS_REWORK.md §3.3); the board's other dates are whole days.
+type Field = 'entryDeadline' | 'retakeDeadline' | BoardSeriesDateField;
+const LABEL: Record<Field, string> = {
+  entryDeadline: 'Entry deadline (the school\'s hard stop)',
+  retakeDeadline: 'Retake deadline (the hard stop for a retake of the previous series)',
+  ...BOARD_SERIES_DATE_LABELS,
+};
 
 /** Per series, the counts each date's line reads. */
 async function seriesStats(seriesIds: string[]) {
@@ -109,6 +116,7 @@ export async function getDeadlines(pastDays = 30) {
   for (const s of series) {
     const dates: [Field, string | null, Date | null][] = [
       ['entryDeadline', s.entryDeadline ? schoolDateString(s.entryDeadline) : null, s.entryDeadline],
+      ['retakeDeadline', s.retakeDeadline ? schoolDateString(s.retakeDeadline) : null, s.retakeDeadline],
       ...(Object.keys(BOARD_SERIES_DATE_LABELS) as BoardSeriesDateField[]).map((f) => [f, s[f] as string | null, null] as [Field, string | null, Date | null]),
     ];
     for (const [field, date, at] of dates) {
@@ -118,7 +126,7 @@ export async function getDeadlines(pastDays = 30) {
         boardSeriesId: s.id, seriesName: boardSeriesName(names, s), boardCode: s.boardCode, boardName: names.get(s.boardCode) ?? s.boardCode,
         field, label: LABEL[field], date, at, daysLeft: daysBetween(today, date), passed,
         outstanding: passed && field !== 'certificatesOn' && field !== 'resultsOn' ? [] : outstanding(field, stats.get(s.id) ?? {}),
-        hardStop: field === 'entryDeadline',
+        hardStop: field === 'entryDeadline' || field === 'retakeDeadline',
       });
     }
   }
@@ -149,7 +157,8 @@ export async function sendDeadlineReminders(now: Date = new Date()) {
   let failed = 0;
   for (const s of series) {
     for (const field of REMINDED) {
-      const date = field === 'entryDeadline' ? (s.entryDeadline ? schoolDateString(s.entryDeadline) : null) : (s[field] as string | null);
+      const instant = field === 'entryDeadline' ? s.entryDeadline : field === 'retakeDeadline' ? s.retakeDeadline : null;
+      const date = field === 'entryDeadline' || field === 'retakeDeadline' ? (instant ? schoolDateString(instant) : null) : (s[field] as string | null);
       if (!date) continue;
       const left = daysBetween(today, date);
       if (left < 1) continue;

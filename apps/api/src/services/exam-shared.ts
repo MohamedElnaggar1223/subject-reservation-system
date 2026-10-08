@@ -58,7 +58,12 @@ export function hardStopSentence(s: { name: string; entryDeadline: Date | null }
   return `The entry deadline for ${s.name} (${schoolDateTime(s.entryDeadline!)}) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)`;
 }
 
-export type BoardRules = typeof examBoardRule.$inferSelect & { recorded: boolean };
+/**
+ * A board's entry rules, and its carry-forward period — since the reservations rework the board's
+ * own column (`exam_board.carry_forward_months`, step A: the line rules' gate.priorSeries reads it
+ * too), read here beside the rules F4 keeps and edited through them (`updateBoardRule`).
+ */
+export type BoardRules = typeof examBoardRule.$inferSelect & { carryForwardMonths: number | null; recorded: boolean };
 
 const DEFAULT_RULES = (boardCode: string): BoardRules => ({
   boardCode,
@@ -82,16 +87,21 @@ const DEFAULT_RULES = (boardCode: string): BoardRules => ({
 
 /** A board's entry rules; a board with none recorded reads lenient defaults and says so (`recorded: false`). */
 export async function boardRulesFor(boardCode: string, executor: Executor = db): Promise<BoardRules> {
-  const [r] = await executor.select().from(examBoardRule).where(eq(examBoardRule.boardCode, boardCode));
-  return r ? { ...r, recorded: true } : DEFAULT_RULES(boardCode);
+  return (await boardRulesMap([boardCode], executor)).get(boardCode)!;
 }
 
 export async function boardRulesMap(boardCodes: string[], executor: Executor = db): Promise<Map<string, BoardRules>> {
   const codes = [...new Set(boardCodes)];
-  const rows = codes.length ? await executor.select().from(examBoardRule).where(inArray(examBoardRule.boardCode, codes)) : [];
+  const [rows, boards] = codes.length
+    ? await Promise.all([
+        executor.select().from(examBoardRule).where(inArray(examBoardRule.boardCode, codes)),
+        executor.select({ code: examBoard.code, carryForwardMonths: examBoard.carryForwardMonths }).from(examBoard).where(inArray(examBoard.code, codes)),
+      ])
+    : [[], []];
   return new Map(codes.map((c) => {
     const r = rows.find((x) => x.boardCode === c);
-    return [c, r ? { ...r, recorded: true } : DEFAULT_RULES(c)];
+    const months = boards.find((b) => b.code === c)?.carryForwardMonths ?? null;
+    return [c, r ? { ...r, carryForwardMonths: months, recorded: true } : { ...DEFAULT_RULES(c), carryForwardMonths: months }];
   }));
 }
 

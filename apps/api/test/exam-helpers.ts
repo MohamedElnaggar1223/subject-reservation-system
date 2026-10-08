@@ -1,32 +1,30 @@
 /**
- * The school F4's suites run in (FEATURES_PLAN.md F4; docs/features/EXAM_ENTRIES.md):
- * staff of every role, a catalogue with a Cambridge AS syllabus (three
- * components, two option codes) and a Pearson IAL award (two W units and the
- * cash-in), subjects mapped to them, an open window feeding a Cambridge
- * November and a Pearson January series, families registered and paid at the
- * desk, and the teachers who teach them. Everything goes through the API.
+ * The school F4's suites run in (FEATURES_PLAN.md F4; docs/features/EXAM_ENTRIES.md), on the
+ * reservations rework's model (RESERVATIONS_REWORK.md §3.2–§3.5): staff of every role, a catalogue
+ * with a Cambridge AS syllabus (three components, two option codes) and a Pearson IAL award (two W
+ * units and the cash-in), a winter session whose offers' items enter them — the Cambridge syllabus
+ * whole (an award item, in Cambridge's November), Pearson's P1 (a units item, in Pearson's January)
+ * and the whole Pearson award (an award item) — each with its board fee in its series' grid,
+ * families reserved and paid at the desk (lines and consent), and the teachers who teach them.
+ * Everything goes through the API.
  *
- * Every code carries the suite's tag, so suites sharing the database never
- * collide in the catalogue. The open window takes the one (type, level) pair
- * no earlier file holds open (earlier suites leave the others open), and each
- * suite closes it at the end.
+ * Every code carries the suite's tag, so suites sharing the database never collide in the
+ * catalogue; the session and the series carry it as their label. Subjects are made through the
+ * API, not the shared helper, so the file's other sessions are not offered them.
  */
 import { expect } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
-import { admin, staff, onboard, subject, session, one, sql, type Client } from './helpers';
+import { admin, staff, onboard, one, CONSENT, type Client } from './helpers';
 
 const DAY = 24 * 60 * 60 * 1000;
+const cairoDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
 
 export type Family = { parent: Client; student: Client; studentId: string };
-
-/** A (type, level) pair no window holds open now: the january|as_level pair is the one the suites share. */
-export async function freeAsPair(): Promise<{ type: 'january' | 'october' | 'november'; level: 'as_level' | 'a_level' }> {
-  const open = new Set((await sql<{ t: string; l: string }>(`select session_type as t, qualification_level as l from registration_session where status = 'active'`)).map((r) => `${r.t}|${r.l}`));
-  const pair = (['january|as_level', 'november|as_level', 'october|as_level', 'january|a_level', 'november|a_level', 'october|a_level'] as const).find((p) => !open.has(p));
-  expect(pair, 'no free (type, level) pair for an open window').toBeDefined();
-  const [type, level] = pair!.split('|') as ['january' | 'october' | 'november', 'as_level' | 'a_level'];
-  return { type, level };
-}
+export type Month = 'january' | 'june' | 'october' | 'november';
+export type Line = {
+  offerItemId: string; attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study'; teacherId?: string | null;
+  priorSittingSeriesId?: string | null; priorSitting?: { month: Month; year: number };
+};
 
 /**
  * `enrol: false` leaves course enrolment (and so this year's academic year)
@@ -44,13 +42,14 @@ export async function examWorld(tag: string, opts: { enrol?: boolean } = {}) {
   const gate = await staff(adm, 'gate', `x-${tag}`);
   const teacherId = (await one<{ id: string }>(`select id from teacher where user_id = $1`, [teacher.id])).id;
   const teacher2Id = (await one<{ id: string }>(`select id from teacher where user_id = $1`, [teacher2.id])).id;
-  const { type, level } = await freeAsPair();
-  const award = (level: 'as_level' | 'a_level') => level;
+  // A winter session (November Y – January Y+1): Cambridge's AS sits November, Pearson's IAL January.
+  const type = 'winter' as const;
+  const level = 'as_level' as const;
 
   // ─── The catalogue ────────────────────────────────────────────────────────
   const cat = coordinator.api.v1.catalogue;
   const cSyllabus = await apiResponse(cat.qualifications.$post({ json: {
-    boardCode: 'cambridge', code: `${T}97`, title: `Biology ${T}`, level: award(level), suite: 'Cambridge International AS & A Level',
+    boardCode: 'cambridge', code: `${T}97`, title: `Biology ${T}`, level, suite: 'Cambridge International AS & A Level',
     subjectArea: `Biology ${T}`, entryMethod: 'syllabus_option',
   } }));
   const component = async (code: string, title: string) => (await apiResponse(cat.units.$post({ json: {
@@ -69,14 +68,15 @@ export async function examWorld(tag: string, opts: { enrol?: boolean } = {}) {
   const pu1 = await pUnit(`${T}WMA11`, 'Pure Mathematics 1', 'P1');
   const pu2 = await pUnit(`${T}WMA12`, 'Pure Mathematics 2', 'P2');
   const pAward = await apiResponse(cat.qualifications.$post({ json: {
-    boardCode: 'pearson_edexcel', code: `${T}XMA01`, title: `Mathematics ${T}`, level: award(level), suite: 'International Advanced Level',
+    boardCode: 'pearson_edexcel', code: `${T}XMA01`, title: `Mathematics ${T}`, level, suite: 'International Advanced Level',
     subjectArea: `Mathematics ${T}`, entryMethod: 'units_cash_in',
   } }));
   await apiResponse(cat.qualifications[':id'].units.$put({ param: { id: pAward.id }, json: { units: [pu1, pu2].map((unitId) => ({ unitId, requirement: 'required' as const })) } }));
 
-  // ─── Subjects families register for, mapped to what they enter ───────────
-  const sub = (code: string, name: string, council: 'cambridge' | 'pearson_edexcel') =>
-    subject(adm, `${T}-${code}`, `${name} ${T}`, { course: 1000, registration: 500 }, { qualificationLevel: level, council });
+  // ─── Subjects families reserve, mapped to what they enter ────────────────
+  const sub = async (code: string, name: string, council: 'cambridge' | 'pearson_edexcel') => (await apiResponse(adm.api.v1.subjects.$post({ json: {
+    name: `${name} ${T}`, code: `${T}-${code}`, council, courseFee: 1000, registrationFee: 500, isOfferedAtSchool: true, isCore: false, qualificationLevel: level,
+  } })))!.id;
   const sc = await sub('BIO', 'Biology', 'cambridge');
   const sp1 = await sub('P1', 'Pure Mathematics 1', 'pearson_edexcel');
   const spx = await sub('MATHS', 'Mathematics', 'pearson_edexcel');
@@ -86,38 +86,56 @@ export async function examWorld(tag: string, opts: { enrol?: boolean } = {}) {
   await map(sp1, 'pearson_edexcel', pAward.id, [pu1]);
   await map(spx, 'pearson_edexcel', pAward.id, []);
 
-  // ─── The window and the two series it feeds ──────────────────────────────
+  // ─── The series, their fee grids, and the session's offers ───────────────
   const now = Date.now();
-  const windowId = await session(adm, `Open window (exams ${tag})`, type, level, {
-    startDate: new Date(now - DAY).toISOString(), endDate: new Date(now + 3 * DAY).toISOString(), seriesYear: seriesYearInAcademicYear(type, Y),
-  });
   const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel', month: 'november' | 'january', deadlineDays: number) =>
     (await apiResponse(adm.api.v1['board-series'].$post({ json: {
       boardCode, month, year: seriesYearInAcademicYear(month, Y), label: `exams ${tag}`, entryDeadline: new Date(now + deadlineDays * DAY),
     } }))).id;
   const cambridgeNov = await mkSeries('cambridge', 'november', 5);
   const pearsonJan = await mkSeries('pearson_edexcel', 'january', 6);
-  await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({
-    param: { id: windowId },
-    json: { series: [{ boardSeriesId: cambridgeNov, isDefault: true }, { boardSeriesId: pearsonJan, isDefault: true }], routes: [] },
-  }));
+  const fee = (seriesId: string, keyKind: 'qualification' | 'unit', keyId: string) =>
+    apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind, keyId, amount: 500, provisional: false }] } }));
+  await fee(cambridgeNov, 'qualification', cSyllabus.id);
+  await fee(pearsonJan, 'unit', pu1);
+  await fee(pearsonJan, 'qualification', pAward.id);
+  const sessionId = (await apiResponse(adm.api.v1.sessions.$post({ json: {
+    type, year: seriesYearInAcademicYear('november', Y), label: `exams ${tag}`,
+    startDate: new Date(now - DAY).toISOString(), endDate: new Date(now + 3 * DAY).toISOString(),
+    courseStartsOn: cairoDate(new Date(now)), paymentDueAt: new Date(now + 3 * DAY).toISOString(),
+  } })))!.id;
+  type ItemIn = { label: string; kind: 'whole' | 'unit'; enters: { kind: 'award'; qualificationId: string } | { kind: 'units'; unitIds: string[] }; boardSeriesId: string };
+  const offerOf = async (subjectId: string, teachers: string[], item: ItemIn) =>
+    (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+      param: { id: sessionId },
+      json: { subjectId, courseFee: 1000, teachers: teachers.map((t) => ({ teacherId: t, mode: 'in_school' as const })), items: [{ ...item, availability: 'open' as const, requiredInSeries: false }] },
+    })))!.items[0]!;
+  const items = {
+    sc: await offerOf(sc, [teacherId, teacher2Id], { label: 'Whole subject', kind: 'whole', enters: { kind: 'award', qualificationId: cSyllabus.id }, boardSeriesId: cambridgeNov }),
+    sp1: await offerOf(sp1, [teacherId], { label: 'P1', kind: 'unit', enters: { kind: 'units', unitIds: [pu1] }, boardSeriesId: pearsonJan }),
+    spx: await offerOf(spx, [teacherId], { label: 'Whole subject', kind: 'whole', enters: { kind: 'award', qualificationId: pAward.id }, boardSeriesId: pearsonJan }),
+  };
 
-  // ─── Families, registered and paid at the desk ───────────────────────────
+  // ─── Families, reserved and paid at the desk ─────────────────────────────
   const families: Record<'a' | 'b' | 'c', Family> = {
     a: await onboard(officer, `x-${tag}-a`, 12),
     b: await onboard(officer, `x-${tag}-b`, 12),
     c: await onboard(officer, `x-${tag}-c`, 12),
   };
-  const desk = async (f: Family, subjectIds: string[]) => {
+  /** A reservation at the desk, collected in cash unless `collect` is false: one line per item. */
+  const reserve = async (f: Family, lines: Line[], collect = true, inSession = sessionId) => {
     const r = await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f.studentId, sessionId: windowId, subjectIds, collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: f.studentId, sessionId: inSession, lines, consent: CONSENT, ...(collect ? { collectNow: { instrumentUsed: 'cash' as const, escrowAmountToApply: 0 } } : {}) },
     }));
-    return Object.fromEntries(r.registrations.map((x) => [x.subjectId, x.id])) as Record<string, string>;
+    return r.registrations;
   };
+  /** A first entry in school (the item's or offer's only teacher unless one is named). */
+  const first = (offerItemId: string, teacher?: string): Line => ({ offerItemId, attempt: 'first', mode: 'in_school', ...(teacher ? { teacherId: teacher } : {}) });
+  const bySubject = (rs: { subjectId: string; id: string }[]) => Object.fromEntries(rs.map((x) => [x.subjectId, x.id])) as Record<string, string>;
   const regs = {
-    a: await desk(families.a, [sc, sp1]),
-    b: await desk(families.b, [sc, spx]),
-    c: await desk(families.c, [sp1]),
+    a: bySubject(await reserve(families.a, [first(items.sc, teacherId), first(items.sp1)])),
+    b: bySubject(await reserve(families.b, [first(items.sc, teacher2Id), first(items.spx)])),
+    c: bySubject(await reserve(families.c, [first(items.sp1)])),
   };
   for (const id of [...Object.values(regs.a), ...Object.values(regs.b), ...Object.values(regs.c)]) {
     expect((await one<{ status: string }>(`select status from registration where id = $1`, [id])).status).toBe('confirmed');
@@ -133,12 +151,13 @@ export async function examWorld(tag: string, opts: { enrol?: boolean } = {}) {
     await apiResponse(coordinator.api.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: families.b.studentId, subjectId: sc, teacherId: teacher2Id } }));
   }
 
-  const close = () => apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: windowId }, json: { reason: `exams ${tag} suite done: free the pair` } }));
+  const close = () => apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: sessionId }, json: { reason: `exams ${tag} suite done` } }));
 
   return {
     T, Y, adm, coordinator, officer, finadmin, teacher, teacher2, gate, teacherId, teacher2Id, type, level,
     catalogue: { cSyllabus: cSyllabus.id, cp1, cp2, cp3, optAll: optAll.code, optTwo: optTwo.code, pu1, pu2, pAward: pAward.id },
-    subjects: { sc, sp1, spx }, windowId, series: { cambridgeNov, pearsonJan }, families, regs, yearId, close,
+    subjects: { sc, sp1, spx }, items, sessionId, windowId: sessionId, series: { cambridgeNov, pearsonJan }, families, regs, yearId, close,
+    reserve, first,
   };
 }
 

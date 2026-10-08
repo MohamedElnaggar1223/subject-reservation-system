@@ -1,0 +1,14 @@
+# igcse_exams_proof: main 2a26557's migrations, then the branch's (F4's 0050, 0051)
+2026-10-08T08:58:28Z
+before: rows|34|1790557902648
+[ok] migrations applied successfully!after main: rows|50|1791437760565
+[ok] migrations applied successfully!after branch: rows|52|1791449161130
+row|52|1791449161130
+row|51|1791449160454
+row|50|1791437760565
+board|cambridge|13
+board|oxford|
+board|pearson_edexcel|
+rule|cambridge|t|f
+rule|oxford|f|f
+rule|pearson_edexcel|f|t

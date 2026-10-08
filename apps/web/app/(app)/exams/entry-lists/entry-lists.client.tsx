@@ -38,7 +38,7 @@ import { InstantText } from '../exams-shared';
 import { FlashNotice, SeriesDeadlineStatus, deriveEntries, type Flash } from '../entries/entries-shared';
 import { BoardRulesPanel } from './board-rules.client';
 
-type Fix = 'candidate' | 'entries' | 'forecasts' | 'settings';
+type Fix = 'candidate' | 'entries' | 'forecasts' | 'settings' | 'verify' | 'desk';
 
 /** Where each problem is fixed. */
 const FIX_OF: Record<EntryProblem, Fix> = {
@@ -55,12 +55,18 @@ const FIX_OF: Record<EntryProblem, Fix> = {
   carry_forward_to_confirm: 'entries',
   registration_not_confirmed: 'entries',
   missing_forecast: 'forecasts',
+  // The reservations rework: a declared sitting is answered on the session's To verify tab; a cash-in is the desk's.
+  prior_sitting_unverified: 'verify',
+  prior_sitting_held: 'verify',
+  cash_in_not_paid: 'desk',
 };
 const FIX_LABEL: Record<Fix, string> = {
   candidate: 'Candidate details',
   entries: 'Entries',
   forecasts: 'Forecast grades',
   settings: 'Settings',
+  verify: 'To verify',
+  desk: 'Student record',
 };
 const ROUTE_LABEL: Record<string, string> = { direct: 'Directly with the board', british_council: 'Through the British Council' };
 
@@ -135,8 +141,10 @@ function ListBody({ data, series }: { data: EntryListData; series: BoardSeriesRo
     downloadCsv(`${data.series.boardCode}-${data.series.month}-${data.series.year}${label}-entry-list-${which === 'ready' ? 'ready-rows' : 'all-rows'}.csv`, csv);
   };
 
-  const fixHref = (fix: Fix, studentId: string): Route => {
+  const fixHref = (fix: Fix, studentId: string, sessionId: string | null): Route => {
     if (fix === 'settings') return '/settings' as Route;
+    if (fix === 'verify') return (sessionId ? `/admin/sessions/${sessionId}#verify` : '/admin/sessions') as Route;
+    if (fix === 'desk') return `/students/${studentId}` as Route;
     if (fix === 'forecasts') return `/exams/forecasts?series=${series.id}` as Route;
     if (fix === 'entries') return `/exams/entries?series=${series.id}&student=${studentId}` as Route;
     return `/exams/candidates?series=${series.id}&student=${studentId}` as Route;
@@ -228,7 +236,7 @@ function ListBody({ data, series }: { data: EntryListData; series: BoardSeriesRo
                           <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs">
                             <span className="text-muted-foreground">Fix on:</span>
                             {fixes.map((f) => (
-                              <Link key={f} href={fixHref(f, r.studentId)} className="font-medium text-primary underline-offset-2 hover:underline">{FIX_LABEL[f]}</Link>
+                              <Link key={f} href={fixHref(f, r.studentId, r.sessionId)} className="font-medium text-primary underline-offset-2 hover:underline">{FIX_LABEL[f]}</Link>
                             ))}
                           </p>
                         )}

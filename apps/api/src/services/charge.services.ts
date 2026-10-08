@@ -27,7 +27,7 @@ import {
 import { randomUUID } from 'crypto';
 import {
   CHARGE_KIND_LABELS, SERVICE_CHARGE_KINDS, serviceLevelOf, seriesLabel,
-  type CreateChargeType, type ListChargesQueryType, type RefundChargeType, type ServiceLevel,
+  type CreateChargeType, type ListChargesQueryType, type RefundChargeType, type ServiceLevel, type ChargeKind,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { getSetting } from './settings.services';
@@ -479,6 +479,23 @@ function withPaymentState<T extends {
     depositSlip: slip,
     outstanding,
   };
+}
+
+/**
+ * F4's contract (RESERVATIONS_REWORK.md §10, the F4 row; docs/features/EXAM_ENTRIES.md §7): the
+ * charges of one kind in one board series — the series' cash-ins and late cash-ins that F4 turns
+ * into award entries (G-22, `exam_entry.charge_id`). Accepted charges only: awaiting payment or
+ * paid — never a family's request the school has not accepted, nor a cancelled or refunded one.
+ * Each carries its deadline (`chargeDeadline`: the service's deadline in the series). Added by F4
+ * on resuming (RESERVATIONS_MONEY.md §10).
+ */
+export async function chargesOfKind(kind: ChargeKind, seriesId: string, executor: Executor = db) {
+  const rows = await executor.select().from(charge)
+    .where(and(eq(charge.kind, kind), eq(charge.boardSeriesId, seriesId), inArray(charge.status, ['pending_payment', 'paid'])))
+    .orderBy(asc(charge.createdAt), asc(charge.id));
+  const out: (ChargeRow & { deadline: Date | null })[] = [];
+  for (const c of rows) out.push({ ...c, deadline: await chargeDeadline(executor, c) });
+  return out;
 }
 
 export async function listChargesFor(studentId: string) {
