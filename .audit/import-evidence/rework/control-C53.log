@@ -1,12 +1,12 @@
 # C53: item 4: "Add …" translated only as the import's own aria-label ("Add X to the catalogue")
 # undone in apps/api/../web/lib/i18n-import.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 2 failed) 14624ms
-   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > A's and B's sentences are not the import's: the two the September patterns half-translated have their own words; the rest reach their own translators 10ms
+ ❯ test/08n-import.test.ts (67 tests | 2 failed) 13066ms
+   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > A's and B's sentences are not the import's: the two the September patterns half-translated have their own words; the rest reach their own translators 14ms
    × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > the import's own sentences read in Arabic, with A's line refusals it shows on a line 1ms
  Test Files  1 failed (1)
       Tests  2 failed | 65 passed (67)
-   Duration  16.71s (transform 678ms, setup 2ms, collect 278ms, tests 14.62s, environment 0ms, prepare 35ms)
+   Duration  14.80s (transform 613ms, setup 2ms, collect 247ms, tests 13.07s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:1341:167
  ❯ test/08n-import.test.ts:1356:69
 

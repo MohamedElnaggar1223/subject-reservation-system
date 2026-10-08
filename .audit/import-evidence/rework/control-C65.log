@@ -1,11 +1,11 @@
 # C65: 2ca07a4 item 3: the family's students held before any row that names a subject
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 14527ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds a family's students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3) 439ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 13141ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds a family's students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3) 436ms
  Test Files  1 failed (1)
       Tests  1 failed | 66 passed (67)
-   Duration  16.36s (transform 736ms, setup 2ms, collect 306ms, tests 14.53s, environment 0ms, prepare 36ms)
+   Duration  14.72s (transform 618ms, setup 2ms, collect 252ms, tests 13.14s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:1227:22
 
 # failures (messages)

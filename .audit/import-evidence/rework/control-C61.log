@@ -1,11 +1,11 @@
 # C61: 2ca07a4 item 1: a "one paper" note is never the whole subject (the one-paper item, else staff choose)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 14135ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 153ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 20197ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 182ms
  Test Files  1 failed (1)
       Tests  1 failed | 66 passed (67)
-   Duration  16.11s (transform 693ms, setup 2ms, collect 282ms, tests 14.13s, environment 0ms, prepare 32ms)
+   Duration  21.78s (transform 604ms, setup 2ms, collect 253ms, tests 20.20s, environment 0ms, prepare 29ms)
  ❯ test/08n-import.test.ts:1063:31
 
 # failures (messages)

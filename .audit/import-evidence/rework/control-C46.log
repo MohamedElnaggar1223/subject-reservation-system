@@ -1,11 +1,11 @@
 # C46: item 1: on an item that needs a prior series, a legacy or noted sitting is the carried sitting of a first entry unless the note or staff say retake
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 14801ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 141ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 12896ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 101ms
  Test Files  1 failed (1)
       Tests  1 failed | 66 passed (67)
-   Duration  16.98s (transform 716ms, setup 2ms, collect 311ms, tests 14.80s, environment 0ms, prepare 34ms)
+   Duration  14.46s (transform 617ms, setup 2ms, collect 245ms, tests 12.90s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:1136:51
 
 # failures (messages)
@@ -24,7 +24,7 @@ AssertionError: expected [ Array(1) ] to match object [ { …(5) } ]
 -     "attempt": "first",
 +     "attempt": "retake",
       "mode": "in_school",
-      "offerItemId": "36223e08-7a8d-45e0-9a74-3d71c848f3e8",
+      "offerItemId": "2ec8f986-d53d-4db5-a467-51e0a97d6542",
       "price": {
         "coursePercent": 100,
         "total": 1400,

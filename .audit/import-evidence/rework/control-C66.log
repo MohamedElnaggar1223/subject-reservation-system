@@ -1,11 +1,11 @@
 # C66: 2ca07a4 item 4: "The item for …" translated only as the import's own aria-label
 # undone in apps/api/../web/lib/i18n-import.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 14386ms
-   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > the import's own sentences read in Arabic, with A's line refusals it shows on a line 6ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 12960ms
+   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > the import's own sentences read in Arabic, with A's line refusals it shows on a line 8ms
  Test Files  1 failed (1)
       Tests  1 failed | 66 passed (67)
-   Duration  16.45s (transform 744ms, setup 2ms, collect 316ms, tests 14.39s, environment 0ms, prepare 35ms)
+   Duration  14.54s (transform 650ms, setup 2ms, collect 252ms, tests 12.96s, environment 0ms, prepare 30ms)
  ❯ test/08n-import.test.ts:1350:86
 
 # failures (messages)

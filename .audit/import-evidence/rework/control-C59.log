@@ -1,12 +1,12 @@
 # C59: item 2: a "one paper" note is one line, never split by the papers the subject names (the early return since 2ca07a4's item 1)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 2 failed) 13650ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a "one paper" note on a row naming two papers is one line: never split; staff choose the one paper 63ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 108ms
+ ❯ test/08n-import.test.ts (67 tests | 2 failed) 13012ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a "one paper" note on a row naming two papers is one line: never split; staff choose the one paper 67ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 97ms
  Test Files  1 failed (1)
       Tests  2 failed | 65 passed (67)
-   Duration  15.57s (transform 678ms, setup 2ms, collect 277ms, tests 13.65s, environment 0ms, prepare 32ms)
+   Duration  14.52s (transform 603ms, setup 2ms, collect 246ms, tests 13.01s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:1025:44
  ❯ test/08n-import.test.ts:1068:93
 
@@ -26,12 +26,12 @@ AssertionError: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ null, [] ]
 +     {
 +       "code": "paper 1",
 +       "itemLabel": "Paper 1",
-+       "offerItemId": "27518e77-d4ab-430a-9e8d-68f5e6f13cf5",
++       "offerItemId": "65aaa413-2a3b-4ead-a0be-54e2b64fa747",
 +     },
 +     {
 +       "code": "paper 2",
 +       "itemLabel": "Paper 2",
-+       "offerItemId": "a0b17ca9-0cd5-4d0f-86bc-186055377cb1",
++       "offerItemId": "106a1192-20b9-47d2-ac3d-3d08abc44332",
 +     },
 +   ],
 +   [
@@ -42,8 +42,8 @@ AssertionError: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ null, [] ]
 +       "found": "unit",
 +       "itemLabel": "Paper 1",
 +       "mode": "in_school",
-+       "offerId": "6fa804d4-0b03-4ec1-ba4e-fd82476274e0",
-+       "offerItemId": "27518e77-d4ab-430a-9e8d-68f5e6f13cf5",
++       "offerId": "da7c68e2-8dde-48c3-804d-4a7725c49fdb",
++       "offerItemId": "65aaa413-2a3b-4ead-a0be-54e2b64fa747",
 +       "price": {
 +         "boardFee": 4800,
 +         "boardFeeBase": 4800,
@@ -55,11 +55,11 @@ AssertionError: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ null, [] ]
 +         "total": 5700,
 +       },
 +       "priorSitting": null,
-+       "series": "Pearson Edexcel November 2026 (t4-yxg3)",
-+       "sessionId": "64f66bfb-72e3-48a4-8020-c898a1f3e656",
-+       "sessionName": "November 2026 – January 2027 — t4-yxg3",
++       "series": "Pearson Edexcel November 2026 (t4-qtze)",
++       "sessionId": "ed3cd4be-002a-4abf-bcbe-fdeaa5c0dc67",
++       "sessionName": "November 2026 – January 2027 — t4-qtze",
 +       "subjectName": "Biology A.S./A.L. (imp)",
-+       "teacherId": "f59f0fcc-8841-44c4-8670-e71421a249a5",
++       "teacherId": "c261d653-d3ae-4970-ba15-7db9430fa046",
 +     },
 +     {
 +       "attempt": "retake",
@@ -68,8 +68,8 @@ AssertionError: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ null, [] ]
 +       "found": "unit",
 +       "itemLabel": "Paper 2",
 +       "mode": "in_school",
-+       "offerId": "6fa804d4-0b03-4ec1-ba4e-fd82476274e0",
-+       "offerItemId": "a0b17ca9-0cd5-4d0f-86bc-186055377cb1",
++       "offerId": "da7c68e2-8dde-48c3-804d-4a7725c49fdb",
++       "offerItemId": "106a1192-20b9-47d2-ac3d-3d08abc44332",
 +       "price": {
 +         "boardFee": 4800,
 +         "boardFeeBase": 4800,
@@ -81,11 +81,11 @@ AssertionError: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ null, [] ]
 +         "total": 5700,
 +       },
 +       "priorSitting": null,
-+       "series": "Pearson Edexcel November 2026 (t4-yxg3)",
-+       "sessionId": "64f66bfb-72e3-48a4-8020-c898a1f3e656",
-+       "sessionName": "November 2026 – January 2027 — t4-yxg3",
++       "series": "Pearson Edexcel November 2026 (t4-qtze)",
++       "sessionId": "ed3cd4be-002a-4abf-bcbe-fdeaa5c0dc67",
++       "sessionName": "November 2026 – January 2027 — t4-qtze",
 +       "subjectName": "Biology A.S./A.L. (imp)",
-+       "teacherId": "f59f0fcc-8841-44c4-8670-e71421a249a5",
++       "teacherId": "c261d653-d3ae-4970-ba15-7db9430fa046",
 +     },
 +   ],
   ]

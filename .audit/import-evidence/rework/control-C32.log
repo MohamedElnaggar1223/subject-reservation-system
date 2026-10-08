@@ -1,14 +1,14 @@
 # C32: flag 1b on the new model: the shared refusal of an item with no fee row on every path (priceLine, A's)
 # undone in apps/api/src/services/pricing.services.ts
 # summary
- ❯ test/03-v3-flows.test.ts (6 tests | 1 failed | 1 skipped) 2985ms
-   × V3 flows > an item with no fee row in its series cannot be reserved on any path — the student's request, the parent's direct reservation, the desk — and the refusal names the grid (F7 review flag 1) 55ms
- ❯ test/08n-import.test.ts (67 tests | 2 failed) 14326ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 212ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 219ms
+ ❯ test/03-v3-flows.test.ts (6 tests | 1 failed | 1 skipped) 2486ms
+   × V3 flows > an item with no fee row in its series cannot be reserved on any path — the student's request, the parent's direct reservation, the desk — and the refusal names the grid (F7 review flag 1) 59ms
+ ❯ test/08n-import.test.ts (67 tests | 2 failed) 12900ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 169ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 157ms
  Test Files  2 failed (2)
       Tests  3 failed | 69 passed | 1 todo (73)
-   Duration  20.15s (transform 768ms, setup 5ms, collect 413ms, tests 17.31s, environment 0ms, prepare 71ms)
+   Duration  17.14s (transform 619ms, setup 3ms, collect 312ms, tests 15.39s, environment 0ms, prepare 57ms)
  ❯ test/03-v3-flows.test.ts:215:113
  ❯ test/08n-import.test.ts:634:44
  ❯ test/08n-import.test.ts:1541:83
@@ -23,7 +23,7 @@ AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 
 + Received
 
   {
--   "error": "Whole subject has no board fee in Cambridge International June 2027 (t1-f1wl) yet — set one on the session's Fees tab",
+-   "error": "Whole subject has no board fee in Cambridge International June 2027 (t1-6bmn) yet — set one on the session's Fees tab",
 -   "status": 400,
 +   "error": "\"\"",
 +   "status": 201,
@@ -48,7 +48,7 @@ AssertionError: expected [] to deeply equal [ { code: 'fee_missing', …(2) } ]
 - [
 -   {
 -     "code": "fee_missing",
--     "detail": "Whole subject has no board fee in Pearson Edexcel November 2026 (t1-xrmo) yet — set one on the session's Fees tab",
+-     "detail": "Whole subject has no board fee in Pearson Edexcel November 2026 (t1-c9u6) yet — set one on the session's Fees tab",
 -     "severity": "error",
 -   },
 - ]
@@ -65,7 +65,7 @@ AssertionError: expected undefined to deeply equal { code: 'fee_missing', …(2)
 - Expected: 
 {
   "code": "fee_missing",
-  "detail": "Whole subject has no board fee in Cambridge International November 2026 (t6-xrmo) yet — set one on the session's Fees tab",
+  "detail": "Whole subject has no board fee in Cambridge International November 2026 (t6-c9u6) yet — set one on the session's Fees tab",
   "severity": "error",
 }
 

@@ -1,11 +1,11 @@
 # C11: the family's rows re-read under the lock (re-run on the new base)
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 14426ms
-   × F7: the day-one import > a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder > the re-read under the lock: a family the other commit made while this one waited for its rows is not made again 388ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 13338ms
+   × F7: the day-one import > a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder > the re-read under the lock: a family the other commit made while this one waited for its rows is not made again 433ms
  Test Files  1 failed (1)
       Tests  1 failed | 66 passed (67)
-   Duration  16.21s (transform 701ms, setup 2ms, collect 289ms, tests 14.43s, environment 0ms, prepare 38ms)
+   Duration  14.95s (transform 629ms, setup 2ms, collect 258ms, tests 13.34s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:1765:120
 
 # failures (messages)

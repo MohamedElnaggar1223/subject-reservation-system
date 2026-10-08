@@ -1,0 +1,35 @@
+# The suite on ee83d29 with TZ=UTC, igcse_import_utc_test, side by side with the local run
+ ✓ test/00-harness.test.ts (5 tests) 2620ms
+ ✓ test/01-desk.test.ts (8 tests) 1693ms
+ ✓ test/02-money.test.ts (4 tests) 1897ms
+ ✓ test/03-v3-flows.test.ts (6 tests | 1 skipped) 2166ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 5988ms
+ ✓ test/05-object-access.test.ts (16 tests) 4829ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3551ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1701ms
+ ✓ test/08-money-rules.test.ts (51 tests) 11738ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 11219ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 6312ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 7349ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 5695ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5066ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 8183ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2491ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4220ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 3827ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4536ms
+ ✓ test/08l-board-change.test.ts (7 tests) 3477ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 5856ms
+ ✓ test/08n-import.test.ts (67 tests) 14564ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 23116ms
+ ✓ test/08o-reservation-lines.test.ts (23 tests) 16284ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 7953ms
+ ✓ test/08q-charges.test.ts (46 tests) 27715ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 8820ms
+ ✓ test/08t-rework-races.test.ts (36 tests) 29350ms
+ ✓ test/09-money-invariants.test.ts (48 tests) 604ms
+ Test Files  29 passed (29)
+      Tests  568 passed | 1 todo (569)
+   Start at  17:33:16
+   Duration  241.53s (transform 1.12s, setup 49ms, collect 3.46s, tests 232.82s, environment 2ms, prepare 940ms)
+rc=0

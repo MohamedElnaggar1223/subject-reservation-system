@@ -713,6 +713,8 @@ records it.
   in any database, so with the two suites side by side the other suite's paused import released this
   suite's race early (a probe across the two test databases: 1 seen, 0 when scoped). `paused` now
   counts its own database's wait; 00-harness tests it with a wait in another database; C67 red.
+- 17:33–17:50Z — on ee83d29: types green; the suites side by side green (568 passed, 1 todo each);
+  every control with its own row: 48 red, C44 green as since 7003e74 (C60 covers it).
 - Next: the reviewer confirms items 1 and 2 on the diff; the final merge waits for F4 on main (main
   has D at c2d7a78, its migrations to 0054): origin/main merged as its own commit, 0050_import
   regenerated after main's last migration with a later stamp and its snapshot chained, the order

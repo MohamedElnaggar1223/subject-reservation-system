@@ -1,17 +1,17 @@
 # C38: the lead's addition: self-study on a first entry of a taught item is an error, never priced at the share silently
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 7 failed) 14818ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 222ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > a first entry in self-study is a line once the student has the exception: the line uses it once 67ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > history of the session's own series, or of a later one, is not a sitting before it: a first entry, in the review as at the commit 149ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed while November was still running: not a sitting before June, so self-study is a first entry, refused without the exception 64ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > history committed after November ended is still not a sitting for a line of November itself: the same series is the same sitting 222ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > a course the student dropped is not a sitting: a self-study line after it is a first entry, refused without the exception — history in the system as in the file (the review of 8 Oct, item 3) 129ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 130ms
+ ❯ test/08n-import.test.ts (67 tests | 7 failed) 12454ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 157ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > a first entry in self-study is a line once the student has the exception: the line uses it once 49ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > history of the session's own series, or of a later one, is not a sitting before it: a first entry, in the review as at the commit 120ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed while November was still running: not a sitting before June, so self-study is a first entry, refused without the exception 45ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > history committed after November ended is still not a sitting for a line of November itself: the same series is the same sitting 140ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > a course the student dropped is not a sitting: a self-study line after it is a first entry, refused without the exception — history in the system as in the file (the review of 8 Oct, item 3) 104ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 92ms
  Test Files  1 failed (1)
       Tests  7 failed | 60 passed (67)
-   Duration  16.61s (transform 712ms, setup 2ms, collect 291ms, tests 14.82s, environment 0ms, prepare 35ms)
+   Duration  14.04s (transform 618ms, setup 2ms, collect 274ms, tests 12.45s, environment 0ms, prepare 30ms)
  ❯ test/08n-import.test.ts:626:91
  ❯ test/08n-import.test.ts:764:114
  ❯ test/08n-import.test.ts:795:92

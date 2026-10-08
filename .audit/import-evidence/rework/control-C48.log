@@ -1,12 +1,12 @@
 # C48: item 2: the commit makes every line of a split row
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 2 failed) 14951ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 336ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 185ms
+ ❯ test/08n-import.test.ts (67 tests | 2 failed) 13505ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 312ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 175ms
  Test Files  1 failed (1)
       Tests  2 failed | 65 passed (67)
-   Duration  17.19s (transform 727ms, setup 2ms, collect 292ms, tests 14.95s, environment 0ms, prepare 36ms)
+   Duration  15.10s (transform 613ms, setup 2ms, collect 247ms, tests 13.50s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:984:34
  ❯ test/08n-import.test.ts:1011:34
 

@@ -1,13 +1,13 @@
 # C60: item 5 with C44: the student held before the lines by neither lockStudents (both calls) nor assertMayRegisterForInTx
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 3 failed) 17907ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders) 5780ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds a family's students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3) 427ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce) 570ms
+ ❯ test/08n-import.test.ts (67 tests | 3 failed) 17250ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders) 5765ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds a family's students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3) 478ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce) 679ms
  Test Files  1 failed (1)
       Tests  3 failed | 64 passed (67)
-   Duration  19.69s (transform 687ms, setup 2ms, collect 297ms, tests 17.91s, environment 0ms, prepare 35ms)
+   Duration  18.80s (transform 624ms, setup 2ms, collect 265ms, tests 17.25s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:1191:11
  ❯ test/08n-import.test.ts:1227:22
  ❯ test/08n-import.test.ts:1306:23
@@ -48,15 +48,17 @@ AssertionError: expected false to be true // Object.is equality
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce)
-AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]
+AssertionError: expected [ …(2) ] to deeply equal [ Array(1) ]
 
 - Expected
 + Received
 
   [
     {
--     "session_id": "151ca66e-8611-4913-8b78-f4bd80f19e2c",
-+     "session_id": "2b547c8b-2fbd-4a38-9977-343b5fe348f1",
++     "session_id": "28fa6162-9133-4caa-a73b-9fa0955d81a1",
++   },
++   {
+      "session_id": "b9d0a977-8226-4eca-a49b-36cefde6b92e",
     },
   ]
 

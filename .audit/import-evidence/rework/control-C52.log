@@ -1,40 +1,15 @@
 # C52: item 4: the September pattern "… is not open" deleted (it read A's "Registration window is not open")
 # undone in apps/api/../web/lib/i18n-import.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 2 failed) 13810ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce) 594ms
-   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > A's and B's sentences are not the import's: the two the September patterns half-translated have their own words; the rest reach their own translators 1ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 13032ms
+   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > A's and B's sentences are not the import's: the two the September patterns half-translated have their own words; the rest reach their own translators 8ms
  Test Files  1 failed (1)
-      Tests  2 failed | 65 passed (67)
-   Duration  15.69s (transform 681ms, setup 2ms, collect 291ms, tests 13.81s, environment 0ms, prepare 35ms)
- ❯ test/08n-import.test.ts:1306:23
+      Tests  1 failed | 66 passed (67)
+   Duration  14.60s (transform 599ms, setup 2ms, collect 252ms, tests 13.03s, environment 0ms, prepare 30ms)
  ❯ test/08n-import.test.ts:1320:70
 
 # failures (messages)
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
-
- FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce)
-AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]
-
-- Expected
-+ Received
-
-  [
-    {
--     "session_id": "6fac1edc-b4a5-449c-accc-bdefe29a9a6f",
-+     "session_id": "cf9922d1-d60e-412f-a66c-89fed5950d05",
-    },
-  ]
-
- ❯ test/08n-import.test.ts:1306:23
-    1304|         const lines = await sql<{ session_id: string }>(`select r.sess…
-    1305|           where r.student_id = $1 and r.board_series_id = $2 and i.lab…
-    1306|         expect(lines).toEqual([{ session_id: sess }]);
-       |                       ^
-    1307|         expect(c.status).toBe(200);
-    1308|         expect(d.status).toBe(409);
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > A's and B's sentences are not the import's: the two the September patterns half-translated have their own words; the rest reach their own translators
 AssertionError: expected 'Registration window غير مفتوحة' to be null
@@ -53,5 +28,5 @@ null
     1321|       expect(importArabic['Registration window is not open']).toBe('نا…
     1322|       expect(translateImportText('Registration window is not open — a …
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

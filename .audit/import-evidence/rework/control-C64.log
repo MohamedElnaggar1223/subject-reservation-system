@@ -1,11 +1,11 @@
 # C64: 2ca07a4 item 2: a copy brings an offer it would open at 0 (not self-study only) across closed, named
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 14505ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 180ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 12959ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 144ms
  Test Files  1 failed (1)
       Tests  1 failed | 66 passed (67)
-   Duration  16.52s (transform 687ms, setup 2ms, collect 292ms, tests 14.51s, environment 0ms, prepare 33ms)
+   Duration  14.62s (transform 622ms, setup 2ms, collect 257ms, tests 12.96s, environment 0ms, prepare 30ms)
  ❯ test/08n-import.test.ts:1597:34
 
 # failures (messages)

@@ -1,11 +1,11 @@
 # C67: the harness: pauseAtAudits().paused counts a wait in its own database only
 # undone in apps/api/../api/test/helpers.ts
 # summary
- ❯ test/00-harness.test.ts (5 tests | 1 failed) 1564ms
-   × harness > pauseAtAudits waits for a transaction of this database: another suite on the same server waiting on the same key does not count 32ms
+ ❯ test/00-harness.test.ts (5 tests | 1 failed) 1543ms
+   × harness > pauseAtAudits waits for a transaction of this database: another suite on the same server waiting on the same key does not count 33ms
  Test Files  1 failed (1)
       Tests  1 failed | 4 passed (5)
-   Duration  3.23s (transform 557ms, setup 2ms, collect 163ms, tests 1.56s, environment 0ms, prepare 31ms)
+   Duration  3.00s (transform 556ms, setup 2ms, collect 164ms, tests 1.54s, environment 0ms, prepare 32ms)
  ❯ test/00-harness.test.ts:34:54
 
 # failures (messages)

@@ -1,16 +1,16 @@
 # C1: the commit claim (re-run on the new base)
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 6 failed) 14602ms
-   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the import is committed: nothing more changes it 19ms
-   × F7: the day-one import > a re-run of the same file changes nothing > staged again, it carries the review over and finds everything already there 46ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 284ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > the list of imports: every file, its state and its counts 10ms
-   × F7: the day-one import > two staff committing the same staged file at the same moment > one commit runs, the other is refused while it does; each family is made once 304ms
-   × F7: the day-one import > a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder > a claim under 15 minutes old is refused, naming who holds it; an older one is taken over and the commit runs 112ms
+ ❯ test/08n-import.test.ts (67 tests | 6 failed) 12677ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the import is committed: nothing more changes it 20ms
+   × F7: the day-one import > a re-run of the same file changes nothing > staged again, it carries the review over and finds everything already there 49ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 212ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the list of imports: every file, its state and its counts 5ms
+   × F7: the day-one import > two staff committing the same staged file at the same moment > one commit runs, the other is refused while it does; each family is made once 240ms
+   × F7: the day-one import > a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder > a claim under 15 minutes old is refused, naming who holds it; an older one is taken over and the commit runs 79ms
  Test Files  1 failed (1)
       Tests  6 failed | 61 passed (67)
-   Duration  16.94s (transform 772ms, setup 2ms, collect 314ms, tests 14.60s, environment 0ms, prepare 36ms)
+   Duration  14.18s (transform 565ms, setup 2ms, collect 235ms, tests 12.68s, environment 0ms, prepare 29ms)
  ❯ test/08n-import.test.ts:448:108
  ❯ test/08n-import.test.ts:464:67
  ❯ test/08n-import.test.ts:1554:104
@@ -51,7 +51,7 @@ AssertionError: expected [ [ …(2) ] ] to deeply equal [ [ …(2) ] ]
 
   [
     [
-      "ca87eacc-fced-4a20-9386-b9f7e3dbdd9c",
+      "02ff10d5-283a-4aa1-b334-2e47676ba5a4",
 -     "committed",
 +     "partial",
     ],

@@ -1,11 +1,11 @@
 # C4: the commit module may not touch a payment table (re-run on the new base)
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 14649ms
-   × F7: the day-one import > the money record (F-01): history only, never a payment > the import cannot make a payment: the code that commits it touches no payment, escrow or receipt table 14ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 13266ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > the import cannot make a payment: the code that commits it touches no payment, escrow or receipt table 6ms
  Test Files  1 failed (1)
       Tests  1 failed | 66 passed (67)
-   Duration  16.85s (transform 716ms, setup 2ms, collect 301ms, tests 14.65s, environment 0ms, prepare 35ms)
+   Duration  14.83s (transform 623ms, setup 2ms, collect 251ms, tests 13.27s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:1448:88
 
 # failures (messages)

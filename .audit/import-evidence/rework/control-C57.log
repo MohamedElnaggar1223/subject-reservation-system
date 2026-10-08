@@ -1,12 +1,12 @@
 # C57: item 6: opening an offer with no course fee, or setting it to 0 while open, is refused (MO-9)
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 2 failed) 14460ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 150ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 102ms
+ ❯ test/08n-import.test.ts (67 tests | 2 failed) 13119ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 128ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 76ms
  Test Files  1 failed (1)
       Tests  2 failed | 65 passed (67)
-   Duration  16.30s (transform 704ms, setup 2ms, collect 296ms, tests 14.46s, environment 0ms, prepare 33ms)
+   Duration  14.81s (transform 603ms, setup 2ms, collect 253ms, tests 13.12s, environment 0ms, prepare 30ms)
  ❯ test/08n-import.test.ts:1533:65
  ❯ test/08n-import.test.ts:1590:89
 

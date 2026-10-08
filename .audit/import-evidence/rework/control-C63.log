@@ -1,11 +1,11 @@
 # C63: 2ca07a4 item 2: a self-study-only offer may be 0 (with its reason); open and retakes-only may not
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 14308ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 94ms
+ ❯ test/08n-import.test.ts (67 tests | 1 failed) 17590ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 71ms
  Test Files  1 failed (1)
       Tests  1 failed | 66 passed (67)
-   Duration  16.27s (transform 709ms, setup 2ms, collect 300ms, tests 14.31s, environment 0ms, prepare 35ms)
+   Duration  20.07s (transform 983ms, setup 2ms, collect 400ms, tests 17.59s, environment 0ms, prepare 42ms)
  ❯ test/08n-import.test.ts:1580:86
 
 # failures (messages)

@@ -1,12 +1,12 @@
 # C43: the review asks the rules on lines as the commit will (assertLineRules, rolled back)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 2 failed) 14082ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 112ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction 349ms
+ ❯ test/08n-import.test.ts (67 tests | 2 failed) 12252ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 87ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction 356ms
  Test Files  1 failed (1)
       Tests  2 failed | 65 passed (67)
-   Duration  16.02s (transform 703ms, setup 2ms, collect 297ms, tests 14.08s, environment 0ms, prepare 36ms)
+   Duration  13.78s (transform 608ms, setup 2ms, collect 246ms, tests 12.25s, environment 0ms, prepare 32ms)
  ❯ test/08n-import.test.ts:966:92
  ❯ test/08n-import.test.ts:1242:122
 
