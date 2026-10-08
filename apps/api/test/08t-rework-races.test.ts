@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
-import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLock, type Client, reservationOf } from './helpers';
+import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLock, type Client, reservationOf, CONSENT } from './helpers';
 
 /**
  * The reservations rework, step 1 — races (RESERVATIONS_REWORK.md §6, §8; FEATURES_PLAN.md §5:
@@ -17,6 +17,11 @@ import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLo
  *   lands first keeps its line untouched; one that lands after is refused (the price changed);
  * - an item's series changed while a checkout is open: refused once the checkout is in;
  * - capture racing the deadline sweep on one paid preregistration: refunded once.
+ *
+ * Since step B every reservation path takes lines (docs/features/RESERVATIONS_LINES.md §2), so
+ * the races reserve through the desk's endpoint with the typed client, as staff do. One race
+ * pauses a reservation between its fee lock and its commit, which a request cannot do: it runs
+ * the services in a transaction (`reserveHeld`), as step A wrote it.
  */
 
 const days = (n: number) => n * 86_400_000;
@@ -26,7 +31,7 @@ const cairoDate = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Afr
 type Res = { status: number; json(): Promise<unknown> };
 type Line = Pick<LineInputType, 'offerItemId' | 'attempt' | 'mode'> & Partial<LineInputType>;
 
-async function reserve(studentId: string, sessionId: string, lines: Line[], hold?: { inserted: () => void; until: Promise<void> }) {
+async function reserveHeld(studentId: string, sessionId: string, lines: Line[], hold?: { inserted: () => void; until: Promise<void> }) {
   const { db } = await import('@repo/db');
   const { insertLines } = await import('../src/services/line.services');
   const { writeConsents } = await import('../src/services/reservation.services');
@@ -44,6 +49,12 @@ async function reserve(studentId: string, sessionId: string, lines: Line[], hold
   });
 }
 const settle = async <T>(p: Promise<T>) => p.then((v) => ({ ok: true as const, v }), (e: unknown) => ({ ok: false as const, e: e instanceof Error ? e.message : String(e) }));
+/** A request's outcome in the shape `settle` gives: ok, or the refusal's sentence. */
+const settleRes = async (p: Promise<Res>) => {
+  const r = await p;
+  const body = await r.json() as { error?: string };
+  return r.status < 300 ? { ok: true as const, v: body } : { ok: false as const, status: r.status, e: body.error ?? String(r.status) };
+};
 const live = async (studentId: string, where = 'true') =>
   sql<{ id: string; offer_item_id: string }>(`select id, offer_item_id from registration where student_id = $1 and status not in ('rejected', 'expired', 'dropped') and ${where} order by id`, [studentId]);
 
@@ -66,6 +77,10 @@ describe('08t: the rework races', () => {
     (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: sessionId }, json: { subjectId, courseFee, teachers: [{ teacherId, mode: 'in_school' }], items } })))!;
   const feeFor = (seriesId: string, subjectId: string, amount = 500, provisional = false) =>
     apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind: 'subject', keyId: subjectId, amount, provisional }] } }));
+  /** Reserve only, at the desk: the lines and the desk's consent tick. */
+  const viaDesk = (studentId: string, sessionId: string, lines: Line[]) =>
+    officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId, lines, consent: CONSENT } });
+  const reserveAtDesk = async (studentId: string, sessionId: string, lines: Line[]) => (await apiResponse(viaDesk(studentId, sessionId, lines))).registrations;
 
   beforeAll(async () => {
     adm = await admin('t08');
@@ -114,11 +129,11 @@ describe('08t: the rework races', () => {
   it('the same entry in one series from two sessions at once: the student lock serialises them and the second is refused', async () => {
     const f = await onboard(officer, `t08-once-${RUN}`, 11);
     const release = await holdRowLock('"user"', f.studentId);
-    let a: ReturnType<typeof settle<unknown>> | undefined;
-    let b: ReturnType<typeof settle<unknown>> | undefined;
+    let a: ReturnType<typeof settleRes> | undefined;
+    let b: ReturnType<typeof settleRes> | undefined;
     try {
-      a = settle(reserve(f.studentId, s1, [{ offerItemId: itemA1, attempt: 'first', mode: 'in_school', teacherId }]));
-      b = settle(reserve(f.studentId, s2, [{ offerItemId: itemA2, attempt: 'first', mode: 'in_school', teacherId }]));
+      a = settleRes(viaDesk(f.studentId, s1, [{ offerItemId: itemA1, attempt: 'first', mode: 'in_school', teacherId }]));
+      b = settleRes(viaDesk(f.studentId, s2, [{ offerItemId: itemA2, attempt: 'first', mode: 'in_school', teacherId }]));
       await lockWaiters(2);
     } finally {
       await release();
@@ -132,11 +147,11 @@ describe('08t: the rework races', () => {
   it('two items of one exclusive group at once: one line, the other refused', async () => {
     const f = await onboard(officer, `t08-group-${RUN}`, 11);
     const release = await holdRowLock('"user"', f.studentId);
-    let a: ReturnType<typeof settle<unknown>> | undefined;
-    let b: ReturnType<typeof settle<unknown>> | undefined;
+    let a: ReturnType<typeof settleRes> | undefined;
+    let b: ReturnType<typeof settleRes> | undefined;
     try {
-      a = settle(reserve(f.studentId, s1, [{ offerItemId: groupAs, attempt: 'first', mode: 'in_school', teacherId }]));
-      b = settle(reserve(f.studentId, s1, [{ offerItemId: groupAl, attempt: 'first', mode: 'in_school', teacherId }]));
+      a = settleRes(viaDesk(f.studentId, s1, [{ offerItemId: groupAs, attempt: 'first', mode: 'in_school', teacherId }]));
+      b = settleRes(viaDesk(f.studentId, s1, [{ offerItemId: groupAl, attempt: 'first', mode: 'in_school', teacherId }]));
       await lockWaiters(2);
     } finally {
       await release();
@@ -154,30 +169,34 @@ describe('08t: the rework races', () => {
     const o = await offerOf(s1, sub, [whole(series)]);
     const close = () => adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: s1, offerId: o.id, itemId: o.items[0]! }, json: { availability: 'closed', reason: 'race: closed' } });
     const reopen = () => apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: s1, offerId: o.id, itemId: o.items[0]! }, json: { availability: 'open', reason: 'race: reopened' } }));
-    // The line first: it holds the item FOR SHARE while it commits; the close then applies, the line stands.
+    // The line first: it holds the item FOR SHARE and waits on its fee row (held here, the last
+    // lock of the order); the close queues behind the item; the line commits, then the close applies.
     const f = await onboard(officer, `t08-close-a-${RUN}`, 11);
-    let inserted!: () => void;
-    let commit!: () => void;
-    const isIn = new Promise<void>((r) => { inserted = r; });
-    const until = new Promise<void>((r) => { commit = r; });
-    const reserving = settle(reserve(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }], { inserted, until }));
-    await isIn;
-    const closing = close();
-    await lockWaiters(1);
-    commit();
-    expect((await reserving).ok).toBe(true);
-    expect((await closing).status).toBe(200);
+    const feeRow = (await one<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_id = $2`, [series, sub])).id;
+    const releaseFee = await holdRowLock('board_fee', feeRow);
+    let reserving: ReturnType<typeof settleRes> | undefined;
+    let closing: Promise<Res> | undefined;
+    try {
+      reserving = settleRes(viaDesk(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]));
+      await lockWaiters(1);
+      closing = close();
+      await lockWaiters(2);
+    } finally {
+      await releaseFee();
+    }
+    expect((await reserving!).ok).toBe(true);
+    expect((await closing!).status).toBe(200);
     expect(await live(f.studentId)).toHaveLength(1);
     // The close first: the line waits for it, then is refused.
     await reopen();
     const g = await onboard(officer, `t08-close-b-${RUN}`, 11);
     const release = await holdRowLock('session_offer_item', o.items[0]!);
     let closing2: Promise<Res> | undefined;
-    let reserving2: ReturnType<typeof settle<unknown>> | undefined;
+    let reserving2: ReturnType<typeof settleRes> | undefined;
     try {
       closing2 = close();
       await lockWaiters(1);
-      reserving2 = settle(reserve(g.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]));
+      reserving2 = settleRes(viaDesk(g.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]));
       await lockWaiters(2);
     } finally {
       await release();
@@ -197,11 +216,11 @@ describe('08t: the rework races', () => {
     const f = await onboard(officer, `t08-teacher-${RUN}`, 11);
     const release = await holdRowLock('session_offer', o.id);
     let removing: Promise<Res> | undefined;
-    let reserving: ReturnType<typeof settle<unknown>> | undefined;
+    let reserving: ReturnType<typeof settleRes> | undefined;
     try {
       removing = adm.api.v1.sessions[':id'].offers[':offerId'].$put({ param: { id: s1, offerId: o.id }, json: { teachers: [{ teacherId: other, mode: 'in_school' }], reason: 'race: the teacher left' } });
       await lockWaiters(1);
-      reserving = settle(reserve(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]));
+      reserving = settleRes(viaDesk(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]));
       await lockWaiters(2);
     } finally {
       await release();
@@ -221,7 +240,8 @@ describe('08t: the rework races', () => {
     let commit!: () => void;
     const isIn = new Promise<void>((r) => { inserted = r; });
     const until = new Promise<void>((r) => { commit = r; });
-    const reserving = settle(reserve(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }], { inserted, until }));
+    // Paused between its fee lock and its commit: a request cannot be, so this runs the services.
+    const reserving = settle(reserveHeld(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }], { inserted, until }));
     await isIn;
     const confirming = finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: s }, json: { rows: [{ feeId }], reason: 'race: published' } });
     await lockWaiters(1);
@@ -242,7 +262,7 @@ describe('08t: the rework races', () => {
       await feeFor(s, sub, 600, false);
       const o = await offerOf(s1, sub, [whole(s)]);
       const f = await onboard(officer, `t08-rp${tag}-${RUN}`, 11);
-      const [line] = await reserve(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
+      const [line] = await reserveAtDesk(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
       // The board's fee changes (confirmed at the new amount): the line read 600, the row now says 650.
       const feeId = (await one<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_id = $2`, [s, sub])).id;
       await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: s }, json: { rows: [{ feeId, amount: 650 }], reason: 'race: the board changed its fee' } }));
@@ -309,9 +329,11 @@ describe('08t: the rework races', () => {
     const o = await offerOf(s1, sub, [whole(series)]);
     const o2 = await offerOf(s1, sub2, [whole(series)]);
     const f = await onboard(officer, `t08-series-${RUN}`, 11);
-    const [l1, l2] = await reserve(f.studentId, s1, [
+    const made = await reserveAtDesk(f.studentId, s1, [
       { offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }, { offerItemId: o2.items[0]!, attempt: 'first', mode: 'in_school', teacherId },
     ]);
+    const l1 = made.find((r) => r.offerItemId === o.items[0]);
+    const l2 = made.find((r) => r.offerItemId === o2.items[0]);
     // The line the change moves is the one held: the checkout (which locks both in id order) and
     // the change both queue on it, the checkout first.
     const release = await holdRowLock('registration', l1!.id);
@@ -372,7 +394,6 @@ describe('08t: the rework races', () => {
 
   describe('a declared sitting answered while its line is being paid', () => {
     let coordinator: Client;
-    const CONSENT = { refundPolicy: true, declaration: true } as const;
     const declared = () => ({ offerItemId: itemA1, attempt: 'retake' as const, mode: 'in_school' as const, teacherId, priorSitting: { month: 'june' as const, year: Y } });
     const declare = async (tag: string) => {
       const f = await onboard(officer, `t08-decl-${tag}-${RUN}`, 11);
