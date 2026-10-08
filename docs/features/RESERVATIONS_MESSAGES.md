@@ -1,7 +1,7 @@
 # Reservations rework — step D (agent D): messages and reminders
 
 Branch `feature/rework-messages`, from `origin/main` b76eae4 (8 Oct 2026; A's, B's and C's steps
-merged). The design is `RESERVATIONS_REWORK.md` version 8: §3.8 (the model), §4.6 (the Money tab's
+merged), with `origin/main` 2a26557 merged in at 5c2f2bf. The design is `RESERVATIONS_REWORK.md` version 8: §3.8 (the model), §4.6 (the Money tab's
 "Remind"), §4.8 (the screen), §5 (the endpoints), §7 (the migration of announcements), §8 (08s and
 the 09 rule) and §9 step 3. The admin's points are SCHOOL_FORMS.md §5 points 5 and 6 (broadcast,
 batch and direct; email and WhatsApp; not deletable by families; automated repeating reminders for
@@ -387,3 +387,9 @@ amount and the date filled in.
 - 08:57 — the suite green in local time at ad671b0, alone (527 passed); 08:58 — CI green on ad671b0
   (run 37752256592). The dev servers left running for the lead: API 3131, web 3130, igcse_rwd_dev
   (seeded with Parent/Student D5–D10, a June 2027 session open now, sections 11A and 12A).
+- 09:13 — origin/main 2a26557 (C's statement charges and a plan line owing its price less its
+  deposits; the desk reservation taking the fee and the charges; B's Reserve result as sentences;
+  step 4) merged in as its own commit 5c2f2bf: no conflict (main touched none of step D's files;
+  money-tab.client.tsx merged hunk by hunk), no migration after 0049. The gates on the merge: check-
+  types clean; the suite 528 passed in local time (09:18) and with TZ=UTC (09:23); CI green
+  (37755188568).
