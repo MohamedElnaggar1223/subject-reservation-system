@@ -23,6 +23,7 @@ import {
   db,
   registration,
   subject,
+  exception,
   eq,
   and,
   inArray,
@@ -44,7 +45,7 @@ import {
 } from './notification.services';
 import { assertMayRegisterFor, assertMayRegisterForInTx, type Eligibility } from './eligibility.services';
 import { schoolFeeGateReason } from './school-fee.services';
-import { sessionWindow, windowRefusal } from './window.services';
+import { sessionWindow, windowRefusal, subjectsOfItems } from './window.services';
 import { reserveLines } from './reservation.services';
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
@@ -54,8 +55,14 @@ import { reserveLines } from './reservation.services';
  * for a line, its own effective deadline decides; for a new reservation (`null`), each new
  * line's deadline is checked when it is made.
  */
-async function assertWindowOpen(studentId: string, sessionId: string, line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null; declarationRejected: boolean | null } | null) {
-  const w = await sessionWindow(studentId, sessionId, line);
+async function assertWindowOpen(
+  studentId: string, sessionId: string,
+  line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null; declarationRejected: boolean | null; subjectId?: string | null } | null,
+  /** A new reservation's lines: with the session closed, a subject-scoped extension opens its subject alone (step C). */
+  newLines?: readonly { offerItemId: string }[],
+) {
+  const subjectIds = newLines ? await subjectsOfItems(db, newLines.map((l) => l.offerItemId)) : undefined;
+  const w = await sessionWindow(studentId, sessionId, line, db, new Date(), subjectIds);
   if (w.open) return;
   throw new Error(windowRefusal(w));
 }
@@ -156,7 +163,7 @@ export async function createRegistrationRequest(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past a line's own deadline (MO-10)
-  await assertWindowOpen(studentId, sess.id, null);
+  await assertWindowOpen(studentId, sess.id, null, data.lines);
   await assertSchoolFeeGate(studentId, eligibility);
 
   // Asked again with the student and window held, so a withdrawal or a
@@ -219,7 +226,7 @@ export async function createDirectRegistration(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past a line's own deadline (MO-10)
-  await assertWindowOpen(data.studentId, sess.id, null);
+  await assertWindowOpen(data.studentId, sess.id, null, data.lines);
   await assertSchoolFeeGate(data.studentId, eligibility);
 
   const now = new Date();
@@ -420,6 +427,13 @@ export async function revertApprovedRegistrationRequest(
     if (paymentLinksInTx.length > 0) {
       throw new Error('One or more registrations already have a payment in progress and cannot be reverted');
     }
+    // The reservations rework (§3.6): a line under a live instalment plan is not reverted — the guard
+    // reads the plan itself (the plan locks the line before it is granted), so a plan with nothing
+    // paid yet is covered too.
+    const [plan] = await tx.select({ id: exception.id }).from(exception)
+      .where(and(eq(exception.policyKey, 'plan.instalments'), eq(exception.status, 'active'), inArray(exception.registrationId, data.registrationIds)))
+      .limit(1);
+    if (plan) throw new Error('A subject under an instalment plan cannot be sent back for approval — ask the finance office to end the plan first');
 
     const rows = await tx
       .update(registration)
@@ -572,7 +586,7 @@ export async function adminOverrideApproval(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past a line's own deadline (MO-10)
-  await assertWindowOpen(data.studentId, sess.id, null);
+  await assertWindowOpen(data.studentId, sess.id, null, data.lines);
   // CORE-003: the override bypasses parent approval (REG-007), not the grade-10 core rule:
   // assertLineRules counts the student's live lines with these (gate.grade10Core). The
   // school-fee gate applies too (a fee waiver is the sanctioned way past it).

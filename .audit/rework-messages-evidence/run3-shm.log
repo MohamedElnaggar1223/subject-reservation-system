@@ -1,0 +1,81 @@
+Run 3 (local time) at ad671b0, run in parallel with run 4 (TZ=UTC, igcse_rwd2_test) on the same Postgres container: one 09 query failed with 'could not resize shared memory segment ... No space left on device' (the container's /dev/shm, two suites at once). Not a test failure; run 5 repeats it alone
+
+Files:
+ ✓ test/00-harness.test.ts (4 tests) 1731ms
+ ✓ test/01-desk.test.ts (8 tests) 1625ms
+ ✓ test/02-money.test.ts (4 tests) 1732ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 2135ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 5858ms
+ ✓ test/05-object-access.test.ts (16 tests) 4253ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3825ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1774ms
+ ✓ test/08-money-rules.test.ts (51 tests) 12727ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 12706ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 7921ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 8074ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 6080ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5486ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 9151ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2657ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4805ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 4060ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4659ms
+ ✓ test/08l-board-change.test.ts (7 tests) 4209ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 6411ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 23254ms
+ ✓ test/08o-reservation-lines.test.ts (23 tests) 17118ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 8712ms
+ ✓ test/08q-charges.test.ts (45 tests) 28437ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 9112ms
+ ✓ test/08s-messages-reminders.test.ts (23 tests) 42793ms
+ ✓ test/08t-rework-races.test.ts (39 tests) 36587ms
+ ❯ test/09-money-invariants.test.ts (51 tests | 1 failed) 945ms
+ ❯ test/09-money-invariants.test.ts:1039:12
+ ❯ test/09-money-invariants.test.ts:1039:12
+
+Failures:
+   × money invariants over the whole database > every delivery belongs to a message; an in-app delivery is the notification it wrote, a notification a message wrote has its delivery; nothing scheduled or cancelled was delivered (§3.8) 153ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > every delivery belongs to a message; an in-app delivery is the notification it wrote, a notification a message wrote has its delivery; nothing scheduled or cancelled was delivered (§3.8)
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > every delivery belongs to a message; an in-app delivery is the notification it wrote, a notification a message wrote has its delivery; nothing scheduled or cancelled was delivered (§3.8)
+Error: Failed query: select d.id from message_delivery d left join notification n on n.id = d.notification_id
+      where d.channel = 'in_app' and d.status = 'sent' and (n.id is null or n.user_id <> d.recipient_id or n.title <> d.title or n.body <> d.body)
+params: 
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:73:11
+ ❯ sql test/helpers.ts:63:18
+     61|     q = s`${q}${params[i - 1]}${s.raw(parts[i] ?? '')}`;
+     62|   }
+     63|   const result = await db.execute(q);
+       |                  ^
+     64|   return result.rows as T[];
+     65| }
+ ❯ test/09-money-invariants.test.ts:1039:12
+
+Caused by: error: could not resize shared memory segment "/PostgreSQL.404552966" to 8388608 bytes: No space left on device
+ ❯ ../../node_modules/.pnpm/pg-pool@3.10.1_pg@8.16.3/node_modules/pg-pool/index.js:45:11
+ ❯ ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:71:12
+ ❯ sql test/helpers.ts:63:18
+ ❯ test/09-money-invariants.test.ts:1039:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { length: 165, severity: 'ERROR', code: '53100', detail: undefined, hint: undefined, position: undefined, internalPosition: undefined, internalQuery: undefined, where: undefined, schema: undefined, table: undefined, dataType: undefined, constraint: undefined, file: 'dsm_impl.c', routine: 'dsm_impl_posix' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 28 passed (29)
+      Tests  1 failed | 526 passed | 1 todo (528)
+   Start at  11:47:42
+   Duration  287.99s (transform 1.08s, setup 49ms, collect 3.66s, tests 278.84s, environment 3ms, prepare 993ms)
+
+/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-messages/apps/api:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @repo/api@ test: `vitest run`
+Exit status 1
+
+ Test Files  1 failed | 28 passed (29)
+      Tests  1 failed | 526 passed | 1 todo (528)
+   Start at  11:47:42
+   Duration  287.99s (transform 1.08s, setup 49ms, collect 3.66s, tests 278.84s, environment 3ms, prepare 993ms)
+
+/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-messages/apps/api:

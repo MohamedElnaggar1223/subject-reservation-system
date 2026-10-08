@@ -16,20 +16,22 @@
  *   on one screen.
  */
 
-import { db, payment, paymentRegistration, registration, parentStudentLink, user as userTable, eq, and, inArray, gradeTodayExtras } from '@repo/db';
+import { db, payment, paymentRegistration, registration, parentStudentLink, charge, user as userTable, eq, and, inArray, notInArray, sql, gradeTodayExtras } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { DeskOnboardFamilyType, DeskRegistrationType, DeskCollectType } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { auth } from '../lib/auth';
 import { assertSchoolFeeGate } from './registration.services';
 import { reserveLines, consentStanding, writeConsents, CONSENT_MISSING_REFUSAL, FAMILY_CONSENT_NEEDED } from './reservation.services';
-import { sessionWindow, windowRefusal } from './window.services';
+import { exceptionsOfLines } from './line-exceptions-read.services';
+import { lineDepositsSql } from './escrow.services';
+import { sessionWindow, windowRefusal, subjectsOfItems } from './window.services';
 import { seriesDeadlineGroups, type DeadlineGroup } from './series.services';
 import { getSetting } from './settings.services';
 import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { setStudentFields } from './user.services';
 import { getEscrowBalance, debitEscrow } from './escrow.services';
-import { confirmPayment, failPayment } from './payment.services';
+import { confirmPayment, failPayment, assertNoLivePlan, createChargePaymentsInTx } from './payment.services';
 import {
   academicYearForDate,
   getSchoolFeeStanding,
@@ -173,11 +175,48 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     where: (s, { eq }) => eq(s.id, data.sessionId),
   });
   if (!sess) throw new Error('Session not found');
-  const w = await sessionWindow(data.studentId, sess.id, null);
+  // The lines' subjects: with the session closed, a subject-scoped extension opens its subject alone.
+  const w = await sessionWindow(data.studentId, sess.id, null, db, new Date(), await subjectsOfItems(db, data.lines.map((l) => l.offerItemId)));
   if (!w.open) {
     throw new Error(windowRefusal(w, 'Registration window is not open — a finance admin can grant this student a deadline extension'));
   }
 
+  // The reservations rework (§3.10 item 1): the year's school fee collected in the same action,
+  // first — the registration's gate asks for it — in a payment of its own.
+  const schoolFee = data.collectNow?.schoolFeeYear
+    ? await collectSchoolFeeAtDesk(staffId, data.studentId, data.collectNow.instrumentUsed, data.collectNow.notes, data.collectNow.schoolFeeYear, auditCtx)
+    : null;
+  try {
+    const registered = await registerAtDeskAfterChecks(staffId, data, eligibility, auditCtx);
+    // Then the student's charges, each group its own payment; what cannot be taken is listed.
+    const chargeIds = data.collectNow?.chargeIds ?? [];
+    let charges: Awaited<ReturnType<typeof collectLinesAndCharges>> | null = null;
+    let chargesNotCollected: { paymentId: string; series: string[]; amount: number; reason: string }[] = [];
+    if (data.collectNow && chargeIds.length) {
+      try {
+        charges = await collectLinesAndCharges(staffId, { studentId: data.studentId, registrationIds: [], chargeIds, instrumentUsed: data.collectNow.instrumentUsed, escrowAmountToApply: 0, notes: data.collectNow.notes }, auditCtx);
+      } catch (err) {
+        chargesNotCollected = [{ paymentId: '', series: ['The charges'], amount: await outstandingOf({ registrationIds: [], chargeIds }), reason: err instanceof Error ? err.message : 'Not collected' }];
+      }
+    }
+    return {
+      ...registered,
+      payments: [...registered.payments, ...(charges?.payments ?? [])],
+      notCollected: [...registered.notCollected, ...(charges?.notCollected ?? []), ...chargesNotCollected],
+      collected: round2(registered.collected + (charges?.collected ?? 0) + (schoolFee?.amount ?? 0)),
+      receipts: [...registered.receipts, ...(charges?.receipts ?? []).map((r) => ({ id: r.id, registrationId: r.registrationId, receiptNumber: r.receiptNumber, status: r.status }))],
+      schoolFee,
+    };
+  } catch (err) {
+    if (!schoolFee) throw err;
+    throw new Error(`The ${schoolFee.academicYear} school fee (EGP ${schoolFee.amount.toFixed(2)}) was collected; the subjects were not registered: ${err instanceof Error ? err.message : 'refused'}`);
+  }
+}
+
+/** The desk's reservation once its inputs are checked (the school fee, if asked, already in). */
+async function registerAtDeskAfterChecks(
+  staffId: string, data: DeskRegistrationType, eligibility: Awaited<ReturnType<typeof assertMayRegisterFor>>, auditCtx?: AuditContext,
+) {
   // The school-fee gate, then the lines: checked, priced and entered in their items' series by
   // insertLines, in the transaction (the grade-10 core rule included), with the desk's consent.
   await assertSchoolFeeGate(data.studentId, eligibility);
@@ -292,6 +331,8 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
 type DeskPayment = {
   id: string; amount: number; escrowApplied: number; registrationIds: string[];
   series: string[]; entryDeadline: Date | null;
+  // The reservations rework (§3.10 item 1): a charge payment's charges (its series: their description).
+  chargeIds?: string[];
 };
 
 function round2(n: number) {
@@ -412,11 +453,42 @@ async function confirmDeskPayment(
  * once through confirmPayment (receipts, notifications, audit rows).
  */
 export async function collectAtDesk(staffId: string, data: DeskCollectType, auditCtx?: AuditContext) {
-  const regs = await db.query.registration.findMany({
-    where: (r, { inArray }) => inArray(r.id, data.registrationIds),
-    columns: { id: true, studentId: true, sessionId: true, status: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true, declarationRejected: true, priceProvisional: true },
-  });
-  if (regs.length !== data.registrationIds.length || regs.some((r) => r.studentId !== data.studentId)) {
+  // The year's school fee first, in a payment of its own (the registration gate asks for it; a
+  // pushed fee is settled by it).
+  const schoolFee = data.schoolFeeYear
+    ? await collectSchoolFeeAtDesk(staffId, data.studentId, data.instrumentUsed, data.notes, data.schoolFeeYear, auditCtx)
+    : null;
+  if (!data.registrationIds.length && !data.chargeIds.length) {
+    return { paymentId: schoolFee!.paymentId, payments: [], notCollected: [], collected: schoolFee!.amount, escrowApplied: 0, receipts: [], schoolFee };
+  }
+  try {
+    const rest = await collectLinesAndCharges(staffId, data, auditCtx);
+    return { ...rest, collected: round2(rest.collected + (schoolFee?.amount ?? 0)), schoolFee };
+  } catch (err) {
+    if (!schoolFee) throw err;
+    // The fee is in; the rest was not taken: say so in the officer's words.
+    return {
+      paymentId: schoolFee.paymentId, payments: [], escrowApplied: 0, receipts: [], schoolFee, collected: schoolFee.amount,
+      notCollected: [{ paymentId: '', series: ['The subjects and charges'], amount: await outstandingOf(data), reason: err instanceof Error ? err.message : 'Not collected' }],
+    };
+  }
+}
+
+/** What the lines and charges asked for would have cost (for a "not collected" line). */
+async function outstandingOf(data: { registrationIds: string[]; chargeIds: string[] }) {
+  const lines = data.registrationIds.length
+    ? await db.select({ p: registration.priceAtRegistration }).from(registration).where(inArray(registration.id, data.registrationIds)) : [];
+  const charges = data.chargeIds.length ? await db.select({ a: charge.amount }).from(charge).where(inArray(charge.id, data.chargeIds)) : [];
+  return round2(lines.reduce((s, l) => s + l.p, 0) + charges.reduce((s, c) => s + c.a, 0));
+}
+
+async function collectLinesAndCharges(staffId: string, data: DeskCollectType, auditCtx?: AuditContext) {
+  const lineIds = data.registrationIds;
+  const regs = lineIds.length ? await db.query.registration.findMany({
+    where: (r, { inArray }) => inArray(r.id, lineIds),
+    columns: { id: true, studentId: true, sessionId: true, subjectId: true, status: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true, declarationRejected: true, priceProvisional: true },
+  }) : [];
+  if (regs.length !== lineIds.length || regs.some((r) => r.studentId !== data.studentId)) {
     throw new Error('One or more subjects do not belong to this student');
   }
   if (regs.some((r) => r.status !== 'pending_payment')) {
@@ -436,47 +508,83 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
   if (regs.some((r) => r.priceProvisional) && !(await getSetting('pricing.payOnProvisionalFee'))) throw new Error(PROVISIONAL_REFUSAL);
   // Consent (§3.5): a line nobody consented to is never paid; one the school reserved (grade 10)
   // takes the family's own pair here, "read and signed by the parent".
-  const consent = await consentStanding(db, data.registrationIds);
+  const consent = await consentStanding(db, lineIds);
   if (consent.missing.length) throw new Error(CONSENT_MISSING_REFUSAL);
   if (consent.schoolOnly.length && !data.consent) throw new Error(FAMILY_CONSENT_NEEDED);
 
+  // The reservations rework (§3.10 item 1): the student's charges in the same action, each group
+  // its own payment (lines per entry deadline, charges per service deadline or per plan line).
+  const chargeRows = data.chargeIds.length
+    ? await db.select({ id: charge.id, studentId: charge.studentId, amount: charge.amount, kind: charge.kind, registrationId: charge.registrationId }).from(charge).where(inArray(charge.id, data.chargeIds))
+    : [];
+  if (chargeRows.length !== data.chargeIds.length || chargeRows.some((c) => c.studentId !== data.studentId)) {
+    throw new Error('One or more charges do not belong to this student');
+  }
+
   const totalCost = Math.round(regs.reduce((s, r) => s + r.priceAtRegistration, 0) * 100) / 100;
   const escrowToApply = data.escrowAmountToApply ?? 0;
-  if (escrowToApply > totalCost) throw new Error('Escrow amount cannot exceed the total cost');
+  const chargeTotal = Math.round(chargeRows.filter((c) => c.kind !== 'instalment').reduce((s, c) => s + c.amount, 0) * 100) / 100;
+  if (escrowToApply > totalCost + chargeTotal + 0.001) throw new Error('Escrow amount cannot exceed the total cost');
   const payerParentId = await resolvePayerParent(data.studentId);
   const prices = new Map(regs.map((r) => [r.id, r.priceAtRegistration]));
 
   const payments = await db.transaction(async (tx) => {
-    // Same guard as an app checkout (MA-06): lock the subjects, then make sure
-    // nothing else is already paying for them.
-    const locked = await tx
-      .select({ id: registration.id, status: registration.status, price: registration.priceAtRegistration })
-      .from(registration)
-      .where(inArray(registration.id, data.registrationIds))
-      .orderBy(registration.id)
-      .for('update');
-    if (locked.some((r) => r.status !== 'pending_payment')) {
-      throw new Error('One or more subjects are not waiting for payment');
+    const made: DeskPayment[] = [];
+    let escrowLeft = escrowToApply;
+    // Every line the collection touches — the lines it pays and the plan lines of the instalments
+    // it takes — in one id-ordered pass (§2.1: the lines in id order), before the charges: a fee
+    // re-price or a series move takes the same lines in the same order, so neither waits on the
+    // other holding a line the other has (the review of step C, item 5; 08t).
+    const planLineIds = chargeRows.filter((c) => c.kind === 'instalment' && c.registrationId).map((c) => c.registrationId!);
+    const touched = [...new Set([...lineIds, ...planLineIds])].sort();
+    const held = touched.length
+      ? await tx
+        .select({ id: registration.id, status: registration.status, price: registration.priceAtRegistration })
+        .from(registration)
+        .where(inArray(registration.id, touched))
+        .orderBy(registration.id)
+        .for('update')
+      : [];
+    if (lineIds.length) {
+      // Same guard as an app checkout (MA-06): the subjects locked (above), then make sure
+      // nothing else is already paying for them.
+      const locked = held.filter((r) => lineIds.includes(r.id));
+      if (locked.length !== lineIds.length || locked.some((r) => r.status !== 'pending_payment')) {
+        throw new Error('One or more subjects are not waiting for payment');
+      }
+      // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
+      if (locked.some((l) => l.price !== prices.get(l.id))) throw new Error(PRICE_CHANGED_REFUSAL);
+      // A line under a live plan is paid by its instalments only (§3.10 item 7).
+      await assertNoLivePlan(tx, lineIds);
+      const open = await tx
+        .select({ ref: payment.externalReference, method: payment.paymentMethod })
+        .from(paymentRegistration)
+        .innerJoin(payment, eq(payment.id, paymentRegistration.paymentId))
+        .where(and(inArray(paymentRegistration.registrationId, lineIds), inArray(payment.status, ['pending', 'pending_verification'])));
+      if (open.length > 0) {
+        throw new Error(
+          `These subjects already have a ${open[0]!.method === 'instapay' ? 'transfer' : 'checkout'} in progress — confirm it or reject it in the Finance Workbench first`
+        );
+      }
+      if (consent.schoolOnly.length) await writeConsents(tx, consent.schoolOnly, { channel: 'desk', confirmedBy: staffId });
+      // F0b: one payment per entry deadline, each with its own creation audit row.
+      const groups = await seriesDeadlineGroups(tx, lineIds, true);
+      const lineEscrow = Math.min(escrowLeft, totalCost);
+      escrowLeft = Math.round((escrowLeft - lineEscrow) * 100) / 100;
+      const lines = await createDeskPayments(tx, { studentId: data.studentId, payerParentId, staffId, escrowToApply: lineEscrow, groups, prices });
+      for (const p of lines) {
+        await logAction(staffId, 'PAYMENT_INITIATED', 'payment', p.id, null,
+          { desk: true, registrationIds: p.registrationIds, amount: p.amount, escrowApplied: p.escrowApplied, ...(lines.length > 1 ? { series: p.series } : {}) }, auditCtx, tx);
+      }
+      made.push(...lines);
     }
-    // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
-    if (locked.some((l) => l.price !== prices.get(l.id))) throw new Error(PRICE_CHANGED_REFUSAL);
-    const open = await tx
-      .select({ ref: payment.externalReference, method: payment.paymentMethod })
-      .from(paymentRegistration)
-      .innerJoin(payment, eq(payment.id, paymentRegistration.paymentId))
-      .where(and(inArray(paymentRegistration.registrationId, data.registrationIds), inArray(payment.status, ['pending', 'pending_verification'])));
-    if (open.length > 0) {
-      throw new Error(
-        `These subjects already have a ${open[0]!.method === 'instapay' ? 'transfer' : 'checkout'} in progress — confirm it or reject it in the Finance Workbench first`
-      );
-    }
-    if (consent.schoolOnly.length) await writeConsents(tx, consent.schoolOnly, { channel: 'desk', confirmedBy: staffId });
-    // F0b: one payment per entry deadline, each with its own creation audit row.
-    const groups = await seriesDeadlineGroups(tx, data.registrationIds, true);
-    const made = await createDeskPayments(tx, { studentId: data.studentId, payerParentId, staffId, escrowToApply, groups, prices });
-    for (const p of made) {
-      await logAction(staffId, 'PAYMENT_INITIATED', 'payment', p.id, null,
-        { desk: true, registrationIds: p.registrationIds, amount: p.amount, escrowApplied: p.escrowApplied, ...(made.length > 1 ? { series: p.series } : {}) }, auditCtx, tx);
+    if (data.chargeIds.length) {
+      const expected = new Map(chargeRows.map((c) => [c.id, c.amount]));
+      const charges = await createChargePaymentsInTx(tx, {
+        studentId: data.studentId, payerParentId, actorId: staffId, chargeIds: data.chargeIds, method: 'in_school', escrowToApply: escrowLeft, desk: true, expected, auditCtx,
+        linesHeld: true,
+      });
+      made.push(...charges.map((c) => ({ id: c.id, amount: c.amount, escrowApplied: c.escrowApplied, registrationIds: [] as string[], chargeIds: c.chargeIds, series: [c.description], entryDeadline: c.deadline })));
     }
     return made;
   });
@@ -485,13 +593,13 @@ export async function collectAtDesk(staffId: string, data: DeskCollectType, audi
 
   // Only receipts ready to hand over; a void one is never offered (MA-20).
   const receipts = await db.query.receipt.findMany({
-    where: (r, { inArray: inArr, and: andOp, eq: eqOp }) =>
-      andOp(inArr(r.registrationId, data.registrationIds), eqOp(r.status, 'pending_issue')),
-    columns: { id: true, registrationId: true, receiptNumber: true, status: true },
+    where: (r, { inArray: inArr, and: andOp, eq: eqOp, or: orOp }) =>
+      andOp(orOp(inArr(r.registrationId, [...lineIds, '__none__']), inArr(r.chargeId, [...data.chargeIds, '__none__'])), eqOp(r.status, 'pending_issue')),
+    columns: { id: true, registrationId: true, chargeId: true, receiptNumber: true, status: true },
   });
   return {
     paymentId: outcome.confirmed[0]!.id,
-    payments: outcome.confirmed.map((p) => ({ id: p.id, series: p.series, entryDeadline: p.entryDeadline, collected: p.amount, escrowApplied: p.escrowApplied, registrationIds: p.registrationIds })),
+    payments: outcome.confirmed.map((p) => ({ id: p.id, series: p.series, entryDeadline: p.entryDeadline, collected: p.amount, escrowApplied: p.escrowApplied, registrationIds: p.registrationIds, chargeIds: p.chargeIds ?? [] })),
     notCollected: outcome.notCollected,
     collected: outcome.collected,
     escrowApplied: outcome.escrowApplied,
@@ -655,9 +763,21 @@ export async function getStudentSummary(studentId: string) {
         orderBy: (p, { desc }) => [desc(p.createdAt)],
         limit: 20,
       }),
+      // The student's own and the family's (a parent account's exception covers every linked
+      // child, RESERVATIONS_REWORK.md §3.7), on the registry's keys.
       db.query.exception.findMany({
-        where: (e, { eq, and }) => and(eq(e.studentId, studentId), eq(e.status, 'active')),
-        columns: { id: true, type: true, value: true, reason: true, validUntil: true },
+        where: (e, { eq, and, or, inArray }) => and(
+          or(
+            eq(e.studentId, studentId),
+            inArray(e.familyId, db.select({ id: parentStudentLink.parentId }).from(parentStudentLink)
+              .where(and(eq(parentStudentLink.studentId, studentId), eq(parentStudentLink.status, 'approved')))),
+          ),
+          eq(e.status, 'active'),
+        ),
+        columns: {
+          id: true, type: true, policyKey: true, value: true, valueNumber: true, valueDate: true, reason: true, validUntil: true,
+          familyId: true, sessionId: true, subjectId: true, registrationId: true, chargeId: true,
+        },
       }),
       db.query.remarkRequest.findMany({
         where: (r, { eq }) => eq(r.studentId, studentId),
@@ -671,6 +791,7 @@ export async function getStudentSummary(studentId: string) {
       }),
     ]);
 
+  const lineExceptions = await exceptionsOfLines(db, registrations);
   const receipts = await db.query.receipt.findMany({
     where: (r, { inArray }) =>
       inArray(r.registrationId, registrations.map((reg) => reg.id).concat('__none__')),
@@ -710,7 +831,19 @@ export async function getStudentSummary(studentId: string) {
   const payOnProvisional = await getSetting('pricing.payOnProvisionalFee');
   const payableNow = (r: (typeof registrations)[number]) =>
     r.status === 'pending_payment' && (!r.priceProvisional || payOnProvisional);
-  const owing = registrations.filter(payableNow).reduce((sum, r) => sum + r.priceAtRegistration, 0);
+  // A line under a live plan owes its price less the deposits held for it (its instalments still
+  // to pay); the charges owed (not instalments — the line counts them — nor a pushed school fee,
+  // which is the fee badge) are owed beside the lines (step C; the statement counts the same).
+  const planLineIds = new Set(exceptions.filter((e) => e.policyKey === 'plan.instalments' && e.registrationId).map((e) => e.registrationId!));
+  const depositRows = planLineIds.size
+    ? await db.execute(sql`select r.id, ${lineDepositsSql('r')} as deposits from registration r where r.id in (${sql.join([...planLineIds].map((id) => sql`${id}`), sql`, `)})`)
+      .then((x) => x.rows as { id: string; deposits: string }[])
+    : [];
+  const depositsOf = new Map(depositRows.map((d) => [d.id, Number(d.deposits)]));
+  const owedCharges = await db.select({ amount: charge.amount }).from(charge)
+    .where(and(eq(charge.studentId, studentId), eq(charge.status, 'pending_payment'), notInArray(charge.kind, ['instalment', 'school_fee_push'])));
+  const owing = round2(registrations.filter(payableNow).reduce((sum, r) => sum + (planLineIds.has(r.id) ? Math.max(0, r.priceAtRegistration - (depositsOf.get(r.id) ?? 0)) : r.priceAtRegistration), 0)
+    + owedCharges.reduce((sum, c) => sum + c.amount, 0));
 
   // The academic record (F0a): grade, cohort, section, status.
   const today = standingToday(student);
@@ -746,7 +879,12 @@ export async function getStudentSummary(studentId: string) {
     registrations: registrations.map((r) => ({
       ...r,
       payableNow: payableNow(r),
+      // Under a live instalment plan (§3.6): paid by its instalments, never collected as a line. A
+      // plan released in full or ended is not live: the line is collected in full again.
+      livePlan: exceptions.some((e) => e.policyKey === 'plan.instalments' && e.registrationId === r.id),
       receipt: receiptByReg.get(r.id) ?? null,
+      // The exceptions that touched the line: priced it, are scoped to it, or let it through (§4.7).
+      exceptions: lineExceptions.get(r.id) ?? [],
     })),
     payments,
     exceptions,

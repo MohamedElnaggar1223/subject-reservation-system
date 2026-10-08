@@ -22,6 +22,7 @@ import { notifySessionOpened, createNotification, notifyPaymentReferenceDue } fr
 import { failPayment, closeStrandedPayments } from './payment.services';
 import { logAction, logActions, type AuditContext } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
+import { lastInstalmentBeingCheckedSql } from './plan.services';
 import { expireIneligibleRegistrations } from './eligibility.services';
 import { deriveSessionName, seriesLabel, sessionSeriesMonths, type CorrectSessionSeriesType, type CreateSessionType, type UpdateSessionType } from '@repo/validations';
 import { env } from '../env';
@@ -670,6 +671,8 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
         where pr.registration_id = ${registration.id}
           and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
       )`,
+      // A plan line whose last instalment's transfer is being checked is spared too (§3.6).
+      sql`not ${lastInstalmentBeingCheckedSql(registration.id, now)}`,
     ),
     'session_closed', now));
 

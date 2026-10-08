@@ -72,8 +72,12 @@ describe('08o: reservation lines (step B)', () => {
         items: [{ label: 'Whole subject', kind: 'whole' as const, enters: { kind: 'subject' as const }, boardSeriesId: seriesId, availability: 'open' as const, requiredInSeries: false, ...extra.item }],
       },
     })))!.items[0]!;
-  const halfBack = (sessionId: string) => apiResponse(finadmin.api.v1.receipts['refund-windows'].$post({
-    json: { sessionId, startsAt: new Date(Date.now() - days(1)).toISOString(), endsAt: at(90).toISOString(), percentage: 50, label: 'step B: half back' },
+  // Half back on a drop today. Since step C a line's refund is refundFor's (refund.services, §3.9):
+  // the policy the family consented to, in weeks from the course's start — V3's refund windows
+  // count only for converted lines. The session's course started 15 days ago: week 3 of June's
+  // policy (100% to week 2, 50% in week 3), so 50% of the course part, as the windows gave.
+  const halfBack = (sessionId: string) => apiResponse(adm.api.v1.sessions[':id'].$put({
+    param: { id: sessionId }, json: { courseStartsOn: cairoDate(new Date(Date.now() - days(15))), reason: 'step B: half back (week 3 of the policy)' },
   }));
   const verify = (who: Client, id: string, json: Parameters<Client['api']['v1']['registrations'][':id']['verify-prior']['$post']>[0]['json']) =>
     who.api.v1.registrations[':id']['verify-prior'].$post({ param: { id }, json });
@@ -492,7 +496,8 @@ describe('08o: reservation lines (step B)', () => {
     expect(await lineOf(id)).toMatchObject({ status: 'dropped_pending_receipt', outcome: 'rejected', declaration_rejected: false });
     expect(await one(`select status, refund_amount_on_return as amount from receipt where id = $1`, [rc.id])).toEqual({ status: 'return_required', amount: '12700.00' });
     // Its own deadline (the retake deadline) has not passed: the board fee is not sent yet, so the
-    // window's percentage applies to the whole price (the case below keeps a sent board fee).
+    // refund is the window's percentage of the course part plus the unsent board fee in full
+    // (3,500 + 9,200 = 12,700); nothing is kept (the case below keeps a sent board fee).
     expect(await one(`select new_data->>'boardSent' as sent, new_data->>'boardFeeKept' as kept from audit_log where action = 'PRIOR_SITTING_REJECTED' and entity_id = $1`, [id]))
       .toEqual({ sent: 'false', kept: '0' });
     expect(await escrowOf(f.studentId)).toEqual(before);

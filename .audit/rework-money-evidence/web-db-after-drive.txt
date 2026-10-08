@@ -1,0 +1,23 @@
+     policy_key      | value_number | family | status |   granted_by    | audit 
+---------------------+--------------+--------+--------+-----------------+-------
+ price.discountFixed |       250.00 | t      | active | Finance admin C |     1
+ price.discountFixed |       250.00 | t      | active | Finance admin C |     1
+ price.discountFixed |       250.00 | t      | active | Finance admin C |     1
+ price.discountFixed |       250.00 | t      | active | Finance admin C |     1
+(4 rows)
+
+      kind       | academic_year | amount  |     status      |    name    | audit | notices 
+-----------------+---------------+---------+-----------------+------------+-------+---------
+ school_fee_push | 2026-2027     | 5000.00 | pending_payment | Student C2 |     1 |       2
+(1 row)
+
+      action       | pushed | skipped 
+-------------------+--------+---------
+ SCHOOL_FEE_PUSHED | 1      | 0
+(1 row)
+
+ status  |  revoke_reason   
+---------+------------------
+ revoked | granted in error
+(1 row)
+

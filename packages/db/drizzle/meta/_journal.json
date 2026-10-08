@@ -330,6 +330,69 @@
       "when": 1791429312401,
       "tag": "0046_rework_reservations_consent_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1791437758565,
+      "tag": "0047_rework_money_structure",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1791437759565,
+      "tag": "0048_rework_money_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1791437760565,
+      "tag": "0049_rework_money_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791444538626,
+      "tag": "0050_rework_messages_structure",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1791444609348,
+      "tag": "0051_rework_messages_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1791453573346,
+      "tag": "0052_rework_messages_claim_day",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1791453585318,
+      "tag": "0053_rework_messages_claim_day_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1791453628209,
+      "tag": "0054_rework_messages_claim_day_required",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1791464695610,
+      "tag": "0055_rework_messages_overdue_text",
+      "breakpoints": true
     }
   ]
 }

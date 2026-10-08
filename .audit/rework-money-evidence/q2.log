@@ -1,0 +1,77 @@
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+> vitest run "test/08q-charges.test.ts"
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+
+[clock] database minus host: -0.4 ms (measured within 2 ms)
+ ❯ test/08q-charges.test.ts (18 tests | 2 failed) 7626ms
+   ✓ 08q: charges > the boards' services, as seeded: Cambridge 1, 1S, 2, 2S; Pearson's review, re-check, scripts, priority, cash-in and late cash-in; refunds in full until Q-21 is answered 14ms
+   ✓ 08q: charges > a cash-in charge, end to end > asked for by the family: requested, at the series' fee, not payable until the school accepts it 39ms
+   ✓ 08q: charges > a cash-in charge, end to end > paid in its own payment beside a line's, in one desk action: two payments, two receipts, both in the takings 74ms
+   ✓ 08q: charges > a cash-in charge, end to end > reversed as the registration payment is (MO-11): the charge payable again, its receipt void; paid again, the receipt reissued under a new number 46ms
+   ✓ 08q: charges > a cash-in charge, end to end > refunded to escrow by finance: at most what it cost, the paper back first, audited; never voided while paid 37ms
+   ✓ 08q: charges > a cash-in charge, end to end > two charges of different service deadlines are refused in one payment; the desk takes each in its own 71ms
+   ✓ 08q: charges > a cash-in charge, end to end > closed unpaid at its service deadline: its open payment failed, escrow back, the charge cancelled, the family told — once, however many sweeps run 52ms
+   ✓ 08q: charges > a Cambridge remark is priced per component at the AS rate from the series' grid; a changed grade refunds it by the service's rule (seeded full; a fixed deduction when set)  476ms
+   ✓ 08q: charges > the school fee pushed to families (point 8) > pushed to a list: a paid, a waived and an A-13 graduate skipped and listed; the others owe it by the date; a second push skips an open one 46ms
+   ✓ 08q: charges > the school fee pushed to families (point 8) > paid through the school-fee path: settled by that payment in its transaction; the payment reversed reopens it; the desk's collection settles it too; a waiver after the push cancels it 51ms
+   ✓ 08q: charges > the school fee pushed to families (point 8) > pushed to a grade: every student of that grade next year who owes it 283ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > week 3 of June: 50% of the course fee and the board fee (1,000); a later course start of the offer moves the anchor; refund.courseStart moves one student's 138ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > week 7 of a winter session: 0% of the course fee, and the board fee (500) 233ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a custom-priced line refunds its total by the course rule, never a board fee (1,200 at 50%: 600)  349ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a converted line refunds as V3 did: its session's windows, on the whole price (50%: 750)  346ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > past its line's deadline: the family is sent to the desk; the desk drops it, the board fee kept (sent), the paper back first  368ms
+   × 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a series with no entry deadline is cut off at its exams' start, and its board fee counts as sent from then 338ms
+     → Failed query: update board_series set exams_start = $1::date where id = $2
+params: 4ac80cc8-e75e-4ce4-a701-4fdf19bc02f6,2028-12-31
+   × 08q: charges > payment.expireOverdueAfterDays: off by default; on, a line unpaid that long after its due date expires ("overdue") once, however many ticks run 300ms
+     → The registration window is not open: this series' exams start on 7 October 2026 and it has no entry deadline
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08q-charges.test.ts > 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a series with no entry deadline is cut off at its exams' start, and its board fee counts as sent from then
+Error: Failed query: update board_series set exams_start = $1::date where id = $2
+params: 4ac80cc8-e75e-4ce4-a701-4fdf19bc02f6,2028-12-31
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:73:11
+ ❯ sql test/helpers.ts:63:18
+     61|     q = s`${q}${params[i - 1]}${s.raw(parts[i] ?? '')}`;
+     62|   }
+     63|   const result = await db.execute(q);
+       |                  ^
+     64|   return result.rows as T[];
+     65| }
+ ❯ test/08q-charges.test.ts:441:9
+
+Caused by: error: invalid input syntax for type date: "4ac80cc8-e75e-4ce4-a701-4fdf19bc02f6"
+ ❯ ../../node_modules/.pnpm/pg-pool@3.10.1_pg@8.16.3/node_modules/pg-pool/index.js:45:11
+ ❯ ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:71:12
+ ❯ sql test/helpers.ts:63:18
+ ❯ test/08q-charges.test.ts:441:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { length: 177, severity: 'ERROR', code: '22007', detail: undefined, hint: undefined, position: undefined, internalPosition: undefined, internalQuery: undefined, where: 'unnamed portal parameter $1 = \'...\'', schema: undefined, table: undefined, dataType: undefined, constraint: undefined, file: 'datetime.c', routine: 'DateTimeParseError' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08q-charges.test.ts > 08q: charges > payment.expireOverdueAfterDays: off by default; on, a line unpaid that long after its due date expires ("overdue") once, however many ticks run
+Error: The registration window is not open: this series' exams start on 7 October 2026 and it has no entry deadline
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ deskUnpaid test/08q-charges.test.ts:43:6
+     41|     }))).registrations.map((r) => r.id);
+     42|   const deskUnpaid = async (f: Family, subjectIds: string[], sessionId…
+     43|     (await apiResponse(officer.api.v1.registrations.desk.$post({ json:…
+       |      ^
+     44|   const paymentOfCharge = async (chargeId: string, status = 'completed…
+     45|     (await one<{ id: string }>(`select p.id from payment p join paymen…
+ ❯ test/08q-charges.test.ts:451:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 16 passed (18)
+   Start at  03:10:10
+   Duration  9.41s (transform 575ms, setup 2ms, collect 207ms, tests 7.63s, environment 0ms, prepare 37ms)
+
+/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @repo/api@ test: `vitest run "test/08q-charges.test.ts"`
+Exit status 1

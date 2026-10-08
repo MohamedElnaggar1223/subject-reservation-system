@@ -1,0 +1,78 @@
+admin@igcse.local → http://localhost:3000/admin/dashboard
+item reset to Open (not counted)
+teacher controls after Show every teacher:
+0: select Availability = Open/Retakes only/Self-study only/Closed
+1: input[number] Course fee = 1200
+2: input[date] Course starts (if not the session's) = 
+3: input[checkbox]  = on
+4: textarea Notes = 
+5: select Series = Cambridge International June 2028
+6: select Availability = Open/Retakes only/Self-study only/Closed
+7: input[number] Course fee (if not the subject's) = 
+8: input Only one of the group = 
+9: input[checkbox]  = on
+10: input[checkbox]  = on
+select 1 options: Cambridge International June 2028
+checkboxes in drawer: 3
+labels: Availability | Course fee | Course starts (if not the session's) | Grade 10 core | Teachers | Notes | Series | Availability | Course fee (if not the subject's) | Only one of the group | A first entry of the subject in this series includes it | Needs an earlier sitting carried forward | Its own teachers
+shot 01-teachers-shown
+candidate teacher boxes: 0
+drawer still open after Save: Accounting | Cambridge International · 0452 · 0 live lines | This cycle |  | Who teaches Accounting? An open subject names its teachers — or make it self-study only |  | Availability | Open | Retakes only | Self-study only | Closed |  | Closing stops new lines; the lines already made stand. |  | Course fee | Course starts (if no
+ROW AFTER: Accounting | Closed | Series has no dates | 	Cambridge International	—	Whole subject	EGP 1,100	 | EGP 300 | provisional | 	0
+shot 02-row-after
+SERIES PAGE url: http://localhost:3000/exams/series
+SERIES PAGE:
+Board series
+
+Every sitting of every board this academic year, with the dates the boards set. The entry deadline is the school's hard stop: past it, nothing more is entered, paid or confirmed for that series. Late-fee dates are shown for information.
+
+Academic year
+2025/26
+2026/27
+2027/28
+
+Add a series
+
+Pearson Edexcel
+Cambridge International
+OxfordAQA
+Month
+Choose…
+October 2026
+November 2026
+January 2027
+June 2027
+Label (only if the board runs two calendars that month)
+Add the series
+Series	Entry deadline	Late fee from	High late fee from	Windows feeding it	Registrations	Actions
+Cambridge International June 2027
+
+Academic year 2026/27
+
+	
+30 Sep 2026 17:30
+Passed
+	—	—	
+June 2027 — IGCSE
+Default
+	0 confirmed	
+Dates
+
+Cambridge International November 2026
+
+Academic year 2026/27
+
+	
+No entry deadline yet
+	—	—	
+November 2026 – January 2027 — November IGCSE
+Default
+	1 confirmed	
+Dates
+series buttons: Pearson Edexcel | Cambridge International | OxfordAQA | Add the series | Dates | Dates
+shot 04-series-page
+FEES after confirm: provisional=0 confirmed=17
+shot 05-fees-confirmed
+TOTAL: inputs 2 clicks 4
+ERRORS: 
+admin@igcse.local console: Failed to load resource: the server responded with a status of 400 (Bad Request)

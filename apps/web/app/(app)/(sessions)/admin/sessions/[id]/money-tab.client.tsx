@@ -5,7 +5,7 @@
  * with its family, its price and what it is made of, its due date and the days overdue; filters
  * (unpaid, overdue, provisional, paid, by subject) and an export. Every number is the ledger's:
  * the takings, the receipts and the workbench are unchanged. (Charges join it in step C; the
- * "Remind" batch in step D.)
+ * "Remind" batch in step D: remind.client.tsx.)
  */
 
 import { useState } from 'react';
@@ -15,6 +15,8 @@ import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
 import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
 import { downloadCsv, toCsv } from '~/lib/csv';
+import { SessionCharges } from './session-charges.client';
+import { Remind } from './remind.client';
 import {
   fetchMoney, moneyKey, Money, Day, INPUT_CLASS, LINE_STATUS_LABEL, LINE_STATUS_TONE, type SessionDetail,
 } from '../sessions-shared';
@@ -49,7 +51,7 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
         <Stat label="Lines" value={<span>{t.lines}</span>} />
         <Stat label="Paid" value={<><span>{t.paid}</span> · <Money amount={t.paidAmount} /></>} />
         <Stat label="Unpaid" value={<><span>{t.unpaid}</span> · <Money amount={t.outstanding} /></>}
-          hint={<><span>{t.families}</span> <span>families</span>{t.awaitingApproval > 0 && <> · <span>{t.awaitingApproval}</span> <span>awaiting the parent</span></>}</>} />
+          hint={<><span>{t.families}</span> <span>families</span>{t.awaitingApproval > 0 && <> · <span>{t.awaitingApproval}</span> <span>awaiting the parent</span></>}{t.depositsHeld > 0 && <> · <span>held from instalments</span> <Money amount={t.depositsHeld} /></>}</>} />
         <Stat label="Overdue" value={<><span>{t.overdue}</span> · <Money amount={t.overdueAmount} /></>} hint={t.provisional ? <><span>{t.provisional}</span> <span>provisional (not payable yet)</span></> : undefined} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -75,8 +77,8 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* "Remind" sends the payment reminder to these families now (a batch audience): step D's
-              messages and reminders (RESERVATIONS_REWORK.md §3.8). Until it lands it does nothing. */}
-          <Button variant="outline" size="sm" disabled title="Reminders arrive with the messages step">Remind</Button>
+              messages and reminders (RESERVATIONS_REWORK.md §3.8, remind.client.tsx). */}
+          <Remind sessionId={session.id} filter={filter} offerId={offerId} sectionId={sectionId} />
           <Button variant="outline" size="sm" onClick={exportCsv} disabled={!data.lines.length}>Export</Button>
         </div>
       </div>
@@ -111,6 +113,7 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
                     <Money amount={l.price} />
                     <div className="text-xs text-muted-foreground" title="course + board"><Money amount={l.courseFee} /> + <Money amount={l.boardFee} /></div>
                     {l.provisional && <Badge tone="info">provisional</Badge>}
+                    {l.deposits > 0 && <div className="text-xs text-muted-foreground"><span>held from instalments</span> <Money amount={l.deposits} /> · <span>owes</span> <Money amount={l.outstanding} /></div>}
                   </td>
                   <td className="px-4 py-2 align-top">
                     <Day iso={l.dueAt} />
@@ -123,6 +126,8 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
           </table>
         </div>
       )}
+      {/* Step C (RESERVATIONS_MONEY.md §8): the session's charges beside its lines. */}
+      <SessionCharges sessionId={session.id} />
     </div>
   );
 }

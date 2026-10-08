@@ -72,7 +72,9 @@ describe('money invariants over the whole database', () => {
       select p.id, p.status, p.escrow_amount_applied, coalesce(d.total, 0) as debited, coalesce(r.total, 0) as returned
       from payment p
       left join (select related_payment_id, sum(amount) as total from escrow_transaction
-                 where reason = 'payment' and type = 'debit' group by related_payment_id) d on d.related_payment_id = p.id
+                 -- The reservations rework (§3.10 item 6): a plan's capture applies the line's held
+                 -- deposits, debited once with the capture payment's id (plan_capture).
+                 where reason in ('payment', 'plan_capture') and type = 'debit' group by related_payment_id) d on d.related_payment_id = p.id
       left join (select related_payment_id, sum(amount) as total from escrow_transaction
                  where reason = 'payment_refund' and type = 'credit' and related_payment_id is not null group by related_payment_id) r on r.related_payment_id = p.id
       where ${cents('coalesce(d.total, 0)')} <> ${cents('p.escrow_amount_applied')}
@@ -250,9 +252,9 @@ describe('money invariants over the whole database', () => {
     expect(broken).toEqual([]);
   });
 
-  it('the held wallet holds exactly the price of paid preregistrations still waiting for their session (MA-15)', async () => {
+  it('the held wallet holds exactly the price of paid preregistrations still waiting for their session, and the deposits of live plans (MA-15, extended by the reservations rework §3.10 item 6)', async () => {
     const broken = await sql(`
-      select e.student_id, e.held_balance, coalesce(h.total, 0) as funded
+      select e.student_id, e.held_balance, coalesce(h.total, 0) as funded, coalesce(d.total, 0) as deposits
       from escrow e
       left join (
         select r.student_id, sum(r.price_at_registration) as total
@@ -262,7 +264,17 @@ describe('money invariants over the whole database', () => {
           where pr.registration_id = r.id and p.purpose = 'preregistration' and p.status = 'completed')
         group by r.student_id
       ) h on h.student_id = e.student_id
-      where ${cents('e.held_balance')} <> ${cents('coalesce(h.total, 0)')}
+      -- A live plan's instalments, held for its line: credited, less any reversed.
+      left join (
+        select x.student_id, sum(case when t.type = 'credit' then t.amount else -t.amount end) as total
+        from escrow_transaction t
+        join escrow x on x.id = t.escrow_id
+        join exception pl on pl.registration_id = t.related_registration_id and pl.policy_key = 'plan.instalments' and pl.status = 'active'
+        join registration r on r.id = t.related_registration_id and r.status = 'pending_payment'
+        where t.balance_type = 'held' and t.reason in ('instalment', 'instalment_reversed')
+        group by x.student_id
+      ) d on d.student_id = e.student_id
+      where ${cents('e.held_balance')} <> ${cents('coalesce(h.total, 0) + coalesce(d.total, 0)')}
     `);
     expect(broken).toEqual([]);
   });
@@ -284,7 +296,9 @@ describe('money invariants over the whole database', () => {
       select p.id, p.purpose, p.metadata->>'desk' as desk, count(a.id) as rows
       from payment p
       left join audit_log a on (a.entity_id = p.id or a.new_data->>'paymentId' = p.id)
-        and a.action in ('PAYMENT_INITIATED', 'SCHOOL_FEE_PAYMENT_INITIATED', 'DESK_SCHOOL_FEE_COLLECTED', 'REMARK_PAYMENT_INITIATED', 'DESK_REGISTRATION')
+        and a.action in ('PAYMENT_INITIATED', 'SCHOOL_FEE_PAYMENT_INITIATED', 'DESK_SCHOOL_FEE_COLLECTED', 'REMARK_PAYMENT_INITIATED', 'DESK_REGISTRATION',
+          -- The reservations rework (§3.10 items 1, 6, 8): a charge payment's creation, a plan's capture.
+          'CHARGE_PAYMENT_INITIATED', 'PLAN_CAPTURED')
       group by p.id having count(a.id) <> 1
     `);
     expect(broken).toEqual([]);
@@ -305,9 +319,8 @@ describe('money invariants over the whole database', () => {
       where action = 'REGISTRATION_EXPIRED'
         and (coalesce(previous_data->>'status', '') not in ('pending_approval', 'pending_payment', 'preregistered')
           or coalesce(new_data->>'reason', '') not in ('session_closed', 'entry_deadline', 'graduated', 'payment_closed', 'preregistration_unfunded_at_deadline', 'ineligible',
-            -- The reservations rework, step B (§3.10 item 8): a declared sitting rejected on a waiting
-            -- line; one still unverified at its deadline under verification.unverifiedAtDeadline = hold.
-            'declaration_rejected', 'hold_unverified')
+            -- The reservations rework (§3.1, §3.10 item 8): the six new reasons.
+            'overdue', 'declaration_rejected', 'hold_unverified', 'plan_revoked', 'plan_lapsed', 'plan_ended')
           -- F0a: a student no longer eligible for the series says what changed.
           or (new_data->>'reason' = 'ineligible' and coalesce(new_data->>'detail', '') not in
             ('withdrawn', 'transferred', 'cohort_corrected', 'graduate_retakes_off', 'series_corrected', 'exception_revoked', 'exception_lapsed')))
@@ -324,6 +337,15 @@ describe('money invariants over the whole database', () => {
           and ${cents(`(a.new_data->>'heldCaptured')::numeric`)} = ${cents('t.amount')})
     `);
     expect(captures).toEqual([]);
+    // The reservations rework (§3.10 item 6): a plan's capture of held money has its PLAN_CAPTURED row,
+    // against the capture payment, for the same amount.
+    const planCaptures = await sql(`
+      select t.related_payment_id, t.amount from escrow_transaction t
+      where t.reason = 'plan_capture' and not exists (
+        select 1 from audit_log a where a.action = 'PLAN_CAPTURED' and a.entity_id = t.related_payment_id
+          and ${cents(`(a.new_data->>'heldCaptured')::numeric`)} = ${cents('t.amount')})
+    `);
+    expect(planCaptures).toEqual([]);
     // Every capture row, funded or not, agrees with the ledger: held money taken exactly when it says so.
     const captureRows = await sql(`
       select a.entity_id, a.new_data from audit_log a
@@ -599,6 +621,293 @@ describe('money invariants over the whole database', () => {
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'PREREG_HELD_INELIGIBLE'`))[0]?.n)).toBeGreaterThan(0);
   });
 
+  // ─── The reservations rework, step C: charges, plans, the registry (RESERVATIONS_MONEY.md §6) ───
+
+  it('there are charges, plans and exceptions to check: every kind happened in the suites above', async () => {
+    const [counts] = await sql<Record<string, string>>(`
+      select
+        (select count(*) from payment where purpose = 'charge' and status = 'completed')                  as charge_payments_completed,
+        (select count(*) from payment where purpose = 'charge' and status = 'refunded')                   as charge_payments_reversed,
+        (select count(*) from payment where purpose = 'charge' and status = 'failed')                     as charge_payments_failed,
+        (select count(*) from charge where status = 'refunded')                                           as charges_refunded,
+        (select count(*) from charge where kind = 'school_fee_push' and status = 'paid')                  as pushes_settled,
+        (select count(*) from charge where kind = 'school_fee_push' and status = 'cancelled')             as pushes_waived,
+        (select count(*) from audit_log where action = 'CHARGE_CLOSED_AT_DEADLINE')                       as charges_closed_at_deadline,
+        (select count(*) from escrow_transaction where reason = 'instalment')                            as instalments_held,
+        (select count(*) from escrow_transaction where reason = 'instalment_reversed')                   as instalments_reversed,
+        (select count(*) from escrow_transaction where reason = 'plan_capture')                          as plans_captured,
+        (select count(*) from escrow_transaction where reason = 'plan_forfeit')                          as plans_forfeited,
+        (select count(*) from escrow_transaction where reason = 'plan_release')                          as plans_released,
+        (select count(*) from exception where policy_key = 'plan.instalments' and status = 'active')     as plans_live,
+        (select count(*) from exception where status = 'used')                                           as one_shot_used,
+        (select count(*) from exception where family_id is not null)                                     as family_exceptions,
+        (select count(*) from audit_log where action = 'DESK_DROP_EXECUTED')                              as desk_drops,
+        (select count(*) from receipt where charge_id is not null)                                       as charge_receipts
+    `);
+    for (const [kind, n] of Object.entries(counts!)) expect(Number(n), kind).toBeGreaterThan(0);
+  });
+
+  it('a charge payment charges exactly the sum of its charges (§3.10 item 1)', async () => {
+    const broken = await sql(`
+      select p.id, p.amount, p.escrow_amount_applied, sum(c.amount) as charges
+      from payment p join payment_charge pc on pc.payment_id = p.id join charge c on c.id = pc.charge_id
+      where p.purpose = 'charge'
+      group by p.id
+      having ${cents('p.amount + p.escrow_amount_applied')} <> ${cents('sum(c.amount)')}
+    `);
+    expect(broken).toEqual([]);
+    // One purpose per payment: a charge payment covers charges only, and nothing else covers a charge.
+    const mixed = await sql(`
+      select p.id, p.purpose from payment p
+      where (p.purpose = 'charge' and (exists (select 1 from payment_registration pr where pr.payment_id = p.id)
+                                     or not exists (select 1 from payment_charge pc where pc.payment_id = p.id)))
+         or (p.purpose <> 'charge' and exists (select 1 from payment_charge pc where pc.payment_id = p.id))
+    `);
+    expect(mixed).toEqual([]);
+  });
+
+  it("an open charge payment's charges share one deadline; an instalment payment covers one plan's line (§3.10 item 1)", async () => {
+    const deadline = `coalesce(charge_effective_deadline(c.kind, c.registration_id, c.board_series_id, c.board_service_id)::text, 'none')`;
+    const broken = await sql(`
+      select p.id, count(distinct ${deadline}) as deadlines,
+             count(distinct case when c.kind = 'instalment' then c.registration_id end) as plan_lines,
+             bool_or(c.kind = 'instalment') and bool_or(c.kind <> 'instalment') as mixed
+      from payment p join payment_charge pc on pc.payment_id = p.id join charge c on c.id = pc.charge_id
+      where p.status in ('pending', 'pending_verification')
+      group by p.id
+      having count(distinct ${deadline}) > 1 or count(distinct case when c.kind = 'instalment' then c.registration_id end) > 1
+         or (bool_or(c.kind = 'instalment') and bool_or(c.kind <> 'instalment'))
+    `);
+    expect(broken).toEqual([]);
+  });
+
+  it('no charge is paid twice and every paid charge once; a pushed school fee by its settling school-fee payment, never as a charge (§3.10 item 1)', async () => {
+    const twice = await sql(`
+      select pc.charge_id, count(*) as payments from payment_charge pc join payment p on p.id = pc.payment_id
+      where p.status = 'completed' group by pc.charge_id having count(*) > 1
+    `);
+    expect(twice).toEqual([]);
+    const paidUnpaid = await sql(`
+      select c.id, c.kind, c.status,
+        (select count(*) from payment_charge pc join payment p on p.id = pc.payment_id where pc.charge_id = c.id and p.status = 'completed') as completed
+      from charge c
+      where c.kind <> 'school_fee_push'
+        and ((c.status in ('paid', 'refunded')) <> exists (
+          select 1 from payment_charge pc join payment p on p.id = pc.payment_id where pc.charge_id = c.id and p.status = 'completed'))
+    `);
+    expect(paidUnpaid).toEqual([]);
+    const pushes = await sql(`
+      select c.id, c.status, c.settled_by_payment_id, p.status as payment_status, p.purpose, p.academic_year, p.student_id = c.student_id as same_student
+      from charge c left join payment p on p.id = c.settled_by_payment_id
+      where c.kind = 'school_fee_push'
+        and ((c.status = 'paid') <> (p.id is not null and p.status = 'completed' and p.purpose = 'school_fee' and p.academic_year = c.academic_year and p.student_id = c.student_id)
+          or (c.status <> 'paid' and c.settled_by_payment_id is not null)
+          or exists (select 1 from payment_charge pc where pc.charge_id = c.id))
+    `);
+    expect(pushes).toEqual([]);
+    // An open push is never left on a year whose fee is already paid (the confirmation settles it under the student's lock).
+    const stale = await sql(`
+      select c.id from charge c
+      where c.kind = 'school_fee_push' and c.status = 'pending_payment' and exists (
+        select 1 from payment p where p.student_id = c.student_id and p.purpose = 'school_fee' and p.academic_year = c.academic_year and p.status = 'completed')
+    `);
+    expect(stale).toEqual([]);
+  });
+
+  it("a charge's refund never exceeds it, and escrow was credited exactly the refund (§3.10 item 3)", async () => {
+    const broken = await sql(`
+      select c.id, c.amount, c.refund_amount, coalesce(t.total, 0) as credited
+      from charge c
+      left join (select related_charge_id, sum(amount) as total from escrow_transaction where reason = 'charge_refund' and type = 'credit' group by related_charge_id) t
+        on t.related_charge_id = c.id
+      where (c.refund_amount is not null and c.refund_amount > c.amount)
+         or ${cents('coalesce(t.total, 0)')} <> ${cents('coalesce(c.refund_amount, 0)')}
+    `);
+    expect(broken).toEqual([]);
+    const stray = await sql(`select id from escrow_transaction where reason = 'charge_refund' and (related_charge_id is null or type <> 'credit')`);
+    expect(stray).toEqual([]);
+  });
+
+  it('every paid charge has its paper receipt, never a void one — an instalment its deposit slip instead (§3.10 item 2)', async () => {
+    const broken = await sql(`
+      select c.id, c.kind, c.status, r.status as receipt_status
+      from charge c left join receipt r on r.charge_id = c.id
+      where (c.kind not in ('instalment', 'school_fee_push') and c.status = 'paid' and (r.id is null or r.status = 'void'))
+         or (c.kind in ('instalment', 'school_fee_push') and r.id is not null)
+    `);
+    expect(broken).toEqual([]);
+    const slips = await sql(`
+      select p.id from payment p
+      where p.purpose = 'charge' and p.status in ('completed', 'refunded')
+        and exists (select 1 from payment_charge pc join charge c on c.id = pc.charge_id where pc.payment_id = p.id and c.kind = 'instalment')
+        and coalesce(p.metadata->>'depositSlip', '') = ''
+    `);
+    expect(slips).toEqual([]);
+  });
+
+  it("an instalment's payment credited the held wallet for exactly its amount, earmarked for its line, and its reversal took exactly that back (§3.6, §3.10 item 6)", async () => {
+    const broken = await sql(`
+      select p.id, p.status, p.amount, p.escrow_amount_applied, line.id as line, coalesce(cr.total, 0) as credited, coalesce(db.total, 0) as reversed
+      from payment p
+      join lateral (select c.registration_id as id from payment_charge pc join charge c on c.id = pc.charge_id
+                    where pc.payment_id = p.id and c.kind = 'instalment' limit 1) line on true
+      left join (select related_payment_id, related_registration_id, sum(amount) as total from escrow_transaction
+                 where reason = 'instalment' and type = 'credit' and balance_type = 'held' group by related_payment_id, related_registration_id) cr
+        on cr.related_payment_id = p.id
+      left join (select related_payment_id, sum(amount) as total from escrow_transaction
+                 where reason = 'instalment_reversed' and type = 'debit' and balance_type = 'held' group by related_payment_id) db
+        on db.related_payment_id = p.id
+      where p.escrow_amount_applied <> 0
+         or ${cents('coalesce(cr.total, 0)')} <> case when p.status in ('completed', 'refunded') then ${cents('p.amount')} else 0 end
+         or (cr.related_registration_id is not null and cr.related_registration_id <> line.id)
+         or ${cents('coalesce(db.total, 0)')} <> case when p.status = 'refunded' then ${cents('p.amount')} else 0 end
+    `);
+    expect(broken).toEqual([]);
+  });
+
+  it("a line under a plan is confirmed only by one payment capturing its held deposits, equal to its price (§3.10 item 6)", async () => {
+    const broken = await sql(`
+      select r.id, r.status, r.price_at_registration, count(p.id) as payments,
+             bool_and(p.payment_method = 'held_deposits') as by_capture, sum(p.escrow_amount_applied) as applied, sum(p.amount) as cash
+      from exception pl
+      join registration r on r.id = pl.registration_id
+      left join payment_registration pr on pr.registration_id = r.id
+      left join payment p on p.id = pr.payment_id and p.status = 'completed'
+      where pl.policy_key = 'plan.instalments' and pl.status = 'used'
+      group by r.id
+      having count(p.id) <> 1 or not bool_and(p.payment_method = 'held_deposits')
+         or ${cents('sum(p.escrow_amount_applied)')} <> ${cents('r.price_at_registration')} or ${cents('sum(p.amount)')} <> 0
+    `);
+    expect(broken).toEqual([]);
+    // And a capture payment is a plan's: its line had a used plan, its debit is plan_capture.
+    const stray = await sql(`
+      select p.id from payment p
+      where p.payment_method = 'held_deposits' and (p.purpose <> 'registration' or p.status <> 'completed' or not exists (
+        select 1 from payment_registration pr join exception pl on pl.registration_id = pr.registration_id
+        where pr.payment_id = p.id and pl.policy_key = 'plan.instalments' and pl.status = 'used'))
+    `);
+    expect(stray).toEqual([]);
+  });
+
+  it("a plan's deposits end as exactly one capture, or at most one release and one forfeit summing to them; a live plan's are all still held (§3.10 item 6)", async () => {
+    const broken = await sql(`
+      with ledger as (
+        select t.related_registration_id as line,
+          sum(case when t.reason = 'instalment' then t.amount when t.reason = 'instalment_reversed' then -t.amount else 0 end) as deposits,
+          sum(case when t.reason = 'plan_capture' then t.amount else 0 end) as captured, count(*) filter (where t.reason = 'plan_capture') as captures,
+          sum(case when t.reason = 'plan_forfeit' then t.amount else 0 end) as forfeited, count(*) filter (where t.reason = 'plan_forfeit') as forfeits,
+          sum(case when t.reason = 'plan_release' then t.amount else 0 end) as released, count(*) filter (where t.reason = 'plan_release') as releases
+        from escrow_transaction t
+        where t.balance_type = 'held' and t.related_registration_id is not null
+          and t.reason in ('instalment', 'instalment_reversed', 'plan_capture', 'plan_forfeit', 'plan_release')
+        group by t.related_registration_id
+      )
+      select pl.id, pl.status, l.*
+      from exception pl join ledger l on l.line = pl.registration_id
+      where pl.policy_key = 'plan.instalments'
+        and case
+          when pl.status = 'used' then l.captures <> 1 or ${cents('l.captured')} <> ${cents('l.deposits')} or l.forfeits + l.releases > 0
+          when pl.status = 'active' then l.captures + l.forfeits + l.releases > 0
+          else l.captures > 0 or l.forfeits > 1 or l.releases > 1 or ${cents('l.forfeited + l.released')} <> ${cents('l.deposits')}
+        end
+    `);
+    expect(broken).toEqual([]);
+    // A release to free escrow is a held debit and a free credit of the same amount, both for the line.
+    const releases = await sql(`
+      select h.related_registration_id, h.amount as held, f.amount as free
+      from escrow_transaction h
+      left join escrow_transaction f on f.related_registration_id = h.related_registration_id and f.reason = 'plan_release' and f.balance_type = 'free' and f.type = 'credit'
+      where h.reason = 'plan_release' and h.balance_type = 'held'
+        and (f.id is null or ${cents('f.amount')} <> ${cents('h.amount')})
+    `);
+    expect(releases).toEqual([]);
+    // PLAN_SETTLED says what the ledger did: kept is the forfeit, released the release.
+    const settled = await sql(`
+      select a.entity_id, a.new_data from audit_log a
+      where a.action = 'PLAN_SETTLED' and (
+        ${cents(`coalesce((a.new_data->>'kept')::numeric, 0)`)} <> ${cents(`coalesce((select sum(t.amount) from escrow_transaction t where t.reason = 'plan_forfeit' and t.related_registration_id = a.entity_id), 0)`)}
+        or ${cents(`coalesce((a.new_data->>'released')::numeric, 0)`)} <> ${cents(`coalesce((select sum(t.amount) from escrow_transaction t where t.reason = 'plan_release' and t.balance_type = 'held' and t.related_registration_id = a.entity_id), 0)`)})
+    `);
+    expect(settled).toEqual([]);
+    // Every plan that ended was settled once (its PLAN_SETTLED row), every live or used one never.
+    const settlements = await sql(`
+      select pl.id, pl.status, (select count(*) from audit_log a where a.action = 'PLAN_SETTLED' and a.new_data->>'planId' = pl.id) as rows
+      from exception pl where pl.policy_key = 'plan.instalments'
+        and (select count(*) from audit_log a where a.action = 'PLAN_SETTLED' and a.new_data->>'planId' = pl.id) <> case when pl.status in ('revoked', 'lapsed') then 1 else 0 end
+    `);
+    expect(settlements).toEqual([]);
+  });
+
+  it('a plan settled keeps at most its deposits and at most the line\'s price (§3.6)', async () => {
+    // What a paid drop that day would keep is computed by refundFor at the settlement (08q's worked example proves it);
+    // this rule checks the two bounds every settlement must hold over every row.
+    const broken = await sql(`
+      select a.entity_id, a.new_data from audit_log a
+      where a.action = 'PLAN_SETTLED'
+        and ((a.new_data->>'kept')::numeric > (a.new_data->>'deposits')::numeric or (a.new_data->>'kept')::numeric > (a.new_data->>'price')::numeric)
+    `);
+    expect(broken).toEqual([]);
+  });
+
+  it('every one-shot gate exception is used at most once, by the reservation it let through (§8)', async () => {
+    const broken = await sql(`
+      select e.id, e.policy_key, e.status, e.used_at, (select count(*) from audit_log a where a.action = 'EXCEPTION_USED' and a.entity_id = e.id) as rows
+      from exception e
+      where (e.status = 'used' and e.policy_key <> 'plan.instalments'
+              and (e.used_at is null or jsonb_array_length(coalesce(e.used_for->'registrationIds', '[]'::jsonb)) = 0
+                or (select count(*) from audit_log a where a.action = 'EXCEPTION_USED' and a.entity_id = e.id) <> 1))
+         or (e.status <> 'used' and (select count(*) from audit_log a where a.action = 'EXCEPTION_USED' and a.entity_id = e.id) <> 0)
+    `);
+    expect(broken).toEqual([]);
+    // And only a one-shot gate (or a captured plan) is ever used.
+    const notOneShot = await sql(`
+      select id, policy_key from exception where status = 'used'
+        and policy_key not in ('gate.selfStudyFirstEntry', 'gate.availability', 'gate.requiredItems', 'gate.priorSeries', 'gate.exclusiveItems', 'gate.sameEntryOnce', 'plan.instalments')
+    `);
+    expect(notOneShot).toEqual([]);
+  });
+
+  it("every exception carries a policy of the registry, its value in its policy's own column, and the scope the policy accepts (§3.7)", async () => {
+    const { POLICIES, SCOPE_FIELD } = await import('@repo/validations');
+    const column: Record<string, string> = {
+      sessionId: 'session_id', subjectId: 'subject_id', offerId: 'offer_id', offerItemId: 'offer_item_id', registrationId: 'registration_id',
+      chargeId: 'charge_id', boardSeriesId: 'board_series_id', academicYear: 'academic_year',
+    };
+    const rows = await sql<Record<string, string | null>>(`select * from exception`);
+    const problems: string[] = [];
+    for (const r of rows) {
+      const p = (POLICIES as Record<string, { valueType: string; scopes: readonly string[] }>)[r.policy_key!];
+      if (!p) { problems.push(`${r.id}: unknown policy ${r.policy_key}`); continue; }
+      const has = { number: r.value_number !== null, date: r.value_date !== null, json: r.value_json !== null };
+      const ok = p.valueType === 'none' ? !has.number && !has.date && !has.json
+        : p.valueType === 'percent' || p.valueType === 'amount' ? has.number && !has.date && !has.json
+          : p.valueType === 'date' ? has.date && !has.number && !has.json
+            : has.json && !has.number && !has.date;
+      if (!ok) problems.push(`${r.id}: ${r.policy_key} value columns ${JSON.stringify(has)}`);
+      const allowed = new Set(p.scopes.map((sc) => column[(SCOPE_FIELD as Record<string, string>)[sc]!]));
+      // A migrated exception whose scope the registry no longer reads the same way waits under
+      // "Check these" (check_reason) with the scope it had (§3.7): not an error.
+      if (r.check_reason) continue;
+      for (const col of Object.values(column)) if (r[col] && !allowed.has(col)) problems.push(`${r.id}: ${r.policy_key} narrowed by ${col}`);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it('every charge has one creation row; every desk drop was past its line\'s deadline (§3.3, §3.6)', async () => {
+    const broken = await sql(`
+      select c.id, count(a.id) as rows from charge c
+      left join audit_log a on a.entity_id = c.id and a.action in ('CHARGE_CREATED', 'CHARGE_REQUESTED')
+      group by c.id having count(a.id) <> 1
+    `);
+    expect(broken).toEqual([]);
+    const early = await sql(`
+      select a.entity_id from audit_log a join registration r on r.id = a.entity_id
+      where a.action = 'DESK_DROP_EXECUTED'
+        and coalesce(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) > a.created_at, true)
+    `);
+    expect(early).toEqual([]);
+  });
+
   // ─── The reservations rework, step B (docs/features/RESERVATIONS_LINES.md §7) ──────────────
 
   it('every line confirmed since the rework has its two consents, the refund policy and the declaration (§3.5, §8)', async () => {
@@ -686,5 +995,72 @@ describe('money invariants over the whole database', () => {
     // There was something to check: answers and system drops on declared sittings.
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action in ('PRIOR_SITTING_VERIFIED', 'PRIOR_SITTING_REJECTED')`))[0]?.n)).toBeGreaterThan(0);
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'LINE_DROPPED_UNVERIFIED' or (action = 'PRIOR_SITTING_REJECTED' and new_data->>'effect' = 'dropped')`))[0]?.n)).toBeGreaterThan(0);
+  });
+  // ─── The reservations rework, step D: messages and reminders (RESERVATIONS_REWORK.md §3.8, §8) ───
+
+  it('there are messages and reminders to check: staff messages, reminders claimed, emails sent and failed, announcements moved', async () => {
+    const [c] = await sql<Record<string, string>>(`select
+      (select count(*) from message where source = 'staff' and status = 'sent') as staff,
+      (select count(*) from message where source = 'reminder') as reminders,
+      (select count(*) from reminder_sent) as claims,
+      (select count(*) from message_delivery where channel = 'email' and status = 'sent') as emails,
+      (select count(*) from message_delivery where channel = 'email' and status = 'failed') as failed,
+      (select count(*) from message where status = 'cancelled') as cancelled`);
+    for (const k of ['staff', 'reminders', 'claims', 'emails', 'failed', 'cancelled']) expect(Number(c![k]), k).toBeGreaterThan(0);
+  });
+
+  it('every reminder sent has its claim row: a reminder message has its claims, each claim its reminder message and rule, one claim per target, day and offset (§8, ST-06, ST-12)', async () => {
+    expect(await sql(`select m.id from message m where m.source = 'reminder' and not exists (select 1 from reminder_sent rs where rs.message_id = m.id)`)).toEqual([]);
+    expect(await sql(`select rs.id from reminder_sent rs join message m on m.id = rs.message_id join reminder_rule rr on rr.id = rs.rule_id
+      where m.source <> 'reminder' or m.reminder_rule_id <> rs.rule_id or rr.kind <> rs.kind`)).toEqual([]);
+    expect(await sql(`select kind, target_kind, target_id, anchor_on, offset_days from reminder_sent
+      group by kind, target_kind, target_id, anchor_on, offset_days having count(*) > 1`)).toEqual([]);
+    // At most one reminder a day per target and date, whatever rule changed during the day (the review of 5c2f2bf, item 5).
+    expect(await sql(`select kind, target_kind, target_id, anchor_on, sent_on from reminder_sent
+      group by kind, target_kind, target_id, anchor_on, sent_on having count(*) > 1`)).toEqual([]);
+    // A reminder about a student who had left the school by the day it went out (item 6).
+    expect(await sql(`select rs.id from reminder_sent rs join "user" u on u.id = rs.student_id
+      where u.left_on is not null and u.left_on <= rs.sent_on`)).toEqual([]);
+    // Nothing about a child's money went out without a claim on that child in the same message.
+    expect(await sql(`select d.id from message_delivery d join message m on m.id = d.message_id join reminder_rule rr on rr.id = m.reminder_rule_id
+      where m.source = 'reminder' and rr.kind in ('payment_due', 'school_fee_due')
+        and (d.student_id is null or not exists (select 1 from reminder_sent rs where rs.message_id = m.id and rs.student_id = d.student_id))`)).toEqual([]);
+  });
+
+  it('a payment reminder was never claimed for a line or a charge after it was paid (§3.8: until paid)', async () => {
+    expect(await sql(`select rs.id from reminder_sent rs
+      where rs.kind = 'payment_due' and rs.target_kind = 'line'
+        and exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id
+                    where pr.registration_id = rs.target_id and p.status = 'completed' and p.confirmed_at < rs.sent_at)`)).toEqual([]);
+    expect(await sql(`select rs.id from reminder_sent rs
+      where rs.kind in ('payment_due', 'school_fee_due') and rs.target_kind = 'charge'
+        and exists (select 1 from charge c where c.id = rs.target_id and c.status in ('paid', 'refunded')
+                    and coalesce((select max(p.confirmed_at) from payment_charge pc join payment p on p.id = pc.payment_id
+                                  where pc.charge_id = c.id and p.status = 'completed'),
+                                 (select p.confirmed_at from payment p where p.id = c.settled_by_payment_id)) < rs.sent_at)`)).toEqual([]);
+  });
+
+  it('every delivery belongs to a message; an in-app delivery is the notification it wrote, a notification a message wrote has its delivery; nothing scheduled or cancelled was delivered (§3.8)', async () => {
+    expect(await sql(`select d.id from message_delivery d left join message m on m.id = d.message_id where m.id is null`)).toEqual([]);
+    expect(await sql(`select d.id from message_delivery d left join notification n on n.id = d.notification_id
+      where d.channel = 'in_app' and d.status = 'sent' and (n.id is null or n.user_id <> d.recipient_id or n.title <> d.title or n.body <> d.body)`)).toEqual([]);
+    expect(await sql(`select n.id from notification n where n.data ? 'messageId'
+      and not exists (select 1 from message_delivery d where d.notification_id = n.id and d.message_id = n.data->>'messageId')`)).toEqual([]);
+    expect(await sql(`select m.id from message m where m.status in ('scheduled', 'cancelled') and exists (select 1 from message_delivery d where d.message_id = m.id)`)).toEqual([]);
+    // A sent email marked its in-app twin's notification as emailed, as the notification centre always recorded it.
+    expect(await sql(`select e.id from message_delivery e join message_delivery i on i.message_id = e.message_id and i.recipient_id = e.recipient_id
+        and coalesce(i.student_id, '') = coalesce(e.student_id, '') and i.channel = 'in_app'
+      join notification n on n.id = i.notification_id
+      join message m on m.id = e.message_id and m.source <> 'legacy_announcement'
+      where e.channel = 'email' and e.status = 'sent' and n.email_sent_at is null`)).toEqual([]);
+  });
+
+  it('every message sent has its audit row, and counts the people its deliveries reached (O-7)', async () => {
+    expect(await sql(`select m.id from message m where m.status = 'sent'
+      and not exists (select 1 from audit_log a where a.entity_id = m.id and a.action in ('MESSAGE_SENT', 'REMINDERS_SENT', 'REWORK_BACKFILL_MESSAGE'))`)).toEqual([]);
+    expect(await sql(`select m.id from message m where m.status = 'cancelled'
+      and m.source <> 'legacy_announcement' and not exists (select 1 from audit_log a where a.entity_id = m.id and a.action = 'MESSAGE_CANCELLED')`)).toEqual([]);
+    expect(await sql(`select m.id from message m where m.status = 'sent' and m.source <> 'legacy_announcement'
+      and m.recipient_count <> (select count(distinct d.recipient_id) from message_delivery d where d.message_id = m.id)`)).toEqual([]);
   });
 });

@@ -24,7 +24,7 @@ import { recheckLines, LineRuleError } from './line-rules.services';
 import { effectiveDeadlineFor, linesKeptByLateEntry } from './deadline.services';
 import { creditHeld, debitHeld, getEscrowBalance } from './escrow.services';
 import { executeReceiptGatedDrop, lockReceiptOf } from './receipt.services';
-import { refundPercentage } from './refund.services';
+import { refundFor } from './refund.services';
 import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterForInTx } from './eligibility.services';
 import { notifyFinanceOfHeldPreregistration, notifyPreregistrationsRefundedAtDeadline } from './notification.services';
 import { logger } from '../lib/logger';
@@ -128,7 +128,10 @@ export async function cancelPreregistration(registrationId: string, parentId: st
   // drop (MO-21; review of ae4f88b, flag 1).
   const deadline = await effectiveDeadlineFor(db, reg);
   const pastDeadline = !!deadline.at && deadline.at <= new Date();
-  const pct = pastDeadline ? 100 : await refundPercentage(new Date(), reg.sessionId, reg.studentId);
+  // Before it, the family's own drop: the line's refund (refundFor, §3.9) — a preregistration was
+  // never confirmed, so its board fee was never sent and comes back in full.
+  const quote = pastDeadline ? null : await refundFor(db, registrationId, new Date());
+  const pct = quote ? quote.percent : 100;
 
   const result = await db.transaction(async (tx) => {
     // Lock the row, then decide. A payment still open for it means money may
@@ -140,7 +143,7 @@ export async function cancelPreregistration(registrationId: string, parentId: st
     if (open) {
       throw new Error('A payment for this subject is in progress — cancel that checkout first, or wait for the finance office to confirm or reject the transfer');
     }
-    const refundAmount = funded ? round2((reg.priceAtRegistration * pct) / 100) : 0;
+    const refundAmount = funded ? (quote ? quote.amount : round2(reg.priceAtRegistration)) : 0;
 
     // Release the full held amount; the refundable portion re-enters the
     // free balance (receipt-gated); the remainder is retained per the

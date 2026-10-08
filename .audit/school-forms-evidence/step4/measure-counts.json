@@ -1,0 +1,113 @@
+{
+ "measured_on": "2026-10-08",
+ "main": "9edefbb",
+ "system": "lead-env, igcse_lead_dev from igcse_template_dev migrated to 0049, ports 3001/3000",
+ "method": "headless Chrome scripts drive-l1..l13 (in this folder); an input is a field filled or a control picked, a click is a button or row pressed; the sign-in and page navigation are not counted",
+ "tasks": [
+  {
+   "task": "New session (June 2028, start empty)",
+   "design": "6 inputs, 1 click",
+   "measured": {
+    "inputs": 6,
+    "clicks": 2
+   },
+   "note": "type, year, reserve from, reserve to, course starts, payment due; the clicks are New session and Create session; the refund policy came from the type"
+  },
+  {
+   "task": "Set up one subject (open, one teacher, course fee)",
+   "design": "per subject: the subject, its teachers, the course fee",
+   "measured": {
+    "inputs": 3,
+    "clicks": 3
+   },
+   "note": "row, availability, fee, Show every teacher (the template has no subject pools), the teacher, Save; a self-study-only subject: 2 inputs, 2 clicks; the template had no teacher, so Teacher A was created on the Team page first (5 inputs, 1 click)"
+  },
+  {
+   "task": "Fees: confirm the series' grid",
+   "design": "one paste per series and a confirm each",
+   "measured": {
+    "inputs": 0,
+    "clicks": 1
+   },
+   "note": "Confirm all confirmed 17 rows copied provisional at EGP 300"
+  },
+  {
+   "task": "Series dates (entry deadline, retakes until, exams start and end, the reason)",
+   "design": "1 date and the deadlines",
+   "measured": {
+    "inputs": 6,
+    "clicks": 2
+   },
+   "note": "on the Board Series page: the academic-year filter, Dates, five fields, Save the dates; the reason is required and sits under 'Why it changes'"
+  },
+  {
+   "task": "A family reserves three subjects, one a self-study retake declared with its sitting",
+   "design": "6-8 answers",
+   "measured": {
+    "inputs": 9,
+    "clicks": 1
+   },
+   "note": "child, session, 3 ticks, the entry, the sitting, 2 consents, Reserve; 7 if the only child and the only open session were preselected; the retake is 'to be verified by the school' and priced course x 50% + board; paid per entry deadline (3,100 + 850)"
+  },
+  {
+   "task": "The desk takes a walk-in family's money (onboarding included)",
+   "design": "14-15 inputs, 4 clicks",
+   "measured": {
+    "inputs": 14,
+    "clicks": 4
+   },
+   "note": "onboarding 7 inputs and 2 clicks (New Family, Create & Link; the student stays open with the Reserve panel), then session, 3 ticks, the entry, the sitting, the consent, Reserve and collect (cash preset): 3 lines reserved and EGP 3,950 collected in 2 payments with 3 receipts to hand over and the slip to print; the script's extra '+ Reserve' click was not needed"
+  },
+  {
+   "task": "The desk collects lines the family reserved",
+   "design": "",
+   "measured": {
+    "inputs": 2,
+    "clicks": 2
+   },
+   "note": "search, the student, the parent-consent tick for school-reserved lines (shown though the family reserved), Collect EGP 3,950; 2 payments, 3 receipts; Owes now 0 after"
+  },
+  {
+   "task": "Lift a rule for one family (20% discount)",
+   "design": "5-6 inputs, 1 click",
+   "measured": {
+    "inputs": 5,
+    "clicks": 1
+   },
+   "note": "student, the whole family, policy, value, reason, Grant; the policy list shows every policy with 'not yours to grant' on the admin-only ones"
+  },
+  {
+   "task": "Know who has paid",
+   "design": "the session's Money tab",
+   "measured": {
+    "inputs": 0,
+    "clicks": 1
+   },
+   "note": "6 lines, 6 paid, EGP 7,900, 0 unpaid, 0 overdue; per line the price split, the due date and the status; filters, Remind, Export"
+  },
+  {
+   "task": "Set the refund windows",
+   "design": "copied from the type's policy at creation; one date",
+   "measured": {
+    "inputs": 0,
+    "clicks": 0
+   },
+   "note": "'100% to week 2 - 50% in week 3 - 0% from week 4' came with the type; the course start is one of the six creation inputs"
+  },
+  {
+   "task": "Remind unpaid families",
+   "design": "a rule once; Remind on the Money tab",
+   "measured": null,
+   "note": "step 3 (D) in progress"
+  }
+ ],
+ "observations_for_the_ui_audit": [
+  "A new session lists every active subject closed (17 rows) and the catalogue's self-study-only subjects (Environmental Management, French) are visible to families at once; the admin table should say which subjects families can see",
+  "The subject drawer has two forms with two Save buttons (the subject and its item); a script, and a person, can save the wrong one",
+  "'Dates not set' on the session is not a link to the Board Series page, where the dates are set under the next academic year's filter",
+  "The dates form's required reason is labelled 'Why it changes' near the top while a 'Notes' field sits at the bottom; call it 'Reason (required)'",
+  "The family's Reserve page should preselect the only child and the only open session (two answers saved)",
+  "The onboarding form opens the Reserve panel itself, so '+ Reserve' is not needed afterwards (good); the desk's consent tick for school-reserved lines appears even when the family reserved",
+  "The Arabic hydration warning from the language provider persists (pre-existing)"
+ ]
+}

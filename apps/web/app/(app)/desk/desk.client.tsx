@@ -9,6 +9,7 @@
  * take back / print receipts.
  */
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
@@ -20,13 +21,16 @@ import {
   IN_SCHOOL_INSTRUMENTS,
   IN_SCHOOL_INSTRUMENT_LABELS,
   EXCEPTION_TYPE_LABELS,
+  POLICIES,
+  isRegistryPolicyKey,
 } from '@repo/validations';
 import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
 import { ReasonModal } from '~/components/ui/reason-modal';
 import { Badge, StandingBadge } from '~/components/ui/tone';
 import { StudentAcademicPanel } from '~/components/student-academic-panel';
-import { Reserve, SlipLink, type ReserveDone } from '~/components/reservations/reserve';
+import { DeskCollectPanel, AlsoCollect, type Extras } from './desk-collect.client';
+import { Reserve, SlipLink, Sentences, type ReserveDone } from '~/components/reservations/reserve';
 import { StatementView } from '~/components/reservations/statement';
 
 // ─── Types, derived from their fetchers (CLAUDE.md: Hono RPC everywhere) ──────
@@ -66,7 +70,8 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
   const [studentId, setStudentId] = useState<string | null>(null);
   const [showOnboard, setShowOnboard] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
-  const [message, setMessage] = useState('');
+  // A string, or a reservation's sentences (each shown, and translated, on its own).
+  const [message, setMessage] = useState<string | string[]>('');
   const [errorMsg, setErrorMsg] = useState('');
   const [reverseTarget, setReverseTarget] = useState<{ id: string; label: string; confirmedAt: string | null } | null>(null);
   const [undoTransferTarget, setUndoTransferTarget] = useState<{ id: string; label: string } | null>(null);
@@ -94,7 +99,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
     qc.invalidateQueries({ queryKey: ['desk'] });
     qc.invalidateQueries({ queryKey: ['finance'] });
   };
-  const done = (msg: string) => { setMessage(msg); setErrorMsg(''); refresh(); };
+  const done = (msg: string | string[]) => { setMessage(msg); setErrorMsg(''); refresh(); };
   const fail = (err: Error) => { setErrorMsg(err.message); setMessage(''); };
 
   // ── Desk actions ──────────────────────────────────────────────────────────
@@ -106,24 +111,6 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
         })
       ),
     onSuccess: (d) => done(`School fee collected (${formatPrice((d as unknown as { amount: number }).amount)}). Registration unlocked.`),
-    onError: fail,
-  });
-
-  // A subject the school reserved (grade 10) carries the school's consent only: the parent's own,
-  // read and signed, goes with its collection (RESERVATIONS_REWORK.md §3.5).
-  const [collectConsent, setCollectConsent] = useState(false);
-  const collectMutation = useMutation({
-    mutationFn: (v: { registrationIds: string[]; instrumentUsed: (typeof IN_SCHOOL_INSTRUMENTS)[number] }) =>
-      apiResponse(api.v1.registrations.desk.collect.$post({ json: {
-        studentId: studentId!, ...v, escrowAmountToApply: 0,
-        ...(collectConsent ? { consent: { refundPolicy: true as const, declaration: true as const } } : {}),
-      } })),
-    onSuccess: (d) => {
-      setCollectConsent(false);
-      done(
-        `Collected ${formatPrice(d.collected)}. Receipts ready to hand over${d.receipts.length ? `: ${d.receipts.map((r) => r.receiptNumber).join(', ')}` : ''}.${paymentsLine(d)}`
-      );
-    },
     onError: fail,
   });
 
@@ -191,7 +178,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
 
       {message && (
         <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400 flex justify-between">
-          <span>{message}</span>
+          <span>{Array.isArray(message) ? <Sentences items={message} /> : message}</span>
           <button className="text-xs underline" onClick={() => setMessage('')}>Dismiss</button>
         </div>
       )}
@@ -358,18 +345,24 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
               </Button>
             </div>
 
+            {isFinanceAdmin && (
+              <p className="mt-3 text-xs">
+                <Link href={`/admin/exceptions?studentId=${summary.student.id}`} className="text-primary underline">Grant an exception for this student</Link>
+              </p>
+            )}
             {summary.exceptions.length > 0 && (
               <p className="mt-3 text-xs text-violet-700 dark:text-violet-400">
                 Active exceptions:{' '}
                 {summary.exceptions
-                  .map((e) => EXCEPTION_TYPE_LABELS[e.type as keyof typeof EXCEPTION_TYPE_LABELS] ?? e.type)
+                  // The registry's label (the student's own and the family's, RESERVATIONS_REWORK.md §3.7).
+                  .map((e) => (isRegistryPolicyKey(e.policyKey) ? POLICIES[e.policyKey].label : EXCEPTION_TYPE_LABELS[e.type as keyof typeof EXCEPTION_TYPE_LABELS] ?? e.policyKey))
                   .join(', ')}
               </p>
             )}
           </div>
 
           {showRegister && (
-            <DeskReserveCard key={summary.student.id} studentId={summary.student.id} onDone={(msg) => done(msg)} />
+            <DeskReserveCard key={summary.student.id} studentId={summary.student.id} onDone={(sentences) => done(sentences)} />
           )}
 
           {showStatement && (
@@ -379,55 +372,11 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
             </div>
           )}
 
-          {/* Subjects registered and waiting for payment (MA-18): after a
-              reversal, a rejected transfer, a cancelled checkout or a
-              register-only visit, the money is taken here in one click. */}
-          {(() => {
-            const waiting = summary.registrations.filter((r) => r.status === 'pending_payment');
-            if (waiting.length === 0) return null;
-            // A line on a provisional board fee is collected once the fee is confirmed (§3.4).
-            const unpaid = waiting.filter((r) => r.payableNow);
-            const provisional = waiting.filter((r) => !r.payableNow);
-            const total = unpaid.reduce((s, r) => s + r.priceAtRegistration, 0);
-            return (
-              <div className="bg-card rounded-xl border border-border shadow-sm px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  {unpaid.length > 0 && (
-                    <>
-                      <p className="text-sm font-semibold text-foreground">
-                        {unpaid.length} subject{unpaid.length === 1 ? '' : 's'} waiting for payment — {formatPrice(total)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{unpaid.map((r) => r.subject.name).join(' · ')}</p>
-                    </>
-                  )}
-                  {provisional.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      <span>On a provisional board fee, collected once the fee is confirmed:</span> <bdi data-i18n-skip="true">{provisional.map((r) => r.subject.name).join(' · ')}</bdi>
-                    </p>
-                  )}
-                  {unpaid.length > 0 && (
-                    <label className="mt-1 flex items-center gap-2 text-xs text-foreground">
-                      <input type="checkbox" className="h-3.5 w-3.5" checked={collectConsent} onChange={(e) => setCollectConsent(e.target.checked)} />
-                      <span>Refund policy and declaration read and signed by the parent (asked for subjects the school reserved)</span>
-                    </label>
-                  )}
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  {unpaid.length > 0 && IN_SCHOOL_INSTRUMENTS.slice(0, 3).map((inst) => (
-                    <Button
-                      key={inst}
-                      size="sm"
-                      variant="outline"
-                      disabled={collectMutation.isPending}
-                      onClick={() => collectMutation.mutate({ registrationIds: unpaid.map((r) => r.id), instrumentUsed: inst })}
-                    >
-                      Collect — {IN_SCHOOL_INSTRUMENT_LABELS[inst]}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          {/* Everything owed now (MA-18 and the reservations rework §3.10 item 1): subjects waiting
+              for payment after a reversal, a rejected transfer, a cancelled checkout or a
+              register-only visit, the student's charges and the year's school fee — ticked and
+              taken in one action, each part its own payment. */}
+          <DeskCollectPanel studentId={summary.student.id} summary={summary} onDone={refresh} />
 
           {/* Registrations with receipts */}
           <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -452,6 +401,15 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                           {r.session.name}
                           {r.teacher && <> · {r.teacher.name}</>}
                         </div>
+                        {/* The exceptions that touched the line (§4.7), and one granted on it from here. */}
+                        {(r.exceptions.length > 0 || isFinanceAdmin) && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {r.exceptions.map((e) => <Badge key={e.id} tone={e.status === 'active' || e.status === 'used' ? 'info' : 'neutral'}>{e.label}</Badge>)}
+                            {isFinanceAdmin && (
+                              <Link href={`/admin/exceptions?studentId=${summary.student.id}&registrationId=${r.id}`} className="text-xs text-primary underline">Exception on this line</Link>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 text-xs">
                         {REGISTRATION_STATUS_LABELS[r.status as keyof typeof REGISTRATION_STATUS_LABELS] ?? r.status}
@@ -759,10 +717,12 @@ const fetchActiveSessions = () => apiResponse(api.v1.sessions.active.$get());
  * (one payment per entry deadline; a provisional line reserved now, collected once confirmed);
  * the slip to print with the consent texts.
  */
-function DeskReserveCard({ studentId, onDone }: { studentId: string; onDone: (msg: string) => void }) {
+function DeskReserveCard({ studentId, onDone }: { studentId: string; onDone: (sentences: string[]) => void }) {
   const { data: sessions = [] } = useQuery({ queryKey: ['sessions', 'active'], queryFn: fetchActiveSessions });
   const [sessionId, setSessionId] = useState('');
   const [last, setLast] = useState<ReserveDone | null>(null);
+  // "Also collect now" (step C, §4.3): the year's fee and the student's charges with the reservation.
+  const [extras, setExtras] = useState<Extras>({ chargeIds: [], total: 0 });
   const chosen = sessionId || (sessions.length === 1 ? sessions[0]!.id : '');
   return (
     <div className="bg-card rounded-xl border border-primary/40 shadow-sm p-5 space-y-4">
@@ -779,16 +739,17 @@ function DeskReserveCard({ studentId, onDone }: { studentId: string; onDone: (ms
       </div>
       {last && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
-          <p>{last.message}</p>
+          <p><Sentences items={last.sentences} /></p>
           {last.desk && last.desk.receipts.length > 0 && (
             <p className="mt-1 text-xs"><span>Receipts to hand over:</span> <span className="font-mono" data-i18n-skip="true">{last.desk.receipts.map((r) => r.receiptNumber).join(', ')}</span></p>
           )}
           <div className="mt-2"><SlipLink studentId={studentId} registrationIds={last.registrationIds} /></div>
         </div>
       )}
+      {chosen && <AlsoCollect studentId={studentId} value={extras} onChange={setExtras} />}
       {chosen && (
-        <Reserve key={`${chosen}|${studentId}`} viewer="desk" studentId={studentId} sessionId={chosen}
-          onDone={(d) => { setLast(d); onDone(d.message); }} />
+        <Reserve key={`${chosen}|${studentId}`} viewer="desk" studentId={studentId} sessionId={chosen} deskExtras={extras}
+          onDone={(d) => { setLast(d); setExtras({ chargeIds: [], total: 0 }); onDone(d.sentences); }} />
       )}
     </div>
   );

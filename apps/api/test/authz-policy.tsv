@@ -44,9 +44,6 @@ GET	/v1/links/parents	D	A	D	D	D	D	D	D	D
 GET	/v1/links/pending	D	A	A	D	D	A	D	D	D
 POST	/v1/links	D	D	A	D	D	D	D	D	D
 PUT	/v1/notifications/:id/read	D	A	A	A	A	A	A	A	A
-POST	/v1/notifications/admin/announce	D	D	D	D	D	A	D	D	D
-DELETE	/v1/notifications/admin/scheduled/:id	D	D	D	D	D	A	D	D	D
-GET	/v1/notifications/admin/scheduled	D	D	D	D	D	A	D	D	D
 PUT	/v1/notifications/read-all	D	A	A	A	A	A	A	A	A
 GET	/v1/notifications/unread-count	D	A	A	A	A	A	A	A	A
 GET	/v1/notifications	D	A	A	A	A	A	A	A	A
@@ -263,8 +260,42 @@ POST	/v1/board-fees/:seriesId/reprice	D	D	D	D	A	A	D	D	D
 POST	/v1/board-fees/:seriesId/copy	D	D	D	D	A	A	D	D	D
 POST	/v1/board-fees/:seriesId/parse	D	D	D	D	A	A	D	D	D
 GET	/v1/registrations/offers	D	A	A	A	A	A	A	D	D
+# The reservations rework, step C (docs/features/RESERVATIONS_MONEY.md §5): charges, board services, the registry, the desk-drop, the push.
+GET	/v1/board-services	D	A	A	A	A	A	A	D	D
+PUT	/v1/board-services/:id	D	D	D	D	D	A	A	D	D
+PUT	/v1/board-services/deadlines	D	D	D	D	D	A	A	D	D
+PUT	/v1/board-services/fees	D	D	D	D	A	A	D	D	D
+PUT	/v1/board-services/:id/refund-rule	D	D	D	D	A	A	D	D	D
+GET	/v1/charges	D	A	A	A	A	A	D	D	D
+POST	/v1/charges	D	A	A	A	A	A	D	D	D
+POST	/v1/charges/:id/accept	D	D	D	A	A	A	D	D	D
+POST	/v1/charges/:id/cancel	D	D	D	A	A	A	D	D	D
+POST	/v1/charges/:id/refund	D	D	D	D	A	A	D	D	D
+GET	/v1/exceptions/check-these	D	D	D	D	A	A	A	D	D
+POST	/v1/exceptions/:id/confirm	D	D	D	D	A	A	A	D	D
+POST	/v1/exceptions/:id/release	D	D	D	D	A	A	D	D	D
+POST	/v1/exceptions/:id/revocation	D	D	D	D	A	A	A	D	D
+GET	/v1/policies	D	D	D	A	A	A	A	D	D
+POST	/v1/registrations/:id/desk-drop	D	D	D	A	A	A	D	D	D
+POST	/v1/school-fees/push	D	D	D	D	A	A	D	D	D
 GET	/v1/sessions/:id/to-verify	D	D	D	A	A	A	A	D	D
 GET	/v1/sessions/:id/refund-terms	D	A	A	A	A	A	A	D	D
 POST	/v1/registrations/:id/verify-prior	D	D	D	A	A	A	A	D	D
 PUT	/v1/registrations/:id/teacher	D	D	D	A	A	A	A	D	D
 GET	/v1/statement	D	A	A	A	A	A	A	D	D
+# The reservations rework, step D (docs/features/RESERVATIONS_MESSAGES.md §3): messages and reminders. They replace the admin's
+# /v1/notifications/admin/announce and /admin/scheduled (removed). Finance passes the gate; the service lets it send to and read the
+# money lists only (05-object-access.test.ts and 08s prove the refusals). Families have no row here: they read /v1/notifications.
+GET	/v1/messages	D	D	D	A	A	A	D	D	D
+POST	/v1/messages	D	D	D	A	A	A	D	D	D
+POST	/v1/messages/:id/cancel	D	D	D	A	A	A	D	D	D
+POST	/v1/messages/audiences/resolve	D	D	D	A	A	A	D	D	D
+GET	/v1/messages/audiences	D	D	D	A	A	A	D	D	D
+GET	/v1/messages/lists	D	D	D	A	A	A	D	D	D
+GET	/v1/messages/templates	D	D	D	A	A	A	D	D	D
+POST	/v1/messages/templates	D	D	D	D	D	A	D	D	D
+PUT	/v1/messages/templates/:id	D	D	D	D	D	A	D	D	D
+GET	/v1/messages/deliveries	D	D	D	A	A	A	D	D	D
+GET	/v1/reminders/rules	D	D	D	D	A	A	D	D	D
+PUT	/v1/reminders/rules	D	D	D	D	A	A	D	D	D
+GET	/v1/reminders/sent	D	D	D	D	A	A	D	D	D

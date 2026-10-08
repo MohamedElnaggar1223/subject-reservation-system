@@ -1,0 +1,41 @@
+officer.mona@igcse.local → http://localhost:3000/desk
+ONBOARD inputs:
+0: input[email] Parent email * = 
+1: input[text] Parent name (new account) = 
+2: input[text] Temp password (new account) = 
+3: input[text] Phone (optional) = 
+4: input[email] Student email * = 
+5: input[text] Student name (new account) = 
+6: input[text] Temp password (new account) = 
+7: select  = Grade this year (new account)…/Grade 9 (starts grade 10 next year)/Grade 10/Grade 11/Grade 12
+8: input[search] Type a student's name, email, or ID… = 
+ONBOARD buttons: Close Onboarding | Create & Link Family
+shot 01-onboard-form
+shot 02-onboard-filled
+submit: New Family (Onboard)
+AFTER ONBOARD url: http://localhost:3000/desk
+AFTER ONBOARD:
+The Desk
+
+Find a student — see everything, do everything, in one place.
+
+Close Onboarding
+Onboard a walk-in family
+
+Enter emails. Existing accounts are reused; new ones need a name and temporary password. The link is approved on the spot — you're vouching for them in person.
+
+PARENT
+
+STUDENT
+
+Grade this year (new account)…
+Grade 9 (starts grade 10 next year)
+Grade 10
+Grade 11
+Grade 12
+Create & Link Family
+
+No student matches “Student F1”. If they are new, use New Family (Onboard) to create their accounts.
+shot 03-after-onboard
+TOTAL: inputs 8 clicks 2
+ERRORS: none

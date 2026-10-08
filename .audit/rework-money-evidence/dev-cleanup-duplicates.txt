@@ -1,0 +1,9 @@
+ lines_priced_with_them 
+------------------------
+                      0
+(1 row)
+
+BEGIN
+DELETE 4
+DELETE 4
+COMMIT

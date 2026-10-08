@@ -11,7 +11,9 @@ import {
 import { foundationArabic } from './i18n-foundation';
 import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
 import { sessionsArabic, translateSessionsText } from './i18n-sessions';
+import { moneyArabic, translateMoneyText } from './i18n-money';
 import { reservationsArabic, translateReservationsText } from './i18n-reservations';
+import { messagesArabic, translateMessagesText } from './i18n-messages';
 
 export type Language = 'en' | 'ar';
 
@@ -44,6 +46,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.schoolFees': 'School Fees',
     'nav.schoolFee': 'School Fee',
     'nav.announcements': 'Announcements',
+    'nav.messages': 'Messages',
     'nav.exceptions': 'Exceptions',
     'nav.remarks': 'Remarks',
     'nav.desk': 'The Desk',
@@ -87,6 +90,9 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.exams': 'Exams',
     'nav.catalogue': 'Exam Catalogue',
     'nav.boardSeries': 'Board Series',
+    'nav.boardServices': 'Board Services',
+    'nav.charges': 'Charges',
+    'nav.chargesDue': 'Charges & Instalments',
     'reports.title': 'Reports',
     'reports.description': 'Generate and export data reports. All reports support CSV download.',
     'reports.pendingApprovals': 'Pending Approvals',
@@ -186,6 +192,9 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.exams': 'الامتحانات',
     'nav.catalogue': 'دليل الامتحانات',
     'nav.boardSeries': 'دورات المجالس',
+    'nav.boardServices': 'خدمات المجالس',
+    'nav.charges': 'الرسوم الأخرى',
+    'nav.chargesDue': 'الرسوم والأقساط',
     'app.subjectReservation': 'حجز المواد',
     'common.user': 'مستخدم',
     'common.signOut': 'تسجيل الخروج',
@@ -211,6 +220,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.schoolFees': 'المصاريف الدراسية',
     'nav.schoolFee': 'المصاريف الدراسية',
     'nav.announcements': 'الإعلانات',
+    'nav.messages': 'الرسائل',
     'nav.exceptions': 'الاستثناءات',
     'nav.remarks': 'إعادة التصحيح',
     'nav.desk': 'المكتب',
@@ -1499,8 +1509,12 @@ Object.assign(autoArabicText, foundationArabic);
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // The reservations rework's screens (lib/i18n-sessions.ts): the same rule.
 for (const [en, ar] of Object.entries(sessionsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// Step C's money screens (lib/i18n-money.ts): the same rule.
+for (const [en, ar] of Object.entries(moneyArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // Step B's screens (lib/i18n-reservations.ts): Reserve, the statement, To verify, the slip.
 for (const [en, ar] of Object.entries(reservationsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// Step D's screens (lib/i18n-messages.ts): Messages, reminders, the Money tab's Remind, the notification types.
+for (const [en, ar] of Object.entries(messagesArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1582,9 +1596,15 @@ function translateDynamicText(text: string): string | null {
   // The reservations rework: session names, refund sentences, the refusals of its screens.
   const reworkText = translateSessionsText(text);
   if (reworkText) return reworkText;
+  // Step C: the registry's sentences, the exceptions' dialogs and refusals.
+  const moneyText = translateMoneyText(text, translateExactText);
+  if (moneyText) return moneyText;
   // Step B: the Reserve page's results, the pricing basis, the consent and the refusals.
   const reservationText = translateReservationsText(text);
   if (reservationText) return reservationText;
+  // Step D: the messages screens' sentences with a name, a number or a variable in them.
+  const messagesText = translateMessagesText(text, translateExactText);
+  if (messagesText) return messagesText;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

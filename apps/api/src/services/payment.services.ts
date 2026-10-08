@@ -89,6 +89,14 @@ import { gradeLabel } from '@repo/validations';
 import { refundPreregistrationsAtDeadline } from './prereg.services';
 import { isAttachableEvidence } from './file.services';
 import { PAYMENT_EVIDENCE_PURPOSES } from '@repo/validations';
+// The reservations rework, step C (§3.6, §3.10): charges, plans, the pushed school fee.
+import { exception, charge, paymentCharge } from '@repo/db';
+import { repriceChargeInTx, chargeDeadline, chargeDeadlineSql, type ChargeRow } from './charge.services';
+import { instalmentsConfirmedInTx, tellFamily } from './plan.services';
+import { settlePushInTx, reopenPushInTx } from './school-fee.services';
+import { createReceiptsForCharges } from './receipt.services';
+import { debitHeld } from './escrow.services';
+import { schoolDate } from './window.services';
 
 // ─── School Receiving Account (InstaPay destination) ─────────────────────────
 //
@@ -156,6 +164,9 @@ export async function initiatePayment(
   data: InitiatePaymentType,
   auditCtx?: AuditContext
 ) {
+  // The reservations rework (§3.10 item 1): one purpose per payment — charges are paid apart.
+  if (data.chargeIds.length > 0) return initiateChargePayment(parentId, data, auditCtx);
+
   // Load registrations
   const regs = await db.query.registration.findMany({
     where: (r, { inArray }) => inArray(r.id, data.registrationIds),
@@ -358,6 +369,8 @@ export async function initiatePayment(
     }
     // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
     if (locked.some((l) => l.price !== regs.find((r) => r.id === l.id)?.priceAtRegistration)) throw new Error(PRICE_CHANGED_REFUSAL);
+    // A line under a live plan is paid by its instalments: only the plan's capture pays it (§3.10 item 7).
+    await assertNoLivePlan(tx, data.registrationIds);
 
     const existingPaymentLinksInTx = await tx.query.paymentRegistration.findMany({
       where: (pr, { inArray: inArr }) => inArr(pr.registrationId, data.registrationIds),
@@ -528,6 +541,7 @@ export async function confirmPayment(
             id: registration.id,
             status: registration.status,
             sessionId: registration.sessionId,
+            subjectId: registration.subjectId,
             boardSeriesId: registration.boardSeriesId,
             attempt: registration.attempt,
             priorSittingSeriesId: registration.priorSittingSeriesId,
@@ -586,6 +600,12 @@ export async function confirmPayment(
         { status: 'awaiting_submission', paymentId }, auditCtx, tx);
     }
 
+    // The reservations rework (§3.6, §3.10): a charge payment's charges, judged under their
+    // locks (an instalment's line, then its plan, then the charges), then paid in this transaction.
+    const chargeOutcome = pay.purpose === 'charge'
+      ? await confirmChargesInTx(tx, { id: paymentId, studentId: pay.studentId, parentId: pay.parentId, amount: pay.amount, status: current.status }, confirmedBy ?? null, now, auditCtx)
+      : null;
+
     const [paymentUpdate] = await tx
       .update(payment)
       .set({
@@ -604,6 +624,11 @@ export async function confirmPayment(
 
     // The row is locked and open, so the guarded update cannot miss.
     if (!paymentUpdate) throw new Error('Payment was concurrently processed');
+
+    // The school fee pushed to the family is paid by this payment (§3.6): marked in the same
+    // transaction, by the family's path and the desk's alike.
+    if (pay.purpose === 'school_fee') await settlePushInTx(tx, pay, confirmedBy ?? null, auditCtx);
+    if (chargeOutcome) await finishChargesInTx(tx, chargeOutcome, confirmedBy ?? null, now, auditCtx);
 
     // Move all linked registrations to 'confirmed'
     let confirmedIds: string[] = [];
@@ -692,7 +717,8 @@ export async function confirmPayment(
       },
     });
 
-    if (enriched) {
+    // A charge payment's family was told in its transaction (finishChargesInTx).
+    if (enriched && enriched.purpose !== 'charge') {
       const subjectNames = enriched.paymentRegistrations.map(
         (pr) => pr.registration.subject.name
       );
@@ -783,7 +809,7 @@ async function failOpenPayment(
     const expired: { id: string; studentId: string; subjectId: string; sessionId: string }[] = [];
     if (opts.expireIfClosed) {
       const regs = await tx
-        .select({ id: registration.id, sessionId: registration.sessionId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId, declarationRejected: registration.declarationRejected })
+        .select({ id: registration.id, sessionId: registration.sessionId, subjectId: registration.subjectId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId, declarationRejected: registration.declarationRejected })
         .from(paymentRegistration)
         .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
         .where(and(eq(paymentRegistration.paymentId, paymentId), eq(registration.status, 'pending_payment')));
@@ -799,8 +825,17 @@ async function failOpenPayment(
           .returning({ id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId, sessionId: registration.sessionId }));
       }
     }
-    const registrationsExpired = expired.length;
     await logActions(expiryEntries(expired.map((r) => ({ id: r.id, from: 'pending_payment' })), 'payment_closed', opts.reason), tx);
+    // The reservations rework (§3.6): a failed instalment payment runs the same test on its line,
+    // through the charge (a plan line has no payment_registration row): the line expires
+    // (`plan_ended`) and its plan is settled only when it is no longer payable — the window closed
+    // for the student, its deadline passed, the student no longer eligible. Otherwise the plan
+    // stands and the instalment can be paid again (a cancelled checkout, a declined card or a
+    // rejected reference is not a family stopping). The payment is locked before the line (§6).
+    if (opts.expireIfClosed && pay.purpose === 'charge') {
+      expired.push(...await expireDeadPlanLineInTx(tx, paymentId, pay.studentId, opts.reason));
+    }
+    const registrationsExpired = expired.length;
 
     await logAction(opts.actorId, opts.action, 'payment', paymentId, { status: pay.status },
       { status: 'failed', reason: opts.reason, escrowReturned: pay.escrowAmountApplied, registrationsExpired }, opts.auditCtx, tx);
@@ -1338,9 +1373,18 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
     }
   }
 
+  // The reservations rework (§3.10 item 4): the sweep covers charges. A board service's charge is
+  // closed unpaid at its series' service deadline (its open payment failed, escrow back, the
+  // family told); an instalment follows its line (settled with it, above), and an open instalment
+  // payment of a plan that ended is failed here, after the ending committed (a payment is locked
+  // before a line, so the ending could not fail it itself).
+  const charges = await closeChargesAtServiceDeadlines(now);
+  const deadPlanPayments = await failInstalmentPaymentsOfDeadPlans();
+
   return {
     referencesLapsed, paymentsClosedAtDeadline, registrationsExpiredAtDeadline, preregistrationsRefundedAtDeadline, preregistrationsExpiredUnopened,
     unverifiedExpired: held.expired, unverifiedDropped: held.dropped,
+    chargesClosedAtDeadline: charges.closed, chargePaymentsClosedAtDeadline: charges.paymentsClosed, instalmentPaymentsOfEndedPlans: deadPlanPayments,
   };
 }
 
@@ -1527,6 +1571,10 @@ export async function getPendingManualPayments() {
           },
         },
       },
+      // The reservations rework (§3.10 item 1): a charge payment's charges.
+      paymentCharges: {
+        with: { charge: { columns: { id: true, kind: true, description: true, amount: true, dueAt: true, registrationId: true } } },
+      },
       student: { columns: { id: true, name: true, email: true, cohortYear: true, studentId: true }, extras: gradeTodayExtras },
       parent: { columns: { id: true, name: true, email: true } },
     },
@@ -1562,6 +1610,11 @@ export async function reversePayment(
   if (pay.status !== 'completed') throw new Error('Only completed payments can be reversed');
   if (pay.purpose === 'remark' || pay.purpose === 'preregistration') {
     throw new Error('Remark and preregistration payments cannot be auto-reversed — contact support flow');
+  }
+  // The reservations rework (§3.6): nothing was received the day a plan was captured — its
+  // instalments reverse one by one while the plan is live, never after.
+  if (pay.paymentMethod === 'held_deposits') {
+    throw new Error('A line paid from its instalments is never reversed: nothing was received that day. Its instalments could be reversed while the plan was live');
   }
 
   const regIds = pay.paymentRegistrations.map((l) => l.registrationId);
@@ -1638,6 +1691,15 @@ export async function reversePayment(
         .returning({ receiptNumber: receipt.receiptNumber });
       voidedReceiptNumbers = voided.map((v) => v.receiptNumber);
     }
+
+    // The reservations rework (§3.10 items 1–3, 7): a charge payment's charges are payable again
+    // (an instalment's deposit taken back out of the held wallet, refused once spent); a school-fee
+    // payment's push is open again.
+    if (pay.purpose === 'charge') {
+      const r = await reverseChargesInTx(tx, { id: paymentId, studentId: pay.studentId, amount: pay.amount }, financeAdminId, reason, auditCtx);
+      voidedReceiptNumbers.push(...r.voidedReceiptNumbers);
+    }
+    if (pay.purpose === 'school_fee') await reopenPushInTx(tx, paymentId, financeAdminId, auditCtx);
 
     if (pay.escrowAmountApplied > 0) {
       await creditEscrow(
@@ -1836,6 +1898,10 @@ export async function getPendingBankTransfers() {
             with: { subject: { columns: { id: true, name: true, code: true } } },
           },
         },
+      },
+      // A charge payment's charges (the reservations rework, §3.10 item 1), listed as its subjects are.
+      paymentCharges: {
+        with: { charge: { columns: { id: true, kind: true, description: true, amount: true } } },
       },
       student: { columns: { id: true, name: true, email: true, cohortYear: true, studentId: true }, extras: gradeTodayExtras },
       parent: { columns: { id: true, name: true, email: true } },
@@ -2171,4 +2237,387 @@ export async function getCheckoutSummary(
       };
     })()),
   };
+}
+
+// ─── Charges (the reservations rework, RESERVATIONS_REWORK.md §3.6, §3.10) ─────────────────────
+//
+// A payment covers lines, or charges (purpose `charge`, payment_charge rows), or the school fee,
+// or a remark fee — one purpose, never mixed (§3.10 item 1). Charges are grouped as lines are by
+// deadline: one payment per group — an instalment's group is its line (never from escrow, credited
+// to the held wallet earmarked for the line), a board service's its series' service deadline,
+// anything else none. A family's own checkout pays one group; the desk collects every group in one
+// action, one payment each. Locks: an instalment's line (FOR SHARE), then the charges (FOR UPDATE,
+// id order) — the plan's order (plan.services), so a settlement and a checkout never interleave.
+
+/** Refuse when any of these lines is under a live plan: only the plan's capture pays it (§3.10 item 7). */
+export async function assertNoLivePlan(tx: Tx, registrationIds: string[]) {
+  if (!registrationIds.length) return;
+  const [plan] = await tx.select({ id: exception.id }).from(exception)
+    .where(and(eq(exception.policyKey, 'plan.instalments'), eq(exception.status, 'active'), inArray(exception.registrationId, registrationIds)))
+    .limit(1);
+  if (plan) throw new Error('A subject under an instalment plan is paid by its instalments: pay the next instalment instead');
+}
+
+export type ChargeGroup = { key: string; deadline: Date | null; lineId: string | null; planId: string | null; instalments: boolean; charges: ChargeRow[]; total: number };
+
+const groupKeyOf = (c: ChargeRow, deadline: Date | null) => (c.kind === 'instalment' ? `line:${c.registrationId}` : deadline ? deadline.toISOString() : 'none');
+
+/**
+ * Lock and judge charges about to be paid, in the creating transaction, and group them (§3.10
+ * item 1). Refused: a charge not this student's, a pushed school fee (paid on the school-fee path,
+ * never as a charge), one awaiting the school's acceptance, already paid, cancelled or refunded,
+ * one with a payment in progress, past its deadline, an instalment of a plan that is no longer
+ * live; and one whose price changed since it was read (an exception granted meanwhile:
+ * PRICE_CHANGED_REFUSAL, as a re-priced line is refused).
+ */
+async function lockChargesForPayment(tx: Tx, studentId: string, chargeIds: string[], expected?: Map<string, number>, opts: { linesHeld?: boolean } = {}): Promise<ChargeGroup[]> {
+  const ids = [...new Set(chargeIds)].sort();
+  const peek = await tx.select({ id: charge.id, registrationId: charge.registrationId, kind: charge.kind, studentId: charge.studentId })
+    .from(charge).where(inArray(charge.id, ids));
+  if (peek.length !== ids.length) throw new Error('One or more charges were not found');
+  if (peek.some((c) => c.studentId !== studentId)) throw new Error('All charges must belong to the same student');
+  // An instalment's line before its charges (the plan's lock order). `linesHeld`: the caller
+  // already holds every line it touches, taken in one id-ordered pass (the desk's collection,
+  // which pays lines beside the instalments); a second pass here would take them out of order.
+  const lineIds = [...new Set(peek.filter((c) => c.kind === 'instalment' && c.registrationId).map((c) => c.registrationId!))].sort();
+  const lineQuery = () => tx.select({ id: registration.id, status: registration.status }).from(registration).where(inArray(registration.id, lineIds)).orderBy(registration.id);
+  const lines = !lineIds.length ? [] : opts.linesHeld ? await lineQuery() : await lineQuery().for('share');
+  const rows = await tx.select().from(charge).where(inArray(charge.id, ids)).orderBy(charge.id).for('update');
+  for (const c of rows) {
+    if (c.kind === 'school_fee_push') throw new Error('A pushed school fee is paid on the School fee page or with the desk\'s school-fee collection, not as a charge');
+    if (c.status === 'requested') throw new Error(`${c.description} is a request awaiting the school's acceptance`);
+    if (c.status === 'paid') throw new Error(`${c.description} is already paid`);
+    if (c.status !== 'pending_payment') throw new Error(`${c.description} is ${c.status.replace('_', ' ')} and cannot be paid`);
+  }
+  const open = await tx.select({ id: payment.id }).from(paymentCharge).innerJoin(payment, eq(payment.id, paymentCharge.paymentId))
+    .where(and(inArray(paymentCharge.chargeId, ids), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])));
+  if (open.length) throw new Error('One or more of these charges already have a payment in progress. Complete or cancel it first.');
+  for (const c of rows.filter((x) => x.kind === 'instalment')) {
+    const [plan] = await tx.select({ status: exception.status }).from(exception).where(eq(exception.id, c.planExceptionId!)).for('share');
+    const line = lines.find((l) => l.id === c.registrationId);
+    if (plan?.status !== 'active' || line?.status !== 'pending_payment') throw new Error('This instalment plan has ended: its instalments can no longer be paid');
+  }
+  // chargeRules (§6): the deadline, and the price exceptions scoped to each charge.
+  const priced: ChargeRow[] = [];
+  for (const c of rows) priced.push(await repriceChargeInTx(tx, c, null, undefined, { forPayment: true }));
+  if (expected && priced.some((c) => Math.abs(c.amount - (expected.get(c.id) ?? c.amount)) > 0.001)) throw new Error(PRICE_CHANGED_REFUSAL);
+
+  const groups = new Map<string, ChargeGroup>();
+  for (const c of priced) {
+    const deadline = await chargeDeadline(tx, c);
+    const key = groupKeyOf(c, deadline);
+    const g = groups.get(key) ?? { key, deadline, lineId: c.kind === 'instalment' ? c.registrationId : null, planId: c.planExceptionId, instalments: c.kind === 'instalment', charges: [], total: 0 };
+    g.charges.push(c);
+    g.total = round2(g.total + c.amount);
+    groups.set(key, g);
+  }
+  return [...groups.values()].sort((a, b) => (a.deadline?.getTime() ?? Infinity) - (b.deadline?.getTime() ?? Infinity) || a.key.localeCompare(b.key));
+}
+
+export type CreatedChargePayment = { id: string; amount: number; escrowApplied: number; chargeIds: string[]; deadline: Date | null; instalments: boolean; description: string };
+
+/**
+ * The payments for charges, in the caller's transaction: one per group (the family's checkout
+ * pays one group), escrow applied to the earliest deadline first and never to an instalment
+ * (its money is held for the line: paying it from escrow would be circular), each with its own
+ * creation row (CHARGE_PAYMENT_INITIATED).
+ */
+export async function createChargePaymentsInTx(
+  tx: Tx,
+  a: {
+    studentId: string; payerParentId: string; actorId: string; chargeIds: string[]; method: 'in_school' | 'instapay'; escrowToApply: number;
+    desk: boolean; expected?: Map<string, number>; auditCtx?: AuditContext;
+    /** The caller holds the plan lines of these instalments already (taken with its own lines, in id order). */
+    linesHeld?: boolean;
+  },
+): Promise<CreatedChargePayment[]> {
+  const groups = await lockChargesForPayment(tx, a.studentId, a.chargeIds, a.expected, { linesHeld: a.linesHeld });
+  if (!a.desk && groups.length > 1) {
+    throw new Error(`These charges fall due at different deadlines (${groups.map((g) => g.charges.map((c) => c.description).join(', ')).join(' · ')}): pay each group on its own`);
+  }
+  const escrowable = round2(groups.filter((g) => !g.instalments).reduce((s, g) => s + g.total, 0));
+  if (a.escrowToApply > 0 && escrowable === 0) {
+    throw new Error('An instalment is paid in cash, by card or by InstaPay — never from escrow (its money is held for the line)');
+  }
+  if (a.escrowToApply > escrowable + 0.001) throw new Error('Escrow amount cannot exceed the total of the charges it can pay');
+  let escrowLeft = a.escrowToApply;
+  const out: CreatedChargePayment[] = [];
+  for (const g of groups) {
+    const escrowApplied = g.instalments ? 0 : round2(Math.min(escrowLeft, g.total));
+    escrowLeft = round2(escrowLeft - escrowApplied);
+    const id = randomUUID();
+    const amount = round2(g.total - escrowApplied);
+    const description = g.charges.map((c) => c.description).join(', ');
+    const metadata: Record<string, unknown> = a.desk
+      ? { desk: true, staffId: a.actorId, charges: description }
+      : a.method === 'in_school'
+        ? { inSchool: { referenceNumber: `SCH-${id.slice(0, 8).toUpperCase()}` }, instructions: 'Pay at the school finance desk. Quote this reference or the student name.', charges: description }
+        : { instapay: { account: getSchoolAccountDetails(), amountDue: amount }, instructions: 'Transfer the exact amount via InstaPay to the school account, then submit your transaction reference.', charges: description };
+    if (amount === 0 && escrowApplied > 0) metadata.fullyEscrowFunded = true;
+    await tx.insert(payment).values({
+      id,
+      studentId: a.studentId,
+      parentId: a.payerParentId,
+      amount,
+      escrowAmountApplied: escrowApplied,
+      paymentMethod: a.method,
+      purpose: 'charge',
+      status: 'pending',
+      externalReference: a.desk ? `DESK-${id.slice(0, 8).toUpperCase()}` : a.method === 'in_school' ? `SCH-${id.slice(0, 8).toUpperCase()}` : null,
+      metadata,
+    });
+    if (escrowApplied > 0) {
+      await debitEscrow({ studentId: a.studentId, amount: escrowApplied, reason: 'payment', initiatedBy: a.actorId, relatedPaymentId: id }, tx);
+    }
+    await tx.insert(paymentCharge).values(g.charges.map((c) => ({ id: randomUUID(), paymentId: id, chargeId: c.id })));
+    // The payment, its escrow debit and its creation row commit together (MO-1; 09 counts it).
+    await logAction(a.actorId, 'CHARGE_PAYMENT_INITIATED', 'payment', id, null,
+      { chargeIds: g.charges.map((c) => c.id), amount, escrowApplied, method: a.method, desk: a.desk, deadline: g.deadline?.toISOString() ?? null }, a.auditCtx, tx);
+    out.push({ id, amount, escrowApplied, chargeIds: g.charges.map((c) => c.id), deadline: g.deadline, instalments: g.instalments, description });
+  }
+  return out;
+}
+
+/**
+ * A family pays charges (§3.10 item 1): one group per payment, as a checkout pays lines of one
+ * deadline. Fully paid from escrow, it is confirmed at once, as a line's would be.
+ */
+export async function initiateChargePayment(parentId: string, data: InitiatePaymentType, auditCtx?: AuditContext) {
+  const rows = await db.select({ id: charge.id, studentId: charge.studentId, amount: charge.amount, kind: charge.kind }).from(charge).where(inArray(charge.id, data.chargeIds));
+  if (rows.length === 0) throw new Error('No charges found');
+  if ((data.escrowAmountToApply ?? 0) > 0 && rows.some((r) => r.kind === 'instalment')) {
+    throw new Error('An instalment is paid in cash, by card or by InstaPay — never from escrow (its money is held for the line)');
+  }
+  const studentIds = [...new Set(rows.map((r) => r.studentId))];
+  if (studentIds.length > 1) throw new Error('All charges must belong to the same student');
+  const studentId = studentIds[0]!;
+  if (!(await validateParentStudentLink(parentId, studentId))) throw new Error('You are not linked to this student');
+  const escrowToApply = data.escrowAmountToApply ?? 0;
+  if (escrowToApply > 0) {
+    const balance = await getEscrowBalance(studentId);
+    if (escrowToApply > balance) {
+      throw new Error(`Escrow balance insufficient. Available: ${balance.toFixed(2)} EGP, Requested: ${escrowToApply.toFixed(2)} EGP`);
+    }
+  }
+  const expected = new Map(rows.map((r) => [r.id, r.amount]));
+  const [made] = await db.transaction((tx) => createChargePaymentsInTx(tx, {
+    studentId, payerParentId: parentId, actorId: parentId, chargeIds: data.chargeIds, method: data.paymentMethod, escrowToApply, desk: false, expected, auditCtx,
+  }));
+  const created = await db.query.payment.findFirst({ where: (p, { eq: e }) => e(p.id, made!.id) });
+  if (made!.escrowApplied > 0) {
+    const newBalance = await getEscrowBalance(studentId);
+    notifyEscrowBalanceChanged({
+      studentId, studentName: 'Student', previousBalance: newBalance + made!.escrowApplied, newBalance, changeAmount: -made!.escrowApplied,
+      reason: `Escrow applied to: ${made!.description}`,
+    }).catch((err) => console.error('[notification] NOT-008 (charge payment debit) failed:', err));
+  }
+  if (made!.amount === 0 && made!.escrowApplied > 0) {
+    const confirmed = await confirmPayment(made!.id, parentId, undefined, 'Auto-confirmed: fully paid from escrow', undefined, auditCtx);
+    if (confirmed) return confirmed;
+  }
+  return created!;
+}
+
+type ChargeConfirmation = {
+  payment: { id: string; studentId: string; parentId: string; amount: number };
+  charges: ChargeRow[];
+  lineId: string | null;
+  planId: string | null;
+};
+
+/**
+ * A charge payment's confirmation, judged in confirmPayment's transaction (the payment locked
+ * first): an instalment's line FOR UPDATE, its plan FOR SHARE, then the charges FOR UPDATE.
+ * Refused: a charge no longer awaiting payment (cancelled, closed at its deadline), past its
+ * deadline (MO-10 per service), an instalment of a plan that is no longer live.
+ */
+export async function confirmChargesInTx(
+  tx: Tx, pay: { id: string; studentId: string; parentId: string; amount: number; status: string }, _actorId: string | null, now: Date, _ctx?: AuditContext,
+): Promise<ChargeConfirmation> {
+  const ids = (await tx.select({ id: paymentCharge.chargeId }).from(paymentCharge).where(eq(paymentCharge.paymentId, pay.id))).map((r) => r.id).sort();
+  if (!ids.length) throw new Error('This payment covers no charges');
+  const peek = await tx.select({ id: charge.id, kind: charge.kind, registrationId: charge.registrationId, planExceptionId: charge.planExceptionId }).from(charge).where(inArray(charge.id, ids));
+  const inst = peek.find((c) => c.kind === 'instalment');
+  let lineId: string | null = null;
+  let planId: string | null = null;
+  if (inst) {
+    lineId = inst.registrationId;
+    planId = inst.planExceptionId;
+    const [line] = await tx.select({ status: registration.status }).from(registration).where(eq(registration.id, lineId!)).for('update');
+    const [plan] = await tx.select({ status: exception.status }).from(exception).where(eq(exception.id, planId!)).for('share');
+    if (plan?.status !== 'active' || line?.status !== 'pending_payment') {
+      throw new Error('This instalment plan has ended: the payment cannot be confirmed — reject the transfer instead (if it arrived, record it as a transfer found later)');
+    }
+  }
+  const rows = await tx.select().from(charge).where(inArray(charge.id, ids)).orderBy(charge.id).for('update');
+  for (const c of rows) {
+    if (c.status !== 'pending_payment') throw new Error(`${c.description} is no longer awaiting payment (${c.status.replace('_', ' ')}) — reject the transfer instead`);
+    const d = await chargeDeadline(tx, c);
+    if (d && d <= now) {
+      throw new Error(c.kind === 'instalment'
+        ? `The line's deadline (${schoolDate(d)}) has passed: this instalment cannot be confirmed`
+        : `The board's deadline for ${c.description} (${schoolDate(d)}) has passed: this payment cannot be confirmed`);
+    }
+  }
+  return { payment: pay, charges: rows, lineId, planId };
+}
+
+/** The confirmed charges paid (after the payment row is completed): receipts, the held wallet, the capture, the family told. */
+export async function finishChargesInTx(tx: Tx, o: ChargeConfirmation, actorId: string | null, now: Date, ctx?: AuditContext) {
+  const ids = o.charges.map((c) => c.id);
+  await tx.update(charge).set({ status: 'paid', updatedAt: now }).where(and(inArray(charge.id, ids), eq(charge.status, 'pending_payment')));
+  await logActions(o.charges.map((c) => ({
+    userId: actorId, action: 'CHARGE_PAID' as const, entityType: 'charge' as const, entityId: c.id,
+    previousData: { status: 'pending_payment' }, newData: { status: 'paid', paymentId: o.payment.id, amount: c.amount },
+  })), tx);
+  const receipted = o.charges.filter((c) => c.kind !== 'instalment').map((c) => c.id);
+  if (receipted.length) await createReceiptsForCharges(receipted, tx);
+  let slip: string | null = null;
+  let captured: { paymentId: string } | null = null;
+  if (o.lineId && o.planId) {
+    const r = await instalmentsConfirmedInTx(tx, { payment: o.payment, lineId: o.lineId, planId: o.planId, chargeIds: ids, actorId, ctx, now });
+    slip = r.slip;
+    captured = r.captured;
+  }
+  const total = round2(o.charges.reduce((s, c) => s + c.amount, 0));
+  await tellFamily(tx, o.payment.studentId, 'CHARGE_UPDATED', `Payment received: EGP ${total.toFixed(2)}`,
+    `Received with thanks: ${o.charges.map((c) => c.description).join(', ')}.${slip ? ` Deposit slip ${slip}: the money is held for the subject until its last instalment.` : ' The receipt is ready at the finance desk.'}${captured ? ' That was the last instalment: the subject is now paid in full.' : ''}`,
+    { paymentId: o.payment.id, chargeIds: ids });
+}
+
+/**
+ * failOpenPayment's own test on an instalment payment's line (§3.6, §3.10 item 8): the line
+ * expires (`plan_ended`) and its plan is settled only when it is no longer payable.
+ */
+async function expireDeadPlanLineInTx(tx: Tx, paymentId: string, studentId: string, reason: string) {
+  const [inst] = await tx.select({ registrationId: charge.registrationId }).from(paymentCharge).innerJoin(charge, eq(charge.id, paymentCharge.chargeId))
+    .where(and(eq(paymentCharge.paymentId, paymentId), eq(charge.kind, 'instalment'))).limit(1);
+  if (!inst?.registrationId) return [];
+  const [line] = await tx.select({ id: registration.id, status: registration.status, sessionId: registration.sessionId, subjectId: registration.subjectId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId, declarationRejected: registration.declarationRejected })
+    .from(registration).where(eq(registration.id, inst.registrationId)).for('update');
+  if (!line || line.status !== 'pending_payment') return [];
+  if (await sessionOpenFor(studentId, line.sessionId, line, tx) && (await mayRegisterFor(studentId, line.sessionId, tx)).allowed) return [];
+  return expireWaitingRegistrations(tx, eq(registration.id, line.id), 'plan_ended', new Date(), reason);
+}
+
+/**
+ * A charge payment reversed (reversePayment's transaction, the payment updated first): its
+ * receipts must still be at the desk (voided), its charges payable again; an instalment's deposit
+ * comes back out of the held wallet — while the plan is live and the deposit unspent (MO-24's
+ * test), never after the capture.
+ */
+async function reverseChargesInTx(tx: Tx, pay: { id: string; studentId: string; amount: number }, actorId: string, reason: string, ctx?: AuditContext) {
+  const ids = (await tx.select({ id: paymentCharge.chargeId }).from(paymentCharge).where(eq(paymentCharge.paymentId, pay.id))).map((r) => r.id).sort();
+  const peek = ids.length ? await tx.select({ id: charge.id, kind: charge.kind, registrationId: charge.registrationId, planExceptionId: charge.planExceptionId }).from(charge).where(inArray(charge.id, ids)) : [];
+  const inst = peek.find((c) => c.kind === 'instalment');
+  if (inst) {
+    const [line] = await tx.select({ status: registration.status }).from(registration).where(eq(registration.id, inst.registrationId!)).for('update');
+    const [plan] = await tx.select({ status: exception.status }).from(exception).where(eq(exception.id, inst.planExceptionId!)).for('share');
+    if (plan?.status !== 'active' || line?.status !== 'pending_payment') {
+      throw new Error('This instalment plan was paid in full or has ended: its instalments can no longer be reversed');
+    }
+  }
+  const receipts = ids.length
+    ? await tx.select({ id: receipt.id, status: receipt.status, receiptNumber: receipt.receiptNumber }).from(receipt).where(inArray(receipt.chargeId, ids)).orderBy(receipt.chargeId).for('update')
+    : [];
+  const out = receipts.filter((r) => r.status !== 'pending_issue' && r.status !== 'void');
+  if (out.length) throw new Error(`Receipts already handed out (${out.map((r) => r.receiptNumber).join(', ')}) — take them back before reversing`);
+  const rows = ids.length ? await tx.select().from(charge).where(inArray(charge.id, ids)).orderBy(charge.id).for('update') : [];
+  if (rows.some((c) => c.status !== 'paid')) throw new Error('A charge on this payment was refunded or changed — undo that first, or settle the difference as a refund');
+  if (inst && pay.amount > 0) {
+    await debitHeld({ studentId: pay.studentId, amount: pay.amount, reason: 'instalment_reversed', initiatedBy: actorId, relatedRegistrationId: inst.registrationId!, relatedPaymentId: pay.id }, tx)
+      .catch((err) => {
+        if (err instanceof Error && err.message.startsWith('Insufficient held')) throw new Error('The deposit this instalment made has already been used, so it can no longer be reversed');
+        throw err;
+      });
+  }
+  const now = new Date();
+  await tx.update(charge).set({ status: 'pending_payment', updatedAt: now }).where(and(inArray(charge.id, ids), eq(charge.status, 'paid')));
+  const voided = ids.length
+    ? await tx.update(receipt).set({ status: 'void', notes: `Voided — payment reversed: ${reason}`, updatedAt: now })
+      .where(and(inArray(receipt.chargeId, ids), eq(receipt.status, 'pending_issue'))).returning({ receiptNumber: receipt.receiptNumber })
+    : [];
+  await logActions(rows.map((c) => ({
+    userId: actorId, action: 'CHARGE_REOPENED' as const, entityType: 'charge' as const, entityId: c.id,
+    previousData: { status: 'paid', paymentId: pay.id }, newData: { status: 'pending_payment', reason },
+  })), tx);
+  if (inst) {
+    await tx.update(payment).set({ metadata: sql`coalesce(${payment.metadata}, '{}'::jsonb) || ${JSON.stringify({ depositSlipVoid: true })}::jsonb` }).where(eq(payment.id, pay.id));
+  }
+  return { voidedReceiptNumbers: voided.map((v) => v.receiptNumber) };
+}
+
+/**
+ * The sweep over charges (§3.10 item 4): a board service's charge still unpaid at its series'
+ * service deadline is closed — its open payment failed by the system (escrow back), the charge
+ * cancelled, the family told. Idempotent and safe with two scheduler instances: every step is
+ * status-guarded under the charge's lock, and failOpenPayment moves a payment once.
+ */
+export async function closeChargesAtServiceDeadlines(now: Date = new Date()) {
+  const due = await db.execute(sql`
+    select c.id from charge c
+    where c.status in ('requested', 'pending_payment') and c.kind not in ('instalment', 'school_fee_push')
+      and ${chargeDeadlineSql('c')} <= ${now}`).then((r) => (r.rows as { id: string }[]).map((x) => x.id));
+  let closed = 0;
+  let paymentsClosed = 0;
+  for (const id of due) {
+    try {
+      const open = await db.select({ id: payment.id }).from(paymentCharge).innerJoin(payment, eq(payment.id, paymentCharge.paymentId))
+        .where(and(eq(paymentCharge.chargeId, id), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])));
+      for (const p of open) {
+        const r = await failOpenPayment(p.id, {
+          from: OPEN_PAYMENT_STATUSES, actorId: null, action: 'PAYMENT_FAILED',
+          reason: "The board's deadline for this service passed before this payment was confirmed",
+        });
+        if (r) paymentsClosed++;
+      }
+      const done = await db.transaction(async (tx) => {
+        const [c] = await tx.select().from(charge).where(eq(charge.id, id)).for('update');
+        if (!c || (c.status !== 'requested' && c.status !== 'pending_payment')) return false;
+        const stillOpen = await tx.select({ id: payment.id }).from(paymentCharge).innerJoin(payment, eq(payment.id, paymentCharge.paymentId))
+          .where(and(eq(paymentCharge.chargeId, id), inArray(payment.status, [...OPEN_PAYMENT_STATUSES])));
+        if (stillOpen.length) return false;
+        const [x] = await tx.update(charge).set({ status: 'cancelled', cancelledAt: now, cancelReason: "Closed unpaid at the board's deadline for the service", updatedAt: now })
+          .where(and(eq(charge.id, id), inArray(charge.status, ['requested', 'pending_payment']))).returning({ id: charge.id });
+        if (!x) return false;
+        await logAction(null, 'CHARGE_CLOSED_AT_DEADLINE', 'charge', id, { status: c.status }, { status: 'cancelled', deadline: (await chargeDeadline(tx, c))?.toISOString() ?? null }, undefined, tx);
+        await tellFamily(tx, c.studentId, 'CHARGE_UPDATED', `${c.description}: closed`,
+          `The board's deadline for ${c.description} has passed and it was not paid, so it was closed. If you did pay by transfer, bring the bank receipt to the finance desk.`, { chargeId: id });
+        return true;
+      });
+      if (done) closed++;
+    } catch (err) {
+      console.error(`[deadlines] Could not close charge ${id} at its service deadline:`, err);
+    }
+  }
+  return { closed, paymentsClosed };
+}
+
+/**
+ * The deadline sweep's second query (§3.6): an open instalment payment of a plan that is no longer
+ * live (its line expired, the plan lapsed or was revoked) is failed by the system, escrow never
+ * applied, so the money it may bring is recorded later as a transfer found.
+ */
+export async function failInstalmentPaymentsOfDeadPlans() {
+  const dead = await db.execute(sql`
+    select distinct p.id from payment p
+    join payment_charge pc on pc.payment_id = p.id
+    join charge c on c.id = pc.charge_id
+    left join exception e on e.id = c.plan_exception_id
+    left join registration r on r.id = c.registration_id
+    where p.status in ('pending', 'pending_verification') and c.kind = 'instalment'
+      and (e.status is distinct from 'active' or r.status is distinct from 'pending_payment')`).then((x) => (x.rows as { id: string }[]).map((r) => r.id));
+  let failed = 0;
+  for (const id of dead) {
+    try {
+      const r = await failOpenPayment(id, {
+        from: OPEN_PAYMENT_STATUSES, actorId: null, action: 'PAYMENT_FAILED',
+        reason: 'The instalment plan ended before this payment was confirmed',
+      });
+      if (r) failed++;
+    } catch (err) {
+      console.error(`[deadlines] Could not fail instalment payment ${id} of an ended plan:`, err);
+    }
+  }
+  return failed;
 }

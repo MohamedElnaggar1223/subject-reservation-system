@@ -1,0 +1,54 @@
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+> vitest run "test/08r-exceptions-registry.test.ts"
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+
+[clock] database minus host: -0.7 ms (measured within 2 ms)
+ ❯ test/08r-exceptions-registry.test.ts (14 tests | 1 failed) 8276ms
+   ✓ 08r: the exceptions registry > GET /policies: every policy with its sentence, value, scopes and grantors; what each caller may grant now 9ms
+   ✓ 08r: the exceptions registry > a grant is checked against the registry: its grantors, its value, the scopes it accepts, a scope where one is required; late entries only while their setting is on  377ms
+   ✓ 08r: the exceptions registry > the same exception twice is refused, naming the one that is active; another scope or value is a grant of its own  418ms
+   ✓ 08r: the exceptions registry > a family's exception covers every linked child, and no one else  862ms
+   ✓ 08r: the exceptions registry > a one-shot gate lets one reservation through and is used by it; the next is refused  404ms
+   ✓ 08r: the exceptions registry > a price exception on one unpaid line re-prices it (its basis records it), and back when it is revoked; on a line with a payment it is refused  416ms
+   ✓ 08r: the exceptions registry > a price exception on one charge prices it again at once, and back when it is revoked; a charge with a payment keeps its amount  318ms
+   ✓ 08r: the exceptions registry > deadline.payment moves one line's due date, and back when it is revoked  338ms
+   ✓ 08r: the exceptions registry > the eight V3 types, as the migration moves them onto the registry (a V3-shaped row is filled the same way), and V3's request shape mapped onto its key  312ms
+   ✓ 08r: the exceptions registry > Check these: a migrated subject-scoped refund percent applies to nothing until a finance admin confirms it; then to that subject's lines, on the course fee  386ms
+   ✓ 08r: the exceptions registry > Check these: a price exception on an old unit row, once an item of another subject enters that unit  313ms
+   × 08r: the exceptions registry > the pricing policies through the registry: a student's self-study course share, a family's board share — each in the line's price and its basis 346ms
+     → expected { status: 201, error: '""' } to match object { status: 400, …(1) }
+   ✓ 08r: the exceptions registry > a migrated subject-scoped window extension, once confirmed, opens the closed session for that subject alone  584ms
+   ✓ 08r: the exceptions registry > a late board entry (Q-20) end to end through the registry: with the setting on, reserved, kept by the sweep and paid after the entry deadline; off, refused and no longer read  992ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08r-exceptions-registry.test.ts > 08r: the exceptions registry > the pricing policies through the registry: a student's self-study course share, a family's board share — each in the line's price and its basis
+AssertionError: expected { status: 201, error: '""' } to match object { status: 400, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": StringMatching / cannot be narrowed by line$/,
+-   "status": 400,
++   "error": "\"\"",
++   "status": 201,
+  }
+
+ ❯ test/08r-exceptions-registry.test.ts:290:24
+    288|     for (const policyKey of ['pricing.selfStudyCoursePercent', 'pricin…
+    289|       const lineOnly = await refused(finadmin.api.v1.exceptions.$post(…
+    290|       expect(lineOnly).toMatchObject({ status: 400, error: expect.stri…
+       |                        ^
+    291|     }
+    292|     expect(await sql(`select id from exception where student_id = $1`,…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 passed (14)
+   Start at  07:35:37
+   Duration  10.24s (transform 576ms, setup 2ms, collect 186ms, tests 8.28s, environment 0ms, prepare 35ms)
+
+ ELIFECYCLE  Test failed. See above for more details.

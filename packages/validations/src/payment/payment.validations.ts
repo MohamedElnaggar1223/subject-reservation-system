@@ -26,6 +26,9 @@ export const PAYMENT_METHODS = [
   'card',
   'mobile_wallet',
   'bank_transfer',
+  // The reservations rework (§3.6): a plan line paid from its instalments in the held wallet —
+  // the capture's own payment, made by the system (never chosen by a family).
+  'held_deposits',
 ] as const;
 
 export const PaymentMethodSchema = z.enum(PAYMENT_METHODS);
@@ -42,6 +45,7 @@ export const PAYMENT_METHOD_LABELS: Record<typeof PAYMENT_METHODS[number], strin
   card:          'Credit / Debit Card',
   mobile_wallet: 'Mobile Wallet',
   bank_transfer: 'Bank Transfer',
+  held_deposits: 'Paid from instalments',
 };
 
 // ─── Payment Purpose Enum ─────────────────────────────────────────────────────
@@ -56,6 +60,8 @@ export const PAYMENT_PURPOSES = [
   'school_fee',
   'preregistration',
   'remark',
+  // The reservations rework (§3.10 item 1): charges, never mixed with lines (payment_charge).
+  'charge',
 ] as const;
 
 export const PaymentPurposeSchema = z.enum(PAYMENT_PURPOSES);
@@ -66,6 +72,7 @@ export const PAYMENT_PURPOSE_LABELS: Record<typeof PAYMENT_PURPOSES[number], str
   school_fee:      'School Fee',
   preregistration: 'Preregistration',
   remark:          'Remark Request',
+  charge:          'Charges',
 };
 
 // ─── In-School Instrument Enum ────────────────────────────────────────────────
@@ -157,16 +164,20 @@ export type PaymentIdType = z.infer<typeof PaymentId>;
  * walletProvider: required when paymentMethod = 'mobile_wallet'
  */
 export const InitiatePayment = z.object({
-  registrationIds: z
-    .array(z.string().min(1, 'Invalid registration ID'))
-    .min(1, 'Select at least one registration to pay for'),
+  registrationIds: z.array(z.string().min(1, 'Invalid registration ID')).max(50).default([]),
+  // The reservations rework (§3.10 item 1): or charges — one purpose per payment, never both.
+  chargeIds: z.array(z.string().min(1, 'Invalid charge ID')).max(50).default([]),
   // V3: only in_school / instapay accepted for new payments.
   paymentMethod: ActivePaymentMethodSchema,
   escrowAmountToApply: z.number().min(0).max(1_000_000, 'Amount exceeds maximum allowed').refine(isWholePiastres, PIASTRES_MESSAGE).default(0),
   // A line the school reserved (grade 10) carries the school's consent only: the family gives its
   // own pair at checkout (RESERVATIONS_REWORK.md §3.5).
   consent: ReservationConsent.optional(),
-});
+})
+  .refine((d) => d.registrationIds.length > 0 || d.chargeIds.length > 0, { message: 'Select at least one registration to pay for', path: ['registrationIds'] })
+  .refine((d) => !(d.registrationIds.length > 0 && d.chargeIds.length > 0), {
+    message: 'Subjects and charges are paid in separate payments: pay one, then the other', path: ['chargeIds'],
+  });
 export type InitiatePaymentType = z.infer<typeof InitiatePayment>;
 
 // ─── Parent: Submit InstaPay Transfer Reference ───────────────────────────────

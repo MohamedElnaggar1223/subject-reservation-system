@@ -10,7 +10,7 @@
  * fails or is cancelled (whether its lines stay payable) and desk collection ask here.
  */
 
-import { db, registrationSession, eq } from '@repo/db';
+import { db, registrationSession, sessionOfferItem, sessionOffer, eq, inArray } from '@repo/db';
 import { hasDeadlineExtension } from './exception.services';
 import { effectiveDeadlineFor, deadlinePassedSentence, type LineDeadlineKey, type DeadlineKind } from './deadline.services';
 
@@ -34,12 +34,17 @@ export type SessionWindow = {
  *   insertLines), so a January item is still taken after October's deadline in a session that
  *   feeds both, and an October one is refused.
  */
+/** A line as the window reads it: its deadline key, and its subject (a subject-scoped extension). */
+export type WindowLine = LineDeadlineKey & { subjectId?: string | null };
+
 export async function sessionWindow(
   studentId: string,
   sessionId: string,
-  line: LineDeadlineKey | null,
+  line: WindowLine | null,
   executor: typeof db | Tx = db,
   now: Date = new Date(),
+  /** A new reservation's subjects: with the session closed, each must be covered by an extension. */
+  subjectIds?: readonly string[],
 ): Promise<SessionWindow> {
   const [sess] = await executor
     .select({ status: registrationSession.status })
@@ -50,12 +55,34 @@ export async function sessionWindow(
   if (!sess || entryDeadlinePassed) {
     return { open: false, entryDeadlinePassed, entryDeadline: d.at, deadlineKind: d.kind, status: sess?.status ?? null };
   }
-  const open = sess.status === 'active' || (await hasDeadlineExtension(studentId, sessionId, executor));
+  let open = sess.status === 'active';
+  if (!open) {
+    // A deadline extension (deadline.window): the session's covers every subject; a subject's
+    // own covers that subject only (the review of step C, item 4).
+    const subjects = line?.subjectId ? [line.subjectId] : [...(subjectIds ?? [])];
+    if (!subjects.length) open = await hasDeadlineExtension(studentId, sessionId, executor);
+    else {
+      open = true;
+      for (const s of subjects) if (!(await hasDeadlineExtension(studentId, sessionId, executor, s))) { open = false; break; }
+    }
+  }
   return { open, entryDeadlinePassed: false, entryDeadline: d.at, deadlineKind: d.kind, status: sess.status };
 }
 
+/**
+ * The subjects of a new reservation's items (step B's lines name items, not subjects), for the
+ * window's subject-scoped extensions. An id not on offer is left out: the reservation refuses it.
+ */
+export async function subjectsOfItems(executor: typeof db | Tx, itemIds: readonly string[]): Promise<string[]> {
+  if (!itemIds.length) return [];
+  const rows = await executor.selectDistinct({ subjectId: sessionOffer.subjectId }).from(sessionOfferItem)
+    .innerJoin(sessionOffer, eq(sessionOffer.id, sessionOfferItem.offerId))
+    .where(inArray(sessionOfferItem.id, [...itemIds]));
+  return rows.map((r) => r.subjectId);
+}
+
 export async function sessionOpenFor(
-  studentId: string, sessionId: string, line: LineDeadlineKey | null, executor: typeof db | Tx = db,
+  studentId: string, sessionId: string, line: WindowLine | null, executor: typeof db | Tx = db,
 ): Promise<boolean> {
   return (await sessionWindow(studentId, sessionId, line, executor)).open;
 }

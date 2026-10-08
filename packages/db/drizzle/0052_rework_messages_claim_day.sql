@@ -1,0 +1,2 @@
+ALTER TABLE "reminder_sent" ADD COLUMN "sent_on" date;--> statement-breakpoint
+CREATE UNIQUE INDEX "reminderSent_one_a_day_idx" ON "reminder_sent" USING btree ("kind","target_kind","target_id","anchor_on","sent_on");

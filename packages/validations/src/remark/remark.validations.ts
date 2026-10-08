@@ -65,7 +65,10 @@ export type RemarkIdType = z.infer<typeof RemarkId>;
  */
 export const CreateRemarkRequest = z.object({
   registrationId: z.string().min(1, 'Invalid registration ID'),
-  serviceType: RemarkServiceTypeSchema,
+  // The service as V3 named it; the reservations rework (§3.6) maps it onto a board service of the
+  // line's board — or the caller names that board service (boardServiceId) directly.
+  serviceType: RemarkServiceTypeSchema.optional(),
+  boardServiceId: z.string().min(1).optional(),
   papers: z
     .array(
       z.object({
@@ -77,7 +80,7 @@ export const CreateRemarkRequest = z.object({
     .max(10, 'Too many papers'),
   // NOTE: no client-supplied studentId — the student is always derived
   // server-side from the registration row (prevents any spoofing).
-});
+}).refine((d) => !!d.serviceType || !!d.boardServiceId, { message: 'Choose the service', path: ['serviceType'] });
 export type CreateRemarkRequestType = z.infer<typeof CreateRemarkRequest>;
 
 export const DecideRemark = z.object({

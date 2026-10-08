@@ -669,18 +669,23 @@ export async function sendLinkDecisionEmail(to: string, data: {
   return sendEmail({ to, subject: `Your link request has been ${decision} by ${data.studentName}`, html });
 }
 
-/** NOT-011: Admin sends a bulk announcement */
-export async function sendBulkAnnouncementEmail(to: string | string[], data: {
-  title: string;
-  body: string;
-}): Promise<EmailResult> {
+/**
+ * A message from the school (step D, RESERVATIONS_REWORK.md §3.8): the title and the text as the
+ * recipient's in-app notification has them. A bilingual message's Arabic paragraphs are set right
+ * to left.
+ */
+export async function sendMessageEmail(to: string, data: { title: string; body: string }): Promise<EmailResult> {
+  const arabic = /[؀-ۿ]/;
+  const paragraphs = data.body.split(/\n{2,}/).map((p) => {
+    const rtl = arabic.test(p);
+    return `<p${rtl ? ' dir="rtl" style="text-align:right"' : ''}>${esc(p).replace(/\n/g, '<br>')}</p>`;
+  }).join('\n');
   const html = emailLayout(data.title, `
-    <h2>${esc(data.title)}</h2>
-    <p>${esc(data.body).replace(/\n/g, '<br>')}</p>
+    <h2${arabic.test(data.title) && !/[A-Za-z]/.test(data.title) ? ' dir="rtl"' : ''}>${esc(data.title)}</h2>
+    ${paragraphs}
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
-    <p style="font-size:12px;color:#9ca3af;">This is an official announcement from the IGCSE administration.</p>
+    <p style="font-size:12px;color:#9ca3af;">A message from the school. It is also in your notifications in the app.</p>
   `);
-
   return sendEmail({ to, subject: data.title, html });
 }
 

@@ -433,6 +433,34 @@ describe('object-level access between families', () => {
     expect(await snapshot()).toEqual(before);
   });
 
+  it("the reservations rework, step C: B cannot read, ask for, pay or refund A's charges; an exception for B cannot reach A's line", async () => {
+    // A's charge (finance adds it).
+    const charge = await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: studentAId, kind: 'custom', amount: 250, reason: 'a lost library book' } }));
+    const before = await statusOf('charge', charge.id);
+    await refusedAs('parentB lists A charges', parentB.api.v1.charges.$get({ query: { studentId: studentAId } }));
+    await refusedAs('studentB lists A charges', studentB.api.v1.charges.$get({ query: { studentId: studentAId } }));
+    expect((await apiResponse(parentB.api.v1.charges.$get({ query: {} }))).some((c) => c.studentId === studentAId)).toBe(false);
+    await refusedAs('parentB asks a service for A', parentB.api.v1.charges.$post({ json: { studentId: studentAId, kind: 'cash_in', boardServiceId: 'svc-pearson-ci', registrationId: physA } }));
+    await refusedAs('studentB asks a service for A', studentB.api.v1.charges.$post({ json: { studentId: studentAId, kind: 'cash_in', boardServiceId: 'svc-pearson-ci', registrationId: physA } }));
+    await refusedAs('parentB pays A charge', parentB.api.v1.payments.initiate.$post({ json: { chargeIds: [charge.id], paymentMethod: 'in_school' } }));
+    await refusedAs('parentB accepts A charge', parentB.api.v1.charges[':id'].accept.$post({ param: { id: charge.id }, json: { reason: 'B acting on A' } }));
+    await refusedAs('parentB cancels A charge', parentB.api.v1.charges[':id'].cancel.$post({ param: { id: charge.id }, json: { reason: 'B acting on A' } }));
+    await refusedAs('parentB refunds A charge', parentB.api.v1.charges[':id'].refund.$post({ param: { id: charge.id }, json: { amount: 1, reason: 'B acting on A' } }));
+    expect(await statusOf('charge', charge.id)).toBe(before);
+    expect((await sql(`select id from payment_charge where charge_id = $1`, [charge.id]))).toEqual([]);
+    // An exception granted to family B (its parent) cannot be scoped to A's line or A's charge.
+    await refusedAs('exception for B on A line', finadmin.api.v1.exceptions.$post({
+      json: { policyKey: 'price.discountPercent', familyId: parentB.id, scope: { registrationId: physA }, value: 50, reason: 'B on A line' },
+    }));
+    await refusedAs('exception for B on A charge', finadmin.api.v1.exceptions.$post({
+      json: { policyKey: 'price.discountPercent', studentId: studentBId, scope: { chargeId: charge.id }, value: 50, reason: 'B on A charge' },
+    }));
+    expect((await sql(`select id from exception where registration_id = $1 or charge_id = $2`, [physA, charge.id]))).toEqual([]);
+    // The desk-drop is staff's: a family is refused.
+    await refusedAs('parentB desk-drops A line', parentB.api.v1.registrations[':id']['desk-drop'].$post({ param: { id: physA }, json: { reason: 'B acting on A' } }));
+    await apiResponse(finadmin.api.v1.charges[':id'].cancel.$post({ param: { id: charge.id }, json: { reason: 'test charge' } }));
+  });
+
   it('F0a exceptions: each type names who may grant it — a coordinator is refused a fee waiver, a finance admin the grade-10 exception', async () => {
     const coordinator = await staff(adm, 'coordinator', 'oa');
     const exceptionsOf = async () => Number((await one<{ n: string }>(`select count(*) as n from exception where student_id = $1`, [studentBId])).n);
@@ -469,5 +497,34 @@ describe('object-level access between families', () => {
     await refusedAs('parentB teacher of A', parentB.api.v1.registrations[':id'].teacher.$put({ param: { id: bioA }, json: { teacherId: null, reason: 'not my child at all' } }));
     await refusedAs('studentB teacher of A', studentB.api.v1.registrations[':id'].teacher.$put({ param: { id: bioA }, json: { teacherId: null, reason: 'not my child at all' } }));
     expect(await one(`select status, teacher_id, prior_sitting_verified_outcome, updated_at from registration where id = $1`, [bioA])).toEqual(before);
+  });
+  it("step D: B cannot read or mark A's copy of a message, reach a message's deliveries or send one; finance reads only the money lists' messages", async () => {
+    // The school writes to A's family (the parent and the student), as the Messages screen does.
+    const sent = await apiResponse(adm.api.v1.messages.$post({ json: {
+      audience: { definition: { kind: 'direct', userIds: [parentA.id, studentAId] } }, title: 'A word to family A', body: 'This message is for family A only.', language: 'en', channels: ['in_app'],
+    } }));
+    const copies = await sql<{ id: string; user_id: string }>(`select id, user_id from notification where data->>'messageId' = $1 order by user_id`, [sent.id]);
+    expect(copies).toHaveLength(2);
+    for (const c of copies) {
+      await refusedAs('parentB mark message copy of A read', parentB.api.v1.notifications[':id'].read.$put({ param: { id: c.id } }));
+      await refusedAs('studentB mark message copy of A read', studentB.api.v1.notifications[':id'].read.$put({ param: { id: c.id } }));
+    }
+    expect(await sql(`select 1 from notification where data->>'messageId' = $1 and read_at is not null`, [sent.id])).toEqual([]);
+    // B's own notifications never list A's copy.
+    for (const who of [parentB, studentB]) {
+      const mine = await apiResponse(who.api.v1.notifications.$get({ query: {} }));
+      expect(mine.some((n) => (n.data as { messageId?: string } | null)?.messageId === sent.id)).toBe(false);
+    }
+    // The deliveries, the log, an audience naming A's student and a send are the school's.
+    await refusedAs('parentB deliveries of A message', parentB.api.v1.messages.deliveries.$get({ query: { messageId: sent.id } }));
+    await refusedAs('studentB deliveries of A message', studentB.api.v1.messages.deliveries.$get({ query: { messageId: sent.id } }));
+    await refusedAs('parentB message log', parentB.api.v1.messages.$get({ query: {} }));
+    await refusedAs('parentB resolve A family', parentB.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: { kind: 'batch', list: 'session_unpaid', sessionId, include: 'both', filter: 'unpaid', studentIds: [studentAId], who: 'families' } } } }));
+    await refusedAs('parentB message to A', parentB.api.v1.messages.$post({ json: { audience: { definition: { kind: 'direct', userIds: [parentA.id] } }, title: 'From another family', body: 'A family may not message another family.', channels: ['in_app'] } }));
+    await refusedAs('studentB message to A', studentB.api.v1.messages.$post({ json: { audience: { definition: { kind: 'direct', userIds: [studentAId] } }, title: 'From another family', body: 'A family may not message another family.', channels: ['in_app'] } }));
+    // Finance passes the role gate but reads only money lists: a direct message's deliveries are refused.
+    await refusedAs('officer deliveries of a direct message', officer.api.v1.messages.deliveries.$get({ query: { messageId: sent.id } }));
+    await refusedAs('officer direct message', officer.api.v1.messages.$post({ json: { audience: { definition: { kind: 'direct', userIds: [parentA.id] } }, title: 'From the finance office', body: 'Finance sends to the money lists only.', channels: ['in_app'] } }));
+    expect(await sql(`select 1 from message m where m.created_by = $1`, [officer.id])).toEqual([]);
   });
 });

@@ -64,14 +64,19 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
         'payment.graceDays': false,
         'refund.defaultPolicy.june': false,
         'refund.defaultPolicy.winter': false,
-        // The reservations rework (step C's key, read by step A's deadline): late board entries
-        // (Q-20) are the admin's alone.
+        // The reservations rework (step C): the overdue expiry is finance's and the admin's; late
+        // board entries (Q-20) the admin's alone.
+        'payment.expireOverdueAfterDays': false,
         'exceptions.boardEntryDeadline': false,
         // F0b: what "A.S./A.2." marks is the coordinator's answer (IS-01).
         'catalogue.levelCodeReading': true,
         // The reservations rework, step B: whether an unverified declared sitting is held at its
         // deadline is the owner's question (Q-22): the admin's setting.
         'verification.unverifiedAtDeadline': false,
+        // The reservations rework, step D: the reminders' switch is the admin's; their send hour the
+        // admin's and finance admin's.
+        'reminders.enabled': false,
+        'reminders.sendAtHour': false,
       });
     });
 

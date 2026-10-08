@@ -12,7 +12,7 @@
  * the registration becomes 'dropped'.
  */
 
-import { db, receipt, registration, eq, and, inArray, gradeTodayExtras } from '@repo/db';
+import { db, receipt, registration, charge, eq, and, inArray, gradeTodayExtras } from '@repo/db';
 import { randomUUID } from 'crypto';
 import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { notifyEscrowBalanceChanged } from './notification.services';
@@ -57,7 +57,7 @@ export async function createReceiptsForRegistrations(
       .update(receipt)
       .set({
         status: 'pending_issue',
-        receiptNumber: `${receiptNumberFor(rc.registrationId)}-R${n}`,
+        receiptNumber: `${receiptNumberFor(rc.registrationId!)}-R${n}`,
         issuedBy: null, issuedAt: null, returnedTo: null, returnedAt: null,
         refundAmountOnReturn: null, refundReason: null, refundInitiatedBy: null,
         notes: `Reissued — ${rc.receiptNumber} was voided when an earlier payment was reversed`,
@@ -77,6 +77,48 @@ export async function createReceiptsForRegistrations(
       }))
     )
     .onConflictDoNothing();
+}
+
+/**
+ * The reservations rework (§3.10 item 2): a charge's receipt, born when its payment completes —
+ * one per charge (receipt.charge_id, exactly one of the two subjects), never for an instalment
+ * (its deposit slip is on the payment; the line's own receipt comes at the plan's capture).
+ * Paying again after a reversal reissues the voided paper under a new number (MA-20).
+ */
+export async function createReceiptsForCharges(chargeIds: string[], executor: DbOrTx = db) {
+  if (chargeIds.length === 0) return;
+  const existing = await executor
+    .select({ id: receipt.id, chargeId: receipt.chargeId, status: receipt.status, receiptNumber: receipt.receiptNumber })
+    .from(receipt)
+    .where(inArray(receipt.chargeId, chargeIds));
+  for (const rc of existing.filter((r) => r.status === 'void')) {
+    const n = Number(/-R(\d+)$/.exec(rc.receiptNumber)?.[1] ?? '1') + 1;
+    await executor
+      .update(receipt)
+      .set({
+        status: 'pending_issue',
+        receiptNumber: `${chargeReceiptNumberFor(rc.chargeId!)}-R${n}`,
+        issuedBy: null, issuedAt: null, returnedTo: null, returnedAt: null,
+        refundAmountOnReturn: null, refundReason: null, refundInitiatedBy: null,
+        notes: `Reissued — ${rc.receiptNumber} was voided when an earlier payment was reversed`,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(receipt.id, rc.id), eq(receipt.status, 'void')));
+  }
+  await executor
+    .insert(receipt)
+    .values(chargeIds.map((chargeId) => ({
+      id: randomUUID(),
+      chargeId,
+      receiptNumber: chargeReceiptNumberFor(chargeId),
+      status: 'pending_issue' as const,
+    })))
+    .onConflictDoNothing();
+}
+
+/** A charge's receipt number: RCP-C + the charge id's first characters (deterministic, retries mint none). */
+function chargeReceiptNumberFor(chargeId: string): string {
+  return `RCP-C${chargeId.replace(/-/g, '').slice(0, 9).toUpperCase()}`;
 }
 
 /**
@@ -178,7 +220,8 @@ export async function executeReceiptGatedDrop(
 
 type ParkedReceipt = {
   id: string;
-  registrationId: string;
+  // A charge's receipt has none (and never a parked drop).
+  registrationId: string | null;
   refundAmountOnReturn: number | null;
   refundReason: string | null;
   refundInitiatedBy: string | null;
@@ -194,6 +237,7 @@ type ParkedReceipt = {
  * audit ST-05).
  */
 async function completeParkedDrop(tx: Tx, rec: ParkedReceipt, staffId: string) {
+  if (!rec.registrationId) return;
   {
     const [reg] = await tx
       .update(registration)
@@ -223,9 +267,10 @@ async function completeParkedDrop(tx: Tx, rec: ParkedReceipt, staffId: string) {
 
 /** NOT-008 (fire-and-forget, after the commit): the parent sees the credit land. */
 async function notifyParkedRefund(rec: ParkedReceipt) {
-  if (rec.refundAmountOnReturn && rec.refundAmountOnReturn > 0) {
+  const registrationId = rec.registrationId;
+  if (registrationId && rec.refundAmountOnReturn && rec.refundAmountOnReturn > 0) {
     const reg = await db.query.registration.findFirst({
-      where: (r, { eq }) => eq(r.id, rec.registrationId),
+      where: (r, { eq }) => eq(r.id, registrationId),
       columns: { studentId: true },
       with: { student: { columns: { name: true } } },
     });
@@ -303,8 +348,15 @@ export async function markLostOrVoid(
       // then its registration — the order a drop, a return and a reversal lock
       // them in, so a void racing one of them waits instead of deadlocking —
       // and judged under both locks, so a drop committing meanwhile is seen (ST-14).
-      const [rc] = await tx.select({ registrationId: receipt.registrationId }).from(receipt).where(eq(receipt.id, receiptId)).for('update');
-      if (rc) {
+      const [rc] = await tx.select({ registrationId: receipt.registrationId, chargeId: receipt.chargeId }).from(receipt).where(eq(receipt.id, receiptId)).for('update');
+      // A charge's receipt: the same rule — never void while the charge is paid (§3.10 item 2).
+      if (rc?.chargeId) {
+        const [c] = await tx.select({ status: charge.status }).from(charge).where(eq(charge.id, rc.chargeId)).for('update');
+        if (c?.status === 'paid') {
+          throw new Error('This charge is still paid for, so its receipt stays valid and cannot be voided — void is for the receipt of a refunded or reversed charge');
+        }
+      }
+      if (rc?.registrationId) {
         const [reg] = await tx
           .select({ status: registration.status })
           .from(registration)
@@ -351,6 +403,11 @@ export async function getReceiptsQueue() {
           session: { columns: { id: true, name: true } },
         },
       },
+      // The reservations rework (§3.10 item 2): a charge's receipt.
+      charge: {
+        columns: { id: true, studentId: true, kind: true, description: true, amount: true, status: true },
+        with: { student: { columns: { id: true, name: true, email: true, cohortYear: true }, extras: gradeTodayExtras } },
+      },
     },
     orderBy: (r, { asc }) => [asc(r.updatedAt)],
   });
@@ -367,6 +424,7 @@ export async function findByNumber(receiptNumber: string) {
           subject: { columns: { id: true, name: true, code: true } },
         },
       },
+      charge: { columns: { id: true, description: true, amount: true, status: true }, with: { student: { columns: { id: true, name: true } } } },
     },
   });
 }

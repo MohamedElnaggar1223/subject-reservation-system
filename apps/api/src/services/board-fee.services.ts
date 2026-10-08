@@ -13,10 +13,11 @@
  */
 
 import {
-  db, boardSeries, boardFee, examBoard, examUnit, qualification, qualificationOption, subject, registration, paymentRegistration,
+  db, boardSeries, boardFee, examBoard, examUnit, qualification, qualificationOption, subject, registration,
   sessionOfferItem, sessionOfferItemFeeKey, sessionOffer, registrationSession,
   and, or, eq, inArray, sql, asc,
 } from '@repo/db';
+import { paymentHistoryOf, PAYMENT_HISTORY_REASON } from './line-history.services';
 import { randomUUID } from 'crypto';
 import type { PutBoardFeesType, ConfirmBoardFeesType, RepriceBoardFeesType, PricingBasis } from '@repo/validations';
 import { logAction, logActions, type AuditContext } from './audit.services';
@@ -81,14 +82,17 @@ export async function getFeeGrid(seriesId: string) {
   const labels = await keyLabels(db, [...rows.map((r) => ({ kind: r.keyKind, id: r.keyId })), ...used.map((u) => ({ kind: u.keyKind, id: u.keyId }))]);
   // Lines priced from each row, and those whose recorded amount differs from the row now (to re-price).
   const lineRows = rows.length ? await db.execute(sql`
-    select f.id as fee_id, r.id, r.status, (fr->>'amount')::numeric as recorded,
-      exists (select 1 from payment_registration pr where pr.registration_id = r.id) as has_payment
+    select f.id as fee_id, r.id, r.status, (fr->>'amount')::numeric as recorded
     from board_fee f
     join registration r on r.pricing_basis is not null
     cross join lateral jsonb_array_elements(r.pricing_basis->'feeRows') fr
-    where f.board_series_id = ${seriesId} and fr->>'id' = f.id`).then((x) => x.rows as { fee_id: string; id: string; status: string; recorded: string; has_payment: boolean }[]) : [];
+    where f.board_series_id = ${seriesId} and fr->>'id' = f.id`).then((x) => x.rows as { fee_id: string; id: string; status: string; recorded: string }[]) : [];
+  // The re-price's own test of a payment history (a payment, a live plan, a price adjustment or an
+  // instalment paid toward the line: line-history.services.ts), so the count is what it will do.
+  const history = await paymentHistoryOf(db, [...new Set(lineRows.map((l) => l.id))]);
   const out = rows.map((r) => {
-    const mine = lineRows.filter((l) => l.fee_id === r.id && (LIVE as readonly string[]).includes(l.status));
+    const mine = lineRows.filter((l) => l.fee_id === r.id && (LIVE as readonly string[]).includes(l.status))
+      .map((l) => ({ ...l, has_payment: history.has(l.id) }));
     const differ = mine.filter((l) => Number(l.recorded) !== r.amount);
     return {
       ...r,
@@ -340,10 +344,9 @@ export async function repriceLines(seriesId: string, data: RepriceBoardFeesType,
     if (prov) throw new BoardFeeError('Confirm a fee before re-pricing the lines read from it');
     // The lines first, locked; their payment history after (a checkout committing meanwhile is seen).
     const lines = await lockLinesOfFees(tx, ids);
-    const histories = lines.length
-      ? await tx.select({ registrationId: paymentRegistration.registrationId }).from(paymentRegistration).where(inArray(paymentRegistration.registrationId, lines.map((l) => l.id)))
-      : [];
-    const withHistory = new Set(histories.map((h) => h.registrationId));
+    // A payment of the line, a live instalment plan on it, or a price adjustment or an instalment
+    // paid or being paid (line-history.services.ts; the review of step C, items 9 and 14): its price stays.
+    const withHistory = await paymentHistoryOf(tx, lines.map((l) => l.id));
     const repriced: { id: string; studentId: string; subjectId: string; from: number; to: number }[] = [];
     const listed: { id: string; studentId: string; status: string; price: number; reason: string }[] = [];
     const now = new Date();
@@ -354,7 +357,7 @@ export async function repriceLines(seriesId: string, data: RepriceBoardFeesType,
       const waiting = (WAITING as readonly string[]).includes(l.status);
       if (!basis || withHistory.has(l.id) || !waiting) {
         listed.push({ id: l.id, studentId: l.studentId, status: l.status, price: l.priceAtRegistration,
-          reason: !basis ? 'converted line (no pricing basis)' : withHistory.has(l.id) ? 'has a payment (open, failed or paid)' : `is ${l.status}` });
+          reason: !basis ? 'converted line (no pricing basis)' : withHistory.has(l.id) ? PAYMENT_HISTORY_REASON[withHistory.get(l.id)!] : `is ${l.status}` });
         if (l.priceProvisional) {
           await tx.update(registration).set({ priceProvisional: false, updatedAt: now }).where(eq(registration.id, l.id));
           // Its price stands (finance adjusts it); the mark it loses is recorded per line.

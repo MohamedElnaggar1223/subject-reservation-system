@@ -8,8 +8,9 @@
  * the receipt book beside it, and nothing at all for the family (no price was ever on a form).
  * Here every line shows its price and why ("course 14,000 × 50% + board 9,200 × 100%"), what was
  * paid and is still owed, when, and its receipt; the payments below it, one per entry deadline;
- * the escrow. Every number is the ledger's. (Charges — services, pushed school fees, instalments —
- * join the lines when step C lands: the API's `charges` per student is their place.)
+ * the escrow. Every number is the ledger's. Charges (step C): each one beside the lines with its
+ * price, paid and outstanding; a line under an instalment plan shows its instalments under it, its
+ * paid part the deposits held for it — the instalments are never added to the totals again.
  */
 
 import { useState } from 'react';
@@ -34,6 +35,12 @@ const STATUS_TONE: Record<string, Tone> = {
   dropped_pending_receipt: 'warning', dropped: 'neutral', rejected: 'neutral', expired: 'neutral',
 };
 const ENDED = ['expired', 'rejected'];
+const INSTALMENT_STATUS: Record<string, string> = { pending_payment: 'to pay', paid: 'paid', cancelled: 'cancelled', refunded: 'refunded', requested: 'requested' };
+const CHARGE_STATUS: Record<string, { label: string; tone: Tone }> = {
+  requested: { label: 'asked for, awaiting the school', tone: 'info' }, pending_payment: { label: 'to pay', tone: 'warning' },
+  paid: { label: 'paid', tone: 'success' }, refunded: { label: 'refunded', tone: 'neutral' }, cancelled: { label: 'cancelled', tone: 'neutral' },
+};
+const PLAN_STATUS: Record<string, string> = { active: 'Instalment plan', used: 'Paid by its instalment plan', lapsed: 'Instalment plan ended', revoked: 'Instalment plan ended' };
 const SOURCE: Record<string, string> = { declared_by_family: 'declared by the family', declared_by_desk: 'declared at the desk', known: 'on record', legacy: 'before the system' };
 
 function entryText(l: StatementLine) {
@@ -152,6 +159,18 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
                             {!l.priorSitting.outcome && (l.priorSitting.source === 'declared_by_family' || l.priorSitting.source === 'declared_by_desk') && <> <Badge tone="warning">to be verified by the school</Badge></>}
                           </div>
                         )}
+                        {money && l.plan && l.plan.instalments.length > 0 && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            <Badge tone={l.plan.live ? 'info' : 'neutral'}>{PLAN_STATUS[l.plan.status] ?? 'Instalment plan'}</Badge>
+                            <ul className="mt-1 space-y-0.5">
+                              {l.plan.instalments.map((i) => (
+                                <li key={i.id}>
+                                  <span>{`Instalment ${i.no} of ${l.plan!.instalments.length}`}</span> · <Money amount={i.amount} /> · <span>due</span> <Day iso={i.dueAt} /> · <span>{INSTALMENT_STATUS[i.status] ?? i.status}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </td>
                       {money && (
                         <td className="px-3 py-2 text-end">
@@ -160,7 +179,7 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
                           <div className="text-[11px] text-muted-foreground" dir="ltr">{l.basisText}</div>
                         </td>
                       )}
-                      {money && <td className="px-3 py-2 text-end"><Money amount={l.paid} />{l.refunded > 0 && <div className="text-xs text-muted-foreground"><span>refunded</span> <Money amount={l.refunded} /></div>}</td>}
+                      {money && <td className="px-3 py-2 text-end"><Money amount={l.paid} />{l.plan?.live && l.paid > 0 && <div className="text-xs text-muted-foreground">held for it, paid in instalments</div>}{l.refunded > 0 && <div className="text-xs text-muted-foreground"><span>refunded</span> <Money amount={l.refunded} /></div>}</td>}
                       {money && <td className="px-3 py-2 text-end">{l.outstanding > 0 ? <Money amount={l.outstanding} className="font-semibold text-amber-700 dark:text-amber-400" /> : <span className="text-muted-foreground">—</span>}</td>}
                       {money && (
                         <td className="px-3 py-2">
@@ -212,8 +231,15 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
           ))}
           {s.charges.map((c) => (
             <div key={c.id} className="flex flex-wrap justify-between gap-2 border-b border-border py-1.5 last:border-0">
-              <bdi data-i18n-skip="true">{c.label}</bdi>
-              <span className="flex gap-4"><Money amount={c.price} /> <span><span>paid</span> <Money amount={c.paid} /></span></span>
+              <span>
+                <bdi data-i18n-skip="true">{c.label}</bdi> <Badge tone={CHARGE_STATUS[c.status]?.tone ?? 'neutral'}>{CHARGE_STATUS[c.status]?.label ?? c.status}</Badge>
+                {c.dueAt && c.outstanding > 0 && <span className="text-xs text-muted-foreground"> · <span>due</span> <Day iso={c.dueAt} /></span>}
+              </span>
+              <span className="flex gap-4">
+                <Money amount={c.status === 'cancelled' ? 0 : c.price} /> <span><span>paid</span> <Money amount={c.paid} /></span>
+                {c.outstanding > 0 && <Money amount={c.outstanding} className="font-semibold text-amber-700 dark:text-amber-400" />}
+                {c.refunded > 0 && <span className="text-xs text-muted-foreground"><span>refunded</span> <Money amount={c.refunded} /></span>}
+              </span>
             </div>
           ))}
         </div>
@@ -227,7 +253,7 @@ function StudentBlock({ s, money, showEnded, teacherChange, onTeacher }: {
             {s.payments.map((p) => (
               <li key={p.id} className="flex flex-wrap items-start justify-between gap-3 px-3 py-2">
                 <div>
-                  <div><Day iso={p.at} /> · <span>{p.purpose === 'registration' ? 'Subjects' : p.purpose === 'school_fee' ? 'School fee' : p.purpose === 'remark' ? 'Remark' : p.purpose === 'preregistration' ? 'Preregistration' : p.purpose}</span>
+                  <div><Day iso={p.at} /> · <span>{p.purpose === 'registration' ? 'Subjects' : p.purpose === 'school_fee' ? 'School fee' : p.purpose === 'remark' ? 'Remark' : p.purpose === 'preregistration' ? 'Preregistration' : p.purpose === 'charge' ? 'Charges' : p.purpose}</span>
                     {' '}<span className="text-muted-foreground">({p.instrument ?? p.method})</span></div>
                   {p.covers.length > 0 && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{p.covers.map((c) => `${c.label}${c.receipt ? ` · ${c.receipt}` : ''}`).join(', ')}</bdi></div>}
                   {p.series.length > 0 && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{p.series.join(', ')}</bdi>{p.deadline && <> · <span>deadline</span> <Day iso={p.deadline} /></>}</div>}

@@ -228,6 +228,26 @@ a provisional fee). 08t forces it in both orders and for the parent's own swap: 
 with the early locks removed each run ends in "deadlock detected". Accepted as is: none — the order
 changes nothing elsewhere in this section (fee rows already came before lines).
 
+**The desk's collection takes every line it touches in one pass** (step C, the review of
+1cb38de item 5): the lines it pays and the plan lines of the instalments it takes, `FOR UPDATE` in
+id order, before the charges — not its own lines first and the plan lines after, which deadlocked
+against a fee re-price or a series move taking both in id order (08t).
+
+**The reminder step: the sessions, then the lines and charges** (step D, RESERVATIONS_MESSAGES.md
+§2, the review of 5c2f2bf). Its claim row has a foreign key to the line's session, which takes the
+session `FOR KEY SHARE` at the insert; the step therefore takes each group's sessions `FOR KEY SHARE`
+in id order **before** its lines and charges (`FOR SHARE`), as this order puts the session before
+its lines. Taken after the lines, it waited behind `updateSession` / `correctSessionSeries` (the
+session `FOR UPDATE`, then its waiting lines) while holding those lines: a deadlock (08t forces it).
+
+**A payment, then the student, for a pushed school fee** (step C, RESERVATIONS_MONEY.md §2).
+`settlePushInTx` runs inside a school-fee payment's confirmation, which holds the payment
+`FOR UPDATE`, and then takes the student `FOR NO KEY UPDATE` to settle the open push of that year
+(the push itself takes the student, so a push and a confirmation serialise on it). No path takes the
+student and then an existing payment: a reservation, a grant or revocation, the push and the plan's
+paths take the student and then lines, charges or new rows; a payment is locked first by every path
+that locks one (confirmation, reversal, failure, the deadline sweeps).
+
 ### 2.2 Creating lines — `insertLines` (`apps/api/src/services/line.services.ts`)
 
 ```ts
@@ -458,7 +478,10 @@ series of the last two years for a declaration.
   columns and the To verify tab; the teacher change and replace on lines; the Reserve pages;
   the Statement; it fills `refund_policy_snapshot`; it removes `/registrations/available`.
 - **C adds:** the registry behind `lineExceptions`, `refundFor`, charges, `board_service` and
-  the service kind of `board_fee` (with the remark fee migration — this step leaves
+  its fees in a table of its own, **`board_service_fee`** (series × service × level, provisional
+  until confirmed) — not a service kind of `board_fee`, whose columns and rules are this step's
+  (the reviewer and the lead accepted the separate table; RESERVATIONS_MONEY.md §4) — and
+  `board_service_deadline` (with the remark fee migration — this step leaves
   `remark_fee_schedule` and `remark_deadline` as they are), instalments, the overdue expiry,
   `dueDateFor`'s charge callers, the checkout's and desk's charge groups.
 - **Shared, by agreement:** the 09 rules over lines (A adds its rules; B and C add theirs in
@@ -616,8 +639,25 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
   `pricing.retakeTaughtCoursePercent` and `pricing.onePaperCoursePercent`; one that applies to the
   line (self-study, a retake in school, a one-paper item) replaces its setting's percent — the
   first the adapter gives of each key — and only those that applied are recorded in
-  `basis.exceptionIds`. Who holds one (a student or a family) is the registry's; C's registry can
-  mark the four policies live at the merge (today `pending`, refused at grant).
+  `basis.exceptionIds`. Who holds one (a student or a family) is the registry's; C's registry
+  marks the four policies live (step C's merge of main: granted by finance, 08r proves a student's
+  and a family's through the real registry, in the line's price and basis).
+- **One payment history for every re-price** *(changed, step C after main)*:
+  `lineIdsWithPaymentHistory(executor, lineIds)` (and `paymentHistoryOf`, which says why) in
+  `line-history.services.ts` — a payment of the line (`payment_registration`, any status), a live
+  instalment plan on it, or what paid toward its price: a price adjustment, or an instalment of a
+  live or captured plan, paid, refunded or being paid (not a service charge for the line's
+  subject, nor the instalments of a plan released in full: the review of 1cb38de, item 9).
+  `repriceLines` (the board fee's re-price; its listed reason names which), the Fees tab's
+  count (`getFeeGrid`, item 6), `repriceMovedLines` (every series move) and step C's single-line
+  price exception (granted or revoked) ask it and leave such a line's price; a plan line
+  re-priced would never be captured (its deposits short of the new price).
+  08q: a plan line is listed by the re-price and kept by a move, and its last instalment captures.
+- **The window by subject** *(changed, step C after main)*: `sessionWindow(…, line, …,
+  subjectIds?)` reads a line's `subjectId` (and a new reservation's subjects) and asks
+  `hasDeadlineExtension(…, subjectId)`: a session-scoped `deadline.window` covers every subject, a
+  subject-scoped one that subject alone — the reservation paths pass their `subjectIds`, the per-line
+  call sites their line's subject.
 - **Known earlier sittings are confirmed lines only** *(changed)*: `GET /registrations/offers`'
   `knownSittings` no longer lists a dropped line (never sat; it may be declared, then verified).
 - **The grade-10 commit freezes the refund steps** *(changed)*: each line's

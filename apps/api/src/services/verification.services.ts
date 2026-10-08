@@ -14,12 +14,18 @@
  *   `declaration_rejected` (F4 enters it as a first entry), the family is told, and finance
  *   decides explicitly whether a price adjustment is owed;
  * - rejected on a paid line after the first-entry deadline: it cannot be entered as a first
- *   entry (MO-10), so the system drops it through the receipt-gated drop, its board fee by the
- *   per-line "sent" rule (reservation.services `refundForSystemDrop`);
+ *   entry (MO-10), so the system drops it through the receipt-gated drop with `refundFor`'s refund
+ *   (step C, refund.services: the course part by the line's consented policy, its board fee by the
+ *   per-line "sent" rule);
  * - still unverified at the line's effective deadline: under `verification.unverifiedAtDeadline`
  *   = `enter_as_declared` (the default) nothing happens (F4 lists it as declared, unverified);
  *   under `hold` the deadline sweep expires a waiting line (`hold_unverified`) and drops a paid
  *   one through the receipt-gated drop with that day's refund, the board fee counted not sent.
+ *
+ * A waiting line that ends here under a live instalment plan (step C, §3.6) has its plan settled
+ * in the same transaction, as every system expiry does (`settlePlansOfExpiredLines`: the school
+ * keeps what a paid drop that day would have kept, the rest goes back to escrow); an instalment
+ * payment in progress counts as a payment in progress of the line.
  *
  * Locks: the line's receipt first (when it has one), then the line — MA-16's order, the one a
  * payment reversal, a receipt's void (ST-14) and return, the receipt-gated drop and a parent's
@@ -30,16 +36,17 @@
  */
 
 import {
-  db, registration, receipt, paymentRegistration, payment, parentStudentLink, schoolSetting,
+  db, registration, receipt, paymentRegistration, payment, paymentCharge, charge, parentStudentLink, schoolSetting,
   and, eq, inArray, sql,
 } from '@repo/db';
 import { hasRole, ROLES, FINANCE_ROLES, type VerifyPriorSittingType } from '@repo/validations';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
-import { effectiveDeadlineFor } from './deadline.services';
+import { effectiveDeadlineFor, effectiveDeadlinesOf } from './deadline.services';
 import { executeReceiptGatedDrop } from './receipt.services';
 import { getSetting } from './settings.services';
 import { createNotification } from './notification.services';
-import { refundForSystemDrop } from './reservation.services';
+import { refundFor } from './refund.services';
+import { settlePlansOfExpiredLines } from './plan.services';
 import { schoolDate } from './window.services';
 import { formatSeriesName } from './statement.services';
 
@@ -99,13 +106,19 @@ export async function listToVerify(sessionId: string, show: 'awaiting' | 'decide
   const now = Date.now();
   // Each line's deadlines as effectiveDeadlineFor gives them for its student — a late board entry
   // granted while the setting is on (Q-20) counts, as it does when the line is answered.
-  const deadlines = await Promise.all(rows.map(async (r) => {
-    const key = { boardSeriesId: (r.boardSeriesId as string | null) ?? null, studentId: r.studentId as string };
-    const [own, first] = await Promise.all([
-      effectiveDeadlineFor(db, { ...key, attempt: r.attempt as string, priorSittingSeriesId: (r.priorSittingSeriesId as string | null) ?? null, declarationRejected: Boolean(r.declarationRejected) }),
-      effectiveDeadlineFor(db, { ...key, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false }),
-    ]);
-    return { own: own.at, first: first.at };
+  // The lines' own deadlines in one query (effectiveDeadlinesOf reads the flag and the late
+  // entry); a first entry's deadline once per series and student.
+  const ownOf = await effectiveDeadlinesOf(db, rows.map((r) => r.id as string));
+  const firstOf = new Map<string, Date | null>();
+  for (const r of rows) {
+    const key = `${(r.boardSeriesId as string | null) ?? ''}|${r.studentId as string}`;
+    if (firstOf.has(key)) continue;
+    const d = await effectiveDeadlineFor(db, { boardSeriesId: (r.boardSeriesId as string | null) ?? null, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false, studentId: r.studentId as string });
+    firstOf.set(key, d.at);
+  }
+  const deadlines = rows.map((r) => ({
+    own: ownOf.get(r.id as string)?.at ?? null,
+    first: firstOf.get(`${(r.boardSeriesId as string | null) ?? ''}|${r.studentId as string}`) ?? null,
   }));
   const lines = rows.map((r, i) => {
       const deadline = deadlines[i]!.own;
@@ -188,7 +201,16 @@ async function paymentState(tx: Tx, registrationId: string) {
   const rows = await tx.select({ status: payment.status }).from(paymentRegistration)
     .innerJoin(payment, eq(payment.id, paymentRegistration.paymentId))
     .where(eq(paymentRegistration.registrationId, registrationId));
-  return { funded: rows.some((r) => r.status === 'completed'), open: rows.some((r) => (OPEN as readonly string[]).includes(r.status)) };
+  // A line under an instalment plan is paid by its instalments (charges, step C §3.6): one in
+  // progress is a payment of the line in progress too.
+  const instalments = await tx.select({ status: payment.status }).from(charge)
+    .innerJoin(paymentCharge, eq(paymentCharge.chargeId, charge.id))
+    .innerJoin(payment, eq(payment.id, paymentCharge.paymentId))
+    .where(and(eq(charge.registrationId, registrationId), eq(charge.kind, 'instalment')));
+  return {
+    funded: rows.some((r) => r.status === 'completed'),
+    open: [...rows, ...instalments].some((r) => (OPEN as readonly string[]).includes(r.status)),
+  };
 }
 
 // ─── Verify or reject ────────────────────────────────────────────────────────
@@ -250,6 +272,8 @@ export async function verifyPriorSitting(
         .where(and(eq(registration.id, registrationId), inArray(registration.status, [...WAITING]))).returning({ id: registration.id });
       if (!expired) throw new VerificationError('The line changed while this was open: try again', 409);
       await logActions(expiryEntries([{ id: registrationId, from: line.status }], 'declaration_rejected'), tx);
+      // A live instalment plan on it ends with it: settled as a drop that day (step C, §3.6).
+      await settlePlansOfExpiredLines(tx, [registrationId], now, 'declaration_rejected');
       await logAction(actor.id, 'PRIOR_SITTING_REJECTED', 'registration', registrationId, { status: line.status },
         { outcome: 'rejected', effect: 'expired', priorSittingSeriesId: line.priorSittingSeriesId, ...why }, ctx, tx);
       return { outcome: 'rejected', effect: 'expired' };
@@ -272,20 +296,21 @@ export async function verifyPriorSitting(
     // one, so the drop below would take it after the line — against MA-16's order (a reversal of
     // that payment takes the receipt first). Refused; asked again, the receipt is taken first.
     if (before.status !== 'confirmed') throw new VerificationError(PAID_MEANWHILE, 409);
-    // The board fee follows the per-line "sent" rule (§3.5, §3.9): sent once the line's own
-    // effective deadline has passed (F4's mark will say so too). A declared retake of the board's
-    // previous sitting runs to the retake deadline, so between the two deadlines it is not sent.
-    const own = await effectiveDeadlineFor(tx, { ...line, studentId: line.studentId });
-    const boardSent = !!own.at && own.at <= now;
-    const refund = await refundForSystemDrop(line, now, { boardSent });
+    // The refund is refundFor's (step C, §3.9): the course part by the policy the family consented
+    // to; the board fee by the per-line "sent" rule — sent once the line's own effective deadline
+    // has passed (F4's mark will say so too). A declared retake of the board's previous sitting
+    // runs to the retake deadline, so between the two deadlines it is not sent.
+    const refund = await refundFor(tx, registrationId, now);
+    const boardSent = refund.boardSent;
+    const boardFeeKept = boardSent ? Math.min(line.priceAtRegistration, Math.max(0, line.registrationFeeAtRegistration)) : 0;
     const drop = await executeReceiptGatedDrop(tx, {
       registrationId, studentId: line.studentId, refundAmount: refund.amount, refundReason: 'drop', initiatedBy: actor.id,
     });
     await tx.update(registration).set(decided).where(eq(registration.id, registrationId));
     await logAction(actor.id, 'PRIOR_SITTING_REJECTED', 'registration', registrationId, { status: 'confirmed' },
       { outcome: 'rejected', effect: 'dropped', status: drop.gated ? 'dropped_pending_receipt' : 'dropped', refundAmount: drop.refundAmount,
-        refundPercentage: refund.percentage, boardSent, boardFeeKept: refund.boardFeeKept, gated: drop.gated, firstEntryDeadline: first.at!.toISOString(), priorSittingSeriesId: line.priorSittingSeriesId, ...why }, ctx, tx);
-    return { outcome: 'rejected', effect: 'dropped', refundAmount: drop.refundAmount, refundPercentage: refund.percentage, gated: drop.gated };
+        refundPercentage: refund.percent, boardSent, boardFeeKept, gated: drop.gated, firstEntryDeadline: first.at!.toISOString(), priorSittingSeriesId: line.priorSittingSeriesId, ...why }, ctx, tx);
+    return { outcome: 'rejected', effect: 'dropped', refundAmount: drop.refundAmount, refundPercentage: refund.percent, gated: drop.gated };
   });
 
   if (result.outcome === 'rejected') {
@@ -352,16 +377,19 @@ export async function holdUnverifiedAtDeadline(now: Date = new Date()) {
             .where(and(eq(registration.id, id), eq(registration.status, line.status))).returning({ id: registration.id });
           if (!row) return null;
           await logActions(expiryEntries([{ id, from: line.status }], 'hold_unverified'), tx);
+          // A live instalment plan on it ends with it: settled as a drop that day (step C, §3.6).
+          await settlePlansOfExpiredLines(tx, [id], now, 'hold_unverified');
           return { line, effect: 'expired' as const, deadline: d.at };
         }
         if (line.status !== 'confirmed') return null;
         // Paid since this tick found it waiting: its receipt was made after lockLine looked for one
         // (MA-16's order); left to the next tick, which takes the receipt first.
         if (found !== 'confirmed') return null;
-        const refund = await refundForSystemDrop(line, now, { boardSent: false });
+        // A held line was never entered: its board fee is counted not sent (refundFor's neverSent).
+        const refund = await refundFor(tx, id, now, { neverSent: true });
         const drop = await executeReceiptGatedDrop(tx, { registrationId: id, studentId: line.studentId, refundAmount: refund.amount, refundReason: 'drop', initiatedBy: line.studentId });
         await logAction(null, 'LINE_DROPPED_UNVERIFIED', 'registration', id, { status: 'confirmed' },
-          { status: drop.gated ? 'dropped_pending_receipt' : 'dropped', refundAmount: drop.refundAmount, refundPercentage: refund.percentage, gated: drop.gated,
+          { status: drop.gated ? 'dropped_pending_receipt' : 'dropped', refundAmount: drop.refundAmount, refundPercentage: refund.percent, gated: drop.gated,
             deadline: d.at.toISOString(), setting: 'hold', priorSittingSeriesId: line.priorSittingSeriesId }, undefined, tx);
         return { line, effect: 'dropped' as const, deadline: d.at, drop };
       });

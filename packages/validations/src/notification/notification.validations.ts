@@ -53,10 +53,20 @@ export const NOTIFICATION_TYPES = [
   'PREREGISTRATION_HELD',
   // Reservations rework: a line re-priced when the board confirmed its fee, or moved
   'PRICE_CHANGED',
+  // Reservations rework, step C: a charge added or pushed, or what happened to it; a plan's news
+  'CHARGE_ADDED',
+  'CHARGE_UPDATED',
+  'PLAN_UPDATED',
   // Step B: the school's answer to a declared sitting (a retake or a carry-forward)
   'DECLARATION_REVIEWED',
   // Reservations rework: a moved line whose price stayed but is now to be confirmed
   'PRICE_TO_BE_CONFIRMED',
+  // Step D (messages and reminders): a message from the school to chosen people or a list, a
+  // payment or school-fee reminder, a reminder to staff. A broadcast stays BULK_ANNOUNCEMENT and
+  // a closing reminder SESSION_CLOSING_SOON, as families have always received them.
+  'SCHOOL_MESSAGE',
+  'PAYMENT_REMINDER',
+  'STAFF_REMINDER',
 ] as const;
 
 export const NotificationTypeSchema = z.enum(NOTIFICATION_TYPES);
@@ -85,8 +95,14 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   LINK_DECISION:                    'Link Request Decision',
   PREREGISTRATION_HELD:             'Preregistration Held',
   PRICE_CHANGED:                    'Price Changed',
+  CHARGE_ADDED:                     'New Charge',
+  CHARGE_UPDATED:                   'Charge Updated',
+  PLAN_UPDATED:                     'Instalment Plan',
   DECLARATION_REVIEWED:             'Declared Sitting Reviewed',
   PRICE_TO_BE_CONFIRMED:            'Price To Be Confirmed',
+  SCHOOL_MESSAGE:                   'Message from the School',
+  PAYMENT_REMINDER:                 'Payment Reminder',
+  STAFF_REMINDER:                   'Reminder',
 };
 
 // Icons mapped per type (used in the notification center UI)
@@ -113,8 +129,14 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   LINK_DECISION:                    '🔗',
   PREREGISTRATION_HELD:             '⏸️',
   PRICE_CHANGED:                    '💱',
+  CHARGE_ADDED:                     '🧾',
+  CHARGE_UPDATED:                   '🧾',
+  PLAN_UPDATED:                     '🗓️',
   DECLARATION_REVIEWED:             '🔎',
   PRICE_TO_BE_CONFIRMED:            '💱',
+  SCHOOL_MESSAGE:                   '✉️',
+  PAYMENT_REMINDER:                 '⏰',
+  STAFF_REMINDER:                   '📌',
 };
 
 // ─── Admin bulk announcement recipient groups ─────────────────────────────────
@@ -165,21 +187,6 @@ export const GetNotificationsQuery = z.object({
 });
 export type GetNotificationsQueryType = z.infer<typeof GetNotificationsQuery>;
 
-// ─── Admin: Bulk Announcement ─────────────────────────────────────────────────
-
-/**
- * Admin composes a bulk announcement to a selected recipient group (NOT-011).
- * sendEmail: true sends both in-app notification AND email.
- * scheduledAt: optional future date to schedule the announcement instead of sending immediately.
- *   - If omitted or in the past, the announcement is sent immediately (current behavior).
- *   - If in the future, the announcement is stored and dispatched by the session-closer cron
- *     when the scheduled time arrives.
- */
-export const BulkAnnouncement = z.object({
-  title:       z.string().min(3, 'Title must be at least 3 characters').max(150),
-  body:        z.string().min(10, 'Body must be at least 10 characters').max(2000),
-  recipients:  AnnouncementRecipientGroupSchema,
-  sendEmail:   z.boolean().default(true),
-  scheduledAt: z.coerce.date().optional(),
-});
-export type BulkAnnouncementType = z.infer<typeof BulkAnnouncement>;
+// The admin's bulk announcement form (NOT-011) and its scheduled queue were replaced by messages
+// (step D, RESERVATIONS_REWORK.md §3.8): /v1/messages. The recipient groups above stay as the
+// names the old announcements were sent under; the backfill (0051) maps them onto audiences.

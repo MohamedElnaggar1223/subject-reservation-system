@@ -113,17 +113,33 @@ const sittingValue = (s: Sitting) => (s.seriesId ? `id:${s.seriesId}` : `my:${s.
 
 type Pick = { on: boolean; entry: string | null; teacherId: string | null | undefined; sitting: string };
 
-export type ReserveDone = { registrationIds: string[]; message: string; desk?: DeskResult };
+/**
+ * A reservation's result. `sentences` are shown each in its own element, so each is translated on
+ * its own (the Arabic rules are per sentence, and step C's school-fee and charges sentences live in
+ * i18n-money): one joined string stays in English as soon as one sentence has no rule in the
+ * translator that reads the whole. `message` is the same text joined, for places that take a string.
+ */
+export type ReserveDone = { registrationIds: string[]; message: string; sentences: string[]; desk?: DeskResult };
+
+/** Sentences shown one element each (each translated on its own), separated by a space. */
+export function Sentences({ items }: { items: string[] }) {
+  return <>{items.map((s, i) => <span key={i}>{i > 0 && ' '}<span>{s}</span></span>)}</>;
+}
+
+/** At the desk, what goes with "Reserve and collect" beside the lines (step C, §4.3): the year's school fee (collected first) and charges. */
+export type DeskExtras = { chargeIds: string[]; schoolFeeYear?: string; total: number };
 
 /**
  * `viewer`: who is reserving — the student (a request their parent approves), a parent (for a
  * linked child; a preregistration when the session has not opened), or the desk (staff).
+ * `deskExtras`: the desk's "Also collect now" — sent in the same action as the lines.
  */
-export function Reserve({ viewer, studentId, sessionId, onDone }: {
+export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
   viewer: 'student' | 'parent' | 'desk';
   studentId: string;
   sessionId: string;
   onDone: (done: ReserveDone) => void;
+  deskExtras?: DeskExtras;
 }): React.JSX.Element {
   const desk = viewer === 'desk';
   const qc = useQueryClient();
@@ -243,14 +259,13 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
       // A consent belongs to the lines it was given for; the next reservation asks again.
       setPicks({}); setRefundTick(false); setDeclTick(false);
       qc.invalidateQueries({ queryKey: ['registrations'] });
-      onDone({
-        registrationIds: made.map((r) => r.id),
-        message: viewer === 'student'
-          ? `Sent to your parent for approval: ${made.length} line${made.length === 1 ? '' : 's'}.`
-          : data?.session.status === 'draft'
-            ? `Preregistered: ${made.length} line${made.length === 1 ? '' : 's'}. Pay now to hold the money until the session opens.`
-            : `Reserved: ${made.length} line${made.length === 1 ? '' : 's'} awaiting payment. Pay by exam series on the next screen.`,
-      });
+      const lines = `${made.length} line${made.length === 1 ? '' : 's'}`;
+      const sentences = viewer === 'student'
+        ? [`Sent to your parent for approval: ${lines}.`]
+        : data?.session.status === 'draft'
+          ? [`Preregistered: ${lines}. Pay now to hold the money until the session opens.`]
+          : [`Reserved: ${lines} awaiting payment. Pay by exam series on the next screen.`];
+      onDone({ registrationIds: made.map((r) => r.id), message: sentences.join(' '), sentences });
     },
     onError: (e) => setFailure(errorText(e)),
   });
@@ -258,7 +273,12 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
   const deskMutation = useMutation({
     mutationFn: (collect: boolean) => reserveDesk({
       studentId, sessionId, lines: linesOut(), consent,
-      ...(collect ? { collectNow: { instrumentUsed: instrument, escrowAmountToApply: Number(escrow) > 0 ? Number(escrow) : 0 } } : {}),
+      ...(collect ? { collectNow: {
+        instrumentUsed: instrument, escrowAmountToApply: Number(escrow) > 0 ? Number(escrow) : 0,
+        // The year's school fee first (the registration's gate asks for it) and the charges after, each its own payment.
+        ...(deskExtras?.schoolFeeYear ? { schoolFeeYear: deskExtras.schoolFeeYear } : {}),
+        ...(deskExtras?.chargeIds.length ? { chargeIds: deskExtras.chargeIds } : {}),
+      } } : {}),
     }),
     onSuccess: (r) => {
       setPicks({}); setDeskTick(false);
@@ -266,10 +286,13 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
       qc.invalidateQueries({ queryKey: ['desk'] });
       qc.invalidateQueries({ queryKey: ['finance'] });
       const parts = [`Reserved ${r.registrations.length} line${r.registrations.length === 1 ? '' : 's'}.`];
-      if (r.collected > 0) parts.push(`Collected EGP ${r.collected.toLocaleString('en-US')}${r.payments.length > 1 ? ` in ${r.payments.length} payments, one per entry deadline` : ''}.`);
+      if (r.schoolFee) parts.push(`The ${r.schoolFee.academicYear} school fee collected first (EGP ${r.schoolFee.amount.toLocaleString('en-US')}).`);
+      // With charges (step C's "Also collect now") the subjects are paid per entry deadline and each charge group on its own.
+      const withCharges = r.payments.some((p) => 'chargeIds' in p && (p.chargeIds as string[] | undefined)?.length);
+      if (r.collected > 0) parts.push(`Collected EGP ${r.collected.toLocaleString('en-US')}${r.payments.length > 1 ? ` in ${r.payments.length} payments, ${withCharges ? 'the subjects per entry deadline and the charges on their own' : 'one per entry deadline'}` : ''}.`);
       if (r.reservedNotCollected.length) parts.push(`${r.reservedNotCollected.length} on a provisional board fee: collected once the fee is confirmed.`);
       if (r.notCollected.length) parts.push(`Not collected — hand this money back: ${r.notCollected.map((n) => n.series.join(' and ')).join('; ')}.`);
-      onDone({ registrationIds: r.registrations.map((x) => x.id), message: parts.join(' '), desk: r });
+      onDone({ registrationIds: r.registrations.map((x) => x.id), message: parts.join(' '), sentences: parts, desk: r });
     },
     onError: (e) => setFailure(errorText(e)),
   });
@@ -284,7 +307,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
 
   const groups = [...new Set(offers.map((o) => LEVEL_GROUP[o.subject.level] ?? 'Other'))];
 
-  const payableNow = Math.max(0, total - provisionalTotal - (Number(escrow) > 0 ? Number(escrow) : 0));
+  const payableNow = Math.max(0, total - provisionalTotal + (deskExtras?.total ?? 0) - (Number(escrow) > 0 ? Number(escrow) : 0));
 
   return (
     <div className="space-y-4">

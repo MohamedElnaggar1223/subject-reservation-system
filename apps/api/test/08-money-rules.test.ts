@@ -588,9 +588,22 @@ describe('money rules', () => {
   // ─── Refund windows ────────────────────────────────────────────────────────
 
   describe('refund windows', () => {
+    // Changed by the reservations rework (RESERVATIONS_REWORK.md §3.9, §3.10; Q-19's default; trail
+    // rows "assertion" of .audit/rework-money.tsv). A line reserved since the rework refunds from its
+    // session's policy (steps in weeks from the course start, snapshotted on the line at consent),
+    // not from absolute windows, and the percent applies to the course fee: the board fee comes back
+    // in full while the entry has not been sent (these lines' series has no entry deadline and exams
+    // a year away). Course 1,000 and board 500: 50% gives 1,000 back (was 750); the 90% exception
+    // 1,400 (was 1,350); a week the policy refunds nothing still gives the board fee, 500 (was
+    // nothing); 100% gives 1,500 as before. The week moves with the session's course start (the
+    // anchor is resolved at refund time), so the steps the family consented to never change.
     let f: Family, regs: Record<string, string>;
     const hour = 60 * 60 * 1000;
     const at = (offset: number) => new Date(Date.now() + offset);
+    const dayOffset = (d: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(Date.now() + d * 24 * hour));
+    const courseStartsOn = async (day: string) =>
+      apiResponse(adm.api.v1.sessions[':id'].$put({ param: { id: sessionId }, json: { courseStartsOn: day, reason: 'refund week check' } }));
+    let restoreStart = '';
     const dropCredit = async (regId: string) => {
       const r = await apiResponse(f.parent.api.v1.registrations[':id'].drop.$post({ param: { id: regId }, json: { reason: 'refund window check' } }));
       const rows = await sql<{ amount: string }>(`select amount from escrow_transaction where related_registration_id = $1 and reason = 'drop'`, [regId]);
@@ -599,36 +612,44 @@ describe('money rules', () => {
 
     beforeAll(async () => {
       f = await family('rw');
+      // The session's policy is the winter default it was created with: 100% to week 2, 50% in
+      // weeks 3–6, 0% after (the setting refund.defaultPolicy.winter; SCHOOL_FORMS.md §2.1).
+      const s = await one<{ refund_policy: { steps: { throughWeek: number | null; percent: number }[] }; course_starts_on: string }>(
+        `select refund_policy, course_starts_on::text from registration_session where id = $1`, [sessionId]);
+      expect(s.refund_policy.steps).toEqual([{ throughWeek: 2, percent: 100 }, { throughWeek: 6, percent: 50 }, { throughWeek: null, percent: 0 }]);
+      restoreStart = s.course_starts_on;
       const desk = await deskCash(f, [subj.PHY!, subj.CHE!, subj.BIO!, subj.GEO!]);
       regs = Object.fromEntries(desk.registrations.map((r) => [r.subjectId, r.id]));
     });
 
-    // Windows scope the whole session, so none may outlive this block, pass or fail.
+    // The course start anchors every line of the session, so it goes back after this block, pass or fail.
     afterAll(async () => {
       const left = (await apiResponse(finadmin.api.v1.receipts['refund-windows'].$get())).filter((w) => w.sessionId === sessionId);
       for (const w of left) await apiResponse(finadmin.api.v1.receipts['refund-windows'][':id'].$delete({ param: { id: w.id } }));
+      if (restoreStart) await courseStartsOn(restoreStart).catch(() => undefined);
     });
 
-    it('drops refund the window\'s percentage, an exception overrides it, and a gap refunds nothing', async () => {
-      const now50 = await apiResponse(finadmin.api.v1.receipts['refund-windows'].$post({
-        json: { sessionId, startsAt: at(-hour), endsAt: at(hour), percentage: 50, label: 'first week' },
+    it('drops refund the policy\'s percent of the course fee and the board fee while not sent; an exception overrides it; a week at 0% still gives the board fee', async () => {
+      // Week 3 (15 days after the course start): 50% of the course fee, and the board fee.
+      await courseStartsOn(dayOffset(-15));
+      // A window on the session is V3's and reads only for a converted line: it changes nothing here.
+      await apiResponse(finadmin.api.v1.receipts['refund-windows'].$post({
+        json: { sessionId, startsAt: at(-hour), endsAt: at(hour), percentage: 20, label: 'a V3 window, not read for this line' },
       }));
-      const later20 = await apiResponse(finadmin.api.v1.receipts['refund-windows'].$post({
-        json: { sessionId, startsAt: at(2 * hour), endsAt: at(3 * hour), percentage: 20, label: 'second week' },
-      }));
-      expect(await dropCredit(regs[subj.PHY!]!)).toEqual({ pct: 50, credited: [750] });
+      expect(await dropCredit(regs[subj.PHY!]!)).toEqual({ pct: 50, credited: [1000] });
 
       const ex = await apiResponse(finadmin.api.v1.exceptions.$post({
         json: { type: 'custom_refund_percent', value: 90, studentId: f.studentId, sessionId, reason: 'medical withdrawal' },
       }));
-      expect(await dropCredit(regs[subj.CHE!]!)).toEqual({ pct: 90, credited: [1350] });
+      expect(await dropCredit(regs[subj.CHE!]!)).toEqual({ pct: 90, credited: [1400] });
       await apiResponse(finadmin.api.v1.exceptions[':id'].revoke.$post({ param: { id: ex.id } }));
 
-      // Only the later window remains: today falls in a gap, which refunds 0%.
-      await apiResponse(finadmin.api.v1.receipts['refund-windows'][':id'].$delete({ param: { id: now50!.id } }));
-      expect(await dropCredit(regs[subj.BIO!]!)).toEqual({ pct: 0, credited: [] });
+      // Week 8: the policy refunds no course fee; the board fee is still the family's (not sent).
+      await courseStartsOn(dayOffset(-50));
+      expect(await dropCredit(regs[subj.BIO!]!)).toEqual({ pct: 0, credited: [500] });
 
-      await apiResponse(finadmin.api.v1.receipts['refund-windows'][':id'].$delete({ param: { id: later20!.id } }));
+      // Week 1: everything back.
+      await courseStartsOn(dayOffset(0));
       expect(await dropCredit(regs[subj.GEO!]!)).toEqual({ pct: 100, credited: [1500] });
     });
 

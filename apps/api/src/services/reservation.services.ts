@@ -36,7 +36,6 @@ import { findOrCreateSeries, OfferError } from './offer.services';
 import { PRICE_CHANGED_REFUSAL, round2 } from './pricing.services';
 import { schoolMonthIndex } from './series.services';
 import { academicYearForDate } from './school-fee.services';
-import { refundPercentage } from './refund.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -328,29 +327,3 @@ export async function reserveLines(
   return inserted;
 }
 
-// ─── The refund of a drop the system makes (§3.5) ────────────────────────────
-
-/**
- * What a line dropped by the system on a declared sitting gets back: a rejection after the
- * first-entry deadline (the board fee by the "sent" rule) or `hold` at the deadline (the board
- * fee counted not sent). The design's rule (RESERVATIONS_REWORK.md §3.10) with today's percentage
- * (the refund windows', or the custom exception's: refund.services `refundPercentage`) until step
- * C's `refundFor(line, at)` replaces this body — with the same amounts:
- * - the course part (the price less the board fee the line recorded,
- *   `registration_fee_at_registration`) by the percentage;
- * - the board fee in full while it is not sent (the school never paid the board), none once sent.
- */
-export async function refundForSystemDrop(
-  line: { sessionId: string; studentId: string; priceAtRegistration: number; registrationFeeAtRegistration: number },
-  at: Date,
-  opts: { boardSent: boolean },
-): Promise<{ amount: number; percentage: number; boardFeeKept: number }> {
-  const percentage = await refundPercentage(at, line.sessionId, line.studentId);
-  const boardFee = Math.min(line.priceAtRegistration, Math.max(0, line.registrationFeeAtRegistration));
-  const coursePart = ((line.priceAtRegistration - boardFee) * percentage) / 100;
-  return {
-    amount: round2(coursePart + (opts.boardSent ? 0 : boardFee)),
-    percentage,
-    boardFeeKept: round2(opts.boardSent ? boardFee : 0),
-  };
-}

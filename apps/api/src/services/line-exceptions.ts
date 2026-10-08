@@ -1,17 +1,22 @@
 /**
- * The exception adapter (docs/features/RESERVATIONS.md §2.8).
+ * The exception adapter (docs/features/RESERVATIONS.md §2.8), over the policy registry.
  *
  * `priceLine`, `assertLineRules` and `dueDateFor` read the student's exceptions only through
- * `lineExceptions`. Today it reads the existing `exception` table, whose types map onto the
- * registry's policy keys (`custom_price` → `price.custom`, `discount_percent` →
- * `price.discountPercent`, `discount_fixed` → `price.discountFixed`), with the session and
- * subject scope applied exactly as `getActiveExceptions` applied it. No gate or due-date key
- * exists in today's table, so those return none. Step C replaces the implementation with the
- * policy registry (RESERVATIONS_REWORK.md §3.7), keeping this interface.
+ * `lineExceptions`. Step A's implementation read the V3 `exception` table by type; step C replaced
+ * it with the registry (RESERVATIONS_REWORK.md §3.7, exception-registry.services.ts), keeping the
+ * interface: active exceptions of the keys asked, held by the student or by their family, whose
+ * scope covers the line; one-shot gates locked FOR UPDATE and marked used in the caller's
+ * transaction; a re-price's exact ids whatever their status now.
+ *
+ * One addition behind the same interface: a line under a live instalment plan is due on its last
+ * instalment's date (§3.6: "its due date = the last instalment's"). Asked for `deadline.payment`
+ * with the line in scope, the adapter answers that date first, so every re-dating of the line
+ * (dueDateFor, redateLines) keeps it.
  */
 
-import { db, exception, and, eq, inArray, asc } from '@repo/db';
+import { db } from '@repo/db';
 import type { LinePolicyKey } from '@repo/validations';
+import { activeExceptions, exceptionsByIds, markExceptionsUsed, type RegistryException } from './exception-registry.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -44,51 +49,32 @@ export interface LineExceptionSource {
   markUsed(tx: Tx, ids: string[], ctx: { registrationIds: string[]; actorId: string | null }): Promise<void>;
 }
 
-const TYPE_TO_KEY: Record<string, LinePolicyKey> = {
-  custom_price: 'price.custom',
-  discount_percent: 'price.discountPercent',
-  discount_fixed: 'price.discountFixed',
-};
+function toPolicy(r: RegistryException): PolicyException {
+  return { id: r.id, policyKey: r.policyKey as LinePolicyKey, value: r.value, valueDate: r.valueDate, oneShot: r.oneShot, scope: r.scope };
+}
 
-function toPolicy(row: typeof exception.$inferSelect): PolicyException {
-  return {
-    id: row.id,
-    policyKey: TYPE_TO_KEY[row.type]!,
-    value: row.value,
-    valueDate: null,
-    oneShot: false,
-    scope: { ...(row.sessionId ? { sessionId: row.sessionId } : {}), ...(row.subjectId ? { subjectId: row.subjectId } : {}) },
-  };
+/** A live plan's last instalment date, as the line's payment due date (§3.6). */
+async function planDueDate(executor: Executor, studentId: string, registrationId: string): Promise<PolicyException[]> {
+  const plans = await activeExceptions(executor, studentId, ['plan.instalments'], { registrationId });
+  const plan = plans.find((p) => p.scope.registrationId === registrationId);
+  const schedule = Array.isArray(plan?.valueJson) ? (plan!.valueJson as { dueAt: string }[]) : [];
+  if (!plan || !schedule.length) return [];
+  const last = new Date(Math.max(...schedule.map((s) => new Date(s.dueAt).getTime())));
+  return [{ id: plan.id, policyKey: 'deadline.payment', value: null, valueDate: last, oneShot: false, scope: { registrationId } }];
 }
 
 export const lineExceptions: LineExceptionSource = {
   async active(executor, studentId, keys, scope, opts) {
-    const types = Object.entries(TYPE_TO_KEY).filter(([, k]) => keys.includes(k)).map(([t]) => t);
-    if (!types.length) return [];
-    const q = executor
-      .select()
-      .from(exception)
-      .where(and(eq(exception.studentId, studentId), eq(exception.status, 'active'), inArray(exception.type, types)))
-      // The order the old pricing hook read them in, made explicit.
-      .orderBy(asc(exception.createdAt), asc(exception.id));
-    const rows = opts?.lock ? await q.for(opts.lock) : await q;
-    const now = new Date();
-    return rows
-      .filter((e) => {
-        if (e.validUntil && e.validUntil < now) return false;
-        // A null scope on the exception means "applies to all" (today's rule).
-        if (e.sessionId && e.sessionId !== scope.sessionId) return false;
-        if (e.subjectId && e.subjectId !== scope.subjectId) return false;
-        return true;
-      })
-      .map(toPolicy);
+    const rows = (await activeExceptions(executor, studentId, keys, scope, opts)).map(toPolicy);
+    if (keys.includes('deadline.payment') && scope.registrationId) {
+      return [...(await planDueDate(executor, studentId, scope.registrationId)), ...rows];
+    }
+    return rows;
   },
   async byIds(executor, ids) {
-    if (!ids.length) return [];
-    const rows = await executor.select().from(exception).where(inArray(exception.id, ids)).orderBy(asc(exception.createdAt), asc(exception.id));
-    return rows.filter((r) => TYPE_TO_KEY[r.type]).map(toPolicy);
+    return (await exceptionsByIds(executor, ids)).map(toPolicy);
   },
-  async markUsed() {
-    // Today's table has no one-shot gates; the registry (step C) marks them used.
+  async markUsed(tx, ids, ctx) {
+    await markExceptionsUsed(tx, ids, ctx);
   },
 };
