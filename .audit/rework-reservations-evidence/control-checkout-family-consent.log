@@ -1,0 +1,52 @@
+# Trimmed under CLAUDE.md (Git): the vitest summary and, for a red run, the failing tests and their
+# messages; the request log of the run removed. Original: 84107 bytes, 915 lines.
+
+ ❯ test/08o-reservation-lines.test.ts (15 tests | 1 failed) 10244ms
+   ✓ 08o: reservation lines (step B) > a family reserves in the app: one line per item with the entry chosen, both consents required and recorded, the refund steps frozen  645ms
+   ✓ 08o: reservation lines (step B) > the price the page showed is the price charged: a line priced otherwise in between is refused, nothing made  409ms
+   ✓ 08o: reservation lines (step B) > a family declares a retake with its sitting: created when not on record, priced as a retake, listed to verify; a first entry names none  691ms
+   ✓ 08o: reservation lines (step B) > a sitting the system knows is filled in and not listed to verify; its retake runs to the retake deadline  355ms
+   ✓ 08o: reservation lines (step B) > the coordinator verifies: the line stands; a carry-forward from another centre records the previous centre and candidate number; answered once  656ms
+   ✓ 08o: reservation lines (step B) > rejected on an unpaid line: refused while a checkout is open; then it expires (declaration_rejected), the family is told, and may reserve a first entry  354ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line before the first-entry deadline: the line stands as paid with declaration_rejected (a first entry for F4), the family is told  331ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line after the first-entry deadline: dropped through the receipt-gated drop with today's refund  345ms
+   ✓ 08o: reservation lines (step B) > unverified at the deadline: entered as declared by default; under hold the sweep expires a waiting line and drops a paid one, once  1331ms
+   × 08o: reservation lines (step B) > the school's grade-10 lines carry the school's consent; the family gives its own at checkout; a line without consent is never paid or confirmed 326ms
+   ✓ 08o: reservation lines (step B) > a swap's new line inherits the dropped line's consent and refund steps  716ms
+   ✓ 08o: reservation lines (step B) > the teacher on a line: "no preference" assigned later; changed on a paid line the enrolment follows and the price does not; self-study is not re-priced  688ms
+   ✓ 08o: reservation lines (step B) > the desk: reserve only; reserve and collect takes one payment per entry deadline, a provisional line reserved and collected once its fee is confirmed  725ms
+   ✓ 08o: reservation lines (step B) > the family's flow: a student asks, a parent approves and pays by series; the statement's numbers are the ledger's, one payment per entry deadline  385ms
+   ✓ 08o: reservation lines (step B) > GET /registrations/available is gone: the Reserve pages read /registrations/offers 282ms
+ ❯ test/08o-reservation-lines.test.ts:391:8
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08o-reservation-lines.test.ts > 08o: reservation lines (step B) > the school's grade-10 lines carry the school's consent; the family gives its own at checkout; a line without consent is never paid or confirmed
+AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 400, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "The school reserved these subjects for the family: tick the refund policy and the declaration before paying",
+-   "status": 400,
++   "error": "\"\"",
++   "status": 201,
+  }
+
+ ❯ test/08o-reservation-lines.test.ts:391:8
+    389|     // The family's checkout asks for its own pair first.
+    390|     expect(await refused(g10.parent.api.v1.payments.initiate.$post({ j…
+    391|       .toEqual({ status: 400, error: 'The school reserved these subjec…
+       |        ^
+    392|     const pay = await apiResponse(g10.parent.api.v1.payments.initiate.…
+    393|     expect((await consentsOf(line!.id)).map((c) => [c.kind, c.channel]…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 passed (15)
+   Start at  02:48:58
+   Duration  12.10s (transform 517ms, setup 2ms, collect 199ms, tests 10.24s, environment 0ms, prepare 36ms)

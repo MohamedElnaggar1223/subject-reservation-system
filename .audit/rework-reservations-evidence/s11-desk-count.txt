@@ -1,0 +1,6 @@
+shot s11-onboard
+shot s11-filled
+shot s11-done
+{"tag":"s1196226","inputs":15,"clicks":3,"result":"Reserved 3 lines. Collected EGP 53,000 in 3 payments, one per entry deadline."}
+click: + New Family (Onboard) | input: parent email | input: parent name | input: parent password | input: student email | input: student name | input: student password | input: grade | click: Create & Link Family | input: tick Biology | input: Biology: retake, self-study | input: Biology: the sitting | input: tick Mathematics | input: tick Chemistry | input: Chemistry: teacher | input: consent tick | input: instrument: card | click: Reserve and collect
+family (parent, /register), 3 subjects one a declared self-study retake, one teacher pick: 8 answers, 1 click (Reserve). tick Biology | Biology: retake, self-study | Biology: the sitting | tick Mathematics | tick Chemistry | Chemistry: teacher | refund policy consent | declaration consent. Screens s11-family-*.png. §11 design: 6-8 answers.

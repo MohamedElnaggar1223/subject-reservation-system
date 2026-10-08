@@ -1,0 +1,42 @@
+# Trimmed under CLAUDE.md (Git): the vitest summary and, for a red run, the failing tests and their
+# messages; the request log of the run removed. Original: 57139 bytes, 774 lines.
+
+ ❯ test/05-object-access.test.ts (14 tests | 1 failed) 4241ms
+   ✓ object-level access between families > registrations: B cannot read, drop, swap, approve, reject, revert or register for A 63ms
+   ✓ object-level access between families > payments and receipts: B cannot read, pay, reference or preview A 45ms
+   ✓ object-level access between families > escrow: B cannot read, move or withdraw A money 14ms
+   ✓ object-level access between families > change requests: B cannot read, approve, reject or cancel A 21ms
+   ✓ object-level access between families > remarks: B cannot request, decide, consent, pay or cancel for A 38ms
+   ✓ object-level access between families > links and notifications: B cannot read or answer A link, a pending link grants nothing, B cannot mark A notification 22ms
+   ✓ object-level access between families > files: B cannot read, download or delete A file 9ms
+   ✓ object-level access between families > files: B cannot attach A file to B own InstaPay payment or remark consent 24ms
+   ✓ object-level access between families > F0a uploads: B cannot read A's family files nor upload for A's student 42ms
+   ✓ object-level access between families > F0a eligibility: B cannot ask whether A's student may register 11ms
+   ✓ object-level access between families > F0a another class and the gate: a teacher reaches only their own teaching; the gate only the school day  554ms
+   ✓ object-level access between families > F0b course enrolment: B cannot read or change A's student's enrolment; a teacher reads only their own class  445ms
+   ✓ object-level access between families > F0a exceptions: each type names who may grant it — a coordinator is refused a fee waiver, a finance admin the grade-10 exception 147ms
+   × object-level access between families > step B: B cannot read A's statement, answer a declared sitting or change a teacher on A's line; the To verify list is the school's 14ms
+ ❯ refusedAs test/05-object-access.test.ts:29:96
+ ❯ test/05-object-access.test.ts:455:5
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/05-object-access.test.ts > object-level access between families > step B: B cannot read A's statement, answer a declared sitting or change a teacher on A's line; the To verify list is the school's
+AssertionError: parentB statement of A answered 200: {"success":true,"data":{"family":null,"students":[{"student":{"id":"HtPDz7hjNS9UBeEEHoep3odkxGuPum65","name":"Student oa-a","number":"STU-20261007-B248F","section":null,"grade":12,"gradeLabel":"Grade : expected 200 to be greater than or equal to 400
+ ❯ refusedAs test/05-object-access.test.ts:29:96
+     27|   const body = (await res.json().catch(() => ({}))) as { error?: unkno…
+     28|   attempts.push([label, String(res.status), typeof body.error === 'str…
+     29|   expect(res.status, `${label} answered ${res.status}: ${JSON.stringif…
+       |                                                                                                ^
+     30|   expect(res.status, `${label} answered ${res.status}`).toBeLessThan(5…
+     31|   return res.status;
+ ❯ test/05-object-access.test.ts:455:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 passed (14)
+   Start at  02:50:32
+   Duration  5.97s (transform 527ms, setup 3ms, collect 185ms, tests 4.24s, environment 0ms, prepare 34ms)
