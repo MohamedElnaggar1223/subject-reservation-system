@@ -445,6 +445,7 @@ render); it is the same on pages F7 does not touch (`drive/hydration-check.mjs`)
 | **the course fee, decided** (review of 2ca07a4, item 2) | open and retakes-only at 0 refused; self-study only at 0 refused without a reason, made with one (the reason on its audit row), edited without it again, made retakes-only at 0 refused; copied into the next session, an open offer at 0 comes across closed and named, the self-study one as it is |
 | **students before subjects** (review of 2ca07a4, item 3) | a subject held FOR UPDATE (a board change): the commit waiting on it already holds the family's student; released, the history row is made |
 | **the level** (review item 7) | an unmapped A.S. line never finds the IGCSE offer of the same name; it finds the A.S. one once offered |
+| **the harness's pause** (found by the race's red runs) | 00-harness: `pauseAtAudits().paused` does not count a transaction of another database waiting on the same key (the suites run side by side on one server) |
 | **the Arabic** (review item 4) | translateImportText on A's and B's sentences (none caught; A's two have their own keys; the grade-10 core sentence and MO-9's are A's translator's; other screens' "Add …" untouched) and on the import's own |
 | the interim rule (MO-25) | committed on 15 November: a first entry; on 1 December: a legacy retake of Cambridge November Y; never for a line of November itself |
 | the race: the import and the desk on one unit in one series from two sessions | forced with a pause at IMPORT_REGISTRATION: one live line, the desk refused (gate.sameEntryOnce) |
@@ -502,6 +503,7 @@ gives for each):
 | C64 | 2ca07a4 item 2: a copy closes an offer it would open at 0 | red |
 | C65 | 2ca07a4 item 3: the students held before any row naming a subject | red |
 | C66 | 2ca07a4 item 4: "The item for …" only as the import's own | red |
+| C67 | the harness: a race's pause counts only its own database's wait | red |
 
 The earlier controls whose code main removed (C3, C13, C14, C19–C22: `getRetakeSubjectIds`,
 `prepareRegistrationInputs`, inactive import subjects) are superseded by C32, C36–C41.
@@ -706,6 +708,11 @@ records it.
   English and Arabic (`f7o-*.png`).
 - 17:03–17:17Z — every control on 20be67b with its own row: 46 red, C44 green as before, C59 green — the
   one-paper note's early return made the guard C59 undid dead; removed, C59 pointed at the early return.
+- 17:22Z — on ebe2437 the race test red again, with TZ=UTC (the import held at its commit, the desk
+  first). 17:30Z — explained: the harness's `pauseAtAudits().paused` counted a wait on its advisory key
+  in any database, so with the two suites side by side the other suite's paused import released this
+  suite's race early (a probe across the two test databases: 1 seen, 0 when scoped). `paused` now
+  counts its own database's wait; 00-harness tests it with a wait in another database; C67 red.
 - Next: the reviewer confirms items 1 and 2 on the diff; the final merge waits for F4 on main (main
   has D at c2d7a78, its migrations to 0054): origin/main merged as its own commit, 0050_import
   regenerated after main's last migration with a later stamp and its snapshot chained, the order

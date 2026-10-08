@@ -137,6 +137,10 @@ CONTROLS = {
     'C66': ('2ca07a4 item 4: "The item for …" translated only as the import\'s own aria-label', '../web/lib/i18n-import.ts',
             "    [/^The session’s item for the sheet’s code (.+)$/, (m) => `بند الجلسة لرمز الجدول ${m[1]}`],",
             "    [/^The item for (.+)$/, (m) => `بند ${m[1]}`],", ['08n-import']),
+    # The harness: a race's pause counts only its own database's wait (two suites side by side).
+    'C67': ('the harness: pauseAtAudits().paused counts a wait in its own database only', '../api/test/helpers.ts',
+            "\n        and database = (select oid from pg_database where datname = current_database())`, [keys.get(action)!]);",
+            "`, [keys.get(action)!]);", ['00-harness']),
     # F7's earlier controls, run again on the new base (their guards unchanged)
     'C1': ('the commit claim (re-run on the new base)', C,
            "sql`(${importBatch.status} in ('staged', 'partial') or (${importBatch.status} = 'committing' and ${importBatch.commitStartedAt} < now() - make_interval(mins => ${STALE_CLAIM_MINUTES})))`",
