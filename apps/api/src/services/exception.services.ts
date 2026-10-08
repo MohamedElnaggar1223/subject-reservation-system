@@ -38,7 +38,8 @@ import { cancelPushesForWaiverInTx } from './school-fee.services';
 import { getSetting } from './settings.services';
 import { priceLine } from './pricing.services';
 import { cairoDayStart } from './refund.services';
-import { dueDateFor } from './deadline.services';
+import { dueDateFor, redateLines } from './deadline.services';
+import { redateChargeInTx } from './charge.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -195,8 +196,14 @@ async function checkScope(tx: Tx, n: Normalised, holderStudents: string[]) {
     if (!l || !holderStudents.includes(l.studentId)) throw new ExceptionError('That line was not found for this student or family', 404);
   }
   if (s.chargeId) {
-    const [c] = await tx.select({ studentId: charge.studentId }).from(charge).where(eq(charge.id, s.chargeId));
+    const [c] = await tx.select({ studentId: charge.studentId, kind: charge.kind }).from(charge).where(eq(charge.id, s.chargeId));
     if (!c || !holderStudents.includes(c.studentId)) throw new ExceptionError('That charge was not found for this student or family', 404);
+    // A pushed school fee's amount is the schedule's (the waiver is its exception); an instalment's is the plan's (§3.10 item 7).
+    if (n.policyKey.startsWith('price.') && (c.kind === 'school_fee_push' || c.kind === 'instalment')) {
+      throw new ExceptionError(c.kind === 'school_fee_push'
+        ? 'A pushed school fee takes no price exception: its amount is the schedule\'s — waive it instead'
+        : 'An instalment takes no price exception: change the plan instead', 409);
+    }
   }
 }
 
@@ -284,7 +291,9 @@ export async function grantException(data: GrantExceptionType, actor: { id: stri
       if (n.policyKey.startsWith('price.') && n.scope.registrationId) {
         repriced = await repriceLineForException(tx, n.scope.registrationId, id, actor.id, ctx);
       }
-      return { ...created!, plan, pushesCancelled, repriced };
+      // A payment due date granted: the waiting lines (and the charge) it covers are re-dated now.
+      const dueDatesMoved = n.policyKey === 'deadline.payment' ? await redateForPaymentException(tx, holderStudents, n.scope, actor.id) : 0;
+      return { ...created!, plan, pushesCancelled, repriced, dueDatesMoved };
     });
   } catch (err) {
     if (err instanceof PlanError) throw new ExceptionError(err.message, err.status);
@@ -321,6 +330,27 @@ async function repriceLineForException(tx: Tx, lineId: string, exceptionId: stri
 }
 
 /**
+ * deadline.payment (§3.1, §6 dueDateFor): the waiting lines of the holder the exception covers — one
+ * line, or a session's — are re-dated (LINE_DUE_MOVED), and a charge it names gets its due date
+ * again, in the grant's (or the revocation's) transaction, the students already locked.
+ */
+async function redateForPaymentException(tx: Tx, students: string[], scope: PolicyScopeInputType, actorId: string) {
+  let moved = 0;
+  if (scope.registrationId || scope.sessionId) {
+    const lines = await tx.select({ id: registration.id }).from(registration)
+      .where(and(
+        inArray(registration.studentId, students),
+        inArray(registration.status, ['pending_approval', 'pending_payment', 'preregistered']),
+        scope.registrationId ? eq(registration.id, scope.registrationId) : eq(registration.sessionId, scope.sessionId!),
+      ))
+      .orderBy(registration.id).for('update');
+    moved += await redateLines(tx, lines.map((l) => l.id), actorId, 'a payment due-date exception');
+  }
+  if (scope.chargeId) moved += await redateChargeInTx(tx, scope.chargeId, actorId);
+  return moved;
+}
+
+/**
  * Revoke an exception — by a role that may grant its policy. What rested on it follows in the
  * same transaction: a grade-10 exception's waiting registrations expire (F0a; the caller closes
  * their checkouts after); a plan's line expires (`plan_revoked`) and its deposits are settled as a
@@ -347,6 +377,13 @@ export async function revokeException(id: string, actor: { id: string; role: str
       .returning();
     await logAction(actor.id, 'EXCEPTION_REVOKED', 'exception', id, { status: 'active' }, updated as Record<string, unknown>, ctx, tx);
     let expired: { id: string; studentId: string; subjectId: string }[] = [];
+    if (row.policyKey === 'deadline.payment') {
+      const students = row.studentId ? [row.studentId] : await holderStudentsOf(tx, row);
+      await tx.select({ id: user.id }).from(user).where(inArray(user.id, students)).orderBy(user.id).for('no key update');
+      await redateForPaymentException(tx, students, {
+        ...(row.registrationId ? { registrationId: row.registrationId } : {}), ...(row.sessionId ? { sessionId: row.sessionId } : {}), ...(row.chargeId ? { chargeId: row.chargeId } : {}),
+      }, actor.id);
+    }
     if (row.policyKey === 'eligibility.grade10OtherSeries') {
       const students = row.studentId ? [row.studentId] : await holderStudentsOf(tx, row);
       expired = await expireIneligibleRegistrations(tx, { studentIds: students, ...(row.sessionId ? { sessionIds: [row.sessionId] } : {}) }, 'exception_revoked', now);

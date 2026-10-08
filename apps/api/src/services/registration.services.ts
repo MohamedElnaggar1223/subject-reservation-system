@@ -27,6 +27,7 @@ import {
   sessionOfferItemTeacher,
   teacher,
   subject,
+  exception,
   sql,
   eq,
   and,
@@ -572,6 +573,13 @@ export async function revertApprovedRegistrationRequest(
     if (paymentLinksInTx.length > 0) {
       throw new Error('One or more registrations already have a payment in progress and cannot be reverted');
     }
+    // The reservations rework (§3.6): a line under a live instalment plan is not reverted — the guard
+    // reads the plan itself (the plan locks the line before it is granted), so a plan with nothing
+    // paid yet is covered too.
+    const [plan] = await tx.select({ id: exception.id }).from(exception)
+      .where(and(eq(exception.policyKey, 'plan.instalments'), eq(exception.status, 'active'), inArray(exception.registrationId, data.registrationIds)))
+      .limit(1);
+    if (plan) throw new Error('A subject under an instalment plan cannot be sent back for approval — ask the finance office to end the plan first');
 
     const rows = await tx
       .update(registration)

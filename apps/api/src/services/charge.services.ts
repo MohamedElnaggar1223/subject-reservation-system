@@ -32,7 +32,7 @@ import {
 import { logAction, type AuditContext } from './audit.services';
 import { getSetting } from './settings.services';
 import { dueDateFor, effectiveDeadlineFor } from './deadline.services';
-import { activeExceptions } from './exception-registry.services';
+import { activeExceptions, type RegistryScope } from './exception-registry.services';
 import { creditEscrow } from './escrow.services';
 import { tellFamily } from './plan.services';
 import { schoolDate } from './window.services';
@@ -111,7 +111,32 @@ export async function serviceFeeFor(tx: Tx, a: { seriesId: string; serviceId: st
 
 // ─── The hook ────────────────────────────────────────────────────────────────
 
-type ChargeBasis = { base: number; exceptionIds: string[]; feeId?: string; provisional?: boolean };
+type ChargeBasis = { base: number; exceptionIds: string[]; feeId?: string; provisional?: boolean; baseDueAt?: string };
+
+/**
+ * A charge's due date (dueDateFor, §6): its own date (the one it was added with), a later one when
+ * it was added after it, a deadline.payment exception for it, capped by its deadline. Re-dated in
+ * the caller's transaction when such an exception is granted or revoked.
+ */
+export async function chargeDueAt(executor: Executor, c: ChargeRow) {
+  const basis = (c.pricingBasis as ChargeBasis | null) ?? { base: c.amount, exceptionIds: [] };
+  const scope: RegistryScope = { chargeId: c.id, ...(c.registrationId ? { registrationId: c.registrationId } : {}) };
+  return dueDateFor(executor, {
+    kind: 'charge', studentId: c.studentId, baseDueAt: basis.baseDueAt ? new Date(basis.baseDueAt) : c.dueAt, reservedAt: c.createdAt,
+    cap: await chargeDeadline(executor, c), scope,
+  });
+}
+
+/** Re-date one open charge (locked here), audited when it moved. */
+export async function redateChargeInTx(tx: Tx, chargeId: string, actorId: string | null) {
+  const [c] = await tx.select().from(charge).where(eq(charge.id, chargeId)).for('update');
+  if (!c || (c.status !== 'requested' && c.status !== 'pending_payment')) return 0;
+  const due = await chargeDueAt(tx, c);
+  if (due.getTime() === c.dueAt.getTime()) return 0;
+  await tx.update(charge).set({ dueAt: due, updatedAt: new Date() }).where(eq(charge.id, chargeId));
+  await logAction(actorId, 'LINE_DUE_MOVED', 'charge', chargeId, { dueAt: c.dueAt.toISOString() }, { dueAt: due.toISOString(), reason: 'a payment due-date exception' }, undefined, tx);
+  return 1;
+}
 
 /**
  * chargeRules (§6): asked at a charge's creation, acceptance and payment, in that transaction.
@@ -254,15 +279,15 @@ export async function createCharge(data: CreateChargeType, actor: { id: string; 
       planExceptionId: null, instalmentNo: null, refundAmount: null, refundedAt: null, refundedBy: null, refundReason: null,
       settledByPaymentId: null, requestedBy: isFamily ? actor.id : null, acceptedBy: isFamily ? null : actor.id, acceptedAt: isFamily ? null : now,
       cancelledBy: null, cancelledAt: null, cancelReason: null,
-      pricingBasis: { base: amount!, exceptionIds: [], ...(feeId ? { feeId, provisional } : {}) },
+      pricingBasis: { base: amount!, exceptionIds: [], ...(feeId ? { feeId, provisional } : {}), ...(data.dueAt ? { baseDueAt: data.dueAt.toISOString() } : {}) },
       createdBy: actor.id, reason: data.reason ?? null, createdAt: now, updatedAt: now,
     };
     const rules = await chargeRules(tx, draft, now);
     const graceDays = await getSetting('payment.graceDays', tx);
-    const dueAt = await dueDateFor(tx, {
-      kind: 'charge', studentId: data.studentId, baseDueAt: data.dueAt ?? new Date(now.getTime() + graceDays * 24 * 60 * 60 * 1000),
-      reservedAt: now, cap: rules.deadline, scope: { sessionId: line?.sessionId, registrationId: line?.id },
-    });
+    const base = data.dueAt ?? new Date(now.getTime() + graceDays * 24 * 60 * 60 * 1000);
+    draft.pricingBasis = { ...(draft.pricingBasis as ChargeBasis), baseDueAt: base.toISOString() };
+    const scope: RegistryScope = { chargeId: id, ...(line ? { registrationId: line.id } : {}) };
+    const dueAt = await dueDateFor(tx, { kind: 'charge', studentId: data.studentId, baseDueAt: base, reservedAt: now, cap: rules.deadline, scope });
     const [made] = await tx.insert(charge).values({ ...draft, dueAt }).returning();
     await logAction(actor.id, isFamily ? 'CHARGE_REQUESTED' : 'CHARGE_CREATED', 'charge', id, null,
       { kind: made!.kind, studentId: made!.studentId, registrationId: made!.registrationId, boardSeriesId: seriesId, boardServiceId: serviceId, level, amount: made!.amount, dueAt: dueAt.toISOString(), status: made!.status, reason: data.reason ?? null }, ctx, tx);

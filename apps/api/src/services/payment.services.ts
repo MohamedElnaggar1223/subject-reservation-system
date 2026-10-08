@@ -2336,8 +2336,11 @@ export async function createChargePaymentsInTx(
  * deadline. Fully paid from escrow, it is confirmed at once, as a line's would be.
  */
 export async function initiateChargePayment(parentId: string, data: InitiatePaymentType, auditCtx?: AuditContext) {
-  const rows = await db.select({ id: charge.id, studentId: charge.studentId, amount: charge.amount }).from(charge).where(inArray(charge.id, data.chargeIds));
+  const rows = await db.select({ id: charge.id, studentId: charge.studentId, amount: charge.amount, kind: charge.kind }).from(charge).where(inArray(charge.id, data.chargeIds));
   if (rows.length === 0) throw new Error('No charges found');
+  if ((data.escrowAmountToApply ?? 0) > 0 && rows.some((r) => r.kind === 'instalment')) {
+    throw new Error('An instalment is paid in cash, by card or by InstaPay — never from escrow (its money is held for the line)');
+  }
   const studentIds = [...new Set(rows.map((r) => r.studentId))];
   if (studentIds.length > 1) throw new Error('All charges must belong to the same student');
   const studentId = studentIds[0]!;
