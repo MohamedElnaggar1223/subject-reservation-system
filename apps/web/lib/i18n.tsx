@@ -11,6 +11,7 @@ import {
 import { foundationArabic } from './i18n-foundation';
 import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
 import { sessionsArabic, translateSessionsText } from './i18n-sessions';
+import { moneyArabic, translateMoneyText } from './i18n-money';
 
 export type Language = 'en' | 'ar';
 
@@ -1496,6 +1497,8 @@ Object.assign(autoArabicText, foundationArabic);
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // The reservations rework's screens (lib/i18n-sessions.ts): the same rule.
 for (const [en, ar] of Object.entries(sessionsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// Step C's money screens (lib/i18n-money.ts): the same rule.
+for (const [en, ar] of Object.entries(moneyArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1577,6 +1580,9 @@ function translateDynamicText(text: string): string | null {
   // The reservations rework: session names, refund sentences, the refusals of its screens.
   const reworkText = translateSessionsText(text);
   if (reworkText) return reworkText;
+  // Step C: the registry's sentences, the exceptions' dialogs and refusals.
+  const moneyText = translateMoneyText(text, translateExactText);
+  if (moneyText) return moneyText;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

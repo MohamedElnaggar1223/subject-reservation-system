@@ -275,6 +275,12 @@ export const RevokeException = z.object({
 });
 export type RevokeExceptionType = z.infer<typeof RevokeException>;
 
+/** The screen's revocation: the same, with the reason it is audited with (POST /exceptions/:id/revocation). */
+export const RevokeWithReason = z.object({
+  reason: z.string().trim().min(3, 'A reason is required').max(500),
+});
+export type RevokeWithReasonType = z.infer<typeof RevokeWithReason>;
+
 /** Confirm a migrated exception listed under "Check these" (§3.7): from now on it applies with its scope. */
 export const ConfirmCheckedException = z.object({
   note: z.string().trim().max(500).optional(),

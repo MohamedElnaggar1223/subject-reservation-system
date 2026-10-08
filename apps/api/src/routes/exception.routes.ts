@@ -5,6 +5,7 @@
  * POST /exceptions               - Grant one: { policyKey, studentId | familyId, scope, value?, validUntil?, reason },
  *                                  or V3's { type, studentId, sessionId?, subjectId?, value?, validUntil?, reason }
  * POST /exceptions/:id/revoke    - Revoke an active exception (a plan: its line expires, its deposits settled as a drop)
+ * POST /exceptions/:id/revocation - The same, with its reason ({ reason }), for the screen
  * POST /exceptions/:id/release   - End a plan and keep the line payable: every deposit released
  * GET  /exceptions/check-these   - Migrated exceptions whose meaning changed, to confirm or revoke
  * POST /exceptions/:id/confirm   - Confirm one of them
@@ -14,9 +15,9 @@
  * refused a fee waiver, a finance admin the grade-10 exception.
  */
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { GrantException, ExceptionId, ListExceptionsQuery, ConfirmCheckedException, RevokeException, POLICY_GRANT_ROLES } from '@repo/validations';
+import { GrantException, ExceptionId, ListExceptionsQuery, ConfirmCheckedException, RevokeException, RevokeWithReason, POLICY_GRANT_ROLES } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
 import { requireAuth, requireRole } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
@@ -25,6 +26,25 @@ import { closePaymentsOfExpiredRegistrations, failInstalmentPaymentsOfDeadPlans 
 import { extractAuditContext } from '../services/audit.services';
 
 const statusOf = (err: unknown) => (err instanceof exceptionService.ExceptionError ? err.status : 400);
+
+/** A revocation and what follows it after its transaction (the checkouts of expired lines, a plan's open instalment payments). */
+async function revoke(c: Context<HonoEnv>, id: string, reason: string | undefined) {
+  const user = c.get('user')!;
+  try {
+    const { exception, expired, repriced } = await exceptionService.revokeException(id, { id: user.id, role: user.role }, extractAuditContext(c), { reason });
+    if (expired.length && exception.policyKey === 'eligibility.grade10OtherSeries') {
+      await closePaymentsOfExpiredRegistrations(expired.map((r) => r.id), 'exception_revoked')
+        .catch((err) => console.error('[exceptions] Closing checkouts after a revoke failed; the recovery sweep will retry:', err));
+    }
+    if (exception.policyKey === 'plan.instalments') {
+      // The plan's open instalment payments, failed after the settlement committed (a payment is locked before a line).
+      await failInstalmentPaymentsOfDeadPlans().catch((err) => console.error('[exceptions] Closing a revoked plan\'s payments failed; the deadline sweep will retry:', err));
+    }
+    return success(c, { ...exception, registrationsExpired: expired.length, repriced });
+  } catch (err) {
+    return error(c, clientMessage(err, 'Failed to revoke exception'), statusOf(err));
+  }
+}
 
 export const exceptions = new Hono<HonoEnv>()
   .use('*', requireAuth())
@@ -51,25 +71,16 @@ export const exceptions = new Hono<HonoEnv>()
   })
 
   .post('/:id/revoke', zValidator('param', ExceptionId), async (c) => {
-    const user = c.get('user')!;
     const { id } = c.req.valid('param');
     // An optional reason ({ reason }) the plan's settlement records; V3's callers send no body.
     const body = RevokeException.safeParse(await c.req.json().catch(() => ({})));
-    try {
-      const { exception, expired, repriced } = await exceptionService.revokeException(id, { id: user.id, role: user.role }, extractAuditContext(c), { reason: body.success ? body.data.reason : undefined });
-      if (expired.length && exception.policyKey === 'eligibility.grade10OtherSeries') {
-        await closePaymentsOfExpiredRegistrations(expired.map((r) => r.id), 'exception_revoked')
-          .catch((err) => console.error('[exceptions] Closing checkouts after a revoke failed; the recovery sweep will retry:', err));
-      }
-      if (exception.policyKey === 'plan.instalments') {
-        // The plan's open instalment payments, failed after the settlement committed (a payment is locked before a line).
-        await failInstalmentPaymentsOfDeadPlans().catch((err) => console.error('[exceptions] Closing a revoked plan\'s payments failed; the deadline sweep will retry:', err));
-      }
-      return success(c, { ...exception, registrationsExpired: expired.length, repriced });
-    } catch (err) {
-      return error(c, clientMessage(err, 'Failed to revoke exception'), statusOf(err));
-    }
+    return revoke(c, id, body.success ? body.data.reason : undefined);
   })
+
+  // The screen's revocation, with the reason it is audited with (the typed client cannot send
+  // the optional body above).
+  .post('/:id/revocation', zValidator('param', ExceptionId), zValidator('json', RevokeWithReason), async (c) =>
+    revoke(c, c.req.valid('param').id, c.req.valid('json').reason))
 
   .post('/:id/release', zValidator('param', ExceptionId), zValidator('json', ConfirmCheckedException), async (c) => {
     const user = c.get('user')!;

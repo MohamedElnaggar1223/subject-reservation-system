@@ -101,6 +101,7 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     'GET /v1/policies',
     'GET /v1/exceptions/check-these',
     'POST /v1/exceptions/:id/confirm',
+    'POST /v1/exceptions/:id/revocation',
     'GET /v1/board-services',
     'PUT /v1/board-services/deadlines',
     'PUT /v1/board-services/:id',

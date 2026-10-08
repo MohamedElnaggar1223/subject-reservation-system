@@ -108,7 +108,8 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
       { titleKey: 'nav.academic', items: ACADEMIC_ITEMS },
       EXAMS_SECTION,
       // The reservations rework (§4.2): the coordinator keeps each session's subjects, teachers and items.
-      { titleKey: 'nav.school', items: [{ labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' }, { labelKey: 'nav.settings', href: '/settings', icon: 'settings' }] },
+      // The reservations rework, step C (§3.7): the academic gates are the coordinator's to grant.
+      { titleKey: 'nav.school', items: [{ labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' }, { labelKey: 'nav.exceptions', href: '/admin/exceptions', icon: 'approvals' }, { labelKey: 'nav.settings', href: '/settings', icon: 'settings' }] },
       ACCOUNT_SECTION,
     ];
   }

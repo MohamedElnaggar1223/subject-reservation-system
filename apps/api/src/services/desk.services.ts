@@ -665,9 +665,21 @@ export async function getStudentSummary(studentId: string) {
         orderBy: (p, { desc }) => [desc(p.createdAt)],
         limit: 20,
       }),
+      // The student's own and the family's (a parent account's exception covers every linked
+      // child, RESERVATIONS_REWORK.md §3.7), on the registry's keys.
       db.query.exception.findMany({
-        where: (e, { eq, and }) => and(eq(e.studentId, studentId), eq(e.status, 'active')),
-        columns: { id: true, type: true, value: true, reason: true, validUntil: true },
+        where: (e, { eq, and, or, inArray }) => and(
+          or(
+            eq(e.studentId, studentId),
+            inArray(e.familyId, db.select({ id: parentStudentLink.parentId }).from(parentStudentLink)
+              .where(and(eq(parentStudentLink.studentId, studentId), eq(parentStudentLink.status, 'approved')))),
+          ),
+          eq(e.status, 'active'),
+        ),
+        columns: {
+          id: true, type: true, policyKey: true, value: true, valueNumber: true, valueDate: true, reason: true, validUntil: true,
+          familyId: true, sessionId: true, subjectId: true, registrationId: true, chargeId: true,
+        },
       }),
       db.query.remarkRequest.findMany({
         where: (r, { eq }) => eq(r.studentId, studentId),

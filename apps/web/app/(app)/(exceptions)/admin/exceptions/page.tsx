@@ -1,8 +1,6 @@
 /**
- * Admin Exceptions Page (V3 §6.3)
- *
- * Grant and revoke per-student exceptions — discounts, custom prices,
- * fee waivers, deadline extensions, custom refund percentages.
+ * Exceptions (RESERVATIONS_REWORK.md §3.7, §4.7): grant, list, revoke, and "Check these".
+ * The form offers only what the policy registry lets this role grant (GET /v1/policies).
  */
 
 import { requireAuth } from '~/lib/auth/session';
@@ -13,7 +11,6 @@ export const metadata = {
 };
 
 export default async function ExceptionsAdminPage(): Promise<React.JSX.Element> {
-  // Each exception type names who may grant it (F0a): the form offers only those.
   const session = await requireAuth();
   return <ExceptionsAdminClient viewerRole={session.user.role ?? null} />;
 }

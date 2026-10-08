@@ -20,6 +20,8 @@ import {
   IN_SCHOOL_INSTRUMENTS,
   IN_SCHOOL_INSTRUMENT_LABELS,
   EXCEPTION_TYPE_LABELS,
+  POLICIES,
+  isRegistryPolicyKey,
 } from '@repo/validations';
 import { formatPrice } from '~/lib/format';
 import { Button } from '~/components/ui/button';
@@ -348,7 +350,8 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
               <p className="mt-3 text-xs text-violet-700 dark:text-violet-400">
                 Active exceptions:{' '}
                 {summary.exceptions
-                  .map((e) => EXCEPTION_TYPE_LABELS[e.type as keyof typeof EXCEPTION_TYPE_LABELS] ?? e.type)
+                  // The registry's label (the student's own and the family's, RESERVATIONS_REWORK.md §3.7).
+                  .map((e) => (isRegistryPolicyKey(e.policyKey) ? POLICIES[e.policyKey].label : EXCEPTION_TYPE_LABELS[e.type as keyof typeof EXCEPTION_TYPE_LABELS] ?? e.policyKey))
                   .join(', ')}
               </p>
             )}
