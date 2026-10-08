@@ -75,7 +75,7 @@ export async function listToVerify(sessionId: string, show: 'awaiting' | 'decide
       s.name as "subjectName", i.label as "itemLabel", i.kind as "itemKind", i.needs_prior_series as "carriesForward",
       ps.id as "priorSeriesId", ps.board_code as "priorBoard", ps.month as "priorMonth", ps.year as "priorYear", ps.label as "priorLabel", pb.name as "priorBoardName",
       ru.name as "declaredBy", ru.role as "declaredByRole",
-      line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) as deadline,
+      line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as deadline,
       line_effective_deadline('first', null, r.board_series_id) as "firstEntryDeadline",
       exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed') as paid,
       exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status in ('pending', 'pending_verification')) as "paymentOpen",
@@ -142,14 +142,14 @@ async function tellFamily(studentId: string, title: string, body: string, data: 
 type LineRow = {
   id: string; studentId: string; sessionId: string; status: string; attempt: string; mode: string;
   boardSeriesId: string | null; priorSittingSeriesId: string | null; priorSittingSource: string | null;
-  outcome: string | null; priceAtRegistration: number; registrationFeeAtRegistration: number; name: string; sitting: string | null;
+  outcome: string | null; declarationRejected: boolean; priceAtRegistration: number; registrationFeeAtRegistration: number; name: string; sitting: string | null;
 };
 
 async function loadLine(executor: typeof db | Tx, id: string): Promise<LineRow | null> {
   const [r] = await executor.execute(sql`
     select r.id, r.student_id as "studentId", r.session_id as "sessionId", r.status, r.attempt, r.mode, r.board_series_id as "boardSeriesId",
       r.prior_sitting_series_id as "priorSittingSeriesId", r.prior_sitting_source as "priorSittingSource",
-      r.prior_sitting_verified_outcome as outcome, r.price_at_registration as "priceAtRegistration",
+      r.prior_sitting_verified_outcome as outcome, r.declaration_rejected as "declarationRejected", r.price_at_registration as "priceAtRegistration",
       r.registration_fee_at_registration as "registrationFeeAtRegistration",
       case when i.kind = 'whole' then s.name else s.name || ' — ' || i.label end as name,
       pb.name as "priorBoardName", ps.month as "priorMonth", ps.year as "priorYear", ps.label as "priorLabel"
@@ -161,7 +161,7 @@ async function loadLine(executor: typeof db | Tx, id: string): Promise<LineRow |
     id: r.id as string, studentId: r.studentId as string, sessionId: r.sessionId as string, status: r.status as string,
     attempt: r.attempt as string, mode: r.mode as string, boardSeriesId: (r.boardSeriesId as string | null) ?? null,
     priorSittingSeriesId: (r.priorSittingSeriesId as string | null) ?? null, priorSittingSource: (r.priorSittingSource as string | null) ?? null,
-    outcome: (r.outcome as string | null) ?? null, priceAtRegistration: Number(r.priceAtRegistration),
+    outcome: (r.outcome as string | null) ?? null, declarationRejected: Boolean(r.declarationRejected), priceAtRegistration: Number(r.priceAtRegistration),
     registrationFeeAtRegistration: Number(r.registrationFeeAtRegistration ?? 0), name: r.name as string,
     sitting: r.priorMonth ? formatSeriesName({ boardName: r.priorBoardName as string, month: r.priorMonth as string, year: Number(r.priorYear), label: (r.priorLabel as string | null) ?? '' }) : null,
   };
@@ -318,8 +318,8 @@ export async function holdUnverifiedAtDeadline(now: Date = new Date()) {
     select r.id from registration r
     where r.prior_sitting_source in ('declared_by_family', 'declared_by_desk') and r.prior_sitting_verified_outcome is null
       and r.status in ('pending_approval', 'pending_payment', 'confirmed')
-      and line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) <= ${now}
-      and line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) > ${since.at}
+      and line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) <= ${now}
+      and line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) > ${since.at}
     order by r.id`).then((x) => x.rows as { id: string }[]);
   let expired = 0;
   let dropped = 0;

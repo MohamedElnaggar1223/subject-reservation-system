@@ -126,7 +126,7 @@ then remark fees stay on `remark_fee_schedule` (§2.10).
 | `due_at` | timestamptz, not null after 0043 | `dueDateFor` at creation; recomputed at fee confirmation (A) |
 | `price_provisional` | bool, default false | `priceLine` |
 | `pricing_basis` | jsonb, null (converted lines) | `priceLine` (§2.3) |
-| `refund_policy_snapshot` | jsonb, null | B at consent (shape §2.6) |
+| `refund_policy_snapshot` | jsonb, null | B at consent (shape §2.6); A's grade-10 commit with its school consent |
 | `legacy` | jsonb, null: `{ converted, no_series, retake_history_unknown }` | the backfill |
 | `is_retake`, `taken_outside_school` | kept, written from `attempt` and `mode` | every path |
 | unique | (student, session, `offer_item_id`) while live — replaces (student, session, subject) | |
@@ -174,6 +174,23 @@ an offer's close, an item's untick or availability change, a teacher removal (it
 a line into a series takes the student lock first and runs `assertLineRules`: the reservation
 paths, an item's series change (per affected student), the grade-10 bulk commit (per student),
 F7's import (per student) and preregistration capture.
+
+**A move of lines** — an item's series change, the admin's move, a board change, the session's
+series correction — takes, after its students and items and **before its lines**, the fee rows
+its lines will read in the series they go to `FOR SHARE` (`lockMoveFeeRows` / `lockFeeRows`,
+`line-moves.services.ts`; the old series' rows carried there first): Confirm's own order, fee
+rows then lines, so a Confirm of one of those rows either lands first (the move reads it
+confirmed) or waits for the move and finds the moved lines by their basis (the review of
+40c1447). The admin's move also takes the items it may move lines to `FOR SHARE` before their
+rows (an item's series change, which takes its item `FOR UPDATE`, waits for it).
+
+**A line's receipt, then the line** (MONEY_AUDIT.md MA-16's order). Wherever a path holds both,
+the receipt (`FOR UPDATE`, `lockReceiptOf` in `receipt.services.ts`) comes first: a payment's
+reversal, a receipt's void and return, `executeReceiptGatedDrop`, a drop's or swap's approval
+(before its deadline check under the line's lock), a preregistration's cancel, capture and the
+deadline sweep's preregistration refund. In the order above it sits where the receipt-gated drop
+takes it: after the student and the session, before the line. The opposite order deadlocks a
+drop's approval against a reversal (08t); B's verification is being changed to take it so (the lead, 8 Oct).
 
 ### 2.2 Creating lines — `insertLines` (`apps/api/src/services/line.services.ts`)
 
@@ -272,8 +289,11 @@ gate exceptions, so the adapter returns none; C's registry adds them).
 ### 2.6 Deadlines and due dates — `deadline.services.ts`
 
 ```ts
-effectiveDeadlineFor(executor, line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null })
-  : Promise<{ at: Date | null; kind: 'retake' | 'entry' | 'exams_start' | null }>
+effectiveDeadlineFor(executor, line: {
+  boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null;
+  declarationRejected?: boolean | null;   // B's registration.declaration_rejected (changed after the review of 40c1447)
+  studentId?: string | null;              // the line's student: Q-20's late board entry is read when given
+}): Promise<{ at: Date | null; kind: 'retake' | 'entry' | 'exams_start' | null }>
 ```
 
 The retake deadline when the line is a `retake` whose prior sitting is **the board's latest
@@ -281,10 +301,26 @@ sitting before this series** in the board's calendar (`exam_board.series_months`
 and year before, label ignored) and the series has one; else the entry deadline; else, for a
 series with no entry deadline, the start of its `exams_start` day in Cairo; else null (no
 cut-off; such a series takes no new line). The same rule in SQL:
-`line_effective_deadline(attempt, prior_sitting_series_id, board_series_id)` (0041), used by
+`line_effective_deadline(attempt, prior_sitting_series_id, board_series_id)` (0042), used by
 `seriesDeadlineGroups`, `openCheckoutsSpanningDeadlines`, the sweep, `referenceDueFor`, the
 InstaPay reference check, `moveRegistrations`, preregistration capture and cancellation, and
 09.
+
+*(Changed after the review of 40c1447.)* **A rejected declaration is a first entry** (§3.5): a
+retake whose declared sitting the school rejected has the entry deadline, never the retake
+deadline — `line_effective_deadline(attempt, prior, series, declaration_rejected)` and its
+`_kind` (0044; the three-argument forms read as not rejected), and `declarationRejected` above.
+The column is B's: at B's merge, `lineDeadlineSql`, `effectiveDeadlinesOf`, the sweep's and
+`refundPreregistrationsAtDeadline`'s column conditions (and C's `charge_effective_deadline`) pass
+`declaration_rejected` as the fourth argument, and the line objects handed to
+`effectiveDeadlineFor` carry it. **Q-20's late board entry**: `lateEntryUntil(executor,
+studentId, boardSeriesId)` reads `deadline.boardEntry` (student × series, its `value_date`)
+through the adapter **only while the setting `exceptions.boardEntryDeadline` is on**; with the
+student given, `effectiveDeadlineFor` moves an entry or retake deadline later to its date (kind
+`entry`) — `sessionWindow`, `insertLines`, capture, cancellation, the family's read and
+`dueDateFor` pass the student — and the sweep keeps such a line to that date
+(`linesKeptByLateEntry`: its open payments, its expiry, a preregistration's refund). Off, a grant
+changes nothing and the board's deadline is the hard stop (MO-10).
 
 `sessionWindow(studentId, sessionId, line | null, executor?, now?)` (window.services) now takes
 the **line** (`{ boardSeriesId, attempt, priorSittingSeriesId }`) instead of its series id; the
@@ -303,7 +339,7 @@ the base); a `deadline.payment` exception (adapter) replaces it; capped by
 `effectiveDeadlineFor`. Charge (C): the same steps from the charge's own base and cap.
 
 `RefundPolicy` = `{ steps: { throughWeek: number | null; percent: number }[] }` (the last step
-`throughWeek: null`). `RefundPolicySnapshot` (B writes at consent) =
+`throughWeek: null`). `RefundPolicySnapshot` (B writes at consent; the grade-10 commit with its school consent) =
 `{ kind: 'weeks'; steps: RefundPolicy['steps'] }` or, in a converted session with no policy,
 `{ kind: 'dates'; windows: { startsAt, endsAt, percent }[] }`. The anchor is resolved at refund
 time by C's `refundFor` (precedence: `refund.courseStart` exception › the group's first lesson
@@ -445,8 +481,9 @@ Each point is marked *(changed)* where the code now differs from what §2 promis
   of the student's own: the same entry once in the target series (any key: an award, a unit, an
   unmapped subject row), the required items there, the carry-forward period; what governs a new
   line (availability, self-study, a declared retake, exclusive groups, the grade-10 core) is not
-  asked again. Then `carryFeeRows(tx, itemId, fromSeriesId, actorId, why)` brings the old series'
-  fee rows into the new one, **provisional**, where finance has none, and
+  asked again. Then `carryFeeRows(tx, itemId, fromSeriesId, toSeriesId, actorId, why)` brings the
+  old series' fee rows into the new one, **provisional**, where finance has none (since 40c1447's
+  review through `lockMoveFeeRows`, before the lines: §2.1), and
   `repriceMovedLines(tx, lineIds, actorId, why)` re-prices every waiting line with no payment
   history on its board part against the new series' rows (the course part and the exceptions its
   basis recorded stay; `LINE_REPRICED`), so the new series' Confirm and Re-price reach it.
@@ -485,6 +522,47 @@ Each point is marked *(changed)* where the code now differs from what §2 promis
   the session's academic year; `sections` lists them and `sectionId` filters.
 - **0042 runs twice safely**: offers, items, units, fee keys and fees are made only where none
   exist; its triggers are dropped before they are made again (proved on converted copies).
+
+After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hooks):
+
+- **A move holds the new series' fee rows before its lines** *(changed)*. The race: a Confirm
+  committing inside a move's transaction read the lines before they moved (none had the row in its
+  basis yet), while the move read the row before it was confirmed — the moved line stayed
+  provisional on a confirmed row until a second Confirm. Every move path now takes those rows
+  `FOR SHARE` before its lines, after carrying the old series' rows across (§2.1); 08t forces the
+  Confirm inside each of the four moves (paused at its `LINE_REPRICED` write, `pauseAtAudit`) and
+  the Confirm clears the moved line; each fails with its lock removed. 09: no waiting line is
+  provisional when every fee row its basis names is confirmed at the amount it recorded (a row
+  confirmed at another amount leaves the line to the Re-price). What is not held: a row that
+  existed nowhere when the move began and that finance creates and confirms inside the move's
+  transaction (the rule above names such a line).
+- **A line that turns provisional on a move is told** *(changed)*: `repriceMovedLines` also
+  returns a line whose total stayed but which became provisional (the new series' fee not
+  confirmed), and `tellPriceChanged` sends it `PRICE_TO_BE_CONFIRMED` ("The price of X is to be
+  confirmed … it can be paid once the school confirms the board fee in its new series"); a
+  changed price that also turned provisional says so in its `PRICE_CHANGED`.
+- **A line's receipt before the line** *(changed)*: §2.1 (MA-16's order) — a drop's approval, a
+  preregistration's cancel, capture and the deadline's preregistration refund take the receipt
+  first.
+- **The effective deadline reads a rejected declaration and Q-20's late entry** *(changed)*:
+  §2.6. The flag and the setting are B's and C's; the wiring at their merges is listed there.
+  `exceptions.boardEntryDeadline` is defined on this branch with C's text, at C's place, so the
+  merge takes C's; `deadline.boardEntry` is in `DUE_POLICY_KEYS`.
+- **`priceLine` reads the pricing.* exceptions** *(changed)*: with the price keys it asks the
+  adapter for `pricing.selfStudyCoursePercent`, `pricing.selfStudyBoardPercent`,
+  `pricing.retakeTaughtCoursePercent` and `pricing.onePaperCoursePercent`; one that applies to the
+  line (self-study, a retake in school, a one-paper item) replaces its setting's percent — the
+  first the adapter gives of each key — and only those that applied are recorded in
+  `basis.exceptionIds`. Who holds one (a student or a family) is the registry's; C's registry can
+  mark the four policies live at the merge (today `pending`, refused at grant).
+- **Known earlier sittings are confirmed lines only** *(changed)*: `GET /registrations/offers`'
+  `knownSittings` no longer lists a dropped line (never sat; it may be declared, then verified).
+- **The grade-10 commit freezes the refund steps** *(changed)*: each line's
+  `refund_policy_snapshot` with its school consent (§2.6's shape), so a bulk line is refunded like
+  any other.
+- **Replace teacher moves the enrolment per unit** *(changed)*: each replaced line's enrolment in
+  each unit its item enters (or in the subject for an item entering none), not the student's other
+  units of the subject taught through another session (§2.11).
 
 ## 3. As built (step 1)
 
@@ -589,8 +667,10 @@ teacher" when the teacher is not yet in its pool, Add — 3 when they are); the 
 published 1 input and 4 clicks; the series' deadline 2 inputs and 2 clicks (plus 2 to choose a
 far academic year on the Board series page) — **25–27 inputs and 75 clicks**. Copied from it
 (June 2031 from June 2030): new session 5 inputs and 2 clicks; Confirm all 2 clicks; the
-deadline 2 inputs and 2 clicks — **7 inputs and 6 clicks** (plus the year choice), the 17
-subjects arriving open with their teachers. Against §11's "about 150 and 70; about 20 and 10":
+deadline 6 inputs and 2 clicks (2 for the deadline, 4 to choose June 2031's academic year on the
+Board series page) — **11 inputs and 6 clicks**, the 17 subjects arriving open with their
+teachers. *(Corrected after the review of 40c1447: this said 2 inputs for the deadline and 7 in
+all; measure-counts-2.json records 6 and 11.)* Against §11's "about 150 and 70; about 20 and 10":
 inputs far fewer than counted (the dev database has no A.S./A.L. subject, no one-paper item and
 one teacher a subject — §11 counted about 26 teacher picks, 10 one-paper fees and 30 per-unit
 inputs), clicks about the same, because each subject is added through its own dialog. Not
@@ -603,10 +683,15 @@ dates; then, after the review of 977848d, 11 more: approval past a deadline, Bio
 October to January with provisional fees, the sweep at the exams' start and at the retake
 deadline, the admin's move of a qualifying retake, replace teacher, the scheduler opening after
 a deadline, the same award in a converted and a new session, the same entry on a move, one-paper
-generation, the Money tab's counts), 08p (6: A-16, one-paper retake, settings for new lines
-only, exceptions in order, provisional fee, confirm higher and re-price), 08t (10 races), a 05
-cross-family case for `/registrations/offers`, the authz rows, 09's rules (§8). Six guards shown
-red when undone (trail rows `control`).
+generation, the Money tab's counts; then, after the review of 40c1447, 9 more: capture's
+`line_rule` hold, the unsourced prior sitting, the re-price on the admin's move and on the
+correction, the to-be-confirmed notice on a board change, replace teacher per unit, the known
+sittings, Q-20's late entry on, off and swept, the rejected declaration), 08p (7: A-16, one-paper
+retake, settings for new lines only, the pricing.* exceptions, exceptions in order, provisional
+fee, confirm higher and re-price), 08t (16 races: since 40c1447's review a Confirm inside each of
+the four moves and a drop's approval against a reversal in both orders), a 05 cross-family case
+for `/registrations/offers`, the authz rows, 09's rules (§8, and the provisional-line rule). Every
+guard added since the reviews shown red when undone (trail rows `control`).
 
 ## 4. Decisions made while building (for the lead)
 
@@ -643,7 +728,8 @@ red when undone (trail rows `control`).
 
 - B: `lines`/consent inputs on the reservation paths, declarations and To verify, the teacher
   change, the desk's and the family's Reserve pages, the Statement, the desk-drop past a deadline.
-- C: `refundFor` and the refund-policy snapshot, the exceptions registry (gates granted by
+- C: `refundFor` (the refund-policy snapshot it reads is written by B at consent, §1.6, §2.10,
+  and by A's grade-10 commit), the exceptions registry (gates granted by
   exception, one-shot use, `deadline.payment`), charges and instalments, board services and the
   remark fee from the grid, the Money tab's charges.
 - D: reminders and the Money tab's "Remind".
@@ -677,3 +763,12 @@ red when undone (trail rows `control`).
   re-priced from the new series' grid), 3–9 and the cheap minors fixed, each with its test or
   trail row; §2.12 lists the contract changes; the conversion re-run on five copies with the
   final 0042 and stated as two shapes plus a scratch case; the step counts measured.
+- 01:07Z — 40c1447 pushed (CI green 01:12Z). The reviewer's second pass, 01:20Z: ready to merge
+  after five follow-ups; then B's four findings (01:53Z), C's two (02:05Z), MA-16's receipt-first
+  correction (02:20Z) and the known sittings (02:21Z).
+- 02:33Z — all of them built, each with its test and its control red when undone: the moves'
+  fee-row locks (four 08t races), the 09 rule, capture's `line_rule` hold, the unsourced prior
+  sitting, the re-price on the admin's move and the correction, the to-be-confirmed notice, the
+  rejected declaration (0044), the grade-10 snapshot, replace-teacher per unit, the pricing.*
+  exceptions, Q-20's late entry, the receipt before the line (an 08t race of an approval against
+  a reversal), the known sittings; §2.1, §2.6, §2.12, §3's copy-from count and §5 corrected.

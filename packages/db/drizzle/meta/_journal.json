@@ -313,15 +313,22 @@
     {
       "idx": 44,
       "version": "7",
-      "when": 1791412653415,
-      "tag": "0044_rework_reservations",
+      "when": 1791425757386,
+      "tag": "0044_rework_sessions_followups",
       "breakpoints": true
     },
     {
       "idx": 45,
       "version": "7",
-      "when": 1791412676908,
-      "tag": "0045_rework_reservations_consent_guard",
+      "when": 1791429270826,
+      "tag": "0045_rework_reservations",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1791429312401,
+      "tag": "0046_rework_reservations_consent_guard",
       "breakpoints": true
     }
   ]

@@ -16,14 +16,14 @@
  *    normal receipt-gated refund path with refund windows applied (D-J).
  */
 
-import { db, registration, auditLog, eq, and, sql } from '@repo/db';
+import { db, registration, auditLog, eq, and, sql, notInArray } from '@repo/db';
 import type { PreregisterRegistrationType } from '@repo/validations';
 import { assertSchoolFeeGate } from './registration.services';
 import { reserveLines } from './reservation.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
-import { effectiveDeadlineFor } from './deadline.services';
+import { effectiveDeadlineFor, linesKeptByLateEntry } from './deadline.services';
 import { creditHeld, debitHeld, getEscrowBalance } from './escrow.services';
-import { executeReceiptGatedDrop } from './receipt.services';
+import { executeReceiptGatedDrop, lockReceiptOf } from './receipt.services';
 import { refundPercentage } from './refund.services';
 import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterForInTx } from './eligibility.services';
 import { notifyFinanceOfHeldPreregistration, notifyPreregistrationsRefundedAtDeadline } from './notification.services';
@@ -133,7 +133,8 @@ export async function cancelPreregistration(registrationId: string, parentId: st
   const result = await db.transaction(async (tx) => {
     // Lock the row, then decide. A payment still open for it means money may
     // be on its way: cancelling now dropped the row with nothing refunded and
-    // left finance unable to confirm the transfer.
+    // left finance unable to confirm the transfer. Its receipt first (MA-16's order).
+    await lockReceiptOf(tx, registrationId);
     await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, registrationId)).for('update');
     const { funded, open } = await preregPaymentState(registrationId, tx);
     if (open) {
@@ -220,18 +221,23 @@ async function settlePreregistrationAtDeadline(
  * Run by the deadline sweep for such a series; idempotent (only rows still preregistered move).
  */
 export async function refundPreregistrationsAtDeadline(sessionId: string, boardSeriesId: string, now: Date = new Date()) {
-  // Only the preregistrations entered in that series whose own deadline has passed.
+  // Only the preregistrations entered in that series whose own deadline has passed (a late board
+  // entry, Q-20, keeps its student's to its own date).
+  const kept = await linesKeptByLateEntry(db, boardSeriesId, now);
   const preregs = await db.select({ id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId, priceAtRegistration: registration.priceAtRegistration })
     .from(registration)
     .where(and(
       eq(registration.sessionId, sessionId), eq(registration.boardSeriesId, boardSeriesId), eq(registration.status, 'preregistered'),
-      sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}) <= ${now}`,
+      sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}, ${registration.declarationRejected}) <= ${now}`,
+      kept.length ? notInArray(registration.id, kept) : undefined,
     ));
 
   const outcomes: { studentId: string; subjectId: string; refunded: number; gated: boolean }[] = [];
   for (const reg of preregs) {
     try {
       const outcome = await db.transaction(async (tx) => {
+        // The receipt before the row (MA-16's order): the settlement may drop it on the receipt-gated path.
+        await lockReceiptOf(tx, reg.id);
         const [row] = await tx.select({ status: registration.status }).from(registration).where(eq(registration.id, reg.id)).for('update');
         if (row?.status !== 'preregistered') return undefined;
         const r = await settlePreregistrationAtDeadline(tx, reg);
@@ -288,6 +294,8 @@ export async function capturePreregistrationsForSession(sessionId: string): Prom
         // then the row; asked before the row's lock, a confirmation committing in between
         // moved a paid row to pending_payment and stranded its held money (the MA-15 outcome).
         const eligibility = await mayRegisterForInTx(tx, reg.studentId, sessionId);
+        // The receipt before the row (MA-16's order): a row past its deadline is dropped on the receipt-gated path.
+        await lockReceiptOf(tx, reg.id);
         const [row] = await tx
           .select({ status: registration.status })
           .from(registration)

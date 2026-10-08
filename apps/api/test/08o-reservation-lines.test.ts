@@ -372,6 +372,36 @@ describe('08o: reservation lines (step B)', () => {
     expect(n!.body).toContain('entered with the board as a first entry');
   });
 
+  it('a rejected declaration is a first entry: its deadline becomes the entry deadline, not the retake one', async () => {
+    const f = await onboard(officer, `o08-rejd-${RUN}`, 11);
+    // Declared, a retake of November (Cambridge's sitting before June) runs to June's retake deadline.
+    const desk = await apiResponse(deskCollect(f.studentId, june, [retake(bioItem, { mode: 'self_study', priorSitting: { month: 'november', year: Y } })]));
+    const id = desk.registrations[0]!.id;
+    const dates = await one<{ entry: string; retake: string }>(`select entry_deadline as entry, retake_deadline as retake from board_series where id = $1`, [camJ]);
+    const entry = new Date(dates.entry).getTime();
+    const retakeAt = new Date(dates.retake).getTime();
+    expect(retakeAt).toBeGreaterThan(entry);
+    const statementDeadline = async () => {
+      const st = (await apiResponse(officer.api.v1.statement.$get({ query: { studentId: f.studentId } }))).students[0]!;
+      return new Date(st.sessions.find((x) => x.id === june)!.lines.find((l) => l.id === id)!.deadline!).getTime();
+    };
+    const { effectiveDeadlinesOf } = await import('../src/services/deadline.services');
+    const { db } = await import('@repo/db');
+    expect(await statementDeadline()).toBe(retakeAt);
+    expect((await effectiveDeadlinesOf(db, [id])).get(id)?.kind).toBe('retake');
+    // Rejected while paid, before the first-entry deadline: it stands, and the board takes it as a first entry.
+    await apiResponse(verify(coordinator, id, { outcome: 'rejected', reason: 'no November result for this candidate' }));
+    expect(await lineOf(id)).toMatchObject({ status: 'confirmed', declaration_rejected: true });
+    expect(await statementDeadline()).toBe(entry);
+    const own = (await effectiveDeadlinesOf(db, [id])).get(id)!;
+    expect([own.at?.getTime(), own.kind]).toEqual([entry, 'entry']);
+    // The SQL rule every sweep and grouping reads (lineDeadlineSql) gives the same.
+    const { lineDeadlineSql } = await import('../src/services/deadline.services');
+    const { sql: dsql } = await import('@repo/db');
+    const [row] = (await db.execute(dsql`select ${lineDeadlineSql('r')} as d from registration r where r.id = ${id}`)).rows as { d: string }[];
+    expect(new Date(row!.d).getTime()).toBe(entry);
+  });
+
   it("rejected on a paid line after the first-entry deadline: dropped through the receipt-gated drop with today's refund", async () => {
     const f = await onboard(officer, `o08-rejl-${RUN}`, 11);
     // A retake of November (Cambridge's latest sitting before June) runs to the retake deadline.

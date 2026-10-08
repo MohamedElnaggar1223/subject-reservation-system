@@ -31,7 +31,7 @@ import { effectiveDeadlineFor, effectiveDeadlinesOf, deadlinePassedSentence, red
 import { itemBoardFees } from './pricing.services';
 import { schoolDate } from './window.services';
 import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
-import { carryFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
+import { lockMoveFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
 import { PricingError } from './pricing.services';
 
@@ -567,6 +567,10 @@ async function changeItemSeries(
   const ids = [targetId, ...(item.boardSeriesId ? [item.boardSeriesId] : [])].sort();
   await tx.select({ id: boardSeries.id }).from(boardSeries).where(inArray(boardSeries.id, ids)).orderBy(boardSeries.id).for('share');
   const target = await assertItemSeriesFits(tx, session, subjectRow, level, targetId);
+  // The fee rows the item will read there (carried provisional from the series it is in where
+  // finance has none), FOR SHARE before its lines — Confirm's order, so a Confirm of one either
+  // lands first or waits for this move and then reaches the moved lines (the review of 40c1447).
+  await lockMoveFeeRows(tx, [{ itemId: item.id, fromSeriesId: item.boardSeriesId, toSeriesId: targetId }], actorId, 'Its item moved to another series');
   const lines = await tx.select().from(registration)
     .where(and(eq(registration.offerItemId, item.id), inArray(registration.status, [...LIVE])))
     .orderBy(registration.id).for('update');
@@ -581,7 +585,7 @@ async function changeItemSeries(
     if (d.at && d.at <= now) {
       throw new OfferError(`${item.label} has lines past their deadline in the series it is entered in (${schoolDate(d.at)}): its entries stand`, 409);
     }
-    const there = await effectiveDeadlineFor(tx, { boardSeriesId: targetId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId });
+    const there = await effectiveDeadlineFor(tx, { boardSeriesId: targetId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId, declarationRejected: l.declarationRejected });
     if (there.at && there.at <= now) {
       throw new OfferError(`${boardSeriesName(names, target)} is past a line's deadline: ${deadlinePassedSentence(there, schoolDate)}`, 409);
     }
@@ -592,8 +596,7 @@ async function changeItemSeries(
   // Each student's lines checked again where they now are (§6): the same entry once in the target
   // series (any entry key, an unmapped row's too), its required items, the carry-forward period.
   await moveRules(() => recheckLines(tx, lines.map((l) => l.id)));
-  // What they cost there: the new series' fee rows (carried provisional where finance has none).
-  await carryFeeRows(tx, item.id, item.boardSeriesId, actorId, 'Its item moved to another series');
+  // What they cost there: the new series' fee rows, held since before the lines.
   const repriced = await moveRules(() => repriceMovedLines(tx, lines.map((l) => l.id), actorId, 'its item moved to another series'));
   const spanning = await openCheckoutsSpanningDeadlines(tx, { registrationIds: lines.map((l) => l.id) });
   if (spanning > 0) {
@@ -660,14 +663,14 @@ export async function replaceTeacher(sessionId: string, offerId: string, data: R
     const [to] = await tx.select().from(teacher).where(eq(teacher.id, data.toTeacherId));
     if (!to) throw new OfferError('Teacher not found', 404);
     if (!to.isActive) throw new OfferError(`${to.name} is inactive`);
-    const items = await tx.select({ id: sessionOfferItem.id }).from(sessionOfferItem).where(eq(sessionOfferItem.offerId, offerId));
+    const items = await tx.select({ id: sessionOfferItem.id, entersKind: sessionOfferItem.entersKind }).from(sessionOfferItem).where(eq(sessionOfferItem.offerId, offerId));
     const itemIds = items.map((i) => i.id);
     const onOffer = await tx.select().from(sessionOfferTeacher).where(and(eq(sessionOfferTeacher.offerId, offerId), eq(sessionOfferTeacher.teacherId, data.fromTeacherId)));
     const onItems = itemIds.length
       ? await tx.select().from(sessionOfferItemTeacher).where(and(inArray(sessionOfferItemTeacher.itemId, itemIds), eq(sessionOfferItemTeacher.teacherId, data.fromTeacherId)))
       : [];
     const lines = itemIds.length
-      ? await tx.select({ id: registration.id, studentId: registration.studentId }).from(registration)
+      ? await tx.select({ id: registration.id, studentId: registration.studentId, offerItemId: registration.offerItemId }).from(registration)
           .where(and(inArray(registration.offerItemId, itemIds), eq(registration.teacherId, data.fromTeacherId), inArray(registration.status, [...LIVE])))
           .orderBy(registration.id).for('update')
       : [];
@@ -689,16 +692,33 @@ export async function replaceTeacher(sessionId: string, offerId: string, data: R
         previousData: { teacherId: data.fromTeacherId }, newData: { teacherId: to.id, reason: data.reason },
       })), tx);
     }
-    // The enrolment follows (§10): this year's open in-school enrolments of those students in the subject.
+    // The enrolment follows (§10), per what each replaced line is taught as (§2.11): this year's open
+    // enrolment of the student in each unit its item enters, or in the subject for an item entering
+    // no units — not the student's other units of the subject, taught through another session.
     const ay = await tx.execute(sql`select id from academic_year where start_year = school_series_academic_year_start(${session.sessionType}, ${session.seriesYear})`);
     const yearId = (ay.rows[0] as { id: string } | undefined)?.id;
     let enrolmentsMoved = 0;
     if (yearId && lines.length) {
-      const moved = await tx.update(courseEnrolment).set({ teacherId: to.id, updatedAt: now })
-        .where(and(eq(courseEnrolment.academicYearId, yearId), eq(courseEnrolment.subjectId, offer.subjectId), eq(courseEnrolment.teacherId, data.fromTeacherId),
-          isNull(courseEnrolment.endedOn), inArray(courseEnrolment.studentId, [...new Set(lines.map((l) => l.studentId))])))
-        .returning({ id: courseEnrolment.id });
-      enrolmentsMoved = moved.length;
+      const unitItems = items.filter((i) => i.entersKind === 'units').map((i) => i.id);
+      const unitsOf = new Map<string, string[]>();
+      if (unitItems.length) {
+        for (const u of await tx.select().from(sessionOfferItemUnit).where(inArray(sessionOfferItemUnit.itemId, unitItems))) {
+          unitsOf.set(u.itemId, [...(unitsOf.get(u.itemId) ?? []), u.unitId]);
+        }
+      }
+      const done = new Set<string>();
+      for (const l of lines) {
+        const units = unitsOf.get(l.offerItemId) ?? [];
+        const key = `${l.studentId}|${units.join(',')}`;
+        if (done.has(key)) continue;
+        done.add(key);
+        const moved = await tx.update(courseEnrolment).set({ teacherId: to.id, updatedAt: now })
+          .where(and(eq(courseEnrolment.academicYearId, yearId), eq(courseEnrolment.subjectId, offer.subjectId), eq(courseEnrolment.teacherId, data.fromTeacherId),
+            isNull(courseEnrolment.endedOn), eq(courseEnrolment.studentId, l.studentId),
+            units.length ? inArray(courseEnrolment.unitId, units) : isNull(courseEnrolment.unitId)))
+          .returning({ id: courseEnrolment.id });
+        enrolmentsMoved += moved.length;
+      }
     }
     await logAction(actorId, 'SESSION_OFFER_TEACHER_REPLACED', 'session_offer', offerId, { teacherId: data.fromTeacherId },
       { teacherId: to.id, reason: data.reason, items: onItems.length, lines: lines.length, enrolments: enrolmentsMoved }, ctx, tx);

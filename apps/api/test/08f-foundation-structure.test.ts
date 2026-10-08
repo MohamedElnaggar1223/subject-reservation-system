@@ -64,6 +64,9 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
         'payment.graceDays': false,
         'refund.defaultPolicy.june': false,
         'refund.defaultPolicy.winter': false,
+        // The reservations rework (step C's key, read by step A's deadline): late board entries
+        // (Q-20) are the admin's alone.
+        'exceptions.boardEntryDeadline': false,
         // F0b: what "A.S./A.2." marks is the coordinator's answer (IS-01).
         'catalogue.levelCodeReading': true,
         // The reservations rework, step B: whether an unverified declared sitting is held at its

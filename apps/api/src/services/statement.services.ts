@@ -66,7 +66,7 @@ async function linesOf(studentIds: string[]) {
       t.name as teacher, r.teacher_id, r.offer_item_id, r.refund_policy_snapshot as snapshot,
       r.price_at_registration as price, r.course_fee_at_registration as course_fee, r.registration_fee_at_registration as board_fee,
       r.due_at, r.price_provisional as provisional, r.pricing_basis as basis, b.name as board_name, bs.month, bs.year, bs.label as series_label,
-      line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) as deadline,
+      line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as deadline,
       pb.name as prior_board, ps.month as prior_month, ps.year as prior_year, ps.label as prior_label,
       r.prior_sitting_source as prior_source, r.prior_sitting_verified_outcome as prior_outcome, r.declaration_rejected, r.created_at,
       rc.receipt_number, rc.status as receipt_status, rc.issued_at as receipt_issued_at, rc.created_at as receipt_created_at,
@@ -160,7 +160,7 @@ async function paymentsOf(studentIds: string[]) {
           'receipt', (select rc.receipt_number from receipt rc where rc.registration_id = r.id)) order by s.name)
         from payment_registration pr join registration r on r.id = pr.registration_id join session_offer_item i on i.id = r.offer_item_id
         join session_offer o on o.id = i.offer_id join subject s on s.id = o.subject_id where pr.payment_id = p.id) as covers,
-      (select min(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id)) from payment_registration pr join registration r on r.id = pr.registration_id where pr.payment_id = p.id) as deadline,
+      (select min(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)) from payment_registration pr join registration r on r.id = pr.registration_id where pr.payment_id = p.id) as deadline,
       (select array_agg(distinct coalesce(b.name, '') || ' ' || initcap(bs.month) || ' ' || bs.year || case when bs.label <> '' then ' (' || bs.label || ')' else '' end)
         from payment_registration pr join registration r on r.id = pr.registration_id join board_series bs on bs.id = r.board_series_id left join exam_board b on b.code = bs.board_code
         where pr.payment_id = p.id) as series,

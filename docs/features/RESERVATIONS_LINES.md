@@ -16,10 +16,11 @@ Resources (FEATURES_PLAN.md §7): test database `igcse_rwb_test`, dev database
 
 ## 1. The data model this step adds
 
-Migrations after A's 0043 (the lead regenerates the later-merging branch's on top of `main`'s
-journal, FEATURES_PLAN.md §3):
+Migrations after A's 0044 (`0044_rework_sessions_followups`, on `main` since b438976): B's were
+0044 and 0045 until the merge of `main`, regenerated then on top of A's journal as 0045 and 0046
+(the generated SQL statement for statement the same; the custom one copied):
 
-### 1.1 `0044_rework_reservations` (generated)
+### 1.1 `0045_rework_reservations` (generated)
 
 | Table | Column / index | Rule |
 |---|---|---|
@@ -32,7 +33,7 @@ journal, FEATURES_PLAN.md §3):
 `prior_centre` and `prior_candidate_number` were added by A (0041); B fills them at
 verification.
 
-### 1.2 `0045_rework_reservations_consent_guard` (custom)
+### 1.2 `0046_rework_reservations_consent_guard` (custom)
 
 A deferred constraint trigger on `registration` (`AFTER INSERT OR UPDATE OF status`, `WHEN
 status = 'confirmed'`): at the commit, a line that is confirmed and was not converted from before
@@ -309,7 +310,7 @@ right.
   assertions restated are in the trail (08d #13, 08i, 08f's settings count, 09's reasons).
 - **Controls** (each guard undone, its test red; logs `control-*.log`, runner
   `scripts/controls.py` in the evidence). On d828ab7, 18 controls: 16 red, 2 green (the review's
-  count; my first report said 19, wrongly): confirmation's consent check; 0045's trigger; the
+  count; my first report said 19, wrongly): confirmation's consent check; the consent trigger (0046 now); the
   checkout's family consent; already reserved; the price shown; the rejection's open-payment
   refusal; the answer's row lock; hold's since-rule in the query alone (green — doubled by the
   re-check) and in both (red); the statement's parent link; swap consent inheritance; "owes now"
@@ -382,19 +383,22 @@ right.
 
 ## 10. For the lead
 
-1. **`line_effective_deadline` should read a rejected declaration as a first entry.** A paid
-   line standing with `declaration_rejected` keeps `attempt = retake` and its prior sitting, so
-   its effective deadline stays the retake deadline; F4 enters it as a first entry, which the
-   board takes only to the entry deadline. The SQL function is A's (0042). Until then, the "sent"
-   rule, due dates and the statement read the later date for such a line.
-2. **A's grade-10 commit writes the `school` consent rows without a refund snapshot**; B writes
-   the snapshot when the family consents (at checkout or the desk's collect), which is when the
-   family agrees to a policy. If the owner wants the policy frozen at the school's commit, it is a
-   one-line change in A's commit.
-3. **A's §5 vs §1.6/§2.10** on the refund snapshot: built by B (decision 3); A's §5 should say so.
-4. **A's `replaceTeacher`** moves enrolments by subject and teacher for the year, not by the
-   offer's units; a student taught the same subject by the same teacher in another session of the
-   year moves too. B's per-line change works per unit.
+1. **Done by A (on `main`, b438976), wired by B at the merge:** `line_effective_deadline` reads a
+   rejected declaration as a first entry (its fourth argument, A's 0044). B passes
+   `declaration_rejected` in `lineDeadlineSql` (so the sweep, the checkout's grouping and every
+   reader of it), `effectiveDeadlinesOf`, the deadline sweep's and the preregistration refund's
+   column conditions, the series correction's move, the statement, the Money tab, the InstaPay
+   reference's cap, the To verify list and the hold step, and the line objects handed to
+   `effectiveDeadlineFor` (the answer's line, the approval's re-check, the item's and the admin's
+   moves) carry it; 09's per-series rules read it too. 08o: a declared retake of the previous
+   sitting runs to the retake deadline, and rejected while paid it reads the entry deadline (the
+   statement, `effectiveDeadlinesOf`, `lineDeadlineSql`); three controls red. C's
+   `charge_effective_deadline` is C's at its merge.
+2. **Done by A:** the grade-10 commit freezes the refund steps with the school's consent; A's §5
+   says the snapshot is B's at consent; `replaceTeacher` moves enrolments per unit; the offers
+   read lists only confirmed lines as known sittings (as B's server does).
+3. (Merged into 1 and 2.)
+4. (Merged into 1 and 2.)
 5. **Pre-existing on `main`, not changed here**: an Arabic user gets a React hydration mismatch
    on every server-rendered page (`I18nProvider`'s `useState` initializer reads localStorage, so
    the server's English differs from the client's Arabic: the sign-in page's language button shows
@@ -425,9 +429,9 @@ right.
 8. **C**: `consentStanding` / `writeConsents` for the checkout and the desk; `refundForSystemDrop`
    to replace; `statementFor`'s `charges`. **D**: `DECLARATION_REVIEWED` notifications exist; the
    Remind button waits.
-9. **Dev databases** migrated through A's 0043 before B's 0045 hold interim lines B's trigger
+9. **Dev databases** migrated through A's migrations before B's consent guard (0046) hold interim lines B's trigger
    refuses to confirm (lines made between the two with no consent rows): dev only — a production
-   database migrates 0044 and 0045 with the rest and has no such lines; a dev database is
+   database migrates 0045 and 0046 with the rest and has no such lines; a dev database is
    recreated from its template.
 10. **F7's import must reserve through `reserveLines(..., channel: 'imported')`** so each imported
     line carries the sheet's confirmation as its two consent rows (a note for F7's document).
@@ -503,3 +507,13 @@ Times UTC, from the trail (`.audit/rework-reservations.tsv`), which holds each e
   change row; (11) the modal's one outcome, the open-payment refusal, the slip's mark; (12) the
   control count (18 on d828ab7, 16 red and 2 green) and the row-lock log re-run; (13) the swap
   approval's price, and the notes in §10. Eleven controls red.
+- 03:10Z–03:30Z — **origin/main merged** (b438976: A's step 1 with its follow-ups). Conflicts:
+  `registration.services` (A had edited `getAvailableSubjects`, which B removed: B's side kept),
+  `swap.services` (A's `lockReceiptOf` in the approval re-check kept, B's equivalent dropped, the
+  flag added to its select), 08n's and 08t's imports and headers (both), 08t's new describes on
+  both sides (A's approval-against-reversal and Confirm-inside-move races appended after B's,
+  their five `reserve(…)` calls through `reserveAtDesk`), the notification types and the setting
+  groups (both), and the migrations (A's 0044 kept; B's renumbered 0045 and 0046, regenerated on
+  A's snapshot, `when` after A's). The flag wired (§10.1). `igcse_rwb_dev` dropped (nobody
+  connected), recreated from `igcse_template_dev`, migrated to 0046, the placeholder demo session
+  seeded again; B's API restarted on it.

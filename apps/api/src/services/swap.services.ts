@@ -41,7 +41,6 @@ import {
   registration,
   registrationSession,
   boardSeries,
-  receipt,
   changeRequest,
   registrationConsent,
   eq,
@@ -61,7 +60,7 @@ import type {
 } from '@repo/validations';
 import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { refundPercentage } from './refund.services';
-import { executeReceiptGatedDrop } from './receipt.services';
+import { executeReceiptGatedDrop, lockReceiptOf } from './receipt.services';
 import { priceLine } from './pricing.services';
 import { resolveItem, availabilityConstraints } from './offer.services';
 import { reserveLines, inheritConsents, writeConsents } from './reservation.services';
@@ -183,7 +182,7 @@ function round2(n: number): number {
  */
 async function assertBeforeLineDeadline(
   executor: Parameters<typeof effectiveDeadlineFor>[0],
-  line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null },
+  line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null; studentId: string },
 ) {
   const deadline = await effectiveDeadlineFor(executor, line);
   if (deadline.at && deadline.at <= new Date()) {
@@ -509,12 +508,10 @@ export async function approveChangeRequest(
     // A swap registers a new subject: asked again with the student and window
     // held, before anything else is locked (F0a; see assertMayRegisterForInTx).
     if (cr.type === 'swap') await assertMayRegisterForInTx(tx, cr.registration.studentId, cr.registration.sessionId);
-    // The receipt first (when the line has one), then the line: MA-16's order, the one every drop,
-    // reversal, void and return takes (the lead's decision of 8 Oct; A makes the same change on
-    // its branch, and its version wins at the merge).
-    await tx.select({ id: receipt.id }).from(receipt).where(eq(receipt.registrationId, cr.registrationId)).for('update');
-    // Asked again under the line's lock, with its series held: a deadline moved at the same moment waits.
-    const [held] = await tx.select({ boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId })
+    // Asked again under the line's lock, with its series held: a deadline moved at the same moment
+    // waits. The line's receipt first (MA-16's order: a reversal takes the receipt, then the line).
+    await lockReceiptOf(tx, cr.registrationId);
+    const [held] = await tx.select({ boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId, declarationRejected: registration.declarationRejected, studentId: registration.studentId })
       .from(registration).where(eq(registration.id, cr.registrationId)).for('update');
     if (held?.boardSeriesId) await tx.select({ id: boardSeries.id }).from(boardSeries).where(eq(boardSeries.id, held.boardSeriesId)).for('share');
     if (held) await assertBeforeLineDeadline(tx, held);

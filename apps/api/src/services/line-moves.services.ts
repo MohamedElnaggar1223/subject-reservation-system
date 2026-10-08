@@ -9,10 +9,17 @@
  * payable (RESERVATIONS_REWORK.md §3.4; the review of 977848d, flag 2). Where finance has set no
  * row in the new series, the old series' row comes across **provisional** (as copy-from does):
  * reservable, not payable until confirmed. Each re-priced line is audited (`LINE_REPRICED`), and
- * each family whose price changed is told after the move commits (`tellPriceChanged`).
+ * each family whose price changed, or whose price became one to be confirmed, is told after the
+ * move commits (`tellPriceChanged`).
+ *
+ * A move takes the rows its lines will read in Confirm's order — the fee rows (FOR SHARE), then
+ * the lines (`lockMoveFeeRows` before the lines' FOR UPDATE): a Confirm of one of those rows
+ * either commits first (the move reads it confirmed) or waits for the move and then finds the
+ * moved lines by their basis, so no moved line is left provisional on a confirmed row (the review
+ * of 40c1447; docs/features/RESERVATIONS.md §2.12).
  */
 
-import { db, registration, paymentRegistration, boardFee, sessionOfferItem, sessionOfferItemFeeKey, subject, and, eq, inArray } from '@repo/db';
+import { db, registration, paymentRegistration, boardFee, sessionOfferItemFeeKey, subject, sql, and, eq, inArray } from '@repo/db';
 import { randomUUID } from 'crypto';
 import { logAction, logActions } from './audit.services';
 import { repriceBoardPart } from './pricing.services';
@@ -22,33 +29,65 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const WAITING = ['pending_approval', 'pending_payment', 'preregistered'];
 
-export type RepricedLine = { id: string; studentId: string; subjectId: string; from: number; to: number };
+/** A moved line whose price changed, or became one to be confirmed (`provisional` and not `wasProvisional`). */
+export type RepricedLine = { id: string; studentId: string; subjectId: string; from: number; to: number; wasProvisional: boolean; provisional: boolean };
+
+/** Fee rows by series and key, locked FOR SHARE in id order (the rows that exist; returns their ids). */
+export async function lockFeeRows(tx: Tx, wanted: { seriesId: string; keyKind: string; keyId: string }[]) {
+  if (!wanted.length) return [];
+  const r = await tx.execute(sql`
+    select f.id from board_fee f
+    join (values ${sql.join(wanted.map((w) => sql`(${w.seriesId}, ${w.keyKind}, ${w.keyId})`), sql`, `)}) as w(series_id, key_kind, key_id)
+      on w.series_id = f.board_series_id and w.key_kind = f.key_kind and w.key_id = f.key_id
+    order by f.id
+    for share of f`);
+  return (r.rows as { id: string }[]).map((x) => x.id);
+}
 
 /**
- * The fee rows an item reads in the series it is now in, carried from the series it came from
+ * Before a move locks its lines: the fee rows each item will read in the series it goes to, FOR
+ * SHARE — after carrying the old series' rows across where the new one has none, so the rows the
+ * lines are priced from are all held (a Confirm of one waits for the move; see the header).
+ */
+export async function lockMoveFeeRows(
+  tx: Tx, moves: { itemId: string; fromSeriesId: string | null; toSeriesId: string | null }[], actorId: string | null, why: string,
+) {
+  for (const m of moves) await carryFeeRows(tx, m.itemId, m.fromSeriesId, m.toSeriesId, actorId, why);
+  const itemIds = [...new Set(moves.filter((m) => m.toSeriesId).map((m) => m.itemId))];
+  if (!itemIds.length) return [];
+  const keys = await tx.select().from(sessionOfferItemFeeKey).where(inArray(sessionOfferItemFeeKey.itemId, itemIds));
+  const wanted = new Map<string, { seriesId: string; keyKind: string; keyId: string }>();
+  for (const m of moves) {
+    if (!m.toSeriesId) continue;
+    for (const k of keys.filter((x) => x.itemId === m.itemId)) wanted.set(`${m.toSeriesId}|${k.keyKind}|${k.keyId}`, { seriesId: m.toSeriesId, keyKind: k.keyKind, keyId: k.keyId });
+  }
+  return lockFeeRows(tx, [...wanted.values()]);
+}
+
+/**
+ * The fee rows an item reads in the series it goes to, carried from the series it came from
  * where the new one has none (provisional, `copied_from_fee_id`, audited). Returns how many came.
  */
-export async function carryFeeRows(tx: Tx, itemId: string, fromSeriesId: string | null, actorId: string | null, why: string) {
-  const [item] = await tx.select({ seriesId: sessionOfferItem.boardSeriesId }).from(sessionOfferItem).where(eq(sessionOfferItem.id, itemId));
-  if (!item?.seriesId || !fromSeriesId || item.seriesId === fromSeriesId) return 0;
+export async function carryFeeRows(tx: Tx, itemId: string, fromSeriesId: string | null, toSeriesId: string | null, actorId: string | null, why: string) {
+  if (!toSeriesId || !fromSeriesId || toSeriesId === fromSeriesId) return 0;
   const keys = await tx.select().from(sessionOfferItemFeeKey).where(eq(sessionOfferItemFeeKey.itemId, itemId));
   let carried = 0;
   for (const k of keys) {
     const [there] = await tx.select({ id: boardFee.id }).from(boardFee)
-      .where(and(eq(boardFee.boardSeriesId, item.seriesId), eq(boardFee.keyKind, k.keyKind), eq(boardFee.keyId, k.keyId)));
+      .where(and(eq(boardFee.boardSeriesId, toSeriesId), eq(boardFee.keyKind, k.keyKind), eq(boardFee.keyId, k.keyId)));
     if (there) continue;
     const [src] = await tx.select().from(boardFee)
       .where(and(eq(boardFee.boardSeriesId, fromSeriesId), eq(boardFee.keyKind, k.keyKind), eq(boardFee.keyId, k.keyId)));
     if (!src) continue;
     const [made] = await tx.insert(boardFee).values({
-      id: randomUUID(), boardSeriesId: item.seriesId, keyKind: src.keyKind, unitId: src.unitId, qualificationOptionId: src.qualificationOptionId,
+      id: randomUUID(), boardSeriesId: toSeriesId, keyKind: src.keyKind, unitId: src.unitId, qualificationOptionId: src.qualificationOptionId,
       qualificationId: src.qualificationId, subjectId: src.subjectId, amount: src.amount, provisional: true, confirmedAt: null,
       zeroReason: src.zeroReason, copiedFromFeeId: src.id, createdBy: actorId,
     }).onConflictDoNothing().returning({ id: boardFee.id });
     if (!made) continue;
     carried++;
     await logAction(actorId, 'BOARD_FEES_SET', 'board_fee', made.id, null,
-      { boardSeriesId: item.seriesId, keyKind: src.keyKind, keyId: src.keyId, amount: src.amount, provisional: true, copiedFromFeeId: src.id,
+      { boardSeriesId: toSeriesId, keyKind: src.keyKind, keyId: src.keyId, amount: src.amount, provisional: true, copiedFromFeeId: src.id,
         reason: `${why}: the fee of the series it came from, provisional until confirmed` }, undefined, tx);
   }
   return carried;
@@ -58,6 +97,7 @@ export async function carryFeeRows(tx: Tx, itemId: string, fromSeriesId: string 
  * Re-price moved lines the caller holds, in its transaction: a waiting line with no payment
  * history and a pricing basis is priced again on its board part from its item's fee rows now.
  * Throws when a row it needs is missing in the new series (the move is refused, naming the grid).
+ * Returns the lines whose price changed or became one to be confirmed (the families to tell).
  */
 export async function repriceMovedLines(tx: Tx, lineIds: string[], actorId: string | null, why: string): Promise<RepricedLine[]> {
   if (!lineIds.length) return [];
@@ -81,20 +121,33 @@ export async function repriceMovedLines(tx: Tx, lineIds: string[], actorId: stri
         newData: { priceAtRegistration: next.total, provisional: next.provisional, reason: why, part: 'board' },
       }], tx);
     }
-    if (next.total !== l.priceAtRegistration) out.push({ id: l.id, studentId: l.studentId, subjectId: l.subjectId, from: l.priceAtRegistration, to: next.total });
+    if (next.total !== l.priceAtRegistration || (next.provisional && !l.priceProvisional)) {
+      out.push({ id: l.id, studentId: l.studentId, subjectId: l.subjectId, from: l.priceAtRegistration, to: next.total, wasProvisional: l.priceProvisional, provisional: next.provisional });
+    }
   }
   return out;
 }
 
-/** Each family whose price a move changed is told the old and the new price (after the commit). */
+/**
+ * After the move commits: each family whose price it changed is told the old and the new price;
+ * one whose price stayed but became one to be confirmed (the new series' fee is not confirmed
+ * yet) is told it cannot be paid until the school confirms that fee.
+ */
 export async function tellPriceChanged(lines: RepricedLine[], because: string) {
   if (!lines.length) return;
   const names = new Map((await db.select({ id: subject.id, name: subject.name }).from(subject)
     .where(inArray(subject.id, [...new Set(lines.map((l) => l.subjectId))]))).map((s) => [s.id, s.name]));
+  const toConfirm = 'it can be paid once the school confirms the board fee in its new series';
   for (const r of lines) {
     const subjectName = names.get(r.subjectId) ?? 'a subject';
-    await createNotification(r.studentId, 'PRICE_CHANGED', `The price of ${subjectName} changed`,
-      `${because}. ${subjectName} was ${r.from.toFixed(2)} EGP and is now ${r.to.toFixed(2)} EGP.`, { registrationId: r.id, from: r.from, to: r.to })
-      .catch((err) => console.error('[line-moves] Price change notice failed:', err));
+    const turned = r.provisional && !r.wasProvisional;
+    const send = r.from !== r.to
+      ? createNotification(r.studentId, 'PRICE_CHANGED', `The price of ${subjectName} changed`,
+        `${because}. ${subjectName} was ${r.from.toFixed(2)} EGP and is now ${r.to.toFixed(2)} EGP${turned ? `, to be confirmed: ${toConfirm}` : ''}.`,
+        { registrationId: r.id, from: r.from, to: r.to, provisional: r.provisional })
+      : createNotification(r.studentId, 'PRICE_TO_BE_CONFIRMED', `The price of ${subjectName} is to be confirmed`,
+        `${because}. ${subjectName} stays at ${r.to.toFixed(2)} EGP, to be confirmed: ${toConfirm}.`,
+        { registrationId: r.id, price: r.to, provisional: true });
+    await send.catch((err) => console.error('[line-moves] Price notice failed:', err));
   }
 }

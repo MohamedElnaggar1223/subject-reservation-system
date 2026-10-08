@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
 import { admin, staff, onboard, subject, refused, one, sql, audited, money, notified, type Client } from './helpers';
 
@@ -149,6 +149,46 @@ describe('08p: pricing policies', () => {
       expect((await priceOf(old!.id)).basis).toMatchObject({ coursePercent: 50 });
     } finally {
       await setPercent(50);
+    }
+  });
+
+  it("a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not", async () => {
+    // Step C's registry holds these per student or per family and answers the adapter with the
+    // ones covering the line (who holds it is the registry's; RESERVATIONS.md §2.12). On this
+    // branch the adapter is answered as the registry would answer it: priceLine is what asks.
+    const { lineExceptions } = await import('../src/services/line-exceptions');
+    const self = await onboard(officer, `p08-pct-s-${RUN}`, 11);
+    const retaker = await onboard(officer, `p08-pct-r-${RUN}`, 11);
+    const none = await onboard(officer, `p08-pct-n-${RUN}`, 11);
+    const grant = (studentId: string, key: 'pricing.selfStudyCoursePercent' | 'pricing.selfStudyBoardPercent' | 'pricing.retakeTaughtCoursePercent' | 'pricing.onePaperCoursePercent', value: number) =>
+      ({ id: `test-${key}-${studentId}`, policyKey: key, value, valueDate: null, oneShot: false, scope: { sessionId: session } });
+    const held: Record<string, ReturnType<typeof grant>[]> = {
+      [self.studentId]: [grant(self.studentId, 'pricing.selfStudyCoursePercent', 30), grant(self.studentId, 'pricing.selfStudyBoardPercent', 50)],
+      [retaker.studentId]: [grant(retaker.studentId, 'pricing.retakeTaughtCoursePercent', 60), grant(retaker.studentId, 'pricing.onePaperCoursePercent', 80)],
+    };
+    const original = lineExceptions.active;
+    const spy = vi.spyOn(lineExceptions, 'active').mockImplementation(async (executor, studentId, keys, scope, opts) => {
+      const own = await original.call(lineExceptions, executor, studentId, keys, scope, opts);
+      return [...(held[studentId] ?? []).filter((e) => keys.includes(e.policyKey) && scope.sessionId === session), ...own];
+    });
+    const retake = { attempt: 'retake' as const, priorSittingSeriesId: priorJune, priorSittingSource: 'declared_by_desk' as const };
+    try {
+      const [s] = await reserve(self.studentId, session, [{ offerItemId: untaught, attempt: 'first', mode: 'self_study' }]);
+      // 30% of the course fee (14,000) and 50% of the board's (9,200), in place of 50% and 100%.
+      expect(await priceOf(s!.id)).toMatchObject({ course: 4200, board: 4600, price: 8800 });
+      expect((await priceOf(s!.id)).basis).toMatchObject({
+        coursePercent: 30, boardPercent: 50, exceptionIds: [`test-pricing.selfStudyCoursePercent-${self.studentId}`, `test-pricing.selfStudyBoardPercent-${self.studentId}`],
+      });
+      // A retake in school at 60%; the one-paper percent does not apply to a whole subject: not recorded.
+      const [r] = await reserve(retaker.studentId, session, [{ offerItemId: taughtWhole, mode: 'in_school', teacherId, ...retake }]);
+      expect(await priceOf(r!.id)).toMatchObject({ course: 8400, board: 9200, price: 17600 });
+      expect((await priceOf(r!.id)).basis).toMatchObject({ coursePercent: 60, onePaperPercent: 100, exceptionIds: [`test-pricing.retakeTaughtCoursePercent-${retaker.studentId}`] });
+      // A student who holds none pays the settings' percents.
+      const [n] = await reserve(none.studentId, session, [{ offerItemId: untaught, attempt: 'first', mode: 'self_study' }]);
+      expect(await priceOf(n!.id)).toMatchObject({ course: 7000, board: 9200, price: 16200 });
+      expect((await priceOf(n!.id)).basis).toMatchObject({ coursePercent: 50, boardPercent: 100, exceptionIds: [] });
+    } finally {
+      spy.mockRestore();
     }
   });
 
