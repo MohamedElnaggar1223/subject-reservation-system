@@ -994,6 +994,28 @@ describe('08n: the review of 977848d', () => {
     expect((await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [lb!.id])).s).toBe(other);
   });
 
+  it("an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)", async () => {
+    const q = (await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({
+      json: { boardCode: 'pearson_edexcel', code: `V4MA-${RUN}`, title: `Mathematics A (08n ${RUN})`, level: 'igcse', suite: 'Pearson Edexcel International GCSE', subjectArea: 'Mathematics', entryMethod: 'qualification' },
+    })))!.id;
+    const paperUnit = async (code: string) => (await apiResponse(coordinator.api.v1.catalogue.units.$post({
+      json: { boardCode: 'pearson_edexcel', code: `${code}-${RUN}`, shortCode: `Paper ${code}`, title: `Paper ${code}`, unitLevel: 'igcse', kind: 'component' },
+    })))!.id;
+    const [h1, h2] = [await paperUnit('1H'), await paperUnit('2H')];
+    await apiResponse(coordinator.api.v1.catalogue.qualifications[':id'].units.$put({ param: { id: q }, json: { units: [h1, h2].map((unitId) => ({ unitId, requirement: 'required' as const })) } }));
+    const sub = await subject(adm, `RWN-VGEN-${RUN}`, `Mathematics generated (08n ${RUN})`, { course: 1000, registration: 300 }, { council: 'pearson_edexcel' });
+    await apiResponse(coordinator.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: sub }, json: { boardCode: 'pearson_edexcel', qualificationId: q, unitIds: [], reason: '08n: mapped' } }));
+    const made = (await apiResponse(coordinator.api.v1.sessions[':id'].offers.$post({ param: { id: june }, json: { subjectId: sub, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }] } })))!;
+    const list = await apiResponse(coordinator.api.v1.sessions[':id'].offers.$get({ param: { id: june } }));
+    const items = list!.offers.find((o) => o.id === made.id)!.items;
+    expect(items.map((i) => [i.label, i.kind, i.entersKind, i.availability, i.exclusiveGroup, i.needsPriorSeries, i.units.map((u) => u.unitId)])).toEqual([
+      ['Whole subject', 'whole', 'award', 'open', 'entry', false, []],
+      ['Paper 1H only (retake)', 'one_paper', 'units', 'closed', 'entry', false, [h1]],
+      ['Paper 2H only (retake)', 'one_paper', 'units', 'closed', 'entry', false, [h2]],
+    ]);
+    expect(await sql(`select key_kind, key_id from session_offer_item_fee_key where item_id = $1`, [items[1]!.id])).toEqual([{ key_kind: 'qualification', key_id: q }]);
+  });
+
   it("the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval", async () => {
     const d = await mkJune(`n08v-mon-${RUN}`, { draft: true });
     const sub = await subject(adm, `RWN-VMO-${RUN}`, `Money tab (08n ${RUN})`, { course: 1000, registration: 300 });

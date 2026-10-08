@@ -16,7 +16,7 @@
 import {
   db, user, subject, teacher, subjectTeacher, registrationSession, registration, boardSeries, boardFee, examBoard, examUnit,
   qualification, qualificationOption, sessionBoardSeries, sessionOffer, sessionOfferTeacher, sessionOfferItem,
-  sessionOfferItemUnit, sessionOfferItemTeacher, sessionOfferItemFeeKey, courseEnrolment, subjectUnit,
+  sessionOfferItemUnit, sessionOfferItemTeacher, sessionOfferItemFeeKey, courseEnrolment, subjectUnit, qualificationUnit, qualificationOptionUnit,
   and, eq, ne, inArray, isNull, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -255,7 +255,8 @@ export async function generateItems(executor: Executor, subjectId: string): Prom
         .where(and(inArray(qualificationOption.qualificationId, siblings.map((x) => x.id)), eq(qualificationOption.isActive, true)))
         .orderBy(asc(qualification.level), asc(qualificationOption.code));
       if (q.level === 'igcse' && options.length === 1) {
-        return [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'option', optionId: options[0]!.id }, availability: 'open', requiredInSeries: false }];
+        return withOnePaper(executor, q, options[0]!.id,
+          { label: 'Whole subject', kind: 'whole', enters: { kind: 'option', optionId: options[0]!.id }, availability: 'open', requiredInSeries: false });
       }
       if (q.level !== 'igcse' && options.length > 0) {
         return options.map((o, i) => ({
@@ -264,9 +265,40 @@ export async function generateItems(executor: Executor, subjectId: string): Prom
         }));
       }
     }
-    return [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'award', qualificationId: s.qualificationId }, availability: 'open', requiredInSeries: false }];
+    const whole: ItemDraft = { label: 'Whole subject', kind: 'whole', enters: { kind: 'award', qualificationId: s.qualificationId }, availability: 'open', requiredInSeries: false };
+    return q ? withOnePaper(executor, q, null, whole) : [whole];
   }
   return [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, availability: 'open', requiredInSeries: false }];
+}
+
+/**
+ * An IGCSE award's one-paper retake items (§3.2's table: "Paper 4 only (retake)", "Paper 1H only"):
+ * one per component the catalogue says the award requires (its own, or its option's), each
+ * entering that component, retakes only, its board fee read for the qualification (Q-13), in one
+ * exclusive group with the whole subject, carrying the other components on a Cambridge syllabus.
+ * They come **unticked** (closed): the school opens the ones it offers on the drawer, with their
+ * course fee.
+ */
+async function withOnePaper(executor: Executor, q: typeof qualification.$inferSelect, optionId: string | null, whole: ItemDraft): Promise<ItemDraft[]> {
+  if (q.level !== 'igcse') return [whole];
+  const own = await executor.select({ id: examUnit.id, code: examUnit.code, shortCode: examUnit.shortCode })
+    .from(qualificationUnit).innerJoin(examUnit, eq(examUnit.id, qualificationUnit.unitId))
+    .where(and(eq(qualificationUnit.qualificationId, q.id), eq(qualificationUnit.requirement, 'required'), eq(examUnit.kind, 'component'), eq(examUnit.isActive, true)));
+  const viaOption = optionId
+    ? await executor.select({ id: examUnit.id, code: examUnit.code, shortCode: examUnit.shortCode })
+        .from(qualificationOptionUnit).innerJoin(examUnit, eq(examUnit.id, qualificationOptionUnit.unitId))
+        .where(and(eq(qualificationOptionUnit.optionId, optionId), eq(examUnit.kind, 'component'), eq(examUnit.isActive, true)))
+    : [];
+  const components = [...new Map([...own, ...viaOption].map((u) => [u.id, u])).values()].sort((a, b) => a.code.localeCompare(b.code));
+  if (!components.length) return [whole];
+  return [
+    { ...whole, exclusiveGroup: 'entry' },
+    ...components.map((u, i): ItemDraft => ({
+      label: `${u.shortCode ?? u.code} only (retake)`, kind: 'one_paper', enters: { kind: 'units', unitIds: [u.id] },
+      feeKeys: [{ kind: 'qualification', id: q.id }], availability: 'closed', needsPriorSeries: q.boardCode === 'cambridge',
+      requiredInSeries: false, exclusiveGroup: 'entry', sortOrder: 10 + i,
+    })),
+  ];
 }
 
 /** What an item enters, checked against the subject's board; the default fee keys follow from it. */
@@ -849,7 +881,10 @@ export async function listOffers(sessionId: string) {
     if (!s.qualificationId && its.some((i) => i.entersKind === 'subject')) warnings.push('unmapped');
     return {
       ...offer,
-      subject: { id: s.id, name: s.name, code: s.code, council: s.council, boardName: names.get(s.council) ?? s.council, qualificationLevel: s.qualificationLevel, isActive: s.isActive },
+      subject: {
+        id: s.id, name: s.name, code: s.code, council: s.council, boardName: names.get(s.council) ?? s.council, qualificationLevel: s.qualificationLevel,
+        qualificationId: s.qualificationId, isActive: s.isActive,
+      },
       teachers: offerTeachers,
       items: its,
       lines: its.reduce((a, i) => a + i.lines.live, 0),

@@ -17,7 +17,7 @@ import {
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { EmptyState, ErrorState, LoadingState } from '~/components/ui/query-state';
-import { fetchBoardSeries, fetchTeachers } from '~/app/(app)/exams/exams-shared';
+import { fetchBoardSeries, fetchTeachers, useCatalogue } from '~/app/(app)/exams/exams-shared';
 import {
   fetchOffers, fetchAddable, fetchSessions, offersKey, SESSIONS_KEY, Money, Modal, Drawer, Field, INPUT_CLASS, ErrorLine, errorText,
   AVAILABILITY_SHORT, type SessionDetail, type OfferRow, type ItemRow,
@@ -147,6 +147,7 @@ function TeacherPicker({ value, onChange, pool }: {
   value: { teacherId: string; mode: 'in_school' | 'online' }[];
   onChange: (v: { teacherId: string; mode: 'in_school' | 'online' }[]) => void;
   pool: string[];
+  subjectId?: string;
 }) {
   const { data: teachers } = useQuery({ queryKey: ['teachers'], queryFn: fetchTeachers });
   const [showAll, setShowAll] = useState(false);
@@ -291,6 +292,9 @@ function ItemCard({ session, offer, item, canEdit }: { session: SessionDetail; o
   const [courseFee, setCourseFee] = useState(item.courseFee === null ? '' : String(item.courseFee));
   const [group, setGroup] = useState(item.exclusiveGroup ?? '');
   const [required, setRequired] = useState(item.requiredInSeries);
+  const [needsPrior, setNeedsPrior] = useState(item.needsPriorSeries);
+  // Its own teachers (an IAL unit names a teacher per unit); none: the subject's.
+  const [ownTeachers, setOwnTeachers] = useState(item.teachers.map((t) => ({ teacherId: t.teacherId, mode: (t.mode === 'online' ? 'online' : 'in_school') as 'in_school' | 'online' })));
   const [reason, setReason] = useState('');
   const [unticking, setUnticking] = useState(false);
   const save = useMutation({
@@ -299,6 +303,7 @@ function ItemCard({ session, offer, item, canEdit }: { session: SessionDetail; o
       json: {
         ...(series && series !== item.boardSeriesId ? { boardSeriesId: series } : {}),
         availability, courseFee: courseFee === '' ? null : Number(courseFee), exclusiveGroup: group.trim() || null, requiredInSeries: required,
+        needsPriorSeries: needsPrior, teachers: ownTeachers.length ? ownTeachers : null,
         ...(reason.trim() ? { reason: reason.trim() } : {}),
       },
     })),
@@ -339,6 +344,17 @@ function ItemCard({ session, offer, item, canEdit }: { session: SessionDetail; o
         <input type="checkbox" checked={required} disabled={!canEdit} onChange={(e) => setRequired(e.target.checked)} />
         <span>A first entry of the subject in this series includes it</span>
       </label>
+      <label className="mt-2 flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={needsPrior} disabled={!canEdit} onChange={(e) => setNeedsPrior(e.target.checked)} />
+        <span>Needs an earlier sitting carried forward</span>
+      </label>
+      <div className="mt-3">
+        <Field label="Its own teachers" hint="None: the subject's teachers.">
+          {canEdit ? <TeacherPicker value={ownTeachers} onChange={setOwnTeachers} pool={[...offer.teachers.map((t) => t.teacherId), ...item.teachers.map((t) => t.teacherId)]} subjectId={offer.subject.id} /> : (
+            <p className="text-sm">{item.teachers.map((t) => t.name).join(' · ') || '—'}</p>
+          )}
+        </Field>
+      </div>
       {canEdit && movesLines && (
         <div className="mt-3 space-y-2">
           <Notice tone="warning"><span>{item.lines.live}</span> <span>lines move with it to the new series, each audited.</span></Notice>
@@ -368,17 +384,41 @@ function ItemCard({ session, offer, item, canEdit }: { session: SessionDetail; o
   );
 }
 
+type EntersChoice = 'subject' | 'award' | 'option' | 'units';
+
 function AddItem({ session, offer, onClose }: { session: SessionDetail; offer: OfferRow; onClose: () => void }) {
   const queryClient = useQueryClient();
+  const { data: catalogue } = useCatalogue();
+  const award = (catalogue?.qualifications ?? []).find((q) => q.id === offer.subject.qualificationId) ?? null;
+  const igcse = offer.subject.qualificationLevel === 'igcse';
+  const boardUnits = (catalogue?.units ?? []).filter((u) => u.boardCode === offer.subject.council && (igcse ? u.unitLevel === 'igcse' : u.unitLevel !== 'igcse'));
   const [label, setLabel] = useState('');
   const [kind, setKind] = useState<ItemKind>('one_paper');
+  const [entersKind, setEntersKind] = useState<EntersChoice>('units');
+  const [optionId, setOptionId] = useState('');
+  const [unitIds, setUnitIds] = useState<string[]>([]);
+  // Q-13: a one-paper item of a board that prices the qualification reads the qualification's fee.
+  const [feeOnAward, setFeeOnAward] = useState(true);
   const [series, setSeries] = useState(offer.items.find((i) => i.boardSeriesId)?.boardSeriesId ?? '');
   const [availability, setAvailability] = useState<Availability>('retake_only');
   const [courseFee, setCourseFee] = useState('');
+  const [needsPrior, setNeedsPrior] = useState(offer.subject.council === 'cambridge');
+  const [group, setGroup] = useState(offer.items.find((i) => i.exclusiveGroup)?.exclusiveGroup ?? 'entry');
+  const [required, setRequired] = useState(false);
+  const [teachers, setTeachers] = useState<{ teacherId: string; mode: 'in_school' | 'online' }[]>([]);
+  const enters = entersKind === 'award' && award ? { kind: 'award' as const, qualificationId: award.id }
+    : entersKind === 'option' && optionId ? { kind: 'option' as const, optionId }
+      : entersKind === 'units' && unitIds.length ? { kind: 'units' as const, unitIds }
+        : { kind: 'subject' as const };
+  const feeKeys = feeOnAward && award && (kind === 'one_paper' || entersKind === 'units') ? [{ kind: 'qualification' as const, id: award.id }] : undefined;
   const add = useMutation({
     mutationFn: async () => apiResponse(api.v1.sessions[':id'].offers[':offerId'].items.$post({
       param: { id: session.id, offerId: offer.id },
-      json: { label: label.trim(), kind, enters: { kind: 'subject' }, boardSeriesId: series || null, availability, courseFee: courseFee === '' ? null : Number(courseFee), requiredInSeries: false },
+      json: {
+        label: label.trim(), kind, enters, boardSeriesId: series || null, availability, courseFee: courseFee === '' ? null : Number(courseFee),
+        ...(feeKeys ? { feeKeys } : {}), needsPriorSeries: needsPrior, requiredInSeries: required, exclusiveGroup: group.trim() || null,
+        ...(teachers.length ? { teachers } : {}),
+      },
     })),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: offersKey(session.id) }); onClose(); },
   });
@@ -401,10 +441,58 @@ function AddItem({ session, offer, onClose }: { session: SessionDetail; offer: O
           <Field label="Series" htmlFor="ai-series"><SeriesSelect id="ai-series" session={session} boardCode={offer.subject.council} value={series} onChange={setSeries} /></Field>
           <Field label="Course fee (if not the subject's)" htmlFor="ai-fee"><input id="ai-fee" className={INPUT_CLASS} type="number" min={0} value={courseFee} placeholder={String(offer.courseFee)} onChange={(e) => setCourseFee(e.target.value)} /></Field>
         </div>
-        <p className="text-xs text-muted-foreground">Its board fee is read for the subject row; an item entering a unit or an award is made from the catalogue when the subject is added.</p>
+        <Field label="What it enters" htmlFor="ai-enters">
+          <select id="ai-enters" className={INPUT_CLASS} value={entersKind} onChange={(e) => setEntersKind(e.target.value as EntersChoice)}>
+            <option value="units">Papers or units</option>
+            {award && <option value="award">The award</option>}
+            {award && award.options.length > 0 && <option value="option">An option code</option>}
+            <option value="subject">The subject row</option>
+          </select>
+        </Field>
+        {entersKind === 'units' && (
+          <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border p-2" role="group" aria-label="Papers or units">
+            {boardUnits.length === 0 && <p className="px-1 text-sm text-muted-foreground">No paper or unit of this board in the catalogue at this level.</p>}
+            {boardUnits.map((u) => (
+              <label key={u.id} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={unitIds.includes(u.id)} onChange={(e) => setUnitIds(e.target.checked ? [...unitIds, u.id] : unitIds.filter((x) => x !== u.id))} />
+                <bdi data-i18n-skip="true" className="font-mono text-xs">{u.code}</bdi> <bdi data-i18n-skip="true">{u.shortCode ?? u.title}</bdi>
+              </label>
+            ))}
+          </div>
+        )}
+        {entersKind === 'option' && award && (
+          <Field label="Option code" htmlFor="ai-option">
+            <select id="ai-option" className={INPUT_CLASS} value={optionId} onChange={(e) => setOptionId(e.target.value)}>
+              <option value="">Choose…</option>
+              {award.options.map((o) => <option key={o.id} value={o.id} data-i18n-skip="true">{o.code} {o.label}</option>)}
+            </select>
+          </Field>
+        )}
+        {award && (kind === 'one_paper' || entersKind === 'units') && (
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={feeOnAward} onChange={(e) => setFeeOnAward(e.target.checked)} />
+            <span>{"Its board fee is the qualification's (the board prices the whole qualification for a one-paper retake)"}</span>
+          </label>
+        )}
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={needsPrior} onChange={(e) => setNeedsPrior(e.target.checked)} />
+          <span>Needs an earlier sitting carried forward</span>
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Only one of the group" htmlFor="ai-group" hint="Items with the same group cannot be reserved together.">
+            <input id="ai-group" className={INPUT_CLASS} value={group} onChange={(e) => setGroup(e.target.value)} />
+          </Field>
+          <label className="mt-7 flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
+            <span>Required in a first entry</span>
+          </label>
+        </div>
+        <Field label="Its own teachers" hint="None: the subject's teachers.">
+          <TeacherPicker value={teachers} onChange={setTeachers} pool={offer.teachers.map((t) => t.teacherId)} subjectId={offer.subject.id} />
+        </Field>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={!label.trim() || add.isPending}>Add</Button>
+          <Button type="submit" disabled={!label.trim() || (entersKind === 'units' && !unitIds.length) || (entersKind === 'option' && !optionId) || add.isPending}>Add</Button>
         </div>
       </form>
     </Modal>
