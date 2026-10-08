@@ -1015,6 +1015,12 @@ describe('money invariants over the whole database', () => {
       where m.source <> 'reminder' or m.reminder_rule_id <> rs.rule_id or rr.kind <> rs.kind`)).toEqual([]);
     expect(await sql(`select kind, target_kind, target_id, anchor_on, offset_days from reminder_sent
       group by kind, target_kind, target_id, anchor_on, offset_days having count(*) > 1`)).toEqual([]);
+    // At most one reminder a day per target and date, whatever rule changed during the day (the review of 5c2f2bf, item 5).
+    expect(await sql(`select kind, target_kind, target_id, anchor_on, sent_on from reminder_sent
+      group by kind, target_kind, target_id, anchor_on, sent_on having count(*) > 1`)).toEqual([]);
+    // A reminder about a student who had left the school by the day it went out (item 6).
+    expect(await sql(`select rs.id from reminder_sent rs join "user" u on u.id = rs.student_id
+      where u.left_on is not null and u.left_on <= rs.sent_on`)).toEqual([]);
     // Nothing about a child's money went out without a claim on that child in the same message.
     expect(await sql(`select d.id from message_delivery d join message m on m.id = d.message_id join reminder_rule rr on rr.id = m.reminder_rule_id
       where m.source = 'reminder' and rr.kind in ('payment_due', 'school_fee_due')

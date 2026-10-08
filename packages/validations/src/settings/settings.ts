@@ -241,24 +241,27 @@ export const SETTINGS = {
   // Reminders, one per kind for every session and a session's own where it overrides.
   'reminders.enabled': defineSetting({
     schema: z.boolean(),
-    default: true,
+    // Off when the system is installed (decided by the lead, 8 Oct 2026): nothing goes out until the
+    // admin has checked the first sessions and fees and turns it on.
+    default: false,
     group: 'reminders',
     label: 'Send reminders automatically',
     description:
-      'On: the scheduler sends the reminder rules on Messages > Reminders (payments due, reservations closing, board deadlines, the school fee, declared retakes to verify). Off: no reminder goes out until it is turned on again; nothing missed meanwhile is sent as a backlog, only each reminder\'s latest day.',
+      'Off when the system is installed: turn it on once the first sessions and fees are checked. On: the scheduler sends the reminder rules on Messages > Reminders (payments due, reservations closing, board deadlines, the school fee, declared retakes to verify); the first minute after it is turned on sends each family only its latest reminder, never a backlog. Off again: nothing goes out until it is turned on.',
     editableBy: [ROLES.ADMIN],
     input: 'boolean',
   }),
   'reminders.sendAtHour': defineSetting({
-    schema: z.number().int().min(0).max(23),
+    // 1 to 23: Egypt's summer time starts at midnight, so a midnight hour would not exist on that day.
+    schema: z.number().int().min(1).max(23),
     default: 9,
     group: 'reminders',
     label: 'Hour the day\'s reminders go out',
     description:
-      'Each reminder is due on its day (seven days before a payment\'s due date, the day itself, three days after…) at this hour, Cairo time. A day whose hour passed while the system was down goes out at the next minute, once.',
+      'Each reminder is due on its day (seven days before a payment\'s due date, the day itself, three days after…) at this hour, Cairo time, from 1 to 23 (midnight does not exist on the day summer time starts). A day whose hour passed while the system was down goes out at the next minute, once.',
     editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
     input: 'number',
-    min: 0,
+    min: 1,
     max: 23,
     unit: 'hour',
   }),

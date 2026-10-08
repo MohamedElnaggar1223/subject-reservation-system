@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, academicYearLabel } from '@repo/validations';
 import {
-  admin, staff, onboard, refused, one, sql, money, app, waitFor, pauseAtAudits, lockWaiters, notificationsFor, CONSENT, type Client,
+  admin, staff, onboard, refused, one, sql, money, app, waitFor, pauseAtAudits, lockWaiters, holdRowLock, notificationsFor, CONSENT, type Client,
 } from './helpers';
 
 /**
@@ -66,6 +66,7 @@ describe('08s: messages and reminders', () => {
   let dueDay: string;
   const TPL = { paymentDue: 'tpl-payment-due', paymentOverdue: 'tpl-payment-overdue' };
   type Family = Awaited<ReturnType<typeof onboard>>;
+  let installed: { enabled: boolean; sendAtHour: number };
 
   const reserveUnpaid = async (f: Family, offerItemId: string, sessionId = sessionA) =>
     (await apiResponse(officer.api.v1.registrations.desk.$post({
@@ -74,11 +75,18 @@ describe('08s: messages and reminders', () => {
   const payAtDesk = (f: Family, ids: string[]) =>
     apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: ids, instrumentUsed: 'cash', escrowAmountToApply: 0 } }));
 
+  afterAll(async () => {
+    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'reminders.enabled' }, json: { value: false, reason: 'back to as installed' } }));
+  });
+
   beforeAll(async () => {
     adm = await admin(`s08-${RUN}`);
     officer = await staff(adm, 'finance_officer', `s08-${RUN}`);
     finadmin = await staff(adm, 'finance_admin', `s08-${RUN}`);
     coordinator = await staff(adm, 'coordinator', `s08-${RUN}`);
+    // Reminders are off when the system is installed (the lead, 8 Oct): the admin turns them on.
+    installed = (await apiResponse(finadmin.api.v1.reminders.rules.$get())).settings;
+    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'reminders.enabled' }, json: { value: true, reason: 'the first sessions and fees are checked' } }));
     teacherId = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher D (08s ${RUN})` } })))!.id;
     // The payment due date: a Cairo day 30 days ahead, at noon; the session runs well past it.
     dueDay = cairoDay(new Date(Date.now() + 30 * DAY));
@@ -121,7 +129,10 @@ describe('08s: messages and reminders', () => {
     expect(global.entry_deadline).toMatchObject({ offsetsDays: [-14, -1], channels: ['in_app'], until: 'deadline' });
     expect(global.school_fee_due).toMatchObject({ offsetsDays: [-14, -7, 0], repeatEveryDays: 7, until: 'paid' });
     expect(global.declared_retakes_to_verify).toMatchObject({ offsetsDays: [-14, -7, -3, -1], until: 'verified' });
+    expect(installed).toEqual({ enabled: false, sendAtHour: 9 });
     expect(settings).toEqual({ enabled: true, sendAtHour: 9 });
+    // The hour is 1 to 23: midnight does not exist on the day Egypt's summer time starts.
+    expect((await refused(adm.api.v1.settings[':key'].$put({ param: { key: 'reminders.sendAtHour' }, json: { value: 0, reason: 'midnight' } }))).status).toBe(400);
     const templates = await apiResponse(officer.api.v1.messages.templates.$get());
     const due = templates.find((t) => t.key === 'payment_due')!;
     expect(due.titleEn).toBe('Payment due — {session}');
@@ -386,7 +397,7 @@ describe('08s: messages and reminders', () => {
     expect(await notificationsFor(paid.parent.email, 'PAYMENT_REMINDER')).toEqual([]);
     // Finance sends to the money lists only, and reads only those messages.
     const bc = await refused(officer.api.v1.messages.$post({ json: { audience: { savedId: 'aud-parents' }, title: 'From the finance office', body: 'A broadcast the finance office may not send.', channels: ['in_app'] } }));
-    expect(bc).toEqual({ status: 403, error: "Finance sends to a money list only: a session's unpaid families or the holders of a charge" });
+    expect(bc).toEqual({ status: 403, error: "Finance sends to a payment list only: a session's unpaid families or the holders of an unpaid charge" });
     const broadcastId = (await one<{ id: string }>(`select m.id from message m join message_audience a on a.id = m.audience_id where a.kind = 'broadcast' and m.source = 'staff' order by m.created_at desc limit 1`)).id;
     expect((await refused(officer.api.v1.messages.deliveries.$get({ query: { messageId: broadcastId } }))).status).toBe(403);
     expect((await apiResponse(officer.api.v1.messages.$get({ query: { limit: '200' } }))).some((m) => m.id === broadcastId)).toBe(false);
@@ -662,5 +673,147 @@ describe('08s: messages and reminders', () => {
       // The schedule gates every suite that registers in that year: it never outlives this test (as 08q's).
       if (made) await sql(`delete from school_fee_schedule where id = $1`, [made.id]);
     }
+  });
+  // ─── The review of 5c2f2bf ────────────────────────────────────────────────────
+
+  it("Remind and every money list leave out what is being paid: a line whose InstaPay transfer is being checked, a charge with its payment open (item 1)", async () => {
+    const f = await onboard(officer, `s08-inpay-${RUN}`, 11);
+    const line = await reserveUnpaid(f, itemA);
+    const definition = { kind: 'batch' as const, list: 'session_unpaid' as const, sessionId: sessionA, include: 'both' as const, filter: 'unpaid' as const, studentIds: [f.studentId], who: 'families' as const };
+    expect((await apiResponse(officer.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition } } }))).students.map((s) => s.id)).toEqual([f.studentId]);
+    // The family pays by InstaPay and sends its reference: the transfer is being checked.
+    const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line], paymentMethod: 'instapay', escrowAmountToApply: 0 } }));
+    await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: pay.id! }, json: { reference: `S08-${RUN}-${f.studentId.slice(0, 6)}` } }));
+    expect((await one<{ status: string }>(`select status from payment where id = $1`, [pay.id!])).status).toBe('pending_verification');
+    expect((await apiResponse(officer.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition } } }))).students).toEqual([]);
+    expect(await refused(officer.api.v1.messages.$post({ json: { audience: { definition }, templateId: TPL.paymentDue, channels: ['in_app'] } })))
+      .toEqual({ status: 409, error: 'Nobody is in this audience now: there is nothing to send' });
+    // The step agrees: nothing on its day.
+    await step(cairoAt(shift(dueDay, -3), 9, 45));
+    expect(await offsetsOf(line)).toEqual([]);
+    expect(await notificationsFor(f.parent.email, 'PAYMENT_REMINDER')).toEqual([]);
+    // A charge whose payment is open is not among the holders of the unpaid charge either.
+    const g = await onboard(officer, `s08-chpay-${RUN}`, 11);
+    const kit = await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: g.studentId, kind: 'custom', amount: 300, description: 'A sports kit', dueAt: cairoAt(dueDay, 12), reason: 'the kit' } }));
+    const holders = { kind: 'batch' as const, list: 'charge_holders' as const, chargeKind: 'custom' as const, unpaidOnly: true, who: 'parents' as const };
+    const before = await apiResponse(officer.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: holders } } }));
+    expect(before.students.map((s) => s.id)).toContain(g.studentId);
+    await apiResponse(g.parent.api.v1.payments.initiate.$post({ json: { chargeIds: [kit.id], paymentMethod: 'instapay' } }));
+    const after = await apiResponse(officer.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: holders } } }));
+    expect(after.students.map((s) => s.id)).not.toContain(g.studentId);
+  });
+
+  it('finance writes to the holders of an unpaid charge only; the admin may write to the holders of a paid one, and that is a message, not a payment reminder (item 2)', async () => {
+    const h = await onboard(officer, `s08-paidch-${RUN}`, 11);
+    const card = await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: h.studentId, kind: 'custom', amount: 150, description: 'A library card', dueAt: cairoAt(dueDay, 12), reason: 'a new card' } }));
+    await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: h.studentId, chargeIds: [card.id], instrumentUsed: 'cash' } }));
+    expect((await one<{ status: string }>(`select status from charge where id = $1`, [card.id])).status).toBe('paid');
+    const paidToo = { kind: 'batch' as const, list: 'charge_holders' as const, chargeKind: 'custom' as const, unpaidOnly: false, who: 'parents' as const };
+    const refusal = { status: 403, error: "Finance sends to a payment list only: a session's unpaid families or the holders of an unpaid charge" };
+    expect(await refused(officer.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: paidToo } } }))).toEqual(refusal);
+    expect(await refused(finadmin.api.v1.messages.$post({ json: { audience: { definition: paidToo }, title: 'To every holder', body: 'Finance may not write to the holders of paid charges.', channels: ['in_app'] } }))).toEqual(refusal);
+    const sent = await apiResponse(adm.api.v1.messages.$post({ json: {
+      audience: { definition: paidToo }, title: 'Library cards are ready', body: 'The new library cards can be collected from the office.', language: 'en', channels: ['in_app'],
+    } }));
+    expect(await notificationsFor(h.parent.email, 'SCHOOL_MESSAGE')).toEqual([{ type: 'SCHOOL_MESSAGE', title: 'Library cards are ready', body: 'The new library cards can be collected from the office.' }]);
+    expect(await notificationsFor(h.parent.email, 'PAYMENT_REMINDER')).toEqual([]);
+    // Finance does not see it in the log, nor its deliveries.
+    expect((await apiResponse(officer.api.v1.messages.$get({ query: { limit: '200' } }))).some((m) => m.id === sent.id)).toBe(false);
+    expect((await refused(officer.api.v1.messages.deliveries.$get({ query: { messageId: sent.id } }))).status).toBe(403);
+  });
+
+  it('a target already reminded is not locked again on the minutes after: the step leaves it out before it locks anything (item 4)', async () => {
+    const f = await onboard(officer, `s08-nolock-${RUN}`, 11);
+    const line = await reserveUnpaid(f, itemA);
+    await step(cairoAt(shift(dueDay, -7), 9, 40));
+    expect(await offsetsOf(line)).toEqual([-7]);
+    // Another session holds the line now; the step of the next minute must not wait for it.
+    const release = await holdRowLock('registration', line);
+    try {
+      const outcome = await Promise.race([
+        step(cairoAt(shift(dueDay, -7), 9, 41)).then(() => 'finished'),
+        new Promise<string>((r) => setTimeout(() => r('waited on the line'), 4000)),
+      ]);
+      expect(outcome).toBe('finished');
+    } finally {
+      await release();
+    }
+    expect(await offsetsOf(line)).toEqual([-7]);
+  });
+
+  it('a rule changed during the day never sends a family a second reminder that day about the same date (item 5)', async () => {
+    const sessionC = (await apiResponse(adm.api.v1.sessions.$post({
+      json: { type: 'june', year: Y + 1, label: `s08c-${RUN}`, startDate: new Date(Date.now() - DAY).toISOString(), endDate: sessionAEnd.toISOString(), courseStartsOn: cairoDay(new Date()), paymentDueAt: cairoAt(dueDay, 12).toISOString() },
+    })))!.id;
+    const itemC = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+      param: { id: sessionC }, json: { subjectId: subjA, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesA, availability: 'open', requiredInSeries: false }] },
+    })))!.items[0]!;
+    const f = await onboard(officer, `s08-sameday-${RUN}`, 11);
+    const line = await reserveUnpaid(f, itemC, sessionC);
+    const rule = (offsetsDays: number[], reason: string) => apiResponse(finadmin.api.v1.reminders.rules.$put({ json: { kind: 'payment_due', sessionId: sessionC, offsetsDays, repeatEveryDays: null, channels: ['in_app'], templateId: TPL.paymentDue, active: true, reason } }));
+    await rule([-3], 'three days ahead');
+    await step(cairoAt(shift(dueDay, -3), 9, 0));
+    expect(await offsetsOf(line)).toEqual([-3]);
+    // At 09:50 the session's rule becomes ten and five days ahead: the −5 is due by the rule, but the family already heard today.
+    await rule([-10, -5], 'ten and five days ahead');
+    await step(cairoAt(shift(dueDay, -3), 9, 50));
+    expect(await offsetsOf(line)).toEqual([-3]);
+    expect(await reminderCount(f.parent.email)).toBe(1);
+    // The next day the rule's latest day goes out, once: one reminder a day at most.
+    await step(cairoAt(shift(dueDay, -2), 9, 0));
+    expect(await offsetsOf(line)).toEqual([-3, -5]);
+    expect((await claimsOf(line)).map((c) => c.anchor_on)).toEqual([dueDay, dueDay]);
+  });
+
+  it('a student who has left the school is in no list and is not reminded, a pending charge of theirs included (item 6)', async () => {
+    const f = await onboard(officer, `s08-left-${RUN}`, 11);
+    const due = cairoAt(shift(dueDay, 2), 12);
+    const fee = await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: f.studentId, kind: 'custom', amount: 120, description: 'A lab fee', dueAt: due, reason: 'the lab' } }));
+    const holders = { kind: 'batch' as const, list: 'charge_holders' as const, chargeKind: 'custom' as const, unpaidOnly: true, who: 'families' as const };
+    expect((await apiResponse(adm.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: holders } } }))).students.map((s) => s.id)).toContain(f.studentId);
+    await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'withdrawn', leftOn: cairoDay(new Date()), reason: 'moved to another school' } }));
+    expect((await one<{ status: string }>(`select status from charge where id = $1`, [fee.id])).status).toBe('pending_payment');
+    expect((await apiResponse(adm.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: holders } } }))).students.map((s) => s.id)).not.toContain(f.studentId);
+    await step(cairoAt(shift(cairoDay(due), -7), 9, 0));
+    expect(await offsetsOf(fee.id)).toEqual([]);
+    expect(await notificationsFor(f.parent.email, 'PAYMENT_REMINDER')).toEqual([]);
+  });
+
+  it('a text a rule sends — one the admin wrote included — cannot be switched off; the refusal names the rule (item 10)', async () => {
+    const sessionD = (await apiResponse(adm.api.v1.sessions.$post({
+      json: { type: 'june', year: Y + 1, label: `s08d-${RUN}`, startDate: new Date(Date.now() - DAY).toISOString(), endDate: sessionAEnd.toISOString(), courseStartsOn: cairoDay(new Date()), paymentDueAt: cairoAt(dueDay, 12).toISOString() },
+    })))!.id;
+    const sessionDName = (await one<{ name: string }>(`select name from registration_session where id = $1`, [sessionD])).name;
+    const json = {
+      name: `Gentle reminder (08s ${RUN})`, titleEn: 'A gentle reminder — {session}', bodyEn: 'Dear {guardian}, {amount} for {student} is due on {due}.',
+      titleAr: 'تذكير لطيف — {session}', bodyAr: 'عزيزي {guardian}، مبلغ {amount} لـ {student} مستحق في {due}.', reason: 'a softer text',
+    };
+    const tpl = await apiResponse(adm.api.v1.messages.templates.$post({ json }));
+    await apiResponse(finadmin.api.v1.reminders.rules.$put({ json: { kind: 'payment_due', sessionId: sessionD, offsetsDays: [-7], repeatEveryDays: null, channels: ['in_app'], templateId: tpl.id, active: true, reason: 'the softer text here' } }));
+    expect(await refused(adm.api.v1.messages.templates[':id'].$put({ param: { id: tpl.id }, json: { ...json, active: false, reason: 'not needed' } })))
+      .toEqual({ status: 409, error: `The reminder "Payment due (lines, instalments, charges)" (${sessionDName}) sends this text: change that rule before switching the text off` });
+    expect((await one<{ active: boolean }>(`select active from message_template where id = $1`, [tpl.id])).active).toBe(true);
+  });
+
+  it('"Remind" per line: what is past its due date gets the overdue text, what is not yet due the due text (item 8)', async () => {
+    const late = await onboard(officer, `s08-late-${RUN}`, 12);
+    const onTime = await onboard(officer, `s08-ontime-${RUN}`, 12);
+    const lateLine = await reserveUnpaid(late, itemA);
+    await reserveUnpaid(onTime, itemA);
+    // The arrangement: the late family's line was due three days ago (a due date set in the past by hand, as expireByHand builds an aftermath).
+    const wasDue = new Date(Date.now() - 3 * DAY);
+    await sql(`update registration set due_at = $1 where id = $2`, [wasDue.toISOString(), lateLine]);
+    const part = (filter: 'overdue' | 'due') => ({ kind: 'batch' as const, list: 'session_unpaid' as const, sessionId: sessionA, include: 'lines' as const, filter, studentIds: [late.studentId, onTime.studentId], who: 'families' as const });
+    const overdue = await apiResponse(officer.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: part('overdue') } } }));
+    const notYet = await apiResponse(officer.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: part('due') } } }));
+    expect(overdue.students.map((s) => s.id)).toEqual([late.studentId]);
+    expect(notYet.students.map((s) => s.id)).toEqual([onTime.studentId]);
+    // The dialog sends one message per part, each with its text.
+    await apiResponse(officer.api.v1.messages.$post({ json: { audience: { definition: part('overdue') }, templateId: TPL.paymentOverdue, channels: ['in_app'] } }));
+    await apiResponse(officer.api.v1.messages.$post({ json: { audience: { definition: part('due') }, templateId: TPL.paymentDue, channels: ['in_app'] } }));
+    const [l] = await notificationsFor(late.parent.email, 'PAYMENT_REMINDER');
+    const [o] = await notificationsFor(onTime.parent.email, 'PAYMENT_REMINDER');
+    expect(l!.body).toContain(`EGP 1,500 for Student s08-late-${RUN} (${subjAName}) was due on ${enDay(cairoDay(wasDue))} and is still unpaid.`);
+    expect(o!.body).toContain(`EGP 1,500 for Student s08-ontime-${RUN} (${subjAName}) is due on ${enDay(dueDay)}.`);
   });
 });

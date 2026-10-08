@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
 import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLock, pauseAtAudit, pauseAtAudits, session, openWindow, runPaymentDeadlines, type Client, reservationOf, CONSENT } from './helpers';
 
@@ -1346,6 +1346,7 @@ describe('08t: the rework races — money (step C)', () => {
  * its line was paid). (Two schedulers claiming one reminder at once: 08s.)
  */
 describe('08t: the rework races — reminders (step D)', () => {
+  // (afterAll for this block is imported with the others.)
   let adm: Client, officer: Client, teacherId: string, itemId: string, sessionId: string, dueDay: string;
   const RUN_D = Math.random().toString(36).slice(2, 6);
   const DAY = 86_400_000;
@@ -1381,6 +1382,12 @@ describe('08t: the rework races — reminders (step D)', () => {
     itemId = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
       param: { id: sessionId }, json: { subjectId, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: series, availability: 'open', requiredInSeries: false }] },
     })))!.items[0]!;
+    // Reminders are off when the system is installed: on for these races, off again after.
+    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'reminders.enabled' }, json: { value: true, reason: 'the races need the step' } }));
+  });
+
+  afterAll(async () => {
+    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'reminders.enabled' }, json: { value: false, reason: 'back to as installed' } }));
   });
 
   const familyWithALine = async (tag: string) => {
@@ -1453,4 +1460,31 @@ describe('08t: the rework races — reminders (step D)', () => {
     expect(sends.reduce((n, x) => n + x.sent, 0)).toBe(1);
     expect(await one(`select status, attempts from message_delivery where id = $1`, [email])).toEqual({ status: 'sent', attempts: 1 });
   });
+  it("the reminder step and the admin's change of the session's payment date at once: the step takes the session before its lines (A's order), so neither waits on the other in a cycle (the review of 5c2f2bf, item 3)", async () => {
+    const { line } = await familyWithALine('session-change');
+    // The session's own rule, so the step's group for this line is its own; its row held, so the step
+    // stops there, inside its transaction, after it has taken what it takes before the message.
+    const rule = await apiResponse(adm.api.v1.reminders.rules.$put({ json: { kind: 'payment_due', sessionId, offsetsDays: [-7], repeatEveryDays: null, channels: ['in_app'], templateId: 'tpl-payment-due', active: true, reason: 'this session, seven days ahead' } }));
+    const release = await holdRowLock('reminder_rule', rule.id);
+    const moved = new Date(new Date(`${dueDay}T10:00:00Z`).getTime() + 5 * DAY);
+    let put: { status: number; body: string } | null = null;
+    try {
+      const reminding = step(cairoNineThirty(minusDays(dueDay, 7)));
+      await lockWaiters(1);
+      const changing = adm.api.v1.sessions[':id'].$put({ param: { id: sessionId }, json: { paymentDueAt: moved, reason: 'the payment date moves five days' } })
+        .then(async (r) => ({ status: r.status, body: await r.text() }));
+      // The change queues behind the step (on the session), or — the order before the fix — takes the
+      // session and queues on the line the step holds.
+      await lockWaiters(2);
+      await release();
+      [, put] = await Promise.all([reminding, changing]);
+    } finally {
+      await release().catch(() => {});
+    }
+    expect(put, put?.body).toMatchObject({ status: 200 });
+    // The reminder went out on the date it was claimed for; then the line's date moved.
+    expect((await claims(line)).map((c) => Number(c.offset_days))).toEqual([-7]);
+    expect(new Date((await one<{ d: string }>(`select due_at as d from registration where id = $1`, [line])).d).getTime()).toBe(moved.getTime());
+  });
+
 });

@@ -16,10 +16,15 @@ copy of `igcse_template_dev`), API 3131, web 3130.
 
 ## 1. The model as built
 
-Migrations after C's 0049 (main's last): `0050_rework_messages_structure` (generated, additive) and
-`0051_rework_messages_backfill` (custom, idempotent: a second run inserts nothing). Each journal
-`when` is later than 0049's (1791437760565 → 1791444538626, 1791444609348). Nothing is dropped:
-`scheduled_announcement` stays one release (§7 step 3), its rows moved to messages.
+Migrations after C's 0049 (main's last): `0050_rework_messages_structure` (generated, additive),
+`0051_rework_messages_backfill` (custom, idempotent: a second run inserts nothing), and after the
+review of 5c2f2bf `0052_rework_messages_claim_day` (generated: `reminder_sent.sent_on`, nullable,
+and its unique index), `0053_rework_messages_claim_day_backfill` (custom, idempotent: the day from
+the reminder message's `context.dueAt`, else `sent_at`, in Cairo) and
+`0054_rework_messages_claim_day_required` (generated: NOT NULL). Each journal `when` is later than
+the one before it (0049's 1791437760565 → 1791444538626, 1791444609348, 1791453573346,
+1791453585318, 1791453628209). Nothing is dropped: `scheduled_announcement` stays one release (§7
+step 3), its rows moved to messages.
 
 | Table | What it holds | Rules the database keeps |
 |---|---|---|
@@ -28,7 +33,7 @@ Migrations after C's 0049 (main's last): `0050_rework_messages_structure` (gener
 | `message` | the audience, a template **or** written text (`title`, `body`, optional `title_ar`, `body_ar`), `language` (`en`, `ar`, `both`), `channels` (`in_app`, `email`; `whatsapp` reserved), `context` (`{ sessionId }` for `{session}`/`{closes}`), `notification_type` (what its in-app rows are), `source` (`staff`, `reminder`, `legacy_announcement`), `reminder_rule_id`, `status` (`scheduled`, `sent`, `cancelled`, `failed`), `scheduled_at`, `sent_at`, `recipient_count`, `error`, the cancel's who/when/why, `legacy_announcement_id`, `created_by` | text present; a scheduled one has its time, a sent one its `sent_at`; a reminder has its rule and only a reminder does; channels within the three; one message per old announcement |
 | `message_delivery` | one per recipient × channel × the student it is about (`student_id`: a parent's child, or the student themself): `status` (`queued`, `sending`, `sent`, `failed`), the `title` and `body` as sent, the `address` an email went to, the in-app `notification_id`, `error`, `attempts`, `sent_at` | **one** per (message, recipient, channel, student) — a unique index; a notification belongs to one delivery; a failed one says why; a sent one has its time |
 | `reminder_rule` | `kind` (`payment_due`, `session_closing`, `entry_deadline`, `school_fee_due`, `declared_retakes_to_verify`), `session_id` (null: every session; a session's own rule overrides there), `offsets_days` (−7 = seven days before the anchor), `repeat_every_days` after the last offset, `until` (`paid`, `closed`, `deadline`, `verified`, the kind's), `channels`, `template_id` and `overdue_template_id` (the text for the days after the date), `active`, `inherits_at` (a session's rule dropped: the session follows every session's rule again) | one rule per kind for every session, one per kind and session; 1–12 offsets; a repeat of 1–60 days; channels within the three; the rule for every session never "inherits" |
-| `reminder_sent` | **the claim**: `kind`, `target_kind` (`line`, `charge`, `session`, `series_entry`, `series_retake`, `verification`), `target_id`, `anchor_on` (the anchor's Cairo day), `offset_days`, the student, the session, the `message_id`, `sent_at` | **unique (kind, target kind, target, anchor day, offset)**: a second scheduler instance's insert conflicts and sends nothing (ST-06, ST-12); a moved date is a new day, so a re-dated line is reminded on its new date |
+| `reminder_sent` | **the claim**: `kind`, `target_kind` (`line`, `charge`, `session`, `series_entry`, `series_retake`, `verification`), `target_id`, `anchor_on` (the anchor's Cairo day), `offset_days`, the student, the session, the `message_id`, `sent_at`, `sent_on` (the school's day the scheduler sent it on) | **unique (kind, target kind, target, anchor day, offset)**: a second scheduler instance's insert conflicts and sends nothing (ST-06, ST-12); **unique (kind, target kind, target, anchor day, `sent_on`)**: one reminder a day per target and date, whatever rule changed during the day; a moved date is a new day, so a re-dated line is reminded on its new date |
 
 The notification types families see gain `SCHOOL_MESSAGE` (a message to a list or chosen people),
 `PAYMENT_REMINDER` (a payment or school-fee reminder, and a money list's message) and
@@ -38,7 +43,11 @@ The notification types families see gain `SCHOOL_MESSAGE` (a message to a list o
 `REMINDER_RULE_SET`, `MESSAGE_TEMPLATE_SAVED`, `MESSAGE_AUDIENCE_SAVED`, `REWORK_BACKFILL_MESSAGE`.
 
 **Settings** (F0a's store, a new group "Reminders" on the Settings screen, in English and Arabic):
-`reminders.enabled` (on; admin) and `reminders.sendAtHour` (9, Cairo time; admin, finance admin).
+`reminders.enabled` (**off when the system is installed**, decided by the lead on 8 Oct: nothing
+goes out until the admin turns it on, once the first sessions and fees are checked; the first minute
+after that sends each target its latest day only; admin) and `reminders.sendAtHour` (9, Cairo time,
+1 to 23 — midnight does not exist on the day Egypt's summer time starts; admin, finance admin). The
+production checklist (SECURITY_AUDIT.md §6) has the line.
 The rules themselves are rows, edited on Messages › Reminders (decided with the lead, 8 Oct: the
 same offsets are not kept in two places).
 
@@ -77,7 +86,8 @@ additions outside its files are listed at the end of this section.
 | C | `charge.due_at` (C's `chargeDueAt`), `charge.status`, `payment_charge` | a charge awaiting payment with no payment open is owed; an instalment's date is its own |
 | C | `chargeRules(tx, charge, now, { forPayment: true })` (`charge.services.ts`) | a charge C refuses to be paid now (its deadline, a service fee still provisional) is not reminded and not listed as owed |
 | C | `listCharges({ sessionId, status }, viewer)` | a session's charges are the ones the Money tab's charges table shows |
-| C | a live plan = an active `plan.instalments` exception on the line (`livePlanOf`'s condition) | a line under a live plan is paid by its instalments: the instalments are reminded, the line is not |
+| C | a live plan = an active `plan.instalments` exception on the line (`livePlanOf`'s condition) | a line under a live plan is paid by its instalments: the instalments are reminded, the line is not (consistent with C's later rule that a plan line owes its price less its deposits) |
+| A | the lock order, §2.1: the session before its lines | the reminder step takes its groups' sessions `FOR KEY SHARE` in id order before their lines and charges: the claim's session foreign key would otherwise take the session after the lines, and `updateSession` / `correctSessionSeries` take the session `FOR UPDATE` and then its lines — a deadlock the reviewer reproduced (added to RESERVATIONS.md §2.1) |
 | C | `payableAcademicYears()` (`school-fee.services.ts`) | the years a pushed school fee can be for |
 | F0a | `getSetting`, `gradeTodaySql`, `parent_student_link` (approved), `user.left_on`, `user.banned` | a grade is today's; a left or banned person is not a recipient; a family is the approved links |
 
@@ -99,6 +109,9 @@ additions outside its files are listed at the end of this section.
    adds it for finance); `/admin/notifications` redirects to `/admin/messages`.
 5. The suite: `authz-policy.tsv` (the three old rows removed, thirteen added), `08f`'s settings map
    (two keys, trail row), a case in `05`, a block in `08t` and in `09`.
+6. After the review of 5c2f2bf: `docs/features/RESERVATIONS.md` §2.1 (A's lock order) gains the
+   reminder step's paragraph; `SECURITY_AUDIT.md` §6 (the production checklist) gains the line on
+   turning reminders on.
 
 ---
 
@@ -149,8 +162,18 @@ Resolved when the message is sent (a grade is today's; the unpaid are those owin
   Cairo ("22 October 2026" / "22 أكتوبر 2026"), amounts "EGP 1,500" / "1,500 جنيه".
 - **Languages**: a template sends English and Arabic (two paragraphs; the title "English ·
   Arabic") or one of them; written text sends what was written, the Arabic beside it when given.
-- **Finance** (the officer and the finance admin) may resolve and send only the money lists, and
-  reads only their messages and the payment reminders (§5's "finance for payment batches").
+- **Finance** (the officer and the finance admin) may resolve and send only the **payment lists**
+  (`isPaymentList`: a session's unpaid families, or the holders of a charge still unpaid — never the
+  holders of a paid one, which with the school fee is nearly every family), and reads only their
+  messages and the payment reminders (§5's "finance for payment batches"). Only a payment list's
+  message is a `PAYMENT_REMINDER`; any other list's is a `SCHOOL_MESSAGE`.
+- **What is owed** in a money list is what the reminder step would remind (one set of predicates,
+  `payable-now.services.ts`): not a line on a provisional board fee (unless the school takes payment
+  on one), paid by its instalment plan, with a payment open (a checkout, an InstaPay transfer being
+  checked) or past its effective deadline; not a charge with a payment open or that C's rules
+  refuse.
+- **A student who has left the school** (F0a's leaving) or is barred is in no list, nor are their
+  parents on their account; the step does not remind about them either.
 
 ### 3.3 The scheduler step (`messages-step.services.ts`, in `jobs/session-closer.ts`)
 
@@ -176,13 +199,19 @@ Every minute, each part logging its own failure and the next part still running:
      whatever zone the server runs in; only one after the target existed. A day whose hour passed
      while nothing ran goes out at the next tick, once; days passed over are not sent as a
      backlog (a family is never sent the −7, −3 and 0 at once);
+   - what is already claimed is left out before anything is locked (`notClaimed`): the same date and
+     offset, or a reminder today about the same date — so a reminder sent costs nothing on the
+     minutes after it, and a rule changed during the day never sends a second one (the unique indexes
+     stay the guard);
    - for each group (payment kinds: the rule and its text; a session's closing; a series' deadline;
-     a session's declared sittings), one transaction: the targets locked `FOR SHARE` in id order and
+     a session's declared sittings), one transaction: **the group's sessions `FOR KEY SHARE` in id
+     order first** (A's order, the session before its lines), then the targets locked `FOR SHARE` in id order and
      **read again in a statement of their own** (under READ COMMITTED a statement sees what
      committed before it began: a payment the desk took while the lock waited is seen, and the line
      is left out), the message (source `reminder`, its batch audience naming the kind, the rule
-     and the days), the claims (`INSERT … ON CONFLICT DO NOTHING RETURNING`: what another scheduler
-     claimed first is skipped; nothing claimed → the transaction rolls back and nothing is written),
+     and the days), the claims (`INSERT … ON CONFLICT DO NOTHING RETURNING` on either unique index:
+     what another scheduler claimed first, or a target already reminded today about that date, is
+     skipped; nothing claimed → the transaction rolls back and nothing is written),
      the notifications and deliveries for what was claimed, `REMINDERS_SENT`;
    - recipients: a payment or school-fee reminder to the student's approved parents and the student
      (one delivery about each child; what one student owes on that day summed: `{amount}`,
@@ -222,9 +251,12 @@ Every minute, each part logging its own failure and the next part still running:
     rule" to drop it; the two settings with a link; what went out, with the deliveries.
   - *Texts*: the school's texts in both languages; the admin adds and changes them.
 - **The Money tab's "Remind"** (A's tab, `remind.client.tsx`): the payment reminder to the
-  families the tab shows (its filter, subject, section), each with what it owes and its due date,
-  ticked; untick any; one click sends (POST /v1/messages, the money-list path the finance officer
-  may use). Lines not payable yet and plan lines are not in it.
+  families the tab shows (its subject, section; under its "Overdue" filter only what is overdue),
+  each with what it owes overdue and not yet due and the dates, ticked; untick any; one click sends
+  (POST /v1/messages, the payment-list path the finance officer may use) — **per line**: what is past
+  its due date with the overdue text, what is not yet due with the due text, one message each (a
+  family with both gets one of each). What cannot be paid now (provisional, a payment in progress,
+  past its deadline) and plan lines are not in it; a plan's instalments are.
 - **Settings**: a Reminders group (on/off, the hour, Cairo time).
 - **The families' notifications**: unchanged, but a message in two languages reads as two
   paragraphs, each in its own direction. There is no delete anywhere.
@@ -271,7 +303,18 @@ amount and the date filled in.
 - **08t** (step D block): a payment taken at the desk while the reminder step reads the line (the
   desk paused holding the line): the step waits and reminds nothing; a reminder claimed while the
   desk takes the payment: the payment waits, the reminder goes out once, before the confirmation;
-  two senders of one queued email (both held on its row): sent once, one attempt.
+  two senders of one queued email (both held on its row): sent once, one attempt; **the reminder
+  step and the admin's change of the session's payment date at once** (the session's own rule held,
+  so the step stops inside its transaction; then `PUT /v1/sessions/:id`): 200, the claim made, the
+  line re-dated — with the sessions not taken first, Postgres detects the deadlock.
+- **08s, after the review of 5c2f2bf**: reminders off as installed, the hour 1–23; Remind and the
+  money lists leave out a line whose InstaPay transfer is being checked and a charge with its payment
+  open; finance refused the holders of a paid charge (403), the admin's message to them a
+  `SCHOOL_MESSAGE`; a target already reminded not locked again (the line held, the next minute's step
+  finishes); a rule changed at 09:50 sends no second reminder that day (the next day's goes); a
+  leaver's pending charge neither listed nor reminded; a text a session's rule sends cannot be
+  switched off (the refusal names the rule); Remind per line (the overdue and the due parts, each
+  with its text).
 - **05**: B's parent and student cannot mark or list A's copies of a message, reach its deliveries,
   the log, an audience naming A's student, or send; finance cannot read a direct message's
   deliveries or send one.
@@ -286,7 +329,11 @@ amount and the date filled in.
   index and conflict skip; the FOR SHARE before the re-read; the owed condition; the provisional
   skip; the scheduled message's row lock and the delivery index (both layers); the cancel's lock;
   the email claim; a failed email recorded; finance's lists; the fillable check; WhatsApp refused;
-  the send hour in Cairo; a session's override; NOT-002's day; an interrupted email not re-sent.
+  the send hour in Cairo; a session's override; NOT-002's day; an interrupted email not re-sent;
+  and after the review: Remind's payable-now narrowing; finance's unpaid-only charge list; the
+  sessions before the lines; the claimed-target filter; one a day (filter and index); the leaver;
+  the text in use; Remind's two parts; the hour 1–23 — twenty-four in all, the earlier fifteen run
+  again on the fixed code.
 - **The migration** (`migration/`): two copies (the template's and F0a's richer copy), each
   migrated with main's migrations and then seeded **through main's own API, before step D's code**
   (placeholder families; announcements sent at once, scheduled and sent by main's tick, pending,
@@ -317,9 +364,12 @@ amount and the date filled in.
 6. **The latest due day only, after the target existed**: a line reserved two days before its due
    date is not sent "due in 7 days" and "due in 3 days" at once; the system down for a week sends
    each target its latest reminder, not a backlog.
-7. **The claim is per kind, target, the anchor's Cairo day and offset**, not per rule: a session's
-   own rule replacing the school's does not re-send a day already sent; a due date moved (an
-   exception, a fee confirmed) is a new date, reminded again on its own days.
+7. **The claim is per kind, target, the anchor's Cairo day and offset**, not per rule, **and at most
+   one a day per kind, target and date** (corrected after the review of 5c2f2bf: the first key alone
+   let a session's rule changed at 09:50 send its −5 on the day the −3 had gone at 09:00). A
+   session's own rule replacing the school's does not re-send a day already sent; a due date moved
+   (an exception, a fee confirmed) is a new date, reminded again on its own days; both keys are unique
+   indexes, so the database holds the rule whatever the scheduler does.
 8. **The target locked FOR SHARE, then read in a statement of its own.** A row locked and checked
    in one statement is re-evaluated only if the row itself changed; the desk takes a payment by
    locking the line and writing a payment row (the line unchanged until it confirms). Reading again
@@ -343,6 +393,21 @@ amount and the date filled in.
     lands, the list reads it instead, with the same definition fields.
 16. **Two endpoints beyond §5**: cancel (the old queue could cancel) and lists (the picker's
     options).
+17. **Reminders are off when the system is installed** (the lead, 8 Oct): the setting's default is
+    off — so a fresh and a production database start off with no setting row to seed and no audit
+    gap — and the admin turns it on once the first sessions and fees are checked; the first minute
+    after that sends each target its latest day only, never a backlog (decision 6). The suites turn it
+    on where they run the step.
+18. **One definition of "owed and payable now"** (`payable-now.services.ts`), read by the step and by
+    every money list (the review of 5c2f2bf: "Remind" asked a family whose InstaPay transfer was being
+    checked to pay).
+19. **The step takes its sessions before its lines** (A's order): the claim's foreign key to the
+    session would otherwise take the session after the lines, against an admin's session change.
+20. **"Remind" per line**: what is past its due date gets the overdue text, what is not yet due the
+    due text — two messages from one click when a family has both, each with its own audience in the
+    log, rather than one text that is wrong for half the lines.
+21. **Arabic counts agree with their number** (1, 2, 3–10, 11–99, hundreds): a count and its noun are
+    one text on the screens, so the translator sees them together.
 
 ---
 
@@ -393,3 +458,11 @@ amount and the date filled in.
   money-tab.client.tsx merged hunk by hunk), no migration after 0049. The gates on the merge: check-
   types clean; the suite 528 passed in local time (09:18) and with TZ=UTC (09:23); CI green
   (37755188568).
+- 09:30–10:18 — the Opus 5.5 review of 5c2f2bf (via the lead: "merge after fixes 1, 2, 3 and 4"):
+  one definition of what is owed and payable now (payable-now.services.ts) for the step and the money
+  lists; finance limited to the payment lists; the step's sessions FOR KEY SHARE before its lines
+  (A's §2.1 updated); claimed targets left out before locking; one reminder a day per target and date
+  (0052–0054: `sent_on` and its unique index); leavers left out; reminders off when installed (the
+  setting's default, the production checklist); Remind per line; the hour 1–23; Arabic counts; a
+  text a live rule sends kept on. Twenty-four controls red, restored. One correction row for the
+  nine decision rows that shared 08:35:35Z.

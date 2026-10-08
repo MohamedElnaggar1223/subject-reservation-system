@@ -233,6 +233,13 @@ changes nothing elsewhere in this section (fee rows already came before lines).
 id order, before the charges — not its own lines first and the plan lines after, which deadlocked
 against a fee re-price or a series move taking both in id order (08t).
 
+**The reminder step: the sessions, then the lines and charges** (step D, RESERVATIONS_MESSAGES.md
+§2, the review of 5c2f2bf). Its claim row has a foreign key to the line's session, which takes the
+session `FOR KEY SHARE` at the insert; the step therefore takes each group's sessions `FOR KEY SHARE`
+in id order **before** its lines and charges (`FOR SHARE`), as this order puts the session before
+its lines. Taken after the lines, it waited behind `updateSession` / `correctSessionSeries` (the
+session `FOR UPDATE`, then its waiting lines) while holding those lines: a deadlock (08t forces it).
+
 **A payment, then the student, for a pushed school fee** (step C, RESERVATIONS_MONEY.md §2).
 `settlePushInTx` runs inside a school-fee payment's confirmation, which holds the payment
 `FOR UPDATE`, and then takes the student `FOR NO KEY UPDATE` to settle the open push of that year

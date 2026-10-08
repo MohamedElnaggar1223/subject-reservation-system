@@ -1,9 +1,9 @@
-Control owed-status: only a line still owed is reminded (until paid) undone; test test/08s-messages-reminders.test.ts -t "a payment reminder"; started 2026-10-08T08:33:41Z; restored after the run
+Control owed-status: only a line still owed is reminded (until paid) undone; test test/08s-messages-reminders.test.ts -t "a payment reminder"; started 2026-10-08T10:13:12Z; restored after the run
 Tests run:
    ↓ 08s: messages and reminders > one rule per kind for every session, seeded with the defaults; the school texts in English and Arabic; WhatsApp has no sender
-   ✓ 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > nothing before its day in Cairo, nothing before the send hour; at 09:00 Cairo on day −7 both families are reminded, once 84ms
-   ✓ 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > a day whose hour passed while nothing ran goes out at the next tick, once; the days between are quiet 53ms
-   × 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > the line paid between two days stops its reminders; the unpaid one is reminded on the day, then with the overdue text at +3, +6, +9 83ms
+   ✓ 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > nothing before its day in Cairo, nothing before the send hour; at 09:00 Cairo on day −7 both families are reminded, once 79ms
+   ✓ 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > a day whose hour passed while nothing ran goes out at the next tick, once; the days between are quiet 57ms
+   × 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > the line paid between two days stops its reminders; the unpaid one is reminded on the day, then with the overdue text at +3, +6, +9 93ms
    × 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > what went out: the reminders list and the log, each message with its deliveries per channel 6ms
    ↓ 08s: messages and reminders > two scheduler instances running the step at the same minute send once: the second waits on the first one's claim and finds it taken
    ↓ 08s: messages and reminders > a line on a provisional board fee is not reminded (it cannot be paid yet); confirmed, it is reminded once
@@ -22,6 +22,14 @@ Tests run:
    ↓ 08s: messages and reminders > a cancel landing while the tick sends the message waits for it, and is refused: the message was sent
    ↓ 08s: messages and reminders > an email claimed by a sender that stopped half way is marked failed at the next tick, never sent again
    ↓ 08s: messages and reminders > a session the old 24-hour closing reminder already reached is not reminded again on its day −1
+   ↓ 08s: messages and reminders > a pushed school fee is reminded by the school-fee rule, 14 days before its date; paid, its reminders stop
+   ↓ 08s: messages and reminders > Remind and every money list leave out what is being paid: a line whose InstaPay transfer is being checked, a charge with its payment open (item 1)
+   ✓ 08s: messages and reminders > finance writes to the holders of an unpaid charge only; the admin may write to the holders of a paid one, and that is a message, not a payment reminder (item 2)  343ms
+   ↓ 08s: messages and reminders > a target already reminded is not locked again on the minutes after: the step leaves it out before it locks anything (item 4)
+   ↓ 08s: messages and reminders > a rule changed during the day never sends a family a second reminder that day about the same date (item 5)
+   ↓ 08s: messages and reminders > a student who has left the school is in no list and is not reminded, a pending charge of theirs included (item 6)
+   ↓ 08s: messages and reminders > a text a rule sends — one the admin wrote included — cannot be switched off; the refusal names the rule (item 10)
+   ↓ 08s: messages and reminders > "Remind" per line: what is past its due date gets the overdue text, what is not yet due the due text (item 8)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
  FAIL  test/08s-messages-reminders.test.ts > 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > the line paid between two days stops its reminders; the unpaid one is reminded on the day, then with the overdue text at +3, +6, +9
@@ -33,30 +41,30 @@ AssertionError: expected [ -7, -3, +0 ] to deeply equal [ -7, -3 ]
     -3,
 +   0,
   ]
- ❯ test/08s-messages-reminders.test.ts:186:41
-    184|       expect((await one<{ status: string }>(`select status from regist…
-    185|       await step(cairoAt(dueDay, 9));
-    186|       expect(await offsetsOf(linePays)).toEqual([-7, -3]);
+ ❯ test/08s-messages-reminders.test.ts:197:41
+    195|       expect((await one<{ status: string }>(`select status from regist…
+    196|       await step(cairoAt(dueDay, 9));
+    197|       expect(await offsetsOf(linePays)).toEqual([-7, -3]);
        |                                         ^
-    187|       expect(await offsetsOf(lineOwes)).toEqual([-7, -3, 0]);
-    188|       await step(cairoAt(shift(dueDay, 3), 9));
+    198|       expect(await offsetsOf(lineOwes)).toEqual([-7, -3, 0]);
+    199|       await step(cairoAt(shift(dueDay, 3), 9));
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
  FAIL  test/08s-messages-reminders.test.ts > 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > what went out: the reminders list and the log, each message with its deliveries per channel
 AssertionError: expected 3 to be greater than or equal to 6
- ❯ test/08s-messages-reminders.test.ts:206:27
-    204|     it('what went out: the reminders list and the log, each message wi…
-    205|       const sent = await apiResponse(finadmin.api.v1.reminders.sent.$g…
-    206|       expect(sent.length).toBeGreaterThanOrEqual(6);
+ ❯ test/08s-messages-reminders.test.ts:217:27
+    215|     it('what went out: the reminders list and the log, each message wi…
+    216|       const sent = await apiResponse(finadmin.api.v1.reminders.sent.$g…
+    217|       expect(sent.length).toBeGreaterThanOrEqual(6);
        |                           ^
-    207|       const msgIds = (await sql<{ message_id: string }>(`select messag…
-    208|       const one9 = sent.find((s) => s.messageId === msgIds.at(-1))!;
+    218|       const msgIds = (await sql<{ message_id: string }>(`select messag…
+    219|       const one9 = sent.find((s) => s.messageId === msgIds.at(-1))!;
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
  Test Files  1 failed (1)
-      Tests  2 failed | 2 passed | 18 skipped (22)
-   Start at  11:33:42
-   Duration  4.15s (transform 541ms, setup 2ms, collect 190ms, tests 2.62s, environment 0ms, prepare 33ms)
+      Tests  2 failed | 3 passed | 25 skipped (30)
+   Start at  13:13:13
+   Duration  4.93s (transform 618ms, setup 2ms, collect 206ms, tests 3.05s, environment 0ms, prepare 32ms)
 
  Test Files  1 failed (1)
-      Tests  2 failed | 2 passed | 18 skipped (22)
-   Start at  11:33:42
-   Duration  4.15s (transform 541ms, setup 2ms, collect 190ms, tests 2.62s, environment 0ms, prepare 33ms)
+      Tests  2 failed | 3 passed | 25 skipped (30)
+   Start at  13:13:13
+   Duration  4.93s (transform 618ms, setup 2ms, collect 206ms, tests 3.05s, environment 0ms, prepare 32ms)

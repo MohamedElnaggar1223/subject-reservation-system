@@ -1,4 +1,4 @@
-Control legacy-not002: a session NOT-002 already reminded is not reminded again on day -1 undone; test test/08s-messages-reminders.test.ts -t "the old 24-hour closing reminder"; started 2026-10-08T08:35:07Z; restored after the run
+Control legacy-not002: a session NOT-002 already reminded is not reminded again on day -1 undone; test test/08s-messages-reminders.test.ts -t "the old 24-hour closing reminder"; started 2026-10-08T10:14:59Z; restored after the run
 Tests run:
    ↓ 08s: messages and reminders > one rule per kind for every session, seeded with the defaults; the school texts in English and Arabic; WhatsApp has no sender
    ↓ 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > nothing before its day in Cairo, nothing before the send hour; at 09:00 Cairo on day −7 both families are reminded, once
@@ -21,7 +21,15 @@ Tests run:
    ↓ 08s: messages and reminders > two ticks at the same minute send a scheduled message once: the second finds it locked and leaves it
    ↓ 08s: messages and reminders > a cancel landing while the tick sends the message waits for it, and is refused: the message was sent
    ↓ 08s: messages and reminders > an email claimed by a sender that stopped half way is marked failed at the next tick, never sent again
-   × 08s: messages and reminders > a session the old 24-hour closing reminder already reached is not reminded again on its day −1 380ms
+   × 08s: messages and reminders > a session the old 24-hour closing reminder already reached is not reminded again on its day −1 374ms
+   ↓ 08s: messages and reminders > a pushed school fee is reminded by the school-fee rule, 14 days before its date; paid, its reminders stop
+   ↓ 08s: messages and reminders > Remind and every money list leave out what is being paid: a line whose InstaPay transfer is being checked, a charge with its payment open (item 1)
+   ↓ 08s: messages and reminders > finance writes to the holders of an unpaid charge only; the admin may write to the holders of a paid one, and that is a message, not a payment reminder (item 2)
+   ↓ 08s: messages and reminders > a target already reminded is not locked again on the minutes after: the step leaves it out before it locks anything (item 4)
+   ↓ 08s: messages and reminders > a rule changed during the day never sends a family a second reminder that day about the same date (item 5)
+   ↓ 08s: messages and reminders > a student who has left the school is in no list and is not reminded, a pending charge of theirs included (item 6)
+   ↓ 08s: messages and reminders > a text a rule sends — one the admin wrote included — cannot be switched off; the refusal names the rule (item 10)
+   ↓ 08s: messages and reminders > "Remind" per line: what is past its due date gets the overdue text, what is not yet due the due text (item 8)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
  FAIL  test/08s-messages-reminders.test.ts > 08s: messages and reminders > a session the old 24-hour closing reminder already reached is not reminded again on its day −1
@@ -32,20 +40,20 @@ AssertionError: expected [ -7, -1 ] to deeply equal [ -7 ]
     -7,
 +   -1,
   ]
- ❯ test/08s-messages-reminders.test.ts:636:56
-    634|     expect(await offsetsOf(legacy, 'session_closing')).toEqual([-7]);
-    635|     await step(cairoAt(shift(cairoDay(end), -1), 9, 0));
-    636|     expect(await offsetsOf(legacy, 'session_closing')).toEqual([-7]);
+ ❯ test/08s-messages-reminders.test.ts:649:56
+    647|     expect(await offsetsOf(legacy, 'session_closing')).toEqual([-7]);
+    648|     await step(cairoAt(shift(cairoDay(end), -1), 9, 0));
+    649|     expect(await offsetsOf(legacy, 'session_closing')).toEqual([-7]);
        |                                                        ^
-    637|     expect((await notificationsFor(f.parent.email, 'SESSION_CLOSING_SO…
-    638|   });
+    650|     expect((await notificationsFor(f.parent.email, 'SESSION_CLOSING_SO…
+    651|   });
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
  Test Files  1 failed (1)
-      Tests  1 failed | 21 skipped (22)
-   Start at  11:35:07
-   Duration  3.79s (transform 578ms, setup 2ms, collect 197ms, tests 2.19s, environment 0ms, prepare 32ms)
+      Tests  1 failed | 29 skipped (30)
+   Start at  13:14:59
+   Duration  3.85s (transform 574ms, setup 2ms, collect 203ms, tests 2.16s, environment 0ms, prepare 30ms)
 
  Test Files  1 failed (1)
-      Tests  1 failed | 21 skipped (22)
-   Start at  11:35:07
-   Duration  3.79s (transform 578ms, setup 2ms, collect 197ms, tests 2.19s, environment 0ms, prepare 32ms)
+      Tests  1 failed | 29 skipped (30)
+   Start at  13:14:59
+   Duration  3.85s (transform 574ms, setup 2ms, collect 203ms, tests 2.16s, environment 0ms, prepare 30ms)

@@ -21,7 +21,7 @@ import { Badge, Notice } from '~/components/ui/tone';
 import { INPUT_CLASS, TEXTAREA_CLASS } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { InstantText } from '~/app/(app)/exams/exams-shared';
 import {
-  fetchSavedAudiences, fetchLists, fetchTemplates, resolveAudience, fetchPeople, cairoInstant, tomorrowAtNine,
+  fetchSavedAudiences, fetchLists, fetchTemplates, resolveAudience, fetchPeople, cairoInstant, tomorrowAtNine, countWords,
   MESSAGES_KEY, TEMPLATES_KEY, ROLE_WORD, type Resolved,
 } from './messages-shared';
 
@@ -146,7 +146,7 @@ export function Composer({ admin }: { admin: boolean }): React.JSX.Element {
           <Notice tone="success">
             {result.status === 'scheduled'
               ? <><span>Scheduled for</span> <InstantText iso={result.scheduledAt!} />. <span>It goes out at that minute; you can cancel it in the log until then.</span></>
-              : <><span>Sent to</span> <span>{result.people}</span> <span>{result.people === 1 ? 'person' : 'people'}</span>. <span>The deliveries are in the log.</span></>}
+              : <><span>{`Sent to ${countWords(result.people, 'person')}`}</span>. <span>The deliveries are in the log.</span></>}
           </Notice>
         )}
 
@@ -383,7 +383,7 @@ export function Composer({ admin }: { admin: boolean }): React.JSX.Element {
           <Button onClick={() => send.mutate()} disabled={!ready || send.isPending}>
             {send.isPending ? 'Sending…' : scheduledAt
               ? <><span>Schedule for</span> <InstantText iso={scheduledAt.toISOString()} /></>
-              : resolved.data ? <><span>Send to</span> <span>{resolved.data.people}</span> <span>{resolved.data.people === 1 ? 'person' : 'people'}</span></> : 'Send'}
+              : resolved.data ? <span>{`Send to ${countWords(resolved.data.people, 'person')}`}</span> : 'Send'}
           </Button>
         </div>
       </div>
@@ -397,8 +397,8 @@ function AudienceSummary({ resolved, loading, error }: { resolved: Resolved | un
   return (
     <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
       <p className="text-foreground">
-        <Badge tone={resolved.people > 0 ? 'info' : 'warning'}><span>{resolved.people}</span>&nbsp;<span>{resolved.people === 1 ? 'person' : 'people'}</span></Badge>{' '}
-        {resolved.messages !== resolved.people && <span className="text-muted-foreground"><span>{resolved.messages}</span> <span>messages, one about each child</span></span>}
+        <Badge tone={resolved.people > 0 ? 'info' : 'warning'}><span>{countWords(resolved.people, 'person')}</span></Badge>{' '}
+        {resolved.messages !== resolved.people && <span className="text-muted-foreground"><span>{`${countWords(resolved.messages, 'message')}, one about each child`}</span></span>}
         {' '}<span className="text-muted-foreground">{resolved.label}</span>
       </p>
       {resolved.sample.length > 0 && (

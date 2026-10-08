@@ -60,8 +60,8 @@ export const SessionUnpaidList = z.object({
   sessionId: id,
   /** What is owed: the session's lines, its charges, or both (the Money tab's two tables). */
   include: z.enum(['lines', 'charges', 'both']).default('both'),
-  /** The Money tab's filter: everything owed, or what is past its due date. */
-  filter: z.enum(['unpaid', 'overdue']).default('unpaid'),
+  /** Everything owed, only what is past its due date, or only what is not yet (the overdue and the due texts of "Remind"). */
+  filter: z.enum(['unpaid', 'overdue', 'due']).default('unpaid'),
   offerId: id.nullable().optional(),
   sectionId: id.nullable().optional(),
   /** The families ticked (by their students); none: every family the list finds. */
@@ -97,6 +97,15 @@ export const DirectDefinition = z.object({
   kind: z.literal('direct'),
   userIds: z.array(id).min(1, 'Choose at least one person').max(500).refine((u) => new Set(u).size === u.length, 'Each person once'),
 });
+
+/**
+ * A list about money a family can pay: a session's unpaid families, or the holders of a charge still
+ * unpaid. Finance sends to these only (§5: "finance for payment batches"); their messages are
+ * payment reminders and fill {amount}, {due} and {items}.
+ */
+export function isPaymentList(def: { kind: string; list?: string; unpaidOnly?: boolean }): boolean {
+  return def.kind === 'batch' && (def.list === 'session_unpaid' || (def.list === 'charge_holders' && def.unpaidOnly === true));
+}
 
 export const AudienceDefinition = z.union([BroadcastDefinition, BatchDefinition, DirectDefinition])
   .refine((d) => d.kind !== 'broadcast' || d.grade == null || ['families', 'parents', 'students'].includes(d.group), 'A grade narrows parents, students or families only');

@@ -365,6 +365,27 @@
       "when": 1791444609348,
       "tag": "0051_rework_messages_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1791453573346,
+      "tag": "0052_rework_messages_claim_day",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1791453585318,
+      "tag": "0053_rework_messages_claim_day_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1791453628209,
+      "tag": "0054_rework_messages_claim_day_required",
+      "breakpoints": true
     }
   ]
 }

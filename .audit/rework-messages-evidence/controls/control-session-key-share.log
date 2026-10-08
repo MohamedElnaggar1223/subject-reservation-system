@@ -1,4 +1,4 @@
-Control email-claim: an email claimed (queued -> sending, status-guarded) before it is sent undone; test test/08t-rework-races.test.ts -t "two senders of the same queued email"; started 2026-10-08T10:13:31Z; restored after the run
+Control session-key-share: the reminder step takes its sessions FOR KEY SHARE before its lines (review item 3) undone; test test/08t-rework-races.test.ts -t "the reminder step and the admin's change"; started 2026-10-08T10:13:58Z; restored after the run
 Tests run:
    ↓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
    ↓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
@@ -38,30 +38,33 @@ Tests run:
    ↓ 08t: the rework races — money (step C) > the last instalment's confirmation racing the line's deadline > the sweep first (after the deadline): the line expires and its deposits are settled once; the confirmation is refused and the payment failed
    ↓ 08t: the rework races — reminders (step D) > a payment taken while the reminder step reads the line: the step waits for the line, reads it being paid, and reminds nothing
    ↓ 08t: the rework races — reminders (step D) > a reminder claimed while the payment is taken: the payment waits for the line, the reminder goes out once, before the payment confirms
-   × 08t: the rework races — reminders (step D) > two senders of the same queued email: each claims it before sending (queued → sending), so it is sent once 326ms
-   ↓ 08t: the rework races — reminders (step D) > the reminder step and the admin's change of the session's payment date at once: the step takes the session before its lines (A's order), so neither waits on the other in a cycle (the review of 5c2f2bf, item 3)
+   ↓ 08t: the rework races — reminders (step D) > two senders of the same queued email: each claims it before sending (queued → sending), so it is sent once
+   × 08t: the rework races — reminders (step D) > the reminder step and the admin's change of the session's payment date at once: the step takes the session before its lines (A's order), so neither waits on the other in a cycle (the review of 5c2f2bf, item 3) 1562ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
- FAIL  test/08t-rework-races.test.ts > 08t: the rework races — reminders (step D) > two senders of the same queued email: each claims it before sending (queued → sending), so it is sent once
-AssertionError: expected 2 to be 1 // Object.is equality
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races — reminders (step D) > the reminder step and the admin's change of the session's payment date at once: the step takes the session before its lines (A's order), so neither waits on the other in a cycle (the review of 5c2f2bf, item 3)
+AssertionError: {"success":false,"error":"Failed to update session"}: expected { status: 400, …(1) } to match object { status: 200 }
+(1 matching property omitted from actual)
 - Expected
 + Received
-- 1
-+ 2
- ❯ test/08t-rework-races.test.ts:1460:51
-    1458|       await release().catch(() => {});
-    1459|     }
-    1460|     expect(sends.reduce((n, x) => n + x.sent, 0)).toBe(1);
-       |                                                   ^
-    1461|     expect(await one(`select status, attempts from message_delivery wh…
-    1462|   });
+  {
+-   "status": 200,
++   "status": 400,
+  }
+ ❯ test/08t-rework-races.test.ts:1484:28
+    1482|       await release().catch(() => {});
+    1483|     }
+    1484|     expect(put, put?.body).toMatchObject({ status: 200 });
+       |                            ^
+    1485|     // The reminder went out on the date it was claimed for; then the …
+    1486|     expect((await claims(line)).map((c) => Number(c.offset_days))).toE…
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
  Test Files  1 failed (1)
       Tests  1 failed | 39 skipped (40)
-   Start at  13:13:31
-   Duration  3.83s (transform 602ms, setup 2ms, collect 248ms, tests 1.80s, environment 0ms, prepare 34ms)
+   Start at  13:13:59
+   Duration  5.03s (transform 627ms, setup 2ms, collect 217ms, tests 3.17s, environment 0ms, prepare 32ms)
 
  Test Files  1 failed (1)
       Tests  1 failed | 39 skipped (40)
-   Start at  13:13:31
-   Duration  3.83s (transform 602ms, setup 2ms, collect 248ms, tests 1.80s, environment 0ms, prepare 34ms)
+   Start at  13:13:59
+   Duration  5.03s (transform 627ms, setup 2ms, collect 217ms, tests 3.17s, environment 0ms, prepare 32ms)

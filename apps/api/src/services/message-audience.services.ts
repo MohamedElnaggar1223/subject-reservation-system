@@ -11,14 +11,15 @@
  * children in the list named.
  */
 
-import { db, sql, user, charge, parentStudentLink, registrationSession, eq, and, inArray, or, isNull, gradeTodaySql } from '@repo/db';
+import { db, sql, user, parentStudentLink, registrationSession, eq, and, inArray, or, isNull, gradeTodaySql } from '@repo/db';
 import {
-  MONEY_LISTS, STAFF_ROLES, ROLES, broadcastLabel, BATCH_LIST_LABELS, WHO_LABELS, CHARGE_KIND_LABELS,
+  STAFF_ROLES, ROLES, broadcastLabel, isPaymentList, BATCH_LIST_LABELS, WHO_LABELS, CHARGE_KIND_LABELS,
   type AudienceDefinitionType, type AudienceWho, type MessageVariable, type BatchList,
 } from '@repo/validations';
 import { getSessionMoney } from './session-money.services';
-import { listCharges, chargeRules, ChargeError } from './charge.services';
+import { listCharges } from './charge.services';
 import { getSetting } from './settings.services';
+import { payableLines, payableCharges, chargeOpenSql, studentPresent } from './payable-now.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -58,14 +59,19 @@ export class AudienceError extends Error {
   }
 }
 
-export const FINANCE_LISTS_ONLY = "Finance sends to a money list only: a session's unpaid families or the holders of a charge";
+export const FINANCE_LISTS_ONLY = "Finance sends to a payment list only: a session's unpaid families or the holders of an unpaid charge";
 
 const FINANCE = [ROLES.FINANCE_OFFICER, ROLES.FINANCE_ADMIN] as string[];
 
-/** Whether the viewer may send to (or read the messages of) this audience. Admin: any; finance: the money lists. */
+/**
+ * Whether the viewer may send to (or read the messages of) this audience. Admin: any; finance: the
+ * payment lists only — a session's unpaid families, or the holders of a charge still unpaid — never
+ * the holders of a paid charge (with the school fee that is nearly every family: the review of
+ * 5c2f2bf, item 2).
+ */
 export function mayUseAudience(viewer: Viewer, def: AudienceDefinitionType): boolean {
   if (viewer.role === ROLES.ADMIN) return true;
-  if (FINANCE.includes(viewer.role ?? '')) return def.kind === 'batch' && MONEY_LISTS.includes(def.list as BatchList);
+  if (FINANCE.includes(viewer.role ?? '')) return isPaymentList(def);
   return false;
 }
 
@@ -73,16 +79,15 @@ export function assertMayUseAudience(viewer: Viewer, def: AudienceDefinitionType
   if (!mayUseAudience(viewer, def)) throw new AudienceError(FINANCE_LISTS_ONLY, 403);
 }
 
-const isMoneyList = (def: AudienceDefinitionType) => def.kind === 'batch' && MONEY_LISTS.includes(def.list as BatchList);
 
 // ─── People ──────────────────────────────────────────────────────────────────
 
-type Person = { id: string; name: string; email: string; role: string; banned: boolean | null };
+type Person = { id: string; name: string; email: string; role: string; banned: boolean | null; leftOn?: string | null };
 const notBanned = or(eq(user.banned, false), isNull(user.banned));
 
 async function people(executor: Executor, ids: string[]): Promise<Map<string, Person>> {
   if (!ids.length) return new Map();
-  const rows = await executor.select({ id: user.id, name: user.name, email: user.email, role: user.role, banned: user.banned })
+  const rows = await executor.select({ id: user.id, name: user.name, email: user.email, role: user.role, banned: user.banned, leftOn: user.leftOn })
     .from(user).where(inArray(user.id, [...new Set(ids)]));
   return new Map(rows.map((r) => [r.id, { ...r, role: r.role ?? '' }]));
 }
@@ -105,7 +110,8 @@ async function parentsOf(executor: Executor, studentIds: string[]) {
 /**
  * A set of students as recipients: each student and/or their approved parents. Per child (a money
  * list), one member per (recipient, student); otherwise one per person, a parent naming their
- * children in the set.
+ * children in the set. A student who has left the school (F0a's leaving) or is barred is in no list,
+ * nor are their parents on their account (the review of 5c2f2bf, item 6).
  */
 async function families(executor: Executor, students: Map<string, Owed | null>, who: AudienceWho, perChild: boolean): Promise<AudienceMember[]> {
   const ids = [...students.keys()];
@@ -114,7 +120,7 @@ async function families(executor: Executor, students: Map<string, Owed | null>, 
   const parentMembers = new Map<string, AudienceMember>();
   for (const sid of ids) {
     const s = studentRows.get(sid);
-    if (!s || s.banned) continue;
+    if (!s || s.banned || s.leftOn) continue;
     const owed = students.get(sid) ?? null;
     const guardians = (parents.get(sid) ?? []).map((p) => p.name);
     if (who !== 'parents') {
@@ -196,85 +202,74 @@ function addOwed(map: Map<string, Owed | null>, studentId: string, add: { amount
   map.set(studentId, o);
 }
 
-/**
- * Whether C's rules let a charge be paid now (`chargeRules` with `forPayment`: its deadline, a
- * service fee still provisional), read in the caller's transaction or a read-only one of its own.
- */
-export async function chargePayableNow(executor: Executor, chargeId: string, now: Date): Promise<boolean> {
-  const check = async (tx: Tx) => {
-    const [c] = await tx.select().from(charge).where(eq(charge.id, chargeId));
-    if (!c || c.status !== 'pending_payment') return false;
-    await chargeRules(tx, c, now, { forPayment: true });
-    return true;
-  };
-  try {
-    return executor === db ? await db.transaction(check) : await check(executor as Tx);
-  } catch (e) {
-    if (e instanceof ChargeError) return false;
-    throw e;
-  }
-}
-
-/** The lines among these under a live instalment plan: their instalments are what is owed. */
-async function planLines(executor: Executor, lineIds: string[]): Promise<Set<string>> {
-  if (!lineIds.length) return new Set();
-  const r = await executor.execute(sql`select registration_id as id from exception
-    where policy_key = 'plan.instalments' and status = 'active' and registration_id in (${sql.join(lineIds.map((i) => sql`${i}`), sql`, `)})`);
-  return new Set((r.rows as { id: string }[]).map((x) => x.id));
-}
+const DAY = 86_400_000;
+/** Past its due date as the Money tab counts it (a whole day late): the overdue text applies. */
+const isOverdue = (due: Date, now: Date) => Math.floor((now.getTime() - due.getTime()) / DAY) > 0;
 
 /**
- * A session's unpaid families, as the Money tab shows them (A's getSessionMoney with its filter,
- * subject and section) and the session's charges awaiting payment (C's listCharges): what each
- * student owes that can be paid now — a line on a provisional board fee (unless the school takes
- * payment on one), a line paid by its instalment plan and a charge C's rules refuse are left out.
+ * A session's unpaid families, as the Money tab shows them (A's getSessionMoney with its subject
+ * and section) and the session's charges awaiting payment (C's listCharges), narrowed by the same
+ * predicates the reminder step reads (payable-now.services.ts): what each student owes and can pay
+ * now — not a line on a provisional board fee (unless the school takes payment on one), one paid by
+ * its instalment plan, one with a payment open or past its effective deadline, nor a charge being
+ * paid or that C's rules refuse. `filter`: everything owed, only what is overdue, or only what is
+ * not yet overdue (the Money tab's "Remind" sends the overdue text to the first, the due text to
+ * the second).
  */
 async function sessionUnpaid(executor: Executor, def: Extract<AudienceDefinitionType, { list: 'session_unpaid' }>, now: Date) {
   const owed = new Map<string, Owed | null>();
   const [session] = await executor.select({ id: registrationSession.id, name: registrationSession.name }).from(registrationSession).where(eq(registrationSession.id, def.sessionId));
   if (!session) throw new AudienceError('Session not found', 404);
   const only = def.studentIds?.length ? new Set(def.studentIds) : null;
+  const wanted = (due: Date) => def.filter === 'unpaid' || (def.filter === 'overdue') === isOverdue(due, now);
   if (def.include !== 'charges') {
-    const money = await getSessionMoney(def.sessionId, { filter: def.filter, ...(def.offerId ? { offerId: def.offerId } : {}), ...(def.sectionId ? { sectionId: def.sectionId } : {}) });
+    const money = await getSessionMoney(def.sessionId, { filter: 'unpaid', ...(def.offerId ? { offerId: def.offerId } : {}), ...(def.sectionId ? { sectionId: def.sectionId } : {}) });
     const payOnProvisional = await getSetting('pricing.payOnProvisionalFee', executor);
-    const lines = (money?.lines ?? []).filter((l) => l.unpaid && (!l.provisional || payOnProvisional) && (!only || only.has(l.student.id)));
-    const planned = await planLines(executor, lines.map((l) => l.id));
+    const lines = (money?.lines ?? []).filter((l) => l.unpaid && (!only || only.has(l.student.id)) && wanted(new Date(l.dueAt)));
+    const payable = await payableLines(executor, lines.map((l) => l.id), now, payOnProvisional);
     for (const l of lines) {
-      if (planned.has(l.id)) continue;
+      if (!payable.has(l.id)) continue;
       addOwed(owed, l.student.id, { amount: l.price, dueAt: new Date(l.dueAt), item: l.item.kind === 'whole' ? l.subject.name : `${l.subject.name} — ${l.item.label}`, sessionId: session.id, sessionName: session.name, lineId: l.id });
     }
   }
   if (def.include !== 'lines' && !def.offerId) {
-    const charges = await listCharges({ sessionId: def.sessionId, status: 'pending_payment' }, { id: 'system', role: ROLES.ADMIN });
+    const charges = (await listCharges({ sessionId: def.sessionId, status: 'pending_payment' }, { id: 'system', role: ROLES.ADMIN }))
+      .filter((c) => c.kind !== 'school_fee_push' && (!only || only.has(c.studentId)) && wanted(new Date(c.dueAt)));
+    const inSection = def.sectionId && charges.length
+      ? new Set(((await executor.execute(sql`select student_id as id from section_membership where section_id = ${def.sectionId} and ended_on is null`)).rows as { id: string }[]).map((r) => r.id))
+      : null;
+    const payable = await payableCharges(executor, charges.filter((c) => !inSection || inSection.has(c.studentId)).map((c) => c.id), now);
     for (const c of charges) {
-      if (only && !only.has(c.studentId)) continue;
-      if (def.filter === 'overdue' && new Date(c.dueAt) >= now) continue;
-      if (c.kind === 'school_fee_push') continue;
-      if (def.sectionId) {
-        const inSection = await executor.execute(sql`select 1 from section_membership where student_id = ${c.studentId} and section_id = ${def.sectionId} and ended_on is null limit 1`);
-        if (!inSection.rows.length) continue;
-      }
-      if (!(await chargePayableNow(executor, c.id, now))) continue;
+      if (!payable.has(c.id)) continue;
       addOwed(owed, c.studentId, { amount: c.amount, dueAt: new Date(c.dueAt), item: c.description, sessionId: session.id, sessionName: session.name, chargeId: c.id });
     }
   }
   return owed;
 }
 
+/**
+ * The holders of a charge kind: of a charge still owed (the step's predicates, then C's rules), or —
+ * the admin only — of any live one, awaiting payment or paid.
+ */
 async function chargeHolders(executor: Executor, def: Extract<AudienceDefinitionType, { list: 'charge_holders' }>, now: Date) {
   const owed = new Map<string, Owed | null>();
-  const statuses = def.unpaidOnly ? ['pending_payment'] : ['pending_payment', 'paid'];
   const rows = await executor.execute(sql`
     select c.id, c.student_id as "studentId", c.amount, c.due_at as "dueAt", c.description, r.session_id as "sessionId", s.name as "sessionName"
     from charge c
     left join registration r on r.id = c.registration_id
     left join registration_session s on s.id = r.session_id
-    where c.kind = ${def.chargeKind} and c.status in (${sql.join(statuses.map((x) => sql`${x}`), sql`, `)})
+    where c.kind = ${def.chargeKind}
+      and ${def.unpaidOnly ? chargeOpenSql : sql`c.status in ('pending_payment', 'paid') and ${studentPresent('c.student_id')}`}
       ${def.academicYear ? sql`and c.academic_year = ${def.academicYear}` : sql``}
     order by c.student_id, c.due_at`);
-  for (const c of rows.rows as { id: string; studentId: string; amount: string; dueAt: string; description: string; sessionId: string | null; sessionName: string | null }[]) {
-    if (!def.unpaidOnly) { if (!owed.has(c.studentId)) owed.set(c.studentId, null); continue; }
-    if (!(await chargePayableNow(executor, c.id, now))) continue;
+  const found = rows.rows as { id: string; studentId: string; amount: string; dueAt: string; description: string; sessionId: string | null; sessionName: string | null }[];
+  if (!def.unpaidOnly) {
+    for (const c of found) owed.set(c.studentId, null);
+    return owed;
+  }
+  const payable = await payableCharges(executor, found.map((c) => c.id), now);
+  for (const c of found) {
+    if (!payable.has(c.id)) continue;
     addOwed(owed, c.studentId, { amount: Number(c.amount), dueAt: new Date(c.dueAt), item: c.description, sessionId: c.sessionId, sessionName: c.sessionName, chargeId: c.id });
   }
   return owed;
@@ -303,7 +298,7 @@ export async function audienceLabel(executor: Executor, def: AudienceDefinitionT
   switch (def.list) {
     case 'session_unpaid': {
       const s = await sessionInfo(executor, def.sessionId).catch(() => null);
-      return `${def.filter === 'overdue' ? 'Overdue' : 'Unpaid'} in ${s?.name ?? 'a session'}${def.studentIds?.length ? ` (${def.studentIds.length} chosen)` : ''} — ${who}`;
+      return `${def.filter === 'overdue' ? 'Overdue' : def.filter === 'due' ? 'Not yet due' : 'Unpaid'} in ${s?.name ?? 'a session'}${def.studentIds?.length ? ` (${def.studentIds.length} chosen)` : ''} — ${who}`;
     }
     case 'section': {
       const r = await executor.execute(sql`select name from section where id = ${def.sectionId}`);
@@ -377,7 +372,7 @@ export async function resolveAudience(def: AudienceDefinitionType, context: { se
   const familyOnly = members.every((m) => m.role === 'student' || m.role === 'parent');
   if (familyOnly) fills.push('guardian', 'student');
   if (session) fills.push('session', 'closes');
-  if (isMoneyList(def) && !(def.kind === 'batch' && def.list === 'charge_holders' && !def.unpaidOnly)) fills.push('amount', 'due', 'items');
+  if (isPaymentList(def)) fills.push('amount', 'due', 'items');
   return { members, session, fills, label: await audienceLabel(executor, def) };
 }
 

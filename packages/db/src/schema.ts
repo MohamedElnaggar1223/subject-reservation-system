@@ -3111,9 +3111,13 @@ export const reminderSent = pgTable(
     sessionId: text("session_id").references(() => registrationSession.id, { onDelete: "set null" }),
     messageId: text("message_id").notNull().references(() => message.id, { onDelete: "restrict" }),
     sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
+    // The school's day (Cairo) the scheduler sent it on: one reminder a day per target and date, so a
+    // rule changed during the day never sends a second (the review of 5c2f2bf, item 5).
+    sentOn: date("sent_on", { mode: "string" }).notNull(),
   },
   (table) => [
     uniqueIndex("reminderSent_claim_idx").on(table.kind, table.targetKind, table.targetId, table.anchorOn, table.offsetDays),
+    uniqueIndex("reminderSent_one_a_day_idx").on(table.kind, table.targetKind, table.targetId, table.anchorOn, table.sentOn),
     index("reminderSent_messageId_idx").on(table.messageId),
     index("reminderSent_studentId_idx").on(table.studentId),
     check("reminder_sent_target_kind_valid", sql`${table.targetKind} IN ('line', 'charge', 'session', 'series_entry', 'series_retake', 'verification')`),

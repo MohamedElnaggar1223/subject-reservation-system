@@ -1,0 +1,1 @@
+ALTER TABLE "reminder_sent" ALTER COLUMN "sent_on" SET NOT NULL;

@@ -18,10 +18,10 @@ import {
   eq, and, lte, inArray, desc, asc,
 } from '@repo/db';
 import {
-  AudienceDefinition, MONEY_LISTS, ROLES, CHARGE_KINDS, CHARGE_KIND_LABELS, variablesIn, renderMessage, messageDate, messageAmount, messageList,
+  AudienceDefinition, isPaymentList, ROLES, CHARGE_KINDS, CHARGE_KIND_LABELS, variablesIn, renderMessage, messageDate, messageAmount, messageList,
   MESSAGE_VARIABLE_LABELS, REMINDER_KIND_LABELS, academicYearStartOf,
   type AudienceDefinitionType, type CreateMessageType, type MessageTexts, type MessageVars, type MessageVariable, type MessageLanguage,
-  type MessageLanguageChoice, type NotificationType, type SaveTemplateType, type BatchList, type ReminderKind,
+  type MessageLanguageChoice, type NotificationType, type SaveTemplateType, type ReminderKind,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { sendMessageEmail } from '../integrations/email';
@@ -134,7 +134,8 @@ export async function deliverInTx(
 /** The notification type a staff message's in-app rows carry: a broadcast as before, a money list as a reminder, else a message. */
 function notificationTypeOf(def: AudienceDefinitionType): NotificationType {
   if (def.kind === 'broadcast') return 'BULK_ANNOUNCEMENT';
-  if (def.kind === 'batch' && MONEY_LISTS.includes(def.list as BatchList)) return 'PAYMENT_REMINDER';
+  // A payment list only: the holders of a paid charge are not being asked to pay (the review of 5c2f2bf, item 2).
+  if (isPaymentList(def)) return 'PAYMENT_REMINDER';
   return 'SCHOOL_MESSAGE';
 }
 
@@ -500,9 +501,14 @@ export async function updateTemplate(id: string, input: SaveTemplateType, actorI
     if (!before) throw new MessageError('Template not found', 404);
     const clash = await tx.execute(sql`select 1 from message_template where lower(name) = lower(${input.name}) and id <> ${id}`);
     if (clash.rows.length) throw new MessageError(`A template is already called "${input.name}"`, 409);
-    if (!input.active && before.key) {
-      const used = await tx.execute(sql`select kind from reminder_rule where (template_id = ${id} or overdue_template_id = ${id}) and active and inherits_at is null limit 1`);
-      if (used.rows.length) throw new MessageError('A reminder rule sends this template: change the rule before switching it off', 409);
+    if (!input.active) {
+      // Any text a live rule sends — the school's or one the admin wrote (the review of 5c2f2bf, item
+      // 10). A rule set meanwhile takes this text FOR SHARE (putRule), so it waits for this lock.
+      const [used] = (await tx.execute(sql`select rr.kind, s.name as session from reminder_rule rr left join registration_session s on s.id = rr.session_id
+        where (rr.template_id = ${id} or rr.overdue_template_id = ${id}) and rr.active and rr.inherits_at is null order by rr.session_id nulls first limit 1`)).rows as { kind: ReminderKind; session: string | null }[];
+      if (used) {
+        throw new MessageError(`The reminder "${REMINDER_KIND_LABELS[used.kind]}" (${used.session ?? 'every session'}) sends this text: change that rule before switching the text off`, 409);
+      }
     }
     const { reason, ...fields } = input;
     const [row] = await tx.update(messageTemplate).set({ ...fields, updatedBy: actorId }).where(eq(messageTemplate.id, id)).returning();

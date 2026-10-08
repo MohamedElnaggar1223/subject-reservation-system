@@ -61,6 +61,18 @@ export const ROLE_WORD: Record<string, string> = {
   coordinator: 'Coordinator', teacher: 'Teacher', gate: 'Gate',
 };
 
+/**
+ * A count and its noun as one text ("14 people"), so the page translator sees the number with its
+ * word and gives Arabic its agreement ("14 شخصًا", not "14 أشخاص"; lib/i18n-messages.ts).
+ */
+const NOUNS = {
+  person: ['person', 'people'], family: ['family', 'families'], student: ['student', 'students'],
+  item: ['item', 'items'], day: ['day', 'days'], message: ['message', 'messages'],
+} as const;
+export function countWords(n: number, noun: keyof typeof NOUNS): string {
+  return `${n} ${n === 1 ? NOUNS[noun][0] : NOUNS[noun][1]}`;
+}
+
 /** "7 days before, 3 days before, the day, 3 days after". */
 export function daysWords(offsets: number[]): string[] {
   return [...offsets].sort((a, b) => a - b).map((o) => (o === 0 ? 'the day' : o < 0 ? (o === -1 ? '1 day before' : `${-o} days before`) : (o === 1 ? '1 day after' : `${o} days after`)));

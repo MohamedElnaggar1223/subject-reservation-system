@@ -10,14 +10,17 @@
  * effective deadline (A's `effectiveDeadlinesOf`, B's To verify list).
  *
  * The step, every minute: for each target, the latest day of its rule whose send hour (Cairo) has
- * come — never earlier, and once: each reminder is **claimed** in `reminder_sent`, whose unique
- * index (kind × target × anchor day × offset) makes a second scheduler's insert conflict and send
- * nothing (ST-06, ST-12). The claim, the message, its notifications and deliveries and the audit
- * row commit together; the target is locked `FOR SHARE` and read again in that transaction, so a
- * payment confirmed meanwhile (which locks its line `FOR UPDATE`) is never followed by a reminder
- * to pay it. A line that cannot be paid yet (a provisional board fee), one paid by its instalment
- * plan (its instalments are reminded), one with a payment open, and a charge C's rules refuse are
- * skipped.
+ * come — never earlier, and once: a target already claimed for that day, or already reminded today
+ * about that date, is left out before anything is locked; each reminder is **claimed** in
+ * `reminder_sent`, whose unique indexes (kind × target × anchor day × offset, and kind × target ×
+ * anchor day × the day it is sent) make a second scheduler's insert — or a second reminder the same
+ * day after a rule changed — conflict and send nothing (ST-06, ST-12). The claim, the message, its
+ * notifications and deliveries and the audit row commit together. In that transaction the group's
+ * sessions are taken `FOR KEY SHARE` first (A's order, §2.1: the session before its lines — the
+ * claim's session foreign key would otherwise take it after the lines, against an admin's session
+ * change that holds the session and then its lines), then the targets `FOR SHARE`, then they are
+ * read again, so a payment taken meanwhile is never followed by a reminder to pay it. What is owed
+ * and payable now is payable-now.services.ts's: shared with the money lists of "Remind".
  */
 
 import { randomUUID } from 'crypto';
@@ -32,7 +35,8 @@ import {
 import { getSetting } from './settings.services';
 import { logAction, type AuditContext } from './audit.services';
 import { deliverInTx, MessageError, type DeliveryTarget } from './message.services';
-import { familyMembers, broadcastMembers, chargePayableNow, type Owed, type AudienceMember } from './message-audience.services';
+import { familyMembers, broadcastMembers, type Owed, type AudienceMember } from './message-audience.services';
+import { linePayableNowSql, chargeOpenSql, chargePayableNow } from './payable-now.services';
 import { effectiveDeadlinesOf } from './deadline.services';
 import { formatSeriesName } from './statement.services';
 import { logger } from '../lib/logger';
@@ -57,19 +61,10 @@ const NOTIFICATION_TYPE: Record<ReminderKind, NotificationType> = {
   declared_retakes_to_verify: 'STAFF_REMINDER',
 };
 
-const OWED_LINE = sql`(r.status = 'pending_payment' or (r.status = 'preregistered' and not exists (
-  select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed')))`;
-const NO_OPEN_LINE_PAYMENT = sql`not exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id
-  where pr.registration_id = r.id and p.status in ('pending', 'pending_verification'))`;
-const NO_LIVE_PLAN = sql`not exists (select 1 from exception e where e.policy_key = 'plan.instalments' and e.status = 'active' and e.registration_id = r.id)`;
-const NO_OPEN_CHARGE_PAYMENT = sql`not exists (select 1 from payment_charge pc join payment p on p.id = pc.payment_id
-  where pc.charge_id = c.id and p.status in ('pending', 'pending_verification'))`;
-/** A pushed school fee (alias c) whose student has a school-fee payment open for its year: being paid. */
-const SCHOOL_FEE_PAYMENT_OPEN = sql`exists (select 1 from payment p where p.student_id = c.student_id and p.purpose = 'school_fee'
-  and p.academic_year = c.academic_year and p.status in ('pending', 'pending_verification'))`;
 const WAITING_LINE = sql`(r.status in ('pending_approval', 'pending_payment') or (r.status = 'preregistered' and not exists (
   select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed')))`;
 const DEADLINE = sql.raw('line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)');
+const ids = (xs: string[]) => sql.join(xs.map((x) => sql`${x}`), sql`, `);
 
 const asDate = (v: unknown) => (v instanceof Date ? v : new Date(String(v)));
 
@@ -80,12 +75,11 @@ async function candidates(kind: ReminderKind, now: Date, payOnProvisional: boole
     case 'payment_due': {
       const lines = (await db.execute(sql`
         select r.id, r.student_id, r.session_id, r.due_at, r.created_at from registration r
-        where ${OWED_LINE} and (not r.price_provisional or ${payOnProvisional}) and ${NO_OPEN_LINE_PAYMENT} and ${NO_LIVE_PLAN}
-          and (${DEADLINE} is null or ${DEADLINE} > ${now})
+        where ${linePayableNowSql(now, payOnProvisional)}
         order by r.id`)).rows as Record<string, unknown>[];
       const charges = (await db.execute(sql`
         select c.id, c.student_id, r.session_id, c.due_at, c.created_at from charge c left join registration r on r.id = c.registration_id
-        where c.status = 'pending_payment' and c.kind <> 'school_fee_push' and ${NO_OPEN_CHARGE_PAYMENT}
+        where ${chargeOpenSql} and c.kind <> 'school_fee_push'
         order by c.id`)).rows as Record<string, unknown>[];
       return [
         ...lines.map((r) => ({ targetKind: 'line' as const, targetId: r.id as string, anchor: asDate(r.due_at), since: asDate(r.created_at), studentId: r.student_id as string, sessionId: r.session_id as string })),
@@ -95,8 +89,7 @@ async function candidates(kind: ReminderKind, now: Date, payOnProvisional: boole
     case 'school_fee_due': {
       const rows = (await db.execute(sql`
         select c.id, c.student_id, c.due_at, c.created_at from charge c
-        where c.kind = 'school_fee_push' and c.status = 'pending_payment'
-          and not ${SCHOOL_FEE_PAYMENT_OPEN}
+        where c.kind = 'school_fee_push' and ${chargeOpenSql}
         order by c.id`)).rows as Record<string, unknown>[];
       return rows.map((c) => ({ targetKind: 'charge' as const, targetId: c.id as string, anchor: asDate(c.due_at), since: asDate(c.created_at), studentId: c.student_id as string, sessionId: null }));
     }
@@ -177,8 +170,9 @@ export async function runReminders(now: Date = new Date()) {
       if (kind === 'session_closing' && c.legacyClosingSent && offset >= -1) continue;
       due.push({ ...c, rule, offset, templateId: offset > 0 && rule.overdueTemplateId ? rule.overdueTemplateId : rule.templateId });
     }
+    const fresh = await notClaimed(kind, due, now);
     const groups = new Map<string, Due[]>();
-    for (const d of due) groups.set(groupKey(kind, d), [...(groups.get(groupKey(kind, d)) ?? []), d]);
+    for (const d of fresh) groups.set(groupKey(kind, d), [...(groups.get(groupKey(kind, d)) ?? []), d]);
     for (const items of groups.values()) {
       try {
         const n = await sendGroup(kind, items, now, payOnProvisional);
@@ -189,6 +183,33 @@ export async function runReminders(now: Date = new Date()) {
     }
   }
   return { claimed, messages, off: false };
+}
+
+/**
+ * The due targets not yet reminded: a target whose claim for this day of its date exists, or which
+ * was already reminded today about that date (a rule changed during the day), is left out before
+ * anything is locked, so a reminder already sent costs nothing on the minutes after it (the review
+ * of 5c2f2bf, items 4 and 5). The unique indexes on the claims stay the guard; this only spares the
+ * work.
+ */
+async function notClaimed(kind: ReminderKind, due: Due[], now: Date): Promise<Due[]> {
+  if (!due.length) return due;
+  const today = anchorDay(now);
+  const taken = new Set<string>();
+  for (let i = 0; i < due.length; i += 1000) {
+    const chunk = due.slice(i, i + 1000);
+    const rows = (await db.execute(sql`
+      select target_kind, target_id, anchor_on::text as anchor_on, offset_days, sent_on::text as sent_on from reminder_sent
+      where kind = ${kind} and target_id in (${ids([...new Set(chunk.map((d) => d.targetId))])})`)).rows as { target_kind: string; target_id: string; anchor_on: string; offset_days: number; sent_on: string }[];
+    for (const r of rows) {
+      taken.add(`${r.target_kind}|${r.target_id}|${r.anchor_on}|o${r.offset_days}`);
+      if (r.sent_on === today) taken.add(`${r.target_kind}|${r.target_id}|${r.anchor_on}|today`);
+    }
+  }
+  return due.filter((d) => {
+    const key = `${d.targetKind}|${d.targetId}|${anchorDay(d.anchor)}`;
+    return !taken.has(`${key}|o${d.offset}`) && !taken.has(`${key}|today`);
+  });
 }
 
 type Live = { item: Due; amount: number; label: string; dueAt: Date; sessionName: string | null };
@@ -209,6 +230,15 @@ async function lockAndRecheck(tx: Tx, kind: ReminderKind, items: Due[], now: Dat
   const ids = (k: TargetKind) => items.filter((i) => i.targetKind === k).map((i) => i.targetId).sort();
   const live: Live[] = [];
   const lineIds = ids('line');
+  // The sessions first (A's order, RESERVATIONS.md §2.1: the session before its lines). The claims'
+  // session foreign key takes FOR KEY SHARE on each session; taken here, before the lines, it never
+  // waits behind an admin's session change (updateSession, correctSessionSeries: the session
+  // FOR UPDATE, then its lines) while holding the lines that change wants — the deadlock of the
+  // review of 5c2f2bf, item 3.
+  const sessionIds = [...new Set(items.map((i) => i.sessionId).filter((x): x is string => !!x))].sort();
+  if (sessionIds.length) {
+    await tx.execute(sql`select id from registration_session where id in (${sql.join(sessionIds.map((x) => sql`${x}`), sql`, `)}) order by id for key share`);
+  }
   await lockShare(tx, 'registration', [...new Set([...lineIds, ...ids('verification')])].sort());
   await lockShare(tx, 'charge', ids('charge'));
   if (lineIds.length) {
@@ -217,7 +247,7 @@ async function lockAndRecheck(tx: Tx, kind: ReminderKind, items: Due[], now: Dat
       from registration r join subject s on s.id = r.subject_id join session_offer_item i on i.id = r.offer_item_id
       join registration_session rs on rs.id = r.session_id
       where r.id in (${sql.join(lineIds.map((x) => sql`${x}`), sql`, `)})
-        and ${OWED_LINE} and (not r.price_provisional or ${payOnProvisional}) and ${NO_OPEN_LINE_PAYMENT} and ${NO_LIVE_PLAN}
+        and ${linePayableNowSql(now, payOnProvisional)}
       order by r.id`)).rows as Record<string, unknown>[];
     for (const r of rows) {
       const item = items.find((i) => i.targetKind === 'line' && i.targetId === r.id)!;
@@ -231,8 +261,7 @@ async function lockAndRecheck(tx: Tx, kind: ReminderKind, items: Due[], now: Dat
     const rows = (await tx.execute(sql`
       select c.id, c.amount, c.description, c.due_at, rs.name as "sessionName" from charge c
       left join registration r on r.id = c.registration_id left join registration_session rs on rs.id = r.session_id
-      where c.id in (${sql.join(chargeIds.map((x) => sql`${x}`), sql`, `)}) and c.status = 'pending_payment' and ${NO_OPEN_CHARGE_PAYMENT}
-        and not (c.kind = 'school_fee_push' and ${SCHOOL_FEE_PAYMENT_OPEN})
+      where c.id in (${sql.join(chargeIds.map((x) => sql`${x}`), sql`, `)}) and ${chargeOpenSql}
       order by c.id`)).rows as Record<string, unknown>[];
     for (const c of rows) {
       const item = items.find((i) => i.targetKind === 'charge' && i.targetId === c.id)!;
@@ -267,9 +296,10 @@ async function staff(tx: Tx, roles: string[]) {
 }
 
 /**
- * One reminder message for a group of due targets, in one transaction: the targets locked and read
- * again, the message, the claims (`ON CONFLICT DO NOTHING`: what another scheduler claimed first is
- * skipped; nothing claimed → nothing written), the notifications and deliveries, the audit row.
+ * One reminder message for a group of due targets, in one transaction: the sessions, then the
+ * targets locked and read again, the message, the claims (`ON CONFLICT DO NOTHING` on either unique
+ * index: what another scheduler claimed first, or a target already reminded today about that date,
+ * is skipped; nothing claimed → nothing written), the notifications and deliveries, the audit row.
  */
 async function sendGroup(kind: ReminderKind, items: Due[], now: Date, payOnProvisional: boolean): Promise<number> {
   const rule = items[0]!.rule;
@@ -293,8 +323,9 @@ async function sendGroup(kind: ReminderKind, items: Due[], now: Date, payOnProvi
       });
       const claims = await tx.insert(reminderSent).values(live.map((l) => ({
         id: randomUUID(), ruleId: rule.id, kind, targetKind: l.item.targetKind, targetId: l.item.targetId, anchorOn: anchorDay(l.item.anchor),
-        offsetDays: l.item.offset, studentId: l.item.studentId, sessionId: l.item.sessionId, messageId,
-      }))).onConflictDoNothing({ target: [reminderSent.kind, reminderSent.targetKind, reminderSent.targetId, reminderSent.anchorOn, reminderSent.offsetDays] })
+        offsetDays: l.item.offset, studentId: l.item.studentId, sessionId: l.item.sessionId, messageId, sentOn: anchorDay(now),
+      // Either unique index: the same day of the date claimed, or a reminder about that date already today.
+      }))).onConflictDoNothing()
         .returning({ targetKind: reminderSent.targetKind, targetId: reminderSent.targetId });
       if (!claims.length) throw new NothingClaimed();
       const won = live.filter((l) => claims.some((c) => c.targetKind === l.item.targetKind && c.targetId === l.item.targetId));
@@ -384,8 +415,10 @@ export async function listRules() {
  */
 export async function putRule(input: PutReminderRuleType, actorId: string, ctx?: AuditContext) {
   return db.transaction(async (tx) => {
+    // The texts FOR SHARE, so a text being switched off (updateTemplate, FOR UPDATE) and a rule set to send it serialise.
     const templates = await tx.select({ id: messageTemplate.id, active: messageTemplate.active, name: messageTemplate.name }).from(messageTemplate)
-      .where(inArray(messageTemplate.id, [input.templateId, ...(input.overdueTemplateId ? [input.overdueTemplateId] : [])]));
+      .where(inArray(messageTemplate.id, [input.templateId, ...(input.overdueTemplateId ? [input.overdueTemplateId] : [])]))
+      .orderBy(messageTemplate.id).for('share');
     for (const id of [input.templateId, input.overdueTemplateId].filter((x): x is string => !!x)) {
       const t = templates.find((x) => x.id === id);
       if (!t) throw new MessageError('Template not found', 404);

@@ -1,4 +1,4 @@
-Control email-failure-recorded: a failed email recorded on its delivery, with why undone; test test/08s-messages-reminders.test.ts -t "a failed email is recorded"; started 2026-10-08T08:34:32Z; restored after the run
+Control email-failure-recorded: a failed email recorded on its delivery, with why undone; test test/08s-messages-reminders.test.ts -t "a failed email is recorded"; started 2026-10-08T10:13:35Z; restored after the run
 Tests run:
    ↓ 08s: messages and reminders > one rule per kind for every session, seeded with the defaults; the school texts in English and Arabic; WhatsApp has no sender
    ↓ 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > nothing before its day in Cairo, nothing before the send hour; at 09:00 Cairo on day −7 both families are reminded, once
@@ -15,13 +15,21 @@ Tests run:
    ↓ 08s: messages and reminders > a scheduled message is sent by the tick at its time and not before; a cancelled one is never sent; a sent one cannot be cancelled
    ↓ 08s: messages and reminders > families cannot delete a message or a notification: there is no such route; marking read keeps every row, the student's too
    ↓ 08s: messages and reminders > a template with every variable renders in both languages for each family
-   × 08s: messages and reminders > a failed email is recorded on its delivery, the in-app copy is still delivered, and the others are sent 5622ms
+   × 08s: messages and reminders > a failed email is recorded on its delivery, the in-app copy is still delivered, and the others are sent 5707ms
    ↓ 08s: messages and reminders > staff reminders: the closing of a session to families; a board deadline to the staff with how many lines wait; a declared retake to the coordinator until verified
    ↓ 08s: messages and reminders > reminders off (the setting): nothing goes out, and nothing missed meanwhile is sent as a backlog
    ↓ 08s: messages and reminders > two ticks at the same minute send a scheduled message once: the second finds it locked and leaves it
    ↓ 08s: messages and reminders > a cancel landing while the tick sends the message waits for it, and is refused: the message was sent
    ↓ 08s: messages and reminders > an email claimed by a sender that stopped half way is marked failed at the next tick, never sent again
    ↓ 08s: messages and reminders > a session the old 24-hour closing reminder already reached is not reminded again on its day −1
+   ↓ 08s: messages and reminders > a pushed school fee is reminded by the school-fee rule, 14 days before its date; paid, its reminders stop
+   ↓ 08s: messages and reminders > Remind and every money list leave out what is being paid: a line whose InstaPay transfer is being checked, a charge with its payment open (item 1)
+   ↓ 08s: messages and reminders > finance writes to the holders of an unpaid charge only; the admin may write to the holders of a paid one, and that is a message, not a payment reminder (item 2)
+   ↓ 08s: messages and reminders > a target already reminded is not locked again on the minutes after: the step leaves it out before it locks anything (item 4)
+   ↓ 08s: messages and reminders > a rule changed during the day never sends a family a second reminder that day about the same date (item 5)
+   ↓ 08s: messages and reminders > a student who has left the school is in no list and is not reminded, a pending charge of theirs included (item 6)
+   ↓ 08s: messages and reminders > a text a rule sends — one the admin wrote included — cannot be switched off; the refusal names the rule (item 10)
+   ↓ 08s: messages and reminders > "Remind" per line: what is past its due date gets the overdue text, what is not yet due the due text (item 8)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
  FAIL  test/08s-messages-reminders.test.ts > 08s: messages and reminders > a failed email is recorded on its delivery, the in-app copy is still delivered, and the others are sent
@@ -34,14 +42,14 @@ Error: waitFor: timed out
     483|     await new Promise((r) => setTimeout(r, 100));
     484|   }
  ❯ emailsSettled test/08s-messages-reminders.test.ts:54:3
- ❯ test/08s-messages-reminders.test.ts:499:7
+ ❯ test/08s-messages-reminders.test.ts:510:7
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
  Test Files  1 failed (1)
-      Tests  1 failed | 21 skipped (22)
-   Start at  11:34:32
-   Duration  8.91s (transform 554ms, setup 2ms, collect 195ms, tests 7.32s, environment 0ms, prepare 29ms)
+      Tests  1 failed | 29 skipped (30)
+   Start at  13:13:35
+   Duration  9.20s (transform 587ms, setup 2ms, collect 200ms, tests 7.55s, environment 0ms, prepare 30ms)
 
  Test Files  1 failed (1)
-      Tests  1 failed | 21 skipped (22)
-   Start at  11:34:32
-   Duration  8.91s (transform 554ms, setup 2ms, collect 195ms, tests 7.32s, environment 0ms, prepare 29ms)
+      Tests  1 failed | 29 skipped (30)
+   Start at  13:13:35
+   Duration  9.20s (transform 587ms, setup 2ms, collect 200ms, tests 7.55s, environment 0ms, prepare 30ms)

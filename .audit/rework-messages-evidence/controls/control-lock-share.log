@@ -1,4 +1,4 @@
-Control lock-share: the reminder step's FOR SHARE on its targets before it reads them again undone; test test/08t-rework-races.test.ts -t "a payment taken while the reminder step reads the line"; started 2026-10-08T08:33:38Z; restored after the run
+Control lock-share: the reminder step's FOR SHARE on its targets before it reads them again undone; test test/08t-rework-races.test.ts -t "a payment taken while the reminder step reads the line"; started 2026-10-08T10:13:08Z; restored after the run
 Tests run:
    ↓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
    ↓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
@@ -36,9 +36,10 @@ Tests run:
    ↓ 08t: the rework races — money (step C) > the desk collects a line and another line's instalment while both lines' board fees are re-priced: every line taken in one id-ordered pass, so the two never deadlock
    ↓ 08t: the rework races — money (step C) > the last instalment's confirmation racing the line's deadline > the confirmation first (begun before the deadline): the line is captured; the sweep after the deadline finds it confirmed and settles nothing
    ↓ 08t: the rework races — money (step C) > the last instalment's confirmation racing the line's deadline > the sweep first (after the deadline): the line expires and its deposits are settled once; the confirmation is refused and the payment failed
-   × 08t: the rework races — reminders (step D) > a payment taken while the reminder step reads the line: the step waits for the line, reads it being paid, and reminds nothing 534ms
+   × 08t: the rework races — reminders (step D) > a payment taken while the reminder step reads the line: the step waits for the line, reads it being paid, and reminds nothing 558ms
    ↓ 08t: the rework races — reminders (step D) > a reminder claimed while the payment is taken: the payment waits for the line, the reminder goes out once, before the payment confirms
    ↓ 08t: the rework races — reminders (step D) > two senders of the same queued email: each claims it before sending (queued → sending), so it is sent once
+   ↓ 08t: the rework races — reminders (step D) > the reminder step and the admin's change of the session's payment date at once: the step takes the session before its lines (A's order), so neither waits on the other in a cycle (the review of 5c2f2bf, item 3)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
  FAIL  test/08t-rework-races.test.ts > 08t: the rework races — reminders (step D) > a payment taken while the reminder step reads the line: the step waits for the line, reads it being paid, and reminds nothing
@@ -49,23 +50,23 @@ AssertionError: expected [ { offset_days: -7, …(1) } ] to deeply equal []
 + [
 +   {
 +     "offset_days": -7,
-+     "sent_at": "2026-10-08 08:33:41.8151+00",
++     "sent_at": "2026-10-08 10:13:12.790478+00",
 +   },
 + ]
- ❯ test/08t-rework-races.test.ts:1409:32
-    1407|     }
-    1408|     expect((await one<{ status: string }>(`select status from registra…
-    1409|     expect(await claims(line)).toEqual([]);
+ ❯ test/08t-rework-races.test.ts:1416:32
+    1414|     }
+    1415|     expect((await one<{ status: string }>(`select status from registra…
+    1416|     expect(await claims(line)).toEqual([]);
        |                                ^
-    1410|     expect(await reminders(f.parent.email)).toEqual([]);
-    1411|   });
+    1417|     expect(await reminders(f.parent.email)).toEqual([]);
+    1418|   });
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
  Test Files  1 failed (1)
-      Tests  1 failed | 38 skipped (39)
-   Start at  11:33:38
-   Duration  3.65s (transform 594ms, setup 2ms, collect 269ms, tests 1.99s, environment 0ms, prepare 35ms)
+      Tests  1 failed | 39 skipped (40)
+   Start at  13:13:08
+   Duration  3.93s (transform 626ms, setup 2ms, collect 216ms, tests 2.15s, environment 0ms, prepare 33ms)
 
  Test Files  1 failed (1)
-      Tests  1 failed | 38 skipped (39)
-   Start at  11:33:38
-   Duration  3.65s (transform 594ms, setup 2ms, collect 269ms, tests 1.99s, environment 0ms, prepare 35ms)
+      Tests  1 failed | 39 skipped (40)
+   Start at  13:13:08
+   Duration  3.93s (transform 626ms, setup 2ms, collect 216ms, tests 2.15s, environment 0ms, prepare 33ms)

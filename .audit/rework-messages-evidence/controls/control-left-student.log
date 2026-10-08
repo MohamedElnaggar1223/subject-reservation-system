@@ -1,4 +1,4 @@
-Control finance-lists: finance sends to and reads the money lists only undone; test test/08s-messages-reminders.test.ts -t "a batch to a session"; started 2026-10-08T10:13:45Z; restored after the run
+Control left-student: a student who has left is in no money list and not reminded (review item 6) undone; test test/08s-messages-reminders.test.ts -t "a student who has left the school"; started 2026-10-08T10:14:17Z; restored after the run
 Tests run:
    ↓ 08s: messages and reminders > one rule per kind for every session, seeded with the defaults; the school texts in English and Arabic; WhatsApp has no sender
    ↓ 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > nothing before its day in Cairo, nothing before the send hour; at 09:00 Cairo on day −7 both families are reminded, once
@@ -10,7 +10,7 @@ Tests run:
    ↓ 08s: messages and reminders > an instalment and a charge are reminded by the payment rule, together; the line its plan pays is not
    ↓ 08s: messages and reminders > a session's own rule overrides the rule for every session there; switched off, nothing goes; dropped, the session follows every session's rule again
    ↓ 08s: messages and reminders > "parents of grade 11" is an audience: the parents of every grade-11 student today, not a parent of grade 10, not the students
-   × 08s: messages and reminders > a batch to a session's unpaid families (the Money tab's "Remind", sent by the finance officer): the families who owe, with what they owe; not the family that paid; only those ticked 1055ms
+   ↓ 08s: messages and reminders > a batch to a session's unpaid families (the Money tab's "Remind", sent by the finance officer): the families who owe, with what they owe; not the family that paid; only those ticked
    ↓ 08s: messages and reminders > a direct message to chosen people; a variable an audience cannot fill is refused before anything is sent
    ↓ 08s: messages and reminders > a scheduled message is sent by the tick at its time and not before; a cancelled one is never sent; a sent one cannot be cancelled
    ↓ 08s: messages and reminders > families cannot delete a message or a notification: there is no such route; marking read keeps every row, the student's too
@@ -27,29 +27,33 @@ Tests run:
    ↓ 08s: messages and reminders > finance writes to the holders of an unpaid charge only; the admin may write to the holders of a paid one, and that is a message, not a payment reminder (item 2)
    ↓ 08s: messages and reminders > a target already reminded is not locked again on the minutes after: the step leaves it out before it locks anything (item 4)
    ↓ 08s: messages and reminders > a rule changed during the day never sends a family a second reminder that day about the same date (item 5)
-   ↓ 08s: messages and reminders > a student who has left the school is in no list and is not reminded, a pending charge of theirs included (item 6)
+   × 08s: messages and reminders > a student who has left the school is in no list and is not reminded, a pending charge of theirs included (item 6) 352ms
    ↓ 08s: messages and reminders > a text a rule sends — one the admin wrote included — cannot be switched off; the refusal names the rule (item 10)
    ↓ 08s: messages and reminders > "Remind" per line: what is past its due date gets the overdue text, what is not yet due the due text (item 8)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
- FAIL  test/08s-messages-reminders.test.ts > 08s: messages and reminders > a batch to a session's unpaid families (the Money tab's "Remind", sent by the finance officer): the families who owe, with what they owe; not the family that paid; only those ticked
-AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 403, …(1) }
+ FAIL  test/08s-messages-reminders.test.ts > 08s: messages and reminders > a student who has left the school is in no list and is not reminded, a pending charge of theirs included (item 6)
+AssertionError: expected [ -7 ] to deeply equal []
 - Expected
 + Received
-  {
--   "error": "Finance sends to a payment list only: a session's unpaid families or the holders of an unpaid charge",
--   "status": 403,
-+   "error": "\"\"",
-+   "status": 201,
-  }
- ❯ test/08s-messages-reminders.test.ts:400:16
+- []
++ [
++   -7,
++ ]
+ ❯ test/08s-messages-reminders.test.ts:778:37
+    776|     expect((await apiResponse(adm.api.v1.messages.audiences.resolve.$p…
+    777|     await step(cairoAt(shift(cairoDay(due), -7), 9, 0));
+    778|     expect(await offsetsOf(fee.id)).toEqual([]);
+       |                                     ^
+    779|     expect(await notificationsFor(f.parent.email, 'PAYMENT_REMINDER'))…
+    780|   });
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
  Test Files  1 failed (1)
       Tests  1 failed | 29 skipped (30)
-   Start at  13:13:45
-   Duration  4.77s (transform 605ms, setup 2ms, collect 219ms, tests 2.88s, environment 0ms, prepare 33ms)
+   Start at  13:14:17
+   Duration  4.02s (transform 579ms, setup 7ms, collect 213ms, tests 2.21s, environment 0ms, prepare 33ms)
 
  Test Files  1 failed (1)
       Tests  1 failed | 29 skipped (30)
-   Start at  13:13:45
-   Duration  4.77s (transform 605ms, setup 2ms, collect 219ms, tests 2.88s, environment 0ms, prepare 33ms)
+   Start at  13:14:17
+   Duration  4.02s (transform 579ms, setup 7ms, collect 213ms, tests 2.21s, environment 0ms, prepare 33ms)

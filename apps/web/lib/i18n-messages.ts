@@ -117,6 +117,12 @@ export const messagesArabic: Record<string, string> = {
   'the board series': 'دورة المجلس',
   'how many': 'العدد',
   'Variables:': 'المتغيرات:',
+  'was due': 'كان مستحقًا',
+  'overdue': 'متأخر',
+  'What is past its due date gets the overdue text.': 'ما فات موعده يصله نص التأخير.',
+  'The payment reminder, now, to the parents and the student of each family ticked: what they owe in this session and by when. What is past its due date gets the overdue text.':
+    'تذكير الدفع الآن إلى أولياء الأمور والطالب في كل أسرة محددة: ما عليهم في هذه الجلسة وموعده. وما فات موعده يصله نص التأخير.',
+  'Not yet due': 'لم يحن موعده',
 
   // ── The log ──
   'Sent and scheduled': 'المرسلة والمجدولة',
@@ -236,7 +242,7 @@ export const messagesArabic: Record<string, string> = {
   'Announcement': 'إعلان',
 
   // ── The API's refusals ──
-  "Finance sends to a money list only: a session's unpaid families or the holders of a charge": 'ترسل المالية إلى قوائم الأموال فقط: الأسر غير المسددة في جلسة أو أصحاب رسم',
+  "Finance sends to a payment list only: a session's unpaid families or the holders of an unpaid charge": 'ترسل المالية إلى قوائم الدفع فقط: الأسر غير المسددة في جلسة أو أصحاب رسم غير مسدد',
   "Finance reads the deliveries of money lists and payment reminders only": 'تقرأ المالية توصيلات قوائم الأموال وتذكيرات الدفع فقط',
   'Nobody is in this audience now: there is nothing to send': 'لا أحد ضمن هذا الجمهور الآن: لا يوجد ما يُرسل',
   'WhatsApp is not connected yet: the school has no WhatsApp Business account, so nothing can be sent there': 'واتساب غير متصل بعد: لا تملك المدرسة حساب واتساب للأعمال، فلا يمكن الإرسال عليه',
@@ -251,15 +257,51 @@ export const messagesArabic: Record<string, string> = {
 
 /** Sentences of these screens that carry a name, a number or a variable. */
 const WHO_AR: Record<string, string> = { 'Parents and students': 'أولياء الأمور والطلاب', Parents: 'أولياء الأمور', Students: 'الطلاب' };
-const DAYS_AR = (w: string) => (w === 'the day' ? 'يوم الموعد' : w === '1 day before' ? 'قبل يوم واحد' : w === '1 day after' ? 'بعد يوم واحد'
-  : w.replace(/^(\d+) days before$/, 'قبل $1 أيام').replace(/^(\d+) days after$/, 'بعد $1 أيام'));
+
+/**
+ * A number with its noun as Arabic counts it (the review of 5c2f2bf, item 10): one, two (the dual),
+ * 3–10 with the plural, 11–99 with the singular in the accusative ("14 يومًا", never "14 أيام"),
+ * hundreds with the singular. `dualGenitive` after a preposition ("قبل يومين").
+ */
+type ArNoun = { one: string; two: string; twoGenitive: string; few: string; many: string; hundred: string };
+const AR_NOUNS: Record<string, ArNoun> = {
+  day: { one: 'يوم واحد', two: 'يومان', twoGenitive: 'يومين', few: 'أيام', many: 'يومًا', hundred: 'يوم' },
+  person: { one: 'شخص واحد', two: 'شخصان', twoGenitive: 'شخصين', few: 'أشخاص', many: 'شخصًا', hundred: 'شخص' },
+  family: { one: 'أسرة واحدة', two: 'أسرتان', twoGenitive: 'أسرتين', few: 'أسر', many: 'أسرة', hundred: 'أسرة' },
+  student: { one: 'طالب واحد', two: 'طالبان', twoGenitive: 'طالبين', few: 'طلاب', many: 'طالبًا', hundred: 'طالب' },
+  item: { one: 'بند واحد', two: 'بندان', twoGenitive: 'بندين', few: 'بنود', many: 'بندًا', hundred: 'بند' },
+  message: { one: 'رسالة واحدة', two: 'رسالتان', twoGenitive: 'رسالتين', few: 'رسائل', many: 'رسالة', hundred: 'رسالة' },
+};
+const EN_NOUN: Record<string, string> = {
+  day: 'day', days: 'day', person: 'person', people: 'person', family: 'family', families: 'family',
+  student: 'student', students: 'student', item: 'item', items: 'item', message: 'message', messages: 'message',
+};
+export function arCount(n: number, noun: string, genitive = false): string {
+  const w = AR_NOUNS[noun]!;
+  if (n === 1) return w.one;
+  if (n === 2) return genitive ? w.twoGenitive : w.two;
+  const r = n % 100;
+  if (r >= 3 && r <= 10) return `${n} ${w.few}`;
+  if (r >= 11 && r <= 99) return `${n} ${w.many}`;
+  return `${n} ${w.hundred}`;
+}
+const COUNT = /^(\d+) (days?|people|person|famil(?:y|ies)|students?|items?|messages?)$/;
+const countAr = (text: string, genitive = false) => {
+  const m = COUNT.exec(text);
+  return m ? arCount(Number(m[1]), EN_NOUN[m[2]!]!, genitive) : null;
+};
+const DAYS_AR = (w: string) => {
+  if (w === 'the day') return 'يوم الموعد';
+  const m = /^(\d+ days?) (before|after)$/.exec(w);
+  return m ? `${m[2] === 'before' ? 'قبل' : 'بعد'} ${countAr(m[1]!, true)}` : w;
+};
 
 export function translateMessagesText(text: string, exact: (t: string) => string | null = () => null): string | null {
   const word = (t: string) => exact(t) ?? t;
   const rules: [RegExp, (m: RegExpExecArray) => string][] = [
     // An audience as the picker and the log name it (the session's and the people's names are data).
-    [/^(Unpaid|Overdue) in (.+?)( \((\d+) chosen\))? — (Parents and students|Parents|Students)$/,
-      (m) => `${m[1] === 'Unpaid' ? 'غير المسددين' : 'المتأخرون'} في ${m[2]}${m[4] ? ` (${m[4]} مختارة)` : ''} — ${WHO_AR[m[5]!]}`],
+    [/^(Unpaid|Overdue|Not yet due) in (.+?)( \((\d+) chosen\))? — (Parents and students|Parents|Students)$/,
+      (m) => `${m[1] === 'Unpaid' ? 'غير المسددين' : m[1] === 'Overdue' ? 'المتأخرون' : 'من لم يحن موعدهم'} في ${m[2]}${m[4] ? ` (${m[4]} مختارة)` : ''} — ${WHO_AR[m[5]!]}`],
     [/^Section (.+) — (Parents and students|Parents|Students)$/, (m) => `قسم ${m[1]} — ${WHO_AR[m[2]!]}`],
     [/^Reserved (.+) in (.+) — (Parents and students|Parents|Students)$/, (m) => `من حجزوا ${m[1]} في ${m[2]} — ${WHO_AR[m[3]!]}`],
     [/^(Unpaid|Holders of) (.+?)( \d{4}-\d{4})? — (Parents and students|Parents|Students)$/,
@@ -267,15 +309,19 @@ export function translateMessagesText(text: string, exact: (t: string) => string
     [/^(.+) with (.+) — (Parents and students|Parents|Students)$/, (m) => `${m[1]} مع ${word(m[2]!)} — ${WHO_AR[m[3]!]}`],
     [/^Families of grade (\d+)$/, (m) => `أسر الصف ${m[1]}`],
     [/^Grade (\d+) students$/, (m) => `طلاب الصف ${m[1]}`],
-    [/^(\d+) people$/, (m) => `${m[1]} أشخاص`],
     [/^Reminder: (.+?)(?: \((.+)\))?$/, (m) => `تذكير: ${word(m[1]!)}${m[2] ? ` (${m[2].split(', ').map(DAYS_AR).join('، ')})` : ''}`],
     [/^This audience cannot fill (.+): choose a list that has it, name a session, or take it out of the text$/, (m) => `لا يستطيع هذا الجمهور ملء ${m[1]}: اختر قائمة فيها هذه القيمة، أو حدد جلسة، أو احذفها من النص`],
     [/^This message was already (sent|cancelled|failed): only a scheduled message can be cancelled$/, (m) => `هذه الرسالة ${m[1] === 'sent' ? 'أُرسلت' : m[1] === 'cancelled' ? 'أُلغيت' : 'فشلت'} بالفعل: لا تُلغى إلا الرسالة المجدولة`],
     [/^The template "(.+)" is switched off: switch it on in Templates, or write the text$/, (m) => `النص «${m[1]}» متوقف: شغّله في النصوص أو اكتب النص`],
     [/^A saved audience is already called "(.+)"$/, (m) => `توجد قائمة محفوظة باسم «${m[1]}» بالفعل`],
     [/^A template is already called "(.+)"$/, (m) => `يوجد نص باسم «${m[1]}» بالفعل`],
-    [/^(\d+) days before$/, (m) => `قبل ${m[1]} أيام`],
-    [/^(\d+) days after$/, (m) => `بعد ${m[1]} أيام`],
+    [/^(\d+ days?) (before|after)$/, (m) => DAYS_AR(m[0])],
+    [COUNT, (m) => countAr(m[0])!],
+    [/^Send to (.+)$/, (m) => `إرسال إلى ${countAr(m[1]!) ?? m[1]}`],
+    [/^Sent to (.+)$/, (m) => `أُرسلت إلى ${countAr(m[1]!) ?? m[1]}`],
+    [/^Remind (\d+ famil(?:y|ies))$/, (m) => `تذكير ${countAr(m[1]!)}`],
+    [/^(\d+ messages?), one about each child$/, (m) => `${countAr(m[1]!)}، واحدة عن كل طفل`],
+    [/^then every (\d+ days?) (until .+)$/, (m) => `ثم كل ${countAr(m[1]!, true)} ${word(m[2]!)}`],
     [/^1 day before$/, () => 'قبل يوم واحد'],
     [/^1 day after$/, () => 'بعد يوم واحد'],
     [/^(\d{2}):00 Cairo time$/, (m) => `${m[1]}:00 بتوقيت القاهرة`],

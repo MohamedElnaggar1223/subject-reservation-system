@@ -18,7 +18,7 @@ import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-stat
 import { ReasonModal } from '~/components/ui/reason-modal';
 import { InstantText } from '~/app/(app)/exams/exams-shared';
 import {
-  fetchMessages, fetchDeliveries, MESSAGES_KEY, StatusBadge, ChannelCounts, CHANNEL_WORD, DELIVERY_TONE, DELIVERY_WORD, ROLE_WORD, type MessageRow,
+  fetchMessages, fetchDeliveries, countWords, MESSAGES_KEY, StatusBadge, ChannelCounts, CHANNEL_WORD, DELIVERY_TONE, DELIVERY_WORD, ROLE_WORD, type MessageRow,
 } from './messages-shared';
 
 const SOURCES = ['all', 'staff', 'reminder', 'legacy_announcement'] as const;
@@ -67,7 +67,7 @@ export function MessageLog({ openId, onOpen }: { openId: string | null; onOpen: 
                   </td>
                   <td className="px-4 py-2">
                     <div className="text-foreground"><bdi>{m.audience.label}</bdi></div>
-                    {m.people !== null && <div className="text-xs text-muted-foreground"><span>{m.people}</span> <span>{m.people === 1 ? 'person' : 'people'}</span></div>}
+                    {m.people !== null && <div className="text-xs text-muted-foreground"><span>{countWords(m.people, 'person')}</span></div>}
                   </td>
                   <td className="px-4 py-2">
                     <div className="font-medium text-foreground" data-i18n-skip="true"><bdi>{m.title}</bdi></div>

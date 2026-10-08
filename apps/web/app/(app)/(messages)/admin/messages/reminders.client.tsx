@@ -21,7 +21,7 @@ import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-stat
 import { INPUT_CLASS } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import { InstantText } from '~/app/(app)/exams/exams-shared';
 import {
-  fetchRules, fetchSent, fetchTemplates, fetchLists, RULES_KEY, TEMPLATES_KEY, MESSAGES_KEY, daysWords, ChannelCounts, type RuleRow, type TemplateRow,
+  fetchRules, fetchSent, fetchTemplates, fetchLists, RULES_KEY, TEMPLATES_KEY, MESSAGES_KEY, daysWords, countWords, ChannelCounts, type RuleRow, type TemplateRow,
 } from './messages-shared';
 import { Deliveries } from './log.client';
 
@@ -117,7 +117,7 @@ function RuleEditor({ rule, templates, title }: { rule: RuleRow; templates: Temp
         <div className="space-y-1">
           <p className="font-medium text-foreground" data-i18n-skip={rule.sessionId ? 'true' : undefined}>{title}</p>
           <p className="text-foreground">{daysWords(rule.offsetsDays).map((w, i) => <span key={i}>{i > 0 && ', '}<span>{w}</span></span>)}</p>
-          {rule.repeatEveryDays && <p className="text-muted-foreground"><span>then every</span> <span>{rule.repeatEveryDays}</span> <span>days</span> <span>{REMINDER_UNTIL_LABELS[rule.until as keyof typeof REMINDER_UNTIL_LABELS]}</span></p>}
+          {rule.repeatEveryDays && <p className="text-muted-foreground"><span>{`then every ${countWords(rule.repeatEveryDays, 'day')} ${REMINDER_UNTIL_LABELS[rule.until as keyof typeof REMINDER_UNTIL_LABELS]}`}</span></p>}
           <p className="text-xs text-muted-foreground">
             <span>{rule.channels.includes('email') ? 'In the app and by email' : 'In the app'}</span> · <span>{nameOf(rule.templateId)}</span>
             {rule.overdueTemplateId && <> · <span>after the date:</span> <span>{nameOf(rule.overdueTemplateId)}</span></>}
@@ -251,8 +251,8 @@ function WentOut({ openId, onOpen }: { openId: string | null; onOpen: (id: strin
                   </td>
                   <td className="px-4 py-2 text-xs">{daysWords(s.offsets).map((w, i) => <span key={i}>{i > 0 && ', '}<span>{w}</span></span>)}</td>
                   <td className="px-4 py-2 text-xs text-muted-foreground">
-                    {s.students > 0 ? <><span>{s.students}</span> <span>{s.students === 1 ? 'student' : 'students'}</span></> : <><span>{s.targets}</span> <span>{s.targets === 1 ? 'item' : 'items'}</span></>}
-                    {s.people !== null && <> · <span>{s.people}</span> <span>{s.people === 1 ? 'person' : 'people'}</span></>}
+                    <span>{s.students > 0 ? countWords(s.students, 'student') : countWords(s.targets, 'item')}</span>
+                    {s.people !== null && <> · <span>{countWords(s.people, 'person')}</span></>}
                   </td>
                   <td className="px-4 py-2"><ChannelCounts c={s.deliveries.in_app} /></td>
                   <td className="px-4 py-2"><ChannelCounts c={s.deliveries.email} /></td>

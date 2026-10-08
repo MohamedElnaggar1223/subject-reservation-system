@@ -1,6 +1,6 @@
-Control finance-lists: finance sends to and reads the money lists only undone; test test/08s-messages-reminders.test.ts -t "a batch to a session"; started 2026-10-08T10:13:45Z; restored after the run
+Control hour-clamp: the send hour 1 to 23 (review item 10) undone; test test/08s-messages-reminders.test.ts -t "one rule per kind"; started 2026-10-08T10:14:29Z; restored after the run
 Tests run:
-   ↓ 08s: messages and reminders > one rule per kind for every session, seeded with the defaults; the school texts in English and Arabic; WhatsApp has no sender
+   × 08s: messages and reminders > one rule per kind for every session, seeded with the defaults; the school texts in English and Arabic; WhatsApp has no sender 19ms
    ↓ 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > nothing before its day in Cairo, nothing before the send hour; at 09:00 Cairo on day −7 both families are reminded, once
    ↓ 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > a day whose hour passed while nothing ran goes out at the next tick, once; the days between are quiet
    ↓ 08s: messages and reminders > a payment reminder: −7, −3, the day, +3, then every 3 days until paid > the line paid between two days stops its reminders; the unpaid one is reminded on the day, then with the overdue text at +3, +6, +9
@@ -10,7 +10,7 @@ Tests run:
    ↓ 08s: messages and reminders > an instalment and a charge are reminded by the payment rule, together; the line its plan pays is not
    ↓ 08s: messages and reminders > a session's own rule overrides the rule for every session there; switched off, nothing goes; dropped, the session follows every session's rule again
    ↓ 08s: messages and reminders > "parents of grade 11" is an audience: the parents of every grade-11 student today, not a parent of grade 10, not the students
-   × 08s: messages and reminders > a batch to a session's unpaid families (the Money tab's "Remind", sent by the finance officer): the families who owe, with what they owe; not the family that paid; only those ticked 1055ms
+   ↓ 08s: messages and reminders > a batch to a session's unpaid families (the Money tab's "Remind", sent by the finance officer): the families who owe, with what they owe; not the family that paid; only those ticked
    ↓ 08s: messages and reminders > a direct message to chosen people; a variable an audience cannot fill is refused before anything is sent
    ↓ 08s: messages and reminders > a scheduled message is sent by the tick at its time and not before; a cancelled one is never sent; a sent one cannot be cancelled
    ↓ 08s: messages and reminders > families cannot delete a message or a notification: there is no such route; marking read keeps every row, the student's too
@@ -32,24 +32,26 @@ Tests run:
    ↓ 08s: messages and reminders > "Remind" per line: what is past its due date gets the overdue text, what is not yet due the due text (item 8)
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
- FAIL  test/08s-messages-reminders.test.ts > 08s: messages and reminders > a batch to a session's unpaid families (the Money tab's "Remind", sent by the finance officer): the families who owe, with what they owe; not the family that paid; only those ticked
-AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 403, …(1) }
+ FAIL  test/08s-messages-reminders.test.ts > 08s: messages and reminders > one rule per kind for every session, seeded with the defaults; the school texts in English and Arabic; WhatsApp has no sender
+AssertionError: expected 200 to be 400 // Object.is equality
 - Expected
 + Received
-  {
--   "error": "Finance sends to a payment list only: a session's unpaid families or the holders of an unpaid charge",
--   "status": 403,
-+   "error": "\"\"",
-+   "status": 201,
-  }
- ❯ test/08s-messages-reminders.test.ts:400:16
+- 400
++ 200
+ ❯ test/08s-messages-reminders.test.ts:135:154
+    133|     expect(settings).toEqual({ enabled: true, sendAtHour: 9 });
+    134|     // The hour is 1 to 23: midnight does not exist on the day Egypt's…
+    135|     expect((await refused(adm.api.v1.settings[':key'].$put({ param: { …
+       |                                                                                                                                                          ^
+    136|     const templates = await apiResponse(officer.api.v1.messages.templa…
+    137|     const due = templates.find((t) => t.key === 'payment_due')!;
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
  Test Files  1 failed (1)
       Tests  1 failed | 29 skipped (30)
-   Start at  13:13:45
-   Duration  4.77s (transform 605ms, setup 2ms, collect 219ms, tests 2.88s, environment 0ms, prepare 33ms)
+   Start at  13:14:31
+   Duration  3.70s (transform 619ms, setup 3ms, collect 304ms, tests 1.93s, environment 0ms, prepare 38ms)
 
  Test Files  1 failed (1)
       Tests  1 failed | 29 skipped (30)
-   Start at  13:13:45
-   Duration  4.77s (transform 605ms, setup 2ms, collect 219ms, tests 2.88s, environment 0ms, prepare 33ms)
+   Start at  13:14:31
+   Duration  3.70s (transform 619ms, setup 3ms, collect 304ms, tests 1.93s, environment 0ms, prepare 38ms)
