@@ -1,0 +1,1203 @@
+
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+> vitest run "test/08n"
+
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -0.1 ms (measured within 2 ms)
+stderr | test/08n-session-offers.test.ts > 08n: sessions and offers
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08n-session-offers.test.ts > 08n: sessions and offers
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers
+[INFO] [1ce1cba9-c6ff-4125-9689-11b70c6661ef] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers
+[email:stub] To: admin.n08s@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers
+[INFO] [8e0181e1-2f07-4a33-936e-5418fdef86d4] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers
+[INFO] [2000a0d4-df8e-4986-8a61-b5d312e88263] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers
+[INFO] [83c57335-13c6-460c-a915-441489c7d2c7] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers
+[INFO] [d7853de4-d1c2-46fe-bd53-934d8f06f77b] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers
+[INFO] [7bbb7585-9c03-4c4c-ae7d-bc153d9d7286] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers
+[INFO] [d3000232-9dad-4f3c-b97e-e57185fccf6c] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+[INFO] [7cd6ddd0-99a0-4a2c-9ac0-c4189890f349] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+[INFO] [0183bf80-1309-43cd-a9e4-eb849cd70c8a] GET /v1/sessions/17094287-6807-4795-befb-e11d0342f2b1/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+[INFO] [b510e425-4a0f-4c76-baef-675402645f7f] POST /v1/sessions/17094287-6807-4795-befb-e11d0342f2b1/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+[INFO] [1b5c55fc-7f21-4930-8d4e-271c197274c1] GET /v1/sessions/17094287-6807-4795-befb-e11d0342f2b1/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+[INFO] [78584109-0334-4d93-ad93-75a79a07e5f0] POST /v1/sessions/17094287-6807-4795-befb-e11d0342f2b1/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+[INFO] [bfa10b8e-e987-4d7b-8423-5d699315b134] GET /v1/sessions/17094287-6807-4795-befb-e11d0342f2b1/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+[INFO] [ec0b6ac3-8256-4acf-a928-2706a69bd922] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+[INFO] [327572d7-3d8b-4b59-b486-89121475ffbb] GET /v1/sessions/17094287-6807-4795-befb-e11d0342f2b1/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers > the next June copied from it: offers, teachers and items in the next year's series; board fees provisional; audited
+[INFO] [4dbb1506-2675-4ec0-83d2-319fe8af28f4] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers > the next June copied from it: offers, teachers and items in the next year's series; board fees provisional; audited
+[INFO] [753dec56-018d-4726-ac6c-e8e6588d732b] GET /v1/sessions/2fb5ea45-694e-4906-a34a-2a4f80902894/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers > the next June copied from it: offers, teachers and items in the next year's series; board fees provisional; audited
+[INFO] [f5cf9174-c075-45d0-b8e9-a21a9fdbe3a9] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: sessions and offers > the next June copied from it: offers, teachers and items in the next year's series; board fees provisional; audited
+[INFO] [94d64aa7-13cb-468b-a4d6-f49c19bcdff2] POST /v1/sessions/da3c0240-9eb9-4eb7-9ee9-9944cc6baf7b/copy-from
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [ababa995-9273-4b7f-88fa-61687d913470] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[email:stub] To: admin.n08w@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [c099a906-da47-4ba4-abc7-afe975fe0e87] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [cc24ad5f-bb70-41d1-b17c-a9cdf8a18e06] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [197f1dd5-ad75-4703-a6be-5c0a5e7ef813] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [618ea68b-b0e1-45c5-8acf-296559eecad6] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [3d4f806a-cae1-46de-89f2-4188bfbf198e] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [692c0d20-f848-413f-b84a-ea71fd4e7db6] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [f95a881d-dd8d-4dd4-8b97-d5d1115b432b] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [0fdc2393-0bac-4bda-b51a-e33dd220fdcc] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [805d043d-100c-458d-a1c1-8ef3038b3f91] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [7c8233bc-bcd7-4372-9056-99757db62814] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [6b29d321-e54e-453e-b4aa-76e0e607d715] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [eb25652e-96dd-4514-9721-8774619dbe08] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [1df0ad9a-7ece-44c9-bdab-3753815359b4] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [fa145f5c-9318-4164-b0e2-4204e265a044] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [4ca73d91-4456-4f46-8ede-c6f232eb51d1] POST /v1/sessions/d7649520-48d6-4c15-a055-c81842106065/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [88f27853-32f6-4873-8490-b44cfe939b69] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [500f8bf4-6d6a-4d45-90fb-1ed8a6d205e7] POST /v1/sessions/d7649520-48d6-4c15-a055-c81842106065/offers/6017c8b3-a61a-438e-a7f5-9e8ddafaf481/items
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [454b297f-3891-4ad5-8592-23bda2fe75a6] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [cbf11549-10d2-41ea-a76f-fa18ec0b408d] POST /v1/sessions/d7649520-48d6-4c15-a055-c81842106065/offers/6017c8b3-a61a-438e-a7f5-9e8ddafaf481/items
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [c1f7acb7-8b12-438e-afd8-f15a7c070740] POST /v1/sessions/d7649520-48d6-4c15-a055-c81842106065/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [d427f441-4901-477f-8bec-b9f6e5475984] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [8d764f3d-6272-45f6-bf2b-dfa6fa0e2e5c] POST /v1/sessions/d7649520-48d6-4c15-a055-c81842106065/offers/6b474112-9689-4fce-9572-2c6ad64e3ffe/items
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [ad825007-f39c-4dff-897c-6d8acde4736b] POST /v1/sessions/d7649520-48d6-4c15-a055-c81842106065/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [bc3d691c-657b-4026-a76b-1bbebb432ed0] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [3f7c4903-4406-474b-8212-d2839a97f311] POST /v1/sessions/d7649520-48d6-4c15-a055-c81842106065/offers/83d52bc8-cbdf-4837-b4b3-b2a2b83cdb99/items
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > an IGCSE item is refused in October and January; Cambridge AS defaults to November, Pearson AS to October
+[INFO] [3a110385-3bfa-4fa8-bc03-523f517304f6] POST /v1/sessions/d7649520-48d6-4c15-a055-c81842106065/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > an IGCSE item is refused in October and January; Cambridge AS defaults to November, Pearson AS to October
+[INFO] [a44fc972-d0f5-43ff-9ee8-c29eaa9398d5] PUT /v1/sessions/d7649520-48d6-4c15-a055-c81842106065/offers/80ef65d8-4853-4bec-9e13-16c677aaa95c/items/611c8b80-a78c-4894-a1ee-c746d6a93089
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > an IGCSE item is refused in October and January; Cambridge AS defaults to November, Pearson AS to October
+[INFO] [e31a6872-55ad-449d-a626-81ead0c47580] PUT /v1/sessions/d7649520-48d6-4c15-a055-c81842106065/offers/80ef65d8-4853-4bec-9e13-16c677aaa95c/items/611c8b80-a78c-4894-a1ee-c746d6a93089
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [da76003f-9c4b-4137-9a8b-2d18649ec138] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[email:stub] To: parent.n08w-oct-a-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[email:stub] To: student.n08w-oct-a-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [6706989c-1e0e-4f03-b971-90dd4207f550] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [bcaeb440-458d-4df1-8c30-57450129c148] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [beac0b35-930c-4ea5-9084-c5e34d1ce4ce] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[email:stub] To: parent.n08w-oct-b-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[email:stub] To: student.n08w-oct-b-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [21a036d2-d7c9-4b15-910a-d8d9d59239d9] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [34cef90e-d176-4289-bf0b-7556b2a7bce0] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [884f930a-3efc-4172-a3e8-4b1f5dc49e1d] PUT /v1/board-series/f93a74f4-af57-44d8-8883-75de5ed04457
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [b2c3e9ae-e77b-4caf-a845-a905a30254bc] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[email:stub] To: parent.n08w-oct-c-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[email:stub] To: student.n08w-oct-c-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [518f5e8a-13ed-4c60-b62a-34aa5db2ff56] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [be342294-ff86-412b-b344-436930b1b3ea] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [4ec4efd0-6335-4f2e-beb7-2fc716a4a63b] GET /v1/registrations/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a Cambridge retake of the previous June is reservable until the retake deadline after the entry deadline passed; a first entry is not; a retake of an older sitting is cut off at the entry deadline; the retake is due by the retake deadline
+[INFO] [da597e44-8446-48f5-b12d-528129f43242] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a Cambridge retake of the previous June is reservable until the retake deadline after the entry deadline passed; a first entry is not; a retake of an older sitting is cut off at the entry deadline; the retake is due by the retake deadline
+[email:stub] To: parent.n08w-retake-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a Cambridge retake of the previous June is reservable until the retake deadline after the entry deadline passed; a first entry is not; a retake of an older sitting is cut off at the entry deadline; the retake is due by the retake deadline
+[email:stub] To: student.n08w-retake-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a Cambridge retake of the previous June is reservable until the retake deadline after the entry deadline passed; a first entry is not; a retake of an older sitting is cut off at the entry deadline; the retake is due by the retake deadline
+[INFO] [14d4616b-626b-4fe6-bb0a-4f5653718a26] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a Cambridge retake of the previous June is reservable until the retake deadline after the entry deadline passed; a first entry is not; a retake of an older sitting is cut off at the entry deadline; the retake is due by the retake deadline
+[INFO] [ed035b16-a69f-45af-8385-cf08df604827] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+[INFO] [d9255880-6ba4-496c-a7dc-5ee24eb2a688] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+[INFO] [ebe51cee-0576-43e4-8e2e-95c2b9f1be41] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+[INFO] [700b7a70-e83d-4c44-9dcf-5aac4ef30a91] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+[INFO] [d56ed2ec-68d9-4a26-a4da-c7bd19d91a9c] POST /v1/sessions/d7649520-48d6-4c15-a055-c81842106065/offers/6017c8b3-a61a-438e-a7f5-9e8ddafaf481/items
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+[INFO] [9219c572-f192-40dc-9bb3-5e2ebe3f24b0] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+[email:stub] To: parent.n08w-bare-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+[email:stub] To: student.n08w-bare-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+[INFO] [4e754485-ee74-4b84-9feb-741c1abfb634] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+[INFO] [de0fe9e0-1485-4ba7-b237-18a9bddfe050] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed
+[INFO] [86b709dc-89ea-4756-a151-0764b96b5297] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed
+[email:stub] To: parent.n08w-grad-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed
+[email:stub] To: student.n08w-grad-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed
+[INFO] [92d94f00-1f32-4503-9979-11de4f3e4e14] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed
+[INFO] [75694d19-af1e-4632-9958-dafa24492aa3] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed
+[INFO] [2df95e3e-07ba-47a0-9fde-e8d9e14ba77f] PUT /v1/settings/eligibility.graduateRetakes
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [d44c0832-c77b-4cad-a3a4-155a07e8d12e] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: admin.n08c@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [12a6bf43-0e6e-441c-ab53-43ba22c9d0bb] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [b3568a46-866f-47bc-bd23-3d89340267fc] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [d8adca40-0f37-4ad7-b153-45b5626b8d30] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [b8e8b47c-eed0-4aca-8824-d71e129425ca] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [2c80f0f3-568e-41c8-9a27-d60a50934f9e] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [f7809300-db83-4927-a767-9f95223e576b] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [9b777cb9-7ecc-4f01-9021-a456b0cdbe40] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [271482cd-bcef-46e4-b706-362e33822581] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [a780df45-0c69-4975-87ac-e6b543cedc70] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [b2c63c2d-7ed3-4466-9c04-634deca404ea] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [d5f85a3d-eb23-4c41-9bef-10e13d823b19] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [bd683aa2-d35b-475d-97f7-0052dd4cbe50] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [d212faf8-9b5c-48af-8350-41bf63a1a19f] POST /v1/sessions/0668c05d-96e1-449a-8c8b-5bc2e78d1c49/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [40b3bbfc-913a-4ae3-9118-e06a478a49c4] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [e65008ac-509e-4f7b-9840-c32df8207748] POST /v1/sessions/0668c05d-96e1-449a-8c8b-5bc2e78d1c49/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [4c6181c2-e5d2-4413-87bb-a6e2c4cf7bd8] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: parent.n08c-paid-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: student.n08c-paid-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [4a46c364-ecfe-49ea-8396-0e903b79d183] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [bbd81969-1183-42b9-9795-e0b1cb2346f1] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [15e4c843-04ac-44a3-90d6-6dd60f0ab329] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: parent.n08c-unfunded-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: student.n08c-unfunded-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [07a9b6f8-a70f-4cb0-852d-13c014058da1] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [3efff214-9ce6-447b-9e55-94bfcbf916b3] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [fd2ba3aa-edf8-43eb-a4fa-423e66c4ca59] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: parent.n08c-open-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: student.n08c-open-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [fef38bdd-ac61-43cd-a972-8a5df79d2080] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [aa6765da-9efa-452f-a4c6-08115f2aae23] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [c6ec1e1c-1664-417a-a085-86d8cd8a60ba] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: parent.n08c-held-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: student.n08c-held-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [3d6c59ea-052c-47df-a135-b72d89b72d63] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [9b2ba120-c198-42a8-aa9c-6820158d175b] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [4d2dd75a-f679-4f39-8b72-99c325cbdd23] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: parent.n08c-later-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: student.n08c-later-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [d0a471c2-3d51-481d-ba3c-962360cf8605] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [634e2d3a-f9d9-4e32-86d6-ad7b28df45f8] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [f5da2b10-df4d-419a-8244-823a88017b3b] POST /v1/registrations/preregister
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [ff50cb90-4ea0-4c77-aad0-3614bc66cc60] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [66f43459-4c0d-4b61-8d62-833ce78f5410] POST /v1/payments/841fde86-dc5e-42d3-84c7-ebd779a53e54/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [c993754c-1165-4ed0-b0e0-b2c5536cff19] POST /v1/registrations/preregister
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: parent.n08c-paid-y9s4@test.local | Subject: Payment confirmed — November 2026 – January 2027 — n08c-y9s4 | Attachments: receipt-841fde86-dc5e-42d3-84c7-ebd779a53e54.pdf
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [224a56e1-1e42-4752-abab-18462162ed74] POST /v1/registrations/preregister
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [fc90c9cf-7e03-49b2-ba6c-b7b11929a6c7] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [2f531d46-3f77-42c7-9b10-514d4078c499] POST /v1/registrations/preregister
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [6160a833-38d5-45c6-a465-87021533e27c] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [eb385e61-8c10-4e53-a22c-2f7962402b7d] POST /v1/payments/d78acafc-a64f-41c1-aa52-ed2d532813e9/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [a1e3467d-7307-47a5-a0f1-a51b8b2fa130] POST /v1/registrations/preregister
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: parent.n08c-held-y9s4@test.local | Subject: Payment confirmed — November 2026 – January 2027 — n08c-y9s4 | Attachments: receipt-d78acafc-a64f-41c1-aa52-ed2d532813e9.pdf
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [6790894a-ae88-4259-a6c2-77408fc6926a] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [02cd0181-4618-48e4-8ae6-92ab05b5d299] POST /v1/payments/97c54016-6c18-4deb-bf0d-2e0066e10213/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[INFO] [c5a9a404-7cdc-4d25-9cc5-79c4ed75b3a6] POST /v1/students/FtOvGrF945W6LZP4I4RqeLbGXQcvOifc/leave
+
+stdout | test/08n-session-offers.test.ts > 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+[email:stub] To: parent.n08c-later-y9s4@test.local | Subject: Payment confirmed — November 2026 – January 2027 — n08c-y9s4 | Attachments: receipt-97c54016-6c18-4deb-bf0d-2e0066e10213.pdf
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [1ec457b0-33dc-48e5-b657-d0bd8fa3ce19] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: admin.n08r@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [60d82fc5-8ccf-474f-b24a-0b14038464e4] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [0e54ebfb-b92b-45ee-a1a5-d320831db8f9] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [f046741b-47ff-4e54-8fc2-495d44ee9d2b] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [408ddc17-7c5d-4b4e-9a6f-56c42f0b5617] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [d31f861c-fee0-45d4-99bc-11d2ceb2fa8e] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [b48bffaf-8458-40ee-9a08-d81f7b6f5aeb] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08w-oct-a-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08w-oct-b-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08w-oct-c-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08c-later-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08w-retake-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08c-paid-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08w-bare-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08w-grad-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08c-held-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08c-unfunded-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08c-open-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08w-oct-a-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08w-oct-b-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08c-paid-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08w-oct-c-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08w-retake-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08w-bare-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08w-grad-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08c-unfunded-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08c-open-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08c-held-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08c-later-y9s4@test.local | Subject: Registration Open — June 2027 — n08r-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [61d9608b-cca3-402e-88a0-fd630eb38029] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08w-oct-a-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08w-oct-b-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08w-oct-c-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08c-later-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08w-retake-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08c-paid-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08w-bare-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08w-grad-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08c-held-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08c-unfunded-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: student.n08c-open-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08w-oct-a-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08w-oct-b-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08c-paid-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08w-oct-c-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08w-retake-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08w-bare-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08w-grad-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08c-unfunded-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08c-open-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08c-held-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[email:stub] To: parent.n08c-later-y9s4@test.local | Subject: Registration Open — June 2027 — n08r2-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [72eedf6f-b85b-47ea-af81-e630c774170e] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [5a0bafb0-9a38-43a5-8b58-00b2fd6a9a8b] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [c0f6209c-442d-41af-a38a-d16550305f17] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [6758cbed-ac84-468f-8b9b-629fcb831063] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [31be1678-7b16-4a50-bccf-7429583aa7ed] POST /v1/sessions/c83d056d-6e97-4cd2-9c8d-028de77cdd57/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [7b364fef-62e9-4607-b436-dc32bf5d358e] POST /v1/sessions/51ac5d27-915e-44cc-a081-1d23e0557f03/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [cfb8db4b-2981-4630-9604-ac1a47001153] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [e5f02bd7-8d19-4a30-962f-537f997c682b] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [847099d8-1994-4097-803c-000f27b54401] POST /v1/sessions/c83d056d-6e97-4cd2-9c8d-028de77cdd57/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [9dbc23f1-aa84-4c74-8acb-7ba77df3a06c] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [e1cb8e4f-b07b-4db3-91da-daf54d7603c7] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [64c6fab9-1632-427f-8692-46b95b412644] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [992f8d82-1a20-41ee-9114-c5f45d513003] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [ffa102d3-1742-4e2d-96d0-d152327577f3] POST /v1/sessions/c83d056d-6e97-4cd2-9c8d-028de77cdd57/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5)
+[INFO] [64daa725-e126-4165-a0f8-4b9fd5d1ee3b] POST /v1/sessions/c83d056d-6e97-4cd2-9c8d-028de77cdd57/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can
+[INFO] [849a3e3b-e118-458c-a869-157e5d609098] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can
+[email:stub] To: parent.n08r-excl-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can
+[email:stub] To: student.n08r-excl-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can
+[INFO] [4d976c5a-f757-4dd3-9b95-f322c213487e] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can
+[INFO] [57b6b9ef-17d1-4f89-87dd-c9899152afa5] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > the same entry twice in one series across two sessions is refused: the board takes one entry
+[INFO] [207727fd-8fa9-40a1-83ce-b4ecd5bf3bf5] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > the same entry twice in one series across two sessions is refused: the board takes one entry
+[email:stub] To: parent.n08r-once-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > the same entry twice in one series across two sessions is refused: the board takes one entry
+[email:stub] To: student.n08r-once-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > the same entry twice in one series across two sessions is refused: the board takes one entry
+[INFO] [df8f8310-718b-455d-aebd-6d2fdd55b431] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > the same entry twice in one series across two sessions is refused: the board takes one entry
+[INFO] [9db8fb4f-6688-459a-a218-78577a82f8ab] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted
+[INFO] [d50f8b5e-1914-4bcc-8774-deaca06c1497] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted
+[email:stub] To: parent.n08r-req-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted
+[email:stub] To: student.n08r-req-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted
+[INFO] [c57e31ad-798d-46ed-9a93-622490327472] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted
+[INFO] [7c0bb975-edcb-4ba7-8c58-af669c32b188] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > a carried sitting outside the board's carry-forward period is refused (Cambridge: 13 months); inside it, accepted
+[INFO] [4bfd77da-d297-4640-9e7f-418129301253] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > a carried sitting outside the board's carry-forward period is refused (Cambridge: 13 months); inside it, accepted
+[email:stub] To: parent.n08r-carry-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > a carried sitting outside the board's carry-forward period is refused (Cambridge: 13 months); inside it, accepted
+[email:stub] To: student.n08r-carry-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > a carried sitting outside the board's carry-forward period is refused (Cambridge: 13 months); inside it, accepted
+[INFO] [302a8426-577c-4398-88de-49c7ca62cf70] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > a carried sitting outside the board's carry-forward period is refused (Cambridge: 13 months); inside it, accepted
+[INFO] [acb8dbba-fb5b-4ea3-930a-d62aeaee8d43] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting
+[INFO] [b3c546f6-9281-4a3f-a38d-641c3e9b5958] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting
+[email:stub] To: parent.n08r-self-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting
+[email:stub] To: student.n08r-self-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting
+[INFO] [2b3c7384-1123-4702-9cb0-e8af517f335f] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting
+[INFO] [ea9700a2-e019-42f4-9bef-273fc021bdf7] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [e5a78bf2-8ad9-4fb1-ad95-a85dbb405bc9] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: admin.n08g@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [61e62725-80ca-4f85-81b3-28868c561a5f] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [6b6ed6ea-e739-467f-82ee-d8a4f8e6ec5f] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [0571d4b2-bf16-44be-b3a4-a5c615e33ee2] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [784936e9-4802-4adf-8845-28b7d3e5aee3] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [52548076-0607-4fd3-9567-42ee8a4b9d40] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [25504200-6578-4fbb-a06f-43459bbcddbf] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [2d64314d-cba3-49f7-a00a-e7afc948074e] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [f3f4c652-c003-4797-b87f-6851d098a96d] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08w-oct-a-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08w-oct-b-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08w-oct-c-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08c-later-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08w-retake-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08c-paid-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08w-bare-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08w-grad-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08c-held-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08c-unfunded-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08c-open-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08r-once-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08r-excl-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08r-req-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08r-carry-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08r-self-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08w-oct-a-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08w-oct-b-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08c-paid-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08w-oct-c-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08w-retake-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08w-bare-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08w-grad-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08c-unfunded-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08c-open-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08c-held-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08c-later-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08r-excl-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08r-once-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08r-req-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08r-self-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08r-carry-y9s4@test.local | Subject: Registration Open — June 2027 — n08g-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [36d5a981-922d-4f94-83c4-7f421697f7cd] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [4475b0ea-d1f9-4713-b2e1-79a9b8ca4622] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [996c842c-5761-4876-a500-7fba0452724c] POST /v1/sessions/982f2d9a-39d3-4960-8772-abbf4fb5a10e/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [64e40763-227d-41b4-817f-095f93add597] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [091139e3-0d12-4c0b-baaf-0a243bcf856b] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [f3b0a22f-a5fe-499a-86ae-52af63023856] POST /v1/sessions/982f2d9a-39d3-4960-8772-abbf4fb5a10e/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [93404da4-bb5a-4ac8-a879-76ad158dc28b] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08g-a-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08g-a-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [026de5de-5f8e-462a-ac85-4219c164d806] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [265c6632-b6e3-4b52-8d3b-bc9623de3b16] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [49df580f-c51f-48b4-9e02-86a5262ea50e] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08g-b-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08g-b-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [bec269e1-a1de-4a60-af76-625c63468ccf] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [4558fa59-c62b-41d4-9400-3be2267be1c4] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [2a762f8e-343a-4b3f-84b3-3a7c7ac08b0d] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: parent.n08g-lone-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[email:stub] To: student.n08g-lone-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [cd24f84a-b05f-4773-aa2e-c4df7e10c318] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [f7df1316-471d-4021-9e5e-175823bacfa5] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [bc666069-8ad2-4f19-aed4-880ca7893666] POST /v1/registrations/direct
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [66fd443b-5a78-4df9-aa1e-a859a06e369b] POST /v1/sessions/982f2d9a-39d3-4960-8772-abbf4fb5a10e/grade10/preview
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+[INFO] [3cb3ab0d-9d6c-4ce0-b7bb-54db5772be65] POST /v1/sessions/982f2d9a-39d3-4960-8772-abbf4fb5a10e/grade10/commit
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [3ebe6f21-8d98-4676-ae94-490b9b109497] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: admin.n08d@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [07807e14-be80-4cdc-9cd4-9a6d7bd8ae8f] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [becaa096-f84b-40da-9876-e0cb4f90f377] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [9d549665-8e53-4fd7-8609-1003767f74bd] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [b0d71b46-dbc3-4dff-8b43-6357fb193d4a] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [ce0dc85f-f230-42b6-980c-1545204879b0] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [f72b9b64-f74d-4d88-8637-50f83b69d325] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08w-oct-a-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08w-oct-b-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08w-oct-c-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08c-later-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08w-retake-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08c-paid-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08w-bare-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08w-grad-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08c-held-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08c-unfunded-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08c-open-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08r-once-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08r-excl-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08r-req-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08r-carry-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08r-self-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08g-a-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08g-b-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08g-lone-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08w-oct-a-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08w-oct-b-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08c-paid-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08w-oct-c-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08w-retake-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08w-bare-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08w-grad-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08c-unfunded-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08c-open-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08c-held-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08c-later-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08r-excl-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08r-once-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08r-req-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08r-self-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08r-carry-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08g-a-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08g-b-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08g-lone-y9s4@test.local | Subject: Registration Open — June 2027 — n08d-y9s4 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [bc0967a9-835d-41a6-82bb-1c459c947da8] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [657b2752-5a70-4c44-a826-9b10a96e4cf2] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [4de2b13e-40e9-479c-b58c-54618d471b3f] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [edfd3eae-eacc-47b1-89bf-cba692441f0b] POST /v1/sessions/dfc25a6a-8279-4303-b207-93dff6fef9a8/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [bc896277-6d78-4f63-bd4c-5db7ccdad86d] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [ebb6be51-5ca1-4933-9171-998b796f8206] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [3edd1155-d941-45a1-b553-0f58ef3be13e] POST /v1/sessions/dfc25a6a-8279-4303-b207-93dff6fef9a8/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [8ba95b14-39bf-4984-8366-b47babe28b83] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08d-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08d-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [d8c42d8d-a9b1-4820-8b10-194a9d41ac56] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [d6657f00-6665-4d6e-9a66-c37137541cde] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [516b2f87-12bb-468d-ba56-1430342ad3c4] PUT /v1/sessions/dfc25a6a-8279-4303-b207-93dff6fef9a8
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [295d5eb2-bb25-40f6-995b-0b6632caa190] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: parent.n08d-grace-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[email:stub] To: student.n08d-grace-y9s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [2c689a6e-2fb1-4e5d-a0da-ec5d92c30a0c] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+[INFO] [68a8462a-5fac-44f6-bac2-e8f849313a76] POST /api/auth/sign-in/email
+
+ ❯ test/08n-session-offers.test.ts (15 tests | 3 failed) 11423ms
+   ✓ 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning 155ms
+   ✓ 08n: sessions and offers > the next June copied from it: offers, teachers and items in the next year's series; board fees provisional; audited 129ms
+   ✓ 08n: a winter session, each item cut off at its own deadline (§3.3) > an IGCSE item is refused in October and January; Cambridge AS defaults to November, Pearson AS to October 35ms
+   ✓ 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only  1040ms
+   ✓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a Cambridge retake of the previous June is reservable until the retake deadline after the entry deadline passed; a first entry is not; a retake of an older sitting is cut off at the entry deadline; the retake is due by the retake deadline  332ms
+   ✓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line  337ms
+   × 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed 348ms
+     → "Graduates may retake after grade 12" already has that value
+   ✓ 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured  2473ms
+   ✓ 08n: the line rules (§3.5) > AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can  319ms
+   ✓ 08n: the line rules (§3.5) > the same entry twice in one series across two sessions is refused: the board takes one entry  302ms
+   × 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted 332ms
+     → Arts (08n rules y9s4) — Option paper is already reserved in Cambridge International June 2027 (n08r-y9s4) (Arts (08n rules y9s4) — Core paper, this reservation): the board takes one entry
+   ✓ 08n: the line rules (§3.5) > a carried sitting outside the board's carry-forward period is refused (Cambridge: 13 months); inside it, accepted  324ms
+   ✓ 08n: the line rules (§3.5) > self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting  358ms
+   × 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core 1446ms
+     → Failed query: select count(*) as n from registration_consent where registration_id = any(($1, $2, $3, $4)) and channel = 'school'
+params: 59ec08db-805d-4d40-a9e8-e2044ce175ac,34fded60-d8e4-4d98-af8b-f9436f8f09fd,ba194408-9bfd-499a-83a9-5512b50f1c56,adc0b254-c116-4c8f-ab2f-2b097fc0fc02
+   ✓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace  1006ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed
+Error: "Graduates may retake after grade 12" already has that value
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08n-session-offers.test.ts:286:5
+    284|     await sql(`update "user" set cohort_year = cohort_year - 1 where i…
+    285|     const stored = await sql<{ value: unknown }>(`select value from sc…
+    286|     await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key:…
+       |     ^
+    287|     try {
+    288|       const [line] = await reserve(g.studentId, w, [{ offerItemId: enN…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/08n-session-offers.test.ts > 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted
+Error: Arts (08n rules y9s4) — Option paper is already reserved in Cambridge International June 2027 (n08r-y9s4) (Arts (08n rules y9s4) — Core paper, this reservation): the board takes one entry
+ ❯ gate src/services/line-rules.services.ts:89:19
+     87|     const exc = await lineExceptions.active(tx, ctx.studentId, [key], …
+     88|     const e = exc.find((x) => !used.includes(x.id));
+     89|     if (!e) throw new LineRuleError(message, key, status);
+       |                   ^
+     90|     if (e.oneShot) used.push(e.id);
+     91|   };
+ ❯ assertLineRules src/services/line-rules.services.ts:174:7
+ ❯ insertLines src/services/line.services.ts:123:32
+ ❯ NodePgSession.transaction ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/node-postgres/session.ts:259:19
+ ❯ test/08n-session-offers.test.ts:475:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/08n-session-offers.test.ts > 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+Error: Failed query: select count(*) as n from registration_consent where registration_id = any(($1, $2, $3, $4)) and channel = 'school'
+params: 59ec08db-805d-4d40-a9e8-e2044ce175ac,34fded60-d8e4-4d98-af8b-f9436f8f09fd,ba194408-9bfd-499a-83a9-5512b50f1c56,adc0b254-c116-4c8f-ab2f-2b097fc0fc02
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:73:11
+ ❯ sql test/helpers.ts:63:18
+     61|     q = s`${q}${params[i - 1]}${s.raw(parts[i] ?? '')}`;
+     62|   }
+     63|   const result = await db.execute(q);
+       |                  ^
+     64|   return result.rows as T[];
+     65| }
+ ❯ one test/helpers.ts:68:16
+ ❯ test/08n-session-offers.test.ts:548:20
+
+Caused by: error: op ANY/ALL (array) requires array on right side
+ ❯ ../../node_modules/.pnpm/pg-pool@3.10.1_pg@8.16.3/node_modules/pg-pool/index.js:45:11
+ ❯ ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:71:12
+ ❯ sql test/helpers.ts:63:18
+ ❯ one test/helpers.ts:68:16
+ ❯ test/08n-session-offers.test.ts:548:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { length: 120, severity: 'ERROR', code: '42809', detail: undefined, hint: undefined, position: '70', internalPosition: undefined, internalQuery: undefined, where: undefined, schema: undefined, table: undefined, dataType: undefined, constraint: undefined, file: 'parse_oper.c', routine: 'make_scalar_array_op' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 12 passed (15)
+   Start at  00:50:55
+   Duration  13.13s (transform 557ms, setup 2ms, collect 212ms, tests 11.42s, environment 0ms, prepare 36ms)
+
+ ELIFECYCLE  Test failed. See above for more details.

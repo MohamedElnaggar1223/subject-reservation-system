@@ -1,0 +1,48 @@
+# run10-full.log: the proof of this run, as vitest reported it (the full log, 30775 lines, 2717040 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ✓ test/00-harness.test.ts (4 tests) 1407ms
+ ✓ test/01-desk.test.ts (8 tests) 1502ms
+ ✓ test/02-money.test.ts (4 tests) 1484ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 1744ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 5061ms
+ ✓ test/05-object-access.test.ts (13 tests) 3469ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3486ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1529ms
+ ✓ test/08-money-rules.test.ts (51 tests) 10176ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 10446ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 5786ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 7054ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 5232ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 4937ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 8894ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2278ms
+ ❯ test/08i-board-series.test.ts (10 tests | 1 failed) 3869ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 3863ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4619ms
+ ✓ test/08l-board-change.test.ts (7 tests) 2858ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 5308ms
+ ✓ test/09-money-invariants.test.ts (30 tests) 259ms
+
+## Failed tests
+   × F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series 341ms
+
+## Failures
+ FAIL  test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+Error: In November 2026 – January 2027 — t1-an3z, Chemistry (series) is entered in Pearson Edexcel October 2026 (series) (exams start 31 December 2027) and would move to OxfordAQA November 2026 (entry deadline none set): a board change keeps the entry deadline — give the two series the same deadline first
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08i-board-series.test.ts:185:17
+    183|         json: { boardCode: 'oxford', code: '9621', title: 'Chemistry (…
+    184|       }));
+    185|       const r = await apiResponse(coordinator.api.v1.catalogue.registr…
+       |                 ^
+    186|         param: { subjectId: che }, json: { boardCode: 'oxford', qualif…
+    187|       }));
+
+## Summary
+[clock] database minus host: -0.4 ms (measured within 1 ms)
+ Test Files  1 failed | 21 passed (22)
+      Tests  1 failed | 309 passed | 1 todo (311)
+   Start at  00:31:15
+   Duration  100.48s (transform 589ms, setup 28ms, collect 1.72s, tests 95.26s, environment 2ms, prepare 609ms)

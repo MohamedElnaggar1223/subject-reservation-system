@@ -24,6 +24,8 @@ import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLo
  * - a parent's approval of a drop against a reversal of the payment for the same line, both
  *   orders: the approval takes the line's receipt before the line, as the reversal does (MA-16),
  *   so nothing deadlocks;
+ * - a paste of the fee list out of id order against a line being priced on two of its rows: the
+ *   put takes the rows it names in one statement in id order, so the line waits for it (no deadlock);
  * - a fee row that exists nowhere when a move begins, created and confirmed by finance around it,
  *   both orders: the move holds the target series' fee grid (shared) and finance's create and
  *   Confirm take it exclusive, so the two never overlap and no moved line is left provisional on a
@@ -435,6 +437,41 @@ describe('08t: the rework races', () => {
       expect(await errorOf(a)).toMatch(/already processed/);
       expect(await state(s)).toEqual({ line: 'pending_payment', payment: 'refunded', request: 'pending_approval' });
     });
+  });
+
+  it('a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks', async () => {
+    const sub = await subject(adm, `RWT-PO-${RUN}`, `Race paste order (08t ${RUN})`, { course: 1000, registration: 500 });
+    const unit = async (code: string) => (await apiResponse(adm.api.v1.catalogue.units.$post({ json: { boardCode: 'cambridge', code: `${code}-${RUN}`, title: code, unitLevel: 'igcse', kind: 'component' } })))!.id;
+    const [u1, u2] = [await unit('T08P1'), await unit('T08P2')];
+    const s = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `t08-po-${RUN}`, entryDeadline: new Date(Date.now() + days(50)) } })))!.id;
+    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: s }, json: { rows: [u1, u2].map((keyId) => ({ keyKind: 'unit' as const, keyId, amount: 250, provisional: true })) } }));
+    const o = await offerOf(s1, sub, [{ ...whole(s), label: 'Both papers', kind: 'unit' as const, enters: { kind: 'units' as const, unitIds: [u1, u2] } } as unknown as ReturnType<typeof whole>]);
+    const rows = await sql<{ id: string; key_id: string }>(`select id, key_id from board_fee where board_series_id = $1 order by id`, [s]);
+    const [first, second] = rows as [{ id: string; key_id: string }, { id: string; key_id: string }];
+    const f = await onboard(officer, `t08-po-${RUN}`, 11);
+    // The later row held. The list is pasted with the later row first: before the fix the put
+    // queued on that row first; the line then took the first row (FOR SHARE, id order) and queued
+    // behind the put for the later one — and once the hold went, the put took the later row and
+    // waited for the first, which the line held: a deadlock. Now the put takes both in id order,
+    // the first at once, and the line waits for the put.
+    const release = await holdRowLock('board_fee', second.id);
+    let reserving: ReturnType<typeof settle<Awaited<ReturnType<typeof reserve>>>> | undefined;
+    let putting: Promise<Res> | undefined;
+    try {
+      putting = finadmin.api.v1['board-fees'].$put({ query: { seriesId: s }, json: { rows: [second, first].map((r) => ({ keyKind: 'unit' as const, keyId: r.key_id, amount: 260, provisional: true })) } });
+      await lockWaiters(1);
+      reserving = settle(reserve(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]));
+      await lockWaiters(2);
+    } finally {
+      await release();
+    }
+    const [r, p] = await Promise.all([reserving!, putting!]);
+    expect([p.status, p.status >= 400 ? (await p.json() as { error: string }).error : null]).toEqual([200, null]);
+    expect(r.ok ? null : r.e).toBeNull();
+    expect(await sql(`select amount::float as amount from board_fee where board_series_id = $1 order by id`, [s])).toEqual([{ amount: 260 }, { amount: 260 }]);
+    // The line, priced after the put, read the new amounts.
+    const [line] = await live(f.studentId);
+    expect(await one(`select price_at_registration::float as price from registration where id = $1`, [line!.id])).toEqual({ price: 1520 });
   });
 
   describe("a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid)", () => {

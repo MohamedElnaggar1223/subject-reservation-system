@@ -1,0 +1,38 @@
+# control-reprice-on-move.log: the proof of this run, as vitest reported it (the full log, 3503 lines, 345735 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ❯ test/08n-session-offers.test.ts (27 tests | 1 failed) 17707ms
+
+## Failed tests
+   × 08n: the review of 977848d > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable 426ms
+
+## Failures
+ FAIL  test/08n-session-offers.test.ts > 08n: the review of 977848d > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+AssertionError: expected { Object (price, provisional, ...) } to deeply equal { Object (price, provisional, ...) }
+- Expected
++ Received
+  {
+-   "price": 7000,
++   "price": 6800,
+    "provisional": true,
+    "rows": [
+-     "b6c035ea-d909-401d-a901-d3d48d0d7be0",
++     "f559b7f0-4384-4b17-b460-4914d32a7b96",
+    ],
+    "series": "d26640e4-47bc-4c8e-802a-09ef5db9bd8b",
+  }
+ ❯ test/08n-session-offers.test.ts:865:34
+    863|     expect(j2.copied).not.toBeNull();
+    864|     // Each line now reads January's rows: WBI11 at January's fee.
+    865|     expect(await priced(l1!.id)).toEqual({ price: 7000, provisional: t…
+       |                                  ^
+    866|     expect(await priced(l2!.id)).toEqual({ price: 6800, provisional: t…
+    867|     await audited([l1!.id], ['LINE_REPRICED']);
+
+## Summary
+[clock] database minus host: -0.4 ms (measured within 1 ms)
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 passed (27)
+   Start at  03:31:24
+   Duration  19.45s (transform 531ms, setup 2ms, collect 236ms, tests 17.71s, environment 0ms, prepare 35ms)

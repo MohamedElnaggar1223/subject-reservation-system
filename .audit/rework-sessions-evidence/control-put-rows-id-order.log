@@ -1,0 +1,157 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -0.2 ms (measured within 2 ms)
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [2e371f99-a8c4-4580-99f8-ddb595d6100f] POST /api/auth/sign-up/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[email:stub] To: admin.t08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [eb631b65-5dfd-4ed9-bd21-d8d131ac8410] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [d8f8d823-4b7e-4661-b46a-6b51285fa402] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c9b7a75e-569c-4d25-85af-f6862f6974c9] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [fd5d4edd-92ec-4452-a6ba-6d0e936548f1] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [6891101c-a5a1-470e-b216-d5decf84657f] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [bc3e5015-c88c-4056-a903-37190700e67b] POST /v1/teachers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [aa4abbb2-e5b3-4096-9666-a962b66cbcbb] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c06c6d79-ea44-4cb5-95ce-bc3b081db6b8] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c7fe6bef-7b2e-476f-bfb6-2f072c7b4ef5] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [657e24d5-ec2a-4bbd-b894-56a7d0976469] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [a2fd370b-6333-4222-916b-b78f51e237c2] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c81d66ef-a5ad-4f79-a55d-7c2ec6847674] POST /v1/sessions/9e030ba6-f045-46cc-ae53-4eb3ef12a2e5/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [6b164735-7e05-44c3-90b9-2c8bdb81c2de] POST /v1/sessions/8c42dac8-383a-4d46-b1b2-8f5b66ba55a0/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [62610e0e-62dd-4031-bee6-d84141e567a1] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [85942faa-658f-4a4f-985e-bf7e78750a54] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [2d2020c7-ac36-46e7-adbd-f64c4b2d3c76] POST /v1/sessions/9e030ba6-f045-46cc-ae53-4eb3ef12a2e5/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [30fa219b-9238-47c0-87ac-9ff147af3af4] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [9aadab25-10d8-49fd-9fde-63126a2b5a4b] POST /v1/catalogue/units
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [7737686b-cdff-4f7c-8079-f6f668eaa274] POST /v1/catalogue/units
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [83f8976b-b8f7-4e6a-8926-8c3b64778fe1] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [ab019cac-a792-41f3-96d7-636b1f65be24] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [78ef540b-082a-41af-9dcd-0812a9afa431] POST /v1/sessions/9e030ba6-f045-46cc-ae53-4eb3ef12a2e5/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [7eb14e26-1bbf-4d34-a824-6e63ceec3f14] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[email:stub] To: parent.t08-po-semg@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[email:stub] To: student.t08-po-semg@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [301b59c5-ef0b-4756-9480-6b324ff748cb] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [77bfd329-b55b-4675-b894-b9bdaba904c0] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [6b84dfbe-f668-45c6-ab74-fb30590192e3] PUT /v1/board-fees
+
+stderr | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[api] hidden from client ("Failed to save the fees"): Failed query: select "id", "board_series_id", "key_kind", "unit_id", "qualification_option_id", "qualification_id", "subject_id", "key_id", "amount", "provisional", "confirmed_at", "confirmed_by", "zero_reason", "copied_from_fee_id", "created_by", "created_at", "updated_at" from "board_fee" where ("board_fee"."board_series_id" = $1 and "board_fee"."key_kind" = $2 and "board_fee"."key_id" = $3) for update
+params: 5893f19c-8ac6-44c0-ab1f-2e10e877a46f,unit,748359f2-bb64-4ad8-aa53-2660b67a89f5 | cause: deadlock detected
+
+ ❯ test/08t-rework-races.test.ts (19 tests | 1 failed | 18 skipped) 3296ms
+   ↓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+   ↓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+   ↓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused
+   ↓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+   ↓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+   ↓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+   ↓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+   ↓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+   ↓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+   ↓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+   ↓ 08t: the rework races > a parent's approval of a drop against a reversal of the line's payment (MA-16's order: the receipt, then the line) > the approval first: it drops the line; the reversal then refuses (the subject was dropped) — no deadlock
+   ↓ 08t: the rework races > a parent's approval of a drop against a reversal of the line's payment (MA-16's order: the receipt, then the line) > the reversal first: it reverts the line; the approval then refuses (already processed) — no deadlock
+   × 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks 1590ms
+     → expected [ 400, 'Failed to save the fees' ] to deeply equal [ 200, null ]
+   ↓ 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+   ↓ 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+   ↓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > an item's series change
+   ↓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+   ↓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > a board change
+   ↓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the session's series correction
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+AssertionError: expected [ 400, 'Failed to save the fees' ] to deeply equal [ 200, null ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[32m-   200,[39m
+[32m-   null,[39m
+[31m+   400,[39m
+[31m+   "Failed to save the fees",[39m
+[2m  ][22m
+
+ ❯ test/08t-rework-races.test.ts:469:94
+    467|     }
+    468|     const [r, p] = await Promise.all([reserving!, putting!]);
+    469|     expect([p.status, p.status >= 400 ? (await p.json() as { error: st…
+       |                                                                                              ^
+    470|     expect(r.ok ? null : r.e).toBeNull();
+    471|     expect(await sql(`select amount::float as amount from board_fee wh…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 skipped (19)
+   Start at  06:39:27
+   Duration  5.04s (transform 534ms, setup 3ms, collect 202ms, tests 3.30s, environment 0ms, prepare 34ms)
+

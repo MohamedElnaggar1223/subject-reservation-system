@@ -201,7 +201,10 @@ closes the case the rows alone left open — a row that existed nowhere when the
 created and confirmed by finance inside the move's transaction (08t, both orders; with the move's
 lock removed the line is left provisional on a confirmed row). The put's lock alone and Confirm's
 lock alone each close it too; Confirm's is the backstop for a row made by any path that forgets
-the grid.
+the grid. Within it, the grid's put takes the rows it names that exist `FOR UPDATE` **in one
+statement in id order** (as Confirm does; a reservation takes its rows `FOR SHARE` in id order),
+never one by one in the order the list was pasted (08t: a paste out of id order against a
+reservation deadlocked).
 
 **A line's receipt, then the line** (MONEY_AUDIT.md MA-16's order). Wherever a path holds both,
 the receipt (`FOR UPDATE`, `lockReceiptOf` in `receipt.services.ts`) comes first: a payment's
@@ -556,6 +559,23 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
   existed nowhere when the move began and that finance creates and confirms inside the move's
   transaction (the rule above names such a line). *Closed after the merge of af33662:* the
   series' fee grid lock (§2.1), shared by a move, exclusive by every fee create and Confirm.
+- **The Fees tab lists any line still provisional on confirmed fees** *(changed)*: `GET
+  /board-fees` returns `stuck` — the waiting lines read from the series' rows that are provisional
+  though every row their basis names is confirmed at the amount they recorded (09's rule) — with
+  the student, subject, session, price and the series' fee ids; the tab counts and lists them and
+  "Confirm their fees again" (Confirm of those rows at their amounts) makes them payable. None
+  should exist; the list is how one would be seen.
+- **`effectiveDeadlinesOf` reads Q-20's late entry** *(changed)*, as `effectiveDeadlineFor` does
+  with the student (each line's student and series, while the setting is on): the InstaPay
+  reference check, the moves' "past its deadline" checks and the reversal's notice read it.
+- **Replace teacher on a converted session** *(changed)*: the student's enrolments in the item's
+  units where they have them, else the subject's own row (an enrolment from before the rework has
+  no unit, and 0042's converted item enters all the subject's units).
+- **The family's read: a retake open until the later of the retake and the first-entry deadline**
+  *(changed with Q-20, recorded after the review of 40c1447..af33662)*: a late board entry can make
+  the first entry's date later than the retake deadline. And the approval's deadline check (the
+  line's student) and `getAvailableSubjects` (the student) pass the student, so a late entry is
+  read there.
 - **A put that confirms settles the lines** *(changed)*: `PUT /board-fees` saving a provisional
   row as the board's published fee (the grid's "published" save, a pasted published list) used to
   confirm the row and leave the lines priced from it provisional and unpayable; it now settles them
@@ -800,3 +820,8 @@ guard added since the reviews shown red when undone (trail rows `control`).
 - 03:02Z — af33662 merged to main (with origin/main, b438976). The lead: close the open race.
   03:12Z — the series' fee grid lock (§2.1), two 08t races (the move first, finance first), the
   control red with the move's lock removed; and a put that confirms now settles its lines (08p).
+- 03:3xZ — the bounded pass on 40c1447..af33662, "fix forward: 1–5": the published put (08p on a
+  copied grid), replace teacher on a converted session, `effectiveDeadlinesOf` and Q-20 (08n
+  submits a reference), the put's rows in id order (08t, a deadlock in its control), the Fees
+  tab's stuck lines, and 09's rule seen failing (the suite with a move's lock removed); the
+  evidence folder in git.

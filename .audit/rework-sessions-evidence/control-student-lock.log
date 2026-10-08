@@ -1,0 +1,124 @@
+
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+> vitest run "test/08t" "-t" "the same entry in one series from two sessions at once"
+
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: 0.4 ms (measured within 5 ms)
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c5f19c51-dd33-435d-97ce-106d9025ba96] POST /api/auth/sign-up/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[email:stub] To: admin.t08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [b07ee3fd-2660-40c4-a8ae-a728b29d8882] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [99fc31f5-346e-4867-8a00-6c5cc7c65145] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [aa43f60d-05de-4d4d-82c0-a586da93de90] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [ad91fd06-4db5-4836-a069-acdd0b10aa90] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [e492e822-57a7-4982-b912-0d244bdbb1e6] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [73fa659b-15a2-4a5f-bf2f-eee2bc32563a] POST /v1/teachers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [f16dcd91-9d0c-4e67-b8c1-88854779f562] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [412666f0-9160-4289-8e18-070bf5ec988e] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [f81b565c-09e3-49b9-9fb4-3b7b3241f69a] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [eef0f035-174b-448c-9845-3acc2a8c71d0] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [769cce0f-cc59-49c5-9069-5bd1ba61f393] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [ef085ede-421b-4aab-8184-99108b5c80dd] POST /v1/sessions/694d4f5e-930e-4bd5-be5c-2e4bd0dbca26/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c03e8900-ea4c-4b09-a17c-64a835b1cfbe] POST /v1/sessions/c43b3b07-642c-4e9f-a384-8d98ee0659f1/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [61cb815d-ed40-478f-b778-4f019bd10147] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [f2445306-71aa-484f-aea2-a1f4d35b6ff6] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [d28500d4-b6e6-4307-892e-9ebdde85a164] POST /v1/sessions/694d4f5e-930e-4bd5-be5c-2e4bd0dbca26/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+[INFO] [414303e8-1945-4928-9c75-50c1172fc993] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+[email:stub] To: parent.t08-once-cnjf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+[email:stub] To: student.t08-once-cnjf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+[INFO] [07c10486-df72-4f67-9da8-096d17c68422] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+[INFO] [fd39cc80-7a9a-4430-aef3-0b174bdec631] POST /api/auth/sign-in/email
+
+ ❯ test/08t-rework-races.test.ts (10 tests | 1 failed | 9 skipped) 1959ms
+   ↓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+   × 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused 436ms
+     → expected [ Array(2) ] to have a length of 1 but got 2
+   ↓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused
+   ↓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+   ↓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+   ↓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+   ↓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+   ↓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+   ↓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+   ↓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 skipped (10)
+   Start at  01:04:15
+   Duration  3.51s (transform 480ms, setup 2ms, collect 163ms, tests 1.96s, environment 0ms, prepare 30ms)
+
+ ELIFECYCLE  Test failed. See above for more details.
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+AssertionError: expected [ Array(2) ] to have a length of 1 but got 2
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 2[39m
+
+ ❯ test/08t-rework-races.test.ts:118:37
+    116|     }
+    117|     const out = await Promise.all([a!, b!]);
+    118|     expect(out.filter((o) => o.ok)).toHaveLength(1);
+       |                                     ^
+    119|     expect(out.find((o) => !o.ok)).toMatchObject({ e: expect.stringMat…
+    120|     expect(await live(f.studentId)).toHaveLength(1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
