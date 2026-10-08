@@ -125,6 +125,9 @@ function applyPriceExceptions(courseFee: number, registrationFee: number, exc: P
 }
 
 const PRICE_KEYS = ['price.custom', 'price.discountPercent', 'price.discountFixed'] as const;
+/** The percents an exception may set for one student or family in place of the settings' (§3.4, §3.7). */
+const PERCENT_KEYS = ['pricing.selfStudyCoursePercent', 'pricing.selfStudyBoardPercent', 'pricing.retakeTaughtCoursePercent', 'pricing.onePaperCoursePercent'] as const;
+type PercentKey = (typeof PERCENT_KEYS)[number];
 
 /**
  * The price of one line. `exceptionIds`: a re-price applies exactly these (the ids its basis
@@ -143,21 +146,33 @@ export async function priceLine(
     getSetting('pricing.retakeTaughtCoursePercent', executor),
     getSetting('pricing.onePaperCoursePercent', executor),
   ]);
+  // The student's exceptions, price and percent keys at once (the adapter: the student's own or
+  // their family's, covering the line). Inside a creating transaction they are held FOR SHARE
+  // (§2.1), so a revocation at the same moment waits for the line, or the line for the revocation.
+  const all = opts.exceptionIds
+    ? await lineExceptions.byIds(executor, opts.exceptionIds)
+    : await lineExceptions.active(executor, input.studentId, [...PRICE_KEYS, ...PERCENT_KEYS], {
+        sessionId: input.sessionId, subjectId: fee.subjectId, offerId: fee.item.offerId, offerItemId: fee.item.id,
+      }, opts.lock ? { lock: 'share' } : undefined);
+  // A percent exception replaces its setting on the lines it applies to (the first the adapter
+  // gives of each key); only those that applied are recorded in the basis.
+  const applied: PolicyException[] = [];
+  const percent = (key: PercentKey, setting: number) => {
+    const e = all.find((x) => x.policyKey === key && x.value != null);
+    if (!e) return setting;
+    applied.push(e);
+    return e.value!;
+  };
   const courseFeeBase = fee.item.courseFee ?? fee.offerCourseFee;
-  const coursePercent = input.mode === 'self_study' ? selfStudyCourse : input.attempt === 'retake' ? retakeTaught : 100;
-  const onePaperPercent = fee.item.kind === 'one_paper' ? onePaper : 100;
+  const coursePercent = input.mode === 'self_study' ? percent('pricing.selfStudyCoursePercent', selfStudyCourse)
+    : input.attempt === 'retake' ? percent('pricing.retakeTaughtCoursePercent', retakeTaught) : 100;
+  const onePaperPercent = fee.item.kind === 'one_paper' ? percent('pricing.onePaperCoursePercent', onePaper) : 100;
   const boardFeeBase = round2(fee.rows.reduce((s, r) => s + r.amount, 0));
-  const boardPercent = input.mode === 'self_study' ? selfStudyBoard : 100;
+  const boardPercent = input.mode === 'self_study' ? percent('pricing.selfStudyBoardPercent', selfStudyBoard) : 100;
   const course = round2(((courseFeeBase * coursePercent) / 100) * onePaperPercent / 100);
   const board = round2((boardFeeBase * boardPercent) / 100);
 
-  const exc = opts.exceptionIds
-    ? (await lineExceptions.byIds(executor, opts.exceptionIds)).filter((e) => (PRICE_KEYS as readonly string[]).includes(e.policyKey))
-    : await lineExceptions.active(executor, input.studentId, [...PRICE_KEYS], {
-        sessionId: input.sessionId, subjectId: fee.subjectId, offerId: fee.item.offerId, offerItemId: fee.item.id,
-        // Inside a creating transaction the exceptions it reads are held FOR SHARE (§2.1), so a
-        // revocation at the same moment waits for the line, or the line for the revocation.
-      }, opts.lock ? { lock: 'share' } : undefined);
+  const exc = all.filter((e) => (PRICE_KEYS as readonly string[]).includes(e.policyKey));
   const priced = applyPriceExceptions(course, board, exc);
   const basis: PricingBasis = {
     v: 1,
@@ -170,7 +185,7 @@ export async function priceLine(
     boardFeeBase,
     boardPercent,
     feeRows: fee.rows.map((r) => ({ id: r.id, keyKind: r.keyKind, keyId: r.keyId, amount: r.amount, provisional: r.provisional })),
-    exceptionIds: exc.map((e) => e.id),
+    exceptionIds: [...applied, ...exc].map((e) => e.id),
     customPrice: priced.customPrice,
     courseFee: priced.courseFee,
     registrationFee: priced.registrationFee,

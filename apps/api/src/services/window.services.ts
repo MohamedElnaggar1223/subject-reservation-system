@@ -45,7 +45,7 @@ export async function sessionWindow(
     .select({ status: registrationSession.status })
     .from(registrationSession)
     .where(eq(registrationSession.id, sessionId));
-  const d = line ? await effectiveDeadlineFor(executor, line) : { at: null, kind: null };
+  const d = line ? await effectiveDeadlineFor(executor, { ...line, studentId }) : { at: null, kind: null };
   const entryDeadlinePassed = !!d.at && d.at <= now;
   if (!sess || entryDeadlinePassed) {
     return { open: false, entryDeadlinePassed, entryDeadline: d.at, deadlineKind: d.kind, status: sess?.status ?? null };

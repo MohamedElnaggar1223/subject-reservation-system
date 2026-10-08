@@ -33,7 +33,7 @@ import {
 import { logAction, logActions, type AuditContext } from './audit.services';
 import { schoolDate, entryDeadlineMessage } from './window.services';
 import { lineDeadlineSql, effectiveDeadlinesOf, deadlinePassedSentence, redateLines, redateSeriesLines } from './deadline.services';
-import { carryFeeRows, repriceMovedLines, tellPriceChanged } from './line-moves.services';
+import { lockMoveFeeRows, repriceMovedLines, tellPriceChanged } from './line-moves.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
 import { PricingError } from './pricing.services';
 
@@ -441,6 +441,18 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
       if (!link) throw new SeriesError('This session has no item in that series', 404);
       const target = link.series;
       const now = new Date();
+      // Before the lines (§6; Confirm's order): the items they would go to in the target, FOR SHARE
+      // (a change of such an item's series waits for this move), then the fee rows those read
+      // there, FOR SHARE, carried provisional where finance has none (the review of 40c1447). A
+      // line's item is read before its lock: its student is held, and only a move changes it.
+      const pre = await tx.select({ offerItemId: registration.offerItemId, boardSeriesId: registration.boardSeriesId })
+        .from(registration).where(inArray(registration.id, data.registrationIds));
+      const toward = pre.filter((r) => r.boardSeriesId !== target.id);
+      const siblings = await siblingItems(tx, [...new Set(toward.map((r) => r.offerItemId))], target.id);
+      await lockMoveFeeRows(tx, toward.flatMap((r) => {
+        const to = siblings.get(r.offerItemId);
+        return to ? [{ itemId: to, fromSeriesId: r.boardSeriesId, toSeriesId: target.id }] : [];
+      }), actorId, 'A line moved to another series');
       const regs = await tx
         .select({ id: registration.id, sessionId: registration.sessionId, status: registration.status, boardSeriesId: registration.boardSeriesId,
           offerItemId: registration.offerItemId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId,
@@ -473,22 +485,12 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
       }
       const moving = regs.filter((r) => r.boardSeriesId !== target.id);
       for (const r of moving) {
-        // The same entry, in the target series: a sibling item of the line's offer.
-        const sib = await tx.execute(sql`
-          select i2.id from session_offer_item i1
-          join session_offer_item i2 on i2.offer_id = i1.offer_id and i2.board_series_id = ${target.id} and i2.enters_kind = i1.enters_kind
-            and i2.qualification_id is not distinct from i1.qualification_id and i2.qualification_option_id is not distinct from i1.qualification_option_id
-            and coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i2.id), '{}')
-              = coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i1.id), '{}')
-          where i1.id = ${r.offerItemId}
-          order by (i2.availability = 'closed'), i2.id limit 1`);
-        const toItem = (sib.rows[0] as { id: string } | undefined)?.id;
+        // The same entry, in the target series: a sibling item of the line's offer (held above).
+        const toItem = siblings.get(r.offerItemId);
         if (!toItem) {
           throw new SeriesError(`${r.subjectName} has no item entering the same in ${boardSeriesName(names, target)} — add one to the subject (or move the item's series) first`, 409);
         }
         await tx.update(registration).set({ offerItemId: toItem, boardSeriesId: target.id, updatedAt: now }).where(eq(registration.id, r.id));
-        // What it costs there: the sibling item's rows in the target (carried provisional where none).
-        await carryFeeRows(tx, toItem, r.boardSeriesId, actorId, 'A line moved to another series');
       }
       // Each student's lines checked again where they now are (§6), then priced from the new grid.
       let repriced: Awaited<ReturnType<typeof repriceMovedLines>> = [];
@@ -523,6 +525,33 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
     if (sentence) throw new SeriesError(sentence, 409);
     throw err;
   }
+}
+
+/**
+ * For each item, the item of its offer entering the same in the target series (an open one
+ * first): the candidates are locked FOR SHARE first, so the one chosen stays in the target until
+ * the move commits (an item's series change takes its item FOR UPDATE).
+ */
+async function siblingItems(tx: Tx, itemIds: string[], targetId: string) {
+  const out = new Map<string, string>();
+  if (!itemIds.length) return out;
+  const ids = sql.join(itemIds.map((id) => sql`${id}`), sql`, `);
+  const held = await tx.execute(sql`
+    select i2.id from session_offer_item i2
+    where i2.board_series_id = ${targetId} and i2.offer_id in (select i1.offer_id from session_offer_item i1 where i1.id in (${ids}))
+    order by i2.id for share`);
+  const heldIds = (held.rows as { id: string }[]).map((x) => x.id);
+  if (!heldIds.length) return out;
+  const r = await tx.execute(sql`
+    select distinct on (i1.id) i1.id as "from", i2.id as "to" from session_offer_item i1
+    join session_offer_item i2 on i2.offer_id = i1.offer_id and i2.board_series_id = ${targetId} and i2.enters_kind = i1.enters_kind
+      and i2.qualification_id is not distinct from i1.qualification_id and i2.qualification_option_id is not distinct from i1.qualification_option_id
+      and coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i2.id), '{}')
+        = coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i1.id), '{}')
+    where i1.id in (${ids}) and i2.id in (${sql.join(heldIds.map((id) => sql`${id}`), sql`, `)})
+    order by i1.id, (i2.availability = 'closed'), i2.id`);
+  for (const x of r.rows as { from: string; to: string }[]) out.set(x.from, x.to);
+  return out;
 }
 
 // ─── What the migration inferred, for staff to check ─────────────────────────

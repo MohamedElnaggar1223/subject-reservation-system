@@ -4,15 +4,17 @@
  * offers for June itself. "Register grade 10" previews every grade-10 student's lines (each
  * core offer's whole item, in school, the offer's teacher when it has only one, else none) and
  * commits them once: lines pending payment, consent on the `school` channel (the family's own
- * pair comes at checkout, step B). A second commit changes nothing (a line already live is
+ * pair comes at checkout, step B) and each line's refund steps frozen with it
+ * (`refund_policy_snapshot`, §2.6's shape — so a bulk line is refunded like any other). A second commit changes nothing (a line already live is
  * skipped). Each student is committed in a transaction of their own, with their lock first
  * (§6), so one refusal does not stop the rest. The school-fee gate applies as on every path
  * that creates lines; a student it holds is listed with its sentence.
  */
 
-import { db, user, registration, registrationConsent, sessionOffer, sessionOfferTeacher, subject, and, eq, inArray, sql } from '@repo/db';
+import { db, user, registration, registrationConsent, registrationSession, refundWindow, sessionOffer, sessionOfferTeacher, subject, and, asc, eq, inArray, sql } from '@repo/db';
 import { randomUUID } from 'crypto';
-import { seriesAcademicYearStart, type LineInputType } from '@repo/validations';
+import { seriesAcademicYearStart, type LineInputType, type RefundPolicy, type RefundPolicySnapshot } from '@repo/validations';
+import { academicYearForDate } from './school-fee.services';
 import { mayRegisterFor, assertMayRegisterForInTx } from './eligibility.services';
 import { schoolFeeGateReason } from './school-fee.services';
 import { resolveItem, availabilityConstraints } from './offer.services';
@@ -27,6 +29,25 @@ export class Grade10Error extends Error {
 }
 
 export const SCHOOL_CONSENT_VERSION = 'grade10-school-v1';
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * The refund steps a line freezes at consent (§2.6): the session's policy in weeks; a converted
+ * session with none, its refund windows (its own, else its academic year's) as dates. The same
+ * rule as B's `writeConsents` (reservation.services) for the reservation paths.
+ */
+async function refundSnapshotOf(tx: Tx, sessionId: string): Promise<RefundPolicySnapshot> {
+  const [s] = await tx.select({ refundPolicy: registrationSession.refundPolicy, startDate: registrationSession.startDate })
+    .from(registrationSession).where(eq(registrationSession.id, sessionId));
+  const policy = s?.refundPolicy as RefundPolicy | null | undefined;
+  if (policy?.steps?.length) return { kind: 'weeks', steps: policy.steps };
+  let windows = await tx.select().from(refundWindow).where(eq(refundWindow.sessionId, sessionId)).orderBy(asc(refundWindow.startsAt));
+  if (!windows.length && s) {
+    windows = await tx.select().from(refundWindow).where(eq(refundWindow.academicYear, academicYearForDate(s.startDate))).orderBy(asc(refundWindow.startsAt));
+  }
+  return { kind: 'dates', windows: windows.map((w) => ({ startsAt: w.startsAt.toISOString(), endsAt: w.endsAt.toISOString(), percent: w.percentage })) };
+}
 
 type Planned = {
   studentId: string;
@@ -126,6 +147,10 @@ export async function commitGrade10(sessionId: string, studentIds: string[] | un
         await tx.insert(registrationConsent).values(inserted.flatMap((r) => (['refund_policy', 'declaration'] as const).map((kind) => ({
           id: randomUUID(), registrationId: r.id, kind, textVersion: SCHOOL_CONSENT_VERSION, confirmedBy: actorId, channel: 'school' as const, at: now,
         }))));
+        // The refund steps the school consented to for the family, frozen with the consent.
+        const snapshot = await refundSnapshotOf(tx, sessionId);
+        await tx.update(registration).set({ refundPolicySnapshot: snapshot as unknown as Record<string, unknown> })
+          .where(inArray(registration.id, inserted.map((r) => r.id)));
         await logAction(actorId, 'GRADE10_BULK_COMMITTED', 'registration', s.studentId, null,
           { sessionId, registrationIds: inserted.map((r) => r.id), lines: inserted.length }, ctx, tx);
         return inserted.map((r) => r.id);

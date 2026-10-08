@@ -35,6 +35,7 @@ import {
   eq,
   and,
   inArray,
+  notInArray,
   lte,
   isNotNull,
   sql,
@@ -63,7 +64,7 @@ import {
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
 import { sessionOpenFor, sessionWindow, windowRefusal, entryDeadlineMessage, schoolDateTime } from './window.services';
-import { effectiveDeadlinesOf, lineDeadlineSql } from './deadline.services';
+import { effectiveDeadlinesOf, lineDeadlineSql, linesKeptByLateEntry } from './deadline.services';
 import { getSetting } from './settings.services';
 import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { seriesPastDeadline, seriesDisplayName, windowsOfSeries, seriesDeadlineGroups, mixedDeadlinesSentence } from './series.services';
@@ -1241,7 +1242,10 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
   const pastDeadline = await seriesPastDeadline(now);
   for (const s of pastDeadline) {
     const seriesName = await seriesDisplayName(s.id);
-    const lineDue = sql`${lineDeadlineSql('r')} <= ${now}`;
+    // A late board entry (Q-20, while its setting is on) keeps its student's lines to its own date.
+    const kept = await linesKeptByLateEntry(db, s.id, now);
+    const notKept = (col: string) => (kept.length ? sql` and ${sql.raw(col)} not in (${sql.join(kept.map((k) => sql`${k}`), sql`, `)})` : sql``);
+    const lineDue = sql`${lineDeadlineSql('r')} <= ${now}${notKept('r.id')}`;
     const open = await db.execute(sql`
       select distinct p.id from payment p
       join payment_registration pr on pr.payment_id = p.id
@@ -1282,7 +1286,8 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
     try {
       const expired = await db.transaction((tx) =>
         expireWaitingRegistrations(tx, and(eq(registration.boardSeriesId, s.id),
-          sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}) <= ${now}`), 'entry_deadline', now));
+          sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}) <= ${now}`,
+          kept.length ? notInArray(registration.id, kept) : undefined), 'entry_deadline', now));
       registrationsExpiredAtDeadline += expired.length;
       for (const sessionId of new Set(expired.map((r) => r.sessionId))) {
         const mine = expired.filter((r) => r.sessionId === sessionId);

@@ -83,7 +83,8 @@ export const PRICE_POLICY_KEYS = [
   'pricing.retakeTaughtCoursePercent',
   'pricing.onePaperCoursePercent',
 ] as const;
-export const DUE_POLICY_KEYS = ['deadline.payment'] as const;
+// deadline.boardEntry: Q-20's late board entry (step C's registry; read by effectiveDeadlineFor while its setting is on).
+export const DUE_POLICY_KEYS = ['deadline.payment', 'deadline.boardEntry'] as const;
 export type LinePolicyKey = (typeof LINE_POLICY_KEYS)[number] | (typeof PRICE_POLICY_KEYS)[number] | (typeof DUE_POLICY_KEYS)[number];
 
 /** The family's (and staff's) read of what a student can reserve in a session. */

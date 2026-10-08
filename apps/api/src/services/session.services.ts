@@ -33,7 +33,7 @@ import { schoolDate } from './window.services';
 import { getSetting } from './settings.services';
 import { dueDateFor, redateLines } from './deadline.services';
 import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
-import { carryFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
+import { lockMoveFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
 import { PricingError } from './pricing.services';
 
@@ -427,6 +427,10 @@ export async function correctSessionSeries(id: string, data: CorrectSessionSerie
         const misfit = await windowChangeMisfit(tx, id, { sessionType: data.sessionType, seriesYear: data.seriesYear });
         if (misfit) throw new Error(`${misfit} (its lines that are history stay in the series they were in)`);
       }
+      // The fee rows each item will read in its corrected series (carried provisional from the
+      // series it is in where finance has none), FOR SHARE before the lines — Confirm's order, so a
+      // Confirm of one lands first or waits and reaches the moved lines (the review of 40c1447).
+      await lockMoveFeeRows(tx, plan.map((p, n) => ({ itemId: p.itemId, fromSeriesId: items[n]!.seriesId, toSeriesId: p.to })), adminId, 'The session\'s series was corrected');
       const live = await tx.select().from(registration)
         .where(and(eq(registration.sessionId, id), notInArray(registration.status, ['rejected', 'expired', 'dropped'])))
         .orderBy(registration.id).for('update');
@@ -465,11 +469,10 @@ export async function correctSessionSeries(id: string, data: CorrectSessionSerie
         userId: adminId, action: 'LINE_SERIES_MOVED' as const, entityType: 'registration' as const, entityId: l.id,
         previousData: { boardSeriesId: l.boardSeriesId }, newData: { boardSeriesId: plan.find((p) => p.itemId === l.offerItemId)?.to ?? null, reason: data.reason },
       })), tx);
-      // What the lines cost in the corrected series: its fee rows (carried provisional from the
-      // series they came from where finance has none), each student's lines checked again there.
+      // What the lines cost in the corrected series: its fee rows (held since before the lines),
+      // each student's lines checked again there.
       let repriced: RepricedLine[] = [];
       try {
-        for (const [n, p] of plan.entries()) if (p.to) await carryFeeRows(tx, p.itemId, items[n]!.seriesId, adminId, 'The session\'s series was corrected');
         await recheckLines(tx, live.map((l) => l.id));
         repriced = await repriceMovedLines(tx, live.map((l) => l.id), adminId, 'the session\'s series was corrected');
       } catch (err) {

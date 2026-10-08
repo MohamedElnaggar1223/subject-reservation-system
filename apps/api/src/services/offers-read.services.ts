@@ -81,8 +81,10 @@ export async function offersForStudent(studentId: string, sessionId: string) {
       const c = availabilityConstraints(o.availability, i.availability as string);
       const seriesId = i.seriesId as string | null;
       const keys = keysOf({ entersKind: i.entersKind as string, qualificationId: i.qualificationId as string | null, subjectId: o.subjectId, units: i.units as string[] });
+      // An earlier sitting the record knows: a confirmed line only. A dropped line was never sat (B's
+      // review): the family may still declare it, and the school then verifies it.
       const known = history
-        .filter((h) => h.sessionId !== sessionId && ['confirmed', 'dropped'].includes(h.status) && h.seriesId)
+        .filter((h) => h.sessionId !== sessionId && h.status === 'confirmed' && h.seriesId)
         .filter((h) => keysOf(h).some((k) => keys.includes(k)) || h.subjectId === o.subjectId)
         .map((h) => ({ registrationId: h.id, sessionName: h.sessionName, seriesId: h.seriesId!, series: `${h.boardName} ${SERIES_MONTH_LABELS[h.month as SeriesMonth] ?? h.month} ${h.year}`, status: h.status }));
       const held = history.find((h) => h.itemId === i.id && h.sessionId === sessionId && !['rejected', 'expired', 'dropped'].includes(h.status));
@@ -96,8 +98,10 @@ export async function offersForStudent(studentId: string, sessionId: string) {
       // Open per attempt (the review of 977848d): a first entry until the entry deadline (or the
       // exams' start with none); a retake of the board's previous sitting until the retake deadline
       // where the board gives one. A retake of an older sitting is a first entry's date.
-      const firstDeadline = seriesId ? await effectiveDeadlineFor(db, { boardSeriesId: seriesId, attempt: 'first', priorSittingSeriesId: null }) : { at: null, kind: null };
-      const retakeUntil = i.retakeDeadline ? new Date(i.retakeDeadline as string) : firstDeadline.at;
+      const firstDeadline = seriesId ? await effectiveDeadlineFor(db, { boardSeriesId: seriesId, attempt: 'first', priorSittingSeriesId: null, studentId }) : { at: null, kind: null };
+      // The later of the retake deadline and a first entry's (a late board entry, Q-20, can be later).
+      const retakeDeadline = i.retakeDeadline ? new Date(i.retakeDeadline as string) : null;
+      const retakeUntil = retakeDeadline && (!firstDeadline.at || retakeDeadline > firstDeadline.at) ? retakeDeadline : firstDeadline.at;
       const openFor = { first: !!firstDeadline.at && firstDeadline.at > now, retake: !!retakeUntil && retakeUntil > now };
       const prices = [];
       for (const k of combos) {
