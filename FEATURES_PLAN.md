@@ -476,7 +476,7 @@ forms with two Save buttons; "Dates not set" on a session is not a link to the B
 (where the next year's filter hides the series); the dates form's required reason is labelled
 "Why it changes" while a Notes field sits below; the family's Reserve page should preselect the
 only child and the only open session; the desk's parent-consent tick shows for lines the family
-reserved itself; the Arabic hydration warning from the language provider (pre-existing). Also
+reserved itself; the Arabic hydration warning on every page (pre-existing; F1 traced it to `i18n.tsx`'s language initialiser, there since 2c3d27f of 30 May; it shows on /sign-in, /academic/years, /academic/rooms and /today too). Also
 from C: three hand-cast API responses in `desk.client.tsx` that predate the rework.
 
 ### F8 — The demo school and the walkthrough (last, after F6)
