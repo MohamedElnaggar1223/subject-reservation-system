@@ -202,7 +202,13 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
         </div>
       )}
 
-      {showOnboard && <OnboardCard onDone={(msg) => { setShowOnboard(false); done(msg); }} onError={fail} />}
+      {/* The family just onboarded stays open with its Reserve page (RESERVATIONS_REWORK.md §11): no second search. */}
+      {showOnboard && (
+        <OnboardCard
+          onDone={(msg, newStudentId) => { setShowOnboard(false); setSearch(''); setStudentId(newStudentId); setShowRegister(true); done(msg); }}
+          onError={fail}
+        />
+      )}
 
       {/* Search */}
       <div className="mb-6">
@@ -649,7 +655,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
 
 // ─── Onboard a walk-in family (G5) ───────────────────────────────────────────
 
-function OnboardCard({ onDone, onError }: { onDone: (msg: string) => void; onError: (e: Error) => void }) {
+function OnboardCard({ onDone, onError }: { onDone: (msg: string, studentId: string) => void; onError: (e: Error) => void }) {
   const qc = useQueryClient();
   const [form, setForm] = useState({
     parentName: '', parentEmail: '', parentPassword: '', parentPhone: '',
@@ -678,9 +684,9 @@ function OnboardCard({ onDone, onError }: { onDone: (msg: string) => void; onErr
           },
         })
       ),
-    onSuccess: () => {
+    onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['users'] });
-      onDone('Family onboarded — accounts ready and linked. Share the temporary passwords with them.');
+      onDone('Family onboarded — accounts ready and linked. Share the temporary passwords with them.', r.student.id);
     },
     onError: (err: Error) => { setLocalError(err.message); onError(err); },
   });

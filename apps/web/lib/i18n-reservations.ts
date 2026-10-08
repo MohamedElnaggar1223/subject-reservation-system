@@ -37,6 +37,7 @@ export const reservationsArabic: Record<string, string> = {
   'on a provisional board fee:': 'على رسوم مجلس مؤقتة:',
   '(payable once confirmed)': '(تُدفع حين تُؤكَّد)',
   'Paid per entry deadline:': 'يُدفع لكل موعد قيد:',
+  '(retake deadline)': '(موعد الإعادة)',
   'Name the earlier sitting on each retake': 'سمِّ الدورة السابقة لكل إعادة',
   'Refund policy and declaration read and signed by the parent': 'قرأ ولي الأمر سياسة الاسترداد والإقرار ووقّع عليهما',
   'Refund policy and declaration read and signed by the parent.': 'قرأ ولي الأمر سياسة الاسترداد والإقرار ووقّع عليهما.',
@@ -231,7 +232,7 @@ const RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   [/^Preregistered: (\d+) lines?\. Pay now to hold the money until the session opens\.$/, (m) => `تم التسجيل المسبق: ${lines(m[1]!)}. ادفع الآن لاحتجاز المبلغ حتى تُفتح الجلسة.`],
   [/^Reserved: (\d+) lines? awaiting payment\. Pay by exam series on the next screen\.$/, (m) => `تم الحجز: ${lines(m[1]!)} في انتظار الدفع. ادفع لكل دورة امتحان في الشاشة التالية.`],
   [/^Reserved (\d+) lines?\.$/, (m) => `تم حجز ${lines(m[1]!)}.`],
-  [/^Collected EGP ([\d,.]+)( in (\d+) payments, one per exam series)?\.$/, (m) => `تم تحصيل ${m[1]} جنيه${m[3] ? ` في ${m[3]} دفعات، دفعة لكل دورة امتحان` : ''}.`],
+  [/^Collected EGP ([\d,.]+)( in (\d+) payments, one per entry deadline)?\.$/, (m) => `تم تحصيل ${m[1]} جنيه${m[3] ? ` في ${m[3]} دفعات، دفعة لكل موعد قيد` : ''}.`],
   [/^(\d+) on a provisional board fee: collected once the fee is confirmed\.$/, (m) => `${m[1]} على رسوم مجلس مؤقتة: تُحصَّل حين تُؤكَّد الرسوم.`],
   [/^Not collected — hand this money back: (.+)\.$/, (m) => `لم يُحصَّل — أعد هذا المبلغ: ${m[1]}.`],
   // The pricing basis, on hover and under a price.

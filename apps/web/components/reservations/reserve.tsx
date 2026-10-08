@@ -60,6 +60,8 @@ export const reserveOffersKey = (sessionId: string, studentId: string) => ['regi
 // ─── Words ───────────────────────────────────────────────────────────────────
 
 const MONTH: Record<string, string> = { january: 'January', june: 'June', october: 'October', november: 'November' };
+const MONTH_ORDER: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
+const ym = (month: string, year: number) => year * 12 + (MONTH_ORDER[month] ?? 0);
 const LEVEL_GROUP: Record<string, string> = { igcse: 'O.L.', as_level: 'A.S. / A.L.', a_level: 'A.S. / A.L.' };
 const AVAILABILITY: Record<string, string> = { retake_only: 'Retakes only', self_study_only: 'Self-study only (not taught this cycle)' };
 
@@ -157,10 +159,36 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
 
   const total = chosen.reduce((a, c) => a + (c.price?.total ?? 0), 0);
   const provisionalTotal = chosen.filter((c) => c.price?.provisional).reduce((a, c) => a + (c.price?.total ?? 0), 0);
-  const bySeries = new Map<string, { name: string; amount: number; provisional: boolean; deadline: string | null }>();
+  // The money is taken per entry deadline, as the desk and the checkout split it: a retake of
+  // the board's previous sitting runs to the series' retake deadline where the board sets one,
+  // every other line to the entry deadline (line_effective_deadline, docs/features/RESERVATIONS.md §2.6).
+  const declarable = data?.declarableSittings ?? [];
+  const priorOf = (c: (typeof chosen)[number]) => {
+    if (c.needsSitting) {
+      if (!c.p.sitting) return null;
+      if (c.p.sitting.startsWith('id:')) return declarable.find((x) => x.seriesId === c.p.sitting.slice(3)) ?? null;
+      const [month, year] = c.p.sitting.slice(3).split('|');
+      return { month: month!, year: Number(year) };
+    }
+    if (c.attempt !== 'retake') return null;
+    const known = c.it.knownSittings.map((k) => declarable.find((x) => x.seriesId === k.seriesId)).filter((x) => !!x);
+    return known.sort((a, b) => ym(b.month, b.year) - ym(a.month, a.year))[0] ?? null;
+  };
+  const deadlineOf = (c: (typeof chosen)[number]): { at: string | null; retake: boolean } => {
+    const s = c.it.series;
+    const entry = { at: c.it.firstEntryDeadline ? String(c.it.firstEntryDeadline) : null, retake: false };
+    if (!s || c.attempt !== 'retake' || !s.retakeDeadline) return entry;
+    const previous = declarable
+      .filter((x) => x.boardCode === c.o.subject.boardCode && ym(x.month, x.year) < ym(s.month, s.year))
+      .sort((a, b) => ym(b.month, b.year) - ym(a.month, a.year))[0];
+    const prior = priorOf(c);
+    return previous && prior && prior.month === previous.month && prior.year === previous.year ? { at: String(s.retakeDeadline), retake: true } : entry;
+  };
+  const bySeries = new Map<string, { name: string; amount: number; provisional: boolean; retake: boolean }>();
   for (const c of chosen) {
-    const key = c.it.series?.id ?? 'none';
-    const cur = bySeries.get(key) ?? { name: seriesName(c.o, c.it) ?? '—', amount: 0, provisional: false, deadline: c.it.firstEntryDeadline ?? null };
+    const d = deadlineOf(c);
+    const key = `${c.it.series?.id ?? 'none'}|${d.at ?? ''}`;
+    const cur = bySeries.get(key) ?? { name: seriesName(c.o, c.it) ?? '—', amount: 0, provisional: false, retake: d.retake };
     bySeries.set(key, { ...cur, amount: cur.amount + (c.price?.total ?? 0), provisional: cur.provisional || !!c.price?.provisional });
   }
   const consented = desk ? deskTick : refundTick && declTick;
@@ -214,7 +242,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
       qc.invalidateQueries({ queryKey: ['desk'] });
       qc.invalidateQueries({ queryKey: ['finance'] });
       const parts = [`Reserved ${r.registrations.length} line${r.registrations.length === 1 ? '' : 's'}.`];
-      if (r.collected > 0) parts.push(`Collected EGP ${r.collected.toLocaleString('en-US')}${r.payments.length > 1 ? ` in ${r.payments.length} payments, one per exam series` : ''}.`);
+      if (r.collected > 0) parts.push(`Collected EGP ${r.collected.toLocaleString('en-US')}${r.payments.length > 1 ? ` in ${r.payments.length} payments, one per entry deadline` : ''}.`);
       if (r.reservedNotCollected.length) parts.push(`${r.reservedNotCollected.length} on a provisional board fee: collected once the fee is confirmed.`);
       if (r.notCollected.length) parts.push(`Not collected — hand this money back: ${r.notCollected.map((n) => n.series.join(' and ')).join('; ')}.`);
       onDone({ registrationIds: r.registrations.map((x) => x.id), message: parts.join(' '), desk: r });
@@ -280,7 +308,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
           <div className="text-xs text-muted-foreground">
             <span>Paid per entry deadline:</span>{' '}
             {[...bySeries.values()].map((s, i) => (
-              <span key={s.name}>{i > 0 && ' · '}<bdi data-i18n-skip="true">{s.name}</bdi> <Money amount={s.amount} />{s.provisional && ' ⓟ'}</span>
+              <span key={`${s.name}|${s.retake}`}>{i > 0 && ' · '}<bdi data-i18n-skip="true">{s.name}</bdi>{s.retake && <> <span>(retake deadline)</span></>} <Money amount={s.amount} />{s.provisional && ' ⓟ'}</span>
             ))}
           </div>
         )}
