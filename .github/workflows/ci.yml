@@ -69,6 +69,9 @@ jobs:
         run: |
           big=$(find .audit -type f -size +300k 2>/dev/null)
           if [ -n "$big" ]; then echo "files over 300 KB under .audit:"; echo "$big"; exit 1; fi
+          # CLAUDE.md: nothing from the school's sheet in the repo; an Egyptian mobile number is the easiest leak to catch.
+          phones=$(grep -lE '(^|[^0-9])01[0-9]{9}([^0-9]|$)' .audit/*.tsv ./*.md docs/features/*.md 2>/dev/null || true)
+          if [ -n "$phones" ]; then echo "trail rows or documents with an 11-digit mobile number:"; echo "$phones"; exit 1; fi
 
       - name: Gate 1 - API type-check (source and tests)
         run: pnpm --filter @repo/api check-types
