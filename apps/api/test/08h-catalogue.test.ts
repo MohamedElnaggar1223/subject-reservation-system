@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, feedSeries, type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, feedSeries, placeItemsIn, type Client, reservationOf } from './helpers';
 
 /**
  * F0b — the exam catalogue (FEATURES_PLAN.md F0b; DISCOVERY_RESEARCH.md §5
@@ -145,12 +143,12 @@ describe('F0b: the exam catalogue', () => {
       asWindow = await session(adm, 'January (AS, catalogue)', 'january', 'as_level', futureWindow());
       alWindow = await session(adm, 'January (A-Level, catalogue)', 'january', 'a_level', futureWindow());
       const seriesId = await feedSeries(adm, asWindow, { label: 'catalogue' });
-      await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({ param: { id: alWindow }, json: { series: [{ boardSeriesId: seriesId, isDefault: true }], routes: [] } }));
+      await placeItemsIn(adm, alWindow, seriesId);
 
       g11 = await onboard(officer, 'cat-g11', 11);
       g12 = await onboard(officer, 'cat-g12', 12);
-      const prereg = (f: { parent: Client; studentId: string }, sessionId: string, subjectIds: string[]) =>
-        apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId, subjectIds, studentId: f.studentId } }));
+      const prereg = async (f: { parent: Client; studentId: string }, sessionId: string, subjectIds: string[]) =>
+        apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId, ...(await reservationOf(sessionId, subjectIds)), studentId: f.studentId } }));
       // Grade 11 sits P1 and M1 (AS units only); grade 12 sits M1 with P3 (an A2 unit) in the same series.
       const [g11p1, g11m1] = await prereg(g11, asWindow, [p1Subject, m1Subject]).then((r) => [r.find((x) => x.subjectId === p1Subject)!.id, r.find((x) => x.subjectId === m1Subject)!.id]);
       const g12m1 = (await prereg(g12, asWindow, [m1Subject]))[0]!.id;

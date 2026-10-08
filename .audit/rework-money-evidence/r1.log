@@ -1,0 +1,20 @@
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+> vitest run "test/08r-exceptions-registry.test.ts"
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+
+[clock] database minus host: -0.8 ms (measured within 1 ms)
+ ✓ test/08r-exceptions-registry.test.ts (9 tests) 5120ms
+   ✓ 08r: the exceptions registry > a grant is checked against the registry: its grantors, its value, the scopes it accepts, a scope where one is required; a pending policy refused; late entries only while their setting is on  317ms
+   ✓ 08r: the exceptions registry > a family's exception covers every linked child, and no one else  701ms
+   ✓ 08r: the exceptions registry > a one-shot gate lets one reservation through and is used by it; the next is refused  395ms
+   ✓ 08r: the exceptions registry > a price exception on one unpaid line re-prices it (its basis records it); on a line with a payment it is refused  383ms
+   ✓ 08r: the exceptions registry > deadline.payment moves one line's due date, and back when it is revoked  324ms
+   ✓ 08r: the exceptions registry > the eight V3 types, as the migration moves them onto the registry (a V3-shaped row is filled the same way), and V3's request shape mapped onto its key  311ms
+   ✓ 08r: the exceptions registry > Check these: a migrated subject-scoped refund percent applies to nothing until a finance admin confirms it; then to that subject's lines, on the course fee  388ms
+   ✓ 08r: the exceptions registry > Check these: a price exception on an old unit row, once an item of another subject enters that unit  334ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  03:29:16
+   Duration  6.96s (transform 564ms, setup 2ms, collect 186ms, tests 5.12s, environment 0ms, prepare 35ms)

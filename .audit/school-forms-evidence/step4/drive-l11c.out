@@ -1,0 +1,64 @@
+officer.mona@igcse.local → http://localhost:3000/desk
+ONBOARD inputs:
+0: input[email] Parent email * = 
+1: input[text] Parent name (new account) = 
+2: input[text] Temp password (new account) = 
+3: input[text] Phone (optional) = 
+4: input[email] Student email * = 
+5: input[text] Student name (new account) = 
+6: input[text] Temp password (new account) = 
+7: select  = Grade this year (new account)…/Grade 9 (starts grade 10 next year)/Grade 10/Grade 11/Grade 12
+8: input[search] Type a student's name, email, or ID… = 
+ONBOARD buttons: Close Onboarding | Create & Link Family
+shot 01-onboard-form
+shot 02-onboard-filled
+submit: Create & Link Family
+AFTER ONBOARD url: http://localhost:3000/desk
+AFTER ONBOARD:
+The Desk
+
+Find a student — see everything, do everything, in one place.
+
++ New Family (Onboard)
+Family onboarded — accounts ready and linked. Share the temporary passwords with them.
+Dismiss
+Student F2Grade 11 · STU-20261008-4B08C
+At school
+Started grade 10 in 2025/26
+Academic record
+Statement
+
+Parents: Parent F2
+
+Owes now
+
+EGP 0
+
+Escrow
+
+EGP 0
+
+Close
+Reserve at the desk
+Session
+Pick an open session…
+June 2028
+
+A retake is set when the system knows the earlier sitting. For a new family choose "retake" and name the sitting: it is recorded and listed on the session's To verify tab. A teacher may be left as "no preference". A line on a provisional board fee (ⓟ) is reserved now and collected once the fee is confirmed.
+
+	SUBJECT · WHAT IS ENTERED	TEACHER	ENTRY	PRICE
+O.L.
+Accounting Cambridge International
+	Whole subject
+Cambridge International June 2028
+			
+Environmental Management Cambridge International Self-study only (not taught this cycle)
+	Whole subject Self-study only (not taught this cycle)
+Cambridge International June 2028
+			
+French Cambridge International Self-study only (not taught this cycle)
+	Whole subject Self-study only (not taught this cycle)
+Cambridge International Jun
+shot 03-after-onboard
+TOTAL: inputs 7 clicks 2
+ERRORS: none

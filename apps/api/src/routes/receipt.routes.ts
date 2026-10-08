@@ -193,6 +193,11 @@ export const receipts = new Hono<HonoEnv>()
             session: { columns: { id: true, name: true } },
           },
         },
+        // The reservations rework (§3.10 item 2): a charge's receipt prints its charge.
+        charge: {
+          columns: { id: true, studentId: true, kind: true, description: true, amount: true, status: true },
+          with: { student: { columns: { id: true, name: true, studentId: true, cohortYear: true }, extras: gradeTodayExtras } },
+        },
       },
     });
     if (!found) return error(c, 'Receipt not found', 404);
@@ -200,7 +205,7 @@ export const receipts = new Hono<HonoEnv>()
     // The family's refund depends on this paper, so they must be able
     // to see and print it — scoped to their own receipts.
     const isStaff = hasRole(user.role, ...FINANCE_ROLES);
-    const ownerStudentId = found.registration.studentId;
+    const ownerStudentId = found.registration?.studentId ?? found.charge?.studentId ?? '';
     let allowed = isStaff || (user.role === ROLES.STUDENT && ownerStudentId === user.id);
     if (!allowed && user.role === ROLES.PARENT) {
       const link = await db.query.parentStudentLink.findFirst({

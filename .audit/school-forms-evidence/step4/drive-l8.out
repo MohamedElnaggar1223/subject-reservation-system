@@ -1,0 +1,15 @@
+admin@igcse.local → http://localhost:3000/admin/dashboard
+teacher control for Accounting: Teacher A
+shot 01-accounting-filled
+drawer still open after Save (Accounting): Items with the same group cannot be reserved together.
+Accounting: Accounting | Series has no dates | 	Cambridge International	Teacher A	Whole subject	EGP 1,200	 | EGP 300 | 	0 · cost inputs +3 clicks +3
+shot 01-mathematics-filled
+drawer still open after Save (Mathematics): Items with the same group cannot be reserved together.
+Mathematics: Mathematics | Self-study only | Grade 10 core | Series has no dates | 	Cambridge International	—	Whole subject	EGP 1,100	 | EGP 300 | 	0 · cost inputs +2 clicks +2
+teacher control for Physics: Teacher A
+shot 01-physics-filled
+drawer still open after Save (Physics): Items with the same group cannot be reserved together.
+Physics: Physics | Series has no dates | 	Cambridge International	Teacher A	Whole subject	EGP 1,300	 | EGP 300 | 	0 · cost inputs +3 clicks +3
+shot 02-subjects
+TOTAL: inputs 8 clicks 8
+ERRORS: none

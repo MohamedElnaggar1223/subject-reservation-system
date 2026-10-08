@@ -11,6 +11,7 @@
  */
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import {
@@ -26,6 +27,7 @@ type RemarkItem = { id: string; paperCode: string; paperName: string | null; out
 type RemarkRow = {
   id: string;
   serviceType: string;
+  boardService: { id: string; label: string } | null;
   status: string;
   feeCharged: number;
   boardReference: string | null;
@@ -153,7 +155,7 @@ export default function RemarksDeskClient({ userRole }: { userRole: string }) {
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     {COUNCIL_LABELS[r.registration.subject.council as keyof typeof COUNCIL_LABELS]} ·{' '}
-                    {REMARK_SERVICE_LABELS[r.serviceType as keyof typeof REMARK_SERVICE_LABELS]} ·{' '}
+                    {r.boardService?.label ?? REMARK_SERVICE_LABELS[r.serviceType as keyof typeof REMARK_SERVICE_LABELS] ?? r.serviceType} ·{' '}
                     {r.registration.session.name} · Papers: {r.items.map((i) => i.paperCode).join(', ')} · {formatPrice(r.feeCharged)} paid
                   </div>
                 </div>
@@ -213,6 +215,12 @@ export default function RemarksDeskClient({ userRole }: { userRole: string }) {
       {isFinanceAdmin && (
         <section>
           <h2 className="text-lg font-semibold text-foreground mb-3">Remark fees (per paper)</h2>
+          {/* The reservations rework (§3.6): each series has its own fees per board service and level. */}
+          <p className="mb-3 text-sm text-muted-foreground">
+            <span>A remark is charged at its series&apos; fee for the board&apos;s service, set on the</span>{' '}
+            <Link href="/exams/services" className="text-primary underline">Board services</Link>{' '}
+            <span>page. The amounts below are the old list, copied into a series (provisional) the first time a service has no fee there.</span>
+          </p>
           <div className="bg-card rounded-xl border border-border shadow-sm p-5">
             <div className="flex gap-2 flex-wrap items-end mb-4">
               <div>

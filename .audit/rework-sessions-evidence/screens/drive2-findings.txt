@@ -1,0 +1,264 @@
+drawer save: no "Saved." notice
+offers read for the family: 17 subjects; first prices {"attempt":"first","mode":"in_school","total":1400,"courseFee":1100,"registrationFee":300,"provisional":false,"noFee":false}
+direct registration: 201 [[1500,"2026-12-06T22:37:00.000Z"]]
+coordinator tabs: Subjects, Fees, Grade 10
+finance officer tabs: Money
+30-sessions-list-ar: dir=rtl
+31-subjects-ar: dir=rtl
+32-fees-ar: dir=rtl
+33-money-ar: dir=rtl
+34-grade10-ar: dir=rtl
+35-settings-ar: dir=rtl
+
+console errors:
+officer.mona@igcse.local en: Failed to load resource: the server responded with a status of 403 (Forbidden)
+admin@igcse.local ar: pageerror Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <InnerScrollAndFocusHandler segmentPath={[...]} focusAndScrollRef={{apply:false, ...}}>
+      <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+        <LoadingBoundary name="sign-in/" loading={null}>
+          <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+            <RedirectBoundary>
+              <RedirectErrorBoundary router={{...}}>
+                <InnerLayoutRouter url="/sign-in" tree={[...]} params={{}} cacheNode={{lazyData:null, ...}} ...>
+                  <SegmentViewNode type="page" pagePath="/.claude/w...">
+                    <SegmentTrieNode>
+                    <ClientPageRoot Component={function SignInPage} serverProvidedParams={{...}}>
+                      <SignInPage params={Promise} searchParams={Promise}>
+                        <AuthLayout title="Welcome back" subtitle="Sign in to..." footer={<p>}>
+                          <div className="flex min-h...">
+                            <MobileHeader>
+                            <div>
+                            <div className="relative f...">
+                              <button
+                                type="button"
+                                onClick={function I18nProvider.useMemo[value]}
+                                className="absolute right-4 top-4 rounded-lg border border-border bg-card px-3 py-1.5 ..."
++                               aria-label="تغيير اللغة"
+-                               aria-label="Switch language"
++                               title="تغيير اللغة"
+-                               title="Switch language"
+                                data-i18n-skip="true"
+                              >
++                               English
+-                               العربية
+                              ...
+                  ...
+                ...
+      ...
+
+admin@igcse.local ar: pageerror Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+      <HTTPAccessFallbackErrorBoundary pathname="/admin/das..." notFound={<SegmentViewNode>} forbidden={undefined} ...>
+        <RedirectBoundary>
+          <RedirectErrorBoundary router={{...}}>
+            <InnerLayoutRouter url="/admin/das..." tree={[...]} params={{}} cacheNode={{lazyData:null, ...}} ...>
+              <SegmentViewNode type="layout" pagePath="/.claude/w...">
+                <SegmentTrieNode>
+                <script>
+                <script>
+                <script>
+                <script>
+                <script>
+                <AppLayout>
+                  <NavShell userName="School Admin" userRole="admin" userEmail="admin@igcs..." teaches={false}>
+                    <div data-app-shell={true} className="flex h-scr...">
+                      <aside className="hidden lg:...">
+                        <div className="flex items...">
+                          <div>
+                          <div className="min-w-0">
+                            <p>
+                            <p className="truncate text-[11px] text-sidebar-foreground/50">
++                             حجز المواد
+-                             Subject Reservation
+                        ...
+                        ...
+                      ...
+            ...
+
+admin@igcse.local ar: pageerror Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+      <HTTPAccessFallbackErrorBoundary pathname="/admin/ses..." notFound={<SegmentViewNode>} forbidden={undefined} ...>
+        <RedirectBoundary>
+          <RedirectErrorBoundary router={{...}}>
+            <InnerLayoutRouter url="/admin/ses..." tree={[...]} params={{}} cacheNode={{lazyData:null, ...}} ...>
+              <SegmentViewNode type="layout" pagePath="/.claude/w...">
+                <SegmentTrieNode>
+                <script>
+                <script>
+                <script>
+                <script>
+                <script>
+                <AppLayout>
+                  <NavShell userName="School Admin" userRole="admin" userEmail="admin@igcs..." teaches={false}>
+                    <div data-app-shell={true} className="flex h-scr...">
+                      <aside className="hidden lg:...">
+                        <div className="flex items...">
+                          <div>
+                          <div className="min-w-0">
+                            <p>
+                            <p className="truncate text-[11px] text-sidebar-foreground/50">
++                             حجز المواد
+-                             Subject Reservation
+                        ...
+                        ...
+                      ...
+            ...
+
+admin@igcse.local ar: pageerror Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+      <HTTPAccessFallbackErrorBoundary pathname="/admin/ses..." notFound={<SegmentViewNode>} forbidden={undefined} ...>
+        <RedirectBoundary>
+          <RedirectErrorBoundary router={{...}}>
+            <InnerLayoutRouter url="/admin/ses..." tree={[...]} params={{}} cacheNode={{lazyData:null, ...}} ...>
+              <SegmentViewNode type="layout" pagePath="/.claude/w...">
+                <SegmentTrieNode>
+                <script>
+                <script>
+                <script>
+                <script>
+                <script>
+                <AppLayout>
+                  <NavShell userName="School Admin" userRole="admin" userEmail="admin@igcs..." teaches={false}>
+                    <div data-app-shell={true} className="flex h-scr...">
+                      <aside className="hidden lg:...">
+                        <div className="flex items...">
+                          <div>
+                          <div className="min-w-0">
+                            <p>
+                            <p className="truncate text-[11px] text-sidebar-foreground/50">
++                             حجز المواد
+-                             Subject Reservation
+                        ...
+                        ...
+                      ...
+            ...
+
+admin@igcse.local ar: pageerror Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+      <HTTPAccessFallbackErrorBoundary pathname="/settings" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+        <RedirectBoundary>
+          <RedirectErrorBoundary router={{...}}>
+            <InnerLayoutRouter url="/settings" tree={[...]} params={{}} cacheNode={{lazyData:null, ...}} ...>
+              <SegmentViewNode type="layout" pagePath="/.claude/w...">
+                <SegmentTrieNode>
+                <script>
+                <script>
+                <script>
+                <script>
+                <script>
+                <AppLayout>
+                  <NavShell userName="School Admin" userRole="admin" userEmail="admin@igcs..." teaches={false}>
+                    <div data-app-shell={true} className="flex h-scr...">
+                      <aside className="hidden lg:...">
+                        <div className="flex items...">
+                          <div>
+                          <div className="min-w-0">
+                            <p>
+                            <p className="truncate text-[11px] text-sidebar-foreground/50">
++                             حجز المواد
+-                             Subject Reservation
+                        ...
+                        ...
+                      ...
+            ...
+
+admin@igcse.local ar: pageerror Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+      <HTTPAccessFallbackErrorBoundary pathname="/admin/ses..." notFound={<SegmentViewNode>} forbidden={undefined} ...>
+        <RedirectBoundary>
+          <RedirectErrorBoundary router={{...}}>
+            <InnerLayoutRouter url="/admin/ses..." tree={[...]} params={{}} cacheNode={{lazyData:null, ...}} ...>
+              <SegmentViewNode type="layout" pagePath="/.claude/w...">
+                <SegmentTrieNode>
+                <script>
+                <script>
+                <script>
+                <script>
+                <script>
+                <AppLayout>
+                  <NavShell userName="School Admin" userRole="admin" userEmail="admin@igcs..." teaches={false}>
+                    <div data-app-shell={true} className="flex h-scr...">
+                      <aside className="hidden lg:...">
+                        <div className="flex items...">
+                          <div>
+                          <div className="min-w-0">
+                            <p>
+                            <p className="truncate text-[11px] text-sidebar-foreground/50">
++                             حجز المواد
+-                             Subject Reservation
+                        ...
+                        ...
+                      ...
+            ...

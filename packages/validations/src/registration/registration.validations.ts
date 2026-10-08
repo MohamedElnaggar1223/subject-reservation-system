@@ -9,6 +9,7 @@
  */
 
 import { z } from 'zod';
+import { ReservationLines, ReservationConsent } from './reservation.validations';
 
 // ─── Status Enum ────────────────────────────────────────────────────────────
 
@@ -47,32 +48,14 @@ export type RegistrationIdType = z.infer<typeof RegistrationId>;
 // ─── Student: Submit Registration Request ────────────────────────────────────
 
 /**
- * Used by students to request registration for a set of subjects.
- * All registrations are created in 'pending_approval' status and
- * require parent approval before proceeding to payment.
+ * Used by students to request a reservation: one line per item ticked (the reservations
+ * rework, RESERVATIONS_REWORK.md §3.5 — `lines` and `consent` replace `subjectIds` and
+ * `subjectOptions`). Lines are created in 'pending_approval' and wait for a parent.
  */
-/**
- * Per-subject registration options (V3):
- * - teacherId: preferred teacher, optional (§6.7 / D-F)
- * - takeOutsideSchool: retaking students may opt to sit the subject
- *   outside school at 50% of the combined fee (§6.9). Validated
- *   server-side — only allowed for retakes or subjects not offered
- *   at school.
- */
-export const SubjectRegistrationOptions = z.object({
-  teacherId: z.string().min(1).optional(),
-  takeOutsideSchool: z.boolean().optional(),
-});
-export type SubjectRegistrationOptionsType = z.infer<typeof SubjectRegistrationOptions>;
-
 export const RequestRegistration = z.object({
   sessionId: z.string().min(1, 'Invalid session ID'),
-  subjectIds: z
-    .array(z.string().min(1, 'Invalid subject ID'))
-    .min(1, 'Select at least one subject')
-    .max(20, 'Cannot register more than 20 subjects at once'),
-  // Keyed by subjectId; absent key = defaults (in school, no teacher)
-  subjectOptions: z.record(z.string(), SubjectRegistrationOptions).optional(),
+  lines: ReservationLines,
+  consent: ReservationConsent,
 });
 export type RequestRegistrationType = z.infer<typeof RequestRegistration>;
 
@@ -85,12 +68,9 @@ export type RequestRegistrationType = z.infer<typeof RequestRegistration>;
  */
 export const DirectRegistration = z.object({
   sessionId: z.string().min(1, 'Invalid session ID'),
-  subjectIds: z
-    .array(z.string().min(1, 'Invalid subject ID'))
-    .min(1, 'Select at least one subject')
-    .max(20, 'Cannot register more than 20 subjects at once'),
   studentId: z.string().min(1, 'Invalid student ID'),
-  subjectOptions: z.record(z.string(), SubjectRegistrationOptions).optional(),
+  lines: ReservationLines,
+  consent: ReservationConsent,
 });
 export type DirectRegistrationType = z.infer<typeof DirectRegistration>;
 
@@ -159,9 +139,9 @@ export type RejectRegistrationsType = z.infer<typeof RejectRegistrations>;
 export const AdminOverrideApproval = z.object({
   studentId:  z.string().min(1, 'Invalid student ID'),
   sessionId:  z.string().min(1, 'Invalid session ID'),
-  subjectIds: z
-    .array(z.string().min(1, 'Invalid subject ID'))
-    .min(1, 'Select at least one subject'),
+  lines: ReservationLines,
+  // Recorded on the desk channel: the family's paper, read and signed (§3.5).
+  consent: ReservationConsent,
   reason: z.string().min(5, 'Reason must be at least 5 characters').max(500),
 });
 export type AdminOverrideApprovalType = z.infer<typeof AdminOverrideApproval>;
@@ -175,10 +155,3 @@ export const ListRegistrationsQuery = z.object({
 });
 export type ListRegistrationsQueryType = z.infer<typeof ListRegistrationsQuery>;
 
-// ─── Available Subjects Query ─────────────────────────────────────────────────
-
-export const AvailableSubjectsQuery = z.object({
-  sessionId:  z.string().min(1, 'Invalid session ID'),
-  studentId:  z.string().min(1, 'Invalid student ID').optional(),
-});
-export type AvailableSubjectsQueryType = z.infer<typeof AvailableSubjectsQuery>;

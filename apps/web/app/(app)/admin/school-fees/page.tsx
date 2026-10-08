@@ -11,6 +11,7 @@ import { getQueryClient } from '~/lib/query-client';
 import { getServerApi } from '~/lib/hono-server';
 import { apiResponse } from '@repo/validations';
 import SchoolFeesAdminClient from './school-fees-admin.client';
+import SchoolFeePush from './school-fee-push.client';
 
 export const metadata = {
   title: 'School Fees — IGCSE Admin',
@@ -28,6 +29,8 @@ export default async function SchoolFeesAdminPage(): Promise<React.JSX.Element> 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <SchoolFeesAdminClient />
+      {/* The reservations rework (§3.6): the year's fee pushed onto the families' statements. */}
+      <SchoolFeePush />
     </HydrationBoundary>
   );
 }

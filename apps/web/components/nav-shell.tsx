@@ -99,6 +99,8 @@ const EXAMS_SECTION: NavSection = {
     { labelKey: 'nav.certificates', href: '/exams/certificates', icon: 'documents' },
     { labelKey: 'nav.catalogue', href: '/exams/catalogue', icon: 'subjects' },
     { labelKey: 'nav.boardSeries', href: '/exams/series', icon: 'sessions' },
+    // The reservations rework, step C (§3.6): the boards' services, their fees and deadlines per series.
+    { labelKey: 'nav.boardServices', href: '/exams/services', icon: 'audit' },
   ],
 };
 
@@ -130,7 +132,9 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
       { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, ...teaching] },
       { titleKey: 'nav.academic', items: ACADEMIC_ITEMS },
       EXAMS_SECTION,
-      { titleKey: 'nav.school', items: [{ labelKey: 'nav.settings', href: '/settings', icon: 'settings' }] },
+      // The reservations rework (§4.2): the coordinator keeps each session's subjects, teachers and items.
+      // The reservations rework, step C (§3.7): the academic gates are the coordinator's to grant.
+      { titleKey: 'nav.school', items: [{ labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' }, { labelKey: 'nav.exceptions', href: '/admin/exceptions', icon: 'approvals' }, { labelKey: 'nav.settings', href: '/settings', icon: 'settings' }] },
       ACCOUNT_SECTION,
     ];
   }
@@ -171,6 +175,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
           { labelKey: 'nav.payments', href: '/admin/payments', icon: 'payments' },
           { labelKey: 'nav.escrow', href: '/admin/escrow', icon: 'adminEscrow' },
           { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'checkout' },
+          { labelKey: 'nav.charges', href: '/charges', icon: 'payments' },
           { labelKey: 'nav.schoolFees', href: '/admin/school-fees', icon: 'escrow' },
           { labelKey: 'nav.exceptions', href: '/admin/exceptions', icon: 'approvals' },
           { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
@@ -204,6 +209,10 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
           { labelKey: 'nav.students', href: '/students', icon: 'students' },
           ...teaching,
           { labelKey: 'nav.financeWorkbench', href: '/finance', icon: 'payments' },
+          // The reservations rework, step C (§3.6, §3.10): charges by family and status.
+          { labelKey: 'nav.charges', href: '/charges', icon: 'checkout' },
+          // The reservations rework (§4.2, §4.6): the sessions' fees and money.
+          { labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' },
           { labelKey: 'nav.dailyTakings', href: '/takings', icon: 'escrow' },
           { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
           { labelKey: 'nav.resultsEntry', href: '/results-entry', icon: 'reports' },
@@ -217,6 +226,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
               titleKey: 'nav.management' as const,
               items: [
                 { labelKey: 'nav.schoolFees' as const, href: '/admin/school-fees', icon: 'escrow' as const },
+                { labelKey: 'nav.boardServices' as const, href: '/exams/services', icon: 'audit' as const },
                 { labelKey: 'nav.exceptions' as const, href: '/admin/exceptions', icon: 'approvals' as const },
                 { labelKey: 'nav.settings' as const, href: '/settings', icon: 'settings' as const },
               ],
@@ -254,7 +264,10 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
       {
         titleKey: 'nav.financial',
         items: [
+          { labelKey: 'nav.statement', href: '/statement', icon: 'documents' },
           { labelKey: 'nav.schoolFee', href: '/school-fee', icon: 'payments' },
+          // The reservations rework, step C (§3.6, §3.10): instalments and charges, paid here.
+          { labelKey: 'nav.chargesDue', href: '/charges-due', icon: 'checkout' },
           { labelKey: 'nav.escrowBalance', href: '/escrow', icon: 'escrow' },
         ],
       },
@@ -281,6 +294,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
       items: [
         { labelKey: 'nav.registerSubjects', href: '/register', icon: 'register' },
         { labelKey: 'nav.myRegistrations', href: '/registrations', icon: 'registrations' },
+        { labelKey: 'nav.statement', href: '/statement', icon: 'documents' },
         { labelKey: 'nav.history', href: '/registrations/history', icon: 'history' },
         { labelKey: 'nav.browseSubjects', href: '/subjects', icon: 'subjects' },
         { labelKey: 'nav.remarks', href: '/remarks', icon: 'audit' },

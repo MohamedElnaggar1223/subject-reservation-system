@@ -1,0 +1,241 @@
+officer.mona@igcse.local → http://localhost:3000/desk
+360 (collect bits):
+Owes now
+EGP 3,950
+EGP 0
+To collect now
+Paid with
+Collect
+EGP 3,950
+Accounting
+EGP 1,500
+Mathematics
+EGP 850
+Physics
+EGP 1,600
+Accounting0452
+	Pending Payment	EGP 1,500	—
+Mathematics0580(outside)
+	Pending Payment	EGP 850	—
+Physics0625
+	Pending Payment	EGP 1,600	—
+360 buttons: + New Family (Onboard) | Academic record | Statement | + Reserve | Collect
+EGP 3,950
+shot 01-f1-360
+visible checkboxes: 4
+labels: Paid with | Accounting
+subject waiting for payment · June 2028 | Mathematics
+subject waiting for payment · June 2028 | Physics
+subject waiting for payment · June 2028 | Refund policy and declaration read and signed by the parent (asked for subjects the school reserved)
+consent boxes: 1
+collect button: Collect EGP 3,950
+AFTER COLLECT:
+Owes now
+EGP 0
+EGP 0
+Collected at the desk
+Collected EGP 3,950.
+Receipts to hand over: RCP-7B71EACE43, RCP-C2144C525F, RCP-12AC940E90
+Accounting0452
+	Confirmed	EGP 1,500	
+Physics0625
+	Confirmed	EGP 1,600	
+Mathematics0580(outside)
+	Confirmed	EGP 850	
+10/8/2026	Registration · Cash · DESK-19937B2F	Completed	EGP 3,100	
+10/8/2026	Registration · Cash · DESK-3807B548	Completed	EGP 850	
+shot 03-after-collect
+parent.f1@lead.local → http://localhost:3000/approvals
+STATEMENT F1:
+Statement
+
+Every line with its price and why, what is paid and what is still owed, and the payments — one per exam board deadline.
+
+Show ended lines (expired, rejected)
+Student F1
+
+Grade 11 · STU-20261008-A9B64
+
+Price
+
+EGP 3,950
+
+Paid
+
+EGP 3,950
+
+Outstanding
+
+EGP 0
+
+Escrow
+
+EGP 0
+
+June 2028
+LINE	PRICE	PAID	OUTSTANDING	DUE	RECEIPT	STATUS
+
+Accounting
+First entry, in school · Teacher A · Cambridge International June 2028
+	EGP 1,500
+course 1,200 × 100% + board 300 × 100%
+	EGP 1,500	—	—	RCP-C2144C525F
+Ready to Hand Over
+	Confirmed
+
+Mathematics
+Retake, self-study · Cambridge International June 2028
+from Cambridge International November 2027 (declared by the family) to be verified by the school
+	EGP 850
+course 1,100 × 50% + board 300 × 100%
+	EGP 850	—	—	RCP-12AC940E90
+Ready to Hand Over
+	Confirmed
+
+Physics
+First entry, in school · Teacher A · Cambridge International June 2028
+	EGP 1,600
+course 1,300 × 100% + board 300 × 100%
+	EGP 1,600	—	—	RCP-7B71EACE43
+Ready to Hand Over
+	Confirmed
+Payments
+
+One payment per entry deadline: each series is paid for on its own.
+
+8 Oct 2026 · Subjects (cash)
+Mathematics · RCP-12AC940E90
+Cambridge International June 2028 · deadline 22 Dec 2026
+EGP 850
+Paid
+8 Oct 2026 · Subjects (cash)
+Accounting · RCP-C2144C525F, Physics · RCP-7B71EACE43
+Cambridge International June 2028 · deadline 7 Dec 2026
+EGP 3,100
+Paid
+shot 04-statement-f1
+admin@igcse.local → http://localhost:3000/admin/dashboard
+MONEY TAB:
+← Sessions
+June 2028
+Open
+
+Reserve 7 Oct 2026 07:43 – 6 Jan 2027 07:43
+Course starts 22 Oct 2026
+Due 22 Nov 2026 07:43
+
+Refunds: 100% to week 2 · 50% in week 3 · 0% from week 4 · fixed: a family has agreed to it
+
+Edit
+Close
+Correct the series
+Deadlines
+Cambridge International June 2028
+7 Dec 2026
+retakes
+ 
+22 Dec 2026
+Subjects
+Fees
+Money
+Grade 10
+To verify
+
+LINES
+
+6
+
+PAID
+
+6 · EGP 7,900
+
+UNPAID
+
+0 · EGP 0
+
+0 families
+
+OVERDUE
+
+0 · EGP 0
+
+All
+Unpaid
+Overdue
+Provisional
+Paid
+Every subject
+Accounting
+Mathematics
+Physics
+Remind
+Export
+STUDENT	SUBJECT	SERIES	PRICE	DUE	STATUS
+
+Student F1
+STU-20261008-A9B64
+	Accounting
+First entry · In school
+	Cambridge International June 2028	EGP 1,500
+EGP 1,200 + EGP 300
+	22 Nov 2026	Paid
+
+Student F1
+STU-20261008-A9B64
+	Mathematics
+Retake · Self-study
+	Cambridge International June 2028	EGP 850
+EGP 550 + EGP 300
+	22 Nov 2026	Paid
+
+Student F1
+STU-20261008-A9B64
+	Physics
+First entry · In school
+	Cambridge International June 2028	EGP 1,600
+EGP 1,300 + EGP 300
+	22 Nov 2026	Paid
+
+Student F2
+STU-20261008-4B08C
+	Accounting
+First entry · In school
+	Cambridge International June 2028	EGP 1,500
+EGP 1,200 + EGP 300
+	22 Nov 2026	Paid
+
+Student F2
+STU-20261008-4B08C
+	Mathematics
+Retake · Self-study
+	Cambridge International June 2028	EGP 850
+EGP 550 + EGP 300
+	22 Nov 2026	Paid
+
+Student F2
+STU-20261008-4B08C
+	Physics
+First entry · In school
+	Cambridge International June 2028	EGP 1,600
+EGP 1,300 + EGP 300
+	22 Nov 2026	Paid
+Charges
+
+Owed EGP 0 · Paid EGP 0 · Charges
+
+No charge in this session yet.
+shot 05-money
+TO VERIFY:
+To verify
+Retakes and carried sittings declared by a family or at the desk. Verified, the line stands. Not confirmed: a line not yet paid ends and the family may reserve a first entry; a paid line stands as a first entry before the board's first-entry deadline, and is dropped with its refund after it.
+To verify
+STUDENT	LINE	DECLARED SITTING	DECLARED BY	PAID	ANSWER BY	
+Student F1
+	Mathematics
+75 days left
+	Verify Not confirmed
+Student F2
+	Mathematics
+shot 06-to-verify
+TOTAL: inputs 2 clicks 2
+ERRORS: none

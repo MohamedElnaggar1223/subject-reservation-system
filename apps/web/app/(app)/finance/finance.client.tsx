@@ -35,24 +35,18 @@ type PendingPayment = Awaited<ReturnType<typeof fetchPendingManual>>[number];
 const fetchWithdrawals = () => apiResponse(api.v1.escrow.admin.withdrawals.$get());
 type WithdrawalRequest = Awaited<ReturnType<typeof fetchWithdrawals>>[number];
 
-// Explicit type — this endpoint's RPC inference degrades in the web
-// compile (same pre-existing quirk as checkout-summary)
-type ReceiptRow = {
-  id: string;
-  receiptNumber: string;
-  status: string;
-  refundAmountOnReturn: number | null;
-  registration: {
-    id: string;
-    status: string;
-    priceAtRegistration: number;
-    student: { id: string; name: string; email: string; grade: number | null };
-    subject: { id: string; name: string; code: string };
-    session: { id: string; name: string };
-  };
-};
-const fetchReceipts = async () =>
-  (await apiResponse(api.v1.receipts.queue.$get())) as ReceiptRow[];
+// The receipts queue, typed from the route (CLAUDE.md: Hono RPC everywhere): a line's receipt,
+// or (the reservations rework, §3.10 item 2) a charge's — `registration` or `charge` set.
+const fetchReceipts = () => apiResponse(api.v1.receipts.queue.$get());
+type ReceiptRow = Awaited<ReturnType<typeof fetchReceipts>>[number];
+
+/** Whose receipt, and for what: the line's student and subject, or the charge's student and description. */
+function receiptOwner(r: ReceiptRow) {
+  if (r.registration) {
+    return { student: r.registration.student, what: `${r.registration.subject.name} (${r.registration.subject.code})`, where: r.registration.session.name };
+  }
+  return { student: r.charge?.student ?? { id: '', name: '—', email: '' }, what: r.charge?.description ?? '—', where: null };
+}
 
 const METHOD_BADGE: Record<string, string> = {
   in_school: 'bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400',
@@ -126,10 +120,9 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
         matchesSearch(
           search,
           r.receiptNumber,
-          r.registration.student.name,
-          r.registration.student.email,
-          r.registration.subject.name,
-          r.registration.subject.code,
+          receiptOwner(r).student.name,
+          receiptOwner(r).student.email,
+          receiptOwner(r).what,
         )
       ),
     [receiptRows, search]
@@ -367,9 +360,11 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {pay.paymentRegistrations
-                        .map((pr) => `${pr.registration.subject.name} (${pr.registration.subject.code})`)
-                        .join(' · ')}
+                      {[
+                        ...pay.paymentRegistrations.map((pr) => `${pr.registration.subject.name} (${pr.registration.subject.code})`),
+                        // A charge payment's charges (an instalment, a board service, an adjustment).
+                        ...pay.paymentCharges.map((pc) => pc.charge.description),
+                      ].join(' · ')}
                     </p>
                     {/* MO-10: what is due once the window has closed */}
                     {pay.status === 'pending' && pay.referenceDueAt && (
@@ -462,7 +457,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {r.registration.student.name} · {r.registration.subject.name} ({r.registration.subject.code}) · {r.registration.session.name}
+                  {receiptOwner(r).student.name} · {receiptOwner(r).what}{receiptOwner(r).where ? <> · {receiptOwner(r).where}</> : null}
                 </p>
                 {r.status === 'return_required' && r.refundAmountOnReturn != null && (
                   <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
@@ -596,7 +591,7 @@ export default function FinanceWorkbenchClient({ userRole }: { userRole: string 
       {lostTarget && (
         <ReasonModal
           title="Write this receipt off as lost?"
-          description={`Receipt ${lostTarget.receiptNumber} — ${lostTarget.registration.subject.name} for ${lostTarget.registration.student.name}. The family cannot produce the paper, so the school accepts the loss: any pending drop completes and its refund is released${lostTarget.refundAmountOnReturn != null ? ` (${lostTarget.refundAmountOnReturn.toFixed(2)} EGP)` : ''}. Recorded in the audit trail.`}
+          description={`Receipt ${lostTarget.receiptNumber} — ${receiptOwner(lostTarget).what} for ${receiptOwner(lostTarget).student.name}. The family cannot produce the paper, so the school accepts the loss: any pending drop completes and its refund is released${lostTarget.refundAmountOnReturn != null ? ` (${lostTarget.refundAmountOnReturn.toFixed(2)} EGP)` : ''}. Recorded in the audit trail.`}
           label="Reason"
           placeholder="e.g. Parent confirms the receipt was lost in a move"
           confirmLabel="Mark Lost"

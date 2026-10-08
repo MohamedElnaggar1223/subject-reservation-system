@@ -1,0 +1,12 @@
+INSERT 0 0
+DO
+CREATE FUNCTION
+INSERT 0 0
+INSERT 0 0
+INSERT 0 0
+ fees | deadlines | backfill_rows | services 
+------+-----------+---------------+----------
+   12 |         2 |           137 |       15
+(1 row)
+
+COMMIT

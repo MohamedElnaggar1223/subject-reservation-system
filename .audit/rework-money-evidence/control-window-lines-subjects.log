@@ -1,0 +1,45 @@
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+> vitest run "test/08r-exceptions-registry.test.ts"
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+
+[clock] database minus host: -0.1 ms (measured within 1 ms)
+ ❯ test/08r-exceptions-registry.test.ts (15 tests | 1 failed) 8944ms
+   ✓ 08r: the exceptions registry > GET /policies: every policy with its sentence, value, scopes and grantors; what each caller may grant now 7ms
+   ✓ 08r: the exceptions registry > a grant is checked against the registry: its grantors, its value, the scopes it accepts, a scope where one is required; late entries only while their setting is on  345ms
+   ✓ 08r: the exceptions registry > the same exception twice is refused, naming the one that is active; another scope or value is a grant of its own  325ms
+   ✓ 08r: the exceptions registry > a family's exception covers every linked child, and no one else  749ms
+   ✓ 08r: the exceptions registry > a one-shot gate lets one reservation through and is used by it; the next is refused  382ms
+   ✓ 08r: the exceptions registry > a price exception on one unpaid line re-prices it (its basis records it), and back when it is revoked; on a line with a payment it is refused  406ms
+   ✓ 08r: the exceptions registry > a price exception on one charge prices it again at once, and back when it is revoked; a charge with a payment keeps its amount  327ms
+   ✓ 08r: the exceptions registry > deadline.payment moves one line's due date, and back when it is revoked  348ms
+   ✓ 08r: the exceptions registry > the eight V3 types, as the migration moves them onto the registry (a V3-shaped row is filled the same way), and V3's request shape mapped onto its key  318ms
+   ✓ 08r: the exceptions registry > Check these: a migrated subject-scoped refund percent applies to nothing until a finance admin confirms it; then to that subject's lines, on the course fee  392ms
+   ✓ 08r: the exceptions registry > Check these: a price exception on an old unit row, once an item of another subject enters that unit  309ms
+   ✓ 08r: the exceptions registry > step B's teacher change to self-study on a first entry asks the real registry's one-shot gate: locked, used once, by that line  395ms
+   ✓ 08r: the exceptions registry > the pricing policies through the registry: a student's self-study course share, a family's board share — each in the line's price and its basis  1080ms
+   × 08r: the exceptions registry > a migrated subject-scoped window extension, once confirmed, opens the closed session for that subject alone 543ms
+     → Registration window is not open — a finance admin can grant this student a deadline extension
+   ✓ 08r: the exceptions registry > a late board entry (Q-20) end to end through the registry: with the setting on, reserved, kept by the sweep and paid after the entry deadline; off, refused and no longer read  915ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08r-exceptions-registry.test.ts > 08r: the exceptions registry > a migrated subject-scoped window extension, once confirmed, opens the closed session for that subject alone
+Error: Registration window is not open — a finance admin can grant this student a deadline extension
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08r-exceptions-registry.test.ts:341:19
+    339|     await apiResponse(finadmin.api.v1.exceptions[':id'].confirm.$post(…
+    340|     // Confirmed: that subject, after the close; another subject still…
+    341|     const line = (await apiResponse(reserve(subj.S9!))).registrations[…
+       |                   ^
+    342|     expect(await one(`select status, session_id as s from registration…
+    343|     expect(await refused(reserve(subj.S10!))).toEqual({ status: 422, e…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 passed (15)
+   Start at  08:50:50
+   Duration  10.60s (transform 552ms, setup 2ms, collect 197ms, tests 8.94s, environment 0ms, prepare 33ms)
+
+ ELIFECYCLE  Test failed. See above for more details.

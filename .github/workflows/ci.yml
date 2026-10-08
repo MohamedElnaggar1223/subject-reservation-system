@@ -64,6 +64,12 @@ jobs:
       - name: Build shared packages
         run: pnpm build --filter=@repo/db --filter=@repo/validations --filter=@repo/storage
 
+      # CLAUDE.md, Git: evidence is its proof, not a request log; nothing over 300 KB under .audit.
+      - name: Gate 0 - evidence size
+        run: |
+          big=$(find .audit -type f -size +300k 2>/dev/null)
+          if [ -n "$big" ]; then echo "files over 300 KB under .audit:"; echo "$big"; exit 1; fi
+
       - name: Gate 1 - API type-check (source and tests)
         run: pnpm --filter @repo/api check-types
 

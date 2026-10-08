@@ -1,0 +1,273 @@
+# commit 360348c; TZ=UTC; started 2026-10-08T07:55:41Z
+# Trimmed under CLAUDE.md (Git): the vitest summary and, for a red run, the failing tests and their
+# messages; the request log of the run removed. Original: 11761833 bytes, 124465 lines.
+
+ ✓ test/00-harness.test.ts (4 tests) 1636ms
+   ✓ harness > serves health and readiness through the typed client  1177ms
+   ✓ harness > provisions admin and finance accounts and refuses a finance officer at an admin route  455ms
+ ✓ test/01-desk.test.ts (8 tests) 1643ms
+ ✓ test/02-money.test.ts (4 tests) 1799ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 2047ms
+   ✓ V3 flows > held wallet: preregister for a draft session, pay at the desk into held, capture on activation  342ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 6182ms
+   ✓ authorization matrix > probes every /v1 endpoint as every principal  4433ms
+ ✓ test/05-object-access.test.ts (15 tests) 4011ms
+   ✓ object-level access between families > F0a another class and the gate: a teacher reaches only their own teaching; the gate only the school day  593ms
+   ✓ object-level access between families > F0b course enrolment: B cannot read or change A's student's enrolment; a teacher reads only their own class  486ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3735ms
+   ✓ auth surface > no endpoint hands the session token to page scripts  430ms
+   ✓ auth surface > a ban signs the account out at once and keeps it out (RF-23)  684ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1728ms
+ ✓ test/08-money-rules.test.ts (51 tests) 11814ms
+   ✓ money rules > checkout under concurrency > a parent cancelling while the desk confirms: one wins, and escrow matches the winner  380ms
+   ✓ money rules > a payment the family abandons or the bank never received > the desk takes the money for a subject already registered and unpaid (MA-18)  392ms
+   ✓ money rules > reversing a confirmation > is refused once a subject on it was dropped and refunded, so the refund is not paid twice (MA-14)  329ms
+   ✓ money rules > reversing a confirmation > a subject paid again after a reversal gets its receipt back under a new number (MA-20)  361ms
+   ✓ money rules > reversing a confirmation > a drop and a reversal of the same payment at once: one wins cleanly, never a deadlock (MA-16)  779ms
+   ✓ money rules > the paper receipt and a drop at the same moment > a drop racing the hand-over of its receipt never refunds at once for paper the family holds (MA-16)  1295ms
+   ✓ money rules > the registration window closes with money in flight > a student with a deadline extension can still be registered and paid for, at the desk and in the app (MA-13)  383ms
+   ✓ money rules > a preregistration paid after its session opened > a session may close after one of its series' entry deadlines: the cut-off is per item (MO-10 per line)  554ms
+   ✓ money rules > a preregistration paid after its session opened > past a later series' board deadline a preregistration can no longer be made, paid or confirmed, and what was paid comes back in full (MO-10, MO-21)  527ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 11696ms
+   ✓ state and time > the school fee (ST-02) > two officers collecting it at the same moment take it once  319ms
+   ✓ state and time > the school fee (ST-02) > the desk does not take it again while the family's transfer for it is being checked  317ms
+   ✓ state and time > a parent reverting an approval while checking out (ST-03) > a revert arriving while the checkout holds the lock sees the checkout, and is refused  579ms
+   ✓ state and time > a parent reverting an approval while checking out (ST-03) > never leaves an open payment on a request back in "awaiting approval", across a sweep of timings  582ms
+   ✓ state and time > a student who is withdrawn with a checkout open (ST-04) > gets the escrow back and the checkout closed, not stranded on an expired registration  424ms
+   ✓ state and time > a student who is withdrawn with a checkout open (ST-04) > a checkout whose transfer is being checked keeps its registration through a withdrawal, as at a close  358ms
+   ✓ state and time > two remark requests for one Cambridge result at once (ST-08) > accepts one  342ms
+   ✓ state and time > parent–student links (ST-09, ST-10) > a student answering one link request twice at once: one answer stands  432ms
+   ✓ state and time > parent–student links (ST-09, ST-10) > the desk enrolls a family whose first link request was rejected and a second is pending  454ms
+   ✓ state and time > a change request cancelled twice at once (ST-11) > is cancelled once; the other click is told  353ms
+   ✓ state and time > the scheduler finishes what a close or an opening left undone (ST-06) > a close interrupted before its finalisation is finished on the next tick, and only once  955ms
+   ✓ state and time > the scheduler finishes what a close or an opening left undone (ST-06) > preregistrations an opening did not capture are captured on the next tick  700ms
+   ✓ state and time > the scheduler finishes what a close or an opening left undone (ST-06) > a payment left open on registrations that have all expired is closed on the next tick, escrow back  696ms
+   ✓ state and time > a close judges "before the close" by one clock (ST-15) > a checkout made just before the close is kept for its reference even when the API's clock runs behind the database's  631ms
+   ✓ state and time > a close judges "before the close" by one clock (ST-15) > the scheduler's close stamps the same clock: a checkout made just before it is kept for its reference  654ms
+   ✓ state and time > a close judges "before the close" by one clock (ST-15) > a subject swapped in just before the close expires with the window, even when the API's clock runs ahead of the database's  659ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 6454ms
+   ✓ an audit row commits with its movement, or neither does (SO-1) > a family checkout > that applies escrow: refused audit, no payment and no debit  455ms
+   ✓ an audit row commits with its movement, or neither does (SO-1) > a desk registration that takes the money: refused audit, no registration and no payment  371ms
+   ✓ an audit row commits with its movement, or neither does (SO-1) > a withdrawal request: refused audit, no request and no hold on the balance  359ms
+   ✓ an audit row commits with its movement, or neither does (SO-1) > a transfer between two children of one parent moves both balances with one audit row, or nothing  639ms
+   ✓ an audit row commits with its movement, or neither does (SO-1) > a remark fee: its checkout, and its refund when the grade changes, each commit with their audit row  377ms
+   ✓ an audit row commits with its movement, or neither does (SO-1) > the school fee: a family's checkout and the desk's collection each commit with their audit row  611ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 7815ms
+   ✓ F0a: grade and eligibility > the boundary table > a student whose grade was never recorded is refused until it is; their own first setup records it once, audited  300ms
+   ✓ F0a: grade and eligibility > today's grade: 1 July in Cairo, whatever the server's zone > the student's page shows today's grade from the cohort, as the SQL computes it now  332ms
+   ✓ F0a: grade and eligibility > the core-subject rule reads the series' grade > a grade-10 student registering for June 2027 must take the core subjects; a grade-11 student need not  1121ms
+   ✓ F0a: grade and eligibility > the school-fee gate by series (row 4's fee; A-13; A-14) > row 4 with a 2027/28 schedule open: the gate asks for 2027/28's fee at grade 11; with none open, registration proceeds  338ms
+   ✓ F0a: grade and eligibility > the school-fee gate by series (row 4's fee; A-13; A-14) > the fee is paid for the series' year: a parent pays 2027/28's fee ahead and the gate opens  424ms
+   ✓ F0a: grade and eligibility > the school-fee gate by series (row 4's fee; A-13; A-14) > A-13: a graduate retaking under A-12 owes no school fee; with A-13 off they owe the uniform fee  344ms
+   ✓ F0a: grade and eligibility > the school-fee gate by series (row 4's fee; A-13; A-14) > A-14 'hold': a series in next year whose fee has not opened waits; 'proceed' lets it through  398ms
+   ✓ F0a: grade and eligibility > the inputs take the grade this academic year and store the cohort > sign-up (grade 11), the desk (grade 9: starts grade 10 next year) and the admin (grade 12)  515ms
+   ✓ F0a: grade and eligibility > the inputs take the grade this academic year and store the cohort > the admin's cohort correction is audited with the reason and tells the family  321ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 5867ms
+   ✓ F0a: when eligibility changes after a registration exists > withdrawn with a checkout open: the registration expires, the checkout closes, the escrow comes back, the family is told; readmission leaves it expired  517ms
+   ✓ F0a: when eligibility changes after a registration exists > withdrawn with an in-school checkout open: nothing holds it (only a transfer being checked or InstaPay's grace does) — the registration expires and the checkout closes  360ms
+   ✓ F0a: when eligibility changes after a registration exists > a cohort moved back a year: the October registration is now out of reach (grade 10: June only) and expires; its checkout closes; the June registration stays  491ms
+   ✓ F0a: when eligibility changes after a registration exists > A-12 turned off with graduates' registrations pending: they expire in the transaction that turns it off; the checkout closes; turning it on again revives nothing  743ms
+   ✓ F0a: when eligibility changes after a registration exists > an admin corrects a window's series: registrations students may no longer sit expire, audited with the correction  421ms
+   ✓ F0a: when eligibility changes after a registration exists > a grade-10 exception revoked: the registration it allowed expires  344ms
+   ✓ F0a: when eligibility changes after a registration exists > a grade-10 exception that runs out: the scheduler lapses it once — its waiting registration expires, the paid one stands  410ms
+   ✓ F0a: when eligibility changes after a registration exists > withdrawn with preregistrations, then the series opens: neither is captured — the paid one keeps its money held, the unpaid one stays unpayable; one audit row each, finance told  535ms
+   ✓ F0a: when eligibility changes after a registration exists > a draft session's header never changes its series: the audited series correction is the way  402ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5421ms
+   ✓ F0a: settings, uploads, academic structure, sections, teaching > uploads by purpose > only the parent's own evidence for this child attaches to a payment; finance then reads a legacy document so attached (O-5)  465ms
+   ✓ F0a: settings, uploads, academic structure, sections, teaching > sections and the roll-over > graduations the backfill inferred are listed for staff to review, and the record says so  326ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 8695ms
+   ✓ F0a: races > a registration racing an eligibility change is never left waiting > a withdrawal: the registration commits first, then the withdrawal expires it  565ms
+   ✓ F0a: races > a registration racing an eligibility change is never left waiting > a transfer: the registration commits first, then the transfer expires it  544ms
+   ✓ F0a: races > a registration racing an eligibility change is never left waiting > a cohort correction: the registration commits first, then the correction expires it  523ms
+   ✓ F0a: races > a registration racing an eligibility change is never left waiting > a window's series corrected: the registration commits first, then the correction expires it  741ms
+   ✓ F0a: races > a registration racing an eligibility change is never left waiting > a grade-10 exception revoked: the registration it allowed commits first, then the revocation expires it  538ms
+   ✓ F0a: races > a registration racing an eligibility change is never left waiting > A-12 turned off: a graduate's registration commits first, then the change expires it  525ms
+   ✓ F0a: races > a withdrawal that lands first refuses every creating path > the desk taking the money: refused, nothing registered and no money recorded  515ms
+   ✓ F0a: races > a withdrawal that lands first refuses every creating path > a preregistration: refused, nothing registered  633ms
+   ✓ F0a: races > a withdrawal that lands first refuses every creating path > approving a swap: refused, the paid subject stays and nothing new waits  565ms
+   ✓ F0a: races > a withdrawal that lands first refuses every creating path > a parent's direct swap: refused, the paid subject stays and nothing new waits  562ms
+   ✓ F0a: races > two people at once > A-12 turned off by two admins at once: one change, one audit row; each graduate registration expires once  460ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2697ms
+   ✓ F0b: the exam catalogue > a unit counting toward AS and A Level (IS-01) > "A.S./A.2." is derived per registration from the unit's level, the awards and the student's year — and nothing stored moves when the reading changes  959ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4365ms
+   ✓ F0b: board series > each registration is entered in its item's series > Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed  405ms
+   ✓ F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series  394ms
+   ✓ F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information  1745ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 3985ms
+   ✓ F0b: course enrolment > two people at once > rows committed while the student leaves: the leaving ends them too, never an open enrolment for a student who left  517ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4556ms
+   ✓ F0b: races > a line racing a change to its item's series is entered by the old routing; the change then carries it, its student locked first  734ms
+   ✓ F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited  596ms
+   ✓ F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the deadline first: the reservation waits for it and is due by the new deadline  613ms
+   ✓ F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)  1059ms
+ ✓ test/08l-board-change.test.ts (7 tests) 3694ms
+   ✓ F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline  304ms
+   ✓ F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)  402ms
+   ✓ F0b: a board change and the entry deadline > a subject's item moves with it (flag 2) > an item in a labelled series moves to the new board's series of that label: the subject is offered and reserved there  306ms
+   ✓ F0b: a board change and the entry deadline > a subject's item moves with it (flag 2) > refused when a line would move to another deadline; an item with no lines moves to a series made for the new board  594ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 6061ms
+   ✓ F0b: one checkout per entry deadline > a family's checkout spanning two deadlines is refused, naming each series to pay separately; the summary groups them  402ms
+   ✓ F0b: one checkout per entry deadline > the desk registers subjects of two deadlines and takes the money in one action: one confirmed payment per deadline, with receipts and takings  365ms
+   ✓ F0b: one checkout per entry deadline > the desk collects waiting subjects of two deadlines: one confirmed payment per deadline  373ms
+   ✓ F0b: one checkout per entry deadline > escrow shared across the desk's split payments goes to the earliest deadline first; the ledger has a debit per payment  449ms
+   ✓ F0b: one checkout per entry deadline > one payment confirmed while the other was closed first: the desk says which it took and which to hand back  361ms
+   ✓ F0b: one checkout per entry deadline > the admin's move may not split an open checkout across deadlines  427ms
+   ✓ F0b: an item's series change may not split an open checkout across deadlines > refused, nothing moved, until the checkout is settled  880ms
+   ✓ F0b: MO-21 per series — a draft session whose items sit October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the policy's rate on the course fee and its board fee back  1169ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 23181ms
+   ✓ 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only  1034ms
+   ✓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a Cambridge retake of the previous June is reservable until the retake deadline after the entry deadline passed; a first entry is not; a retake of an older sitting is cut off at the entry deadline; the retake is due by the retake deadline  402ms
+   ✓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line  300ms
+   ✓ 08n: a winter session, each item cut off at its own deadline (§3.3) > the admin's move takes a retake into a series past its entry deadline while the retake deadline is ahead; a first entry not  634ms
+   ✓ 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed  309ms
+   ✓ 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured  2275ms
+   ✓ 08n: the line rules (§3.5) > AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can  321ms
+   ✓ 08n: the line rules (§3.5) > the same entry twice in one series across two sessions is refused: the board takes one entry  314ms
+   ✓ 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted  320ms
+   ✓ 08n: the line rules (§3.5) > a carried sitting outside the board's carry-forward period is refused (Cambridge: 13 months); inside it, accepted  314ms
+   ✓ 08n: the line rules (§3.5) > self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting  355ms
+   ✓ 08n: past a line's own deadline (flags 59, 60) > a family's drop of a paid line whose deadline passed is refused and sent to the desk; a series with no entry deadline is cut off at the start of its exams' day  1007ms
+   ✓ 08n: the enrolment per unit (§3.2, §10: F1 reads it) > a line of an item entering units is enrolled per unit with its item's teacher; the teaching demand groups per unit  708ms
+   ✓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core  1499ms
+   ✓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace  961ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's  406ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable  506ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)  532ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited  662ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other  515ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry  420ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too  442ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval  1301ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured  620ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both  358ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price  709ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed  431ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable  394ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)  421ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line  407ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat  616ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line  883ms
+ ✓ test/08o-reservation-lines.test.ts (23 tests) 16340ms
+   ✓ 08o: reservation lines (step B) > a family reserves in the app: one line per item with the entry chosen, both consents required and recorded, the refund steps frozen  684ms
+   ✓ 08o: reservation lines (step B) > a converted session with no refund policy freezes its refund windows as dates: the session's own, else its academic year's  795ms
+   ✓ 08o: reservation lines (step B) > the price the page showed is the price charged: a line priced otherwise in between is refused, nothing made  427ms
+   ✓ 08o: reservation lines (step B) > a family declares a retake with its sitting: created when not on record, priced as a retake, listed to verify; a first entry names none  1011ms
+   ✓ 08o: reservation lines (step B) > a sitting the system knows is filled in and not listed to verify; its retake runs to the retake deadline  367ms
+   ✓ 08o: reservation lines (step B) > a dropped line is not a known sitting (it was never sat): a retake naming nothing is refused, naming it declares it and lists it to verify  400ms
+   ✓ 08o: reservation lines (step B) > the coordinator verifies: the line stands; a carry-forward from another centre records the previous centre and candidate number; answered once  649ms
+   ✓ 08o: reservation lines (step B) > rejected on an unpaid line: refused while a checkout is open; then it expires (declaration_rejected), the family is told, and may reserve a first entry  384ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line before the first-entry deadline: the line stands as paid with declaration_rejected (a first entry for F4), the family is told  337ms
+   ✓ 08o: reservation lines (step B) > a rejected declaration is a first entry: its deadline becomes the entry deadline, not the retake one  368ms
+   ✓ 08o: reservation lines (step B) > a paid preregistration whose declaration was rejected, captured between the entry and retake deadlines: refunded in full, not confirmed (MO-21)  382ms
+   ✓ 08o: reservation lines (step B) > the deadline sweeps read a rejected declaration as a first entry: a reverted waiting line expires, a held preregistration is refunded, at the entry deadline  812ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line after the first-entry deadline: dropped through the receipt-gated drop with today's refund  355ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line after its own deadline: the board fee the school has paid is kept, the rest refunded by the window  415ms
+   ✓ 08o: reservation lines (step B) > unverified at the deadline: entered as declared by default; under hold the sweep expires a waiting line and drops a paid one, once  1638ms
+   ✓ 08o: reservation lines (step B) > the school's grade-10 lines carry the school's consent; the family gives its own at checkout; a line without consent is never paid or confirmed  816ms
+   ✓ 08o: reservation lines (step B) > a swap's new line inherits the dropped line's consent and refund steps  1515ms
+   ✓ 08o: reservation lines (step B) > the teacher on a line: "no preference" assigned later; changed on a paid line the enrolment follows and the price does not; self-study is not re-priced  1075ms
+   ✓ 08o: reservation lines (step B) > the teacher change asks the self-study gate as the line rules do: a rejected declaration is a first entry; a one-shot exception is locked and used once  359ms
+   ✓ 08o: reservation lines (step B) > the desk: reserve only; reserve and collect takes one payment per entry deadline, a provisional line reserved and collected once its fee is confirmed  817ms
+   ✓ 08o: reservation lines (step B) > the family's flow: a student asks, a parent approves and pays by series; the statement's numbers are the ledger's, one payment per entry deadline  404ms
+   ✓ 08o: reservation lines (step B) > the statement's outstanding is the Money tab's unpaid: a line awaiting the parent is not owed, an unfunded preregistration is  366ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 8145ms
+   ✓ 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%  1201ms
+   ✓ 08p: pricing policies > a one-paper retake costs its own course fee and the qualification's board fee; it is refused with the whole subject, and as a first entry  326ms
+   ✓ 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given  614ms
+   ✓ 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not  905ms
+   ✓ 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line  626ms
+   ✓ 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace  343ms
+   ✓ 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price  399ms
+   ✓ 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)  385ms
+   ✓ 08p: pricing policies > the Fees tab lists a waiting line still provisional on confirmed fees, and confirming its fees again makes it payable (09's rule, on the screen)  394ms
+   ✓ 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told  1716ms
+ ✓ test/08q-charges.test.ts (46 tests) 27630ms
+   ✓ 08q: charges > a Cambridge remark is priced per component at the AS rate from the series' grid; a changed grade refunds it by the service's rule (seeded full; a fixed deduction when set)  440ms
+   ✓ 08q: charges > the school fee pushed to families (point 8) > pushed to a grade: every student of that grade next year who owes it  382ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a custom-priced line refunds its total by the course rule, never a board fee (1,200 at 50%: 600)  332ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a converted line refunds as V3 did: its session's windows, on the whole price (50%: 750)  414ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > past its line's deadline: the family is sent to the desk; the desk drops it, the board fee kept (sent), the paper back first  648ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a series with no entry deadline is cut off at its exams' start, and its board fee counts as sent from then  534ms
+   ✓ 08q: charges > payment.expireOverdueAfterDays: off by default; on, a line unpaid that long after its due date expires ("overdue") once, however many ticks run  325ms
+   ✓ 08q: instalment plans > refused: a provisional board fee, a checkout in progress, instalments that do not add up, a last date past the session's end; granted by finance only  401ms
+   ✓ 08q: instalment plans > three instalments into the held wallet, earmarked for the line, each with a deposit slip and in the day's takings; the line captured at the last in one payment from its deposits  524ms
+   ✓ 08q: instalment plans > a plan line is not sent back for approval by the parent, even with nothing paid yet  347ms
+   ✓ 08q: instalment plans > stopped in week 3 (50%): the school keeps min(deposits, price − the refund) and releases the rest — 1,000 paid: 500 kept; 500 paid: 500 kept; 300 paid: 300 kept; a paid drop that day gives 1,000 back  519ms
+   ✓ 08q: instalment plans > released in full by finance: every deposit back in escrow, the line still payable and paid normally  438ms
+   ✓ 08q: instalment plans > ended by an overdue expiry, by the student leaving, and by an instalment payment failing on a line no longer payable — each settled as a drop that day  748ms
+   ✓ 08q: instalment plans > the close spares a line whose last instalment is being checked; that instalment rejected after the close ends the plan (plan_ended); a line under a plan not spared is settled at the close  505ms
+   ✓ 08q: instalment plans > at the deadline: confirming the last instalment is refused, the sweep ends the plans and fails their open instalment payments; a plan that lapses is settled and its transfer refused at confirmation  654ms
+   ✓ 08q: instalment plans > an instalment payment that fails on a line still payable leaves the plan standing: the instalment is paid again  361ms
+   ✓ 08q: instalment plans > a line under a live plan keeps its price: a price exception on it is refused naming the plan; one granted before the plan and revoked after leaves it, and the capture pays it; a paid charge against a line keeps its price too  453ms
+   ✓ 08q: instalment plans > only what paid toward the line keeps its price: a paid certificate split alone leaves it re-priceable, and so do the paid instalments of a plan released in full  465ms
+   ✓ 08q: instalment plans > one plan per line: a second plan on a line whose plan was released in full is refused  374ms
+   ✓ 08q: instalment plans > the eligibility clean-up spares a line whose last instalment is being checked; the transfer rejected after it ends the plan (plan_ended)  387ms
+   ✓ 08q: instalment plans > the last instalment falls by the line's own deadline when it comes before the session's end  775ms
+   ✓ 08q: instalment plans > a late board entry (Q-20, the setting on) keeps a plan line's instalments payable after the board's date, and the last captures it  845ms
+   ✓ 08q: instalment plans > a declared retake under a plan, its sitting rejected by the school: refused while an instalment payment is in progress; then the line expires and its plan is settled as a drop that day (step B's expiry, step C's settlement)  534ms
+   ✓ 08q: instalment plans > a declared retake under a plan still unverified at its deadline under hold: the sweep expires it (hold_unverified) and settles its plan, once  1124ms
+   ✓ 08q: instalment plans > a declared retake rejected while paid stands as a first entry; its payment reversed, a plan on it falls due at the first-entry deadline, not the retake deadline (B's flag in the charge deadlines)  956ms
+   ✓ 08q: instalment plans > the statement, the desk's Owes now and the Money tab agree: a plan line paid = its deposits, owed = the rest, its instalments under it and never in the totals; the charges beside the lines  665ms
+   ✓ 08q: instalment plans > another line's preregistration capture leaves the plan's deposits alone; held money is never transferred to a sibling  1012ms
+   ✓ 08q: instalment plans > a plan line is listed, not re-priced, when its board fee is confirmed at a new amount and re-priced — and its last instalment captures it  556ms
+   ✓ 08q: instalment plans > a plan line moved to another series with its item keeps its price there — and its last instalment captures it  606ms
+   ✓ 08q: the desk collects lines, charges and the year's school fee in one action > reserve and collect: the year's fee first (the gate asks for it), the lines, then the student's charges — each its own payment  359ms
+   ✓ 08q: the desk collects lines, charges and the year's school fee in one action > the fee alone; and when the rest cannot be taken, the fee stays collected and the rest is listed as not collected  660ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 8727ms
+   ✓ 08r: the exceptions registry > a grant is checked against the registry: its grantors, its value, the scopes it accepts, a scope where one is required; late entries only while their setting is on  332ms
+   ✓ 08r: the exceptions registry > a family's exception covers every linked child, and no one else  723ms
+   ✓ 08r: the exceptions registry > a one-shot gate lets one reservation through and is used by it; the next is refused  355ms
+   ✓ 08r: the exceptions registry > a price exception on one unpaid line re-prices it (its basis records it), and back when it is revoked; on a line with a payment it is refused  382ms
+   ✓ 08r: the exceptions registry > a price exception on one charge prices it again at once, and back when it is revoked; a charge with a payment keeps its amount  311ms
+   ✓ 08r: the exceptions registry > deadline.payment moves one line's due date, and back when it is revoked  333ms
+   ✓ 08r: the exceptions registry > the eight V3 types, as the migration moves them onto the registry (a V3-shaped row is filled the same way), and V3's request shape mapped onto its key  308ms
+   ✓ 08r: the exceptions registry > Check these: a migrated subject-scoped refund percent applies to nothing until a finance admin confirms it; then to that subject's lines, on the course fee  389ms
+   ✓ 08r: the exceptions registry > Check these: a price exception on an old unit row, once an item of another subject enters that unit  306ms
+   ✓ 08r: the exceptions registry > step B's teacher change to self-study on a first entry asks the real registry's one-shot gate: locked, used once, by that line  392ms
+   ✓ 08r: the exceptions registry > the pricing policies through the registry: a student's self-study course share, a family's board share — each in the line's price and its basis  1056ms
+   ✓ 08r: the exceptions registry > a migrated subject-scoped window extension, once confirmed, opens the closed session for that subject alone  703ms
+   ✓ 08r: the exceptions registry > a late board entry (Q-20) end to end through the registry: with the setting on, reserved, kept by the sweep and paid after the entry deadline; off, refused and no longer read  1185ms
+ ✓ test/08t-rework-races.test.ts (36 tests) 29741ms
+   ✓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line  570ms
+   ✓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused  455ms
+   ✓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused  425ms
+   ✓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it  1054ms
+   ✓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused  559ms
+   ✓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional  461ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it  568ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged  576ms
+   ✓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused  616ms
+   ✓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once  640ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the checkout first: it opens its payment, and the rejection is refused while it is open  528ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the rejection first: the line expires, and the checkout that waited is refused, no payment made  575ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > verified while its payment is confirmed: both land, the line paid and verified  584ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > a parent's approval of a drop against the coordinator's rejection of the same paid line > the approval first: the line is dropped, and the rejection that waited finds nothing to answer  709ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > a parent's approval of a drop against the coordinator's rejection of the same paid line > the rejection first: the paid line stands as a first entry, then the approval drops it  578ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > a payment confirmed while a rejection waits for the line: the rejection is refused (try again), then answered with the receipt first  650ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > a payment reversal against the coordinator's rejection of the same paid line > the rejection first: it holds the receipt and the line; the reversal waits, then reverts the payment  562ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > a payment reversal against the coordinator's rejection of the same paid line > the reversal first: the line waits for payment again, and the rejection that waited ends it  559ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the hold step run by two schedulers at once drops a paid unverified line once  555ms
+   ✓ 08t: the rework races > a parent's approval of a drop against a reversal of the line's payment (MA-16's order: the receipt, then the line) > the approval first: it drops the line; the reversal then refuses (the subject was dropped) — no deadlock  601ms
+   ✓ 08t: the rework races > a parent's approval of a drop against a reversal of the line's payment (MA-16's order: the receipt, then the line) > the reversal first: it reverts the line; the approval then refuses (already processed) — no deadlock  609ms
+   ✓ 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks  550ms
+   ✓ 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land  643ms
+   ✓ 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land  652ms
+   ✓ 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land  612ms
+   ✓ 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after  568ms
+   ✓ 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line  792ms
+   ✓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > an item's series change  582ms
+   ✓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move  565ms
+   ✓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > a board change  583ms
+   ✓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the session's series correction  661ms
+   ✓ 08t: the rework races — money (step C) > an exception revoked while a line relies on it: the revocation waits for the reservation, then re-dates its line; one that lands first leaves the line without it  1395ms
+   ✓ 08t: the rework races — money (step C) > a family's one-shot gate wanted by two of its children at once: one reservation gets it, the other is refused  618ms
+   ✓ 08t: the rework races — money (step C) > the desk collects a line and another line's instalment while both lines' board fees are re-priced: every line taken in one id-ordered pass, so the two never deadlock  692ms
+   ✓ 08t: the rework races — money (step C) > the last instalment's confirmation racing the line's deadline > the confirmation first (begun before the deadline): the line is captured; the sweep after the deadline finds it confirmed and settles nothing  3206ms
+   ✓ 08t: the rework races — money (step C) > the last instalment's confirmation racing the line's deadline > the sweep first (after the deadline): the line expires and its deposits are settled once; the confirmation is refused and the payment failed  3319ms
+ ✓ test/09-money-invariants.test.ts (46 tests) 573ms
+
+ Test Files  28 passed (28)
+      Tests  496 passed | 1 todo (497)
+   Start at  07:55:41
+   Duration  228.16s (transform 914ms, setup 44ms, collect 3.06s, tests 220.23s, environment 2ms, prepare 923ms)
+exit 0

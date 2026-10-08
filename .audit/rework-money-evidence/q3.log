@@ -1,0 +1,18 @@
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+> vitest run "test/08q-charges.test.ts"
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+
+[clock] database minus host: 0.5 ms (measured within 2 ms)
+ ✓ test/08q-charges.test.ts (18 tests) 7338ms
+   ✓ 08q: charges > a Cambridge remark is priced per component at the AS rate from the series' grid; a changed grade refunds it by the service's rule (seeded full; a fixed deduction when set)  445ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a custom-priced line refunds its total by the course rule, never a board fee (1,200 at 50%: 600)  334ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a converted line refunds as V3 did: its session's windows, on the whole price (50%: 750)  353ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > past its line's deadline: the family is sent to the desk; the desk drops it, the board fee kept (sent), the paper back first  363ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a series with no entry deadline is cut off at its exams' start, and its board fee counts as sent from then  333ms
+   ✓ 08q: charges > payment.expireOverdueAfterDays: off by default; on, a line unpaid that long after its due date expires ("overdue") once, however many ticks run  347ms
+
+ Test Files  1 passed (1)
+      Tests  18 passed (18)
+   Start at  03:10:31
+   Duration  9.08s (transform 531ms, setup 2ms, collect 210ms, tests 7.34s, environment 0ms, prepare 34ms)

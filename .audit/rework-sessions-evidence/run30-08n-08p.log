@@ -1,0 +1,13 @@
+# run30-08n-08p.log: the proof of this run, as vitest reported it (the full log, 6173 lines, 638865 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ✓ test/08n-session-offers.test.ts (37 tests) 22860ms
+ ✓ test/08p-pricing-policies.test.ts (7 tests) 7301ms
+
+## Summary
+[clock] database minus host: 0.8 ms (measured within 3 ms)
+ Test Files  2 passed (2)
+      Tests  44 passed (44)
+   Start at  05:31:22
+   Duration  32.23s (transform 532ms, setup 5ms, collect 366ms, tests 30.16s, environment 0ms, prepare 82ms)

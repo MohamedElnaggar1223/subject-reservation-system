@@ -1,0 +1,148 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -0.2 ms (measured within 2 ms)
+stderr | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [e4dbce4f-429b-4f7d-ba08-1978ed39eb75] POST /api/auth/sign-up/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[email:stub] To: admin.p08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [a1ca704f-055d-444c-a385-54c39fc68224] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [72c52588-8c33-4ff8-ace5-62de6ae864ef] POST /v1/users
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [646bc196-e5d9-4e23-8f1f-35ce39d3f9e9] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [88030a20-580a-4732-9d3b-eda7480afe87] POST /v1/users
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [c4623cab-643c-4c20-a0ba-1552063a6759] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [89082aee-55d2-4141-8ef4-56b44bd411a4] POST /v1/teachers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [12ac6488-8f03-4b4f-8e0b-ede166d9d241] POST /v1/sessions
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [cfbaa557-04a2-4d60-bb4f-b7788b1ed85e] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [f0faaa74-86c8-4a84-b913-fe8409e3e8dc] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [90de73c4-a6df-474b-abcb-1bd430d76ac7] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [fe74f459-f5b9-4ce7-af37-44b3b857a556] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [b63bfa86-42a3-4aa8-82a2-bc76110a9f09] POST /v1/catalogue/qualifications
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [c622795a-fe34-4b68-a199-19b1ac9cf4ad] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [b95ad6d2-fcfa-4526-8f3c-7afc33ef2b27] POST /v1/sessions/07042bc0-63a0-48ba-b2bf-7a6106b72dff/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [3cd395a5-8cb0-4e5c-8673-b22aafcf4205] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [807753e0-0079-41ea-886a-b9ab88638186] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [77b13b59-3ce0-4de6-ba5b-f76fe66988d4] POST /v1/sessions/07042bc0-63a0-48ba-b2bf-7a6106b72dff/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [08435176-6e8c-4b9f-871b-e97a14e65a97] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [d1b17bf5-a4a1-47f9-9f06-0287399395a1] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [ce65cf29-206d-42a7-8a3e-6a36303bdfd0] POST /v1/sessions/07042bc0-63a0-48ba-b2bf-7a6106b72dff/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [143eb550-e92a-40aa-89d9-844411bc8ec9] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [255b7532-0fef-47c6-afb5-11353fa2b6c6] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [ccd408ea-15c3-4f03-ac3d-b4db458343b0] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [97740db8-5ac3-4a5d-af35-735868bcf1d6] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [91488c4a-7ed9-47e0-a2a2-805baff99b47] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[email:stub] To: parent.p08-put-vlgc@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[email:stub] To: student.p08-put-vlgc@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [88b9dff6-bf52-4481-bbba-8390518ffbd8] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [c228ddc5-d4ad-423f-b399-d52cf0985a2a] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [edad37b2-5d06-448f-8248-743481e6964a] POST /v1/sessions/07042bc0-63a0-48ba-b2bf-7a6106b72dff/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [af4f655b-94f5-4efd-8734-3821e7154270] POST /v1/sessions/07042bc0-63a0-48ba-b2bf-7a6106b72dff/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [b70c1629-a951-48cc-80cd-b5900e1dfd53] PUT /v1/board-fees
+
+ ❯ test/08p-pricing-policies.test.ts (8 tests | 1 failed | 7 skipped) 1860ms
+   ↓ 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+   ↓ 08p: pricing policies > a one-paper retake costs its own course fee and the qualification's board fee; it is refused with the whole subject, and as a first entry
+   ↓ 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+   ↓ 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+   ↓ 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+   ↓ 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace
+   × 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price 362ms
+     → expected { changed: 2, …(1) } to match object { changed: 2, …(1) }
+   ↓ 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+AssertionError: expected { changed: 2, …(1) } to match object { changed: 2, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "changed": 2,[22m
+[32m-   "linesNoLongerProvisional": 1,[39m
+[31m+   "linesNoLongerProvisional": 0,[39m
+[2m  }[22m
+
+ ❯ test/08p-pricing-policies.test.ts:257:17
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 skipped (8)
+   Start at  06:11:41
+   Duration  3.26s (transform 452ms, setup 2ms, collect 160ms, tests 1.86s, environment 0ms, prepare 31ms)
+

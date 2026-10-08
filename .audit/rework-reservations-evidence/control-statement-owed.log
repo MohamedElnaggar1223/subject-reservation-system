@@ -1,0 +1,58 @@
+# Trimmed under CLAUDE.md (Git): the vitest summary and, for a red run, the failing tests and their
+# messages; the request log of the run removed. Original: 129524 bytes, 1366 lines.
+
+ ❯ test/08o-reservation-lines.test.ts (19 tests | 1 failed) 14191ms
+   ✓ 08o: reservation lines (step B) > a family reserves in the app: one line per item with the entry chosen, both consents required and recorded, the refund steps frozen  708ms
+   ✓ 08o: reservation lines (step B) > a converted session with no refund policy freezes its refund windows as dates: the session's own, else its academic year's  692ms
+   ✓ 08o: reservation lines (step B) > the price the page showed is the price charged: a line priced otherwise in between is refused, nothing made  433ms
+   ✓ 08o: reservation lines (step B) > a family declares a retake with its sitting: created when not on record, priced as a retake, listed to verify; a first entry names none  1025ms
+   ✓ 08o: reservation lines (step B) > a sitting the system knows is filled in and not listed to verify; its retake runs to the retake deadline  394ms
+   ✓ 08o: reservation lines (step B) > a dropped line is not a known sitting (it was never sat): a retake naming nothing is refused, naming it declares it and lists it to verify  424ms
+   ✓ 08o: reservation lines (step B) > the coordinator verifies: the line stands; a carry-forward from another centre records the previous centre and candidate number; answered once  675ms
+   ✓ 08o: reservation lines (step B) > rejected on an unpaid line: refused while a checkout is open; then it expires (declaration_rejected), the family is told, and may reserve a first entry  397ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line before the first-entry deadline: the line stands as paid with declaration_rejected (a first entry for F4), the family is told  337ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line after the first-entry deadline: dropped through the receipt-gated drop with today's refund  375ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line after its own deadline: the board fee the school has paid is kept, the rest refunded by the window  393ms
+   ✓ 08o: reservation lines (step B) > unverified at the deadline: entered as declared by default; under hold the sweep expires a waiting line and drops a paid one, once  1409ms
+   ✓ 08o: reservation lines (step B) > the school's grade-10 lines carry the school's consent; the family gives its own at checkout; a line without consent is never paid or confirmed  726ms
+   ✓ 08o: reservation lines (step B) > a swap's new line inherits the dropped line's consent and refund steps  1165ms
+   ✓ 08o: reservation lines (step B) > the teacher on a line: "no preference" assigned later; changed on a paid line the enrolment follows and the price does not; self-study is not re-priced  1084ms
+   ✓ 08o: reservation lines (step B) > the desk: reserve only; reserve and collect takes one payment per entry deadline, a provisional line reserved and collected once its fee is confirmed  807ms
+   ✓ 08o: reservation lines (step B) > the family's flow: a student asks, a parent approves and pays by series; the statement's numbers are the ledger's, one payment per entry deadline  397ms
+   × 08o: reservation lines (step B) > the statement's outstanding is the Money tab's unpaid: a line awaiting the parent is not owed, an unfunded preregistration is 374ms
+   ✓ 08o: reservation lines (step B) > GET /registrations/available is gone: the Reserve pages read /registrations/offers 288ms
+ ❯ test/08o-reservation-lines.test.ts:727:37
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08o-reservation-lines.test.ts > 08o: reservation lines (step B) > the statement's outstanding is the Money tab's unpaid: a line awaiting the parent is not owed, an unfunded preregistration is
+AssertionError: expected { …(33) } to match object { status: 'pending_approval', …(3) }
+(33 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "outstanding": 0,
++   "outstanding": 23200,
+    "paid": 0,
+    "price": 23200,
+    "status": "pending_approval",
+  }
+
+ ❯ test/08o-reservation-lines.test.ts:727:37
+    725|     const st = (await apiResponse(f.parent.api.v1.statement.$get({ que…
+    726|     const lineIn = (sessionId: string, id: string) => st.sessions.find…
+    727|     expect(lineIn(june, asked!.id)).toMatchObject({ status: 'pending_a…
+       |                                     ^
+    728|     expect(lineIn(draft, pre!.id)).toMatchObject({ status: 'preregiste…
+    729|     expect(st.totals).toMatchObject({ paid: 0, outstanding: 14600 });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 passed (19)
+   Start at  06:00:25
+   Duration  16.20s (transform 553ms, setup 2ms, collect 213ms, tests 14.19s, environment 0ms, prepare 35ms)

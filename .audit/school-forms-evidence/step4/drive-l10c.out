@@ -1,0 +1,129 @@
+parent.f1@lead.local → http://localhost:3000/approvals
+session options: Choose… / June 2028
+offer rows: 11
+ROWS: O.L. | Accounting Cambridge International | 	Whole subject | Environmental Management Cambridge International Self-study only (not taught this cycle) | 	Whole subject Self-study only (not taught this cycle) | French Cambridge International Self-study only (not taught this cycle) | 	Whole subject Self-study only (not taught this cycle) | Mathematics Cambridge International grade-10 core Self-study only (not taught this cycle) | 	Whole subject | Physics Cambridge International | 	Whole subject
+ACCOUNTING: 	Whole subject | Cambridge International June 2028 | 	Teacher A	 | First entry, in school | Retake, in school — name the sitting | Retake, self-study — name the sitting | 	EGP 1,500
+PHYSICS: 	Whole subject | Cambridge International June 2028 | 	Teacher A	 | First entry, in school | Retake, in school — name the sitting | Retake, self-study — name the sitting | 	EGP 1,600
+MATHEMATICS: 	Whole subject | Cambridge International June 2028 | 	— self-study	 | First entry, self-study (not taught this cycle) | Retake, self-study — name the sitting | 	EGP 850
+maths entry options: First entry, self-study (not taught this cycle) / Retake, self-study — name the sitting
+MATHEMATICS after retake: 	Whole subject to be verified by the school | Cambridge International June 2028 | 	— self-study	 | First entry, self-study (not taught this cycle) | Retake, self-study — name the sitting | From the sitting… | Cambridge International November 2027 | Cambridge International June 2027 | Cambridge International November 2026 | Cambridge International June 2026 | 	EGP 850
+sitting options: From the sitting… / Cambridge International November 2027 / Cambridge International June 2027 / Cambridge International November 2026 / Cambridge International June 2026
+accounting teacher select: First entry, in school/Retake, in school — name the sitting/Retake, self-study — name the sitting
+SUMMARY:
+Tick what you want to sit. A retake the school does not know about yet: choose "retake" and name the sitting, as on the form; the school verifies it. A provisional board fee (ⓟ) is confirmed before you pay.
+	EGP 1,500
+	Whole subject to be verified by the school
+	EGP 850
+	EGP 1,600
+3 lines · EGP 3,950
+Due 22 Nov 2026
+Paid per entry deadline: Cambridge International June 2028 EGP 3,100 · Cambridge International June 2028 (retake deadline) EGP 850
+shot 01-ticked
+checkboxes visible: 7
+consent boxes: 2
+reserve button: Reserve
+3
+lines
+AFTER RESERVE url: http://localhost:3000/register
+AFTER RESERVE:
+Reserve
+
+Choose your child and the session, tick what they will sit, and pay by exam series.
+
+Reserved: 3 lines awaiting payment. Pay by exam series on the next screen.
+
+Pay now →
+See the statement
+Reserve more
+Child
+Choose…
+Student F1 · Grade 11
+Session
+Choose…
+June 2028
+
+Reservations close 6 Jan 2027
+
+Tick what you want to sit. A retake the school does not know about yet: choose "retake" and name the sitting, as on the form; the school verifies it. A provisional board fee (ⓟ) is confirmed before you pay.
+
+	SUBJECT · WHAT IS ENTERED	TEACHER	ENTRY	PRICE
+O.L.
+Accounting Cambridge International
+	Whole subject already reserved
+Cambridge International June 2028
+			
+Environmental Management Cambridge International Self-study only (not taught this cycle)
+	Whole subject Self-study only (not taught this cycle)
+Cambridge International June 2028
+			
+French Cambridge International Self-study only (not taught this cycle)
+	Whole subject Self-study only (not taught this cycle)
+Cambridge International June 2028
+			
+Mathematics Cambridge International grade-10 core Self-study only (not taught this cycle)
+	Whole subject already reserved
+Cambridge International June 2028
+			
+Physics Cambridge International
+	Whole subject already reserved
+Cambridge International June 2028
+			
+
+0 lines · EGP 0
+
+Due 22 Nov 2026
+
+I confirm that I have read the refund policy: of the course fee, 100% to week 2 · 50% in week 3 · 0% from week 4, counted from the first lesson.
+I confirm that the information given is true, complete and accurate.
+Reserve
+shot 02-after-reserve
+STATEMENT:
+Statement
+
+Every line with its price and why, what is paid and what is still owed, and the payments — one per exam board deadline.
+
+Show ended lines (expired, rejected)
+Student F1
+
+Grade 11 · STU-20261008-A9B64
+
+Price
+
+EGP 3,950
+
+Paid
+
+EGP 0
+
+Outstanding
+
+EGP 3,950
+
+Escrow
+
+EGP 0
+
+June 2028
+LINE	PRICE	PAID	OUTSTANDING	DUE	RECEIPT	STATUS
+
+Accounting
+First entry, in school · Teacher A · Cambridge International June 2028
+	EGP 1,500
+course 1,200 × 100% + board 300 × 100%
+	EGP 0	EGP 1,500	22 Nov 2026	—	Pending Payment
+
+Mathematics
+Retake, self-study · Cambridge International June 2028
+from Cambridge International November 2027 (declared by the family) to be verified by the school
+	EGP 850
+course 1,100 × 50% + board 300 × 100%
+	EGP 0	EGP 850	22 Nov 2026	—	Pending Payment
+
+Physics
+First entry, in school · Teacher A · Cambridge International June 2028
+	EGP 1,600
+course 1,300 × 100% + board 300 × 100%
+	EGP 0	EGP 1,600	22 Nov 2026	—	Pending Payment
+shot 03-statement
+TOTAL: inputs 9 clicks 1
+ERRORS: none

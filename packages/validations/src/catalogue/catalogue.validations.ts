@@ -30,7 +30,7 @@
 
 import { z } from 'zod';
 import { CouncilSchema, QualificationLevelSchema } from '../subject/subject.validations';
-import { SessionTypeSchema } from '../session/session.validations';
+import { SeriesMonthSchema } from '../session/session.validations';
 
 // ─── Boards ──────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ export const UpdateBoard = z.object({
   shortName: z.string().trim().min(1).max(40).optional(),
   entryPortal: z.string().trim().max(100).nullable().optional(),
   /** The months the board runs series in (research, DISCOVERY_RESEARCH.md §2). */
-  seriesMonths: z.array(SessionTypeSchema).min(1, 'A board sits at least one series a year').max(4)
+  seriesMonths: z.array(SeriesMonthSchema).min(1, 'A board sits at least one series a year').max(4)
     .refine((m) => new Set(m).size === m.length, 'Each month once')
     .optional(),
   notes: z.string().trim().max(1000).nullable().optional(),

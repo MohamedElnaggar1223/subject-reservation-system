@@ -1,0 +1,165 @@
+admin@igcse.local → http://localhost:3000/admin/dashboard
+shot 01-list
+LIST:
+Sessions
+
+0 open · 0 draft · 3 in all
+
+All
+June
+Winter
+New session
+June 2027 — IGCSE
+Closed
+
+Reserve 27 Sep 2026 – 29 Sep 2026
+Course starts 27 Sep 2026
+Due 29 Sep 2026
+
+Open
+Money
+0 subjects · 0 boards
+·
+Cambridge International June 2027
+Passed
+November 2026 – January 2027 — November IGCSE
+Closed
+
+Reserve 1 Jul 2026 – 1 Oct 2026
+Course starts 1 Jul 2026
+Due 1 Oct 2026
+
+Open
+Money
+17 subjects · 1 board
+·
+Cambridge International November 2026
+Dates not set
+
+1 lines · 1 paid · 0 unpaid
+
+June 2026 — IGCSE
+Closed
+
+Reserve 1 Feb 2026 – 1 May 2026
+Course starts 1 Feb 2026
+Due 1 May 2026
+
+Open
+Money
+0 subjects · 0 boards
+·
+Cambridge International June 2026
+Dates not set
+NEW SESSION text:
+New session
+Type
+June
+Winter (November – January)
+June of
+It will be called June 2027. Refunds: 100% to week 2 · 50% in week 3 · 0% from week 4
+Reserve from
+Reserve to
+Course starts
+Payment due
+Copy from
+Start empty
+June 2027 — IGCSE
+June 2026 — IGCSE
+
+Subjects, teachers, what can be entered and course fees come across; board fees come across provisional until the board publishes.
+
+A session whose reserving starts now or earlier opens at once; otherwise it opens on its start date. Families may preregister for a session that has not opened.
+
+Cancel
+Create session
+NEW SESSION inputs:
+0: select Type = June/Winter (November – January)
+1: input[number] June of = 2027
+2: input[datetime-local] Reserve from = 
+3: input[datetime-local] Reserve to = 
+4: input[date] Course starts = 
+5: input[datetime-local] Payment due = 
+6: select Copy from = Start empty/June 2027 — IGCSE/June 2026 — IGCSE
+NEW SESSION buttons:  | Cancel | Create session
+shot 02-new-session
+SESSION URL: http://localhost:3000/admin/sessions/897c0e42-42b3-4d24-9681-7dcff39b1d9c
+SESSION:
+← Sessions
+June 2027 — IGCSE
+Closed
+
+Reserve 27 Sep 2026 17:29 – 29 Sep 2026 17:30
+Course starts 27 Sep 2026
+Due 29 Sep 2026 17:30
+
+Refunds: by the refund windows (a converted session)
+
+Deadlines
+Cambridge International June 2027
+30 Sep 2026
+ 
+passed
+Subjects
+Fees
+Money
+Grade 10
+To verify
+
+17 subjects
+
+O.L.
+SUBJECT	BOARD	TEACHERS	WHAT CAN BE ENTERED	COURSE FEE	BOARD FEE	LINES
+Accounting
+Closed
+	Cambridge International	—	Whole subject	EGP 1,100	
+EGP 300
+	0
+Arabic Language
+Closed
+Grade 10 core
+	Cambridge International	—	Whole subject	EGP 900	
+EGP 300
+	0
+Art & Design
+Closed
+	Cambridge International	—	Whole subject	EGP 1,300	
+EGP 300
+	0
+Biology
+Closed
+	Cambridge International	—	Whole subject	EGP 1,200	
+EGP 300
+	0
+Business Studies
+Closed
+	Cambridge International	—	Whole subject	EGP 1,100	
+EGP 300
+	0
+Chemistry
+Closed
+	Cambridge International	—	Whole subject	EGP 1,200	
+EGP 300
+	0
+Computer Science
+Closed
+	Cambridge International	—	Whole subject	EGP 1,200	
+EGP 300
+	0
+Economics
+Closed
+	Cambridge International	—	Whole subject	EGP 1,100	
+EGP 300
+	0
+English Language
+Closed
+Grade 10 core
+	Cambridge International	—	Whole subject	EGP 1,200	
+EGP 300
+	0
+Environmental Management
+Closed
+	Cambridge Int
+shot 03-session
+no Add subject button; buttons: Subjects | Fees | Money | Grade 10 | To verify | Accounting | Arabic Language | Art & Design | Biology | Business Studies | Chemistry | Computer Science | Economics | English Language | Environmental Management | French | Geography | History | Information and Communication Technology | Mathematics
+ERRORS: none

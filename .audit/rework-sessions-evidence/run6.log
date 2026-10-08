@@ -1,0 +1,507 @@
+
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+> vitest run "test/08i"
+
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -0.0 ms (measured within 1 ms)
+stderr | test/08i-board-series.test.ts > F0b: board series
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08i-board-series.test.ts > F0b: board series
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [37662553-98fe-4903-b75e-0d1703bd21fe] POST /api/auth/sign-up/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[email:stub] To: admin.bs@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [22662a6c-83ec-4c80-a6ef-6573e517a486] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [9f31b7bb-49e4-4a4b-a146-d654608abc1a] POST /v1/users
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [33e7465a-fbd3-4943-8824-d944e4431c28] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [70b2569d-186b-45d1-9528-b15b8f1e3356] POST /v1/users
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [d58b6304-bc70-4868-986f-27633a7b1f92] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [d708d50a-9f0f-43a8-b745-1894b8e93f80] POST /v1/users
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [f01af684-798f-4387-b41a-fb5fa742dcbf] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [ea90d16c-ce1d-4a90-b693-5c887ab2fd3c] POST /v1/subjects
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [5db6f409-94e3-4585-8812-5da50d776b64] POST /v1/subjects
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [e26b6a5b-c0ac-4741-b127-c8df3eb46519] POST /v1/subjects
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [1fe9d1f3-8e0a-47e1-baeb-d1f5ef77a353] POST /v1/subjects
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [0a02c54d-d5a1-40e5-a6f0-add0e4db33c3] POST /v1/subjects
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [e92e0280-36c7-455b-ae01-73233f353706] POST /v1/sessions
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [797e6d5e-ac69-46aa-8e52-d4a190a08dfc] POST /v1/board-series
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [99ccdc0d-84d4-4289-97f8-113c66668ad9] POST /v1/teachers
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [03d4f577-8b3e-4b8e-8c71-7b317c96d639] POST /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [3b13f056-9155-4e15-8e05-1e88c8478aa3] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [10944971-9ffa-4320-9738-1be5ff47788f] POST /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [ebfd73fd-cc7b-4a9f-9e8c-a8aaa6c9670c] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [12b30595-ab9d-48d2-b35d-1ee54a64ff61] POST /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [bf3b5bd5-d9f6-4bf5-8c22-bdf8a644453b] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [5adc537d-ff0f-4297-8342-fa49e94287b2] POST /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [bd43e25e-900d-43a7-88d4-2acfa549a7a5] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [af83d48b-6784-4118-acc6-938d4b891efd] POST /v1/board-series
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [1d0c5dc6-6209-4dd3-ab1f-fbcf612a018b] POST /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [dafa1e40-1c13-450a-8610-80580d34adea] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [5eb43442-3405-4157-adb2-1786dd78d0c6] POST /v1/board-series
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [0af19582-5770-4cc6-b98d-b4c925c548fb] POST /v1/board-series
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [61d1e42a-3ec9-46da-8175-6bed1fbe9019] POST /v1/board-series
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [7d9bd0ba-f512-4ed9-aee8-ef51213bd1a4] POST /v1/board-series
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [514c2aa8-e58a-41ee-8f1c-d156ca61e49f] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [f5979dae-2459-47e6-a31d-1fbe105a786f] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [d186302e-2b92-4b8e-863d-440def2add2b] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [d8ca1dc0-65fc-479b-af2a-d6cd053d5f75] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [4e957bf1-54e2-49f6-b775-8a25189cdd0c] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [64ec0546-803a-4c3e-937c-6fe4e53821f9] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [28fee009-a2a1-4de0-9324-8bac78d49b0e] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series
+[INFO] [4427c161-094f-4425-b872-4e4e395b9142] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session's items are entered in series of its own academic year and kind > refuses a June series and a series of another academic year for an item, each with the rule's sentence
+[INFO] [cb7e3a90-3e55-482e-aca1-f72a5581c596] PUT /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers/3a19c52d-dd12-4f29-8a8b-d92ab5ebdc6f/items/f31cd9f0-445f-4662-a080-dba24e48180c
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session's items are entered in series of its own academic year and kind > refuses a June series and a series of another academic year for an item, each with the rule's sentence
+[INFO] [988ba3b5-005a-4106-af5d-81543e77cee4] PUT /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers/3a19c52d-dd12-4f29-8a8b-d92ab5ebdc6f/items/f31cd9f0-445f-4662-a080-dba24e48180c
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session's items are entered in series of its own academic year and kind > Mathematics is placed in IAL October and Biology in IAL January: each series attached by its items
+[INFO] [8d91b27c-f438-4d85-abf7-ebdb65d5ca1e] PUT /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers/3a19c52d-dd12-4f29-8a8b-d92ab5ebdc6f/items/f31cd9f0-445f-4662-a080-dba24e48180c
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session's items are entered in series of its own academic year and kind > Mathematics is placed in IAL October and Biology in IAL January: each series attached by its items
+[INFO] [03b4a941-5d6b-49dc-a8f7-1ea72b15d518] PUT /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers/7ab595e9-ae7c-4d0d-a354-3d11d555a77d/items/54007f29-f875-4a84-b25a-a1a05dda0d3f
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session's items are entered in series of its own academic year and kind > Mathematics is placed in IAL October and Biology in IAL January: each series attached by its items
+[INFO] [bc30409d-29f6-49e4-9ea5-e23ccc4587d5] PUT /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers/02329a20-1540-418d-a82d-867e5fa750b5/items/732f5bf1-161f-4b49-b51c-65a68254317d
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session's items are entered in series of its own academic year and kind > Mathematics is placed in IAL October and Biology in IAL January: each series attached by its items
+[INFO] [9ac610cc-1d77-432e-a61c-a4e5748b4d68] PUT /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers/70d68fdf-eb31-4ced-9f87-af3b217f9894/items/768826d2-e19f-42df-a0ae-f3b4427062f6
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session's items are entered in series of its own academic year and kind > Mathematics is placed in IAL October and Biology in IAL January: each series attached by its items
+[INFO] [25230b79-4c2a-494b-81f0-413940cbe49d] GET /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/board-series
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed
+[INFO] [4ba64551-59e4-4674-ad9f-0a4c6036ec6e] DELETE /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers/1b0aebeb-7431-4cf4-ad4f-25a1df75d617
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed
+[INFO] [d9b0b0dd-be17-4706-90cd-35efbc1038c5] POST /v1/links/desk-onboard
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed
+[email:stub] To: parent.bs-route@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed
+[email:stub] To: student.bs-route@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed
+[INFO] [74a8cf84-9267-4bfa-b2c3-65db6846c83d] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed
+[INFO] [0b2e9df1-dd9e-4489-aad5-0d89db7dd4ff] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed
+[INFO] [0bd77d14-e48c-4463-86fc-0c3ca780e989] POST /v1/registrations/direct
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed
+[INFO] [ede14768-9bf0-46a9-9ebc-29544f2f75be] GET /v1/registrations/available
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed
+[email:stub] To: student.bs-route@test.local | Subject: Your parent registered you for 2 subjects 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed
+[INFO] [4fd483c1-5ef4-4d1f-8f68-f8709d9ac8cd] POST /v1/registrations/direct
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the admin moves a registration to the other series of its board, with a reason; history stays
+[INFO] [ba50abeb-35e4-404d-a990-f0720ea25284] POST /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/board-series/move
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the admin moves a registration to the other series of its board, with a reason; history stays
+[INFO] [922aa6a2-e165-44f6-8413-aef8f23573e4] POST /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers/3a19c52d-dd12-4f29-8a8b-d92ab5ebdc6f/items
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the admin moves a registration to the other series of its board, with a reason; history stays
+[INFO] [4a892dcd-8dfe-444d-82d0-6a1df7d28893] POST /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/board-series/move
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the admin moves a registration to the other series of its board, with a reason; history stays
+[INFO] [5a9961d5-b479-4d57-afcf-0dcad566b817] POST /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/board-series/move
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the admin moves a registration to the other series of its board, with a reason; history stays
+[INFO] [013fd98d-10d7-4f8c-8e27-5a7446e0cd42] DELETE /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers/3a19c52d-dd12-4f29-8a8b-d92ab5ebdc6f/items/20b8f404-2512-4f08-935b-5653567de09a
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the admin moves a registration to the other series of its board, with a reason; history stays
+[INFO] [a3975061-0f4b-4461-bdcb-7846557550a4] DELETE /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers/3a19c52d-dd12-4f29-8a8b-d92ab5ebdc6f/items/f31cd9f0-445f-4662-a080-dba24e48180c
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[INFO] [75472f49-3c68-45d1-b4c8-a6191dd9e66a] POST /v1/subjects
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[INFO] [6eb75f36-711e-476d-acfa-402176e03e2a] POST /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[INFO] [838ee3a4-7331-4bf9-b117-a60dd9cf5d77] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[INFO] [b428304a-ef1f-4de6-b321-a1bbb96abfbf] PUT /v1/board-fees
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[INFO] [cea66989-1383-491c-a60c-3cf747cf5ab5] PUT /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/offers/432dba74-93ce-47f0-82f8-d081a670805f/items/e9fe9320-fbaf-4b54-b3b0-a5a4b3440195
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[INFO] [001ef888-0d01-4030-8bd7-0de7a9031ad5] POST /v1/links/desk-onboard
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[email:stub] To: parent.bs-board@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[email:stub] To: student.bs-board@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[INFO] [478e28fb-b20a-4356-bdc9-903457e3ae14] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[INFO] [e6a0bf94-37d6-4cf7-930a-297a3832d43a] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[INFO] [96028c18-2655-48ed-bfac-c8be40246054] POST /v1/registrations/direct
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[email:stub] To: student.bs-board@test.local | Subject: Your parent registered you for 1 subject 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[INFO] [176a6f4c-00c0-4fb3-81f8-8412773cb8b6] POST /v1/catalogue/qualifications
+
+stdout | test/08i-board-series.test.ts > F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series
+[INFO] [77226093-3bd1-4257-9645-ece944bf9709] PUT /v1/catalogue/registrable/b7f14151-2915-40f3-9982-b84d33301668
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [62ebf011-97c4-41f6-9685-ab04ac82c70b] POST /v1/links/desk-onboard
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: parent.bs-b@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: student.bs-b@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [65f906df-1f00-420d-b248-a3aa1877843f] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [765ab1c8-4242-4a2d-be0b-8b265ff76c1b] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [067f381c-4a19-4ab6-b33a-e6e2dbe1d96c] POST /v1/links/desk-onboard
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: parent.bs-d@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: student.bs-d@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [c47891d9-787a-4d48-aef3-bcc24e13702c] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [f1b5c8c2-a5dd-40ae-ad52-c25e4a716b0c] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [b939dd90-d1c5-425b-b2c3-4baac3f586ef] POST /v1/links/desk-onboard
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: parent.bs-e@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: student.bs-e@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [ff98cee3-e16e-494d-bd9b-f58a4d3b506f] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [76770bdf-54ee-436c-8708-fd7719f37831] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [f4a4c581-a834-495a-8199-e2d8d145d493] POST /v1/links/desk-onboard
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: parent.bs-f@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: student.bs-f@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [3f6f97a6-4326-4068-bf7a-8fae4d983ef4] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [408f76e2-fc07-4b97-8e12-789be1291e64] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [4ac7fad5-6e67-4cb8-bee7-5aa050feb734] POST /v1/links/desk-onboard
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: parent.bs-x@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: student.bs-x@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [7c8f9a72-6c64-4f18-9903-c904a3561fa6] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [6a7e4084-abf0-4d21-8a1d-c5db2b5fa189] POST /api/auth/sign-in/email
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [c5b79e37-138c-471f-9682-89bd81447946] POST /v1/registrations/desk
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [20a0bb2e-ddf4-45a2-bf86-ed43ac557a50] POST /v1/registrations/88f03afa-e34f-4d78-ae2d-384a8bb189af/drop
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: parent.bs-b@test.local | Subject: Payment confirmed — November 2026 – January 2027 — t1-iukt | Attachments: receipt-df7b1ea0-4c68-4308-ac77-0584a1700e61.pdf
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: student.bs-b@test.local | Subject: Your parent dropped a subject for you 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [a285de99-5093-4195-87be-5a51b67dd42a] POST /v1/registrations/direct
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: parent.bs-b@test.local | Subject: Escrow balance updated for Student bs-b 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [73d4e915-522c-4b8b-b92b-cfd189d2ca87] POST /v1/payments/initiate
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: student.bs-b@test.local | Subject: Your parent registered you for 1 subject 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [fd7883f3-ea36-42c6-8de5-5d692af5ab02] POST /v1/payments/1c30894b-a5bd-4ca9-b490-0ebdc2bdd26f/instapay-reference
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: parent.bs-b@test.local | Subject: Escrow balance updated for Student bs-b 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [033fe2de-c08f-41e2-838b-403c9281398c] POST /v1/registrations/direct
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [7071ad83-d105-4f39-bb37-1558740b977b] POST /v1/payments/initiate
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: student.bs-d@test.local | Subject: Your parent registered you for 1 subject 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [015bbeb2-0783-4756-9316-a19987fc8b5d] POST /v1/payments/7083c680-ab21-4350-b148-86ad792eec79/instapay-reference
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [5f86a830-3930-4911-acea-3fad25c752f2] POST /v1/registrations/direct
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [c22ee6f2-865a-42b2-b5f0-ea7994888368] POST /v1/payments/initiate
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: student.bs-e@test.local | Subject: Your parent registered you for 1 subject 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [1063d8ca-26c2-48b7-aa86-949cf1b5e82d] POST /v1/registrations/direct
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [4a9286b3-110c-41bd-a40a-7bb766b39f7d] POST /v1/payments/initiate
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[email:stub] To: student.bs-f@test.local | Subject: Your parent registered you for 1 subject 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [c96fff52-2671-475d-8228-91f71866d2dd] PUT /v1/board-series/2d5547d2-e3e2-4b9a-aa67-652444e06baf
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [0d0b19aa-94cc-47de-b37a-632c66566ede] PUT /v1/board-series/2d5547d2-e3e2-4b9a-aa67-652444e06baf
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [90511949-7aa7-4b36-952e-f2865d8e786b] PUT /v1/board-series/2d5547d2-e3e2-4b9a-aa67-652444e06baf
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [2885a4ab-1f84-4eaa-9fa8-24cc2ae987c7] PUT /v1/board-series/2d5547d2-e3e2-4b9a-aa67-652444e06baf
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [1f03ea3e-7837-4fc6-b5ad-e65f51e1a360] PUT /v1/board-series/58a8c8e2-a442-440e-a2f8-38e2547aa89e
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [c659cd2d-6c5f-468b-a893-50551c276193] PUT /v1/board-series/58a8c8e2-a442-440e-a2f8-38e2547aa89e
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information
+[INFO] [c1633375-5c74-4557-8e9e-82fd5ca915f0] PUT /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[INFO] [5f95436f-edb3-43f3-b9a2-ea8111b87c14] POST /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/close
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: parent.bs-f@test.local | Subject: Submit your InstaPay reference — Student bs-f 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: parent.bs-e@test.local | Subject: Submit your InstaPay reference — Student bs-e 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[session:close] Finalized 3 registration(s) and 0 change request(s) for session 97537a7e-98ee-475e-a6d6-bf9b4cab614a.
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: student.bs-route@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: student.bs-board@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: student.bs-b@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: student.bs-d@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: student.bs-e@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: student.bs-f@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: student.bs-x@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: parent.bs-route@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: parent.bs-board@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: parent.bs-b@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: parent.bs-d@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: parent.bs-e@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: parent.bs-f@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > at the close, the time left to send a reference is capped by each checkout's own series (MO-10)
+[email:stub] To: parent.bs-x@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-iukt 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > past October's deadline, before the sweep: October's entries are refused, January's go on
+[INFO] [3533ec95-b799-418f-ad71-e3fdf399e103] POST /v1/payments/1c30894b-a5bd-4ca9-b490-0ebdc2bdd26f/confirm
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > past October's deadline, before the sweep: October's entries are refused, January's go on
+[INFO] [f0a60f0b-2963-4c90-92db-ca34fd1b4b3d] POST /v1/payments/bae4b0fc-2ab6-4d5a-8764-154b7d2e2ed1/instapay-reference
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > past October's deadline, before the sweep: October's entries are refused, January's go on
+[INFO] [04cae787-3732-4781-896c-d9a9462bb4a0] POST /v1/payments/7083c680-ab21-4350-b148-86ad792eec79/confirm
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > past October's deadline, before the sweep: October's entries are refused, January's go on
+[INFO] [3fa15afe-4b95-445e-97ac-bb8125ec0b5c] POST /v1/payments/93ef2a98-d201-4ed7-964c-d2cba5e0250d/instapay-reference
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > past October's deadline, before the sweep: October's entries are refused, January's go on
+[email:stub] To: parent.bs-d@test.local | Subject: Payment confirmed — November 2026 – January 2027 — t1-iukt | Attachments: receipt-7083c680-ab21-4350-b148-86ad792eec79.pdf
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > past October's deadline, before the sweep: October's entries are refused, January's go on
+[INFO] [92fdac85-5580-449a-a8c1-6a45111d197b] POST /v1/exceptions
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > past October's deadline, before the sweep: October's entries are refused, January's go on
+[INFO] [597d232d-b6c0-4609-8792-3f163ea94fde] POST /v1/registrations/direct
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > past October's deadline, before the sweep: October's entries are refused, January's go on
+[INFO] [c994c520-3ea0-46c5-98ff-0ae5dbe634be] POST /v1/registrations/direct
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > past October's deadline, before the sweep: October's entries are refused, January's go on
+[email:stub] To: student.bs-x@test.local | Subject: Your parent registered you for 1 subject 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > the sweep closes October only: its open payments fail with escrow back, its waiting entries expire, families told; January's stay
+[email:stub] To: parent.bs-b@test.local | Subject: Escrow balance updated for Student bs-b 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > the sweep closes October only: its open payments fail with escrow back, its waiting entries expire, families told; January's stay
+[email:stub] To: parent.bs-b@test.local | Subject: Payment closed at the exam board deadline — Student bs-b 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > the sweep closes October only: its open payments fail with escrow back, its waiting entries expire, families told; January's stay
+[email:stub] To: parent.bs-e@test.local | Subject: Payment closed at the exam board deadline — Student bs-e 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > January's deadline closes January at its own time; the expiry notice names the series
+[email:stub] To: parent.bs-f@test.local | Subject: Payment closed at the exam board deadline — Student bs-f 
+
+stdout | test/08i-board-series.test.ts > F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > January's deadline closes January at its own time; the expiry notice names the series
+[INFO] [33bf3d30-1a96-4829-8683-b209dbabd0eb] POST /v1/sessions/97537a7e-98ee-475e-a6d6-bf9b4cab614a/board-series/move
+
+ ✓ test/08i-board-series.test.ts (10 tests) 4504ms
+   ✓ F0b: board series > each registration is entered in its item's series > Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed  384ms
+   ✓ F0b: board series > each registration is entered in its item's series > the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series  338ms
+   ✓ F0b: board series > a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series) > only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information  1681ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  00:07:49
+   Duration  6.00s (transform 489ms, setup 2ms, collect 194ms, tests 4.50s, environment 0ms, prepare 35ms)
+

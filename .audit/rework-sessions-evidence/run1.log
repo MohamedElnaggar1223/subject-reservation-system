@@ -1,0 +1,77 @@
+# run1.log: the proof of this run, as vitest reported it (the full log, 8788 lines, 581505 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ✓ test/00-harness.test.ts (4 tests) 1483ms
+ ❯ test/01-desk.test.ts (8 tests | 1 failed) 1449ms
+ ✓ test/02-money.test.ts (4 tests) 1460ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 1713ms
+ ❯ test/04-authz-matrix.test.ts (1 test | 1 failed) 4699ms
+ ✓ test/05-object-access.test.ts (13 tests) 3321ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3387ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1549ms
+
+## Failed tests
+   × the desk > records the family as payer of record and tells the parent and student, not the officer (RF-03) 4ms
+   × authorization matrix > probes every /v1 endpoint as every principal 3137ms
+
+## Failures
+ FAIL  test/01-desk.test.ts > the desk > records the family as payer of record and tells the parent and student, not the officer (RF-03)
+AssertionError: expected 'Payment confirmed — November 2026 – J…' to be 'Payment confirmed — November (desk)' // Object.is equality
+Expected: "Payment confirmed — November (desk)"
+Received: "Payment confirmed — November 2026 – January 2027 — t1-8fiy"
+ ❯ test/01-desk.test.ts:96:32
+     94| 
+     95|     const toParent = await notified(parent.email, 'PAYMENT_CONFIRMED',…
+     96|     expect(toParent[0]?.title).toBe('Payment confirmed — November (des…
+       |                                ^
+     97|     await notified(student.email, 'PAYMENT_CONFIRMED', 1);
+     98|     expect((await notificationsFor(officer.email)).length).toBe(0);
+
+ FAIL  test/04-authz-matrix.test.ts > authorization matrix > probes every /v1 endpoint as every principal
+AssertionError: expected [ …(26) ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   "POST /v1/board-fees/:seriesId/confirm: no row in authz-policy.tsv — decide who may call it",
++   "POST /v1/board-fees/:seriesId/copy: no row in authz-policy.tsv — decide who may call it",
++   "POST /v1/board-fees/:seriesId/parse: no row in authz-policy.tsv — decide who may call it",
++   "POST /v1/board-fees/:seriesId/reprice: no row in authz-policy.tsv — decide who may call it",
++   "GET /v1/board-fees: no row in authz-policy.tsv — decide who may call it",
++   "PUT /v1/board-fees: no row in authz-policy.tsv — decide who may call it",
++   "GET /v1/registrations/offers: no row in authz-policy.tsv — decide who may call it",
++   "POST /v1/sessions/:id/copy-from: no row in authz-policy.tsv — decide who may call it",
++   "POST /v1/sessions/:id/grade10/commit: no row in authz-policy.tsv — decide who may call it",
++   "POST /v1/sessions/:id/grade10/preview: no row in authz-policy.tsv — decide who may call it",
++   "GET /v1/sessions/:id/money: no row in authz-policy.tsv — decide who may call it",
++   "DELETE /v1/sessions/:id/offers/:offerId/items/:itemId: no row in authz-policy.tsv — decide who may call it",
++   "PUT /v1/sessions/:id/offers/:offerId/items/:itemId: no row in authz-policy.tsv — decide who may call it",
++   "POST /v1/sessions/:id/offers/:offerId/items: no row in authz-policy.tsv — decide who may call it",
++   "POST /v1/sessions/:id/offers/:offerId/replace-teacher: no row in authz-policy.tsv — decide who may call it",
++   "DELETE /v1/sessions/:id/offers/:offerId: no row in authz-policy.tsv — decide who may call it",
++   "PUT /v1/sessions/:id/offers/:offerId: no row in authz-policy.tsv — decide who may call it",
++   "GET /v1/sessions/:id/offers/addable: no row in authz-policy.tsv — decide who may call it",
++   "GET /v1/sessions/:id/offers: no row in authz-policy.tsv — decide who may call it",
++   "POST /v1/sessions/:id/offers: no row in authz-policy.tsv — decide who may call it",
++   "GET /v1/sessions/:id: officer got 404, policy says D",
++   "GET /v1/sessions/:id: finadmin got 404, policy says D",
++   "GET /v1/sessions/:id: coordinator got 404, policy says D",
++   "GET /v1/sessions: officer got 200, policy says D",
++   "GET /v1/sessions: finadmin got 200, policy says D",
++   "PUT /v1/sessions/:id/board-series: in authz-policy.tsv but no longer registered",
++ ]
+ ❯ test/04-authz-matrix.test.ts:141:22
+    139|     }
+    140|     for (const key of policy.keys()) if (!observed.has(key)) problems.…
+    141|     expect(problems).toEqual([]);
+       |                      ^
+    142| 
+    143|     // No endpoint may answer an anonymous caller except the health pr…
+
+## Summary
+[clock] database minus host: -2.1 ms (measured within 9 ms)
+ Test Files  2 failed | 6 passed (8)
+      Tests  2 failed | 57 passed | 1 todo (60)
+   Start at  23:51:56
+   Duration  22.04s (transform 479ms, setup 12ms, collect 618ms, tests 19.06s, environment 1ms, prepare 223ms)

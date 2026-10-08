@@ -1,0 +1,30 @@
+# control-approve-deadline.log: the proof of this run, as vitest reported it (the full log, 3513 lines, 347298 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ❯ test/08n-session-offers.test.ts (27 tests | 1 failed) 17806ms
+
+## Failed tests
+   × 08n: the review of 977848d > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's 389ms
+
+## Failures
+ FAIL  test/08n-session-offers.test.ts > 08n: the review of 977848d > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+AssertionError: expected '""' to match /^The entry is with the board \(its de…/
+- Expected: 
+/^The entry is with the board \(its deadline, .+, has passed\): ask the finance desk to drop it$/
++ Received: 
+"\"\""
+ ❯ test/08n-session-offers.test.ts:817:23
+    815|     try {
+    816|       const r = await refused(f.parent.api.v1['change-requests'][':id'…
+    817|       expect(r.error).toMatch(/^The entry is with the board \(its dead…
+       |                       ^
+    818|       expect(await statusOf(line!.id)).toBe('confirmed');
+    819|       expect((await one<{ status: string }>(`select status from change…
+
+## Summary
+[clock] database minus host: 0.2 ms (measured within 1 ms)
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 passed (27)
+   Start at  03:31:04
+   Duration  19.51s (transform 523ms, setup 2ms, collect 207ms, tests 17.81s, environment 0ms, prepare 38ms)

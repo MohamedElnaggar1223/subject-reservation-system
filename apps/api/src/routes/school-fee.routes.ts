@@ -20,6 +20,7 @@ import {
   SchoolFeeScheduleId,
   SchoolFeeStatusQuery,
   PaySchoolFee,
+  PushSchoolFees,
   ROLES,
 } from '@repo/validations';
 import { db } from '@repo/db';
@@ -164,6 +165,20 @@ export const schoolFees = new Hono<HonoEnv>()
         message.includes('not linked') ? 403 :
         message.includes('already') ? 409 : 400;
       return error(c, message, status);
+    }
+  })
+
+  /**
+   * POST /school-fees/push — the reservations rework (§3.6, point 8): push a year's school fee into
+   * the chosen families' pending payments (a grade, a section or a list), with its due date. Paid,
+   * waived, A-13-exempt and already-pushed students are skipped and listed. Finance admin, admin.
+   */
+  .post('/push', requireFinanceAdmin(), zValidator('json', PushSchoolFees), async (c) => {
+    const user = c.get('user')!;
+    try {
+      return success(c, await schoolFeeService.pushSchoolFees(c.req.valid('json'), user.id, extractAuditContext(c)), 201);
+    } catch (err) {
+      return error(c, clientMessage(err, 'Failed to push the school fee'), 400);
     }
   });
 

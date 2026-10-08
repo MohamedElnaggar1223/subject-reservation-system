@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, one, sql, futureWindow, openWindow, schoolToday, lockWaiters, holdRowLock,
-  type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, one, sql, futureWindow, openWindow, schoolToday, lockWaiters, holdRowLock, wholeItemSql, type Client, reservationOf, swapTo } from './helpers';
 
 /**
  * F0a — races (FEATURES_PLAN.md §5: anything two people can act on at once
@@ -41,8 +38,8 @@ async function holdInsert(studentId: string, sessionId: string, subjectId: strin
   await client.connect();
   await client.query('BEGIN');
   await client.query(
-    `insert into registration (id, student_id, session_id, subject_id, price_at_registration, status, requested_by)
-     values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment', $1)`,
+    `insert into registration (id, student_id, session_id, subject_id, price_at_registration, status, requested_by, offer_item_id, due_at)
+     values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment', $1, ${wholeItemSql('$2', '$3')}, now() + interval '30 days')`,
     [studentId, sessionId, subjectId],
   );
   return async () => {
@@ -84,7 +81,7 @@ describe('F0a: races', () => {
     let registering: Promise<Res> | undefined;
     let changing: Promise<Res> | undefined;
     try {
-      registering = f.parent.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [subjectId], studentId: f.studentId } });
+      registering = f.parent.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subjectId])), studentId: f.studentId } });
       await lockWaiters(1);
       changing = change();
       // The change either queues behind the registration (the fix) or runs
@@ -160,7 +157,7 @@ describe('F0a: races', () => {
       await extend(f.studentId, own);
       // Corrected to the November a year earlier: grade 10 then, and grade 10 sits June only.
       const { reg, chg } = await race(f, own, subj[1]!, () =>
-        adm.api.v1.sessions[':id'].series.$put({ param: { id: own }, json: { sessionType: 'november', seriesYear: seriesYearInAcademicYear('november', thisYear - 1), reason: 'race check' } }));
+        adm.api.v1.sessions[':id'].series.$put({ param: { id: own }, json: { sessionType: 'winter', seriesYear: seriesYearInAcademicYear('november', thisYear - 1), reason: 'race check' } }));
       expect(reg.status).toBe(201);
       expect(chg.status).toBe(200);
       const [created] = (await reg.json() as { data: { id: string }[] }).data;
@@ -261,8 +258,8 @@ describe('F0a: races', () => {
     afterAll(async () => {
       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: open }, json: {} }));
     });
-    const deskCash = (f: Family, sessionId: string, subjectId: string) =>
-      officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId, subjectIds: [subjectId], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } } });
+    const deskCash = async (f: Family, sessionId: string, subjectId: string) =>
+      officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId, ...(await reservationOf(sessionId, [subjectId])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } } });
 
     it('the desk taking the money: refused, nothing registered and no money recorded', async () => {
       const f = await family('first-desk');
@@ -277,8 +274,8 @@ describe('F0a: races', () => {
     it('a preregistration: refused, nothing registered', async () => {
       const f = await family('first-prereg');
       const draft = await session(adm, 'November (IGCSE, F0a races, prereg)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', thisYear) });
-      const created = await afterWithdrawal(f, () =>
-        f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, subjectIds: [subj[1]!], studentId: f.studentId } }));
+      const created = await afterWithdrawal(f, async () =>
+        f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, ...(await reservationOf(draft, [subj[1]!])), studentId: f.studentId } }));
       expect(created.status).toBe(400);
       expect(((await created.json()) as { error: string }).error).toContain('was withdrawn from the school');
       expect(await sql(`select 1 from registration where student_id = $1`, [f.studentId])).toEqual([]);
@@ -302,8 +299,8 @@ describe('F0a: races', () => {
     it("a parent's direct swap: refused, the paid subject stays and nothing new waits", async () => {
       const f = await family('first-swap-direct');
       const paid = (await apiResponse(deskCash(f, open, swapSubj[2]!))).registrations[0]!.id;
-      const created = await afterWithdrawal(f, () =>
-        f.parent.api.v1.registrations[':id'].swap.$post({ param: { id: paid }, json: { newSubjectId: swapSubj[3]!, reason: 'timetable clash' } }));
+      const created = await afterWithdrawal(f, async () =>
+        f.parent.api.v1.registrations[':id'].swap.$post({ param: { id: paid }, json: { line: await swapTo(paid, swapSubj[3]!), reason: 'timetable clash' } }));
       expect(created.status).toBe(400);
       expect(((await created.json()) as { error: string }).error).toContain('was withdrawn from the school');
       expect((await one<{ status: string }>(`select status from registration where id = $1`, [paid])).status).toBe('confirmed');
@@ -326,7 +323,7 @@ describe('F0a: races', () => {
       const g = await family('graduate-twice', 12);
       await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: g.studentId }, json: { cohortYear: thisYear - 3, reason: 'graduated last June' } }));
       await extend(g.studentId, nov);
-      const [reg] = await apiResponse(g.parent.api.v1.registrations.direct.$post({ json: { sessionId: nov, subjectIds: [subj[4]!], studentId: g.studentId } }));
+      const [reg] = await apiResponse(g.parent.api.v1.registrations.direct.$post({ json: { sessionId: nov, ...(await reservationOf(nov, [subj[4]!])), studentId: g.studentId } }));
       const before = Number((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'SETTING_CHANGED' and entity_id = 'eligibility.graduateRetakes'`)).n);
       const results = await Promise.all([adm, adm2].map((a) =>
         a.api.v1.settings[':key'].$put({ param: { key: 'eligibility.graduateRetakes' }, json: { value: false, reason: 'turned off twice' } })));

@@ -1,0 +1,146 @@
+
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+> vitest run "test/08k" "-t" "the reservation first"
+
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: 0.0 ms (measured within 1 ms)
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [aa2884fc-5b15-4d12-a09b-febdda6781ff] POST /api/auth/sign-up/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[email:stub] To: admin.f0br@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [4e252ed4-52ac-4742-9415-5e13caafd4e5] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [e419e4d4-a050-4ee8-bd1e-24d97612f9f1] POST /v1/users
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [963f7fc7-ef64-472a-9f13-d8dfcacad8ae] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [4700ad5f-a9fa-4768-9c20-1246acdc6a27] POST /v1/users
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [ad0ab8a1-b2c7-41b9-b4c9-4c76ba202cc3] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [34d5d648-3ea4-4bff-a8ae-970caf742aaf] POST /v1/users
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [081490b5-5fbe-4baf-93e2-c2cbc940dca4] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [14dba3a2-c863-46bd-b532-fed65e4e42b1] POST /v1/users
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [28e48c40-b5b0-4434-ac20-607800dfd374] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [ecc82725-a818-450e-b5ac-f1f28947c83f] POST /v1/subjects
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [48bdc9ab-e5a8-41a2-8e0f-b7f66d2f9a82] POST /v1/subjects
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [65843552-73ee-4bfd-9919-50cf0e1ab689] POST /v1/sessions
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [033c7bec-cbf0-4b33-8dd5-66fa47ae49ac] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [2f71e894-f011-4c09-9ed9-364dbc598522] POST /v1/teachers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [557c496a-91d5-4663-9567-07c8254eeb62] POST /v1/sessions/e306870f-00a7-4c30-9ac5-8c913380123c/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [bb963d4c-342b-4500-85f8-8940bdaa2269] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [14a85f5c-fddc-4e42-81b1-c7cc8f18a243] POST /v1/sessions/e306870f-00a7-4c30-9ac5-8c913380123c/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [75f2bb25-20a8-4901-8d75-7faa6806337e] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [7085f95a-06af-4f3f-a00e-06e214d40396] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [23216688-b061-4ea3-bd00-c621adf6c5c0] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [2998d674-d490-4330-a98b-38c75fadac8b] PUT /v1/sessions/e306870f-00a7-4c30-9ac5-8c913380123c/offers/ca01332b-6f2a-4618-bc6e-08010f08bf53/items/3bdb2b35-3727-4b0e-b8ca-904878839c20
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [b0b52431-1bad-4550-857f-575d8a554b2a] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [a7f31faa-673a-4fb4-9313-0ec863390aad] PUT /v1/sessions/e306870f-00a7-4c30-9ac5-8c913380123c/offers/7c3f5ed8-d0e8-45bd-a005-2503a4a30566/items/d2fc595d-06d5-4f88-94e7-e8794ccf42df
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [f5185990-c534-4b3a-8dc4-41624302b2fb] POST /v1/links/desk-onboard
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[email:stub] To: parent.f0br-line-first@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[email:stub] To: student.f0br-line-first@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [c576ab77-7504-4c02-9b5f-d8b984c9ac12] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [ad39f9a9-7e0c-483d-b4ff-a1d502d62e45] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [c3085b42-3791-408c-ab61-3eb58423c2a3] POST /v1/registrations/preregister
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+[INFO] [f51485c6-679a-4892-a005-ca7551bb06f4] PUT /v1/board-series/e20edfe6-c258-481e-8bcc-095e854383a9
+
+ ❯ test/08k-catalogue-races.test.ts (5 tests | 1 failed | 4 skipped) 2244ms
+   ↓ F0b: races > a line racing a change to its item's series is entered by the old routing; the change then carries it, its student locked first
+   × F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited 674ms
+     → expected 1806962686350 to be 1806530686350 // Object.is equality
+   ↓ F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the deadline first: the reservation waits for it and is due by the new deadline
+   ↓ F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+   ↓ F0b: races > two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  01:04:43
+   Duration  3.64s (transform 413ms, setup 2ms, collect 147ms, tests 2.24s, environment 0ms, prepare 31ms)
+
+ ELIFECYCLE  Test failed. See above for more details.
+stderr | test/08k-catalogue-races.test.ts > F0b: races
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08k-catalogue-races.test.ts > F0b: races
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08k-catalogue-races.test.ts > F0b: races > a reservation and its series' deadline moved at the same moment: the line is never due after its deadline (MO-10, per line) > the reservation first: it is entered, then the earlier deadline re-dates it, audited
+AssertionError: expected 1806962686350 to be 1806530686350 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1806530686350[39m
+[31m+ 1806962686350[39m
+
+ ❯ test/08k-catalogue-races.test.ts:145:37
+    143|       // Reserved due at the session's payment date (its deadline was …
+    144|       // before it, so its due date followed, audited with why.
+    145|       expect(await dueOf(line!.id)).toBe(earlier.getTime());
+       |                                     ^
+    146|       expect(await one<{ reason: string }>(`select new_data->>'reason'…
+    147|         .toEqual({ reason: "the series' dates changed" });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

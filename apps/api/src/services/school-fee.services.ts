@@ -16,8 +16,13 @@
  * registering under A-12 owes no fee while the school says so (A-13).
  */
 
-import { db, payment, schoolFeeSchedule, eq } from '@repo/db';
+import { db, payment, schoolFeeSchedule, charge, user, sectionMembership, eq, and, inArray, isNull } from '@repo/db';
 import { hasFeeWaiver } from './exception.services';
+import { schoolFeeWaived } from './exception-registry.services';
+import { tellFamily } from './plan.services';
+import type { PushSchoolFeesType } from '@repo/validations';
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 import { logAction, type AuditContext } from './audit.services';
 import { getSetting } from './settings.services';
 import type { Eligibility } from './eligibility.services';
@@ -164,8 +169,8 @@ export async function schoolFeeGateReason(studentId: string, eligibility: Eligib
     return null; // no configured/open schedule → gate off
   }
 
-  // Hook 3 (§6.3): fee_waiver exception bypasses the gate
-  if (await hasFeeWaiver(studentId)) return null;
+  // Hook 3 (§6.3): a gate.schoolFee exception (V3's fee_waiver) for that year, or every year
+  if (await hasFeeWaiver(studentId, academicYear)) return null;
 
   if (await hasCompletedSchoolFeePayment(studentId, academicYear)) return null;
 
@@ -198,7 +203,7 @@ export async function getSchoolFeeStanding(
   const fee = exempt ? null : await getApplicableFee(academicYear, grade);
   if (!fee) return { fee: null, required: false, waived: false, paid: false, settled: true };
   const [waived, paid] = await Promise.all([
-    hasFeeWaiver(studentId),
+    hasFeeWaiver(studentId, academicYear),
     hasCompletedSchoolFeePayment(studentId, academicYear),
   ]);
   return { fee, required: !waived, waived, paid, settled: waived || paid };
@@ -256,6 +261,11 @@ export async function getSchoolFeeStatus(studentId: string, requestedYear?: stri
     ? null
     : await getSchoolFeeStanding(studentId, gradeInAcademicYear(student.cohortYear, academicYearStartFromLabel(nextYear)!), nextYear);
 
+  // The reservations rework (§3.6, point 8): the fee the school pushed into the family's pending
+  // payments, and the date it asked for.
+  const [pushed] = await db.select({ id: charge.id, dueAt: charge.dueAt, amount: charge.amount }).from(charge)
+    .where(and(eq(charge.studentId, studentId), eq(charge.kind, 'school_fee_push'), eq(charge.academicYear, academicYear), eq(charge.status, 'pending_payment')));
+
   return {
     academicYear,
     student: { id: student.id, name: student.name, grade },
@@ -263,12 +273,132 @@ export async function getSchoolFeeStatus(studentId: string, requestedYear?: stri
       ? { academicYear: nextYear, amount: nextStanding.fee.amount, dueAt: nextStanding.fee.dueAt }
       : null,
     amount: fee?.amount ?? null,
-    dueAt: fee?.dueAt ?? null,
+    dueAt: pushed?.dueAt ?? fee?.dueAt ?? null,
     required: standing.required,
     waived: standing.waived,
     paid,
     pendingPayment: openPayment ?? null,
+    pushed: pushed ? { chargeId: pushed.id, dueAt: pushed.dueAt, amount: pushed.amount } : null,
   };
+}
+
+// ─── The school fee pushed to families (RESERVATIONS_REWORK.md §3.6, point 8) ──
+
+/**
+ * "Push to families": the school fee of a year into each chosen student's pending payments, as a
+ * `school_fee_push` charge with the date it is due — a grade (their grade in that year), a section,
+ * or a list. Skipped, and listed with the reason: a fee already paid, waived, an A-13 graduate, an
+ * open push already, a payment in progress, no fee for their grade. One student at a time, under
+ * the student's lock (the school-fee confirmation takes the same lock, so a push never lands on a
+ * year just paid). Never priced by a price exception: its amount is the schedule's.
+ */
+export async function pushSchoolFees(data: PushSchoolFeesType, actorId: string, ctx?: AuditContext) {
+  const yearStart = academicYearStartFromLabel(data.academicYear);
+  if (yearStart === null) throw new Error('Academic year must look like 2026-2027');
+  const ids = new Set<string>();
+  if (data.studentIds?.length) data.studentIds.forEach((s) => ids.add(s));
+  if (data.grade !== undefined) {
+    const cohort = yearStart - (data.grade - 10);
+    const rows = await db.select({ id: user.id }).from(user).where(and(eq(user.role, 'student'), eq(user.cohortYear, cohort), isNull(user.leftOn)));
+    rows.forEach((r) => ids.add(r.id));
+  }
+  if (data.sectionId) {
+    const rows = await db.select({ id: sectionMembership.studentId }).from(sectionMembership)
+      .where(and(eq(sectionMembership.sectionId, data.sectionId), isNull(sectionMembership.endedOn)));
+    rows.forEach((r) => ids.add(r.id));
+  }
+  const students = await db.select({ id: user.id, name: user.name, role: user.role, cohortYear: user.cohortYear, leftOn: user.leftOn })
+    .from(user).where(inArray(user.id, [...ids, '__none__']));
+  const pushed: { studentId: string; name: string; chargeId: string; amount: number }[] = [];
+  const skipped: { studentId: string; name: string; reason: string }[] = [];
+  for (const s of students.sort((a, b) => a.id.localeCompare(b.id))) {
+    if (s.role !== 'student') { skipped.push({ studentId: s.id, name: s.name, reason: 'not a student' }); continue; }
+    if (s.leftOn) { skipped.push({ studentId: s.id, name: s.name, reason: 'left the school' }); continue; }
+    const grade = gradeInAcademicYear(s.cohortYear, yearStart);
+    try {
+      const outcome = await db.transaction(async (tx) => {
+        await tx.select({ id: user.id }).from(user).where(eq(user.id, s.id)).for('no key update');
+        if (grade !== null && grade > LAST_GRADE && (await getSetting('schoolFee.graduatesExempt', tx))) return { skip: 'a graduate owes no school fee (A-13)' };
+        const fee = await getApplicableFee(data.academicYear, grade);
+        if (!fee) return { skip: 'no school fee is open for their grade that year' };
+        if (await schoolFeeWaived(tx, s.id, data.academicYear)) return { skip: 'the fee is waived' };
+        const [paid] = await tx.select({ id: payment.id }).from(payment)
+          .where(and(eq(payment.studentId, s.id), eq(payment.purpose, 'school_fee'), eq(payment.academicYear, data.academicYear), eq(payment.status, 'completed')));
+        if (paid) return { skip: 'already paid' };
+        const [inProgress] = await tx.select({ id: payment.id }).from(payment)
+          .where(and(eq(payment.studentId, s.id), eq(payment.purpose, 'school_fee'), eq(payment.academicYear, data.academicYear), inArray(payment.status, ['pending', 'pending_verification'])));
+        if (inProgress) return { skip: 'a school-fee payment is in progress' };
+        const [open] = await tx.select({ id: charge.id }).from(charge)
+          .where(and(eq(charge.studentId, s.id), eq(charge.kind, 'school_fee_push'), eq(charge.academicYear, data.academicYear), eq(charge.status, 'pending_payment')));
+        if (open) return { skip: 'already pushed' };
+        const id = randomUUID();
+        const description = `School fee ${data.academicYear}`;
+        await tx.insert(charge).values({
+          id, studentId: s.id, kind: 'school_fee_push', academicYear: data.academicYear, description, amount: fee.amount,
+          dueAt: data.dueAt, status: 'pending_payment', createdBy: actorId, acceptedBy: actorId, acceptedAt: new Date(), reason: 'pushed to families',
+        });
+        await logAction(actorId, 'CHARGE_CREATED', 'charge', id, null,
+          { kind: 'school_fee_push', studentId: s.id, academicYear: data.academicYear, amount: fee.amount, dueAt: data.dueAt.toISOString() }, ctx, tx);
+        await tellFamily(tx, s.id, 'CHARGE_ADDED', `${description}: EGP ${fee.amount.toFixed(2)}`,
+          `The ${data.academicYear} school fee (EGP ${fee.amount.toFixed(2)}) is due by ${data.dueAt.toISOString().slice(0, 10)}. Pay it on the School fee page or at the finance desk.`,
+          { chargeId: id, academicYear: data.academicYear });
+        return { chargeId: id, amount: fee.amount };
+      });
+      if ('skip' in outcome) skipped.push({ studentId: s.id, name: s.name, reason: outcome.skip! });
+      else pushed.push({ studentId: s.id, name: s.name, chargeId: outcome.chargeId!, amount: outcome.amount! });
+    } catch (err) {
+      // Two pushes at once: the second meets the one-live-push index.
+      if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') skipped.push({ studentId: s.id, name: s.name, reason: 'already pushed' });
+      else throw err;
+    }
+  }
+  if (pushed.length) {
+    await logAction(actorId, 'SCHOOL_FEE_PUSHED', 'school_fee_schedule', data.academicYear, null,
+      { academicYear: data.academicYear, grade: data.grade ?? null, sectionId: data.sectionId ?? null, dueAt: data.dueAt.toISOString(), pushed: pushed.length, skipped: skipped.length, chargeIds: pushed.map((p) => p.chargeId) }, ctx);
+  }
+  return { pushed, skipped };
+}
+
+/**
+ * A school-fee payment confirmed (confirmPayment's transaction, the payment locked): the open push
+ * of that student and year is paid by it (settled_by_payment_id), under the student's lock.
+ */
+export async function settlePushInTx(tx: Tx, p: { id: string; studentId: string; academicYear: string | null }, actorId: string | null, ctx?: AuditContext) {
+  if (!p.academicYear) return 0;
+  await tx.select({ id: user.id }).from(user).where(eq(user.id, p.studentId)).for('no key update');
+  const settled = await tx.update(charge).set({ status: 'paid', settledByPaymentId: p.id, updatedAt: new Date() })
+    .where(and(eq(charge.studentId, p.studentId), eq(charge.kind, 'school_fee_push'), eq(charge.academicYear, p.academicYear), eq(charge.status, 'pending_payment')))
+    .returning({ id: charge.id });
+  for (const c of settled) {
+    await logAction(actorId, 'CHARGE_SETTLED', 'charge', c.id, { status: 'pending_payment' }, { status: 'paid', settledByPaymentId: p.id }, ctx, tx);
+  }
+  return settled.length;
+}
+
+/** A school-fee payment reversed: the push it settled is open again (reversePayment's transaction). */
+export async function reopenPushInTx(tx: Tx, paymentId: string, actorId: string, ctx?: AuditContext) {
+  const reopened = await tx.update(charge).set({ status: 'pending_payment', settledByPaymentId: null, updatedAt: new Date() })
+    .where(and(eq(charge.settledByPaymentId, paymentId), eq(charge.kind, 'school_fee_push'), eq(charge.status, 'paid')))
+    .returning({ id: charge.id });
+  for (const c of reopened) {
+    await logAction(actorId, 'CHARGE_REOPENED', 'charge', c.id, { status: 'paid', settledByPaymentId: paymentId }, { status: 'pending_payment' }, ctx, tx);
+  }
+  return reopened.length;
+}
+
+/** A school-fee waiver granted after a push cancels the open push it covers (the grant's transaction). */
+export async function cancelPushesForWaiverInTx(tx: Tx, studentIds: string[], academicYear: string | null, actorId: string, ctx?: AuditContext) {
+  if (!studentIds.length) return 0;
+  const conds = [inArray(charge.studentId, studentIds), eq(charge.kind, 'school_fee_push'), eq(charge.status, 'pending_payment')];
+  if (academicYear) conds.push(eq(charge.academicYear, academicYear));
+  const now = new Date();
+  const cancelled = await tx.update(charge).set({ status: 'cancelled', cancelledAt: now, cancelledBy: actorId, cancelReason: 'The school fee was waived', updatedAt: now })
+    .where(and(...conds)).returning({ id: charge.id, studentId: charge.studentId, description: charge.description });
+  for (const c of cancelled) {
+    await logAction(actorId, 'CHARGE_CANCELLED', 'charge', c.id, { status: 'pending_payment' }, { status: 'cancelled', reason: 'waived' }, ctx, tx);
+    await tellFamily(tx, c.studentId, 'CHARGE_UPDATED', `${c.description}: waived`, `The school waived ${c.description}: nothing is owed for it.`, { chargeId: c.id });
+  }
+  return cancelled.length;
 }
 
 /**

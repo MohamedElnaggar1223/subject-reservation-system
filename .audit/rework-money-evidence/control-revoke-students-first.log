@@ -1,0 +1,50 @@
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+> vitest run "test/08t-rework-races.test.ts"
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+
+[clock] database minus host: 0.2 ms (measured within 2 ms)
+ ❯ test/08t-rework-races.test.ts (14 tests | 1 failed) 16078ms
+   ✓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line  612ms
+   ✓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused  462ms
+   ✓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused  340ms
+   ✓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it  1016ms
+   ✓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused  638ms
+   ✓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional  497ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it  609ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged  621ms
+   ✓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused  693ms
+   ✓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once  732ms
+   × 08t: the rework races — money (step C) > an exception revoked while a line relies on it: the revocation waits for the reservation, then re-dates its line; one that lands first leaves the line without it 716ms
+     → expected 1792529999000 to be 1817340774933 // Object.is equality
+   ✓ 08t: the rework races — money (step C) > a family's one-shot gate wanted by two of its children at once: one reservation gets it, the other is refused  593ms
+   ✓ 08t: the rework races — money (step C) > the last instalment's confirmation racing the line's deadline > the confirmation first (begun before the deadline): the line is captured; the sweep after the deadline finds it confirmed and settles nothing  3210ms
+   ✓ 08t: the rework races — money (step C) > the last instalment's confirmation racing the line's deadline > the sweep first (after the deadline): the line expires and its deposits are settled once; the confirmation is refused and the payment failed  3262ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races — money (step C) > an exception revoked while a line relies on it: the revocation waits for the reservation, then re-dates its line; one that lands first leaves the line without it
+AssertionError: expected 1792529999000 to be 1817340774933 // Object.is equality
+
+- Expected
++ Received
+
+- 1817340774933
++ 1792529999000
+
+ ❯ test/08t-rework-races.test.ts:427:32
+    425|     expect((await revoking).status).toBe(200);
+    426|     const [a] = await live(f.studentId);
+    427|     expect(await dueOf(a!.id)).toBe(usual);
+       |                                ^
+    428|     expect(await sql(`select 1 from audit_log where action = 'LINE_DUE…
+    429| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 passed (14)
+   Start at  03:52:45
+   Duration  17.71s (transform 525ms, setup 2ms, collect 196ms, tests 16.08s, environment 0ms, prepare 35ms)
+
+ ELIFECYCLE  Test failed. See above for more details.

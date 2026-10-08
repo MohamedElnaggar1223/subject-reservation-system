@@ -1,0 +1,203 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -0.7 ms (measured within 1 ms)
+stderr | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [4efe4388-0ca1-4373-a87f-80c8e0cf93f4] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[email:stub] To: admin.n08v@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [9b6faf9f-c3ab-4942-8459-f5e40929aa0e] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [ee6bee09-35d9-48ab-a2e1-3c4b26515cf7] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [fa8cbf71-4fe0-4c87-984f-8646c27b2489] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [237ea79a-f584-42b4-883a-294919183de3] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [83219ed5-6a44-40a7-b829-27f8aca290b1] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [01bc0373-2e58-49d8-ae00-d3580f75c4d8] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [b15279c3-5627-42e3-8493-698ead90b3de] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [cb0cfd6c-f7df-4c02-9e39-eed292b00bfd] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [57a7fda3-b4f4-48a3-903a-8597a161b46d] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [9ea9ee70-6c8e-4dea-8972-4d008c1abfb3] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [5ee14563-29b3-48ff-bf63-46f2351a185e] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [02586202-1e69-4775-966b-b40307486884] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [b3ca2ec4-2f8a-4d4c-8796-9a44867f5c73] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [d50f1438-abde-4102-b498-1301a39bdf7c] POST /v1/sessions/1c6fd20d-9b6e-4c93-afdb-cf7a878fa22a/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [308f6615-8e46-44c0-b149-26c036bf283d] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [4a262bed-5264-4734-8eaa-6225e93d4bd5] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-ps-54wl@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-ps-54wl@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [3e6430bf-9c6e-492d-8517-81100e6be8c4] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [c9d337ae-22f5-4d50-a850-92ee77cfb948] POST /api/auth/sign-in/email
+
+ ❯ test/08n-session-offers.test.ts (33 tests | 1 failed | 32 skipped) 2096ms
+   ↓ 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+   ↓ 08n: sessions and offers > the next June copied from it: offers, teachers and items in the next year's series; board fees provisional; audited
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > an IGCSE item is refused in October and January; Cambridge AS defaults to November, Pearson AS to October
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a Cambridge retake of the previous June is reservable until the retake deadline after the entry deadline passed; a first entry is not; a retake of an older sitting is cut off at the entry deadline; the retake is due by the retake deadline
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > the admin's move takes a retake into a series past its entry deadline while the retake deadline is ahead; a first entry not
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > the sweep at the retake deadline closes the waiting retakes of the previous sitting (MO-10 per line)
+   ↓ 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+   ↓ 08n: the line rules (§3.5) > AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can
+   ↓ 08n: the line rules (§3.5) > the same entry twice in one series across two sessions is refused: the board takes one entry
+   ↓ 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted
+   ↓ 08n: the line rules (§3.5) > a carried sitting outside the board's carry-forward period is refused (Cambridge: 13 months); inside it, accepted
+   ↓ 08n: the line rules (§3.5) > self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting
+   ↓ 08n: past a line's own deadline (flags 59, 60) > a family's drop of a paid line whose deadline passed is refused and sent to the desk; a series with no entry deadline is cut off at the start of its exams' day
+   ↓ 08n: the enrolment per unit (§3.2, §10: F1 reads it) > a line of an item entering units is enrolled per unit with its item's teacher; the teaching demand groups per unit
+   ↓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+   ↓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+   ↓ 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+   ↓ 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+   ↓ 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+   ↓ 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+   ↓ 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+   ↓ 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+   ↓ 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+   ↓ 08n: the reviews of 977848d and 40c1447 > an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)
+   ↓ 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+   ↓ 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+   × 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both 362ms
+     → promise resolved "[ { …(35) } ]" instead of rejecting
+   ↓ 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+   ↓ 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+   ↓ 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+AssertionError: promise resolved "[ { …(35) } ]" instead of rejecting
+
+[32m- Expected:[39m 
+Error {
+  "message": "rejected promise",
+}
+
+[31m+ Received:[39m 
+[
+  {
+    "approvalComments": null,
+    "approvedAt": null,
+    "approvedBy": null,
+    "attempt": "retake",
+    "boardSeriesId": "3324c5f8-331e-49cd-ba31-78bd4da001ad",
+    "courseFeeAtRegistration": 1000,
+    "createdAt": 2026-10-08T02:00:26.957Z,
+    "droppedAt": null,
+    "dueAt": 2026-11-07T02:00:26.617Z,
+    "gradeReceived": null,
+    "id": "622a950b-66de-4605-b329-d6d944292b04",
+    "isRetake": true,
+    "legacy": null,
+    "mode": "in_school",
+    "offerItemId": "bc72f2cb-de05-413d-bfc3-a167af21b7d5",
+    "priceAtRegistration": 1300,
+    "priceProvisional": false,
+    "pricingBasis": {
+      "attempt": "retake",
+      "boardFeeBase": 300,
+      "boardPercent": 100,
+      "courseFee": 1000,
+      "courseFeeBase": 1000,
+      "coursePercent": 100,
+      "customPrice": false,
+      "exceptionIds": [],
+      "feeRows": [
+        {
+          "amount": 300,
+          "id": "17a0248b-3136-4148-a94c-dc5bfb5edf41",
+          "keyId": "aa745d1c-5c73-474b-9b75-0eb54a658817",
+          "keyKind": "subject",
+          "provisional": false,
+        },
+      ],
+      "itemKind": "whole",
+      "mode": "in_school",
+      "onePaperPercent": 100,
+      "registrationFee": 300,
+      "total": 1300,
+      "v": 1,
+    },
+    "priorCandidateNumber": null,
+    "priorCentre": null,
+    "priorSittingSeriesId": "3339e51f-d4dc-4837-9363-e8d4ff0abeee",
+    "priorSittingSource": null,
+    "refundPolicySnapshot": null,
+    "registrationFeeAtRegistration": 300,
+    "requestedBy": "lB6WsjfCn4XvrQPTuqJc1jo6e9udKq3N",
+    "resultRecordedAt": null,
+    "resultRecordedBy": null,
+    "sessionId": "1c6fd20d-9b6e-4c93-afdb-cf7a878fa22a",
+    "status": "pending_payment",
+    "studentId": "lB6WsjfCn4XvrQPTuqJc1jo6e9udKq3N",
+    "subjectId": "aa745d1c-5c73-474b-9b75-0eb54a658817",
+    "takenOutsideSchool": false,
+    "teacherId": "a2e47959-092f-47ff-b7f2-d372cb11499b",
+    "updatedAt": 2026-10-08T02:00:26.957Z,
+    "wasCoreAtRegistration": false,
+  },
+]
+
+ ❯ test/08n-session-offers.test.ts:1099:54
+    1097|     const f = await onboard(officer, `n08v-ps-${RUN}`, 12);
+    1098|     const retake = { offerItemId: item, attempt: 'retake' as const, mo…
+    1099|     await expect(reserve(f.studentId, june, [retake])).rejects.toThrow…
+       |                                                      ^
+    1100|     expect(await sql(`select 1 from registration where student_id = $1…
+    1101|     const [line] = await reserve(f.studentId, june, [{ ...retake, prio…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 32 skipped (33)
+   Start at  05:00:23
+   Duration  3.71s (transform 509ms, setup 2ms, collect 209ms, tests 2.10s, environment 0ms, prepare 34ms)
+

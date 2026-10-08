@@ -18,7 +18,8 @@ import { autoManageSessions, finalizePendingRecords, recoverSessionTransitions }
 import { failPayment, enforcePaymentDeadlines } from '../services/payment.services';
 import { notifySessionOpened, notifySessionClosingSoon, notifySessionClosed, processScheduledAnnouncements, getStudentAndParentBroadcastIds } from '../services/notification.services';
 import { capturePreregistrationsForSession } from '../services/prereg.services';
-import { lapseGrade10Exceptions } from '../services/exception-lapse.services';
+import { lapseGrade10Exceptions, lapsePlans } from '../services/exception-lapse.services';
+import { expireOverdueLines } from '../services/overdue.services';
 import { sendDeadlineReminders } from '../services/exam-deadline.services';
 import { logAction } from '../services/audit.services';
 import { logger } from '../lib/logger';
@@ -220,6 +221,24 @@ export function startSessionScheduler(): void {
         }
       } catch (err) {
         logger.error('[session-closer] Grade-10 exception lapse failed:', err);
+      }
+
+      // The reservations rework (§3.6): an instalment plan whose validUntil passed lapses — its line
+      // expires ("plan_lapsed") and its deposits are settled as a drop that day.
+      try {
+        const p = await lapsePlans();
+        if (p.lapsed > 0) logger.info(`[session-closer] ${p.lapsed} instalment plan(s) ran out and were settled.`);
+      } catch (err) {
+        logger.error('[session-closer] Plan lapse failed:', err);
+      }
+
+      // The reservations rework (§3.1): a line still unpaid payment.expireOverdueAfterDays after its
+      // due date expires ("overdue"; off by default), its plan settled as a drop that day.
+      try {
+        const o = await expireOverdueLines();
+        if (o.expired > 0) logger.info(`[session-closer] ${o.expired} overdue line(s) expired.`);
+      } catch (err) {
+        logger.error('[session-closer] Overdue expiry failed:', err);
       }
 
       // Process scheduled announcements whose time has arrived

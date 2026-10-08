@@ -1,0 +1,108 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -0.9 ms (measured within 1 ms)
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [9cad397f-8cbf-4533-95c3-559c21814a95] POST /api/auth/sign-up/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[email:stub] To: admin.t08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [5f0df1a9-1814-483d-935a-42d919ef1768] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [88558cb9-2cb7-4b63-af3c-85c1fed6cc7b] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [5845c6ac-ae36-48b3-9a1e-332df4ed1ca1] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [003df444-1f9c-41ce-a24a-4aba5757c577] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [790e50cc-5121-4984-8410-a1b5ead611e4] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [80b5095b-409b-4fb2-802d-6481f7d8e7a6] POST /v1/teachers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [afcecdae-a137-4e2c-86b0-00ab5cda99a8] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [a9c7f03b-67fe-41bc-bff2-1b3f6a9e42cb] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [580934ca-8830-4921-aea4-6aa563801157] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [746d4fce-3288-44b8-bdf0-463c900543d2] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [e7d99c28-4097-4fea-a12b-36df9055fefb] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [b73be76d-a761-4a2a-adca-1e38b8ace9a9] POST /v1/sessions/7ec2f3dc-ba54-4206-9ba1-ea73822573f0/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [eb271600-93a9-4d16-8e04-3a4aeeb73ac4] POST /v1/sessions/b21d8809-8fe7-41b5-8db7-cd90d61ebf8b/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [07841896-56b0-49db-88b6-3c04d6dbc78f] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [b994ba33-b3cd-400d-9b27-4c6b227bb5ac] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [dda0e2cd-da05-43e4-bbb3-18fbb34843f4] POST /v1/sessions/7ec2f3dc-ba54-4206-9ba1-ea73822573f0/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [600b44a2-456e-49db-9940-43a23a1d5718] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [30320516-f9ab-4e67-8205-7e93ba83306a] POST /v1/catalogue/units
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [fa36a715-b85c-4d0a-b692-a54589f33497] POST /v1/catalogue/units
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [68871022-c006-4d30-97ba-7a069ac9a30d] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [2387fb08-1f3b-4985-bdab-f15157a8a195] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [3c25fe0a-e3ad-4611-be45-086b9d59834f] POST /v1/sessions/7ec2f3dc-ba54-4206-9ba1-ea73822573f0/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [342c1b9d-0a9f-4bb6-9723-e33756eb7aab] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[email:stub] To: parent.t08-po-3yw6@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[email:stub] To: student.t08-po-3yw6@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [a74fd270-b3b0-4042-bdd8-b9bd66a947d2] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [bf048bfc-072e-4999-8b28-6701e8e1d699] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks
+[INFO] [25acbc3e-0559-454a-8f93-f19183fb2003] PUT /v1/board-fees
+
+ ✓ test/08t-rework-races.test.ts (19 tests | 18 skipped) 2158ms
+   ✓ 08t: the rework races > a fee list pasted out of id order against a line priced on two of its rows: the put takes them in id order, the line waits for it, nothing deadlocks  591ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 18 skipped (19)
+   Start at  06:38:56
+   Duration  3.59s (transform 464ms, setup 2ms, collect 182ms, tests 2.16s, environment 0ms, prepare 32ms)
+

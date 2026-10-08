@@ -1,0 +1,3 @@
+Reading config file '/private/tmp/rwc/main-db/packages/db/drizzle.config.js'
+Using 'pg' driver for database querying
+[⣷] applying migrations...[⣯] applying migrations...[✓] migrations applied successfully!
