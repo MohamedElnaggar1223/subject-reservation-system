@@ -641,10 +641,17 @@ describe('08q: instalment plans', () => {
     const [l] = await unpaid(f, [subj.P10!], s1);
     const p = await plan(f, l!, [500, 500, 500]);
     await payAtDesk(f, [p.i[0]!, p.i[1]!]);
+    // The desk's Student 360: under the live plan the line is not collected as a line (its
+    // instalments are); released in full, it is offered again — the panel reads livePlan.
+    const lineOn360 = async () => (await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: f.studentId } }))).registrations.find((r) => r.id === l)!;
+    expect(await lineOn360()).toMatchObject({ status: 'pending_payment', livePlan: true });
     await apiResponse(finadmin.api.v1.exceptions[':id'].release.$post({ param: { id: p.id }, json: { note: 'the family will pay the rest now' } }));
     expect(await settledOf(l!)).toMatchObject({ deposits: '1000', kept: '0', released: '1000', cause: 'released_in_full' });
     expect(await wallet(f.studentId)).toEqual({ free: 1000, held: 0 });
     expect(await statusOf('registration', l!)).toBe('pending_payment');
+    // Its two paid instalments stay paid, and the line is collectable in full again.
+    expect([await statusOf('charge', p.i[0]!), await statusOf('charge', p.i[1]!), await statusOf('charge', p.i[2]!)]).toEqual(['paid', 'paid', 'cancelled']);
+    expect(await lineOn360()).toMatchObject({ status: 'pending_payment', livePlan: false, payableNow: true });
     const col = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [l!], instrumentUsed: 'cash', escrowAmountToApply: 1000 } }));
     expect(col.collected).toBe(500);
     expect(await statusOf('registration', l!)).toBe('confirmed');
@@ -915,6 +922,45 @@ describe('08q: instalment plans', () => {
     } finally {
       await verification('enter_as_declared');
     }
+  });
+
+  it("a declared retake rejected while paid stands as a first entry; its payment reversed, a plan on it falls due at the first-entry deadline, not the retake deadline (B's flag in the charge deadlines)", async () => {
+    const s = await session(adm, 'November (AS, plans flag)', 'november', 'as_level', { ...openWindow(), activate: true });
+    const fl = await subject(adm, 'CQP-FL', 'Rejected flag (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    const it = await one<{ id: string; series: string; board: string; month: string; year: number }>(
+      `select i.id, bs.id as series, bs.board_code as board, bs.month, bs.year from session_offer_item i join session_offer o on o.id = i.offer_id join board_series bs on bs.id = i.board_series_id
+       where o.session_id = $1 and o.subject_id = $2`, [s, fl]);
+    // The series' entry deadline in 30 days, its retake deadline in 35: a retake of the board's
+    // previous sitting runs to the retake deadline (§3.3).
+    await sql(`update board_series set entry_deadline = now() + interval '30 days', retake_deadline = now() + interval '35 days' where id = $1`, [it.series]);
+    const prev = await one<{ month: 'january' | 'june' | 'october' | 'november'; year: number }>(`select month, year from board_previous_sitting($1, $2, $3)`, [it.board, it.month, it.year]);
+    const f = await onboard(officer, 'cqp-flag', 12);
+    const desk = await apiResponse(officer.api.v1.registrations.desk.$post({ json: {
+      studentId: f.studentId, sessionId: s, consent: CONSENT,
+      lines: [{ offerItemId: it.id, attempt: 'retake', mode: 'in_school', priorSitting: { month: prev.month, year: Number(prev.year) } }],
+      collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 },
+    } }));
+    const l = desk.registrations[0]!.id;
+    // Rejected while paid, before the first-entry deadline: the line stands, a first entry (B, §3.5).
+    expect(await apiResponse(coordinator.api.v1.registrations[':id']['verify-prior'].$post({ param: { id: l }, json: { outcome: 'rejected', reason: 'no result for this candidate' } })))
+      .toMatchObject({ outcome: 'rejected', effect: 'stands' });
+    // Its payment reversed (confirmed by mistake): it waits for payment again, the flag still set.
+    await apiResponse(finadmin.api.v1.payments[':id'].reverse.$post({ param: { id: desk.payments[0]!.id }, json: { reason: 'confirmed by mistake', moneyReturned: true } }));
+    expect(await one(`select status, declaration_rejected as rejected from registration where id = $1`, [l])).toEqual({ status: 'pending_payment', rejected: true });
+    // A plan on it: its instalments fall due at the line's deadline — the entry deadline (a first entry).
+    const p = await plan(f, l, [750, 750]);
+    const due = await one<{ charge: string; entry: string; retake: string }>(
+      `select charge_effective_deadline(c.kind, c.registration_id, c.board_series_id, c.board_service_id) as charge, bs.entry_deadline as entry, bs.retake_deadline as retake
+       from charge c join board_series bs on bs.id = c.board_series_id where c.id = $1`, [p.i[0]!]);
+    expect(new Date(due.charge).getTime()).toBe(new Date(due.entry).getTime());
+    expect(new Date(due.charge).getTime()).toBeLessThan(new Date(due.retake).getTime());
+    await payAtDesk(f, [p.i[0]!]);
+    // Between the two deadlines: the second instalment is refused (the retake deadline would still allow it).
+    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [it.series]);
+    const refusedInstalment = await refused(f.parent.api.v1.payments.initiate.$post({ json: { chargeIds: [p.i[1]!], paymentMethod: 'instapay' } }));
+    expect(refusedInstalment.status).toBeGreaterThanOrEqual(400);
+    expect(refusedInstalment.error).toMatch(/^The line's deadline \(.+\) has passed: this instalment can no longer be paid$/);
+    expect(await sql(`select 1 from payment_charge where charge_id = $1`, [p.i[1]!])).toEqual([]);
   });
 
   it("another line's preregistration capture leaves the plan's deposits alone; held money is never transferred to a sibling", async () => {

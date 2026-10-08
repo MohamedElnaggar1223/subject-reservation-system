@@ -35,9 +35,10 @@ function useOwed(studentId: string, summary: Summary | undefined) {
   const charges = useQuery({ queryKey: [...CHARGES_KEY, 'student', studentId], queryFn: () => fetchCharges({ studentId }) });
   return useMemo(() => {
     const rows = charges.data ?? [];
-    // A line under a live plan is paid by its instalments (they are charges).
-    const planLines = new Set(rows.filter((c) => c.kind === 'instalment' && (c.status === 'pending_payment' || c.status === 'paid')).map((c) => c.registrationId));
-    const waiting = (summary?.registrations ?? []).filter((r) => r.status === 'pending_payment' && !planLines.has(r.id));
+    // A line under a live plan is paid by its instalments (they are charges, listed below). A plan
+    // released in full is not live: its line is collected in full here again (its paid
+    // instalments stay paid; their deposits went back to escrow).
+    const waiting = (summary?.registrations ?? []).filter((r) => r.status === 'pending_payment' && !r.livePlan);
     const lines = waiting.filter((r) => r.payableNow);
     const provisional = waiting.filter((r) => !r.payableNow);
     const payable = rows.filter((c) => c.status === 'pending_payment' && c.kind !== 'school_fee_push' && !c.openPaymentId);

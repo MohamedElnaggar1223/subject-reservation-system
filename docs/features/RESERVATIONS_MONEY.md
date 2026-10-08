@@ -294,10 +294,12 @@ line under a live plan it answers the plan's last date first.
     session in week 3 of its policy, since V3's windows count only for converted lines (§3.9).
 32. **B's `declaration_rejected` in every money reader of a line's deadline**:
     `chargeDeadline` (TypeScript) and `charge_effective_deadline` (SQL, 0048), `refundFor`'s
-    sent rule, the dead plan's line, 09's desk-drop rule. A live plan sits on an unpaid line, and a
-    rejection on an unpaid line expires it, so no instalment's line is ever rejected-and-live: no
-    test can tell the flag from its absence there; it is passed for the rule's sake (as B's hold
-    query does).
+    sent rule, the dead plan's line, 09's desk-drop rule. A plan line can carry the flag: a paid
+    declared retake rejected before the first-entry deadline stands with it, and when its payment
+    is reversed it waits for payment again, flag set — a plan granted then falls due at the
+    first-entry deadline, not the retake deadline. 08q proves both readers on that path (the SQL
+    deadline equals the entry deadline; an instalment between the two deadlines is refused).
+    *Corrected (the reviewer's final pass): this said no test could show the flag here.*
 33. **The window by subject reads the lines' items** since B (every reservation path takes lines):
     `subjectsOfItems` in window.services gives `sessionWindow` a new reservation's subjects.
 34. **The desk's reservation card is B's `Reserve`**: "Also collect now" (the year's fee and the

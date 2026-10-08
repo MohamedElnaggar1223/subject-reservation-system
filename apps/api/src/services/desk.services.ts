@@ -866,6 +866,9 @@ export async function getStudentSummary(studentId: string) {
     registrations: registrations.map((r) => ({
       ...r,
       payableNow: payableNow(r),
+      // Under a live instalment plan (§3.6): paid by its instalments, never collected as a line. A
+      // plan released in full or ended is not live: the line is collected in full again.
+      livePlan: exceptions.some((e) => e.policyKey === 'plan.instalments' && e.registrationId === r.id),
       receipt: receiptByReg.get(r.id) ?? null,
       // The exceptions that touched the line: priced it, are scoped to it, or let it through (§4.7).
       exceptions: lineExceptions.get(r.id) ?? [],
