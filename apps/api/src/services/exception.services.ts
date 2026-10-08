@@ -20,7 +20,7 @@
 
 import {
   db, exception, user, registration, registrationSession, subject, sessionOffer, sessionOfferItem, charge, boardSeries, parentStudentLink,
-  paymentRegistration,
+  paymentRegistration, paymentCharge, payment,
   eq, and, inArray, sql, gradeTodayExtras,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -39,7 +39,7 @@ import { getSetting } from './settings.services';
 import { priceLine } from './pricing.services';
 import { cairoDayStart } from './refund.services';
 import { dueDateFor, redateLines } from './deadline.services';
-import { redateChargeInTx } from './charge.services';
+import { redateChargeInTx, repriceChargeInTx, ChargeError } from './charge.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -252,6 +252,7 @@ export async function grantException(data: GrantExceptionType, actor: { id: stri
       // The students first (the reservation's lock, §6), then what the grant rests on.
       await tx.select({ id: user.id }).from(user).where(inArray(user.id, holderStudents)).orderBy(user.id).for('no key update');
       if (n.scope.registrationId) await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, n.scope.registrationId)).for('update');
+      if (n.scope.chargeId) await tx.select({ id: charge.id }).from(charge).where(eq(charge.id, n.scope.chargeId)).for('update');
       await checkScope(tx, n, holderStudents);
       const id = randomUUID();
       const [created] = await tx.insert(exception).values({
@@ -290,6 +291,9 @@ export async function grantException(data: GrantExceptionType, actor: { id: stri
       let repriced: { from: number; to: number } | null = null;
       if (n.policyKey.startsWith('price.') && n.scope.registrationId) {
         repriced = await repriceLineForException(tx, n.scope.registrationId, id, actor.id, ctx);
+      }
+      if (n.policyKey.startsWith('price.') && n.scope.chargeId) {
+        repriced = await repriceChargeForException(tx, n.scope.chargeId, actor.id, ctx, 'grant');
       }
       // A payment due date granted: the waiting lines (and the charge) it covers are re-dated now.
       const dueDatesMoved = n.policyKey === 'deadline.payment' ? await redateForPaymentException(tx, holderStudents, n.scope, actor.id) : 0;
@@ -330,6 +334,54 @@ async function repriceLineForException(tx: Tx, lineId: string, exceptionId: stri
 }
 
 /**
+ * A price exception on one line revoked: an unpaid line it re-priced gets its price without it (the
+ * grant's re-price undone, LINE_REPRICED). A line with a payment keeps its price — finance adds a
+ * price adjustment or refunds the difference, as for any paid line.
+ */
+async function repriceLineWithout(tx: Tx, lineId: string, exceptionId: string, actorId: string, ctx?: AuditContext) {
+  const [l] = await tx.select().from(registration).where(eq(registration.id, lineId));
+  const basis = l?.pricingBasis as { exceptionIds?: string[] } | null | undefined;
+  if (!l || !basis?.exceptionIds?.includes(exceptionId)) return null;
+  if (!['pending_approval', 'pending_payment', 'preregistered'].includes(l.status)) return null;
+  const history = await tx.select({ id: paymentRegistration.id }).from(paymentRegistration).where(eq(paymentRegistration.registrationId, lineId)).limit(1);
+  if (history.length) return null;
+  const price = await priceLine(tx, { item: { id: l.offerItemId }, attempt: l.attempt as 'first' | 'retake', mode: l.mode as 'in_school' | 'self_study', studentId: l.studentId, sessionId: l.sessionId },
+    { exceptionIds: basis.exceptionIds.filter((x) => x !== exceptionId) });
+  await tx.update(registration).set({
+    priceAtRegistration: price.total, courseFeeAtRegistration: price.courseFee, registrationFeeAtRegistration: price.registrationFee,
+    priceProvisional: price.provisional, pricingBasis: price.basis as unknown as Record<string, unknown>, updatedAt: new Date(),
+  }).where(eq(registration.id, lineId));
+  await logAction(actorId, 'LINE_REPRICED', 'registration', lineId, { priceAtRegistration: l.priceAtRegistration },
+    { priceAtRegistration: price.total, reason: 'a price exception on this line revoked', exceptionId }, ctx, tx);
+  return { from: l.priceAtRegistration, to: price.total };
+}
+
+/**
+ * A price exception on one charge granted or revoked: a charge still awaiting payment, with no
+ * payment open or made, is priced again at once (CHARGE_REPRICED), as a line is. A charge with a
+ * payment keeps its amount (a payment charges exactly what it covers); a grant on it is refused.
+ */
+async function repriceChargeForException(tx: Tx, chargeId: string, actorId: string, ctx: AuditContext | undefined, why: 'grant' | 'revoke') {
+  const [c] = await tx.select().from(charge).where(eq(charge.id, chargeId));
+  if (!c) throw new ExceptionError('That charge was not found', 404);
+  const paid = await tx.select({ id: paymentCharge.id }).from(paymentCharge).innerJoin(payment, eq(payment.id, paymentCharge.paymentId))
+    .where(and(eq(paymentCharge.chargeId, chargeId), inArray(payment.status, ['pending', 'pending_verification', 'completed']))).limit(1);
+  if (!['requested', 'pending_payment'].includes(c.status) || paid.length) {
+    if (why === 'revoke') return null;
+    throw new ExceptionError('This charge has a payment: its amount stays — refund the difference instead', 409);
+  }
+  try {
+    const next = await repriceChargeInTx(tx, c, actorId, ctx);
+    return next.amount === c.amount ? null : { from: c.amount, to: next.amount };
+  } catch (err) {
+    // Past the charge's deadline it can no longer be paid: a grant is refused, a revocation leaves it.
+    if (!(err instanceof ChargeError)) throw err;
+    if (why === 'revoke') return null;
+    throw new ExceptionError(err.message, err.status);
+  }
+}
+
+/**
  * deadline.payment (§3.1, §6 dueDateFor): the waiting lines of the holder the exception covers — one
  * line, or a session's — are re-dated (LINE_DUE_MOVED), and a charge it names gets its due date
  * again, in the grant's (or the revocation's) transaction, the students already locked.
@@ -361,12 +413,15 @@ export async function revokeException(id: string, actor: { id: string; role: str
   if (!peek || peek.status !== 'active') throw new ExceptionError('Exception not found or already revoked', 404);
   if (!isRegistryPolicyKey(peek.policyKey)) throw new ExceptionError('Exception not found or already revoked', 404);
   assertMayGrant(peek.policyKey, actor.role, 'revoke');
+  // Who it covers now (a family whose children were all unlinked since covers no one).
+  const holders = await holderStudentsOf(db, peek).catch(() => [] as string[]);
   return db.transaction(async (tx) => {
-    // A plan: the student and the line first (§6), then the exception.
-    if (peek.policyKey === 'plan.instalments' && peek.registrationId && peek.studentId) {
-      await tx.select({ id: user.id }).from(user).where(eq(user.id, peek.studentId)).for('no key update');
-      await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, peek.registrationId)).for('update');
-    }
+    // The order of §6 (RESERVATIONS.md §2.1): the students it covers first — so a reservation
+    // reading it either commits before the revocation (and the revocation then re-dates or expires
+    // its line with the others) or reads it revoked — then the line or charge it rests on, then it.
+    if (holders.length) await tx.select({ id: user.id }).from(user).where(inArray(user.id, holders)).orderBy(user.id).for('no key update');
+    if (peek.registrationId) await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, peek.registrationId)).for('update');
+    if (peek.chargeId) await tx.select({ id: charge.id }).from(charge).where(eq(charge.id, peek.chargeId)).for('update');
     const [row] = await tx.select().from(exception).where(eq(exception.id, id)).for('update');
     if (!row || row.status !== 'active') throw new ExceptionError('Exception not found or already revoked', 404);
     const now = new Date();
@@ -377,15 +432,17 @@ export async function revokeException(id: string, actor: { id: string; role: str
       .returning();
     await logAction(actor.id, 'EXCEPTION_REVOKED', 'exception', id, { status: 'active' }, updated as Record<string, unknown>, ctx, tx);
     let expired: { id: string; studentId: string; subjectId: string }[] = [];
+    let repriced: { from: number; to: number } | null = null;
+    if (row.policyKey.startsWith('price.') && row.registrationId) repriced = await repriceLineWithout(tx, row.registrationId, row.id, actor.id, ctx);
+    if (row.policyKey.startsWith('price.') && row.chargeId) repriced = await repriceChargeForException(tx, row.chargeId, actor.id, ctx, 'revoke');
     if (row.policyKey === 'deadline.payment') {
-      const students = row.studentId ? [row.studentId] : await holderStudentsOf(tx, row);
-      await tx.select({ id: user.id }).from(user).where(inArray(user.id, students)).orderBy(user.id).for('no key update');
+      const students = holders;
       await redateForPaymentException(tx, students, {
         ...(row.registrationId ? { registrationId: row.registrationId } : {}), ...(row.sessionId ? { sessionId: row.sessionId } : {}), ...(row.chargeId ? { chargeId: row.chargeId } : {}),
       }, actor.id);
     }
     if (row.policyKey === 'eligibility.grade10OtherSeries') {
-      const students = row.studentId ? [row.studentId] : await holderStudentsOf(tx, row);
+      const students = holders;
       expired = await expireIneligibleRegistrations(tx, { studentIds: students, ...(row.sessionId ? { sessionIds: [row.sessionId] } : {}) }, 'exception_revoked', now);
     }
     if (row.policyKey === 'plan.instalments' && row.registrationId) {
@@ -393,7 +450,7 @@ export async function revokeException(id: string, actor: { id: string; role: str
       expired = await expireWaitingRegistrations(tx, eq(registration.id, row.registrationId), 'plan_revoked', now, opts.reason);
       await settlePlanInTx(tx, { lineId: row.registrationId, planId: row.id, cause: 'revoked', at: now, actorId: actor.id, detail: opts.reason ?? 'the plan was revoked', ctx });
     }
-    return { exception: updated!, expired };
+    return { exception: updated!, expired, repriced };
   });
 }
 

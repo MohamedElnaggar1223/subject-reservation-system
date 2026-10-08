@@ -126,7 +126,7 @@ describe('08r: the exceptions registry', () => {
     expect((await refused(finadmin.api.v1.exceptions[':id'].revoke.$post({ param: { id: gate.id } }))).status).toBe(404);
   });
 
-  it('a price exception on one unpaid line re-prices it (its basis records it); on a line with a payment it is refused', async () => {
+  it('a price exception on one unpaid line re-prices it (its basis records it), and back when it is revoked; on a line with a payment it is refused', async () => {
     const f = await onboard(officer, 'xr-line', 12);
     const [unpaid] = await deskUnpaid(f.studentId, [subj.S4!]);
     const [paid] = await deskPaid(f.studentId, [subj.S5!]);
@@ -136,6 +136,26 @@ describe('08r: the exceptions registry', () => {
       .toEqual({ p: 1300, c: 800, b: 500, ids: [ex.id] });
     await audited([unpaid!], ['LINE_REPRICED']);
     expect((await refused(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'price.discountFixed', studentId: f.studentId, scope: { registrationId: paid! }, value: 200, reason: 'too late' } }))).status).toBe(409);
+    // Revoked (granted in error): the unpaid line is priced without it again.
+    const back = await apiResponse(finadmin.api.v1.exceptions[':id'].revoke.$post({ param: { id: ex.id } }));
+    expect(back.repriced).toEqual({ from: 1300, to: 1500 });
+    expect(await one(`select price_at_registration::float as p, pricing_basis->'exceptionIds' as ids from registration where id = $1`, [unpaid!])).toEqual({ p: 1500, ids: [] });
+    await audited([unpaid!], ['LINE_REPRICED', 'LINE_REPRICED']);
+  });
+
+  it('a price exception on one charge prices it again at once, and back when it is revoked; a charge with a payment keeps its amount', async () => {
+    const f = await onboard(officer, 'xr-charge', 12);
+    const c = await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: f.studentId, kind: 'custom', amount: 250, reason: 'a replacement ID card' } }));
+    const ex = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'price.discountFixed', studentId: f.studentId, scope: { chargeId: c.id }, value: 50, reason: 'the first card was faulty' } }));
+    expect(ex.repriced).toEqual({ from: 250, to: 200 });
+    const amountOf = async () => money((await one<{ a: string }>(`select amount as a from charge where id = $1`, [c.id])).a);
+    expect(await amountOf()).toBe(200);
+    await audited([c.id], ['CHARGE_CREATED', 'CHARGE_REPRICED']);
+    expect((await apiResponse(finadmin.api.v1.exceptions[':id'].revoke.$post({ param: { id: ex.id } }))).repriced).toEqual({ from: 200, to: 250 });
+    expect(await amountOf()).toBe(250);
+    // Once a payment is open for it, its amount stays: a grant is refused.
+    await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { chargeIds: [c.id], paymentMethod: 'in_school' } }));
+    expect((await refused(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'price.discountFixed', studentId: f.studentId, scope: { chargeId: c.id }, value: 50, reason: 'too late' } }))).status).toBe(409);
   });
 
   it('deadline.payment moves one line\'s due date, and back when it is revoked', async () => {

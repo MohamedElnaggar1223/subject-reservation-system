@@ -56,7 +56,7 @@ export const exceptions = new Hono<HonoEnv>()
     // An optional reason ({ reason }) the plan's settlement records; V3's callers send no body.
     const body = RevokeException.safeParse(await c.req.json().catch(() => ({})));
     try {
-      const { exception, expired } = await exceptionService.revokeException(id, { id: user.id, role: user.role }, extractAuditContext(c), { reason: body.success ? body.data.reason : undefined });
+      const { exception, expired, repriced } = await exceptionService.revokeException(id, { id: user.id, role: user.role }, extractAuditContext(c), { reason: body.success ? body.data.reason : undefined });
       if (expired.length && exception.policyKey === 'eligibility.grade10OtherSeries') {
         await closePaymentsOfExpiredRegistrations(expired.map((r) => r.id), 'exception_revoked')
           .catch((err) => console.error('[exceptions] Closing checkouts after a revoke failed; the recovery sweep will retry:', err));
@@ -65,7 +65,7 @@ export const exceptions = new Hono<HonoEnv>()
         // The plan's open instalment payments, failed after the settlement committed (a payment is locked before a line).
         await failInstalmentPaymentsOfDeadPlans().catch((err) => console.error('[exceptions] Closing a revoked plan\'s payments failed; the deadline sweep will retry:', err));
       }
-      return success(c, { ...exception, registrationsExpired: expired.length });
+      return success(c, { ...exception, registrationsExpired: expired.length, repriced });
     } catch (err) {
       return error(c, clientMessage(err, 'Failed to revoke exception'), statusOf(err));
     }
