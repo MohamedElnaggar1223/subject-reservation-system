@@ -208,7 +208,8 @@ describe('08s: messages and reminders', () => {
       const all = await notificationsFor(fOwes.parent.email, 'PAYMENT_REMINDER');
       expect(all).toHaveLength(6);
       expect(all.at(-1)!.title).toBe(`Payment overdue — ${sessionAName} · دفعة متأخرة — ${sessionAName}`);
-      expect(all.at(-1)!.body).toContain(`EGP 1,500 for Student s08-owes-${RUN} (${subjAName}) was due on ${enDay(dueDay)} and is still unpaid.`);
+      expect(all.at(-1)!.body).toContain(`EGP 1,500 for Student s08-owes-${RUN} is overdue and still unpaid: ${subjAName} (overdue since ${enDay(dueDay)}).`);
+      expect(all.at(-1)!.body).toContain(`مبلغ 1,500 جنيه الخاص بـ Student s08-owes-${RUN} متأخر ولم يُسدَّد بعد: ${subjAName} (متأخر منذ ${arDay(dueDay)}).`);
       expect(await reminderCount(fPays.parent.email)).toBe(2);
       // Each send claimed under the rule for every session, each claim on its anchor day.
       expect((await claimsOf(lineOwes)).every((c) => c.kind === 'payment_due' && c.anchor_on === dueDay)).toBe(true);
@@ -815,7 +816,7 @@ describe('08s: messages and reminders', () => {
     await apiResponse(officer.api.v1.messages.$post({ json: { audience: { definition: part('due') }, templateId: TPL.paymentDue, channels: ['in_app'] } }));
     const [l] = await notificationsFor(late.parent.email, 'PAYMENT_REMINDER');
     const [o] = await notificationsFor(onTime.parent.email, 'PAYMENT_REMINDER');
-    expect(l!.body).toContain(`EGP 1,500 for Student s08-late-${RUN} (${subjAName}) was due on ${enDay(cairoDay(wasDue))} and is still unpaid.`);
+    expect(l!.body).toContain(`EGP 1,500 for Student s08-late-${RUN} is overdue and still unpaid: ${subjAName} (overdue since ${enDay(cairoDay(wasDue))}).`);
     expect(o!.body).toContain(`EGP 1,500 for Student s08-ontime-${RUN} (${subjAName}) is due on ${enDay(dueDay)}.`);
   });
 
@@ -884,8 +885,61 @@ describe('08s: messages and reminders', () => {
     await apiResponse(officer.api.v1.messages.$post({ json: { audience: { definition: part('due') }, templateId: TPL.paymentDue, channels: ['in_app'] } }));
     const [l] = await notificationsFor(past.parent.email, 'PAYMENT_REMINDER');
     const [o] = await notificationsFor(ahead.parent.email, 'PAYMENT_REMINDER');
-    expect(l!.body).toContain(`EGP 1,500 for Student s08-hpast-${RUN} (${subjAName}) was due on ${enDay(cairoDay(hourAgo))} and is still unpaid.`);
+    expect(l!.body).toContain(`EGP 1,500 for Student s08-hpast-${RUN} is overdue and still unpaid: ${subjAName} (overdue since ${enDay(cairoDay(hourAgo))}).`);
     expect(o!.body).toContain(`EGP 1,500 for Student s08-hahead-${RUN} (${subjAName}) is due on ${enDay(cairoDay(inAnHour))}.`);
+  });
+
+  // ─── The review of 9e7a4d6..9037be2: its two follow-ups ─────────────────────────
+
+  it("under the Money tab's Overdue filter Remind uses the tab's whole-day rule and lists exactly the families the tab lists; elsewhere the due instant (follow-up 1)", async () => {
+    const hour = await onboard(officer, `s08-tabh-${RUN}`, 12);
+    const day = await onboard(officer, `s08-tabd-${RUN}`, 12);
+    const hourLine = await reserveUnpaid(hour, itemA);
+    const dayLine = await reserveUnpaid(day, itemA);
+    // The arrangement, by hand as in item 8: one line due an hour ago, one a day and an hour ago.
+    await sql(`update registration set due_at = $1 where id = $2`, [new Date(Date.now() - 3_600_000).toISOString(), hourLine]);
+    await sql(`update registration set due_at = $1 where id = $2`, [new Date(Date.now() - 25 * 3_600_000).toISOString(), dayLine]);
+    const ours = new Set([hour.studentId, day.studentId]);
+    const resolved = async (filter: 'overdue' | 'overdue_days') => (await apiResponse(officer.api.v1.messages.audiences.resolve.$post({
+      json: { audience: { definition: { kind: 'batch', list: 'session_unpaid', sessionId: sessionA, include: 'both', filter, who: 'families' } } },
+    }))).students.map((x) => x.id).filter((id) => ours.has(id)).sort();
+    // The tab's Overdue filter lists the line a day late and not the one an hour late; so does Remind under it.
+    const tab = await apiResponse(officer.api.v1.sessions[':id'].money.$get({ param: { id: sessionA }, query: { filter: 'overdue' } }));
+    const listed = [...new Set(tab.lines.map((l) => l.student.id).filter((id) => ours.has(id)))].sort();
+    expect(listed).toEqual([day.studentId]);
+    expect(await resolved('overdue_days')).toEqual(listed);
+    // Under every other filter the overdue text applies from the due instant: both families.
+    expect(await resolved('overdue')).toEqual([hour.studentId, day.studentId].sort());
+  });
+
+  it('the overdue part names everything overdue, each item with its date, under one sum; what is not yet due keeps its first day (follow-up 2)', async () => {
+    const f = await onboard(officer, `s08-two-${RUN}`, 11);
+    const line = await reserveUnpaid(f, itemA);
+    const coat = await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: f.studentId, kind: 'custom', registrationId: line, amount: 200, description: 'A lab coat', dueAt: cairoAt(dueDay, 12), reason: 'the lab' } }));
+    await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: f.studentId, kind: 'custom', registrationId: line, amount: 300, description: 'A field trip', dueAt: cairoAt(shift(dueDay, 5), 12), reason: 'the trip' } }));
+    // Behind on two dates (set by hand, as in item 8): the line five days ago, the lab coat two days ago; the trip still ahead.
+    const today = cairoDay(new Date());
+    const fiveAgo = cairoAt(shift(today, -5), 12);
+    const twoAgo = cairoAt(shift(today, -2), 12);
+    await sql(`update registration set due_at = $1 where id = $2`, [fiveAgo.toISOString(), line]);
+    await sql(`update charge set due_at = $1 where id = $2`, [twoAgo.toISOString(), coat.id]);
+    const part = (filter: 'overdue' | 'due') => ({ kind: 'batch' as const, list: 'session_unpaid' as const, sessionId: sessionA, include: 'both' as const, filter, studentIds: [f.studentId], who: 'families' as const });
+    const overdue = await apiResponse(officer.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: part('overdue') } } }));
+    expect(overdue.students).toEqual([{ id: f.studentId, name: `Student s08-two-${RUN}`, amount: 1700, dueAt: fiveAgo.toISOString() }]);
+    // The school's overdue text (0055) names the items; the sum is not put under one date.
+    const texts = await apiResponse(officer.api.v1.messages.templates.$get());
+    expect(texts.find((t) => t.key === 'payment_overdue')!.bodyEn).toBe("Dear {guardian}, {amount} for {student} is overdue and still unpaid: {items}. Please pay in the app or at the school's finance desk.");
+    await apiResponse(officer.api.v1.messages.$post({ json: { audience: { definition: part('overdue') }, templateId: TPL.paymentOverdue, channels: ['in_app'] } }));
+    await apiResponse(officer.api.v1.messages.$post({ json: { audience: { definition: part('due') }, templateId: TPL.paymentDue, channels: ['in_app'] } }));
+    const [late, ahead] = await notificationsFor(f.parent.email, 'PAYMENT_REMINDER');
+    expect(late!.body).toBe([
+      `Dear Parent s08-two-${RUN}, EGP 1,700 for Student s08-two-${RUN} is overdue and still unpaid: ${subjAName} (overdue since ${enDay(shift(today, -5))}) and A lab coat (overdue since ${enDay(shift(today, -2))}). Please pay in the app or at the school's finance desk.`,
+      `عزيزي ولي الأمر Parent s08-two-${RUN}، مبلغ 1,700 جنيه الخاص بـ Student s08-two-${RUN} متأخر ولم يُسدَّد بعد: ${subjAName} (متأخر منذ ${arDay(shift(today, -5))}) وA lab coat (متأخر منذ ${arDay(shift(today, -2))}). يرجى الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.`,
+    ].join('\n\n'));
+    expect(ahead!.body).toBe([
+      `Dear Parent s08-two-${RUN}, EGP 300 for Student s08-two-${RUN} (A field trip) is due on ${enDay(shift(dueDay, 5))}. You can pay in the app or at the school's finance desk.`,
+      `عزيزي ولي الأمر Parent s08-two-${RUN}، مبلغ 300 جنيه الخاص بـ Student s08-two-${RUN} (A field trip) مستحق في ${arDay(shift(dueDay, 5))}. يمكنكم الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.`,
+    ].join('\n\n'));
   });
 
   it("every label and text of the Reminders settings has its Arabic, keyed to today's English (item 2)", () => {
