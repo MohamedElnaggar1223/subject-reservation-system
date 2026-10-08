@@ -21,9 +21,11 @@ Migrations after C's 0049 (main's last): `0050_rework_messages_structure` (gener
 review of 5c2f2bf `0052_rework_messages_claim_day` (generated: `reminder_sent.sent_on`, nullable,
 and its unique index), `0053_rework_messages_claim_day_backfill` (custom, idempotent: the day from
 the reminder message's `context.dueAt`, else `sent_at`, in Cairo) and
-`0054_rework_messages_claim_day_required` (generated: NOT NULL). Each journal `when` is later than
-the one before it (0049's 1791437760565 → 1791444538626, 1791444609348, 1791453573346,
-1791453585318, 1791453628209). Nothing is dropped: `scheduled_announcement` stays one release (§7
+`0054_rework_messages_claim_day_required` (generated: NOT NULL), and after the follow-ups of
+9e7a4d6..9037be2 `0055_rework_messages_overdue_text` (custom: the seeded overdue text names each
+item with its date; changed only where the school has not rewritten it, so a second run changes
+nothing). Each journal `when` is later than the one before it (0049's 1791437760565 →
+1791444538626, 1791444609348, 1791453573346, 1791453585318, 1791453628209, 1791464695610). Nothing is dropped: `scheduled_announcement` stays one release (§7
 step 3), its rows moved to messages.
 
 | Table | What it holds | Rules the database keeps |
@@ -156,13 +158,20 @@ Resolved when the message is sent (a grade is today's; the unpaid are those owin
   day, Cairo): `{amount}` the sum of those items, `{items}` their names, `{due}` that day. What falls
   due later is not in that message: the step reminds it on its own days, and a second "Remind" after
   the first is paid names it (the review of 9e7a4d6, item 1: a plan's two instalments of 750 read
-  "EGP 1,500 … is due on" the first one's date). Any other list is per person: a parent hears once,
-  `{student}` naming their children in the list.
+  "EGP 1,500 … is due on" the first one's date). **What is overdue** (the session's unpaid list with
+  an overdue filter: Remind's overdue part) is named in full instead — all of it is owed now:
+  `{amount}` the sum, `{items}` each item with its own date ("Biology (overdue since 4 October 2026)
+  and A lab coat (overdue since 6 October 2026)"), `{due}` the earliest; the school's overdue text
+  reads "{amount} for {student} is overdue and still unpaid: {items}." (0055 changed the seeded text
+  where the school had not rewritten it), and the step's reminders after the date name their items
+  the same way (the review of 9e7a4d6..9037be2, follow-up 2). Any other list is per person: a parent
+  hears once, `{student}` naming their children in the list.
 - **Overdue** (the session's unpaid list's `filter`, and so Remind's two texts) is past the **due
-  instant**: an hour after it, the overdue text ("was due on … and is still unpaid"); an hour before
-  it, the due text. The Money tab keeps its own count, whole days ("1 day overdue" from 24 hours
-  after the instant), for its badge and its Overdue filter; under that filter the dialog also lists a
-  line due within the last day, marked overdue (the review of 9e7a4d6, item 5).
+  instant**: an hour after it, the overdue text; an hour before it, the due text (the review of
+  9e7a4d6, item 5). The Money tab counts whole days ("1 day overdue" from 24 hours after the
+  instant) for its badge and its Overdue filter, and **under that filter** Remind uses the tab's rule
+  (`filter: 'overdue_days'`, a line carrying the tab's own count, a charge the same count): the
+  dialog lists exactly the families the tab lists (follow-up 1).
 - **Variables**: `{guardian}` (a parent recipient's name; for a student's copy, the parents'),
   `{student}`, `{session}` and `{closes}` (the list's session, or the one the composer names),
   `{amount}`, `{due}`, `{items}` (money lists), `{series}`, `{count}` (staff reminders). A text
@@ -268,7 +277,9 @@ Every minute, each part logging its own failure and the next part still running:
   past its deadline) and plan lines are not in it; a plan's instalments are. The dialog records
   which part went: when the second fails, the ticks and the email choice are frozen, it says
   "Already sent to N people. Sending again sends only the rest.", and "Send the rest" sends only
-  that part; a part refused because nobody is in it now (they paid meanwhile) is done.
+  that part; a part refused because nobody is in it now (they paid meanwhile) is done. Each family
+  shows what it owes overdue "since" the earliest date and what is due next; under the tab's Overdue
+  filter only the overdue part, by the tab's whole-day rule.
 - **Settings**: a Reminders group (on/off, the hour, Cairo time), in English and Arabic.
 - **The families' notifications**: unchanged, but a message in two languages reads as two
   paragraphs, each in its own direction. There is no delete anywhere.
@@ -335,6 +346,13 @@ amount and the date filled in.
   overdue text, one due in an hour the due text, the tab's count 0 for both; every label and text of
   the Reminders settings has its Arabic key. The retry of Remind is driven in the browser
   (`screens/drive-d4.mjs`): the second POST failed once, the retry sends the second part only.
+- **08s, the follow-ups of 9e7a4d6..9037be2**: under the tab's Overdue filter Remind lists the family
+  whose line is a day and an hour late and not the one an hour late, exactly as the tab lists them,
+  while the instant rule lists both; a family behind on two dates (a line five days ago, a charge two
+  days ago, another charge ahead) gets "EGP 1,700 for Student … is overdue and still unpaid: Biology …
+  (overdue since <five days ago>) and A lab coat (overdue since <two days ago>)" and the due text for
+  the charge ahead, each body whole in both languages; the step's overdue reminder at +9 names its
+  item with its date.
 - **05**: B's parent and student cannot mark or list A's copies of a message, reach its deliveries,
   the log, an audience naming A's student, or send; finance cannot read a direct message's
   deliveries or send one.
@@ -357,7 +375,9 @@ amount and the date filled in.
   fails both item-1 cases), the due instant (whole days fails the boundary), the Arabic keys (the old
   English fails the Arabic test) — twenty-seven; and one in the browser: the dialog's "skip a part
   that went" undone, the same drive POSTs the overdue part twice and Parent D7 gets two reminders
-  (`screens/control-remind-retry.out`).
+  (`screens/control-remind-retry.out`). After the follow-ups: the tab's rule under its filter (the
+  instant rule fails follow-up 1), everything overdue (the first day's rule fails follow-up 2), each
+  overdue item's date (the names alone fail it) — thirty.
 - **The migration** (`migration/`): two copies (the template's and F0a's richer copy), each
   migrated with main's migrations and then seeded **through main's own API, before step D's code**
   (placeholder families; announcements sent at once, scheduled and sent by main's tick, pending,
@@ -434,14 +454,19 @@ amount and the date filled in.
     log, rather than one text that is wrong for half the lines.
 21. **Arabic counts agree with their number** (1, 2, 3–10, 11–99, hundreds): a count and its noun are
     one text on the screens, so the translator sees them together.
-22. **A money list names the first day's items** (the review of 9e7a4d6, item 1): per student, what
-    falls due on the first Cairo day it owes anything, their sum and that day — not every item with
-    its own date. The school's sentence "{amount} … is due on {due}" stays literally true in both
-    languages with no new variable or text; it is what the step does (each target on its own days);
-    and the family reads one sum under the date it belongs to. The cost: a family behind on two
-    dates hears the first; the step and the next "Remind" name the second.
-23. **Overdue from the due instant** (item 5): the texts follow whether the date has passed, the tab's
-    badge how late it is; the two are allowed to differ for the first 24 hours.
+22. **A money list names the first day's items; what is overdue, all of it** (the review of 9e7a4d6,
+    item 1, amended by its follow-up 2): per student, what falls due on the first Cairo day it owes
+    anything, their sum and that day — so "{amount} … is due on {due}" stays literally true and the
+    family reads one sum under the date it belongs to; what falls due later is reminded on its own
+    days. What is already overdue is different: all of it is owed now, so the overdue part names
+    every overdue item, each with its own date ("… (overdue since 4 October 2026)"), under one sum,
+    and the school's overdue text says "is overdue and still unpaid: {items}" rather than putting the
+    sum under one date. A family behind on two dates hears of both, even while the automatic
+    reminders are off.
+23. **Overdue from the due instant, except under the tab's own filter** (item 5, follow-up 1): the
+    texts follow whether the date has passed; the tab's badge and its Overdue filter count whole
+    days. Remind under that filter uses the tab's rule, so what the officer filtered is what the
+    dialog lists; under any other filter a line due within the last day is in the overdue part.
 24. **Remind records what went** (item 4): the two parts are two messages; a retry sends only the
     part that did not go, and a part refused as empty (`NOTHING_TO_SEND`, one constant for the API
     and the dialog) is done. A family is never sent the same part twice from one dialog.
@@ -461,6 +486,9 @@ amount and the date filled in.
 - **F1's teaching groups** — read from the enrolments until F1's table lands.
 - **The walkthrough (F8)** — still shows the old `/admin/notifications` page until it is regenerated.
 - **`scheduled_announcement`** — kept one release (§7 step 3), then dropped by a later migration.
+- **An idempotency key on `POST /v1/messages`** (deferred by the lead after the review of
+  9e7a4d6..9037be2): a retry from the Remind dialog sends only what did not go; a request the API
+  committed but whose answer was lost is not recognised as a repeat yet.
 - **The Arabic pages' hydration warning** — every Arabic page logs it (C's "For the lead" item 6:
   the language provider reads `localStorage` in its first render); not this step's.
 
@@ -512,3 +540,8 @@ amount and the date filled in.
   §6; Remind records the parts that went and sends only the rest (driven with the second POST
   failed once, in English and Arabic; the Arabic dual after "to" made genitive on the way); overdue
   from the due instant. Three more controls red and one in the browser, restored.
+- 12:57–13:20 — "confirmed: merge"; step 3 on main (c2d7a78). Main merged back as its own commit
+  6a9a697 (no conflict). The two follow-ups: Remind under the tab's Overdue filter by the tab's
+  whole-day rule (`overdue_days`); the overdue part naming everything overdue, each item with its
+  date (0055 for the school's text; decision 22 amended). Three controls red, restored; driven in
+  both languages. The idempotency key on `POST /v1/messages` deferred (§5).

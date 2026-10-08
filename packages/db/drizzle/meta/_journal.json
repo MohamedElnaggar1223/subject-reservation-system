@@ -386,6 +386,13 @@
       "when": 1791453628209,
       "tag": "0054_rework_messages_claim_day_required",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1791464695610,
+      "tag": "0055_rework_messages_overdue_text",
+      "breakpoints": true
     }
   ]
 }

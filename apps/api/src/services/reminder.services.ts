@@ -329,7 +329,8 @@ async function sendGroup(kind: ReminderKind, items: Due[], now: Date, payOnProvi
         .returning({ targetKind: reminderSent.targetKind, targetId: reminderSent.targetId });
       if (!claims.length) throw new NothingClaimed();
       const won = live.filter((l) => claims.some((c) => c.targetKind === l.item.targetKind && c.targetId === l.item.targetId));
-      const targets = await targetsOf(tx, kind, won);
+      // After the date a payment is reminded with the overdue text, which names each item with its date.
+      const targets = await targetsOf(tx, kind, won, kind === 'payment_due' && !!rule.overdueTemplateId && rule.overdueTemplateId !== rule.templateId && templateId === rule.overdueTemplateId);
       const d = await deliverInTx(tx, msg, texts, { session: null }, targets, now);
       await tx.update(message).set({ recipientCount: d.people }).where(eq(message.id, messageId));
       await tx.update(messageAudience).set({ resolvedCount: d.people, resolvedAt: new Date() }).where(eq(messageAudience.id, audienceId));
@@ -346,15 +347,16 @@ async function sendGroup(kind: ReminderKind, items: Due[], now: Date, payOnProvi
 }
 
 /** Who each claimed reminder goes to, with the values its text needs. */
-async function targetsOf(tx: Tx, kind: ReminderKind, won: Live[]): Promise<DeliveryTarget[]> {
+async function targetsOf(tx: Tx, kind: ReminderKind, won: Live[], overdueText = false): Promise<DeliveryTarget[]> {
   if (kind === 'payment_due' || kind === 'school_fee_due') {
     const owed = new Map<string, Owed | null>();
-    for (const l of won) {
+    for (const l of [...won].sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime())) {
       const sid = l.item.studentId!;
-      const o = owed.get(sid) ?? { amount: 0, dueAt: l.dueAt, items: [], sessionId: l.item.sessionId, sessionName: l.sessionName, lineIds: [], chargeIds: [] };
+      const o = owed.get(sid) ?? { amount: 0, dueAt: l.dueAt, items: [], sessionId: l.item.sessionId, sessionName: l.sessionName, lineIds: [], chargeIds: [], ...(overdueText ? { overdue: [] } : {}) };
       o.amount = Math.round((o.amount + l.amount) * 100) / 100;
       if (l.dueAt < o.dueAt) o.dueAt = l.dueAt;
       if (!o.items.includes(l.label)) o.items.push(l.label);
+      o.overdue?.push({ item: l.label, since: l.dueAt });
       if (!o.sessionName && l.sessionName) o.sessionName = l.sessionName;
       owed.set(sid, o);
     }
