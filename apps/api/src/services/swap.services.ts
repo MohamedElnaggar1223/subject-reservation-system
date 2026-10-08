@@ -38,6 +38,9 @@
 
 import {
   db,
+  registration,
+  registrationSession,
+  boardSeries,
   changeRequest,
   registrationConsent,
   eq,
@@ -170,6 +173,21 @@ function round2(n: number): number {
  * - Subject is NOT a core subject in Grade 10 June sessions (SWAP-005)
  * - No existing pending_approval change request for this registration
  */
+/**
+ * A family's change of a line (a drop or a swap, asked or approved) only before the line's own
+ * effective deadline (§3.3): past it the entry is with the board. Every path that calls this is a
+ * family's; the desk's drop past the deadline (the receipt gate, the "sent" refund) is step B/C's.
+ */
+async function assertBeforeLineDeadline(
+  executor: Parameters<typeof effectiveDeadlineFor>[0],
+  line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null },
+) {
+  const deadline = await effectiveDeadlineFor(executor, line);
+  if (deadline.at && deadline.at <= new Date()) {
+    throw new Error(`The entry is with the board (its deadline, ${schoolDate(deadline.at)}, has passed): ask the finance desk to drop it`);
+  }
+}
+
 async function validateChangeEligibility(
   registrationId: string,
   studentId: string,
@@ -213,12 +231,7 @@ async function validateChangeEligibility(
   }
   // The cut-off is per line (§3.3): past the line's own deadline the entry is with the board,
   // and only the desk can drop it.
-  const deadline = await effectiveDeadlineFor(db, reg);
-  if (deadline.at && deadline.at <= new Date()) {
-    // Every path here is a family's (a student's request, a parent's own drop or swap): it is sent
-    // to the desk, whose drop past the deadline (the receipt gate, the "sent" refund) is step B/C's.
-    throw new Error(`The entry is with the board (its deadline, ${schoolDate(deadline.at)}, has passed): ask the finance desk to drop it`);
-  }
+  await assertBeforeLineDeadline(db, reg);
 
   // The student's grade in the series' academic year, for the core lock
   // (F0a, A-05): not today's grade.
@@ -481,10 +494,19 @@ export async function approveChangeRequest(
   const pct = await refundPercentage(now, cr.registration.sessionId, cr.registration.studentId);
   const refundAmount = round2((cr.registration.priceAtRegistration * pct) / 100);
 
+  // A request asked before the line's deadline is approved only before it too (the review of
+  // 977848d, flag 1): past it the entry is with the board.
+  await assertBeforeLineDeadline(db, cr.registration);
+
   const result = await db.transaction(async (tx) => {
     // A swap registers a new subject: asked again with the student and window
     // held, before anything else is locked (F0a; see assertMayRegisterForInTx).
     if (cr.type === 'swap') await assertMayRegisterForInTx(tx, cr.registration.studentId, cr.registration.sessionId);
+    // Asked again under the line's lock, with its series held: a deadline moved at the same moment waits.
+    const [held] = await tx.select({ boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId })
+      .from(registration).where(eq(registration.id, cr.registrationId)).for('update');
+    if (held?.boardSeriesId) await tx.select({ id: boardSeries.id }).from(boardSeries).where(eq(boardSeries.id, held.boardSeriesId)).for('share');
+    if (held) await assertBeforeLineDeadline(tx, held);
 
     // Status guard: prevent concurrent double-approval
     const [updatedCR] = await tx

@@ -247,6 +247,8 @@ describe('08p: pricing policies', () => {
     expect(await priceOf(lDisc)).toMatchObject({ course: 900, board: 8550, price: 9450, provisional: false });
     for (const l of [lOpen, lFailed, lPaid]) expect(await priceOf(l)).toMatchObject({ price: 10000, board: 9000 });
     await audited([lPlain], ['LINE_REPRICED']);
+    // A listed line kept its price and lost its provisional mark, recorded per line.
+    for (const l of [lOpen, lFailed, lPaid]) await audited([l], ['LINE_PRICE_KEPT']);
     await audited([s], ['BOARD_FEES_CONFIRMED', 'BOARD_FEES_REPRICED']);
     // The family is told the old and the new price.
     const email = (await one<{ email: string }>(`select email from "user" where id = $1`, [plain.studentId])).email;

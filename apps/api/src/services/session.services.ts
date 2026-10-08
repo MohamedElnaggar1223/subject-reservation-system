@@ -33,6 +33,9 @@ import { schoolDate } from './window.services';
 import { getSetting } from './settings.services';
 import { dueDateFor, redateLines } from './deadline.services';
 import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
+import { carryFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
+import { recheckLines, LineRuleError } from './line-rules.services';
+import { PricingError } from './pricing.services';
 
 /**
  * Determine the correct initial status when creating a session.
@@ -388,7 +391,7 @@ export async function getSessionDetail(id: string) {
  */
 export async function correctSessionSeries(id: string, data: CorrectSessionSeriesType, adminId: string, auditCtx?: AuditContext) {
   try {
-    return await withStudentsFirst((extra) => db.transaction(async (tx) => {
+    const out = await withStudentsFirst((extra) => db.transaction(async (tx) => {
       // The students with live lines first (§6: every path that puts a line into a series), then the session.
       const students = await tx.selectDistinct({ id: registration.studentId }).from(registration)
         .where(and(eq(registration.sessionId, id), notInArray(registration.status, ['rejected', 'expired', 'dropped'])));
@@ -462,10 +465,23 @@ export async function correctSessionSeries(id: string, data: CorrectSessionSerie
         userId: adminId, action: 'LINE_SERIES_MOVED' as const, entityType: 'registration' as const, entityId: l.id,
         previousData: { boardSeriesId: l.boardSeriesId }, newData: { boardSeriesId: plan.find((p) => p.itemId === l.offerItemId)?.to ?? null, reason: data.reason },
       })), tx);
+      // What the lines cost in the corrected series: its fee rows (carried provisional from the
+      // series they came from where finance has none), each student's lines checked again there.
+      let repriced: RepricedLine[] = [];
+      try {
+        for (const [n, p] of plan.entries()) if (p.to) await carryFeeRows(tx, p.itemId, items[n]!.seriesId, adminId, 'The session\'s series was corrected');
+        await recheckLines(tx, live.map((l) => l.id));
+        repriced = await repriceMovedLines(tx, live.map((l) => l.id), adminId, 'the session\'s series was corrected');
+      } catch (err) {
+        if (err instanceof LineRuleError || err instanceof PricingError) throw new SessionError(err.message, 409);
+        throw err;
+      }
       await redateLines(tx, live.map((l) => l.id), adminId, 'the session\'s series was corrected');
       const expired = await expireIneligibleRegistrations(tx, { sessionIds: [id] }, 'series_corrected');
-      return { session: updated!, expired };
+      return { session: updated!, expired, repriced };
     }));
+    await tellPriceChanged(out.repriced, "The session's exam series was corrected, and with it the board fee");
+    return { session: out.session, expired: out.expired };
   } catch (err) {
     if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') {
       throw new Error(`Another ${deriveSessionName(data.sessionType, data.seriesYear)} session is already open — close it first`);
@@ -888,8 +904,8 @@ export async function autoManageSessions(): Promise<{
 }> {
   const now = new Date();
 
-  // Close expired active sessions — return sessionType so the scheduler can
-  // call progressGrades() for each unique sessionType that just closed.
+  // Close expired active sessions (no grade moves at a close since F0a: a grade is derived from
+  // the cohort and the series' academic year).
   const closedResult = await db
     .update(registrationSession)
     .set({ status: 'closed', closedAt: sql`now()`, updatedAt: now })
@@ -901,13 +917,12 @@ export async function autoManageSessions(): Promise<{
     )
     .returning({ id: registrationSession.id, name: registrationSession.name, sessionType: registrationSession.sessionType });
 
-  // Activate draft sessions whose startDate has arrived — never one whose
-  // window has already ended: opening it would close it on the next tick,
-  // after capturing paid preregistrations' held money, possibly for entries
-  // the board no longer takes (the database keeps the board's deadline after
-  // the window's end, so a draft past its deadline is past its end too;
-  // review of fc1a101, flag 4; MO-21).
-  // We do this one at a time to respect the unique constraint per sessionType
+  // Activate draft sessions whose startDate has arrived — never one whose reserving has already
+  // ended: opening it would close it on the next tick. A session whose series' deadline has passed
+  // still opens (the reservations rework, §3.3: the cut-off is per item): capture asks each
+  // preregistration its own deadline first, so nothing is captured for an entry the board no
+  // longer takes (MO-21: a paid one is refunded in full, an unfunded one expires).
+  // One at a time, for the one-active-session rule per (type, year, label).
   const draftsDue = await db.query.registrationSession.findMany({
     where: (s, { eq, lte, gt, and }) =>
       and(eq(s.status, 'draft'), lte(s.startDate, now), gt(s.endDate, now)),

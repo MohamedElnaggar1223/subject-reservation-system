@@ -201,10 +201,11 @@ describe('F0b: races', () => {
     // Both entered with Pearson: B waited for the change and was routed by the new board.
     expect(await sql(`select id, board_series_id from registration where id in ($1, $2) order by id`, [aReg, bReg]))
       .toEqual([aReg, bReg].sort().map((id) => ({ id, board_series_id: pea })));
-    // The reservations rework: A keeps the price it was given; B is priced with the fee the change
-    // carried into Pearson's series (the old board's amount, provisional until finance confirms it).
+    // The reservations rework: both read Pearson's grid now — the fee the change carried into
+    // Pearson's series (the old board's amount, provisional until finance confirms it). A, unpaid,
+    // was re-priced from it when it moved (the review of 977848d, flag 2); B was priced from it.
     expect(await sql(`select id, price_at_registration::float as price, price_provisional as provisional from registration where id in ($1, $2) order by id`, [aReg, bReg]))
-      .toEqual([{ id: aReg, price: 1200, provisional: false }, { id: bReg, price: 1200, provisional: true }].sort((x, y) => x.id.localeCompare(y.id)));
+      .toEqual([{ id: aReg, price: 1200, provisional: true }, { id: bReg, price: 1200, provisional: true }].sort((x, y) => x.id.localeCompare(y.id)));
   });
 
   it("two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix", async () => {
