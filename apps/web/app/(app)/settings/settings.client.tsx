@@ -50,7 +50,7 @@ function describeValue(s: Setting, value: unknown): string {
     return [...(value as number[])].sort((a, b) => a - b).map((d) => WEEKDAY_LABELS[d] ?? String(d)).join(', ');
   }
   // A number with its unit (F4's months, candidates and days before; D's hour; the rework's percent and days).
-  if (s.input === 'number' && typeof value === 'number') return s.unit === 'percent' ? `${value}%` : s.unit === 'days' ? `${value} ${value === 1 ? 'day' : 'days'}` : s.unit === 'hour' ? `${String(value).padStart(2, '0')}:00` : `${value}${s.unit ? ` ${s.unit}` : ''}`;
+  if (s.input === 'number' && typeof value === 'number') return s.unit === 'percent' ? `${value}%` : s.unit === 'days' ? `${value} ${value === 1 ? 'day' : 'days'}` : s.unit === 'hour' ? `${String(value).padStart(2, '0')}:00 Cairo time` : `${value}${s.unit ? ` ${s.unit}` : ''}`;
   if (s.input === 'refundPolicy') {
     const p = RefundPolicySchema.safeParse(value);
     return p.success ? refundPolicySentence(p.data) : JSON.stringify(value);
