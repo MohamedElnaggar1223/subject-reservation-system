@@ -26,6 +26,10 @@ import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLo
  *   so nothing deadlocks;
  * - a paste of the fee list out of id order against a line being priced on two of its rows: the
  *   put takes the rows it names in one statement in id order, so the line waits for it (no deadlock);
+ * - a swap (approved, or the parent's own) while the fee row its new line reads — and the old
+ *   line too — is confirmed, both orders: the swap takes the new line's series, items, fee grid and
+ *   fee rows before the old line's receipt and the line, so the Confirm (rows, then lines) and the
+ *   swap never wait on each other (the review of B);
  * - a fee row that exists nowhere when a move begins, created and confirmed by finance around it,
  *   both orders: the move holds the target series' fee grid (shared) and finance's create and
  *   Confirm take it exclusive, so the two never overlap and no moved line is left provisional on a
@@ -769,6 +773,107 @@ describe('08t: the rework races', () => {
     // The line, priced after the put, read the new amounts.
     const [line] = await live(f.studentId);
     expect(await one(`select price_at_registration::float as price from registration where id = $1`, [line!.id])).toEqual({ price: 1520 });
+  });
+
+  describe("a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line", () => {
+    /** The old line is paid on the qualification's row; the subject it swaps to reads the same row. */
+    const setUp = async (tag: string) => {
+      const q = (await apiResponse(adm.api.v1.catalogue.qualifications.$post({
+        json: { boardCode: 'cambridge', code: `T08W${tag}-${RUN}`, title: `Race swap award ${tag} (08t ${RUN})`, level: 'igcse', suite: 'Cambridge IGCSE', subjectArea: 'Test', entryMethod: 'qualification' },
+      })))!.id;
+      const s = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `t08-sw${tag}-${RUN}`, entryDeadline: new Date(Date.now() + days(50)) } })))!.id;
+      await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId: s }, json: { rows: [{ keyKind: 'qualification', keyId: q, amount: 500, provisional: false }] } }));
+      const item = async (code: string, name: string) => {
+        const sub = await subject(adm, `${code}-${RUN}`, `${name} (08t ${RUN})`, { course: 1000, registration: 500 });
+        return (await offerOf(s1, sub, [whole(s, { feeKeys: [{ kind: 'qualification', id: q }] })])).items[0]!;
+      };
+      const from = await item(`RWT-WF${tag}`, `Race swap from ${tag}`);
+      const to = await item(`RWT-WT${tag}`, `Race swap to ${tag}`);
+      const f = await onboard(officer, `t08-sw${tag}-${RUN}`, 11);
+      const [line] = await reserveAtDesk(f.studentId, s1, [{ offerItemId: from, attempt: 'first', mode: 'in_school', teacherId }]);
+      const p = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } })))!.id!;
+      await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: p }, json: { instrumentUsed: 'cash' } }));
+      const feeId = (await one<{ id: string }>(`select id from board_fee where board_series_id = $1`, [s])).id;
+      const newLine = { offerItemId: to, attempt: 'first' as const, mode: 'in_school' as const, teacherId };
+      return {
+        line: line!.id, to, feeId, studentId: f.studentId,
+        request: async () => (await apiResponse(f.student.api.v1.registrations[':id']['request-swap'].$post({ param: { id: line!.id }, json: { line: newLine, reason: 'race: the other subject' } })))!.id,
+        approve: (cr: string) => f.parent.api.v1['change-requests'][':id'].approve.$put({ param: { id: cr }, json: {} }),
+        direct: () => f.parent.api.v1.registrations[':id'].swap.$post({ param: { id: line!.id }, json: { line: newLine, reason: 'race: the other subject' } }),
+        // The board's fee published again at the same amount: Confirm holds the row, then the lines read from it.
+        confirm: () => finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: s }, json: { rows: [{ feeId }], reason: 'race: published again' } }),
+      };
+    };
+    const outcome = async (r: Res) => [r.status, r.status >= 300 ? (await r.json() as { error: string }).error : null];
+    const swapped = async (s: { line: string; to: string; studentId: string }) => ({
+      old: (await one<{ s: string }>(`select status as s from registration where id = $1`, [s.line])).s,
+      fresh: await sql(`select status, price_at_registration::float as price, price_provisional as provisional from registration where student_id = $1 and offer_item_id = $2`, [s.studentId, s.to]),
+    });
+
+    it("the Confirm takes the row first: the approval waits for its fee grid before the old line; both land", async () => {
+      const s = await setUp('a');
+      const cr = await s.request();
+      const release = await holdRowLock('board_fee', s.feeId);
+      let confirming: Promise<Res> | undefined;
+      let approving: Promise<Res> | undefined;
+      try {
+        // The Confirm holds the grid and queues on the row (held).
+        confirming = s.confirm();
+        await lockWaiters(1);
+        // The approval: before the fix it took the old line and queued on the row behind the
+        // Confirm, which then wanted the old line — a deadlock. Now it waits for the grid first.
+        approving = s.approve(cr);
+        await lockWaiters(2);
+      } finally {
+        await release();
+      }
+      const [c, a] = await Promise.all([confirming!, approving!]);
+      expect(await outcome(a)).toEqual([200, null]);
+      expect(await outcome(c)).toEqual([200, null]);
+      expect(await swapped(s)).toEqual({ old: 'dropped', fresh: [{ status: 'pending_payment', price: 1500, provisional: false }] });
+    });
+
+    it('the approval takes its new line\'s row first: the Confirm waits for the swap; both land', async () => {
+      const s = await setUp('b');
+      const cr = await s.request();
+      // The old line held: the approval (its new line's grid and row already taken) queues on it.
+      const release = await holdRowLock('registration', s.line);
+      let approving: Promise<Res> | undefined;
+      let confirming: Promise<Res> | undefined;
+      try {
+        approving = s.approve(cr);
+        await lockWaiters(1);
+        // The Confirm: before the fix it took the row and queued on the old line behind the
+        // approval, which then wanted the row — a deadlock. Now it waits for the grid.
+        confirming = s.confirm();
+        await lockWaiters(2);
+      } finally {
+        await release();
+      }
+      const [a, c] = await Promise.all([approving!, confirming!]);
+      expect(await outcome(a)).toEqual([200, null]);
+      expect(await outcome(c)).toEqual([200, null]);
+      expect(await swapped(s)).toEqual({ old: 'dropped', fresh: [{ status: 'pending_payment', price: 1500, provisional: false }] });
+    });
+
+    it("the parent's own swap, the Confirm first: the same order, both land", async () => {
+      const s = await setUp('c');
+      const release = await holdRowLock('board_fee', s.feeId);
+      let confirming: Promise<Res> | undefined;
+      let swapping: Promise<Res> | undefined;
+      try {
+        confirming = s.confirm();
+        await lockWaiters(1);
+        swapping = s.direct();
+        await lockWaiters(2);
+      } finally {
+        await release();
+      }
+      const [c, w] = await Promise.all([confirming!, swapping!]);
+      expect(await outcome(w)).toEqual([200, null]);
+      expect(await outcome(c)).toEqual([200, null]);
+      expect(await swapped(s)).toEqual({ old: 'dropped', fresh: [{ status: 'pending_payment', price: 1500, provisional: false }] });
+    });
   });
 
   describe("a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid)", () => {

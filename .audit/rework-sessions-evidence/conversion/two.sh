@@ -2,8 +2,8 @@
 set -u
 EV=/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/.audit/rework-sessions-evidence/conversion
 BR=/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions
-URL=postgresql://audit:auditpass@127.0.0.1:5433/igcse_rwa_conv_two
-export PGPASSWORD=auditpass
+URL=postgresql://audit:${PGPASSWORD}@127.0.0.1:5433/igcse_rwa_conv_two
+: "${PGPASSWORD:?set PGPASSWORD: the local test container password}"; export PGPASSWORD
 cd /tmp/rwa/main-src/apps/api
 env DATABASE_URL=$URL BETTER_AUTH_SECRET=conversion-proof-secret-at-least-32-chars NODE_ENV=test npx tsx /tmp/rwa/conv/probe.mts /tmp/rwa/main-src/apps/api $EV/igcse_rwa_conv_two-before.json 2>&1 | grep probe
 cd $BR/packages/db

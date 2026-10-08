@@ -7,8 +7,8 @@ SRC=$1; COPY=$2
 EV=/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/.audit/rework-sessions-evidence/conversion
 BR=/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions
 mkdir -p $EV
-export PGPASSWORD=auditpass
-URL=postgresql://audit:auditpass@127.0.0.1:5433/$COPY
+: "${PGPASSWORD:?set PGPASSWORD: the local test container password}"; export PGPASSWORD
+URL=postgresql://audit:${PGPASSWORD}@127.0.0.1:5433/$COPY
 for i in $(seq 1 30); do
   out=$(psql -h 127.0.0.1 -p 5433 -U audit -d postgres -c "CREATE DATABASE $COPY TEMPLATE $SRC" 2>&1)
   if echo "$out" | grep -q "CREATE DATABASE"; then echo "copied $SRC -> $COPY"; break; fi

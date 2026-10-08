@@ -57,7 +57,7 @@ export async function lockFeeRows(tx: Tx, wanted: { seriesId: string; keyKind: s
 export async function lockMoveFeeRows(
   tx: Tx, moves: { itemId: string; fromSeriesId: string | null; toSeriesId: string | null }[], actorId: string | null, why: string,
 ) {
-  await lockFeeGrids(tx, moves.map((m) => m.toSeriesId), 'move');
+  await lockFeeGrids(tx, moves.map((m) => m.toSeriesId), 'shared');
   for (const m of moves) await carryFeeRows(tx, m.itemId, m.fromSeriesId, m.toSeriesId, actorId, why);
   const itemIds = [...new Set(moves.filter((m) => m.toSeriesId).map((m) => m.itemId))];
   if (!itemIds.length) return [];
