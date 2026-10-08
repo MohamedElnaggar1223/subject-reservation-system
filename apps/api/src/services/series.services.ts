@@ -456,6 +456,7 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
       const regs = await tx
         .select({ id: registration.id, sessionId: registration.sessionId, status: registration.status, boardSeriesId: registration.boardSeriesId,
           offerItemId: registration.offerItemId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId,
+          declarationRejected: registration.declarationRejected,
           council: subject.council, subjectName: subject.name })
         .from(registration).innerJoin(subject, eq(subject.id, registration.subjectId))
         .where(inArray(registration.id, data.registrationIds))
@@ -467,8 +468,8 @@ export async function moveRegistrations(sessionId: string, data: MoveRegistratio
       // A series past a line's own deadline takes no more of it (MO-10 per line): past the entry
       // deadline, a retake of the board's previous sitting still goes in until the retake deadline.
       for (const r of regs) {
-        const d = await tx.execute(sql`select line_effective_deadline(${r.attempt}, ${r.priorSittingSeriesId}, ${target.id}) as at,
-          line_effective_deadline_kind(${r.attempt}, ${r.priorSittingSeriesId}, ${target.id}) as kind`);
+        const d = await tx.execute(sql`select line_effective_deadline(${r.attempt}, ${r.priorSittingSeriesId}, ${target.id}, ${r.declarationRejected}) as at,
+          line_effective_deadline_kind(${r.attempt}, ${r.priorSittingSeriesId}, ${target.id}, ${r.declarationRejected}) as kind`);
         const row = d.rows[0] as { at: string | Date | null; kind: 'entry' | 'retake' | 'exams_start' | null };
         if (row.at && new Date(row.at) <= now && r.boardSeriesId !== target.id) throw new SeriesError(entryDeadlineMessage(new Date(row.at), row.kind));
       }

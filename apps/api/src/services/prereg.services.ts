@@ -18,8 +18,8 @@
 
 import { db, registration, auditLog, eq, and, sql, notInArray } from '@repo/db';
 import type { PreregisterRegistrationType } from '@repo/validations';
-import { prepareLegacyLines, getExistingRegistrationSubjectIds } from './registration.services';
-import { insertLines } from './line.services';
+import { assertSchoolFeeGate } from './registration.services';
+import { reserveLines } from './reservation.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
 import { effectiveDeadlineFor, linesKeptByLateEntry } from './deadline.services';
 import { creditHeld, debitHeld, getEscrowBalance } from './escrow.services';
@@ -62,28 +62,17 @@ export async function createPreregistration(parentId: string, data: PreregisterR
     throw new Error('Preregistration is only available for upcoming (not-yet-open) sessions');
   }
 
-  const subjects = await db.query.subject.findMany({
-    where: (s, { eq, and, inArray }) =>
-      and(eq(s.isActive, true), inArray(s.id, data.subjectIds)),
-  });
-  if (subjects.length !== data.subjectIds.length) {
-    throw new Error('One or more subjects are invalid or inactive');
-  }
-  const existing = await getExistingRegistrationSubjectIds(data.studentId, data.sessionId);
-  if (data.subjectIds.some((id) => existing.includes(id))) {
-    throw new Error('Some subjects are already preregistered for this session');
-  }
-
-  // The school-fee gate, then each subject as a line; past a line's deadline nothing more can
-  // be entered (MO-10, per line). The price locks now (D-E).
-  const lines = await prepareLegacyLines(data.studentId, data.sessionId, data.subjectIds, data.subjectOptions, eligibility);
+  // The school-fee gate, then the lines (reservation.services reserveLines, with both consents
+  // on the app channel); past a line's deadline nothing more can be entered (MO-10, per line).
+  // The price locks now (D-E).
+  await assertSchoolFeeGate(data.studentId, eligibility);
   const now = new Date();
   // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
   return db.transaction(async (tx) => {
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    return insertLines(tx, {
-      studentId: data.studentId, sessionId: data.sessionId, lines, status: 'preregistered',
-      requestedBy: parentId, approvedBy: parentId, approvedAt: now, eligibility,
+    return reserveLines(tx, {
+      studentId: data.studentId, sessionId: data.sessionId, lines: data.lines, status: 'preregistered',
+      requestedBy: parentId, approvedBy: parentId, approvedAt: now, eligibility, declaredBy: 'family', channel: 'app',
     });
   });
 }
@@ -239,7 +228,7 @@ export async function refundPreregistrationsAtDeadline(sessionId: string, boardS
     .from(registration)
     .where(and(
       eq(registration.sessionId, sessionId), eq(registration.boardSeriesId, boardSeriesId), eq(registration.status, 'preregistered'),
-      sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}) <= ${now}`,
+      sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}, ${registration.declarationRejected}) <= ${now}`,
       kept.length ? notInArray(registration.id, kept) : undefined,
     ));
 
@@ -289,7 +278,7 @@ export async function capturePreregistrationsForSession(sessionId: string): Prom
   const preregs = await db.query.registration.findMany({
     where: (r, { eq, and }) =>
       and(eq(r.sessionId, sessionId), eq(r.status, 'preregistered')),
-    columns: { id: true, studentId: true, subjectId: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true },
+    columns: { id: true, studentId: true, subjectId: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true, declarationRejected: true },
   });
 
   let captured = 0;

@@ -21,7 +21,7 @@ import { ROLES, type Role } from '../roles';
 import { LevelCodeReadingSchema, LEVEL_CODE_READINGS, LEVEL_CODE_READING_LABELS } from '../catalogue/level-code';
 import { RefundPolicySchema, DEFAULT_REFUND_POLICIES } from '../session/session.validations';
 
-export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar' | 'catalogue' | 'pricing' | 'payment' | 'refund' | 'exceptions';
+export type SettingGroup = 'eligibility' | 'school_fee' | 'calendar' | 'catalogue' | 'pricing' | 'payment' | 'refund' | 'exceptions' | 'verification';
 
 export type SettingDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> = {
   schema: S;
@@ -205,6 +205,22 @@ export const SETTINGS = {
     editableBy: [ROLES.ADMIN, ROLES.FINANCE_ADMIN],
     source: 'Q-11',
     input: 'refundPolicy',
+  }),
+  // Reservations rework, step B (RESERVATIONS_REWORK.md §3.5; DISCOVERY.md Q-22, default (a)).
+  'verification.unverifiedAtDeadline': defineSetting({
+    schema: z.enum(['enter_as_declared', 'hold']),
+    default: 'enter_as_declared',
+    group: 'verification',
+    label: 'A declared sitting still unverified at its deadline',
+    description:
+      'A family (or the desk) may declare the sitting a retake follows; the coordinator verifies it on the session\'s To verify tab. "Enter as declared": the form trusts the family — the line is entered and the entry check lists it as declared, unverified. "Hold": at the line\'s deadline a line awaiting payment expires, and a paid one is dropped with that day\'s refund (the paper receipt comes back first).',
+    editableBy: [ROLES.ADMIN],
+    source: 'Q-22',
+    input: 'choice',
+    choices: [
+      { value: 'enter_as_declared', label: 'Enter as declared' },
+      { value: 'hold', label: 'Hold: expire or drop at the deadline' },
+    ],
   }),
 } as const;
 

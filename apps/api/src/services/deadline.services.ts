@@ -31,7 +31,7 @@ export type LineDeadlineKey = {
    * Step B's `registration.declaration_rejected`: a retake whose declared sitting the school
    * rejected is a first entry for the board — its deadline is the entry deadline (§3.5).
    */
-  declarationRejected?: boolean | null;
+  declarationRejected: boolean | null;
   /** The line's student: a late board entry granted to them (Q-20) is read when given. */
   studentId?: string | null;
 };
@@ -45,7 +45,7 @@ const asDate = (v: unknown): Date | null => (v === null || v === undefined ? nul
  * With step B merged it passes the row's `declaration_rejected` as the fourth argument (0044).
  */
 export function lineDeadlineSql(alias = 'r') {
-  return sql.raw(`line_effective_deadline(${alias}.attempt, ${alias}.prior_sitting_series_id, ${alias}.board_series_id)`);
+  return sql.raw(`line_effective_deadline(${alias}.attempt, ${alias}.prior_sitting_series_id, ${alias}.board_series_id, ${alias}.declaration_rejected)`);
 }
 
 /**
@@ -109,8 +109,8 @@ export async function effectiveDeadlinesOf(executor: Executor, registrationIds: 
   if (!registrationIds.length) return out;
   const r = await executor.execute(sql`
     select r.id, r.student_id as "studentId", r.board_series_id as "seriesId",
-      line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) as at,
-      line_effective_deadline_kind(r.attempt, r.prior_sitting_series_id, r.board_series_id) as kind
+      line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as at,
+      line_effective_deadline_kind(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as kind
     from registration r where r.id in (${sql.join(registrationIds.map((id) => sql`${id}`), sql`, `)})`);
   const lateOn = await getSetting('exceptions.boardEntryDeadline', executor);
   const late = new Map<string, Date | null>();
@@ -182,7 +182,7 @@ export async function dueDateFor(executor: Executor, input: DueDateInput): Promi
     .select({
       id: registration.id, studentId: registration.studentId, sessionId: registration.sessionId, subjectId: registration.subjectId,
       offerItemId: registration.offerItemId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt,
-      priorSittingSeriesId: registration.priorSittingSeriesId, createdAt: registration.createdAt,
+      priorSittingSeriesId: registration.priorSittingSeriesId, declarationRejected: registration.declarationRejected, createdAt: registration.createdAt,
       priceProvisional: registration.priceProvisional, pricingBasis: registration.pricingBasis, paymentDueAt: registrationSession.paymentDueAt,
     })
     .from(registration)

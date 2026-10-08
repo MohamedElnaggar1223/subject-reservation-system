@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { RoleSchema } from '../roles';
 import { EntryGradeSchema } from '../academic/academic-year';
 import { CommonSchemas, isWholePiastres, PIASTRES_MESSAGE } from '../common.validations';
-import { SubjectRegistrationOptions } from '../registration/registration.validations';
+import { ReservationLines, ReservationConsent } from '../registration/reservation.validations';
 
 // ─── Team management (G7) ────────────────────────────────────────────────────
 
@@ -79,18 +79,17 @@ export type DeskOnboardFamilyType = z.infer<typeof DeskOnboardFamily>;
 // ─── Desk registration + payment (G1) ────────────────────────────────────────
 
 /**
- * One action at the desk: register the subjects AND record the money the
- * officer just took. `collectNow` omitted = register only (family pays
- * later, rows sit at pending_payment).
+ * One action at the desk: reserve the lines AND record the money the officer just took
+ * ("Reserve and collect", RESERVATIONS_REWORK.md §4.3). `collectNow` omitted = reserve only
+ * (the family pays later, lines wait at pending_payment). A line whose board fee is still
+ * provisional is reserved and not collected: it is collected once the fee is confirmed.
+ * `consent` is the desk's one tick, "read and signed by the parent".
  */
 export const DeskRegistration = z.object({
   studentId: z.string().min(1, 'Pick a student'),
   sessionId: z.string().min(1, 'Pick a session'),
-  subjectIds: z
-    .array(z.string().min(1))
-    .min(1, 'Select at least one subject')
-    .max(20),
-  subjectOptions: z.record(z.string(), SubjectRegistrationOptions).optional(),
+  lines: ReservationLines,
+  consent: ReservationConsent,
   collectNow: z
     .object({
       instrumentUsed: z.enum(['cash', 'card', 'instapay', 'other']),
@@ -112,6 +111,9 @@ export const DeskCollect = z.object({
   instrumentUsed: z.enum(['cash', 'card', 'instapay', 'other']),
   escrowAmountToApply: z.number().min(0).max(1_000_000).refine(isWholePiastres, PIASTRES_MESSAGE).default(0),
   notes: z.string().max(500).optional(),
+  // A line the school reserved (grade 10, §4.2) carries the school's consent only: the family's
+  // own pair is taken when it is paid — here, "read and signed by the parent".
+  consent: ReservationConsent.optional(),
 });
 export type DeskCollectType = z.infer<typeof DeskCollect>;
 

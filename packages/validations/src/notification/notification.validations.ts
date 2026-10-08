@@ -53,6 +53,8 @@ export const NOTIFICATION_TYPES = [
   'PREREGISTRATION_HELD',
   // Reservations rework: a line re-priced when the board confirmed its fee, or moved
   'PRICE_CHANGED',
+  // Step B: the school's answer to a declared sitting (a retake or a carry-forward)
+  'DECLARATION_REVIEWED',
   // Reservations rework: a moved line whose price stayed but is now to be confirmed
   'PRICE_TO_BE_CONFIRMED',
 ] as const;
@@ -83,6 +85,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   LINK_DECISION:                    'Link Request Decision',
   PREREGISTRATION_HELD:             'Preregistration Held',
   PRICE_CHANGED:                    'Price Changed',
+  DECLARATION_REVIEWED:             'Declared Sitting Reviewed',
   PRICE_TO_BE_CONFIRMED:            'Price To Be Confirmed',
 };
 
@@ -110,6 +113,7 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   LINK_DECISION:                    '🔗',
   PREREGISTRATION_HELD:             '⏸️',
   PRICE_CHANGED:                    '💱',
+  DECLARATION_REVIEWED:             '🔎',
   PRICE_TO_BE_CONFIRMED:            '💱',
 };
 

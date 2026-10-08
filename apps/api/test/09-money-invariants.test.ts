@@ -304,7 +304,10 @@ describe('money invariants over the whole database', () => {
       select entity_id, previous_data, new_data from audit_log
       where action = 'REGISTRATION_EXPIRED'
         and (coalesce(previous_data->>'status', '') not in ('pending_approval', 'pending_payment', 'preregistered')
-          or coalesce(new_data->>'reason', '') not in ('session_closed', 'entry_deadline', 'graduated', 'payment_closed', 'preregistration_unfunded_at_deadline', 'ineligible')
+          or coalesce(new_data->>'reason', '') not in ('session_closed', 'entry_deadline', 'graduated', 'payment_closed', 'preregistration_unfunded_at_deadline', 'ineligible',
+            -- The reservations rework, step B (§3.10 item 8): a declared sitting rejected on a waiting
+            -- line; one still unverified at its deadline under verification.unverifiedAtDeadline = hold.
+            'declaration_rejected', 'hold_unverified')
           -- F0a: a student no longer eligible for the series says what changed.
           or (new_data->>'reason' = 'ineligible' and coalesce(new_data->>'detail', '') not in
             ('withdrawn', 'transferred', 'cohort_corrected', 'graduate_retakes_off', 'series_corrected', 'exception_revoked', 'exception_lapsed')))
@@ -474,12 +477,12 @@ describe('money invariants over the whole database', () => {
   it("a registration expired at an entry deadline was past its own effective deadline (MO-10 per line: the retake deadline, the entry deadline or the exams' start)", async () => {
     // The reservations rework (§3.3): which date a line is cut off at is its effective deadline.
     const broken = await sql(`
-      select r.id, r.board_series_id, line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) as deadline, a.created_at
+      select r.id, r.board_series_id, line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as deadline, a.created_at
       from audit_log a
       join registration r on r.id = a.entity_id
       where a.action = 'REGISTRATION_EXPIRED' and a.new_data->>'reason' in ('entry_deadline', 'preregistration_unfunded_at_deadline')
         and r.board_series_id is not null
-        and coalesce(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) > a.created_at, true)
+        and coalesce(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) > a.created_at, true)
     `);
     expect(broken).toEqual([]);
   });
@@ -493,7 +496,7 @@ describe('money invariants over the whole database', () => {
     // Changed by the reservations rework (pre-authorised; trail row "assertion"): the deadline is
     // each line's effective one (a retake's retake deadline, a series with no entry deadline its
     // exams' start), which is what the sweep closes a payment at (§3.3).
-    const deadline = `coalesce(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id)::text, 'none')`;
+    const deadline = `coalesce(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)::text, 'none')`;
     const broken = await sql(`
       select p.id, count(distinct ${deadline}) as deadlines
       from payment p
@@ -594,5 +597,94 @@ describe('money invariants over the whole database', () => {
     expect(capturedWhileRefused).toEqual([]);
     // There was something to check: 08e holds preregistrations of a student who left.
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'PREREG_HELD_INELIGIBLE'`))[0]?.n)).toBeGreaterThan(0);
+  });
+
+  // ─── The reservations rework, step B (docs/features/RESERVATIONS_LINES.md §7) ──────────────
+
+  it('every line confirmed since the rework has its two consents, the refund policy and the declaration (§3.5, §8)', async () => {
+    // A line that is or was confirmed (paid, or captured from a preregistration); a line converted
+    // from before the rework was consented to on the school's paper form.
+    const broken = await sql(`
+      select r.id, r.status from registration r
+      where not (r.legacy is not null and r.legacy ? 'converted')
+        and (r.status in ('confirmed', 'dropped_pending_receipt')
+          or exists (select 1 from audit_log a where a.entity_id = r.id and a.action in ('REGISTRATION_CONFIRMED', 'PREREG_CAPTURED')))
+        and (select count(distinct c.kind) from registration_consent c where c.registration_id = r.id) < 2
+    `);
+    expect(broken).toEqual([]);
+    // There was something to check: lines confirmed with their consents, on the app and the desk channel.
+    const [n] = await sql<{ app: string; desk: string }>(`
+      select count(distinct c.registration_id) filter (where c.channel = 'app') as app, count(distinct c.registration_id) filter (where c.channel = 'desk') as desk
+      from registration_consent c join registration r on r.id = c.registration_id where r.status = 'confirmed'`);
+    expect(Number(n?.app)).toBeGreaterThan(0);
+    expect(Number(n?.desk)).toBeGreaterThan(0);
+  });
+
+  it('a line the family or the desk consented to has its refund steps frozen, as weeks or as dates (§3.1, §2.6)', async () => {
+    const broken = await sql(`
+      select r.id, r.refund_policy_snapshot from registration r
+      where exists (select 1 from registration_consent c where c.registration_id = r.id and c.channel in ('app', 'desk', 'imported'))
+        and (r.refund_policy_snapshot is null or coalesce(r.refund_policy_snapshot->>'kind', '') not in ('weeks', 'dates'))
+    `);
+    expect(broken).toEqual([]);
+  });
+
+  it('a declared sitting is answered once, by someone, and only a paid line stands with its declaration rejected (§3.5)', async () => {
+    // Answered: who and when; a declared one only (the database checks the outcome's who and when).
+    const answered = await sql(`
+      select r.id from registration r
+      where r.prior_sitting_verified_outcome is not null
+        and (r.prior_sitting_verified_by is null or r.prior_sitting_source not in ('declared_by_family', 'declared_by_desk'))
+    `);
+    expect(answered).toEqual([]);
+    // One answer each: one PRIOR_SITTING_VERIFIED or PRIOR_SITTING_REJECTED row per answered line.
+    const rows = await sql(`
+      select r.id, count(a.id) as n from registration r
+      left join audit_log a on a.entity_id = r.id and a.action in ('PRIOR_SITTING_VERIFIED', 'PRIOR_SITTING_REJECTED')
+      where r.prior_sitting_verified_outcome is not null
+      group by r.id having count(a.id) <> 1
+    `);
+    expect(rows).toEqual([]);
+    // Standing rejected: paid (confirmed, a paid preregistration), since dropped through the receipt
+    // gate, or paid when rejected (a payment confirmed before the answer) and that payment reversed
+    // after it — a reversal undoes the payment, not the answer (08t's reversal race) — the line then
+    // waiting for payment again, or expired at its deadline since.
+    const standing = await sql(`
+      select r.id, r.status from registration r
+      where r.declaration_rejected
+        and not (r.status in ('confirmed', 'dropped', 'dropped_pending_receipt')
+          or (r.status = 'preregistered' and exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed'))
+          or (r.status in ('pending_payment', 'expired')
+              and exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id
+                          where pr.registration_id = r.id and p.status = 'refunded'
+                            and p.confirmed_at is not null and p.confirmed_at <= r.prior_sitting_verified_at
+                            and p.reversed_at is not null and p.reversed_at >= r.prior_sitting_verified_at)))
+    `);
+    expect(standing).toEqual([]);
+    // An expiry or a system drop on a declared sitting followed from it: rejected, or unverified under hold.
+    const ends = await sql(`
+      select a.entity_id, a.action, a.new_data->>'reason' as reason from audit_log a join registration r on r.id = a.entity_id
+      where ((a.action = 'REGISTRATION_EXPIRED' and a.new_data->>'reason' = 'declaration_rejected') and r.prior_sitting_verified_outcome is distinct from 'rejected')
+         or ((a.action = 'LINE_DROPPED_UNVERIFIED' or (a.action = 'REGISTRATION_EXPIRED' and a.new_data->>'reason' = 'hold_unverified'))
+           and (r.prior_sitting_verified_outcome is not null or r.prior_sitting_source not in ('declared_by_family', 'declared_by_desk')))
+    `);
+    expect(ends).toEqual([]);
+    // A line the system dropped on a declared sitting (rejected after the first-entry deadline, or
+    // unverified under hold) was refunded at most its price: the escrow credits for its drop plus a
+    // refund still parked on its receipt.
+    const overRefunded = await sql(`
+      select r.id, r.price_at_registration as price,
+        coalesce((select sum(e.amount) from escrow_transaction e where e.related_registration_id = r.id and e.reason = 'drop'), 0)
+          + coalesce((select rc.refund_amount_on_return from receipt rc where rc.registration_id = r.id and rc.status = 'return_required'), 0) as refunded
+      from registration r
+      where exists (select 1 from audit_log a where a.entity_id = r.id
+                    and (a.action = 'LINE_DROPPED_UNVERIFIED' or (a.action = 'PRIOR_SITTING_REJECTED' and a.new_data->>'effect' = 'dropped')))
+        and coalesce((select sum(e.amount) from escrow_transaction e where e.related_registration_id = r.id and e.reason = 'drop'), 0)
+          + coalesce((select rc.refund_amount_on_return from receipt rc where rc.registration_id = r.id and rc.status = 'return_required'), 0) > r.price_at_registration
+    `);
+    expect(overRefunded).toEqual([]);
+    // There was something to check: answers and system drops on declared sittings.
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action in ('PRIOR_SITTING_VERIFIED', 'PRIOR_SITTING_REJECTED')`))[0]?.n)).toBeGreaterThan(0);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'LINE_DROPPED_UNVERIFIED' or (action = 'PRIOR_SITTING_REJECTED' and new_data->>'effect' = 'dropped')`))[0]?.n)).toBeGreaterThan(0);
   });
 });

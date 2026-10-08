@@ -598,7 +598,7 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   // covers (a qualifying retake's is its series' retake deadline; §3.3).
   const referenceDueFor = async (paymentId: string) => {
     const [row] = await db.execute(sql`
-      select min(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id)) as deadline
+      select min(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)) as deadline
       from payment_registration pr join registration r on r.id = pr.registration_id
       where pr.payment_id = ${paymentId}`).then((r) => r.rows as { deadline: string | Date | null }[]);
     const deadline = row?.deadline ? new Date(row.deadline).getTime() : Infinity;

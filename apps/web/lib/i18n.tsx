@@ -11,6 +11,7 @@ import {
 import { foundationArabic } from './i18n-foundation';
 import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
 import { sessionsArabic, translateSessionsText } from './i18n-sessions';
+import { reservationsArabic, translateReservationsText } from './i18n-reservations';
 
 export type Language = 'en' | 'ar';
 
@@ -56,7 +57,8 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.notifications': 'Notifications',
     'nav.home': 'Home',
     'nav.registration': 'Registration',
-    'nav.registerSubjects': 'Register Subjects',
+    'nav.registerSubjects': 'Reserve Subjects',
+    'nav.statement': 'Statement',
     'nav.myRegistrations': 'My Registrations',
     'nav.history': 'History',
     'nav.approvals': 'Approvals',
@@ -222,7 +224,8 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.notifications': 'الإشعارات',
     'nav.home': 'الرئيسية',
     'nav.registration': 'التسجيل',
-    'nav.registerSubjects': 'تسجيل المواد',
+    'nav.registerSubjects': 'حجز المواد',
+    'nav.statement': 'كشف الحساب',
     'nav.myRegistrations': 'تسجيلاتي',
     'nav.history': 'السجل',
     'nav.approvals': 'الموافقات',
@@ -1496,6 +1499,8 @@ Object.assign(autoArabicText, foundationArabic);
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // The reservations rework's screens (lib/i18n-sessions.ts): the same rule.
 for (const [en, ar] of Object.entries(sessionsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// Step B's screens (lib/i18n-reservations.ts): Reserve, the statement, To verify, the slip.
+for (const [en, ar] of Object.entries(reservationsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1577,6 +1582,9 @@ function translateDynamicText(text: string): string | null {
   // The reservations rework: session names, refund sentences, the refusals of its screens.
   const reworkText = translateSessionsText(text);
   if (reworkText) return reworkText;
+  // Step B: the Reserve page's results, the pricing basis, the consent and the refusals.
+  const reservationText = translateReservationsText(text);
+  if (reservationText) return reservationText;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

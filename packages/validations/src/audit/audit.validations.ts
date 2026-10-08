@@ -280,6 +280,11 @@ export const AUDIT_ACTIONS = [
   'LINE_PRICE_KEPT',
   'LINE_DUE_MOVED',
   'GRADE10_BULK_COMMITTED',
+  // Reservations rework, step B (declared sittings, the teacher on a line)
+  'PRIOR_SITTING_VERIFIED',
+  'PRIOR_SITTING_REJECTED',
+  'LINE_DROPPED_UNVERIFIED',
+  'LINE_TEACHER_CHANGED',
   // Parent-student links (security audit RF-14: access to a child's money
   // and records hangs on these, so every change is recorded)
   'LINK_REQUESTED',
@@ -463,6 +468,10 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   LINE_PRICE_KEPT: 'Line price kept (fee confirmed)',
   LINE_DUE_MOVED:             'Line Due Date Moved',
   GRADE10_BULK_COMMITTED:     'Grade 10 Registered in Bulk',
+  PRIOR_SITTING_VERIFIED:     'Declared Sitting Verified',
+  PRIOR_SITTING_REJECTED:     'Declared Sitting Rejected',
+  LINE_DROPPED_UNVERIFIED:    'Line Dropped: Sitting Unverified at the Deadline',
+  LINE_TEACHER_CHANGED:       'Line Teacher Changed',
 };
 
 // ─── Query Filters ────────────────────────────────────────────────────────────

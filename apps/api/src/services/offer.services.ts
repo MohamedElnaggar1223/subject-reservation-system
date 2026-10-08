@@ -76,6 +76,7 @@ export function availabilityConstraints(offer: string, item: string) {
 /** The board's series of (month, year, label), created with no dates when not on record. */
 export async function findOrCreateSeries(
   tx: Tx, boardCode: string, month: SeriesMonth, year: number, label: string, actorId: string | null,
+  reason = 'Created when an item of a session was placed in it (no dates yet)',
 ): Promise<{ id: string; created: boolean }> {
   const { names, months } = await boardNames(tx);
   if (!names.has(boardCode)) throw new OfferError('Board not found', 404);
@@ -93,7 +94,7 @@ export async function findOrCreateSeries(
     return { id: again!.id, created: false };
   }
   await logAction(actorId, 'BOARD_SERIES_CREATED', 'board_series', id, null,
-    { boardCode, month, year, label, reason: 'Created when an item of a session was placed in it (no dates yet)' }, undefined, tx);
+    { boardCode, month, year, label, reason }, undefined, tx);
   return { id, created: true };
 }
 
@@ -585,7 +586,7 @@ async function changeItemSeries(
     if (d.at && d.at <= now) {
       throw new OfferError(`${item.label} has lines past their deadline in the series it is entered in (${schoolDate(d.at)}): its entries stand`, 409);
     }
-    const there = await effectiveDeadlineFor(tx, { boardSeriesId: targetId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId });
+    const there = await effectiveDeadlineFor(tx, { boardSeriesId: targetId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId, declarationRejected: l.declarationRejected });
     if (there.at && there.at <= now) {
       throw new OfferError(`${boardSeriesName(names, target)} is past a line's deadline: ${deadlinePassedSentence(there, schoolDate)}`, 409);
     }

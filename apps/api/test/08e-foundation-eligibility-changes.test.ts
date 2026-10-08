@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, money, audited, notified, openWindow, futureWindow, schoolToday,
-  runSessionRecovery, waitFor, notificationsFor,
-  type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, money, audited, notified, openWindow, futureWindow, schoolToday, runSessionRecovery, waitFor, notificationsFor, type Client, reservationOf } from './helpers';
 
 /**
  * F0a — eligibility can change after a registration exists
@@ -39,14 +35,14 @@ describe('F0a: when eligibility changes after a registration exists', () => {
   /** Free escrow the way it really happens: paid at the desk, dropped before the receipt left the desk. */
   const fund = async (f: Family, subjectId: string) => {
     const desk = await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f.studentId, sessionId: october, subjectIds: [subjectId], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: f.studentId, sessionId: october, ...(await reservationOf(october, [subjectId])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }));
     await apiResponse(f.parent.api.v1.registrations[':id'].drop.$post({ param: { id: desk.registrations[0]!.id }, json: { reason: 'set-up for escrow' } }));
     return escrowOf(f.studentId);
   };
   /** A subject registered and a checkout started with 300 of escrow applied. */
   const checkout = async (f: Family, subjectId: string) => {
-    const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, subjectIds: [subjectId], studentId: f.studentId } })))[0]!.id;
+    const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, ...(await reservationOf(october, [subjectId])), studentId: f.studentId } })))[0]!.id;
     const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 300 } }))).id!;
     return { reg, pay };
   };
@@ -104,7 +100,7 @@ describe('F0a: when eligibility changes after a registration exists', () => {
 
   it('withdrawn with an in-school checkout open: nothing holds it (only a transfer being checked or InstaPay\'s grace does) — the registration expires and the checkout closes', async () => {
     const f = await family('in-school');
-    const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, subjectIds: [subj.S3!], studentId: f.studentId } })))[0]!.id;
+    const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, ...(await reservationOf(october, [subj.S3!])), studentId: f.studentId } })))[0]!.id;
     const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
     expect(await statusOf('payment', pay)).toBe('pending');
 
@@ -123,7 +119,7 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     const june = await session(adm, 'June (IGCSE, F0a changes)', 'june', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('june', thisYear) });
     const igcse = await subject(adm, 'F0E-IG', 'Geography (F0a changes)', { course: 1000, registration: 200 });
     await extend(f.studentId, june);
-    const juneReg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, subjectIds: [igcse], studentId: f.studentId } })))[0]!.id;
+    const juneReg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: june, ...(await reservationOf(june, [igcse])), studentId: f.studentId } })))[0]!.id;
 
     const r = await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: f.studentId }, json: { gradeNow: 10, reason: 'repeating grade 10' } }));
     expect(r).toMatchObject({ grade: 10, registrationsExpired: 1, paymentsClosed: 1 });
@@ -146,10 +142,10 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: g.studentId }, json: { cohortYear: thisYear - 3, reason: 'finished grade 12 last June' } }));
     const funded = await fund(g, subj.S5!);
     const { reg, pay } = await checkout(g, subj.S6!);
-    const asked = (await apiResponse(g.student.api.v1.registrations.request.$post({ json: { sessionId: october, subjectIds: [subj.S7!] } })))[0]!.id;
+    const asked = (await apiResponse(g.student.api.v1.registrations.request.$post({ json: { sessionId: october, ...(await reservationOf(october, [subj.S7!])) } })))[0]!.id;
     // A student in grade 12 this year is not touched.
     const twelve = await family('twelve', 12);
-    const kept = (await apiResponse(twelve.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, subjectIds: [subj.S7!], studentId: twelve.studentId } })))[0]!.id;
+    const kept = (await apiResponse(twelve.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, ...(await reservationOf(october, [subj.S7!])), studentId: twelve.studentId } })))[0]!.id;
 
     // Only the admin may change A-12.
     expect((await refused(finadmin.api.v1.settings[':key'].$put({ param: { key: 'eligibility.graduateRetakes' }, json: { value: false, reason: 'not mine to change' } }))).status).toBe(403);
@@ -181,7 +177,7 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     const nov = await session(adm, 'November (IGCSE, F0a series)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', thisYear) });
     const igcse = await subject(adm, 'F0E-IG2', 'History (F0a series)', { course: 1000, registration: 200 });
     await extend(f.studentId, nov);
-    const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: nov, subjectIds: [igcse], studentId: f.studentId } })))[0]!.id;
+    const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: nov, ...(await reservationOf(nov, [igcse])), studentId: f.studentId } })))[0]!.id;
     // The window was really for next year's June: past grade 12 by then, and June is not a retake series.
     const r = await apiResponse(adm.api.v1.sessions[':id'].series.$put({
       param: { id: nov }, json: { sessionType: 'june', seriesYear: seriesYearInAcademicYear('june', thisYear + 1), reason: 'typed the wrong series' },
@@ -199,7 +195,7 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     const grant = await apiResponse(coordinator.api.v1.exceptions.$post({
       json: { type: 'grade10_other_series', studentId: f.studentId, sessionId: october, reason: 'sitting one AS unit early' },
     }));
-    const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, subjectIds: [subj.S8!], studentId: f.studentId } })))[0]!.id;
+    const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, ...(await reservationOf(october, [subj.S8!])), studentId: f.studentId } })))[0]!.id;
     const r = await apiResponse(coordinator.api.v1.exceptions[':id'].revoke.$post({ param: { id: grant.id } }));
     expect(r).toMatchObject({ status: 'revoked', registrationsExpired: 1 });
     expect(await statusOf('registration', reg)).toBe('expired');
@@ -212,9 +208,9 @@ describe('F0a: when eligibility changes after a registration exists', () => {
       json: { type: 'grade10_other_series', studentId: f.studentId, sessionId: october, reason: 'one AS unit early', validUntil: new Date(Date.now() + days(2)).toISOString() },
     }));
     const paid = (await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f.studentId, sessionId: october, subjectIds: [subj.S1!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: f.studentId, sessionId: october, ...(await reservationOf(october, [subj.S1!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }))).registrations[0]!.id;
-    const waiting = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, subjectIds: [subj.S7!], studentId: f.studentId } })))[0]!.id;
+    const waiting = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: october, ...(await reservationOf(october, [subj.S7!])), studentId: f.studentId } })))[0]!.id;
     const { lapseGrade10Exceptions } = await import('../src/services/exception-lapse.services');
     const exceptionStatus = async () => (await one<{ status: string }>(`select status from exception where id = $1`, [grant.id])).status;
 
@@ -243,7 +239,7 @@ describe('F0a: when eligibility changes after a registration exists', () => {
       subject(adm, `F0E-A${i + 1}`, `${name} (A-Level, F0a prereg)`, { course: 1000, registration: 200 }, { qualificationLevel: 'a_level' })));
     // The October A-Level series of this year, still a draft; closed at the end so 08f can open its own.
     const oct = await session(adm, 'October (A-Level, F0a prereg)', 'october', 'a_level', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('october', thisYear) });
-    const pre = await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: oct, subjectIds: ids, studentId: f.studentId } }));
+    const pre = await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: oct, ...(await reservationOf(oct, ids)), studentId: f.studentId } }));
     const [paid, unpaid] = [pre.find((r) => r.subjectId === ids[0])!.id, pre.find((r) => r.subjectId === ids[1])!.id];
     const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [paid], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
     await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay.id! }, json: { instrumentUsed: 'cash' } }));
@@ -289,7 +285,7 @@ describe('F0a: when eligibility changes after a registration exists', () => {
     const f = await family('draft-series');
     const draft = await session(adm, 'November (IGCSE, F0a draft edit)', 'november', 'igcse', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('november', thisYear) });
     const igcse = await subject(adm, 'F0E-IG3', 'Geography (F0a draft edit)', { course: 1000, registration: 200 });
-    await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, subjectIds: [igcse], studentId: f.studentId } }));
+    await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, ...(await reservationOf(draft, [igcse])), studentId: f.studentId } }));
 
     const r = await refused(adm.api.v1.sessions[':id'].$put({ param: { id: draft }, json: { seriesYear: thisYear + 1, reason: 'next year' } as never }));
     expect(r).toEqual({ status: 400, error: 'Nothing to change' });

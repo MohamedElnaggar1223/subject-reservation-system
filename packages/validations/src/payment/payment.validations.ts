@@ -9,6 +9,7 @@
 
 import { z } from 'zod';
 import { isWholePiastres, PIASTRES_MESSAGE } from '../common.validations';
+import { ReservationConsent } from '../registration/reservation.validations';
 
 // ─── Payment Method Enum ──────────────────────────────────────────────────────
 
@@ -162,6 +163,9 @@ export const InitiatePayment = z.object({
   // V3: only in_school / instapay accepted for new payments.
   paymentMethod: ActivePaymentMethodSchema,
   escrowAmountToApply: z.number().min(0).max(1_000_000, 'Amount exceeds maximum allowed').refine(isWholePiastres, PIASTRES_MESSAGE).default(0),
+  // A line the school reserved (grade 10) carries the school's consent only: the family gives its
+  // own pair at checkout (RESERVATIONS_REWORK.md §3.5).
+  consent: ReservationConsent.optional(),
 });
 export type InitiatePaymentType = z.infer<typeof InitiatePayment>;
 

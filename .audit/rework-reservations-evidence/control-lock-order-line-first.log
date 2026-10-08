@@ -1,0 +1,75 @@
+# Trimmed under CLAUDE.md (Git): the vitest summary and, for a red run, the failing tests and their
+# messages; the request log of the run removed. Original: 82397 bytes, 863 lines.
+
+ ❯ test/08t-rework-races.test.ts (18 tests | 2 failed) 14932ms
+   ✓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line  678ms
+   ✓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused  517ms
+   ✓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused  499ms
+   ✓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it  1120ms
+   ✓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused  566ms
+   ✓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional  468ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it  590ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged  588ms
+   ✓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused  615ms
+   ✓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once  636ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the checkout first: it opens its payment, and the rejection is refused while it is open  593ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the rejection first: the line expires, and the checkout that waited is refused, no payment made  559ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > verified while its payment is confirmed: both land, the line paid and verified  578ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > a parent's approval of a drop against the coordinator's rejection of the same paid line > the approval first: the line is dropped, and the rejection that waited finds nothing to answer  583ms
+   × 08t: the rework races > a declared sitting answered while its line is being paid > a parent's approval of a drop against the coordinator's rejection of the same paid line > the rejection first: the paid line stands as a first entry, then the approval drops it 1596ms
+   × 08t: the rework races > a declared sitting answered while its line is being paid > a payment reversal against the coordinator's rejection of the same paid line > the rejection first: it holds the receipt and the line; the reversal waits, then reverts the payment 1585ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > a payment reversal against the coordinator's rejection of the same paid line > the reversal first: the line waits for payment again, and the rejection that waited ends it  579ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the hold step run by two schedulers at once drops a paid unverified line once  575ms
+ ❯ test/08t-rework-races.test.ts:528:26
+ ❯ test/08t-rework-races.test.ts:561:26
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a declared sitting answered while its line is being paid > a parent's approval of a drop against the coordinator's rejection of the same paid line > the rejection first: the paid line stands as a first entry, then the approval drops it
+AssertionError: expected 400 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 400
+
+ ❯ test/08t-rework-races.test.ts:528:26
+    526|         const [r, a] = await Promise.all([rej!, apr!]);
+    527|         expect(r.status).toBe(200);
+    528|         expect(a.status).toBe(200);
+       |                          ^
+    529|         expect(await after(id)).toEqual({ status: 'dropped', outcome: …
+    530|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a declared sitting answered while its line is being paid > a payment reversal against the coordinator's rejection of the same paid line > the rejection first: it holds the receipt and the line; the reversal waits, then reverts the payment
+AssertionError: expected 400 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 400
+
+ ❯ test/08t-rework-races.test.ts:561:26
+    559|         const [r, v] = await Promise.all([rej!, rev!]);
+    560|         expect(r.status).toBe(200);
+    561|         expect(v.status).toBe(200);
+       |                          ^
+    562|         // Rejected while paid, it stood as a first entry; the reversa…
+    563|         expect(await after(id)).toEqual({ status: 'pending_payment', o…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+
+# The API's log lines naming the cause:
+params: 6df9638f-4a63-4b32-a43c-a04829be43da | cause: deadlock detected
+params: 02fe77a2-abc7-4993-839a-0bc4871de41c | cause: deadlock detected
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 16 passed (18)
+   Start at  05:24:22
+   Duration  17.50s (transform 577ms, setup 2ms, collect 241ms, tests 14.93s, environment 0ms, prepare 40ms)

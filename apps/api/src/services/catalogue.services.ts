@@ -647,7 +647,7 @@ async function followBoardChange(tx: Tx, s: typeof subject.$inferSelect, newBoar
       // it, or another date than the one the family was given, and nothing moves.
       for (const l of mine) {
         const was = current.get(l.id) ?? { at: null, kind: null };
-        const there = await effectiveDeadlineFor(tx, { boardSeriesId: to, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId });
+        const there = await effectiveDeadlineFor(tx, { boardSeriesId: to, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId, declarationRejected: l.declarationRejected });
         if (there.at && there.at <= now) {
           throw new CatalogueError(`${boardSeriesName(names, target)} is past its ${deadlineWord(there.kind)} (${schoolDate(there.at)}): ${s.name} cannot be moved into it in ${it.sessionName}`);
         }

@@ -3,7 +3,7 @@
  *
  * Handles the full subject registration lifecycle:
  *
- * GET  /registrations/available     - Subjects available for registration in a session (student/parent)
+ * GET  /registrations/offers        - What a student can reserve in a session (the Reserve pages, §4.3–§4.4)
  * GET  /registrations/pending       - Pending approval requests for a parent's children (parent/admin)
  * GET  /registrations/history       - Full registration history across all sessions (own or child)
  * GET  /registrations               - Registrations with optional filters (role-aware)
@@ -35,10 +35,8 @@ import {
   RejectRegistrations,
   AdminOverrideApproval,
   ListRegistrationsQuery,
-  AvailableSubjectsQuery,
   RegistrationId,
   ROLES,
-  FINANCE_ROLES,
   STUDENT_RECORD_ROLES,
   EligibilityQuery,
   OffersQuery,
@@ -62,6 +60,16 @@ import * as linkService from '../services/link.services';
 import { mayRegisterFor } from '../services/eligibility.services';
 import { offersForStudent } from '../services/offers-read.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
+
+/**
+ * A refusal's status: the sentence's own mapping where a route has one, else the status the
+ * refusing service gave (a line's rules, its price, a reservation: 400, 404 or 409), else 400.
+ */
+function statusOf(err: unknown, mapped: number): 400 | 403 | 404 | 409 | 422 {
+  if (mapped !== 400) return mapped as 403 | 409 | 422;
+  const s = (err as { status?: unknown } | null)?.status;
+  return s === 403 || s === 404 || s === 409 || s === 422 ? s : 400;
+}
 
 export const registrations = new Hono<HonoEnv>()
   .use('*', requireAuth())
@@ -100,8 +108,8 @@ export const registrations = new Hono<HonoEnv>()
    *
    * What a student can reserve in a session: the offers and items with the student's known
    * sittings, teachers, deadlines and the price of each allowed attempt and mode. The student
-   * themself, a linked parent, staff with student records. Replaces /available once step B's
-   * Reserve pages read it.
+   * themself, a linked parent, staff with student records. The Reserve pages read it (it replaced
+   * /available in step B).
    */
   .get('/offers',
     zValidator('query', OffersQuery),
@@ -125,53 +133,6 @@ export const registrations = new Hono<HonoEnv>()
         const message = clientMessage(err, 'Failed to load the offers');
         return error(c, message, message.includes('not found') ? 404 : 400);
       }
-    }
-  )
-
-  /**
-   * GET /registrations/available
-   *
-   * Returns active subjects not yet registered for the given session.
-   * - Students: uses own ID automatically
-   * - Parents: must provide studentId (must be a linked child)
-   * - Admins: studentId is required
-   */
-  .get('/available',
-    zValidator('query', AvailableSubjectsQuery),
-    async (c) => {
-      const user = c.get('user')!;
-      const { sessionId, studentId: requestedStudentId } = c.req.valid('query');
-
-      let targetStudentId: string;
-
-      if (user.role === ROLES.STUDENT) {
-        targetStudentId = user.id;
-      } else if (user.role === ROLES.PARENT) {
-        if (!requestedStudentId) {
-          return error(c, 'studentId is required for parents', 400);
-        }
-        // Verify parent-child link
-        const children = await linkService.getLinkedChildren(user.id);
-        const isLinked = children.some((child) => child.studentId === requestedStudentId);
-        if (!isLinked) {
-          return error(c, 'You are not linked to this student', 403);
-        }
-        targetStudentId = requestedStudentId;
-      } else if (hasRole(user.role, ...FINANCE_ROLES)) {
-        // Admin + finance staff (desk registration needs the same list)
-        if (!requestedStudentId) {
-          return error(c, 'studentId is required', 400);
-        }
-        targetStudentId = requestedStudentId;
-      } else {
-        return error(c, 'Forbidden', 403);
-      }
-
-      const available = await registrationService.getAvailableSubjects(
-        targetStudentId,
-        sessionId
-      );
-      return success(c, available);
     }
   )
 
@@ -325,7 +286,7 @@ export const registrations = new Hono<HonoEnv>()
                        message.includes('window is not open') ||
                        message.includes('already registered') ||
                        message.includes('core subjects') ? 422 : 400;
-        return error(c, message, status);
+        return error(c, message, statusOf(err, status));
       }
     }
   )
@@ -357,7 +318,7 @@ export const registrations = new Hono<HonoEnv>()
                        message.includes('window is not open') ||
                        message.includes('already registered') ||
                        message.includes('core subjects') ? 422 : 400;
-        return error(c, message, status);
+        return error(c, message, statusOf(err, status));
       }
     }
   )
@@ -414,9 +375,9 @@ export const registrations = new Hono<HonoEnv>()
       } catch (err) {
         const message = clientMessage(err, 'Failed to process desk registration');
         const status =
-          message.includes('already') ? 409 :
+          message.includes('already') || message.includes('Already') ? 409 :
           message.includes('not open') || message.includes('insufficient') || message.includes('Insufficient') ? 422 : 400;
-        return error(c, message, status);
+        return error(c, message, statusOf(err, status));
       }
     }
   )
@@ -473,8 +434,8 @@ export const registrations = new Hono<HonoEnv>()
         const message = clientMessage(err, 'Failed to preregister');
         const status =
           message.includes('not linked') ? 403 :
-          message.includes('already') ? 409 : 400;
-        return error(c, message, status);
+          message.includes('already') || message.includes('Already') ? 409 : 400;
+        return error(c, message, statusOf(err, status));
       }
     }
   )
@@ -605,7 +566,7 @@ export const registrations = new Hono<HonoEnv>()
         const message = clientMessage(err, 'Failed to override approval');
         const status = message.includes('window is not open') ||
                        message.includes('already registered') ? 422 : 400;
-        return error(c, message, status);
+        return error(c, message, statusOf(err, status));
       }
     }
   )

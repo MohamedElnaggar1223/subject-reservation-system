@@ -117,7 +117,10 @@ export async function logActions(
 // the cause in `detail`.
 export type ExpiryReason =
   | 'session_closed' | 'entry_deadline' | 'graduated' | 'payment_closed' | 'preregistration_unfunded_at_deadline'
-  | 'ineligible';
+  | 'ineligible'
+  // Step B (RESERVATIONS_REWORK.md §3.5): a declared sitting rejected on a waiting line; one still
+  // unverified at its deadline under `verification.unverifiedAtDeadline = hold`.
+  | 'declaration_rejected' | 'hold_unverified';
 
 /**
  * One REGISTRATION_EXPIRED row per registration the system expired, with the
