@@ -38,6 +38,7 @@ export const reservationsArabic: Record<string, string> = {
   '(payable once confirmed)': '(تُدفع حين تُؤكَّد)',
   'Paid per entry deadline:': 'يُدفع لكل موعد قيد:',
   '(retake deadline)': '(موعد الإعادة)',
+  'This line was paid while the answer was being given: open it again and answer again': 'دُفع هذا السطر أثناء إعطاء الإجابة: افتحه من جديد وأجب مرة أخرى',
   'The refund terms could not be loaded, so nothing can be reserved yet: reload the page to try again.': 'تعذّر تحميل شروط الاسترداد، فلا يمكن الحجز بعد: أعد تحميل الصفحة للمحاولة مرة أخرى.',
   'Loading the refund terms…': 'جارٍ تحميل شروط الاسترداد…',
   'The price of the subject to swap to has changed since the swap was asked for: ask for the swap again to see the new price':
