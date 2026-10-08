@@ -19,7 +19,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PublishedClashNotice, isPublishedClash, clashMessage } from '~/components/published-clash';
+import { PublishedClashNotice, isPublishedClash, clashMessage, goAheadWith } from '~/components/published-clash';
 import { apiResponse, academicYearShortLabel, academicYearStartOf, gradeLabel, gradeStanding, schoolDateString } from '@repo/validations';
 import { api } from '~/lib/hono';
 import { cn } from '~/lib/utils';
@@ -380,14 +380,14 @@ function AddStudents({ section: s, full, onAdded }: { section: SectionDetailData
   const placesLeft = s.capacity === null ? null : s.capacity - s.members.length;
 
   // F1: a move that would put a student in two lessons at once in a published timetable is refused
-  // with the clash; the coordinator may go ahead anyway.
-  const [clash, setClash] = useState<string | null>(null);
+  // with the clashes and their code; the coordinator may go ahead with exactly those.
+  const [clash, setClash] = useState<{ message: string; goAhead: { anyway: true; clashToken: string | null } } | null>(null);
   const add = useMutation({
-    mutationFn: (vars: { anyway?: boolean } = {}) =>
+    mutationFn: (vars: { anyway?: boolean; clashToken?: string | null } = {}) =>
       apiResponse(
         api.v1.academic.sections[':id'].members.$post({
           param: { id: s.id },
-          json: { studentIds: [...selected.keys()], ...(startsOn ? { startsOn } : {}), ...(vars.anyway ? { anyway: true } : {}) },
+          json: { studentIds: [...selected.keys()], ...(startsOn ? { startsOn } : {}), ...(vars.anyway ? { anyway: true, clashToken: vars.clashToken ?? null } : {}) },
         }),
       ),
     onSuccess: (d) => {
@@ -398,7 +398,7 @@ function AddStudents({ section: s, full, onAdded }: { section: SectionDetailData
       onAdded();
     },
     onError: (err: Error) => {
-      if (isPublishedClash(err)) setClash(clashMessage(err));
+      if (isPublishedClash(err)) setClash({ message: clashMessage(err), goAhead: goAheadWith(err) });
       else setError(err.message);
       setResult(null);
     },
@@ -459,8 +459,8 @@ function AddStudents({ section: s, full, onAdded }: { section: SectionDetailData
         </Notice>
       )}
       {clash && (
-        <PublishedClashNotice className="mt-3" message={clash} pending={add.isPending}
-          onAnyway={() => add.mutate({ anyway: true })} onCancel={() => setClash(null)} />
+        <PublishedClashNotice className="mt-3" message={clash.message} pending={add.isPending}
+          onAnyway={() => add.mutate(clash.goAhead)} onCancel={() => setClash(null)} />
       )}
       {error && (
         <Notice tone="danger" className="mt-3">

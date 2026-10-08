@@ -373,7 +373,16 @@ export async function upsertEnrolments(
   academicYearId: string,
   rows: EnrolmentRowInput[],
   actorId: string,
-  opts: { source: EnrolmentSource; commit: boolean; ctx?: AuditContext; follow?: boolean | 'defer'; reason?: string },
+  opts: {
+    source: EnrolmentSource; commit: boolean; ctx?: AuditContext; follow?: boolean | 'defer'; reason?: string;
+    /**
+     * false: the caller holds what serialises it with a leaving without the students' lock (A's
+     * replace-teacher holds the lines and moves only open enrolments it has read: taking the
+     * students after its lines would turn RESERVATIONS.md §2.1's order round). Such a call only
+     * updates: a row it would create is refused.
+     */
+    lockStudents?: boolean;
+  },
 ): Promise<{ rows: EnrolmentRowOutcome[]; created: number; updated: number; teacherLinks: number; changes: EnrolmentChange[]; groupsFollowed: FollowOutcome | null }> {
   const y = await yearOrThrow(academicYearId, tx);
   const startedOn = clampStart(y);
@@ -384,10 +393,11 @@ export async function upsertEnrolments(
   // student: a leaving (which holds the student FOR UPDATE while it ends every
   // open enrolment) and this run one after the other, so no enrolment is made
   // for a student whose leaving has just ended the others.
-  const students = studentIds.length
-    ? await tx.select({ id: user.id, name: user.name, role: user.role, cohortYear: user.cohortYear, leftOn: user.leftOn })
-        .from(user).where(inArray(user.id, studentIds)).orderBy(user.id).for('share')
-    : [];
+  const studentRows = studentIds.length
+    ? tx.select({ id: user.id, name: user.name, role: user.role, cohortYear: user.cohortYear, leftOn: user.leftOn })
+        .from(user).where(inArray(user.id, studentIds)).orderBy(user.id)
+    : null;
+  const students = studentRows ? await (opts.lockStudents === false ? studentRows : studentRows.for('share')) : [];
   const [subjects, teachers, existing] = await Promise.all([
     subjectIds.length ? tx.select({ id: subject.id, name: subject.name, code: subject.code, isActive: subject.isActive, isOfferedAtSchool: subject.isOfferedAtSchool }).from(subject).where(inArray(subject.id, subjectIds)) : [],
     teacherIds.length ? tx.select({ id: teacher.id, name: teacher.name, isActive: teacher.isActive }).from(teacher).where(inArray(teacher.id, teacherIds)) : [],
@@ -452,6 +462,9 @@ export async function upsertEnrolments(
   }
 
   const toCreate = out.filter((r) => r.outcome === 'create');
+  if (opts.lockStudents === false && toCreate.length) {
+    throw new EnrolmentError('An enrolment is made only with its student locked (upsertEnrolments without lockStudents updates only)');
+  }
   let created = 0;
   let teacherLinks = 0;
   if (toCreate.length) {

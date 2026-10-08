@@ -240,8 +240,13 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
       .toEqual({ status: 400, error: 'An online group takes no room: leave its room needs empty' });
 
     // The first timetable: every lesson by hand at its own slot (the homeroom with Maths P1 — A).
+    gid['Provider later'] = (await apiResponse(coordinator.api.v1.scheduling.groups.$post({ json: { academicYearId: yearId, name: 'Provider later', subjectId: arabic, teacherId: t.a!.id, weeklyPeriods: 1, doublePeriods: 0 } }))).id;
     v1 = (await apiResponse(coordinator.api.v1.timetables.$post({ json: { termId, name: 'RW — first' } }))).id;
+    expect((await load(v1)).engine.lessons.filter((l) => l.groupId === gid['Provider later'])).toHaveLength(1);
+    // Given to the provider before any version holds it: its card leaves the draft.
+    await apiResponse(coordinator.api.v1.scheduling.groups[':id'].$put({ param: { id: gid['Provider later']! }, json: { teacherId: t.p!.id } }));
     const tt = await load(v1);
+    expect(tt.engine.lessons.filter((l) => l.groupId === gid['Provider later'])).toEqual([]);
     expect(tt.engine.lessons.filter((l) => l.groupId === gid['Arabic W'])).toEqual([]);
     expect(tt.engine.groups.find((g) => g.id === gid['Biology W — ' + name('c')])).toMatchObject({ noRoom: true });
     await place(v1, 'Maths W P1 — ' + name('a'), 0, 1);

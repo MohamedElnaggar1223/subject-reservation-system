@@ -1,0 +1,9 @@
+Control F5b-roll-over-guard: apps/api/src/services/academic.services.ts — the guard undone ('if (published) {\n        const candidates' -> 'if (published && false) {\n        const candidates'); ran test/08s6 at 2026-10-08T13:51:58+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those 152ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 passed (22)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those
+    AssertionError: expected 200 to be 409 // Object.is equality
+    - Expected
+    + Received

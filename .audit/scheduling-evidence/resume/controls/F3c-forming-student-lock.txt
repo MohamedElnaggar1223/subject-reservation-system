@@ -1,0 +1,14 @@
+Control F3c-forming-student-lock: apps/api/src/services/group.services.ts — the guard undone ('await lockMembershipChange(tx, {\n        studentIds: plans.flatMap((p) => p.adding.map((a) => a.studentId)),' -> 'await lockMembershipChange(tx, {\n        studentIds: [],'); ran test/08s6 at 2026-10-08T13:48:28+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > forming takes the students it adds first: a student added to another group while forming is held waits, then is moved — no second open group, no refusal 277ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > forming reads its students again under their locks: a student moved into a group while forming waited stays there — no refusal, no second group 585ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 20 passed (22)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > forming takes the students it adds first: a student added to another group while forming is held waits, then is moved — no second open group, no refusal
+    AssertionError: expected 409 to be 200 // Object.is equality
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > forming reads its students again under their locks: a student moved into a group while forming waited stays there — no refusal, no second group
+    AssertionError: expected 409 to be 200 // Object.is equality
+    - Expected
+    + Received

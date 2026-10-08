@@ -1,0 +1,31 @@
+Control F5a-confirmation-code: apps/api/src/services/timetable-clash.services.ts — the guard undone ('if (!opts.anyway || opts.clashToken !== code) {' -> 'if (!opts.anyway) {'); ran test/08s5 test/08s6 at 2026-10-08T13:51:31+00:00 on igcse_scheduling_ctl_test
+
+   × F1: the review round — changes after publishing, dated teachers, cover and the clock > a student added to a group after publishing, into a lesson at the time of one they have: refused with the clash; going ahead anyway records it and lists it until it no longer happens 56ms
+   × F1: the review round — changes after publishing, dated teachers, cover and the clock > publishing a new version carries cover over to the same lesson, or removes it and tells the cover teacher and the class; a teacher covers only what is in force 155ms
+   × F1: the review round — changes after publishing, dated teachers, cover and the clock > a teacher who covers is then recorded away: the lesson needs new cover and its class is told; removing a cover and withdrawing an absence tell the class and the cover teacher 5131ms
+   × F1: the review round — changes after publishing, dated teachers, cover and the clock > today inside a term (the test clock): a version takes effect today or later; a leaving part-way through a membership; a group retired by today leaves the drafts; the version in force today 46ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those 202ms
+ Test Files  2 failed (2)
+      Tests  5 failed | 25 passed (30)
+ FAIL  test/08s5-scheduling-review.test.ts > F1: the review round — changes after publishing, dated teachers, cover and the clock > a student added to a group after publishing, into a lesson at the time of one they have: refused with the clash; going ahead anyway records it and lists it until it no longer happens
+    AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+    - Expected
+    + Received
+ FAIL  test/08s5-scheduling-review.test.ts > F1: the review round — changes after publishing, dated teachers, cover and the clock > publishing a new version carries cover over to the same lesson, or removes it and tells the cover teacher and the class; a teacher covers only what is in force
+    Error: Resolve the clashes before publishing (1): 1 student is in both Arabic R R-11B and Physics R at Sunday P1
+     ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+     ❯ test/08s5-scheduling-review.test.ts:220:18
+        218|     const v2 = (await apiResponse(coordinator.api.v1.timetables.$post(…
+ FAIL  test/08s5-scheduling-review.test.ts > F1: the review round — changes after publishing, dated teachers, cover and the clock > a teacher who covers is then recorded away: the lesson needs new cover and its class is told; removing a cover and withdrawing an absence tell the class and the cover teacher
+    Error: waitFor: timed out
+     ❯ waitFor test/helpers.ts:482:38
+        480|     const v = await probe();
+        481|     if (v) return v;
+ FAIL  test/08s5-scheduling-review.test.ts > F1: the review round — changes after publishing, dated teachers, cover and the clock > today inside a term (the test clock): a version takes effect today or later; a leaving part-way through a membership; a group retired by today leaves the drafts; the version in force today
+    AssertionError: expected [ 'R — first' ] to deeply equal [ 'R — second' ]
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those
+    AssertionError: expected 200 to be 409 // Object.is equality
+    - Expected
+    + Received

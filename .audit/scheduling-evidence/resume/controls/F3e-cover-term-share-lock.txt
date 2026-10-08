@@ -1,0 +1,34 @@
+Control F3e-cover-term-share-lock: apps/api/src/services/cover.services.ts — the guard undone (".where(eq(timetable.id, lessonRow.timetableId)).for('share', { of: academicTerm });" -> '.where(eq(timetable.id, lessonRow.timetableId));'); ran test/08s6 at 2026-10-08T13:48:56+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, publishing first: the old version’s lesson is not held then and the cover is refused 5258ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over 9ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a line’s teacher changed (the group follows) while the coordinator adds the same student elsewhere: one after the other, no deadlock, one open P1 group 30008ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > forming reads its students again under their locks: a student moved into a group while forming waited stays there — no refusal, no second group 30012ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those 30003ms
+ Test Files  1 failed (1)
+      Tests  5 failed | 17 passed (22)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, publishing first: the old version’s lesson is not held then and the cover is refused
+    Error: waitFor: timed out
+     ❯ waitFor test/helpers.ts:482:38
+        480|     const v = await probe();
+        481|     if (v) return v;
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over
+    TypeError: Cannot read properties of undefined (reading 'find')
+     ❯ lessonOf test/08s6-scheduling-rework.test.ts:78:25
+         76|   const lessonOf = async (ttId: string, group: string, seq = 1) => {
+         77|     const tt = await load(ttId);
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a line’s teacher changed (the group follows) while the coordinator adds the same student elsewhere: one after the other, no deadlock, one open P1 group
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:585:3
+        583|   });
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > forming reads its students again under their locks: a student moved into a group while forming waited stays there — no refusal, no second group
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:598:3
+        596|   });
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those
+    Error: Test timed out in 30000ms.
+    If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+     ❯ test/08s6-scheduling-rework.test.ts:646:3
+        644|   // ─── Round two, flag 5: the roll-over into a year with a published…

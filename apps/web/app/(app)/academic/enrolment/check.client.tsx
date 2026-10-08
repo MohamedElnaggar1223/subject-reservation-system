@@ -30,6 +30,15 @@ export function Check({ year, onOpenStudent }: { year: AcademicYearRow; onOpenSt
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ENROLMENT_KEY });
   const onError = (err: Error) => setError(err.message);
 
+  // A line taught per unit (the reservations rework: an IAL paper) is enrolled per unit from the
+  // student's own lines (the enrolment's bulk step from registrations); the rest as before.
+  const enrolUnits = useMutation({
+    mutationFn: (rows: FlagRow[]) => apiResponse(api.v1.enrolments.bulk.$post({
+      json: { academicYearId: year.id, source: 'registrations', studentIds: [...new Set(rows.map((f) => f.studentId))], subjectMap: [], exclude: [], commit: true },
+    })),
+    onSuccess: () => { setError(''); invalidate(); },
+    onError,
+  });
   const enrol = useMutation({
     mutationFn: (rows: FlagRow[]) => apiResponse(api.v1.enrolments.batch.$post({
       json: {
@@ -66,8 +75,14 @@ export function Check({ year, onOpenStudent }: { year: AcademicYearRow; onOpenSt
   if (q.isLoading) return <LoadingState label="Checking the registrations against the enrolments…" />;
   if (q.isError || !q.data) return <ErrorState title="The check did not load" onRetry={() => q.refetch()} />;
   const f = q.data;
-  const total = f.registeredNotEnrolled.length + f.enrolledNotRegistered.length + f.modeDiffers.length + f.teacherDiffers.length;
-  const pending = enrol.isPending || update.isPending;
+  const total = f.registeredNotEnrolled.length + f.enrolledNotRegistered.length + f.modeDiffers.length + f.teacherDiffers.length + f.subjectAndUnit.length;
+  const pending = enrol.isPending || enrolUnits.isPending || update.isPending;
+  const enrolRows = (rows: FlagRow[]) => {
+    const perUnit = rows.filter((r) => r.unitId);
+    const whole = rows.filter((r) => !r.unitId);
+    if (perUnit.length) enrolUnits.mutate(perUnit);
+    if (whole.length) enrol.mutate(whole);
+  };
 
   return (
     <div className="space-y-6">
@@ -88,7 +103,7 @@ export function Check({ year, onOpenStudent }: { year: AcademicYearRow; onOpenSt
         rows={f.registeredNotEnrolled}
         tone="warning"
         bulk={f.registeredNotEnrolled.length > 1 ? (
-          <Button size="sm" disabled={pending} onClick={() => enrol.mutate(f.registeredNotEnrolled)}>
+          <Button size="sm" disabled={pending} onClick={() => enrolRows(f.registeredNotEnrolled)}>
             <span>Enrol all</span> <span className="tabular-nums">{f.registeredNotEnrolled.length}</span>
           </Button>
         ) : null}
@@ -100,7 +115,7 @@ export function Check({ year, onOpenStudent }: { year: AcademicYearRow; onOpenSt
           </>
         )}
         fix={(r) => (
-          <Button size="sm" variant="outline" disabled={pending} onClick={() => enrol.mutate([r])}>
+          <Button size="sm" variant="outline" disabled={pending} onClick={() => enrolRows([r])}>
             {r.takenOutsideSchool ? 'Enrol as self-study' : 'Enrol'}
           </Button>
         )}
@@ -147,6 +162,21 @@ export function Check({ year, onOpenStudent }: { year: AcademicYearRow; onOpenSt
           <Button size="sm" variant="outline" disabled={pending || !r.enrolmentId} onClick={() => update.mutate({ id: r.enrolmentId!, teacherId: r.registrationTeacherId })}>
             Use the registration&apos;s teacher
           </Button>
+        )}
+      />
+
+      <FlagSection
+        title="Enrolled in the subject and in its units"
+        hint="An enrolment in the subject as a whole (from before the reservations rework) beside enrolments in its units: the student would be taught it twice."
+        rows={f.subjectAndUnit}
+        tone="warning"
+        onOpenStudent={onOpenStudent}
+        detail={(r) => {
+          const x = f.subjectAndUnit.find((y) => y.enrolmentId === r.enrolmentId);
+          return <><span>Units:</span> <bdi data-i18n-skip="true">{x?.units.join(', ')}</bdi> · <span>{x?.fix}</span></>;
+        }}
+        fix={(r) => (
+          <Button size="sm" variant="outline" disabled={pending || !r.enrolmentId} onClick={() => setEnding(r)}>End the whole-subject enrolment…</Button>
         )}
       />
 
@@ -207,11 +237,11 @@ function FlagSection({
       {open && (
         <ul className="divide-y divide-border">
           {rows.map((r) => (
-            <li key={`${r.studentId}|${r.subjectId}|${r.registrationId ?? ''}`} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
+            <li key={`${r.studentId}|${r.subjectId}|${r.unitId ?? ''}|${r.registrationId ?? ''}|${r.enrolmentId ?? ''}`} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
               <div className="min-w-0">
                 <button type="button" className="font-semibold text-foreground hover:underline" onClick={() => onOpenStudent(r.studentId)}><bdi data-i18n-skip="true">{r.studentName}</bdi></button>
                 {r.section && <span className="text-muted-foreground"> · <bdi data-i18n-skip="true">{r.section}</bdi></span>}
-                <span className="text-muted-foreground"> · </span><bdi data-i18n-skip="true" className="text-foreground">{r.subjectName}</bdi>
+                <span className="text-muted-foreground"> · </span><bdi data-i18n-skip="true" className="text-foreground">{r.subjectName}{r.unitCode ? ` ${r.unitCode}` : ''}</bdi>
                 <p className="text-xs text-muted-foreground">{detail(r)}</p>
               </div>
               {fix(r)}

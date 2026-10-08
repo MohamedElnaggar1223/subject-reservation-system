@@ -1,0 +1,29 @@
+Control RW6-unit-key: apps/api/src/services/group.services.ts — the guard undone ('const sameKey = (r: { subjectId: string | null; unitId?: string | null }) =>\n  (r.unitId' -> 'const sameKey = (r: { subjectId: string | null; unitId?: string | null }) =>\n  (false'); ran test/08s6 at 2026-10-08T13:44:48+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a line's teacher changed at the desk reaches the group of its unit: the student moves to the new teacher's P1 group from today, their P2 group stays 28ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher replaced on an offer moves one unit’s members and not the other’s: the June P1 group, all its members now with the new teacher, takes them from today; the winter P2 group keeps its teacher 25ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > "no preference" assigned later on Teaching groups: listed with the teachers its line may take; a teacher the line may not take is refused by name; then the line, the enrolment and the group take the teacher 44ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > with no group of the new teacher the student stays where they are and is listed; the coordinator makes the group and Moves them (guarded) 64ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash 25ms
+ Test Files  1 failed (1)
+      Tests  5 failed | 17 passed (22)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a line's teacher changed at the desk reaches the group of its unit: the student moves to the new teacher's P1 group from today, their P2 group stays
+    AssertionError: expected [ { …(2) }, …(1) ] to deeply equal [ { …(2) }, …(1) ]
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher replaced on an offer moves one unit’s members and not the other’s: the June P1 group, all its members now with the new teacher, takes them from today; the winter P2 group keeps its teacher
+    AssertionError: expected { left: [], moved: [], …(3) } to match object { groupsGiven: [ { …(2) } ], …(2) }
+    (2 matching properties omitted from actual)
+    - Expected
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > "no preference" assigned later on Teaching groups: listed with the teachers its line may take; a teacher the line may not take is refused by name; then the line, the enrolment and the group take the teacher
+    AssertionError: expected [] to deeply equal [ { …(3) } ]
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > with no group of the new teacher the student stays where they are and is listed; the coordinator makes the group and Moves them (guarded)
+    AssertionError: expected [ { …(9) } ] to deeply equal []
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash
+    AssertionError: expected { …(9) } to match object { …(3) }
+    (6 matching properties omitted from actual)
+    - Expected

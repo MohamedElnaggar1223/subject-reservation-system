@@ -1282,6 +1282,18 @@ export async function assignGroupTeacher(data: AssignGroupTeacherType, actorId: 
   return result;
 }
 
+// ─── For step D's "a teaching group" audience (RESERVATIONS_MESSAGES.md §2) ──
+
+/**
+ * The students in a group on a date (today by default), by §2's rules — a section's group follows
+ * the section, the later membership wins a shared day, nobody after leaving. Step D's teaching-group
+ * list reads it once F1 is on main (with `listGroups(academicYearId)` for its picker), in place of
+ * the course enrolments it reads until then.
+ */
+export async function studentsOfGroup(groupId: string, date: string = todayAtSchool(), executor: Executor = db): Promise<string[]> {
+  return [...new Set((await groupMembersBetween([groupId], date, date, executor)).map((m) => m.studentId))].sort();
+}
+
 // ─── Draft timetables follow the groups ──────────────────────────────────────
 
 /**

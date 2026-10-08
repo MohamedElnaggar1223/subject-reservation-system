@@ -731,7 +731,9 @@ export async function replaceTeacher(sessionId: string, offerId: string, data: R
         }
       }
       if (rows.length) {
-        const r = await upsertEnrolments(tx, yearId, rows, actorId, { source: 'registrations', commit: true, ctx, follow: true, reason: data.reason });
+        // Updates only, of the open enrolments just read; the lines are held, so the students are not
+        // locked after them (RESERVATIONS.md §2.1's order: the student before the lines).
+        const r = await upsertEnrolments(tx, yearId, rows, actorId, { source: 'registrations', commit: true, ctx, follow: true, reason: data.reason, lockStudents: false });
         enrolmentsMoved = r.updated;
         groupsFollowed = r.groupsFollowed;
       }
