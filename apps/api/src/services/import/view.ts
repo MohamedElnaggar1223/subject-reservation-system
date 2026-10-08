@@ -36,7 +36,7 @@ import {
 import { getSetting } from '../settings.services';
 import { judgeEligibility, mayRegisterFor, type Eligibility } from '../eligibility.services';
 import { schoolFeeGateReason } from '../school-fee.services';
-import { findOffer, findItem, findOrCreateSeries, availabilityConstraints, OfferError } from '../offer.services';
+import { findOffer, findItem, findItemsByCode, findOrCreateSeries, availabilityConstraints, OfferError } from '../offer.services';
 import { priceLine, PricingError } from '../pricing.services';
 import { assertLineRules, LineRuleError, type RuleLine } from '../line-rules.services';
 import { effectiveDeadlineFor, deadlinePassedSentence } from '../deadline.services';
@@ -72,7 +72,7 @@ export type ResolvedSettings = {
 
 export type RowPlan = ImportRowPlan;
 
-const noPlan = (): RowPlan => ({ student: 'none', parents: [], links: [], section: 'none', enrolment: 'none', registration: 'none', money: 'none', line: null });
+const noPlan = (): RowPlan => ({ student: 'none', parents: [], links: [], section: 'none', enrolment: 'none', registration: 'none', money: 'none', lines: [], split: null });
 
 export type ViewProblem = ImportViewProblem;
 
@@ -682,7 +682,8 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
   // that had ended when it was committed (the interim rule, review flag 2).
   const earliestHistory = new Map<string, number>();
   for (const h of historyRows) {
-    if (!h.subjectId || h.outcome === 'drop_intended' || !seriesEndedBy(h.sessionType, h.seriesYear, h.committedAt)) continue;
+    // Only what was sat: a dropped course or one meant to be dropped is not a sitting (the lead's decision, 8 Oct).
+    if (!h.subjectId || h.outcome !== 'registered' || !seriesEndedBy(h.sessionType, h.seriesYear, h.committedAt)) continue;
     const k = `${h.studentId}|${h.subjectId}`;
     earliestHistory.set(k, Math.min(earliestHistory.get(k) ?? Infinity, seriesOrder(h.sessionType, h.seriesYear)));
   }
@@ -699,11 +700,11 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     return !w.seriesKey || settings.series[w.seriesKey]?.mode !== 'window' || neverLive(d);
   };
   // In this file: a history row of the same subject in an earlier series, over by now, is a sitting
-  // before a line of this file (it is committed first, in the same transaction, so it is committed now).
+  // (registered: a dropped course was never sat — the lead's decision, 8 Oct) before a line of this file (it is committed first, in the same transaction, so it is committed now).
   const historyInFile = new Map<string, { type: Series['type']; year: number }[]>();
   const now = new Date();
   for (const w of work) {
-    if (w.decision === 'import' && w.d.kind === 'sheet' && w.studentKey && w.subjectId && w.d.series && isHistory(w) && historyOutcome(w.d) !== 'drop_intended'
+    if (w.decision === 'import' && w.d.kind === 'sheet' && w.studentKey && w.subjectId && w.d.series && isHistory(w) && historyOutcome(w.d) === 'registered'
       && seriesEndedBy(w.d.series.type, w.d.series.year, now)) {
       const k = `${w.studentKey}|${w.subjectId}`;
       historyInFile.set(k, [...(historyInFile.get(k) ?? []), { type: w.d.series.type, year: w.d.series.year }]);
@@ -715,8 +716,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
   const feeCache = new Map<string, string | null>();
   /** Per (student, session): the rows with a line, for the rules on lines asked together below. */
   const liveGroups = new Map<string, { sid: string | null; sessionId: string; rows: Working[] }>();
-  const linePlans = new Map<string, ImportLinePlan>();
-  const linePrior = new Map<string, string | null>();
+  const linePlans = new Map<string, { line: ImportLinePlan; priorId: string | null }[]>();
 
   // ── A line in a session (RESERVATIONS_REWORK.md §9's F7 list) ──
   type Target = {
@@ -748,28 +748,53 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     }
     return factsCache.get(itemId)!;
   };
-  const findCache = new Map<string, { target: Target | null; found: ImportLinePlan['found'] | null; offerName: string | null; candidates: string[] }>();
-  /** The offer and item the line's words name in the session (findOffer, findItem), or staff's choice on the line. */
-  const targetOf = async (w: Working, d: SheetLine, sessionId: string) => {
-    const chosen = (w.r.edits as ImportRowEditsType | null)?.offerItemId;
-    if (chosen) {
-      const t = await itemFacts(chosen);
-      return t && t.sessionId === sessionId ? { target: t, found: 'staff' as const, offerName: t.subjectName, candidates: [] }
-        : { target: null, found: null, offerName: null, candidates: ['the item chosen on the line is not offered in this session'] };
+  type Found = {
+    targets: { target: Target; code: string | null; found: ImportLinePlan['found'] }[];
+    offerName: string | null; unclear: string | null; split: ImportRowPlan['split'];
+  };
+  const findCache = new Map<string, { offerId: string; offerName: string; item: Target | null; how: ImportLinePlan['found'] | null; candidates: string[] } | null>();
+  /**
+   * The offer and the item or items the line's words name in the session: findOffer and findItem; a
+   * line naming several units or papers that no single item enters is split, one item per code
+   * (findItemsByCode; the review of 8 Oct, item 2); staff's choice on the line over them — the item of
+   * the whole line, or the item of a code the words cannot tell.
+   */
+  const targetsOf = async (w: Working, d: SheetLine, sessionId: string): Promise<Found> => {
+    const e = (w.r.edits ?? {}) as ImportRowEditsType;
+    if (e.offerItemId) {
+      const t = await itemFacts(e.offerItemId);
+      return t && t.sessionId === sessionId ? { targets: [{ target: t, code: null, found: 'staff' }], offerName: t.subjectName, unclear: null, split: null }
+        : { targets: [], offerName: '—', unclear: 'the item chosen on the line is not offered in this session', split: null };
     }
     const label = d.noteOnePaper && d.feeNote ? `${d.subject} ${d.feeNote}` : d.subject;
-    const key = `${sessionId}|${w.subjectId ?? ''}|${lower(label)}|${d.series?.type}|${d.series?.year}`;
+    const where = { month: d.series?.type ?? null, year: d.series?.year ?? null };
+    const key = `${sessionId}|${w.subjectId ?? ''}|${lower(label)}|${d.levelFamily ?? ''}|${d.series?.type}|${d.series?.year}`;
     if (!findCache.has(key)) {
-      const offer = await findOffer(db, sessionId, d.subject, { subjectId: w.subjectId });
-      if (!offer) findCache.set(key, { target: null, found: null, offerName: null, candidates: [] });
+      const offer = await findOffer(db, sessionId, d.subject, { subjectId: w.subjectId, levels: d.levelFamily ? LEVEL_OF[d.levelFamily] : null });
+      if (!offer) findCache.set(key, null);
       else {
-        const it = await findItem(db, offer.offer.id, label, { month: d.series?.type ?? null, year: d.series?.year ?? null });
-        findCache.set(key, it.item
-          ? { target: await itemFacts(it.item.id), found: it.how!, offerName: offer.offer.name, candidates: [] }
-          : { target: null, found: null, offerName: offer.offer.name, candidates: it.candidates.map((c) => c.label) });
+        const it = await findItem(db, offer.offer.id, label, where);
+        findCache.set(key, {
+          offerId: offer.offer.id, offerName: offer.offer.name, item: it.item ? await itemFacts(it.item.id) : null, how: it.how,
+          candidates: it.candidates.map((c) => c.label),
+        });
       }
     }
-    return findCache.get(key)!;
+    const f = findCache.get(key)!;
+    if (!f) return { targets: [], offerName: null, unclear: null, split: null };
+    if (f.item) return { targets: [{ target: f.item, code: null, found: f.how! }], offerName: f.offerName, unclear: null, split: null };
+    // A "one paper" note is one line of one paper, whatever papers the subject's words name: staff choose it.
+    const parts = d.noteOnePaper ? null : await findItemsByCode(db, f.offerId, label, { ...where, chosen: e.codeItems ?? null });
+    if (!parts) return { targets: [], offerName: f.offerName, unclear: `${f.offerName}: ${f.candidates.join(' · ') || 'no item fits'}`, split: null };
+    const split = parts.map((p) => ({ code: p.code, offerItemId: p.item?.id ?? null, itemLabel: p.item?.label ?? null }));
+    const missing = parts.filter((p) => !p.item);
+    if (missing.length) {
+      return { targets: [], offerName: f.offerName, split,
+        unclear: `${f.offerName}: choose the item for ${missing.map((p) => p.code).join(', ')} (${f.candidates.join(' · ') || 'no item'})` };
+    }
+    const targets: Found['targets'] = [];
+    for (const p of parts) targets.push({ target: (await itemFacts(p.item!.id))!, code: p.code, found: e.codeItems?.[p.code] ? 'staff' : 'unit' });
+    return { targets, offerName: f.offerName, unclear: null, split };
   };
   /** An earlier sitting in the board's calendar (a board series of the item's board), when the board sits that month. */
   const sittingBefore = (t: Target, s: { type: string; year: number }) =>
@@ -777,7 +802,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
   /** The student's legacy history of the subject, an earlier series that had ended when it was committed (the interim rule, MO-25): the latest. */
   const legacySitting = (w: Working, sid: string | null, t: Target) => {
     const subjectIds = [...new Set([w.subjectId, t.subjectId].filter((x): x is string => !!x))];
-    const fromDb = sid ? historyRows.filter((h) => h.studentId === sid && h.subjectId && subjectIds.includes(h.subjectId) && h.outcome !== 'drop_intended'
+    const fromDb = sid ? historyRows.filter((h) => h.studentId === sid && h.subjectId && subjectIds.includes(h.subjectId) && h.outcome === 'registered'
       && seriesEndedBy(h.sessionType, h.seriesYear, h.committedAt)).map((h) => ({ type: h.sessionType as Series['type'], year: h.seriesYear })) : [];
     const fromFile = subjectIds.flatMap((sub) => historyInFile.get(`${w.studentKey}|${sub}`) ?? []);
     return [...fromDb, ...fromFile].filter((s) => sittingBefore(t, s)).sort((a, b) => seriesOrder(b.type, b.year) - seriesOrder(a.type, a.year))[0] ?? null;
@@ -800,45 +825,65 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
    * coordinator's answers and staff's choices on the line over it), the sitting it follows and from
    * where, its teacher and its price from the series' fee grid now. Pushes the line's problems.
    */
-  const lineOf = async (w: Working, d: SheetLine, s: PersonView | undefined, sid: string | null, sess: SessionRow) => {
-    const e = (w.r.edits ?? {}) as ImportRowEditsType;
-    const out = { live: true, mode: (d.selfStudy ? 'self_study' : 'in_school') as 'in_school' | 'self_study', refusals: [] as string[], line: null as ImportLinePlan | null };
-    const found = await targetOf(w, d, sess.id);
-    if (!found.target) {
-      if (!found.offerName) w.problems.push({ code: 'not_offered', severity: 'error', detail: `${sess.name} offers no subject for "${d.subject}"` });
-      else w.problems.push({ code: 'item_unclear', severity: 'error', detail: `${found.offerName}: ${found.candidates.join(' · ') || 'no item fits'}` });
+  const pushOnce = (w: Working, p: ViewProblem) => { if (!w.problems.some((x) => x.code === p.code && x.detail === p.detail)) w.problems.push(p); };
+  /** The lines a row makes in its session: one per item it names (several when it is split). */
+  const linesOf = async (w: Working, d: SheetLine, sid: string | null, sess: SessionRow) => {
+    const out = {
+      live: true, mode: (d.selfStudy ? 'self_study' : 'in_school') as 'in_school' | 'self_study', refusals: [] as string[],
+      lines: [] as ImportLinePlan[], priors: [] as (string | null)[], split: null as ImportRowPlan['split'],
+    };
+    const f = await targetsOf(w, d, sess.id);
+    out.split = f.split;
+    if (!f.targets.length) {
+      if (!f.offerName) w.problems.push({ code: 'not_offered', severity: 'error', detail: `${sess.name} offers no subject for "${d.subject}"` });
+      else w.problems.push({ code: 'item_unclear', severity: 'error', detail: f.unclear });
       return out;
     }
-    const t = found.target;
+    if (f.targets.length > 1) w.problems.push({ code: 'line_split', severity: 'info', detail: f.targets.map((x) => `${x.code}: ${x.target.itemLabel}`).join(' · ') });
+    for (const x of f.targets) {
+      const r = await lineFor(w, d, sid, sess, x.target, x.code, x.found);
+      out.mode = r.mode;
+      for (const why of r.refusals) if (!out.refusals.includes(why)) out.refusals.push(why);
+      if (!r.live) { out.live = false; out.lines = []; out.priors = []; return out; }
+      out.lines.push(r.line);
+      out.priors.push(r.priorId);
+    }
+    return out;
+  };
+  /** One line of a row: the attempt, mode, sitting, teacher, window and price for one item. */
+  const lineFor = async (w: Working, d: SheetLine, sid: string | null, sess: SessionRow, t: Target, code: string | null, found: ImportLinePlan['found']) => {
+    const e = (w.r.edits ?? {}) as ImportRowEditsType;
+    const out = { live: true, mode: (d.selfStudy ? 'self_study' : 'in_school') as 'in_school' | 'self_study', refusals: [] as string[] };
     const c = availabilityConstraints(t.offerAvailability, t.itemAvailability);
     if (c.selfStudyOnly) {
-      if (d.selfStudy) w.problems.push({ code: 'self_study_not_taught', severity: 'info', detail: null });
+      if (d.selfStudy) pushOnce(w, { code: 'self_study_not_taught', severity: 'info', detail: null });
       out.mode = 'self_study';
     }
     // The attempt and the sitting it follows: staff's choice on the line, the student's legacy history,
     // a sitting the sheet names ("From June 2026"; "Carry forward on …" read as a result).
     const named = e.priorSitting ? { month: e.priorSitting.month, year: e.priorSitting.year, from: 'line' as const } : null;
-    const carried = settings.carryForward === 'result' && d.carryForwardFrom ? readSeries(d.carryForwardFrom) : null;
-    const noted = d.noteSitting ? { month: d.noteSitting.type, year: d.noteSitting.year, from: 'note' as const }
-      : carried ? { month: carried.type, year: carried.year, from: 'carry_forward' as const } : null;
-    const legacy = e.attempt === 'first' ? null : legacySitting(w, sid, t);
-    const wantsRetake = e.attempt === 'retake' || (e.attempt !== 'first' && (d.noteRetake || d.noteOnePaper || t.itemKind === 'one_paper'));
+    const noted = d.noteSitting ? { month: d.noteSitting.type, year: d.noteSitting.year, from: 'note' as const } : null;
+    const carriedRead = settings.carryForward === 'result' && d.carryForwardFrom ? readSeries(d.carryForwardFrom) : null;
+    const carried = carriedRead ? { month: carriedRead.type, year: carriedRead.year, from: 'carry_forward' as const } : null;
+    const legacy = legacySitting(w, sid, t);
+    const saysRetake = e.attempt === 'retake' || (e.attempt !== 'first' && (d.noteRetake || d.noteOnePaper || t.itemKind === 'one_paper'));
+    const declared = (p: { month: Series['type']; year: number; from: 'line' | 'note' | 'carry_forward' }) => ({ ...p, source: 'declared_by_desk' as const });
+    const legacyPrior = legacy ? { month: legacy.type, year: legacy.year, source: 'legacy' as const, from: 'history' as const } : null;
     let attempt: 'first' | 'retake' = 'first';
     let prior: ImportLinePlan['priorSitting'] = null;
-    if (t.needsPriorSeries && !wantsRetake && !legacy && e.attempt !== 'retake') {
-      // A carried-forward route: a first entry carrying the sitting named (gate.priorSeries asks for it).
-      const p = named ?? noted;
-      if (p) prior = { ...p, source: 'declared_by_desk' };
+    if (t.needsPriorSeries && !saysRetake) {
+      // A carried-forward route (an "A2, carry forward" item): a first entry carrying a sitting forward —
+      // the one staff name, the student's legacy history, or the one the sheet names. Never a retake unless
+      // the note or staff say so (the review of 8 Oct, item 1): a retake would take the retake deadline and
+      // the self-study share without the exception, and be entered with the board as a re-sit.
+      const p = named ? declared(named) : legacyPrior ?? (noted ? declared(noted) : carried ? declared(carried) : null);
+      prior = p;
     } else if (e.attempt === 'first') {
       attempt = 'first';
-    } else if (named) {
-      attempt = 'retake'; prior = { ...named, source: 'declared_by_desk' };
-    } else if (legacy) {
-      attempt = 'retake'; prior = { month: legacy.type, year: legacy.year, source: 'legacy', from: 'history' };
-    } else if (noted) {
-      attempt = 'retake'; prior = { ...noted, source: 'declared_by_desk' };
-    } else if (wantsRetake) {
-      attempt = 'retake';
+    } else {
+      const p = named ? declared(named) : legacyPrior ?? (noted ? declared(noted) : t.needsPriorSeries && carried ? declared(carried) : null);
+      if (p) { attempt = 'retake'; prior = p; }
+      else if (saysRetake) attempt = 'retake';
     }
     const rule = d.selfStudyChoice ?? (settings.selfStudyOnTaught === 'retake_only' ? null : settings.selfStudyOnTaught);
     if (prior && !sittingBefore(t, { type: prior.month, year: prior.year })) {
@@ -849,40 +894,38 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
         // The coordinator's answer (or staff's on the line) settles a self-study note with no sitting.
         attempt = 'first';
       } else {
-        w.problems.push({ code: 'retake_sitting_missing', severity: 'error', detail: `${d.feeNote ? `"${d.feeNote}"` : 'a retake'}: name the sitting it follows on the line, or make it a first entry` });
+        pushOnce(w, { code: 'retake_sitting_missing', severity: 'error', detail: `${d.feeNote ? `"${d.feeNote}"` : 'a retake'}: name the sitting it follows on the line, or make it a first entry` });
       }
     }
     if (out.mode === 'self_study' && attempt === 'first' && !c.selfStudyOnly) {
       if (rule === 'in_school') {
         out.mode = 'in_school';
-        w.problems.push({ code: 'self_study_on_taught', severity: 'info', detail: 'taken as taught in school' });
+        pushOnce(w, { code: 'self_study_on_taught', severity: 'info', detail: 'taken as taught in school' });
       } else if (rule === 'enrol_only') {
         out.live = false;
-        w.problems.push({ code: 'self_study_on_taught', severity: 'info', detail: 'enrolled as self-study, no exam line made' });
-        return out;
+        pushOnce(w, { code: 'self_study_on_taught', severity: 'info', detail: 'enrolled as self-study, no exam line made' });
       } else if (await selfStudyException(sid, t)) {
-        w.problems.push({ code: 'self_study_on_taught', severity: 'info', detail: 'a first entry in self-study, by the student’s exception' });
+        pushOnce(w, { code: 'self_study_on_taught', severity: 'info', detail: 'a first entry in self-study, by the student’s exception' });
       } else {
-        w.problems.push({ code: 'self_study_on_taught', severity: 'error', detail: 'Self-study on a first entry needs the exception: grant it on the Exceptions page or make it a retake with its sitting' });
+        pushOnce(w, { code: 'self_study_on_taught', severity: 'error', detail: 'Self-study on a first entry needs the exception: grant it on the Exceptions page or make it a retake with its sitting' });
       }
     }
     if (out.mode === 'self_study' && attempt === 'retake' && prior) {
-      w.problems.push({ code: 'self_study_retake', severity: 'info', detail: `a retake of ${seriesText({ type: prior.month, year: prior.year })} (${prior.source === 'legacy' ? 'the student’s history' : 'named on the sheet or the line, to verify'})` });
+      pushOnce(w, { code: 'self_study_retake', severity: 'info', detail: `a retake of ${seriesText({ type: prior.month, year: prior.year })} (${prior.source === 'legacy' ? 'the student’s history' : 'named on the sheet or the line, to verify'})` });
     }
     // The teacher: the one the sheet names when the item or the subject's offer has them; else its only one; else none yet.
     let teacherId: string | null = null;
     if (out.mode === 'in_school') {
       if (w.teacherId && t.teachers.includes(w.teacherId)) teacherId = w.teacherId;
       else {
-        if (d.teacher && t.teachers.length) w.problems.push({ code: 'teacher_not_on_offer', severity: 'warning', detail: `${d.teacher} does not teach ${t.subjectName} in ${sess.name}` });
+        if (d.teacher && t.teachers.length) pushOnce(w, { code: 'teacher_not_on_offer', severity: 'warning', detail: `the sheet names ${d.teacher}, who does not teach ${t.subjectName} in ${sess.name}` });
         teacherId = t.teachers.length === 1 ? t.teachers[0]! : null;
       }
     }
     // The family's confirmation on the sheet: the line's consent (the imported channel).
-    if (d.confirm !== 'confirm') w.problems.push({ code: 'consent_missing', severity: 'error', detail: null });
+    if (d.confirm !== 'confirm') pushOnce(w, { code: 'consent_missing', severity: 'error', detail: null });
     // The session, the series and its deadline for this line.
     const priorId = prior && t.boardCode ? await existingSeriesId(t.boardCode, prior.month, prior.year) : null;
-    linePrior.set(w.r.id, priorId);
     if (sess.status === 'closed') out.refusals.push(`${sess.name} is closed`);
     else if (!t.seriesId) out.refusals.push(`${t.subjectName} is entered in no board series: it cannot be reserved`);
     else {
@@ -902,16 +945,17 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
         total: p.total, courseFee: p.courseFee, boardFee: p.registrationFee, provisional: p.provisional,
         courseFeeBase: p.basis.courseFeeBase, coursePercent: p.basis.coursePercent, boardFeeBase: p.basis.boardFeeBase, boardPercent: p.basis.boardPercent,
       };
-      if (p.provisional) w.problems.push({ code: 'price_provisional', severity: 'info', detail: `board fee ${p.basis.boardFeeBase} in ${t.seriesName ?? 'its series'}` });
+      if (p.provisional) pushOnce(w, { code: 'price_provisional', severity: 'info', detail: `board fee ${p.basis.boardFeeBase} in ${t.seriesName ?? 'its series'}` });
     } catch (err) {
       if (!(err instanceof PricingError)) throw err;
-      w.problems.push({ code: 'fee_missing', severity: 'error', detail: err.message });
+      pushOnce(w, { code: 'fee_missing', severity: 'error', detail: err.message });
     }
-    out.line = {
+    const line: ImportLinePlan = {
+      code, exists: false,
       sessionId: sess.id, sessionName: sess.name, offerId: t.offerId, offerItemId: t.offerItemId, subjectName: t.subjectName, itemLabel: t.itemLabel,
-      found: found.found!, series: t.seriesName, attempt, mode: out.mode, priorSitting: prior, teacherId, price,
+      found, series: t.seriesName, attempt, mode: out.mode, priorSitting: prior, teacherId, price,
     };
-    return out;
+    return { ...out, line, priorId };
   };
 
   for (const w of work) {
@@ -980,9 +1024,10 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
         w.problems.push({ code: 'registration_refused', severity: 'error', detail: 'choose the session for this series on the Mapping tab' });
         plan.registration = 'live';
       } else {
-        const l = await lineOf(w, d, s, sid, sess);
+        const l = await linesOf(w, d, sid, sess);
         mode = l.mode;
         registerLive = l.live;
+        plan.split = l.split;
         if (l.live) {
           // Eligibility and the school fee, as every reservation path asks them.
           const eKey = `${w.studentKey}|${sess.id}`;
@@ -1001,10 +1046,11 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
             if (gate) l.refusals.push(gate);
           }
           if (l.refusals.length) w.problems.push({ code: 'registration_refused', severity: 'error', detail: l.refusals.join('; ') });
-          if (l.line) {
-            linePlans.set(w.r.id, l.line);
-            plan.line = l.line;
-            plan.registration = sid && liveItemSet.has(`${sid}|${sess.id}|${l.line.offerItemId}`) ? 'live_exists' : 'live';
+          if (l.lines.length) {
+            for (const line of l.lines) line.exists = !!sid && liveItemSet.has(`${sid}|${sess.id}|${line.offerItemId}`);
+            linePlans.set(w.r.id, l.lines.map((line, i) => ({ line, priorId: l.priors[i] ?? null })));
+            plan.lines = l.lines;
+            plan.registration = l.lines.every((x) => x.exists) ? 'live_exists' : 'live';
             const k = `${w.studentKey}|${sess.id}`;
             const g = liveGroups.get(k) ?? { sid, sessionId: sess.id, rows: [] };
             g.rows.push(w);
@@ -1057,21 +1103,23 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     await db.transaction(async (tx) => {
       const accepted: RuleLine[] = [];
       for (const w of checkable) {
-        const line = linePlans.get(w.r.id)!;
-        let priorId = linePrior.get(w.r.id) ?? null;
-        try {
-          await tx.transaction(async (sp) => {
-            if (line.priorSitting && !priorId) {
-              const t = (await itemFacts(line.offerItemId))!;
-              priorId = (await findOrCreateSeries(sp, t.boardCode!, line.priorSitting.month, line.priorSitting.year, '', null, 'checked by the import review (rolled back)')).id;
-            }
-            const rl: RuleLine = { offerItemId: line.offerItemId, attempt: line.attempt, mode: line.mode, priorSittingSeriesId: priorId, priorSittingSource: line.priorSitting?.source ?? null };
-            await assertLineRules(sp, { studentId: g.sid ?? NEW_STUDENT, sessionId: g.sessionId, eligibility: { grade: null, series: el.series } }, [...accepted, rl]);
-            accepted.push(rl);
-          });
-        } catch (err) {
-          if (err instanceof LineRuleError || err instanceof OfferError) refused.set(w.r.id, err.message);
-          else throw err;
+        for (const { line, priorId: known } of linePlans.get(w.r.id)!.filter((x) => !x.line.exists)) {
+          let priorId = known;
+          try {
+            await tx.transaction(async (sp) => {
+              if (line.priorSitting && !priorId) {
+                const t = (await itemFacts(line.offerItemId))!;
+                priorId = (await findOrCreateSeries(sp, t.boardCode!, line.priorSitting.month, line.priorSitting.year, '', null, 'checked by the import review (rolled back)')).id;
+              }
+              const rl: RuleLine = { offerItemId: line.offerItemId, attempt: line.attempt, mode: line.mode, priorSittingSeriesId: priorId, priorSittingSource: line.priorSitting?.source ?? null };
+              // Read, never lock: a GET holds no exception row (the review of 8 Oct, item 5).
+              await assertLineRules(sp, { studentId: g.sid ?? NEW_STUDENT, sessionId: g.sessionId, eligibility: { grade: null, series: el.series } }, [...accepted, rl], { lockExceptions: false });
+              accepted.push(rl);
+            });
+          } catch (err) {
+            if (err instanceof LineRuleError || err instanceof OfferError) { refused.set(w.r.id, err.message); break; }
+            throw err;
+          }
         }
       }
       throw new DryRun();
@@ -1088,7 +1136,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     const core = await db.select({ id: sessionOffer.id, name: subject.name }).from(sessionOffer).innerJoin(subject, eq(subject.id, sessionOffer.subjectId))
       .where(and(eq(sessionOffer.sessionId, g.sessionId), eq(sessionOffer.grade10Core, true), ne(sessionOffer.availability, 'closed')));
     const have = new Set([
-      ...g.rows.map((w) => linePlans.get(w.r.id)?.offerId).filter((x): x is string => !!x),
+      ...g.rows.flatMap((w) => (linePlans.get(w.r.id) ?? []).map((x) => x.line.offerId)),
       ...(g.sid ? liveRegs.filter((r) => r.studentId === g.sid && r.sessionId === g.sessionId).map((r) => r.offerId) : []),
     ]);
     const missing = core.filter((c) => !have.has(c.id)).map((c) => c.name).sort();
@@ -1236,12 +1284,12 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       newSections: mapping.sections.filter((s) => !s.exists && s.yearSetUp).length,
       enrolments: count((p) => p.enrolment === 'create'),
       history: count((p) => p.registration === 'history'),
-      registrations: count((p) => p.registration === 'live'),
+      registrations: pending.reduce((n, w) => n + (w.plan.registration === 'live' ? Math.max(1, w.plan.lines.filter((l) => !l.exists).length) : 0), 0),
       money: count((p) => p.money === 'create'),
       newTeachers: mapping.teachers.filter((t) => !t.teacherId && t.create).length,
       existing: {
         enrolments: count((p) => p.enrolment === 'exists'), history: count((p) => p.registration === 'history_exists'),
-        registrations: count((p) => p.registration === 'live_exists'), money: count((p) => p.money === 'exists'),
+        registrations: pending.reduce((n, w) => n + w.plan.lines.filter((l) => l.exists).length, 0), money: count((p) => p.money === 'exists'),
       },
     },
   };

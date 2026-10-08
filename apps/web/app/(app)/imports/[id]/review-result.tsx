@@ -17,6 +17,7 @@ type Result = {
   created?: Record<string, number>;
   teachersCreated?: string[];
   sectionsCreated?: string[];
+  rowsSplit?: { row: string; lines: number }[];
 };
 
 const CREATED: [string, string][] = [
@@ -41,6 +42,12 @@ export function ResultTab({ v, onOpenRows }: { v: ImportView; onOpenRows: (show:
       </Notice>
       {(r.teachersCreated?.length ?? 0) > 0 && (
         <p className="text-sm"><span className="text-muted-foreground">New teacher records:</span> <bdi data-i18n-skip="true">{r.teachersCreated!.join(', ')}</bdi></p>
+      )}
+      {(r.rowsSplit?.length ?? 0) > 0 && (
+        <p className="text-sm">
+          <span className="text-muted-foreground">Lines of the sheet split into one line per unit or paper:</span>{' '}
+          {r.rowsSplit!.map((x, i) => <span key={x.row}>{i > 0 && ', '}<bdi data-i18n-skip="true">{x.row}</bdi> (<span className="tabular-nums">{x.lines}</span> <span>lines</span>)</span>)}
+        </p>
       )}
       {(r.sectionsCreated?.length ?? 0) > 0 && (
         <p className="text-sm"><span className="text-muted-foreground">New sections:</span> <bdi data-i18n-skip="true">{r.sectionsCreated!.join(', ')}</bdi></p>

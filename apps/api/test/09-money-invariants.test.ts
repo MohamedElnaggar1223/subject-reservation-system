@@ -666,7 +666,7 @@ describe('money invariants over the whole database', () => {
     // Each traced to the committed import line whose outcome names it.
     const untraced = await sql(`
       select r.id from registration r where r.id in $1
-        and not exists (select 1 from import_row ir where ir.status = 'committed' and ir.outcome->>'registration' = r.id)`, [ids]);
+        and not exists (select 1 from import_row ir where ir.status = 'committed' and ir.outcome->'registrations' ? r.id)`, [ids]);
     expect(untraced).toEqual([]);
     // A sitting it follows says where it is known from: the student's legacy history, or the desk's declaration.
     const sourced = await sql(`

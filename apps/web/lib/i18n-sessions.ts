@@ -337,6 +337,9 @@ export function translateSessionsText(text: string): string | null {
       () => 'تغيّر سعر مادة أو أكثر أثناء فتح هذه الصفحة (أكد المجلس رسومه) — راجع السعر الجديد وادفع مرة أخرى'],
     [/^(.+) is already in this session$/, (m) => `${m[1]} موجودة في هذه الجلسة بالفعل`],
     [/^Who teaches (.+)\? An open subject names its teachers — or make it self-study only$/, (m) => `من يدرّس ${m[1]}؟ المادة المفتوحة تحدد معلميها — أو اجعلها دراسة ذاتية فقط`],
+    // MO-9: an open subject carries the school's course fee (F7's review of 8 Oct, item 6).
+    [/^(.+) has no course fee: set the school's course fee before it is open in this session \(a line is never priced without one\)$/,
+      (m) => `${m[1]} بلا رسوم تدريس: حدّد رسوم التدريس في المدرسة قبل فتحها في هذه الجلسة (لا يُسعَّر سطر من دونها)`],
     [/^Copy from a session of the same kind \(June from June, winter from winter\)$/, () => 'انسخ من جلسة من النوع نفسه (يونيو من يونيو، والشتاء من الشتاء)'],
     [/^IGCSE sits neither October nor January: an IGCSE item is entered in a June or November series$/, () => 'لا تُعقد IGCSE في أكتوبر ولا يناير: يُقيَّد بند IGCSE في دورة يونيو أو نوفمبر'],
     [/^(\d+) checkouts? still open would pay for two deadlines after this move — confirm or cancel (?:it|them) first$/, (m) => `${m[1]} عملية دفع مفتوحة ستدفع لموعدين بعد هذا النقل — أكّدها أو ألغها أولًا`],

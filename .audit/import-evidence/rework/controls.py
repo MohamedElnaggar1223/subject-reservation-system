@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 ROOT = '/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/agent-acf43230a4e06e8b4'
 API = ROOT + '/apps/api'
@@ -36,7 +37,7 @@ CONTROLS = {
             '  if (edits.selfStudy === undefined && answeredNo && noteSaysSelf) local.push(', '  if (false) local.push(', ['08n-import']),
     # RESERVATIONS_REWORK.md s9's F7 list
     'C31': ('s9: the review refuses a line whose item has no fee row, naming the grid (fee_missing)', V,
-            "      w.problems.push({ code: 'fee_missing', severity: 'error', detail: err.message });", '      void err;', ['08n-import']),
+            "      pushOnce(w, { code: 'fee_missing', severity: 'error', detail: err.message });", '      void err;', ['08n-import']),
     'C32': ('flag 1b on the new model: the shared refusal of an item with no fee row on every path (priceLine, A\'s)', P,
             '  if (missing.length) {', '  if (false && missing.length) {', ['03-v3', '08n-import']),
     'C33': ('s9: a provisional fee row prices the line provisional at its amount, never 0 (priceLine reads provisional rows)', P,
@@ -46,15 +47,15 @@ CONTROLS = {
             "  await writeConsents(tx, inserted.map((i) => i.id), { channel: 'imported', confirmedBy: actor.id, at: now });",
             "  await writeConsents(tx, inserted.map((i) => i.id), { channel: 'desk', confirmedBy: actor.id, at: now });", ['08n-import']),
     'C35': ('s9: a line with no confirmation on the sheet is an error (consent_missing)', V,
-            "    if (d.confirm !== 'confirm') w.problems.push({ code: 'consent_missing'", "    if (false) w.problems.push({ code: 'consent_missing'", ['08n-import']),
+            "    if (d.confirm !== 'confirm') pushOnce(w, { code: 'consent_missing'", "    if (false) pushOnce(w, { code: 'consent_missing'", ['08n-import']),
     'C36': ('the lead\'s Q2: a sitting from the student\'s history is the legacy source', V,
-            "      attempt = 'retake'; prior = { month: legacy.type, year: legacy.year, source: 'legacy', from: 'history' };",
-            "      attempt = 'retake'; prior = { month: legacy.type, year: legacy.year, source: 'declared_by_desk', from: 'history' };", ['08n-import']),
+            "    const legacyPrior = legacy ? { month: legacy.type, year: legacy.year, source: 'legacy' as const, from: 'history' as const } : null;",
+            "    const legacyPrior = legacy ? { month: legacy.type, year: legacy.year, source: 'declared_by_desk' as const, from: 'history' as const } : null;", ['08n-import']),
     'C37': ('the lead\'s Q2: a retake that names no sitting is an error (retake_sitting_missing)', V,
-            "        w.problems.push({ code: 'retake_sitting_missing', severity: 'error',", "        void ({ code: 'retake_sitting_missing', severity: 'error',", ['08n-import']),
+            "        pushOnce(w, { code: 'retake_sitting_missing', severity: 'error',", "        void ({ code: 'retake_sitting_missing', severity: 'error',", ['08n-import']),
     'C38': ('the lead\'s addition: self-study on a first entry of a taught item is an error, never priced at the share silently', V,
-            "        w.problems.push({ code: 'self_study_on_taught', severity: 'error', detail: 'Self-study on a first entry needs the exception",
-            "        w.problems.push({ code: 'self_study_on_taught', severity: 'info', detail: 'Self-study on a first entry needs the exception", ['08n-import']),
+            "        pushOnce(w, { code: 'self_study_on_taught', severity: 'error', detail: 'Self-study on a first entry needs the exception",
+            "        pushOnce(w, { code: 'self_study_on_taught', severity: 'info', detail: 'Self-study on a first entry needs the exception", ['08n-import']),
     'C39': ('the student\'s gate.selfStudyFirstEntry exception lets a first entry in self-study through', V,
             '      } else if (await selfStudyException(sid, t)) {', '      } else if (false) {', ['08n-import']),
     'C40': ('the interim rule (MO-25): history is a sitting only if its series had ended when it was committed', V,
@@ -74,6 +75,40 @@ CONTROLS = {
     'C45': ('reserving lines in a session is the admin\'s (the commit\'s 403)', C,
             "    if (actor.role !== 'admin' && view.rows.some((r) => readyRows.has(r.id) && r.plan.registration === 'live')) {",
             '    if (false) {', ['08n-import']),
+    # The review of 8 Oct (items 1 to 7)
+    'C46': ('item 1: on an item that needs a prior series, a legacy or noted sitting is the carried sitting of a first entry unless the note or staff say retake', V,
+            '    if (t.needsPriorSeries && !saysRetake) {', '    if (false) {', ['08n-import']),
+    'C47': ('item 2: a row naming several units or papers is split, one item per code (findItemsByCode)', V,
+            '    const parts = d.noteOnePaper ? null : await findItemsByCode(db, f.offerId, label, { ...where, chosen: e.codeItems ?? null });',
+            "    const parts = d.noteOnePaper ? null : await findItemsByCode(db, f.offerId, '', { ...where, chosen: e.codeItems ?? null });", ['08n-import']),
+    'C59': ('item 2: a "one paper" note is one line, never split by the papers the subject names', V,
+            '    const parts = d.noteOnePaper ? null : await findItemsByCode(', '    const parts = false ? null : await findItemsByCode(', ['08n-import']),
+    'C48': ('item 2: the commit makes every line of a split row', C,
+            '  const wanted = rows.flatMap((r) => r.plan.lines.map((l) => ({ r, l })));',
+            '  const wanted = rows.flatMap((r) => r.plan.lines.slice(0, 1).map((l) => ({ r, l })));', ['08n-import']),
+    'C49': ('item 2: findOffer takes the one offer entering any unit named when none enters them all (the code left for staff)', O,
+            "  return pick(every.length ? every : covering(false), 'unit');", "  return pick(every, 'unit');", ['08n-import']),
+    'C50': ('item 3: a dropped course in the file is not a sitting', V,
+            "isHistory(w) && historyOutcome(w.d) === 'registered'", "isHistory(w) && historyOutcome(w.d) !== 'drop_intended'", ['08n-import']),
+    'C51': ('item 3: a dropped course in the system\'s history is not a sitting', V,
+            "subjectIds.includes(h.subjectId) && h.outcome === 'registered'", "subjectIds.includes(h.subjectId) && h.outcome !== 'drop_intended'", ['08n-import']),
+    'C52': ('item 4: the September pattern "… is not open" deleted (it read A\'s "Registration window is not open")', '../web/lib/i18n-import.ts',
+            "    [/^(.+) is no longer offered$/, (m) => `${m[1]} لم تعد متاحة`],",
+            "    [/^(.+) is not open$/, (m) => `${m[1]} غير مفتوحة`],\n    [/^(.+) is no longer offered$/, (m) => `${m[1]} لم تعد متاحة`],", ['08n-import']),
+    'C53': ('item 4: "Add …" translated only as the import\'s own aria-label ("Add X to the catalogue")', '../web/lib/i18n-import.ts',
+            '    [/^Add (.+) to the catalogue$/, (m) => `أضف ${m[1]} إلى الدليل`],', '    [/^Add (.+)$/, (m) => `أضف ${m[1]}`],', ['08n-import']),
+    'C54': ('item 5: every student with lines held FOR NO KEY UPDATE in id order before the first line', C,
+            "  await lockStudents(tx, [...bySession.keys()].map((k) => k.split('|')[0]!));", '  void lockStudents;', ['08n-import']),
+    'C55': ('item 5: the review\'s dry run reads the exception rows without a lock (a GET holds none)', V,
+            '[...accepted, rl], { lockExceptions: false });', '[...accepted, rl]);', ['08n-import']),
+    'C56': ('item 6: an open offer with no course fee is refused at creation, naming the subject (MO-9)', O,
+            '      assertCourseFeeFor(data.availability, data.courseFee, s.name);', '      void assertCourseFeeFor;', ['08n-import']),
+    'C57': ('item 6: opening an offer with no course fee, or setting it to 0 while open, is refused (MO-9)', O,
+            '    if (data.courseFee !== undefined || data.availability !== undefined) assertCourseFeeFor(',
+            '    if (false) assertCourseFeeFor(', ['08n-import']),
+    'C58': ('item 7: findOffer\'s name fallback matches the row\'s level', O,
+            "  const byName = pick(atLevel(offers.filter((o) => words(o.name) === t || words(o.code) === t)), 'name')",
+            "  const byName = pick(offers.filter((o) => words(o.name) === t || words(o.code) === t), 'name')", ['08n-import']),
     # F7's earlier controls, run again on the new base (their guards unchanged)
     'C1': ('the commit claim (re-run on the new base)', C,
            "sql`(${importBatch.status} in ('staged', 'partial') or (${importBatch.status} = 'committing' and ${importBatch.commitStartedAt} < now() - make_interval(mins => ${STALE_CLAIM_MINUTES})))`",
@@ -125,9 +160,27 @@ def run(name: str):
         summary = [l.strip() for l in log.splitlines() if l.strip().startswith('Tests ')]
         verdict = 'RED' if out.returncode != 0 else 'GREEN'
         print(f'{name}\t{verdict}\t{desc}\t{summary[-1] if summary else ""}\t{failed[0][:200] if failed else ""}', flush=True)
+        if ROW_FOR:
+            first = (failed[0] if failed else '').replace('× F7: the day-one import > ', '').replace('× V3 flows > ', '03: ')[:220]
+            args = ['python3', ROOT + '/scripts/trail-row.py', 'import', 'control', verdict.lower(),
+                    '--decision', f'{name} undone ({desc}) on {ROW_FOR}: {" and ".join(files)} {verdict.lower()}, {summary[-1].strip() if summary else ""}; first failing: {first}; restored',
+                    '--why', 'each guard shown red once with it undone (FEATURES_PLAN s5); one row per control at the time it finished (the review of 8 Oct, item 8)',
+                    '--evidence', f'.audit/import-evidence/rework/control-{name}.log']
+            for _ in range(3):
+                r = subprocess.run(args, capture_output=True, text=True)
+                if r.returncode == 0:
+                    break
+                time.sleep(1.1)  # two controls finishing in one second: the next second is its own time
+            print(r.stdout.strip() or r.stderr.strip(), flush=True)
     finally:
         open(path, 'w').write(src)
 
 
-for n in sys.argv[1:] or list(CONTROLS):
+# --row <commit>: write each control's trail row as it finishes, naming the code it ran on.
+ROW_FOR = None
+argv = sys.argv[1:]
+if '--row' in argv:
+    ROW_FOR = argv[argv.index('--row') + 1]
+    argv = [a for i, a in enumerate(argv) if a != '--row' and (i == 0 or argv[i - 1] != '--row')]
+for n in argv or list(CONTROLS):
     run(n)

@@ -204,22 +204,38 @@ and board parts, their bases and percents and the provisional mark.
 
 For a line whose series and level the admin mapped to its session (`lineOf` in view.ts):
 
-1. **Offer and item.** `findOffer(sessionId, term, { subjectId })` and `findItem(offerId, label,
-   { month, year })` (added to A's `offer.services.ts`, §6): the offer of the mapped catalogue row,
-   else the subject named by name or code (or without its bracket), else the one offer with an item
-   entering a unit the words name ("Pure Mathematics 1 (P1)" → the IAL Mathematics offer's P1 item);
-   the item labelled so, else the one entering exactly the unit or paper named, else the whole
-   subject; among several, the one in the sheet's month and year. Staff may choose the item on the
-   line (`offerItemId`, one of the session's items).
+1. **Offer and item.** `findOffer(sessionId, term, { subjectId, levels })` and `findItem(offerId,
+   label, { month, year })` (added to A's `offer.services.ts`, §6): the offer of the mapped catalogue
+   row, else the subject named by name or code (or without its bracket) **at the line's level** (an
+   A.S. line never lands on an IGCSE subject of the same name; two at its level are ambiguous and
+   none is chosen), else the one offer with an item entering every unit the words name, or any of
+   them when none enters all ("Pure Mathematics 1 (P1)" → the IAL Mathematics offer's P1 item); the
+   item labelled so, else the one entering exactly the unit or paper named, else the whole subject;
+   among several, the one in the sheet's month and year. Staff may choose the item on the line
+   (`offerItemId`, one of the session's items).
+   - **A line naming several units or papers is split** (the review of 8 Oct, item 2): when no
+     single item enters them all ("Biology (Paper 1 & Paper 2)", "Mathematics (P1 & M1)"),
+     `findItemsByCode` finds one item per code and the row makes **one line per item**, each with
+     its own attempt, sitting, teacher and price, listed in the row's line section with its code
+     (`line_split`, info, names each code and its item). A code no item of its own fits leaves the
+     row `item_unclear` ("…: choose the item for p5 (M1 · P1 · P2)") until staff choose the item
+     **for that code only** (`codeItems`); staff may instead choose one item for the whole line. A
+     "one paper" note is one line of one paper, never split: staff choose it.
 2. **Attempt, mode and the sitting** (the lead's rules of 8 Oct, MO-25's interim rule):
    - mode: self-study from the answer or the note, or when the item or offer is self-study only;
-   - a **retake with source `legacy`** when the student's history has the subject in an earlier
-     series of the item's board **that had ended when it was committed** (the history row's
-     creation; a history line of the same file counts as committed now) — the latest such;
+   - a **retake with source `legacy`** when the student's history has the subject **sat** (not
+     dropped, nor a drop the family meant) in an earlier series of the item's board **that had ended
+     when it was committed** (the history row's creation; a history line of the same file counts as
+     committed now) — the latest such;
    - a **retake with source `declared_by_desk`** when the sheet names the sitting ("From June
      2026"; "Carry forward on …" read as a result) or staff name it on the line; listed on the
      session's To verify tab;
-   - a carried-forward route (`needs_prior_series`) is a first entry carrying the sitting named;
+   - **an item that needs a prior series** (a carry-forward route, "A2, carry forward") is a
+     **first entry carrying the sitting** — the one staff name, the student's legacy history, the one
+     the note names, or a carry forward read as a result — and a retake only when the note or staff
+     say so (the review of 8 Oct, item 1): a retake would take the retake deadline and the self-study
+     share without the exception, and be entered with the board as a re-sit. Staff's "First entry"
+     keeps the carried sitting;
    - a note that says a retake with neither: `retake_sitting_missing` (error) — never `legacy`
      without a series;
    - self-study on a first entry of a taught item: `self_study_on_taught` (error) unless the
@@ -260,9 +276,12 @@ For a line whose series and level the admin mapped to its session (`lineOf` in v
    - sections locked, then accounts (no password: "Forgot password" sets one), links (a link to an
      existing account only once confirmed on its line), section places, `registration_history`,
      course enrolments (`upsertEnrolments`, source `import`);
-   - **lines in a session** (`reserveImportLines`), per student and session: the student held first
-     (`assertMayRegisterForInTx`, `FOR NO KEY UPDATE`, as every reservation path); a line the
-     student holds already on the item is not made again; each line's window and effective
+   - **lines in a session** (`reserveImportLines`): **every student of the family with lines held
+     `FOR NO KEY UPDATE` in id order before the first line** (`lockStudents`, RESERVATIONS.md §2.1;
+     the review of 8 Oct, item 5: no student's line, fee row or one-shot exception is locked while
+     another is still to be locked); then per student and session, in that order: the student's
+     eligibility under the lock (`assertMayRegisterForInTx`); every line of each row — one per item
+     of a split row; a line the student holds already on the item is not made again; each line's window and effective
      deadline; a sitting named but not on record made as a board series with no dates
      (`findOrCreateSeries`, audited); the school-fee gate; then **`insertLines`** — the rework's
      locks in their order, `assertLineRules`, `priceLine` from the grid, the due date, the teacher —
@@ -272,10 +291,12 @@ For a line whose series and level the admin mapped to its session (`lineOf` in v
      steps on the line as B's consent does; `IMPORT_REGISTRATION` lists each line with its row,
      item, attempt, mode, sitting source, price and provisional mark;
    - money history (fee notes; carried-forward payments under that reading);
-   - each line marked committed with what it made; `IMPORT_FAMILY_COMMITTED`.
+   - each line marked committed with what it made (`registrations`: every line it made);
+     `IMPORT_FAMILY_COMMITTED`.
 5. **A family that fails rolls back whole**; its lines say why. A unique violation (an email taken
    meanwhile) retries the family once.
-6. The batch becomes `committed` or `partial`; `IMPORT_COMMITTED` in the same transaction.
+6. The batch becomes `committed` or `partial`; `IMPORT_COMMITTED` in the same transaction. The
+   result lists the sheet's lines split into several lines (`rowsSplit`: the line and how many).
 
 The import does not move existing lines (RESERVATIONS.md §2.11–§2.12's three calls for a move of
 lines do not apply): it makes new ones, through the reservation paths' own function.
@@ -289,9 +310,17 @@ makes are priced and wait for payment; nothing is paid.
 
 ## 6. Changes outside the import
 
-- **`findOffer` and `findItem`** (`apps/api/src/services/offer.services.ts`, A's service; the
-  smallest addition: nothing on main served them — `resolveItem` gives a subject's whole item
-  only). Named in RESERVATIONS.md §2.12.
+- **`findOffer`, `findItem` and `findItemsByCode`** (`apps/api/src/services/offer.services.ts`, A's
+  service; the smallest addition: nothing on main served them — `resolveItem` gives a subject's
+  whole item only). Named in RESERVATIONS.md §2.12.
+- **`assertLineRules(…, { lockExceptions: false })`** (A's `line-rules.services.ts`): the review's
+  rolled-back check reads the one-shot exception rows without `FOR UPDATE` (a GET holds no row);
+  every path that makes lines keeps the lock.
+- **MO-9 on the offer** (A's `offer.services.ts`, the review of 8 Oct, item 6): an offer that is not
+  closed is refused with a course fee of 0, at creation and on update, naming the subject ("Astronomy
+  has no course fee: set the school's course fee before it is open in this session (a line is never
+  priced without one)"); A's Add subject dialog shows the field empty, not 0, for a catalogue row
+  with no fee (an import-added subject has none). Named in RESERVATIONS.md §2.12.
 - **03-v3-flows**: F7's scenario of review flag 1b restated on the new model (an item with no fee row
   in its series refused on the student's request, the parent's direct reservation and the desk,
   naming the grid; reserved at its price once finance sets the row).
@@ -303,10 +332,18 @@ makes are priced and wait for payment; nothing is paid.
   (§4.5) and by priceLine's refusal on every path.
 - Kept from before: `addSectionMembersInTx`, the settings store's "Import" group and the Settings
   screen's catalogue and import groups, the audit actions (`IMPORT_*`, entity `import`).
-- **Arabic**: the import's dictionary (`apps/web/lib/i18n-import.ts`) gains patterns for the rework's
+- **Arabic**: the import's dictionary (`apps/web/lib/i18n-import.ts`) has patterns for the rework's
   refusals a line can carry (priceLine's missing grid row, the rules on lines, the deadline
-  sentences); the import's translator runs first for every screen, so these read in Arabic on the
-  Reserve pages too.
+  sentences). The import's translator runs before the rework's on every page, so its patterns must
+  catch only the import's own sentences (the review of 8 Oct, item 4): the September patterns ("… is
+  not open", "… has no price yet", "… is not at …'s level") are deleted — they read A's "Registration
+  window is not open" as "Registration window غير مفتوحة" — "does not teach" is anchored to the
+  import's sentence ("the sheet names …, who does not teach … in …") with exact keys for A's two
+  sentences, the grade-10 core sentence is left to A's translator, and "Add …" is only the import's
+  aria-label ("Add Astronomy to the catalogue"). A scan of every string in apps/api/src and
+  apps/web/app through the import's translator found what it still catches: the rework's line
+  refusals the import shows on a line (the same words on the Reserve page) and none of B's.
+  MO-9's sentence is in A's dictionary (`i18n-sessions.ts`).
 
 ## 7. Roles and endpoints
 
@@ -336,7 +373,13 @@ mapping, commit and result), with the rework's additions:
   subject and item, the board series, the entry, the sitting with its source (from the student's
   history / declared by the desk, listed to verify), the teacher and the price with its basis
   ("course 12,000 × 50% + board 10,850 × 100%", provisional marked); three choices: the item (the
-  session's items), first entry or retake, and the sitting a retake follows.
+  session's items), first entry or retake, and the sitting a retake follows. A line naming several
+  units or papers shows "The lines in the session", one block per line with its code, and a choice
+  of item per code ("The item for p5"; "As the sheet's words find it: P1"), or one item for the
+  whole line. *Excel:* the desk copies the row once per paper and works out each fee; *here:* the
+  split is made and priced, and only a code the words cannot tell asks for a choice.
+- **The result** lists the sheet's lines split into one line per unit or paper ("Units row 5 (2
+  lines)").
 - **After the commit** the lines are on the session's Money tab (unpaid, provisional counted), the
   declared ones on its To verify tab, and each on the family's Statement ("from Cambridge
   International June 2026 (before the system)" for a legacy sitting; "(declared at the desk) to be
@@ -351,13 +394,15 @@ session, the problems, the line of a legacy retake, of a declared sitting, of a 
 entry (then "Taught in school instead"), of a provisional fee, of a missing grid row (then left
 out), of a retake naming no sitting (then the sitting named), of a unit, of a line whose item staff
 choose, the commit dialog, the result, the session's Money and To verify tabs, and the statement.
-Screenshots: `.audit/import-evidence/rework/screens/f7r-{en,ar}-*.png` (40). In Arabic every page of
+Screenshots: `.audit/import-evidence/rework/screens/f7r-{en,ar}-*.png` (40), and for the review's
+items 2 and 4 `f7s-*.png`: a split line, a code chosen by staff, the result's split rows, and the
+family's Reserve page in Arabic with a closed session (B's and A's sentences in their own Arabic). In Arabic every page of
 the app reports one React hydration error (the language is read from local storage after the first
 render); it is the same on pages F7 does not touch (`drive/hydration-check.mjs`) and is not F7's.
 
 ## 9. Tests
 
-`apps/api/test/08n-import.test.ts` (55 tests), fixtures in `import-fixtures.ts`.
+`apps/api/test/08n-import.test.ts` (64 tests), fixtures in `import-fixtures.ts`.
 
 | Scenario | Test |
 |---|---|
@@ -371,7 +416,14 @@ render); it is the same on pages F7 does not touch (`drive/hydration-check.mjs`)
 | **§9: a provisional grid prices the line provisional, never 0** | the provisional subject: 1600 = 1000 + 600, provisional |
 | **§9: consent 'imported' and the sitting's source on the line** | "the admin commits…": both consents `imported`, `prior_sitting_source` legacy / declared_by_desk, the series of the sitting; "a line whose family's confirmation is not on the sheet…" |
 | **§9: the statement and the Money tab show imported lines right** | "the statement and the session's Money tab…"; the To verify tab lists the declared ones, not the legacy one; B's known sittings do not read sheet history |
-| the rules on lines in the review | P2 (retakes only) refused as the commit refuses it; a paper set waits for staff's item |
+| the rules on lines in the review | P2 (retakes only) refused as the commit refuses it; the dry run answers a GET while another transaction holds the student's exception row (no `FOR UPDATE` in a GET) |
+| **the split** (review item 2) | "Biology (Paper 1 & Paper 2)": two lines, each priced, `line_split`, the commit makes both and the result lists the row; "Mathematics (P1 & P5)": item_unclear for p5 only, staff choose it, two lines; a "one paper" note: one line, staff choose the paper |
+| **the carried sitting** (review item 1) | an "A2, carry forward" route with the student's ended AS history: in school a first entry carrying the legacy sitting; in self-study a first entry needing the exception; staff's "First entry" keeps the sitting; a carry forward read as a result is the declared sitting, and staff's "Retake" makes it a retake of it |
+| **a dropped course** (review item 3) | a self-study line after a course dropped in the system's history, and after one dropped in the same file: a first entry, refused without the exception |
+| **the lock order** (review item 5) | one family, two students: the commit waits for the student held second in id order, and for the one held first, holding neither child's fee row meanwhile; both lines made |
+| **MO-9's course fee** (review item 6) | the import-added subject: an open offer at 0 refused naming it; closed it is kept; opening it at 0, or setting 0 once open, refused; opened with its fee |
+| **the level** (review item 7) | an unmapped A.S. line never finds the IGCSE offer of the same name; it finds the A.S. one once offered |
+| **the Arabic** (review item 4) | translateImportText on A's and B's sentences (none caught; A's two have their own keys; the grade-10 core sentence and MO-9's are A's translator's; other screens' "Add …" untouched) and on the import's own |
 | the interim rule (MO-25) | committed on 15 November: a first entry; on 1 December: a legacy retake of Cambridge November Y; never for a line of November itself |
 | the race: the import and the desk on one unit in one series from two sessions | forced with a pause at IMPORT_REGISTRATION: one live line, the desk refused (gate.sameEntryOnce) |
 | two staff committing one file; a commit taken over; the re-read under the lock | as before (flag 5) |
@@ -385,7 +437,10 @@ rows, both consents on the imported channel, its committed import line names it,
 on the new model; **08f** the import settings.
 
 **Controls** on the new model (`.audit/import-evidence/rework/controls.py`, logs `control-C*.log`,
-a trail row each). Each guard undone once, run, restored:
+a trail row each, written by the script the moment the control finishes). Each guard undone once,
+run, restored. All of them were run again on the review's fixes, each with its own row (the first
+run's 27 rows shared one time; the trail's correction row of 8 Oct 13:02Z says what the session log
+gives for each):
 
 | Control | What was undone | Result |
 |---|---|---|
@@ -409,6 +464,16 @@ a trail row each). Each guard undone once, run, restored:
 | C44 | the commit's student lock | red (green at first: the race was unforced, and a section place also held the student; the race is now forced and touches only the lines) |
 | C45 | the commit's 403 for lines in a session | red |
 | C1, C4, C5, C6, C9, C11, C25 | the earlier guards, run again on the new base | red |
+| C46 | item 1: the carried sitting of a first entry on an item needing a prior series | red |
+| C47, C48 | item 2: the split (findItemsByCode); the commit making every line of a split row | red |
+| C49 | item 2: findOffer taking the offer entering any unit named | red |
+| C59 | item 2: a "one paper" note never split | red |
+| C50, C51 | item 3: a dropped course not a sitting, in the file and in the system | red |
+| C52, C53 | item 4: the deleted "… is not open" pattern; "Add …" only as the import's own | red |
+| C54 | item 5: every student locked before the first line | red (in the order where the student held is second) |
+| C55 | item 5: the dry run without exception locks | red (the GET waits) |
+| C56, C57 | item 6: course fee 0 refused on an open offer, at creation and on update | red |
+| C58 | item 7: the name fallback at the line's level | red |
 
 The earlier controls whose code main removed (C3, C13, C14, C19–C22: `getRetakeSubjectIds`,
 `prepareRegistrationInputs`, inactive import subjects) are superseded by C32, C36–C41.
@@ -441,6 +506,10 @@ records it.
   (November 2026 at three levels, January 2027 at two), 219 lines that would be lines in the
   session, each `not_offered` until the school offers its subject there — 16 distinct subjects as
   the sheet writes them with their level — besides the identity errors already held.
+- **The split (the review of 8 Oct, item 2).** Of the 219 lines, 26 name two or more units or
+  papers (all two; November 2026 17, January 2027 9) and make 52 lines once the session offers
+  those papers as items; the reviewer's 27 is the same count with live-tab row 124, which the
+  review leaves out as a duplicate line (IS-13). None carries a "one paper" note.
 - **Self-study, reconciled with the spike (review flag 7).** 44 self-study lines importing = the
   "2024" tab's 13 (its yes/no column holds 14 Yes; one of those lines is left out as a duplicate,
   IS-13) + Sheet1's 31 = the 23 "Self Study" fee notes the spike read + 7 Yes answers of Sheet1's
@@ -471,6 +540,23 @@ records it.
   verify. A retake or self-study note with neither is an error on the line; never `legacy` without a
   series (that would let sheet text alone unlock the 50% self-study course price, unverified).
   B's known sittings are not extended to `registration_history`.
+- **A dropped course is not a sitting** (the lead's call on the review of 8 Oct, item 3; MO-25):
+  history counts as a sitting only when the student sat it — outcome `registered`, not `dropped` nor
+  `drop_intended` — so a self-study line after a dropped course is a first entry needing the
+  exception.
+- **On an item that needs a prior series, the sitting is carried, not retaken** (item 1): a legacy,
+  noted or carried-forward sitting is the sitting a first entry carries forward, unless the note or
+  staff say retake; otherwise sheet history would make a carry-forward a retake, with the retake
+  deadline and the self-study share and no exception.
+- **One line of the sheet naming several units or papers is one line per item** (item 2): each is a
+  board entry; the review shows each priced, staff choose only the code the words cannot tell, and
+  the result names the rows split (26 lines of the real sheet, 52 lines). A "one paper" note stays
+  one line.
+- **The commit locks every student before the first line, in id order** (item 5), as RESERVATIONS.md
+  §2.1 orders it; the review's rolled-back check takes no row lock in a GET.
+- **A course fee of 0 is refused on an offer that is not closed** (item 6, MO-9), in A's service, so
+  an import-added subject (no fee) cannot be opened and priced at the board fee alone.
+- **A name matches at the line's level, or not at all** (item 7).
 - **Self-study on a first entry is an error on the line, never priced at the share silently** (the
   lead's addition): `gate.selfStudyFirstEntry` refuses it without the student's exception; the
   import shows it before the commit, with the way out.
@@ -492,9 +578,6 @@ records it.
 - **No invitation emails** at the commit (the school decides when go-live is announced).
 - **Lines paid before go-live cannot be marked paid by the import** (F-01): they are history, or
   lines awaiting payment.
-- **A line that names two papers** ("Biology (Paper 3 & Paper 4)") is one sheet line and one
-  reservation line: staff choose its item, or reserve the second at the desk. Splitting a row is
-  not built.
 - **The import does not create offers, items or fee rows**: the school's links sheet and fee lists
   are the session's (the admin's Subjects and Fees tabs). The real run shows 16 subjects the
   winter session must offer before the live tab can become lines.
@@ -527,9 +610,11 @@ records it.
   should read it too.
 - `money_history`: money before the system, for finance's history views; never balances.
 - The settings `import.selfStudyOnTaught` and `import.carryForward`.
-- **`findOffer(executor, sessionId, term, { subjectId? })` and `findItem(executor, offerId, label,
-  { month?, year? })`** (offer.services.ts; RESERVATIONS_REWORK.md §10's F7 row): the offer and item
-  a school's words name in a session, for any later path that reads the school's own sheets.
+- **`findOffer(executor, sessionId, term, { subjectId?, levels? })`, `findItem(executor, offerId,
+  label, { month?, year? })` and `findItemsByCode(executor, offerId, label, { month?, year?, chosen?
+  })`** (offer.services.ts; RESERVATIONS_REWORK.md §10's F7 row): the offer and item, or the item of
+  each unit or paper, a school's words name in a session, for any later path that reads the school's
+  own sheets.
 - Lines made by the import: ordinary lines with consent channel `imported`, `prior_sitting_source`
   `legacy` (with its series) or `declared_by_desk`, `[IMPORT]` in their comments, and an
   `IMPORT_REGISTRATION` row naming each.
@@ -567,5 +652,12 @@ records it.
   §2.12's line for findOffer and findItem.
 - 10:38–10:45Z — gates green on 669cf84: API and web types; the suite in local time and with TZ=UTC,
   29 files, 555 passed, 1 todo each; CI 37764801732 green on 669cf84.
-- Next: the Opus 5.5 review on the new model, then the lead's; at the merge, main's step D first and
-  the import's migration generated once more after D's.
+- 12:19Z — the Opus 5.5 review of 6f18364: merge after fixes 1 and 2; eleven items with the lead's
+  calls.
+- 13:02Z — the trail's correction row for the 27 batch-stamped control rows.
+- 13:09Z — items 1-7 and 9 fixed with their 08n cases (64 tests); 13:08Z the new controls tried (13
+  red); 13:11Z the split counted on the real sheet privately (26 lines, 52 lines made).
+- Next: the reviewer confirms items 1 and 2 on the diff; the final merge waits for F4 on main (main
+  has D at c2d7a78, its migrations to 0054): origin/main merged as its own commit, 0050_import
+  regenerated after main's last migration with a later stamp and its snapshot chained, the order
+  proven on a copy migrated at main then at the branch, the proof log kept in the evidence (item 11).

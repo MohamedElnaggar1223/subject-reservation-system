@@ -294,7 +294,7 @@ const PROBLEM_FIELDS: Record<string, string[]> = {
 
 const OUTCOME_WORDS: Record<string, string> = {
   studentId: 'Student account', link: 'Parent link', section: 'Section', enrolment: 'Course enrolment', history: 'History row',
-  registration: 'Line', money: 'Money history',
+  registration: 'Line', registrations: 'Lines', money: 'Money history',
 };
 
 /** The entry as one sentence (the reservation pages' words). */
@@ -304,70 +304,101 @@ const ENTRY_WORDS: Record<string, string> = {
 };
 
 /** Problems whose detail is the sheet's own words (data, never translated). */
-const DATA_DETAILS = new Set(['fee_note', 'dropped', 'self_study_contradiction', 'subject_unmapped', 'level_code_unknown', 'class_unreadable', 'column_drift']);
+const DATA_DETAILS = new Set(['fee_note', 'dropped', 'self_study_contradiction', 'subject_unmapped', 'level_code_unknown', 'class_unreadable', 'column_drift', 'line_split']);
 
 type SaveRows = { mutate: (json: Parameters<typeof api.v1.imports[':id']['rows']['$put']>[0]['json']) => void; isPending: boolean };
 
 /**
- * The line a row makes in its session (the reservations rework): the subject and item the sheet's
- * words found, the entry and mode its note gives, the sitting a retake follows and where it is known
- * from, the teacher and the price from the session's fee grid — and staff's choices over them: the
- * item, first entry or retake, the sitting.
+ * The lines a row makes in its session (the reservations rework): the subject and item the sheet's
+ * words found — one line, or one per unit or paper a row names that no single item enters (the row
+ * split) — the entry and mode its note gives, the sitting a retake follows and where it is known
+ * from, the teacher and the price from the session's fee grid; and staff's choices over them: the
+ * item of the whole line or of each code the words cannot tell, first entry or retake, the sitting.
  */
 function LineSection({ v, row, editable, save }: { v: ImportView; row: ImportRow; editable: boolean; save: SaveRows }) {
-  const line = row.plan.line;
-  const edits = (row.edits ?? {}) as { offerItemId?: string | null; attempt?: 'first' | 'retake'; priorSitting?: { month: string; year: number } | null };
-  const sessionId = line?.sessionId ?? (row.seriesKey ? v.settings.series[row.seriesKey]?.sessionId ?? null : null);
+  const lines = row.plan.lines;
+  const split = row.plan.split;
+  const first = lines[0] ?? null;
+  const edits = (row.edits ?? {}) as { offerItemId?: string | null; codeItems?: Record<string, string>; attempt?: 'first' | 'retake'; priorSitting?: { month: string; year: number } | null };
+  const sessionId = first?.sessionId ?? (row.seriesKey ? v.settings.series[row.seriesKey]?.sessionId ?? null : null);
   const items = sessionId ? v.mapping.sessionItems[sessionId] ?? [] : [];
-  const [sitting, setSitting] = useState(() => edits.priorSitting ?? (line?.priorSitting ? { month: line.priorSitting.month, year: line.priorSitting.year } : { month: 'june', year: new Date().getFullYear() }));
-  const teacher = line?.teacherId ? v.options.teachers.find((t) => t.id === line.teacherId)?.name ?? null : null;
+  const [sitting, setSitting] = useState(() => edits.priorSitting ?? (first?.priorSitting ? { month: first.priorSitting.month, year: first.priorSitting.year } : { month: 'june', year: new Date().getFullYear() }));
+  const teacherName = (id: string | null) => (id ? v.options.teachers.find((t) => t.id === id)?.name ?? null : null);
+  const itemOption = (it: (typeof items)[number]) => `${it.subjectName} — ${it.label}${it.series ? ` · ${it.series}` : ''}${it.availability === 'closed' ? ' · closed' : ''}`;
   return (
     <section aria-labelledby="row-line" className="rounded-lg border border-border p-3">
-      <h3 id="row-line" className="mb-2 text-sm font-semibold text-foreground">The line in the session</h3>
-      {line ? (
-        <dl className="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[10rem_1fr]">
-          <dt className="text-muted-foreground">Session</dt><dd><bdi>{line.sessionName}</bdi></dd>
-          <dt className="text-muted-foreground">Subject and item</dt>
-          <dd><bdi data-i18n-skip="true">{line.subjectName} — {line.itemLabel}</bdi> {line.found === 'staff' && <Badge tone="warning">Chosen on the line</Badge>}</dd>
-          <dt className="text-muted-foreground">Board series</dt><dd><bdi data-i18n-skip="true">{line.series ?? '—'}</bdi></dd>
-          <dt className="text-muted-foreground">Entry</dt>
-          <dd>{ENTRY_WORDS[`${line.attempt}|${line.mode}`]}</dd>
-          <dt className="text-muted-foreground">Sitting it follows</dt>
-          <dd>
-            {line.priorSitting ? (
-              <>
-                <span>{MONTH[line.priorSitting.month]} {line.priorSitting.year}</span>{' '}
-                {line.priorSitting.source === 'legacy'
-                  ? <Badge tone="info">From the student’s history (legacy)</Badge>
-                  : <Badge tone="warning">Declared by the desk — listed to verify</Badge>}
-              </>
-            ) : '—'}
-          </dd>
-          <dt className="text-muted-foreground">Teacher</dt><dd>{line.mode === 'self_study' ? 'None (self-study)' : teacher ? <bdi data-i18n-skip="true">{teacher}</bdi> : 'No preference yet'}</dd>
-          <dt className="text-muted-foreground">Price</dt>
-          <dd>
-            {line.price ? (
-              <>
-                <span className="tabular-nums">EGP {egp(line.price.total)}</span>{' '}
-                <span className="block text-xs text-muted-foreground">{`course ${egp(line.price.courseFeeBase)} × ${line.price.coursePercent}% + board ${egp(line.price.boardFeeBase)} × ${line.price.boardPercent}%`}</span>
-                {line.price.provisional && <> <Badge tone="warning">Board fee provisional</Badge></>}
-              </>
-            ) : <span className="text-muted-foreground">Not priced: the series’ grid has no fee for it</span>}
-          </dd>
-        </dl>
-      ) : (
+      <h3 id="row-line" className="mb-2 text-sm font-semibold text-foreground">{lines.length > 1 ? 'The lines in the session' : 'The line in the session'}</h3>
+      {lines.length > 1 && <p className="mb-2 text-xs text-muted-foreground">This line of the sheet names several units or papers: it makes one line for each, priced on its own.</p>}
+      {lines.length ? lines.map((line) => {
+        const teacher = teacherName(line.teacherId);
+        return (
+          <dl key={line.offerItemId} className={cn('grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[10rem_1fr]', lines.length > 1 && 'mb-3 border-b border-border pb-3 last:mb-0 last:border-b-0 last:pb-0')}>
+            <dt className="text-muted-foreground">Session</dt><dd><bdi>{line.sessionName}</bdi></dd>
+            <dt className="text-muted-foreground">Subject and item</dt>
+            <dd>
+              <bdi data-i18n-skip="true">{line.subjectName} — {line.itemLabel}</bdi>
+              {line.code && <> <span className="text-xs text-muted-foreground">(<bdi data-i18n-skip="true">{line.code}</bdi>)</span></>}
+              {line.found === 'staff' && <> <Badge tone="warning">Chosen on the line</Badge></>}
+              {line.exists && <> <Badge tone="neutral">Reserved already</Badge></>}
+            </dd>
+            <dt className="text-muted-foreground">Board series</dt><dd><bdi data-i18n-skip="true">{line.series ?? '—'}</bdi></dd>
+            <dt className="text-muted-foreground">Entry</dt>
+            <dd>{ENTRY_WORDS[`${line.attempt}|${line.mode}`]}</dd>
+            <dt className="text-muted-foreground">Sitting it follows</dt>
+            <dd>
+              {line.priorSitting ? (
+                <>
+                  <span>{MONTH[line.priorSitting.month]} {line.priorSitting.year}</span>{' '}
+                  {line.priorSitting.source === 'legacy'
+                    ? <Badge tone="info">From the student’s history (legacy)</Badge>
+                    : <Badge tone="warning">Declared by the desk — listed to verify</Badge>}
+                </>
+              ) : '—'}
+            </dd>
+            <dt className="text-muted-foreground">Teacher</dt><dd>{line.mode === 'self_study' ? 'None (self-study)' : teacher ? <bdi data-i18n-skip="true">{teacher}</bdi> : 'No preference yet'}</dd>
+            <dt className="text-muted-foreground">Price</dt>
+            <dd>
+              {line.price ? (
+                <>
+                  <span className="tabular-nums">EGP {egp(line.price.total)}</span>{' '}
+                  <span className="block text-xs text-muted-foreground">{`course ${egp(line.price.courseFeeBase)} × ${line.price.coursePercent}% + board ${egp(line.price.boardFeeBase)} × ${line.price.boardPercent}%`}</span>
+                  {line.price.provisional && <> <Badge tone="warning">Board fee provisional</Badge></>}
+                </>
+              ) : <span className="text-muted-foreground">Not priced: the series’ grid has no fee for it</span>}
+            </dd>
+          </dl>
+        );
+      }) : (
         <p className="text-sm text-muted-foreground">No line yet: see the problems above.</p>
       )}
       {editable && sessionId && (
         <div className="mt-3 space-y-3 border-t border-border pt-3">
+          {split && !edits.offerItemId ? (
+            <fieldset className="space-y-2 text-sm">
+              <legend className="mb-1 text-xs text-muted-foreground">The item of each unit or paper the line names</legend>
+              {split.map((p) => (
+                <label key={p.code} className="flex flex-wrap items-center gap-2">
+                  <bdi data-i18n-skip="true" className="w-24 font-medium">{p.code}</bdi>
+                  <select aria-label={`The item for ${p.code}`} className={cn(SELECT, 'min-w-64 flex-1')} disabled={save.isPending} value={edits.codeItems?.[p.code] ?? ''}
+                    onChange={(e) => {
+                      const next = { ...(edits.codeItems ?? {}) };
+                      if (e.target.value) next[p.code] = e.target.value; else delete next[p.code];
+                      save.mutate(Object.keys(next).length ? { rowIds: [row.id], edits: { codeItems: next } } : { rowIds: [row.id], clear: ['codeItems'] });
+                    }}>
+                    <option value="">{p.itemLabel ? `As the sheet’s words find it: ${p.itemLabel}` : 'Choose its item'}</option>
+                    {items.map((it) => <option key={it.id} value={it.id}>{itemOption(it)}</option>)}
+                  </select>
+                  {edits.codeItems?.[p.code] && <Badge tone="warning">Fixed</Badge>}
+                </label>
+              ))}
+            </fieldset>
+          ) : null}
           <label className="block text-sm">
-            <span className="mb-1 flex items-center gap-2 text-xs text-muted-foreground"><span>Item</span>{edits.offerItemId && <Badge tone="warning">Fixed</Badge>}</span>
+            <span className="mb-1 flex items-center gap-2 text-xs text-muted-foreground"><span>{split ? 'Or one item for the whole line' : 'Item'}</span>{edits.offerItemId && <Badge tone="warning">Fixed</Badge>}</span>
             <select aria-label="The item of the session this line is" className={cn(SELECT, 'w-full')} disabled={save.isPending} value={edits.offerItemId ?? ''}
               onChange={(e) => save.mutate(e.target.value ? { rowIds: [row.id], edits: { offerItemId: e.target.value } } : { rowIds: [row.id], clear: ['offerItemId'] })}>
               <option value="">As the sheet’s words find it</option>
-              {items.map((it) => (
-                <option key={it.id} value={it.id}>{`${it.subjectName} — ${it.label}${it.series ? ` · ${it.series}` : ''}${it.availability === 'closed' ? ' · closed' : ''}`}</option>
-              ))}
+              {items.map((it) => <option key={it.id} value={it.id}>{itemOption(it)}</option>)}
             </select>
           </label>
           <div className="text-sm">
@@ -476,7 +507,7 @@ export function RowEditor({ id, v, row, editable, onClose }: { id: string; v: Im
             </fieldset>
           )}
 
-          {row.data.kind === 'sheet' && (row.plan.registration === 'live' || row.plan.line) && (
+          {row.data.kind === 'sheet' && (row.plan.registration === 'live' || row.plan.lines.length > 0) && (
             <LineSection v={v} row={row} editable={editable && row.status !== 'committed'} save={save} />
           )}
 
@@ -559,7 +590,7 @@ export function RowEditor({ id, v, row, editable, onClose }: { id: string; v: Im
             {row.status === 'committed' && row.outcome && (
               <ul className="mt-2 space-y-0.5 text-sm">
                 {Object.entries(row.outcome as Record<string, unknown>).filter(([k]) => k in OUTCOME_WORDS).map(([k, val]) => (
-                  <li key={k}><span className="text-muted-foreground">{OUTCOME_WORDS[k]}:</span> <bdi data-i18n-skip="true" className="font-mono text-xs">{String(val)}</bdi></li>
+                  <li key={k}><span className="text-muted-foreground">{OUTCOME_WORDS[k]}:</span> <bdi data-i18n-skip="true" className="font-mono text-xs">{Array.isArray(val) ? val.join(', ') : String(val)}</bdi></li>
                 ))}
               </ul>
             )}

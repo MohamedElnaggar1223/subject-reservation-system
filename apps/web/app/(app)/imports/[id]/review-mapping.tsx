@@ -344,7 +344,7 @@ function AddSubjects({ id, v, rows, onDone }: { id: string; v: ImportView; rows:
           <tbody>
             {items.map((x, i) => (
               <tr key={x.key}>
-                <td className="py-1 pe-2"><input type="checkbox" aria-label={`Add ${x.name}`} checked={x.include} onChange={(e) => upd(i, { include: e.target.checked })} /></td>
+                <td className="py-1 pe-2"><input type="checkbox" aria-label={`Add ${x.name} to the catalogue`} checked={x.include} onChange={(e) => upd(i, { include: e.target.checked })} /></td>
                 <td className="py-1 pe-2"><input dir="auto" data-i18n-skip="true" className={cn(INPUT, 'min-w-48')} value={x.name} onChange={(e) => upd(i, { name: e.target.value })} /></td>
                 <td className="py-1 pe-2"><input dir="ltr" data-i18n-skip="true" className={cn(INPUT, 'w-40 font-mono')} value={x.code} onChange={(e) => upd(i, { code: e.target.value })} /></td>
                 <td className="py-1 pe-2">

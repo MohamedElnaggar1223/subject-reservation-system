@@ -25,7 +25,6 @@ import {
   subject,
   exception,
   eq,
-  ne,
   and,
   inArray,
   gradeTodayExtras,
@@ -39,7 +38,6 @@ import type {
   AdminOverrideApprovalType,
   ListRegistrationsQueryType,
 } from '@repo/validations';
-import { seriesOrder, seriesEndedBy } from '@repo/validations';
 import {
   notifyRegistrationRequestReceived,
   notifyRegistrationDecision,

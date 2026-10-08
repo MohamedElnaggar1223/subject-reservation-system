@@ -37,6 +37,7 @@ import { assertSchoolFeeGate } from '../registration.services';
 import { insertLines } from '../line.services';
 import { writeConsents } from '../reservation.services';
 import { findOrCreateSeries } from '../offer.services';
+import { lockStudents } from '../../lib/student-locks';
 import {
   computeView, historyFingerprint, feeFingerprint, carryFingerprint, moneyFingerprints, historyOutcome, lower,
   type ImportView, type ImportRowView,
@@ -131,6 +132,11 @@ export async function commitImport(batchId: string, actor: Actor, ctx?: AuditCon
       families: { committed: results.filter((r) => r.status === 'committed').length, failed: results.filter((r) => r.status === 'failed').length },
       failed: results.filter((r) => r.status === 'failed').map((r) => ({ family: r.key, error: r.error })),
       created, teachersCreated: reference.teachers, sectionsCreated: reference.sections,
+      // The sheet's lines that made several lines in a session (one per unit or paper they name).
+      rowsSplit: after.rows
+        .filter((r) => r.status === 'committed' && r.committedAt && r.committedAt >= claimed.commitStartedAt!
+          && ((r.outcome as { registrations?: string[] } | null)?.registrations?.length ?? 0) > 1)
+        .map((r) => ({ row: `${r.tab} row ${r.rowNumber}`, lines: (r.outcome as { registrations: string[] }).registrations.length })),
     };
     const status = left === 0 ? 'committed' : 'partial';
     const finished = await db.transaction(async (tx) => {
@@ -440,16 +446,23 @@ async function commitFamily(
   const live = rows.filter((r) => r.plan.registration === 'live');
   const bySession = new Map<string, ImportRowView[]>();
   for (const r of live) {
-    if (!r.plan.line || !studentIdOf(r)) throw new ImportError(`${r.tab} row ${r.rowNumber}: no line in a session for it`);
-    const k = `${studentIdOf(r)}|${r.plan.line.sessionId}`;
+    if (!r.plan.lines.length || !studentIdOf(r)) throw new ImportError(`${r.tab} row ${r.rowNumber}: no line in a session for it`);
+    const k = `${studentIdOf(r)}|${r.plan.lines[0]!.sessionId}`;
     bySession.set(k, [...(bySession.get(k) ?? []), r]);
   }
-  for (const [k, list] of bySession) {
+  // Every student with lines held FOR NO KEY UPDATE, in id order, before the first line (RESERVATIONS.md
+  // §2.1: the student first; the review of 8 Oct, item 5): no student's line, fee row or one-shot
+  // exception is locked while another student of the family is still to be locked.
+  await lockStudents(tx, [...bySession.keys()].map((k) => k.split('|')[0]!));
+  for (const [k, list] of [...bySession].sort(([a], [b]) => a.localeCompare(b))) {
     const [studentId, sessionId] = k.split('|') as [string, string];
     const made = await reserveImportLines(tx, studentId, sessionId, list, actor, batch, ctx);
     created.registrations += made.length;
     createdIds.registrations!.push(...made.map((m) => m.id));
-    for (const m of made) note(m.rowId, 'registration', m.id);
+    for (const r of list) {
+      const ids = made.filter((m) => m.rowId === r.id).map((m) => m.id);
+      if (ids.length) note(r.id, 'registrations', ids);
+    }
   }
 
   // Money history: the sheet's fee notes and, read that way, a carried-forward payment (IS-02, IS-08).
@@ -492,15 +505,15 @@ async function reserveImportLines(
   const [sess] = await tx.select({ name: registrationSession.name }).from(registrationSession).where(eq(registrationSession.id, sessionId));
   if (!sess) throw new ImportError('Session not found', 404);
   // A line the student holds already (the same file committed before) is not made again.
+  const wanted = rows.flatMap((r) => r.plan.lines.map((l) => ({ r, l })));
   const held = await tx.select({ itemId: registration.offerItemId }).from(registration)
-    .where(and(eq(registration.studentId, studentId), eq(registration.sessionId, sessionId), inArray(registration.offerItemId, rows.map((r) => r.plan.line!.offerItemId)),
+    .where(and(eq(registration.studentId, studentId), eq(registration.sessionId, sessionId), inArray(registration.offerItemId, wanted.map((x) => x.l.offerItemId)),
       notInArray(registration.status, ['dropped', 'rejected', 'expired'])));
-  const todo = rows.filter((r) => !held.some((h) => h.itemId === r.plan.line!.offerItemId));
+  const todo = wanted.filter((x) => !held.some((h) => h.itemId === x.l.offerItemId));
   if (!todo.length) return [];
   const now = new Date();
   const lines: LineInputType[] = [];
-  for (const r of todo) {
-    const l = r.plan.line!;
+  for (const { r, l } of todo) {
     const [it] = await tx.select({ seriesId: sessionOfferItem.boardSeriesId, subjectId: sessionOffer.subjectId, boardCode: boardSeries.boardCode })
       .from(sessionOfferItem).innerJoin(sessionOffer, eq(sessionOffer.id, sessionOfferItem.offerId))
       .leftJoin(boardSeries, eq(boardSeries.id, sessionOfferItem.boardSeriesId)).where(eq(sessionOfferItem.id, l.offerItemId));
@@ -521,19 +534,22 @@ async function reserveImportLines(
   await assertSchoolFeeGate(studentId, eligibility);
   const inserted = await insertLines(tx, {
     studentId, sessionId, lines, status: 'pending_payment', requestedBy: actor.id, approvedBy: actor.id, approvedAt: now,
-    approvalComments: `[IMPORT] ${batch.fileName} — ${todo.map((r) => `${r.tab} row ${r.rowNumber}`).join(', ')}`, eligibility, now,
+    approvalComments: `[IMPORT] ${batch.fileName} — ${[...new Set(todo.map(({ r }) => `${r.tab} row ${r.rowNumber}`))].join(', ')}`, eligibility, now,
   });
   // The sheet's "I confirm my registration": the family's consent to the refund policy and the declaration, as the sheet recorded it.
   await writeConsents(tx, inserted.map((i) => i.id), { channel: 'imported', confirmedBy: actor.id, at: now });
-  const rowOf = (itemId: string) => todo.find((x) => x.plan.line!.offerItemId === itemId)!;
+  const lineOf = (itemId: string) => todo.find((x) => x.l.offerItemId === itemId)!;
   await logAction(actor.id, 'IMPORT_REGISTRATION', 'registration', studentId, null, {
     batchId: batch.id, sessionId, session: sess.name, registrationIds: inserted.map((i) => i.id),
     lines: inserted.map((i) => {
-      const r = rowOf(i.offerItemId!);
-      return { row: `${r.tab} row ${r.rowNumber}`, registrationId: i.id, item: r.plan.line!.itemLabel, attempt: i.attempt, mode: i.mode, priorSittingSource: i.priorSittingSource, price: i.priceAtRegistration, provisional: i.priceProvisional };
+      const { r, l } = lineOf(i.offerItemId!);
+      return {
+        row: `${r.tab} row ${r.rowNumber}`, ...(l.code ? { code: l.code } : {}), registrationId: i.id, item: l.itemLabel, attempt: i.attempt, mode: i.mode,
+        priorSittingSource: i.priorSittingSource, price: i.priceAtRegistration, provisional: i.priceProvisional,
+      };
     }),
   }, ctx, tx);
-  return inserted.map((i) => ({ id: i.id, rowId: rowOf(i.offerItemId!).id }));
+  return inserted.map((i) => ({ id: i.id, rowId: lineOf(i.offerItemId!).r.id }));
 }
 
 /** The rows and people of a committed family, and its one audit row. */

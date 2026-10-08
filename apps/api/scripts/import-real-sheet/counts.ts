@@ -161,9 +161,18 @@ try {
     const byCode = new Map<string, number>();
     for (const r of liveRows) for (const p of r.problems) if (p.severity === 'error') byCode.set(p.code, (byCode.get(p.code) ?? 0) + 1);
     const notOffered = new Set(liveRows.filter((r) => r.problems.some((p) => p.code === 'not_offered')).map((r) => r.subjectKey));
+    // The split (the review of 8 Oct, item 2): the lines whose words name two or more units or papers — each
+    // becomes one line per item once the session offers them as items (a "one paper" note is one line).
+    const { namedCodes } = await import('../../src/services/offer.services');
+    const several = liveRows.filter((r) => { const d = r.data as { subject?: string; noteOnePaper?: boolean }; return !d.noteOnePaper && namedCodes(d.subject ?? '').length > 1; });
+    const bySeries = new Map<string, number>();
+    for (const r of several) bySeries.set(r.seriesKey ?? 'none', (bySeries.get(r.seriesKey ?? 'none') ?? 0) + 1);
+    const byCount = new Map<number, number>();
+    for (const r of several) { const n = namedCodes((r.data as { subject?: string }).subject ?? '').length; byCount.set(n, (byCount.get(n) ?? 0) + 1); }
     lines.push('## The live series mapped to its session, nothing offered yet (the rework)', '',
       `Series groups mapped: ${groups.map((g) => g.key).join(', ') || 'none'}. Lines that would be lines in the session: ${liveRows.length}.`, '',
-      `Errors on them: ${JSON.stringify(Object.fromEntries(byCode))}. Distinct subjects (as the sheet writes them, with level) the session must offer first: ${notOffered.size}.`, '');
+      `Errors on them: ${JSON.stringify(Object.fromEntries(byCode))}. Distinct subjects (as the sheet writes them, with level) the session must offer first: ${notOffered.size}.`, '',
+      `Lines naming two or more units or papers (split, one line per item, once offered): ${several.length}; by series ${JSON.stringify(Object.fromEntries(bySeries))}; by the number named ${JSON.stringify(Object.fromEntries(byCount))}; the lines they make: ${several.reduce((n, r) => n + namedCodes((r.data as { subject?: string }).subject ?? '').length, 0)}.`, '');
     await apiResponse(adm.v1.imports[':id'].settings.$put({ param: { id: first }, json: { series: Object.fromEntries(groups.map((g) => [g.key, { mode: 'history' as const, sessionId: null }])) } }));
   }
   v = await view(first);

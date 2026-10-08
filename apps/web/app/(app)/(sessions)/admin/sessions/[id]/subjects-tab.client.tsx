@@ -573,7 +573,7 @@ function AddSubject({ session, onClose }: { session: SessionDetail; onClose: () 
             {matches.length === 0 && <p className="p-3 text-sm text-muted-foreground">Every active subject is already in this session.</p>}
             {matches.map((a) => (
               <button key={a.id} type="button" role="option" aria-selected={a.id === subjectId}
-                onClick={() => { setSubjectId(a.id); setCourseFee(String(a.courseFee)); setTeachers(a.teachers.length === 1 ? [{ teacherId: a.teachers[0]!.teacherId, mode: 'in_school' }] : []); }}
+                onClick={() => { setSubjectId(a.id); setCourseFee(a.courseFee > 0 ? String(a.courseFee) : ''); setTeachers(a.teachers.length === 1 ? [{ teacherId: a.teachers[0]!.teacherId, mode: 'in_school' }] : []); }}
                 className={`flex w-full items-center justify-between gap-2 border-b border-border px-3 py-2 text-start text-sm last:border-0 ${a.id === subjectId ? 'bg-primary/10' : 'hover:bg-muted/40'}`}>
                 <span><bdi data-i18n-skip="true">{a.name}</bdi> <span className="font-mono text-xs text-muted-foreground"><bdi data-i18n-skip="true">{a.code}</bdi></span></span>
                 {!a.mapped && <Badge tone="warning">Map on the Catalogue</Badge>}

@@ -189,7 +189,8 @@ export const IMPORT_PROBLEMS = {
   teacher_not_on_offer: { severity: 'warning', title: 'The teacher named does not teach it in the session', meaning: 'The line takes the subject’s only teacher in the session, or none yet (the coordinator assigns one later). Add the teacher to the subject on the session’s Subjects tab if the sheet is right.' },
   registration_refused: { severity: 'error', title: 'The line would be refused', meaning: 'The session would refuse this line (the reason is given): eligibility, the school fee, the session or the series closed, or a rule on lines. Import the series as history, skip the row, or fix what is refused.' },
   not_offered: { severity: 'error', title: 'The session does not offer this subject', meaning: 'No subject of the session fits the line’s words. Add it on the session’s Subjects tab (its teachers, items and course fee), map the line to the right catalogue row, or import its series as history.' },
-  item_unclear: { severity: 'error', title: 'Which item of the subject?', meaning: 'The line’s words fit none, or more than one, of the subject’s items (the whole subject, a unit, a route, a one-paper retake). Choose the item on the line.' },
+  item_unclear: { severity: 'error', title: 'Which item of the subject?', meaning: 'The line’s words fit none, or more than one, of the subject’s items (the whole subject, a unit, a route, a one-paper retake). Choose the item on the line — for a line naming several units or papers, the item of each one the words cannot tell.' },
+  line_split: { severity: 'info', title: 'One line of the sheet, several lines in the session', meaning: 'The line names several units or papers the session offers as separate items: it makes one line per item, each priced on its own.' },
   fee_missing: { severity: 'error', title: 'No board fee in the series’ grid', meaning: 'The item has no fee row in its board series yet (the grid is named). Set it on the session’s Fees tab — provisional until the board publishes is fine — and the line is priced from it; nothing is ever priced at 0 for want of a fee.' },
   price_provisional: { severity: 'info', title: 'The board fee is provisional', meaning: 'The series’ grid holds a provisional fee: the line is reserved at that price, marked provisional, and is paid once the school confirms the board’s fee.' },
   consent_missing: { severity: 'error', title: 'No confirmation from the family on the line', meaning: 'A line made in a session records the sheet’s “I confirm my registration” as the family’s consent (the imported channel); this line has none. Import its series as history, or skip the line; the desk can reserve it with the parent’s signature.' },
@@ -244,6 +245,8 @@ export const ImportRowEdits = z.object({
   selfStudyChoice: z.enum(['in_school', 'enrol_only']).nullable().optional(),
   /** A line in a session: the item of the subject staff choose when the sheet's words cannot tell (an item of the session). */
   offerItemId: z.string().min(1).nullable().optional(),
+  /** A row naming several units or papers: the item staff choose for a code the words cannot tell (code → an item of the subject). */
+  codeItems: z.record(z.string().min(1).max(40), z.string().min(1)).optional(),
   /** A first entry, or a retake, whatever the note says (a retake names its sitting). */
   attempt: z.enum(['first', 'retake']).optional(),
   /** The sitting a retake (or a carried-forward route) follows, named by staff: the desk's declaration, verified on To verify. */

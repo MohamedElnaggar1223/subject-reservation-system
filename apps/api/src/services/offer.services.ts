@@ -391,6 +391,17 @@ async function sessionForChange(tx: Tx, sessionId: string, lock: 'share' | 'upda
   return s;
 }
 
+/**
+ * MO-9: a line is never priced from a course fee nobody set. An offer the school opens (any
+ * availability but closed) has a course fee above 0; a closed offer may keep 0 (F7's review of 8 Oct,
+ * item 6: a catalogue row the day-one import adds carries no fee, and the Add subject dialog read it).
+ */
+function assertCourseFeeFor(availability: string, courseFee: number, subjectName: string) {
+  if (availability !== 'closed' && !(courseFee > 0)) {
+    throw new OfferError(`${subjectName} has no course fee: set the school's course fee before it is open in this session (a line is never priced without one)`);
+  }
+}
+
 function assertTeachersFor(availability: string, teacherCount: number, subjectName: string) {
   if (availability === 'open' && teacherCount === 0) {
     throw new OfferError(`Who teaches ${subjectName}? An open subject names its teachers — or make it self-study only`);
@@ -412,6 +423,7 @@ export async function createOffer(sessionId: string, data: CreateOfferType, acto
       if (dup) throw new OfferError(`${s.name} is already in this session`, 409);
       const teachers = await resolveTeachers(tx, s.id, data.teachers, actorId);
       assertTeachersFor(data.availability, teachers.length, s.name);
+      assertCourseFeeFor(data.availability, data.courseFee, s.name);
       const offerId = randomUUID();
       const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(sessionOffer).where(eq(sessionOffer.sessionId, sessionId)) as [{ n: number }];
       await tx.insert(sessionOffer).values({
@@ -469,6 +481,8 @@ export async function updateOffer(sessionId: string, offerId: string, data: Upda
     }
     const availability = data.availability ?? offer.availability;
     assertTeachersFor(availability, teachers.length, subjectRow.name);
+    // Checked when the change sets the fee or opens the offer (an offer converted with 0 keeps its other edits).
+    if (data.courseFee !== undefined || data.availability !== undefined) assertCourseFeeFor(availability, data.courseFee ?? offer.courseFee, subjectRow.name);
     const { reason, teachers: _t, ...fields } = data;
     const [updated] = await tx.update(sessionOffer).set({ ...fields, updatedAt: new Date() }).where(eq(sessionOffer.id, offerId)).returning();
     await logAction(actorId, 'SESSION_OFFER_UPDATED', 'session_offer', offerId,
@@ -853,25 +867,51 @@ export async function resolveItem(executor: Executor, sessionId: string, subject
 // ─── Finding what a sheet's words name (F7's contract, RESERVATIONS_REWORK.md §10) ───
 
 const words = (t: string) => t.replace(/\s+/g, ' ').trim().toLowerCase();
-/** The codes a sheet's words name: in brackets ("Pure Mathematics 1 (P1)") or on their own ("P1", "WMA11", "Paper 4", "1H"). */
-function namedCodes(term: string): string[] {
+/** "Unit 3" and "Paper 3" are one name (the school writes Pearson's units as papers). */
+const paperName = (n: string) => `paper ${n.toLowerCase()}`;
+/**
+ * The codes a sheet's words name, each once, in order: in brackets ("Pure Mathematics 1 (P1)",
+ * "Biology (Paper 3 & Paper 4)") or on their own ("P1", "WMA11", "Paper 4", "Unit 3", "1H"); a paper
+ * or a unit named by its number reads as "paper N".
+ */
+export function namedCodes(term: string): string[] {
   const t = words(term);
-  const out = new Set<string>();
-  for (const m of t.matchAll(/\(([^)]+)\)/g)) for (const part of m[1]!.split(/\s*(?:&|and|,|\/)\s*/)) if (part) out.add(part.trim());
-  for (const m of t.matchAll(/\b((?:p|m|s|d|fp)\d|w[a-z]{2}\d{2}|\d[a-z]{1,3}\d[a-z]?)\b/g)) out.add(m[1]!);
-  for (const m of t.matchAll(/\bpaper\s*(\d+[a-z]?)\b/g)) out.add(`paper ${m[1]}`);
-  return [...out];
+  const out: string[] = [];
+  const add = (c: string) => {
+    const m = /^(?:paper|unit)\s*(\d+[a-z]?)$/.exec(c);
+    const code = m ? paperName(m[1]!) : c;
+    if (code && !out.includes(code)) out.push(code);
+  };
+  for (const m of t.matchAll(/\(([^)]+)\)/g)) for (const part of m[1]!.split(/\s*(?:&|\band\b|,|\/|\+)\s*/)) if (part.trim()) add(part.trim());
+  for (const m of t.matchAll(/\b((?:p|m|s|d|fp)\d|w[a-z]{2}\d{2}|\d[a-z]{1,3}\d[a-z]?)\b/g)) add(m[1]!);
+  for (const m of t.matchAll(/\b(?:paper|unit)s?\s*(\d+[a-z]?)\b/g)) add(paperName(m[1]!));
+  // "Papers 3 & 4", "Units 1, 2": the numbers after the word.
+  for (const m of t.matchAll(/\b(?:papers|units)\s+((?:\d+[a-z]?\s*(?:&|\band\b|,|\+)\s*)+\d+[a-z]?)\b/g)) for (const n of m[1]!.split(/\s*(?:&|\band\b|,|\+)\s*/)) add(paperName(n));
+  return out;
+}
+/** What a unit is called: its code, the school's short code, and "paper N" for a paper or unit numbered so. */
+function unitNames(u: { code: string; shortCode: string | null }): string[] {
+  const out = [u.code.toLowerCase()];
+  const short = (u.shortCode ?? '').toLowerCase().trim();
+  if (short) out.push(short);
+  const numbered = /^(?:paper|unit)\s*(\d+[a-z]?)$/.exec(short);
+  if (numbered) out.push(paperName(numbered[1]!));
+  const component = /\/(\d+)$/.exec(u.code);
+  if (component) out.push(paperName(component[1]!));
+  return out;
 }
 
 /**
  * The session's offer a sheet's words name (F7, the day-one import): the offer of the catalogue
  * row the import's mapping chose; else the offer whose subject is named exactly (name or code),
- * or by its name without a bracket ("Biology (Paper 3 & Paper 4)" → Biology); else the one offer
- * with an item entering a unit the words name ("Pure Mathematics 1 (P1)" → the IAL Mathematics
- * offer whose P1 item enters it). Null when nothing, or more than one offer, fits.
+ * or by its name without a bracket ("Biology (Paper 3 & Paper 4)" → Biology), at the line's level
+ * (`levels`: the qualification levels its code reads as; more than one fitting is ambiguous, none
+ * chosen); else the one offer with an item entering a unit the words name ("Pure Mathematics 1
+ * (P1)" → the IAL Mathematics offer whose P1 item enters it) — every unit they name, else any of
+ * them. Null when nothing, or more than one offer, fits: a name at another level is not a fit.
  */
-export async function findOffer(executor: Executor, sessionId: string, term: string, opts: { subjectId?: string | null } = {}) {
-  const offers = await executor.select({ id: sessionOffer.id, subjectId: sessionOffer.subjectId, availability: sessionOffer.availability, name: subject.name, code: subject.code })
+export async function findOffer(executor: Executor, sessionId: string, term: string, opts: { subjectId?: string | null; levels?: string[] | null } = {}) {
+  const offers = await executor.select({ id: sessionOffer.id, subjectId: sessionOffer.subjectId, availability: sessionOffer.availability, name: subject.name, code: subject.code, level: subject.qualificationLevel })
     .from(sessionOffer).innerJoin(subject, eq(subject.id, sessionOffer.subjectId)).where(eq(sessionOffer.sessionId, sessionId));
   const pick = (xs: typeof offers, how: 'subject' | 'name' | 'unit') => (xs.length === 1 ? { offer: xs[0]!, how } : null);
   if (opts.subjectId) {
@@ -880,26 +920,34 @@ export async function findOffer(executor: Executor, sessionId: string, term: str
   }
   const t = words(term);
   const bare = words(term.replace(/\s*\([^)]*\)\s*$/, ''));
-  const byName = pick(offers.filter((o) => words(o.name) === t || words(o.code) === t), 'name')
-    ?? (bare !== t ? pick(offers.filter((o) => words(o.name) === bare), 'name') : null);
+  const atLevel = (xs: typeof offers) => (opts.levels?.length ? xs.filter((o) => opts.levels!.includes(o.level)) : xs);
+  const byName = pick(atLevel(offers.filter((o) => words(o.name) === t || words(o.code) === t)), 'name')
+    ?? (bare !== t ? pick(atLevel(offers.filter((o) => words(o.name) === bare)), 'name') : null);
   if (byName) return byName;
   const codes = namedCodes(term);
   if (!codes.length || !offers.length) return null;
-  const r = await executor.execute(sql`
-    select distinct i.offer_id as "offerId" from session_offer_item i
-    join session_offer_item_unit iu on iu.item_id = i.id join exam_unit u on u.id = iu.unit_id
-    where i.session_id = ${sessionId} and (lower(coalesce(u.short_code, '')) in (${sql.join(codes.map((c) => sql`${c}`), sql`, `)})
-      or lower(u.code) in (${sql.join(codes.map((c) => sql`${c}`), sql`, `)}))`);
-  const ids = new Set((r.rows as { offerId: string }[]).map((x) => x.offerId));
-  return pick(offers.filter((o) => ids.has(o.id)), 'unit');
+  const units = await executor.select({ offerId: sessionOfferItem.offerId, code: examUnit.code, shortCode: examUnit.shortCode })
+    .from(sessionOfferItem).innerJoin(sessionOfferItemUnit, eq(sessionOfferItemUnit.itemId, sessionOfferItem.id)).innerJoin(examUnit, eq(examUnit.id, sessionOfferItemUnit.unitId))
+    .where(eq(sessionOfferItem.sessionId, sessionId));
+  // The offer whose items enter a unit of each code the words name ("Biology (Paper 3 & Paper 4)": units 3 and 4 of one subject);
+  // when none enters them all, the one offer entering any of them ("Mathematics (P1 & P5)": the line is
+  // split and the code no item enters is left for staff to choose, findItemsByCode).
+  const covering = (all: boolean) => {
+    const enters = (offerId: string, c: string) => units.some((u) => u.offerId === offerId && unitNames(u).includes(c));
+    const ids = new Set(units.map((u) => u.offerId).filter((offerId) => (all ? codes.every((c) => enters(offerId, c)) : codes.some((c) => enters(offerId, c)))));
+    const xs = offers.filter((o) => ids.has(o.id));
+    return xs.length > 1 ? atLevel(xs) : xs;
+  };
+  const every = covering(true);
+  return pick(every.length ? every : covering(false), 'unit');
 }
 
 /**
  * The item of an offer a sheet's words name (F7): the item labelled so; else the one item entering
- * the unit or paper the words name (P1, WMA11, "Paper 4" → "Paper 4 only (retake)"); else the
- * whole subject, as resolveItem picks it; an offer of one item, that item. Among several that fit,
- * the one in the series of the sheet's month and year. `candidates` lists them when none or more
- * than one fit, for staff to choose on the line.
+ * exactly the units or paper the words name (P1, WMA11, "Paper 3" → the item entering unit 3,
+ * "Paper 4" → "Paper 4 only (retake)"); else the whole subject, as resolveItem picks it; an offer of
+ * one item, that item. Among several that fit, the one in the series of the sheet's month and year.
+ * `candidates` lists them when none or more than one fit, for staff to choose on the line.
  */
 export async function findItem(executor: Executor, offerId: string, label: string, opts: { month?: string | null; year?: number | null } = {}) {
   const items = await executor.select({ item: sessionOfferItem, month: boardSeries.month, year: boardSeries.year })
@@ -924,13 +972,16 @@ export async function findItem(executor: Executor, offerId: string, label: strin
   };
   if (items.length === 1) return { item: items[0]!.item, how: 'only' as const, candidates };
   const t = words(label);
-  const byLabel = pick(items.filter((i) => words(i.item.label) === t), 'label');
+  // The label as written, or the one code it names written another way ("Paper 3" for an item labelled "Unit 3").
+  const one = namedCodes(label);
+  const sameCode = (itemLabel: string) => one.length === 1 && namedCodes(itemLabel).length === 1 && namedCodes(itemLabel)[0] === one[0];
+  const byLabel = pick(items.filter((i) => words(i.item.label) === t || sameCode(i.item.label)), 'label');
   if (byLabel) return byLabel;
   const codes = namedCodes(label);
   if (codes.length) {
     // An item fits when the units it enters are exactly the ones named (by code or by what the school calls them).
     const fits = items.filter((i) => {
-      const own = units.filter((u) => u.itemId === i.item.id).map((u) => [u.code.toLowerCase(), (u.shortCode ?? '').toLowerCase(), `paper ${u.code.toLowerCase().split('/').pop()}`]);
+      const own = units.filter((u) => u.itemId === i.item.id).map(unitNames);
       return own.length > 0 && own.every((u) => u.some((c) => codes.includes(c))) && codes.every((c) => own.some((u) => u.includes(c)));
     });
     const hit = pick(fits, 'unit');
@@ -945,6 +996,38 @@ export async function findItem(executor: Executor, offerId: string, label: strin
   }
   const whole = pick(items.filter((i) => i.item.kind === 'whole'), 'whole');
   return whole ?? { item: null, how: null, candidates };
+}
+
+/**
+ * A line naming several units or papers ("Mathematics (P1 & P2)", "Biology (Paper 3 & Paper 4)")
+ * that no single item enters (F7, the review of 8 Oct, item 2): one item per code the words name —
+ * staff's choice for a code first (`chosen`), else findItem on the code alone — or null for a code
+ * no single item, or an item another code already took, fits. Null when the words name fewer than
+ * two codes.
+ */
+export async function findItemsByCode(
+  executor: Executor, offerId: string, label: string,
+  opts: { month?: string | null; year?: number | null; chosen?: Record<string, string> | null } = {},
+) {
+  const codes = namedCodes(label);
+  if (codes.length < 2) return null;
+  const parts: { code: string; item: typeof sessionOfferItem.$inferSelect | null; candidates: { id: string; label: string; kind: string }[] }[] = [];
+  for (const code of codes) {
+    const chosenId = opts.chosen?.[code];
+    if (chosenId) {
+      const [it] = await executor.select().from(sessionOfferItem).where(and(eq(sessionOfferItem.id, chosenId), eq(sessionOfferItem.offerId, offerId)));
+      const all = await findItem(executor, offerId, code, opts);
+      parts.push({ code, item: it ?? null, candidates: all.candidates });
+      continue;
+    }
+    const r = await findItem(executor, offerId, code, opts);
+    // A code that falls back to the whole subject, or to the offer's only item, names no item of its own.
+    const own = r.item && r.how !== 'whole' && r.how !== 'only' ? r.item : null;
+    parts.push({ code, item: own, candidates: r.candidates });
+  }
+  // Two codes on one item: neither is that item's alone.
+  for (const p of parts) if (p.item && parts.filter((q) => q.item?.id === p.item!.id).length > 1 && !opts.chosen?.[p.code]) p.item = null;
+  return parts;
 }
 
 /** The Subjects tab (§4.2): every offer with its board, teachers, items, their series, fees and lines. */

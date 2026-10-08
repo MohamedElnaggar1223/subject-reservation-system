@@ -118,6 +118,10 @@ export type ImportViewProblem = { code: ImportProblemCode; severity: ImportSever
  * commit prices it again, under its locks).
  */
 export type ImportLinePlan = {
+  /** The unit or paper the sheet's words named for this line, when the row names several (split: one line each). */
+  code: string | null;
+  /** The student holds a live line on this item in the session already: the commit makes none. */
+  exists: boolean;
   sessionId: string;
   sessionName: string;
   offerId: string;
@@ -144,6 +148,11 @@ export type ImportRowPlan = {
   enrolment: 'create' | 'exists' | 'none';
   registration: 'live' | 'live_exists' | 'history' | 'history_exists' | 'none';
   money: 'create' | 'exists' | 'none';
-  /** The line in a session, when `registration` is live (null otherwise, or while it cannot be told). */
-  line: ImportLinePlan | null;
+  /**
+   * The lines in a session, when `registration` is live: one, or one per unit or paper a row names
+   * that no single item enters (the row split; empty while an item cannot be told).
+   */
+  lines: ImportLinePlan[];
+  /** A row naming several units or papers: each code with the item it found (null: staff choose it). */
+  split: { code: string; offerItemId: string | null; itemLabel: string | null }[] | null;
 };

@@ -571,8 +571,11 @@ export const importArabic: Record<string, string> = {
   'No subject of the session fits the line’s words. Add it on the session’s Subjects tab (its teachers, items and course fee), map the line to the right catalogue row, or import its series as history.':
     'لا تطابق أي مادة في الجلسة كلمات السطر. أضفها في تبويب المواد في الجلسة (معلموها وبنودها ورسوم تدريسها)، أو طابق السطر مع صف الدليل الصحيح، أو استورد دورته سجلًا سابقًا.',
   'Which item of the subject?': 'أي بند من المادة؟',
-  'The line’s words fit none, or more than one, of the subject’s items (the whole subject, a unit, a route, a one-paper retake). Choose the item on the line.':
-    'لا تطابق كلمات السطر أيًّا من بنود المادة، أو تطابق أكثر من بند (المادة كاملة، أو وحدة، أو مسار، أو إعادة ورقة واحدة). اختر البند في السطر.',
+  'The line’s words fit none, or more than one, of the subject’s items (the whole subject, a unit, a route, a one-paper retake). Choose the item on the line — for a line naming several units or papers, the item of each one the words cannot tell.':
+    'لا تطابق كلمات السطر أيًّا من بنود المادة، أو تطابق أكثر من بند (المادة كاملة، أو وحدة، أو مسار، أو إعادة ورقة واحدة). اختر البند في السطر — وفي سطر يذكر عدة وحدات أو أوراق، بند كل واحدة لا تحددها الكلمات.',
+  'One line of the sheet, several lines in the session': 'سطر واحد في الجدول، وعدة سطور في الجلسة',
+  'The line names several units or papers the session offers as separate items: it makes one line per item, each priced on its own.':
+    'يذكر السطر عدة وحدات أو أوراق تقدّمها الجلسة بنودًا منفصلة: فيُنشئ سطرًا لكل بند، يُسعَّر كلٌّ على حدة.',
   'No board fee in the series’ grid': 'لا رسوم مجلس في جدول الدورة',
   'The item has no fee row in its board series yet (the grid is named). Set it on the session’s Fees tab — provisional until the board publishes is fine — and the line is priced from it; nothing is ever priced at 0 for want of a fee.':
     'ليس للبند صف رسوم في دورة مجلسه بعد (الجدول مذكور). حدّده في تبويب الرسوم في الجلسة — والمؤقت حتى ينشر المجلس مقبول — فيُسعَّر السطر منه؛ ولا يُسعَّر شيء بصفر لغياب الرسوم.',
@@ -603,6 +606,14 @@ export const importArabic: Record<string, string> = {
     'تصبح كل واحدة صفًا قابلًا للتسجيل في الدليل. المجلس افتراض اليوم (الوحدات ومجموعات الأوراق: Pearson Edexcel IAL؛ والباقي: Cambridge) — غيّره هنا أو لاحقًا في الدليل. لا تحمل المادة سعرًا: يُسعَّر السطر من رسوم التدريس في جلسته ورسوم المجلس في جدول الدورة، ولا يُحجز شيء حتى يُحدَّد الاثنان.',
   // The row editor: the line in the session
   'The line in the session': 'السطر في الجلسة',
+  'The lines in the session': 'السطور في الجلسة',
+  'This line of the sheet names several units or papers: it makes one line for each, priced on its own.':
+    'يذكر هذا السطر من الجدول عدة وحدات أو أوراق: فيُنشئ سطرًا لكل واحدة، يُسعَّر كلٌّ على حدة.',
+  'The item of each unit or paper the line names': 'بند كل وحدة أو ورقة يذكرها السطر',
+  'Choose its item': 'اختر بندها',
+  'Or one item for the whole line': 'أو بند واحد للسطر كله',
+  'the item chosen on the line is not offered in this session': 'البند المختار في السطر غير مقدَّم في هذه الجلسة',
+  'Lines of the sheet split into one line per unit or paper:': 'سطور الجدول المقسّمة سطرًا لكل وحدة أو ورقة:',
   'Subject and item': 'المادة والبند',
   'Chosen on the line': 'مختار في السطر',
   'Board series': 'دورة المجلس',
@@ -641,6 +652,10 @@ export const importArabic: Record<string, string> = {
   'no item fits': 'لا يطابق أي بند',
   'Retake, in school': 'إعادة، في المدرسة',
   'Retake, self-study': 'إعادة، دراسة ذاتية',
+  // Sentences of other screens the import's patterns once caught (the review of 8 Oct, item 4): their own words.
+  'Registration window is not open': 'نافذة التسجيل غير مفتوحة',
+  'Registration window is not open — a finance admin can grant this student a deadline extension': 'نافذة التسجيل غير مفتوحة — يستطيع مدير المالية منح هذا الطالب تمديدًا للموعد',
+  'That teacher does not teach this subject in this session': 'هذا المعلم لا يدرّس هذه المادة في هذه الجلسة',
 };
 
 /** The import's sentences with a name, a number, a code or a year in them. */
@@ -667,11 +682,7 @@ export function translateImportText(text: string): string | null {
     [/^from (\w+ \d{4})$/, (m) => `من ${m[1]}`],
     [/^(.+) is in another column$/, (m) => `${m[1]} في عمود آخر`],
     [/^(.+) are in another column$/, (m) => `${m[1]} في أعمدة أخرى`],
-    [/^(.+) has no price yet — set its fees on Subjects first$/, (m) => `${m[1]} بلا سعر بعد — حدّد رسومها في صفحة المواد أولًا`],
-    [/^(.+) is not open$/, (m) => `${m[1]} غير مفتوحة`],
-    [/^(.+) is not at (.+)'s level$/, (m) => `${m[1]} ليست بمستوى ${m[2]}`],
     [/^(.+) is no longer offered$/, (m) => `${m[1]} لم تعد متاحة`],
-    [/^Grade 10 June session requires all core subjects\. Missing: (.+)$/, (m) => `دورة يونيو للصف العاشر تتطلب كل المواد الأساسية. الناقصة: ${m[1]}`],
     [/^The (\d{4}-\d{4}) school fee \((.+) EGP\) must be paid before registering subjects$/, (m) => `يجب دفع الرسوم المدرسية لعام ${m[1]} (${m[2]} جنيه) قبل تسجيل المواد`],
     [/^(.+) is committing this import now — wait for it to finish, then look again$/, (m) => `${m[1]} يعتمد هذا الاستيراد الآن — انتظر حتى ينتهي ثم انظر مرة أخرى`],
     [/^This file does not have the template's columns: (.+) (?:is|are) missing\. Download the template and fill it in\.$/, (m) => `هذا الملف لا يحتوي أعمدة القالب: ${m[1]} مفقودة. نزّل القالب واملأه.`],
@@ -682,7 +693,7 @@ export function translateImportText(text: string): string | null {
     [/^Teacher record for (.+)$/, (m) => `سجل المعلم لـ ${m[1]}`],
     [/^Own email for (.+)$/, (m) => `بريد خاص لـ ${m[1]}`],
     [/^Select (.+) row (\d+)$/, (m) => `حدد ${m[1]} السطر ${m[2]}`],
-    [/^Add (.+)$/, (m) => `أضف ${m[1]}`],
+    [/^Add (.+) to the catalogue$/, (m) => `أضف ${m[1]} إلى الدليل`],
     [/^(.+) is taught at school$/, (m) => `${m[1]} تُدرَّس في المدرسة`],
     // The reservations rework: the lines a row makes in a session, and the refusals the session gives.
     [/^Lines awaiting payment in (.+) \((closed|draft)\)$/, (m) => `سطور بانتظار الدفع في ${m[1]} (${m[2] === 'closed' ? 'مغلقة' : 'مسودة'})`],
@@ -692,7 +703,11 @@ export function translateImportText(text: string): string | null {
     [/^a retake of (\w+) (\d{4}) \(named on the sheet or the line, to verify\)$/, (m) => `إعادة لدورة ${monthAr(m[1]!)} ${m[2]} (مذكورة في الجدول أو السطر، للتحقق)`],
     [/^"(.+)": name the sitting it follows on the line, or make it a first entry$/, (m) => `"${m[1]}": سمِّ الدورة التي يتبعها في السطر، أو اجعله قيدًا أول`],
     [/^a retake: name the sitting it follows on the line, or make it a first entry$/, () => 'إعادة: سمِّ الدورة التي يتبعها في السطر، أو اجعله قيدًا أول'],
-    [/^(.+) does not teach (.+) in (.+)$/, (m) => `${m[1]} لا يدرّس ${m[2]} في ${m[3]}`],
+    [/^the sheet names (.+), who does not teach (.+) in (.+)$/, (m) => `يذكر الجدول ${m[1]}، وهو لا يدرّس ${m[2]} في ${m[3]}`],
+    // A line naming several units or papers (the split): the code no item fits, and staff's choice for each code.
+    [/^(.+): choose the item for (.+) \((.+)\)$/, (m) => `${m[1]}: اختر البند لـ ${m[2]} (${m[3]})`],
+    [/^The item for (.+)$/, (m) => `بند ${m[1]}`],
+    [/^As the sheet’s words find it: (.+)$/, (m) => `كما تجده كلمات الجدول: ${m[1]}`],
     [/^board fee ([\d.,]+) in (.+)$/, (m) => `رسوم المجلس ${m[1]} في ${m[2]}`],
     [/^(.+) has no board fee in (.+) yet — set one on the session's Fees tab$/, (m) => `${m[1]} بلا رسوم مجلس في ${m[2]} بعد — حدّدها في تبويب الرسوم في الجلسة`],
     [/^(.+) is not open for reservations$/, (m) => `${m[1]} غير مفتوحة للحجز`],

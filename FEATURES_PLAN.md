@@ -518,7 +518,7 @@ branch.
 | F4 | candidates, entries, results per unit and award, `getSittings(studentId)`, `getExamsFor(studentId, date)` | F2, F3, F5 |
 | F2 | leave requests and states; `getLeaveCoverage(studentId, date)` | F3 |
 | F3 | attendance; `getAttendanceSummary(studentId, range)` | Student 360, F6 |
-| F7 | what a student sat before the system: `registration_history` (student, subject or the sheet's words, series, outcome, mode, teacher, source line), read by the import's own lines as a `legacy` sitting only when its series is earlier than the line's and had ended when committed (`seriesOrder`, `seriesEndedBy`, `@repo/validations`; MO-25); money before the system as `money_history` (history, never balances); the settings `import.selfStudyOnTaught` and `import.carryForward`; `addSectionMembersInTx(tx, …)`; `findOffer(executor, sessionId, term, { subjectId? })` and `findItem(executor, offerId, label, { month?, year? })` in offer.services.ts (RESERVATIONS_REWORK.md §10's F7 row); lines it makes are ordinary lines with consent channel `imported` and `prior_sitting_source` `legacy` or `declared_by_desk`. Details: docs/features/IMPORT.md §14 | F4 (sittings), F5 (the advisor), finance history, any path reading the school's own sheets |
+| F7 | what a student sat before the system: `registration_history` (student, subject or the sheet's words, series, outcome, mode, teacher, source line), read by the import's own lines as a `legacy` sitting only when the student sat it (not dropped) and its series is earlier than the line's and had ended when committed (`seriesOrder`, `seriesEndedBy`, `@repo/validations`; MO-25); money before the system as `money_history` (history, never balances); the settings `import.selfStudyOnTaught` and `import.carryForward`; `addSectionMembersInTx(tx, …)`; `findOffer(executor, sessionId, term, { subjectId?, levels? })`, `findItem(executor, offerId, label, { month?, year? })` and `findItemsByCode(…)` in offer.services.ts (RESERVATIONS_REWORK.md §10's F7 row; a sheet line naming several units or papers is one line per item); lines it makes are ordinary lines with consent channel `imported` and `prior_sitting_source` `legacy` or `declared_by_desk`. Details: docs/features/IMPORT.md §14 | F4 (sittings), F5 (the advisor), finance history, any path reading the school's own sheets |
 
 ---
 
@@ -664,7 +664,7 @@ API and web ports):
 | F2 Campus leave | | | | |
 | F5 Pathway advisor | | | | |
 | F3 Attendance | | | | |
-| F7 Day-one import | frozen 7 Oct at e58324b (gates green on 0036d64; fixing its review's flags, last flag 6); **resumed 8 Oct 2026 08:20Z** on the rework's model (§9's F7 list) in worktree `agent-acf43230a4e06e8b4` | Opus 5.5 implementer; reviewer after its push | | |
+| F7 Day-one import | frozen 7 Oct at e58324b (gates green on 0036d64; fixing its review's flags, last flag 6); **resumed 8 Oct 2026 08:20Z** on the rework's model (§9's F7 list) in worktree `agent-acf43230a4e06e8b4`; its Opus 5.5 review of 6f18364 (merge after fixes: 1, 2) answered the same day, all eleven items (docs/features/IMPORT.md §15); the final merge after F4 | Opus 5.5 implementer; reviewer confirms items 1 and 2 | | |
 | F6 UI audit | | | | |
 | F8 Demo school and walkthrough | | | | owner's request, 30 Sep 2026; after F6 |
 
