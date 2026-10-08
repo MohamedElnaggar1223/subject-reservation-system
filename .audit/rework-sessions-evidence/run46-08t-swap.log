@@ -1,0 +1,266 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -0.3 ms (measured within 1 ms)
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [bfa6303b-36c8-462a-9bc5-931d365b39fe] POST /api/auth/sign-up/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[email:stub] To: admin.t08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [56308c0d-194a-43ec-8d9e-09a5bc9dc388] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [526314d5-f0ed-4c1b-86af-03a9703b8a68] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [13f0ad39-032d-4573-9f7e-6d0ca2241693] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c51be561-095b-4ee9-986d-c0a2b2a69f43] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [27495315-53e8-4f38-9c79-725a023652a4] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c4c0703e-c0e8-447c-90ae-fa42202c493a] POST /v1/teachers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [68558a8a-2c49-45a1-bbf4-bafefcf33e7a] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [2b2d34ed-05fe-419b-b118-bbbe7de5be33] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [857022c7-3ed6-4b5e-96d7-7c8115f0d3a7] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [9b6c2a56-7ccd-4eed-997d-7af8bae6a4ce] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [cc0b442c-8137-4245-91ea-4831b1404877] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [93aed071-a98a-4ee0-9123-7b111d2649ee] POST /v1/sessions/3ba29fe3-81d4-4621-adff-ebc9b8bf178d/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [2f2e4d64-8b28-45ad-b4b4-54e598db5aef] POST /v1/sessions/36bb709e-003d-462a-9bcf-a90831c2d91a/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [cea8d93e-b78f-4cc1-a398-63d7ce1c80e5] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [8c8139cf-8a06-4621-8f82-882a36f6eb11] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [54fb9666-c382-4eef-bf6a-2a167c3f95b2] POST /v1/sessions/3ba29fe3-81d4-4621-adff-ebc9b8bf178d/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [fc72a050-4911-4433-8046-2ac02f549ec5] POST /v1/catalogue/qualifications
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [479d0e70-80d9-4297-8433-48740ec5ad4b] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [04f84ed5-90e1-446b-9b54-78593490cf23] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [64f61e06-7b8e-48fc-8572-f2371172170c] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [0d554aa8-8bde-4dc8-95f6-1adedef042dc] POST /v1/sessions/3ba29fe3-81d4-4621-adff-ebc9b8bf178d/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [a6d70dc4-73db-4d17-b295-7bc7a91a6c51] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [e22147ba-cf8e-4999-bb62-85b76e26c2fb] POST /v1/sessions/3ba29fe3-81d4-4621-adff-ebc9b8bf178d/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [55806ce0-71a3-4b79-b828-766e6f4b7415] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[email:stub] To: parent.t08-swa-zalj@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[email:stub] To: student.t08-swa-zalj@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [b639403e-02d5-425c-a298-2b0cee858169] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [bd7c5506-6024-456c-a1f0-6e30fce8bdfc] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [7c160b0d-a605-41e6-bec6-83edb1815a58] POST /v1/registrations/desk
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [e2f99688-29f0-4efc-a15c-f2949b6dfde3] POST /v1/payments/initiate
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [0f8d9461-682c-4aa8-aaf1-ecd8215e3139] POST /v1/payments/9c5ba49e-8391-4cd8-99f1-ca08adb4c5fb/confirm
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[email:stub] To: parent.t08-swa-zalj@test.local | Subject: Payment confirmed — June 2027 — t08a-zalj | Attachments: receipt-9c5ba49e-8391-4cd8-99f1-ca08adb4c5fb.pdf
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [acf3d481-f58d-445f-a364-d3f3c42674e8] POST /v1/registrations/9faacced-3a88-4893-bf5b-ae67bb899a5c/request-swap
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[email:stub] To: parent.t08-swa-zalj@test.local | Subject: Action Required: Student t08-swa-zalj requested a subject swap 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [2bbdfe0f-b5ad-4350-b544-65a40d031f92] POST /v1/board-fees/18e4a5d5-9cac-484f-96a3-587596a64917/confirm
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land
+[INFO] [d7fa6209-4639-4845-924d-ed82459685b3] PUT /v1/change-requests/62f4bd19-a703-48d7-bf9f-0949203c3d51/approve
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [432fe950-19dd-48eb-bdba-660728949ece] POST /v1/catalogue/qualifications
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[email:stub] To: student.t08-swa-zalj@test.local | Subject: Your swap request was approved 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[email:stub] To: parent.t08-swa-zalj@test.local | Subject: Escrow balance updated for Student t08-swa-zalj 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [c0f81c28-0e9d-461b-aed9-f411d09116fc] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [7fcafd42-d58d-41c7-9361-b22a337dcc16] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [1537bc19-7077-40a9-9cf3-e57baff551a9] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [643a0f7a-f72d-4a2c-9590-df710276e850] POST /v1/sessions/3ba29fe3-81d4-4621-adff-ebc9b8bf178d/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [c500e02c-f007-43d0-a6c2-99622481edc7] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [d702ae42-8088-4be6-bd2e-aae848b138cc] POST /v1/sessions/3ba29fe3-81d4-4621-adff-ebc9b8bf178d/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [c6b8884f-f50c-4338-95b1-2457c0c84082] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[email:stub] To: parent.t08-swb-zalj@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[email:stub] To: student.t08-swb-zalj@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [895b112a-c8ab-4586-8883-72062fff27ed] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [377d8f93-8ff3-42c6-af5d-5a4c35987e42] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [c01ed171-da26-4200-9645-7f1cccda12e3] POST /v1/registrations/desk
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [73d895d7-e771-4c6b-87cd-c49f19aed8e1] POST /v1/payments/initiate
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [0e4efc03-eb7f-4b66-9419-92aae6f5294a] POST /v1/payments/89d45a80-4f60-42eb-84cb-a2a092830458/confirm
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [950ef010-adaf-4d51-8371-fe754eeeef1d] POST /v1/registrations/33aaacc7-f3f5-439a-b86d-5f21eca22c01/request-swap
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[email:stub] To: parent.t08-swb-zalj@test.local | Subject: Payment confirmed — June 2027 — t08a-zalj | Attachments: receipt-89d45a80-4f60-42eb-84cb-a2a092830458.pdf
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[email:stub] To: parent.t08-swb-zalj@test.local | Subject: Action Required: Student t08-swb-zalj requested a subject swap 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [c6be67ec-df6e-4194-b72f-e06a92e50e86] PUT /v1/change-requests/734dd897-cf16-4d2b-bad0-5f6fe168d123/approve
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[INFO] [d8fba121-7c17-4069-b4f5-656996130c8c] POST /v1/board-fees/20a3b254-63c1-4241-bb9f-9d83973822d0/confirm
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[email:stub] To: student.t08-swb-zalj@test.local | Subject: Your swap request was approved 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land
+[email:stub] To: parent.t08-swb-zalj@test.local | Subject: Escrow balance updated for Student t08-swb-zalj 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [6141cb60-fbdf-46cd-8445-459cef2b33e7] POST /v1/catalogue/qualifications
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [28f24072-624c-4bd7-8faf-53df6ab48997] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [7d3647f2-3240-47aa-9310-17b9974117e1] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [7c813f7d-7ac0-4402-a993-965598e9691a] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [19c2a8b1-3400-45a5-be4a-5f4460322fea] POST /v1/sessions/3ba29fe3-81d4-4621-adff-ebc9b8bf178d/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [27da819a-0f6a-43b6-8c51-6c9c9bbb1e34] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [5b25d3b1-b19b-42c2-9804-a142b8f54a84] POST /v1/sessions/3ba29fe3-81d4-4621-adff-ebc9b8bf178d/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [96fb42b3-e4b2-4aed-9097-aaf032b77cd2] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[email:stub] To: parent.t08-swc-zalj@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[email:stub] To: student.t08-swc-zalj@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [79858249-be8c-45ee-bef0-c3ce137d5269] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [fff5a76a-6cf1-4844-ae8c-174ea607a999] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [18588c5f-c968-4ccc-825b-1b4998ba4c37] POST /v1/registrations/desk
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [c24bdeae-0309-4f7b-b8ea-cf3c81a0281f] POST /v1/payments/initiate
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [7dc0e469-2a4e-4258-9fe2-f37eaf7ed0eb] POST /v1/payments/7be33f86-3d20-4eb6-a05b-bbeeb7f06b09/confirm
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[email:stub] To: parent.t08-swc-zalj@test.local | Subject: Payment confirmed — June 2027 — t08a-zalj | Attachments: receipt-7be33f86-3d20-4eb6-a05b-bbeeb7f06b09.pdf
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [e118c5e3-1d96-410c-8c8c-8d9fde58dbdc] POST /v1/board-fees/5d0b4f37-af04-4de9-8071-31f6ba6b1c43/confirm
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[INFO] [7d6d6383-6a19-41f6-b55d-b9f38ea081ec] POST /v1/registrations/770e08c3-50ef-4a60-9aaf-833ef1099269/swap
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land
+[email:stub] To: student.t08-swc-zalj@test.local | Subject: Your parent swapped a subject for you 
+
+ ✓ test/08t-rework-races.test.ts (31 tests | 28 skipped) 3626ms
+   ✓ 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the Confirm takes the row first: the approval waits for its fee grid before the old line; both land  679ms
+   ✓ 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the approval takes its new line's row first: the Confirm waits for the swap; both land  671ms
+   ✓ 08t: the rework races > a swap while the fee row its new line and its old line read is confirmed (the review of B): the new line's locks come before the old line > the parent's own swap, the Confirm first: the same order, both land  626ms
+stdout | sendEmail (/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api/src/integrations/email.ts:75:13)
+[email:stub] To: parent.t08-swc-zalj@test.local | Subject: Escrow balance updated for Student t08-swc-zalj 
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed | 28 skipped (31)
+   Start at  08:35:46
+   Duration  5.39s (transform 535ms, setup 4ms, collect 215ms, tests 3.63s, environment 0ms, prepare 34ms)
+

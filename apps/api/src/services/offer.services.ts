@@ -815,7 +815,7 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
   }
   // The fees, once the series' fee grids are held exclusive in id order (§2.1: a fee row is
   // created in a series only while no move into it is under way).
-  await lockFeeGrids(tx, feesToCopy.map((f) => f.seriesId), 'write');
+  await lockFeeGrids(tx, feesToCopy.map((f) => f.seriesId), 'exclusive');
   for (const { seriesId, src } of feesToCopy) {
     const made = await tx.insert(boardFee).values({
       id: randomUUID(), boardSeriesId: seriesId, keyKind: src.keyKind, unitId: src.unitId, qualificationOptionId: src.qualificationOptionId,

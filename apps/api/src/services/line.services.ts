@@ -21,7 +21,8 @@ import {
   and, eq, or, inArray, sql,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
-import type { Eligibility, LineInputType } from '@repo/validations';
+import type { Eligibility, LineInputType, Attempt, LineMode } from '@repo/validations';
+import { lockFeeGrids } from '../lib/fee-grid-lock';
 import { assertLineRules } from './line-rules.services';
 import { priceLine } from './pricing.services';
 import { computeDueAt, effectiveDeadlineFor, deadlinePassedSentence } from './deadline.services';
@@ -77,12 +78,34 @@ async function lockForLines(tx: Tx, sessionId: string, itemIds: string[]) {
   // takes a series FOR UPDATE, and it holds no item, so this later share lock waits on no cycle.
   const moved = [...new Set(held.map((i) => i.seriesId).filter((x): x is string => !!x && !seriesIds.includes(x)))].sort();
   if (moved.length) await tx.select({ id: boardSeries.id }).from(boardSeries).where(inArray(boardSeries.id, moved)).orderBy(boardSeries.id).for('share');
+  // The series' fee grids, shared, before the rows (§2.1; lib/fee-grid-lock.ts): a fee write or a
+  // Confirm of this series waits for the line, or the line for it.
+  await lockFeeGrids(tx, held.map((i) => i.seriesId), 'shared');
   const keys = itemIds.length ? await tx.select().from(sessionOfferItemFeeKey).where(inArray(sessionOfferItemFeeKey.itemId, itemIds)) : [];
   const feeConds = keys.flatMap((k) => {
     const it = held.find((i) => i.id === k.itemId);
     return it?.seriesId ? [and(eq(boardFee.boardSeriesId, it.seriesId), eq(boardFee.keyKind, k.keyKind), eq(boardFee.keyId, k.keyId))] : [];
   });
   if (feeConds.length) await tx.select({ id: boardFee.id }).from(boardFee).where(or(...feeConds)).orderBy(boardFee.id).for('share');
+}
+
+/**
+ * For a path that holds a line before it makes new ones (a swap drops the old line — its receipt,
+ * then the line — and then makes the new one): what making the new lines will lock, taken first,
+ * in §2.1's order — the subjects, the session's series links, the series, the offers, the items,
+ * the fee grids (shared) and the fee rows, then the student's price exceptions (FOR SHARE, as
+ * `priceLine` takes them). A Confirm or a grid save holds its fee rows and then wants the lines
+ * priced from them, the old line among them; taken after the old line, the new line's rows closed
+ * that cycle (the review of B, on the swap approval). insertLines takes the same locks again,
+ * already held. Call after the student lock (`assertMayRegisterForInTx`).
+ */
+export async function holdNewLines(tx: Tx, a: { studentId: string; sessionId: string; lines: { offerItemId: string; attempt: Attempt; mode: LineMode }[] }) {
+  const itemIds = [...new Set(a.lines.map((l) => l.offerItemId))];
+  if (!itemIds.length) return;
+  await lockForLines(tx, a.sessionId, itemIds);
+  for (const l of a.lines) {
+    await priceLine(tx, { item: { id: l.offerItemId }, attempt: l.attempt, mode: l.mode, studentId: a.studentId, sessionId: a.sessionId }, { lock: true });
+  }
 }
 
 /** The teachers who may be named on a line of an item: the item's own, else the offer's. */

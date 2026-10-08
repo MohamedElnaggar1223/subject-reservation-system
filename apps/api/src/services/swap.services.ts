@@ -62,6 +62,7 @@ import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { refundPercentage } from './refund.services';
 import { executeReceiptGatedDrop, lockReceiptOf } from './receipt.services';
 import { priceLine, PRICE_CHANGED_REFUSAL } from './pricing.services';
+import { holdNewLines } from './line.services';
 import { resolveItem, availabilityConstraints } from './offer.services';
 import { reserveLines, inheritConsents, writeConsents } from './reservation.services';
 import { effectiveDeadlineFor } from './deadline.services';
@@ -512,6 +513,9 @@ export async function approveChangeRequest(
     // A swap registers a new subject: asked again with the student and window
     // held, before anything else is locked (F0a; see assertMayRegisterForInTx).
     if (cr.type === 'swap') await assertMayRegisterForInTx(tx, cr.registration.studentId, cr.registration.sessionId);
+    // The new line's series, items, fee grid and fee rows before the old line (§2.1: a Confirm holds
+    // its rows and then wants the lines priced from them, this old line among them).
+    if (cr.type === 'swap' && swap) await holdNewLines(tx, { studentId: cr.registration.studentId, sessionId: cr.registration.sessionId, lines: [swap.line] });
     // Asked again under the line's lock, with its series held: a deadline moved at the same moment
     // waits. The line's receipt first (MA-16's order: a reversal takes the receipt, then the line).
     await lockReceiptOf(tx, cr.registrationId);
@@ -810,6 +814,8 @@ export async function executeDirectSwap(
     // Asked again with the student and window held, before anything else is
     // locked (F0a; see assertMayRegisterForInTx).
     await assertMayRegisterForInTx(tx, reg.studentId, reg.sessionId);
+    // The new line's locks before the old line's receipt and the line (§2.1; as the approval).
+    await holdNewLines(tx, { studentId: reg.studentId, sessionId: reg.sessionId, lines: [swap.line] });
     const dropOutcome = await executeReceiptGatedDrop(tx, {
       registrationId,
       studentId: reg.studentId,
