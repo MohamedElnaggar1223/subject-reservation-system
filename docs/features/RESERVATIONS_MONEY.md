@@ -1,8 +1,8 @@
 # Reservations rework — step C (agent C): money changes, charges, exceptions
 
 Branch `feature/rework-money`, from `origin/feature/rework-sessions` (agent A's step 1, merged
-again at 977848d), with main merged at c6ab55f (A's step 1) and at 42cbf2c (step 2's B, main at
-84d60ca). The design is `RESERVATIONS_REWORK.md` version 8 (accepted 7 Oct 2026 with
+again at 977848d), with main merged at c6ab55f (A's step 1), at 42cbf2c (step 2's B, main at
+84d60ca) and at ff7f2a7 (A's swap deadlock fix, main at 7c95950). The design is `RESERVATIONS_REWORK.md` version 8 (accepted 7 Oct 2026 with
 its §17 defaults); this step is its §3.6, §3.7, §3.9, §3.10 items 1–9, §4.7, the School fees
 push and the desk-drop of §3.3. A's contract is `docs/features/RESERVATIONS.md` §2 (§2.1 the
 lock order, §2.8 the adapter this step replaces, §2.10 what is not mine to touch, §2.11 what
@@ -605,3 +605,6 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
   week); then the after-B items: both of B's expiries settle a plan, `paymentState` counts
   instalments, the flag in the charge deadlines, the 08q and 08r cases; five controls red,
   restored; the dev copy recreated and migrated main first (rows 48–50 are step C's).
+- 06:10 — main at 7c95950 (A's swap deadlock fix: holdNewLines, the fee grid shared in every path
+  that makes lines) merged in with no conflict (ff7f2a7); step C's lock paths take no fee grid or
+  fee row; no migration changed, so the dev copy's proof stands.
