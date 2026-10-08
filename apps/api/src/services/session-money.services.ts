@@ -1,12 +1,14 @@
 /**
  * The session's Money tab, lines only (RESERVATIONS_REWORK.md §4.6): who has reserved what, who
  * has paid, who has not, with the amount, the due date and the days overdue; filters (unpaid,
- * overdue, by subject, by section, provisional). Charges join this list with step C; "Remind"
- * with step D. The finance workbench, takings and receipts are unchanged.
+ * overdue, by subject, by section, provisional). Charges are listed below it (step C,
+ * session-charges); a line under an instalment plan owes its price less the deposits held for it.
+ * "Remind" with step D. The finance workbench, takings and receipts are unchanged.
  */
 
 import { db, sql } from '@repo/db';
 import { seriesAcademicYearStart, type SessionMoneyQueryType } from '@repo/validations';
+import { lineDepositsSql } from './escrow.services';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -32,7 +34,8 @@ export async function getSessionMoney(sessionId: string, q: SessionMoneyQueryTyp
       exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id
         where pr.registration_id = r.id and p.status = 'completed') as funded,
       (select string_agg(pu.name, ', ' order by pu.name) from parent_student_link l join "user" pu on pu.id = l.parent_id
-        where l.student_id = u.id and l.status = 'approved') as parents
+        where l.student_id = u.id and l.status = 'approved') as parents,
+      ${lineDepositsSql('r')} as deposits
     from registration r
     join "user" u on u.id = r.student_id
     join subject s on s.id = r.subject_id
@@ -50,6 +53,8 @@ export async function getSessionMoney(sessionId: string, q: SessionMoneyQueryTyp
     const funded = r.funded as boolean;
     const unpaid = r.status === 'pending_payment' || (r.status === 'preregistered' && !funded);
     const overdueDays = unpaid && due.getTime() < now ? Math.floor((now - due.getTime()) / DAY) : 0;
+    // A line under an instalment plan (step C): its deposits held are paid in; owed is the rest.
+    const deposits = Math.round(Number(r.deposits ?? 0) * 100) / 100;
     return {
       id: r.id as string,
       status: r.status as string,
@@ -64,6 +69,8 @@ export async function getSessionMoney(sessionId: string, q: SessionMoneyQueryTyp
       mode: r.mode as string,
       paymentStatus: (r.payment_status as string | null) ?? null,
       unpaid,
+      deposits,
+      outstanding: unpaid ? Math.round(Math.max(0, Number(r.price) - deposits) * 100) / 100 : 0,
       paid: r.status === 'confirmed' || (r.status === 'preregistered' && funded),
       student: { id: r.student_id as string, name: r.student_name as string, number: (r.student_number as string | null) ?? null, section: (r.section as string | null) ?? null, sectionId: (r.section_id as string | null) ?? null },
       parents: (r.parents as string | null) ?? null,
@@ -85,6 +92,7 @@ export async function getSessionMoney(sessionId: string, q: SessionMoneyQueryTyp
   });
   const live = lines.filter((l) => !['expired', 'dropped', 'rejected'].includes(l.status));
   const sum = (xs: typeof lines) => Math.round(xs.reduce((a, l) => a + l.price, 0) * 100) / 100;
+  const owed = (xs: typeof lines) => Math.round(xs.reduce((a, l) => a + l.outstanding, 0) * 100) / 100;
   const waiting = live.filter((l) => l.unpaid);
   const paid = live.filter((l) => l.paid);
   return {
@@ -95,9 +103,11 @@ export async function getSessionMoney(sessionId: string, q: SessionMoneyQueryTyp
       paidAmount: sum(paid),
       awaitingApproval: live.filter((l) => l.status === 'pending_approval').length,
       unpaid: waiting.length,
-      outstanding: sum(waiting),
+      outstanding: owed(waiting),
+      // Paid in under instalment plans, held until each line's capture (step C).
+      depositsHeld: Math.round(waiting.reduce((a, l) => a + l.deposits, 0) * 100) / 100,
       overdue: waiting.filter((l) => l.overdueDays > 0).length,
-      overdueAmount: sum(waiting.filter((l) => l.overdueDays > 0)),
+      overdueAmount: owed(waiting.filter((l) => l.overdueDays > 0)),
       provisional: waiting.filter((l) => l.provisional).length,
       families: new Set(waiting.map((l) => l.student.id)).size,
     },

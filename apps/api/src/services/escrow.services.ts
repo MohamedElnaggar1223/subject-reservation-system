@@ -235,6 +235,18 @@ export async function creditHeld(params: EscrowMutationParams, tx?: DbConn): Pro
 export const PLAN_HELD_DEBIT_REASONS = ['instalment_reversed', 'plan_capture', 'plan_forfeit', 'plan_release'] as const;
 
 /** A line's deposits still held (net of every plan debit), or every line's of the wallet. */
+/**
+ * The SQL of a line's deposits held under its instalment plan (alias of the registration row): the
+ * instalments credited to the held wallet for it, less what was reversed, captured, kept or
+ * released — the same ledger rows earmarkedHeld sums. Zero once the plan is captured or settled.
+ * The statement, the Money tab and the desk's "Owes now" read a plan line's paid part from it.
+ */
+export const lineDepositsSql = (alias = 'r') => sql.raw(`(select coalesce(sum(case when t.type = 'credit' then t.amount else -t.amount end), 0)
+  from escrow_transaction t
+  where t.related_registration_id = ${alias}.id and t.balance_type = 'held'
+    and ((t.type = 'credit' and t.reason = 'instalment')
+      or (t.type = 'debit' and t.reason in ('instalment_reversed', 'plan_capture', 'plan_forfeit', 'plan_release'))))`);
+
 export async function earmarkedHeld(conn: Pick<typeof db, 'execute'>, escrowId: string, registrationId?: string): Promise<number> {
   const r = await conn.execute(sql`
     select coalesce(sum(case when t.type = 'credit' then t.amount else -t.amount end), 0)::numeric as held

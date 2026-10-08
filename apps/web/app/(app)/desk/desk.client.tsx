@@ -29,7 +29,7 @@ import { Button } from '~/components/ui/button';
 import { ReasonModal } from '~/components/ui/reason-modal';
 import { Badge, StandingBadge } from '~/components/ui/tone';
 import { StudentAcademicPanel } from '~/components/student-academic-panel';
-import { DeskCollectPanel } from './desk-collect.client';
+import { DeskCollectPanel, AlsoCollect, type Extras } from './desk-collect.client';
 import { Reserve, SlipLink, type ReserveDone } from '~/components/reservations/reserve';
 import { StatementView } from '~/components/reservations/statement';
 
@@ -720,6 +720,8 @@ function DeskReserveCard({ studentId, onDone }: { studentId: string; onDone: (ms
   const { data: sessions = [] } = useQuery({ queryKey: ['sessions', 'active'], queryFn: fetchActiveSessions });
   const [sessionId, setSessionId] = useState('');
   const [last, setLast] = useState<ReserveDone | null>(null);
+  // "Also collect now" (step C, §4.3): the year's fee and the student's charges with the reservation.
+  const [extras, setExtras] = useState<Extras>({ chargeIds: [], total: 0 });
   const chosen = sessionId || (sessions.length === 1 ? sessions[0]!.id : '');
   return (
     <div className="bg-card rounded-xl border border-primary/40 shadow-sm p-5 space-y-4">
@@ -743,9 +745,10 @@ function DeskReserveCard({ studentId, onDone }: { studentId: string; onDone: (ms
           <div className="mt-2"><SlipLink studentId={studentId} registrationIds={last.registrationIds} /></div>
         </div>
       )}
+      {chosen && <AlsoCollect studentId={studentId} value={extras} onChange={setExtras} />}
       {chosen && (
-        <Reserve key={`${chosen}|${studentId}`} viewer="desk" studentId={studentId} sessionId={chosen}
-          onDone={(d) => { setLast(d); onDone(d.message); }} />
+        <Reserve key={`${chosen}|${studentId}`} viewer="desk" studentId={studentId} sessionId={chosen} deskExtras={extras}
+          onDone={(d) => { setLast(d); setExtras({ chargeIds: [], total: 0 }); onDone(d.message); }} />
       )}
     </div>
   );
