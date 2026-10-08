@@ -303,20 +303,20 @@ function Unentered({ data, series }: { data: EntryListData; series: BoardSeriesR
   const passed = data.series.pastDeadline;
   return (
     <section className="mb-8" aria-labelledby="unentered-title">
-      <h2 id="unentered-title" className="mb-1 font-display text-lg font-bold text-foreground">Confirmed registrations with no entry</h2>
+      <h2 id="unentered-title" className="mb-1 font-display text-lg font-bold text-foreground">Paid reservations with no entry</h2>
       <p className="mb-3 max-w-3xl text-sm text-muted-foreground">
-        A family paid for these subjects, but nothing is entered with the board for them yet.
+        A family paid for these, but nothing is entered with the board for them yet.
       </p>
       <FlashNotice flash={flash} onClose={() => setFlash(null)} />
       {data.unentered.length === 0 ? (
-        <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">Every confirmed registration in this series has its entries.</p>
+        <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-sm">Every paid reservation in this series has its entries.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
           <table className="w-full min-w-[720px] text-sm">
             <thead className="border-b border-border bg-muted">
               <tr>
                 <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Candidate</th>
-                <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Registered subject</th>
+                <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Reserved</th>
                 <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Why there is no entry</th>
                 <th scope="col" className="px-3 py-2 text-end font-semibold text-muted-foreground"><span className="sr-only">Actions</span></th>
               </tr>
@@ -325,10 +325,16 @@ function Unentered({ data, series }: { data: EntryListData; series: BoardSeriesR
               {data.unentered.map((u) => (
                 <tr key={u.registrationId}>
                   <td className="px-3 py-2 font-medium text-foreground"><bdi data-i18n-skip="true">{u.studentName}</bdi></td>
-                  <td className="px-3 py-2"><BoardText>{u.subjectName}</BoardText> <Code className="text-xs text-muted-foreground">{u.subjectCode}</Code></td>
+                  <td className="px-3 py-2">
+                    <BoardText>{u.subjectName}</BoardText> <Code className="text-xs text-muted-foreground">{u.subjectCode}</Code>
+                    {u.itemKind !== 'whole' && <span className="ms-1 text-xs text-muted-foreground">— <BoardText>{u.itemLabel}</BoardText></span>}
+                    {u.declaredUnverified && <div className="mt-1"><Badge tone="warning">Declared sitting, not verified</Badge></div>}
+                  </td>
                   <td className="px-3 py-2 text-foreground">
                     {!u.mapped ? (
                       <span>The subject is not mapped on the Catalogue</span>
+                    ) : u.held ? (
+                      <span>Held: the sitting it follows was declared and is not verified yet (the session&apos;s To verify tab)</span>
                     ) : u.withdrawnAt ? (
                       <span><span>Its entry was withdrawn on</span> <InstantText iso={u.withdrawnAt} time={false} /><span>; the registration is still confirmed.</span></span>
                     ) : (
@@ -357,7 +363,25 @@ function Unentered({ data, series }: { data: EntryListData; series: BoardSeriesR
               ))}
             </tbody>
           </table>
-          {passed && <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">The entry deadline has passed: no new entry can be made for this series.</p>}
+          {passed && <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">The entry deadline has passed: only a retake of the board&apos;s previous series can still be entered, until the retake deadline.</p>}
+        </div>
+      )}
+      {data.cashInsToEnter.length > 0 && (
+        <div className="mt-6">
+          <h3 className="mb-1 text-sm font-semibold text-foreground">Paid cash-ins with no entry</h3>
+          <p className="mb-3 max-w-3xl text-sm text-muted-foreground">
+            The family paid the board&apos;s cash-in for an award. A cash-in whose line says the award is entered by Derive; the others are added by hand with the cash-in.
+          </p>
+          <ul className="divide-y divide-border rounded-xl border border-border bg-card text-sm shadow-sm">
+            {data.cashInsToEnter.map((c) => (
+              <li key={c.chargeId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                <span><bdi data-i18n-skip="true" className="font-medium text-foreground">{c.studentName}</bdi> <span className="text-muted-foreground">·</span> <BoardText>{c.description}</BoardText></span>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/exams/entries?series=${series.id}&student=${c.studentId}` as never}>{c.registrationId ? 'Derive it' : 'Add the award by hand'}</Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </section>

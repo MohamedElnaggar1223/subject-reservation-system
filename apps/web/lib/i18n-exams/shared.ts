@@ -25,6 +25,10 @@ export const sharedArabic: Record<string, string> = {
   'Carry forward suggested — confirm it': 'مقترح ترحيل - أكّده',
   'Its registration is no longer confirmed — withdraw the entry': 'لم يعد تسجيله مؤكدًا - اسحب القيد',
   'Access arrangements without a board approval, or expired': 'ترتيبات وصول دون موافقة المجلس أو منتهية',
+  // The reservations rework: a declared sitting not verified, a cash-in no longer paid.
+  'Declared earlier sitting not verified yet — entered as declared (the To verify tab)': 'دورة سابقة مُصرَّح بها لم يُتحقق منها بعد - قُيِّدت كما صُرّح بها (تبويب للتحقق)',
+  'Declared earlier sitting not verified — held, not sent until it is (the To verify tab)': 'دورة سابقة مُصرَّح بها لم يُتحقق منها - معلّقة ولا تُرسل حتى يُتحقق منها (تبويب للتحقق)',
+  'Its cash-in is no longer paid — collect it again or withdraw the entry': 'لم يعد طلب الشهادة (Cash-in) مدفوعًا - حصّله مجددًا أو اسحب القيد',
   // ── Sessions, arrangements, fee tiers ──
   'Morning': 'صباحًا',
   'Afternoon': 'مساءً',

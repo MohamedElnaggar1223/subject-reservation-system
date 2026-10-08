@@ -1,43 +1,52 @@
 # F4 — Exam-entry management (as built)
 
-Branch `feature/exam-entries`, started from `origin/main` e5da650 (F0a and F0b merged). The plan
-is FEATURES_PLAN.md §1 "F4 — Exam-entry management", its §2 row and §5's rules; the design basis
-is DISCOVERY_RESEARCH.md §2 (what a centre must do, per board) and §5 (notes 2, 4, 5, 6),
-DISCOVERY.md (Q-02 carry forward, Q-05 identifiers, F-07 the boards' files, A-08 the hard stop)
-and IMPORT_SPIKE.md. It builds on F0b's catalogue and board series (docs/features/CATALOGUE.md,
-§7: `entryItemsFor`, `teacherOf`, `registration.boardSeriesId`) and F0a's settings store,
-uploads, rooms and roles (docs/features/FOUNDATION.md). The trail is `.audit/exam-entries.tsv`;
-evidence (suite logs, control logs, screenshots) is `.audit/exams-evidence/` (git-ignored). The
-progress log is the last section.
+Branch `feature/exam-entries`, started from `origin/main` e5da650 (F0a and F0b merged), frozen on
+7 Oct 2026 at ec7689b and **resumed on 8 Oct on the reservations rework's model** (main 2a26557
+merged at 1a3ba69; §2a says what changed and how each item of RESERVATIONS_REWORK.md §9 and §10
+was checked). The plan is FEATURES_PLAN.md §1 "F4 — Exam-entry management", its §2 row and §5's
+rules; the design basis is DISCOVERY_RESEARCH.md §2 (what a centre must do, per board) and §5
+(notes 2, 4, 5, 6), DISCOVERY.md (Q-02 carry forward, Q-05 identifiers, F-07 the boards' files,
+A-08 the hard stop) and IMPORT_SPIKE.md; since the rework, RESERVATIONS_REWORK.md §3, §9, §10 and
+the steps' documents (docs/features/RESERVATIONS.md, RESERVATIONS_LINES.md, RESERVATIONS_MONEY.md).
+It builds on the rework's lines (`lineItemsFor`, attempt, mode, prior sittings and their
+verification), C's charges (`chargesOfKind`, `refundFor`'s seams), F0b's catalogue and board series
+and course enrolment (`teacherOf`), and F0a's settings store, uploads, rooms and roles
+(docs/features/FOUNDATION.md). The trail is `.audit/exam-entries.tsv`; evidence since the rework is
+`.audit/exams-evidence/rework/` (force-added, nothing over 300 KB: migration proofs, suite
+summaries, control logs, screenshots); September's evidence stays in the git-ignored
+`.audit/exams-evidence/`. The progress log is the last section.
 
 F4 makes the school an exam centre in the system: **who the boards' candidates are** (the name as
 on the ID, date of birth, gender, Pearson's permanent UCI, a candidate number per series with
 its history, and a national ID only the coordinator and admin can read); **what each candidate is
-entered for** (per unit or award, derived from confirmed registrations, with option codes, tiers,
-retakes, carry forward, forecast grades and access arrangements); **the boards' lists** (one row
+entered for** (per unit or award, derived from paid reservation lines and paid cash-ins, with option
+codes, tiers, retakes, carry forward, forecast grades and access arrangements); **the boards' lists** (one row
 per entry in each portal's fields, and a check of everything the board would refuse); **the exam
 timetable and exam days** (papers, each candidate's timetable, clashes, rooms, seats,
 invigilators, the boards' attendance registers, special consideration, the statement of entry);
 **results** (a board's file read through a column mapping, every attempt kept, publication to
 families); **certificates** (received, collected once, unclaimed ones kept for the retention
 period); and **a deadlines dashboard** across every series. Nothing here takes or moves family
-money.
+money: the board's fees are sentences; what F4 records ("mark as sent") is what C's `refundFor`
+reads to decide whether a dropped line's board fee comes back.
 
 ---
 
 ## 1. Data model
 
-Migrations `0041_exam_entries.sql` (structure, generated) and `0042_exam_entries_board_rules.sql`
-(custom: each board's rules seeded from the research). All tables in `packages/db/src/schema.ts`,
-section "F4".
+Migrations `0050_exam_entries.sql` (structure, generated) and `0051_exam_entries_board_rules.sql`
+(custom: each board's rules seeded from the research) — 0041 and 0042 on the frozen branch,
+regenerated on main's journal after the rework's 0049 (each journal `when` later than 0049's; the
+order proved on a copy of the template, `.audit/exams-evidence/rework/migrate-proof-copy.txt`), and
+renumbered again when step D's land. All tables in `packages/db/src/schema.ts`, section "F4".
 
 | Table | What it holds | Rules |
 |---|---|---|
-| `exam_board_rule` | per board: forecast required / fixed once sent; option code required; UCI required; candidate number fixed once entries are sent; amendments after the deadline (allowed with a fee, or refused) and from which date they cost a fee; up to which date a withdrawal is refunded; carry-forward months; what the results file keys on (candidate number or UCI); notes | seeded for Cambridge, Pearson Edexcel, OxfordAQA (0042); the coordinator and admin edit it (audited); a board with no row reads lenient defaults and says so |
+| `exam_board_rule` | per board: forecast required / fixed once sent; option code required; UCI required; candidate number fixed once entries are sent; amendments after the deadline (allowed with a fee, or refused) and from which date they cost a fee; up to which date a withdrawal is refunded; what the results file keys on (candidate number or UCI); notes. **The carry-forward period is the board's own column since the rework** (`exam_board.carry_forward_months`, step A, which the line rules read too): read beside these rules and edited through them | seeded for Cambridge, Pearson Edexcel, OxfordAQA (0051); the coordinator and admin edit it (audited, one row for both tables); a board with no row reads lenient defaults and says so |
 | `exam_candidate` | per student: legal forenames and surname (as on the ID), date of birth, gender, UCI, approved access arrangements with the board's reference and expiry, notes | UCI unique and 13 characters of Pearson's shape (a check); a recorded UCI changes only with a reason (`CANDIDATE_UCI_CORRECTED`) |
 | `exam_candidate_identity` | per student: national ID or passport, its number, who recorded it | **its own table**, read by one function; unique per (type, number); never in a list, a log or an audit row |
 | `exam_candidate_number` | per student and board series: the four-digit number, the centre it was issued under, how it came (assigned, manual, import) | unique per (student, series) and per (series, number); fixed once an entry in the series has gone to a board that fixes numbers |
-| `exam_entry` | one unit or award per candidate per series: board, registration (null for a cash-in added by hand), kind, unit or qualification, the code and title as entered, option code, tier, status (`draft`, `submitted`, `amended`, `withdrawn`), retake and why, carry forward (`none`, `suggested`, `confirmed`) with the source month and year, previous centre, previous candidate number and option type, forecast grade with who and when and when it was sent, access arrangements (null: the candidate's), the board's fee tier when sent, sent / amended / withdrawn with who, when, why, and the board's fee sentence | one live entry per (candidate, series, unit) and per (candidate, series, award) (partial unique indexes); a unit entry has a unit, an award entry an award (a check); a sent entry has its time; a withdrawn one its time |
+| `exam_entry` | one unit or award per candidate per series: board, registration (the line it was made from; null for an entry from a cash-in or added by hand), **cash-in charge (`charge_id`, the rework: the paid cash-in or late cash-in an award entry was made from)**, kind, unit or qualification, the code and title as entered, option code, tier, status (`draft`, `submitted`, `amended`, `withdrawn`), retake and why, carry forward (`none`, `suggested`, `confirmed`) with the source month and year, previous centre, previous candidate number and option type, forecast grade with who and when and when it was sent, access arrangements (null: the candidate's), the board's fee tier when sent, sent / amended / withdrawn with who, when, why, and the board's fee sentence | one live entry per (candidate, series, unit), per (candidate, series, award) and per cash-in charge (partial unique indexes); a unit entry has a unit, an award entry an award, an entry with a charge is an award (checks); a sent entry has its time; a withdrawn one its time |
 | `exam_series_state` | per board series: when its timetable, forecasts and results went out (and the timetable's version) | |
 | `exam_paper` | a series' timetable: code, title, the unit (component) it belongs to or an award with a tier, date, session (am, pm, ev), start, duration | unique per (series, code); times and durations checked |
 | `exam_clash_note` | how a candidate's clash between two papers is handled | the pair ordered, unique per candidate |
@@ -58,7 +67,7 @@ admin and the coordinator, audited:
 | Key | Default | Stands for |
 |---|---|---|
 | `exams.centres` | none | the centre number with each board and the entry route, direct or through the British Council (Q-05) |
-| `exams.carryForward` | `suggest` | whether an A Level entry after the candidate's AS of the same syllabus within the board's period is suggested as carry forward (Q-02: the coordinator's answer changes this, not code) |
+| `exams.carryForward` | `suggest` | whether an A Level entry after the candidate's AS of the same syllabus within the board's period is suggested as carry forward (Q-02: the coordinator's answer changes this, not code). Since the rework it applies only to a line with no prior sitting of its own whose item fixes no route: a line that carries a sitting forward is entered from it |
 | `exams.selfStudyForecast` | `coordinator` | who gives a self-study candidate's forecast grade, or that none is asked for (IS-03) |
 | `exams.certificateRetentionMonths` | 12 | how long an unclaimed certificate is kept (Cambridge: at least 12 months) |
 | `exams.candidatesPerInvigilator` | 30 | one invigilator per this many candidates in a room |
@@ -66,23 +75,29 @@ admin and the coordinator, audited:
 
 ## 2. Entries
 
-**Derived per component from confirmed registrations** (`deriveEntries`, preview then commit), by
-F0b's `entryItemsFor` and the award's entry method:
+**Derived per component from paid reservation lines** (`deriveEntries`, preview then commit), by
+what each line's item enters (`lineItemsFor`, §2a) and the award's entry method, and **from paid
+cash-ins** (§2a):
 
-| The registration enters… | Entries made |
+| The line's item enters… | Entries made |
 |---|---|
 | a Cambridge syllabus (`syllabus_option`), whole | the award, with its option code when the syllabus has exactly one (else the coordinator chooses; the check flags it) and the tier the option's components share |
 | a Cambridge syllabus's components (a paper set) | the award, with the option that enters exactly those components (else flagged) |
 | Pearson units (a unit, a paper set) | one unit entry per W unit |
 | a whole Pearson award (`units_cash_in`) | its required units and the cash-in; a choice group ("one of M1, S1, D1") is named for the coordinator to add |
 | an International GCSE (`qualification`) | the award, with its option code if it has one |
-| a subject not mapped on the Catalogue | nothing — the preview says so and the entry list lists the registration as unentered |
+| a subject not mapped on the Catalogue (a `subject` item of an unmapped row) | nothing — the preview says so and the entry list lists the line as unentered |
+| a carry-forward option (Cambridge's A2 carried forward) or a one-paper retake that carries the rest | the award, carried forward from the line's prior sitting (§2a) |
+| a paid cash-in or late cash-in (C's charge) | the award its line's item enters, with the charge; one whose line does not say the award is added by hand with it |
 
-Retakes are flagged from the registration (`isRetake`) or from history (an earlier entry or
-result for the same unit or award). Carry forward is suggested (setting) for an A Level award
-after an AS entry of the same syllabus code within the board's months, with the source series,
-the previous centre and candidate number, and the board's carry-forward option code where the
-syllabus has exactly one; the coordinator confirms it (`carry_forward_to_confirm` until then).
+Retakes are flagged from the line's attempt (a rejected declaration is a first entry) or from
+history (an earlier entry or result for the same unit or award). Carry forward comes from the
+line's prior sitting where its item carries one forward (§2a); for a line without one it is
+suggested (setting) for an A Level award after an AS entry of the same syllabus code within the
+board's months, with the source series, the previous centre and candidate number, and the board's
+carry-forward option code where the syllabus has exactly one; the coordinator confirms it
+(`carry_forward_to_confirm` until then). A line that follows a declared sitting the school has not
+verified is entered as declared, or held, as `verification.unverifiedAtDeadline` says.
 Two commits at once run one after the other (an advisory lock per series) and the partial unique
 indexes keep one live entry per unit or award (08x3). The coordinator can add an entry by hand (a
 cash-in with no unit sat this series, the unit of a choice group).
@@ -97,22 +112,60 @@ fee (a draft: nothing to pay; a sent entry: refunded up to the rule's date — t
 an instant, or the late or high-late date — else kept). The family is told when an entry that had
 gone to the board is withdrawn.
 
-**MO-10's hard stop is unchanged.** After a series' entry deadline no entry is made (derived or by
-hand) and no draft is marked as sent at a time after it (`hardStopSentence`); the series row is
-read `FOR SHARE` in the same transaction, so a deadline change and a derivation run one after the
-other. 09 checks over every row that no entry was made or sent after its series' deadline.
+**MO-10's hard stop, per line since the rework.** No entry is made (derived or by hand) and no
+draft is marked as sent at a time after its own deadline: its line's effective deadline (A's
+`effectiveDeadlinesOf`: the retake deadline for a retake of the board's previous sitting, a late
+board entry while Q-20's setting is on), its cash-in's service deadline, else the series' entry
+deadline (`entryStopSentence`). A derivation past the series' entry deadline with no line still open
+is refused with the series' sentence, as before. The series row is read `FOR SHARE` in the same
+transaction, so a deadline change and a derivation run one after the other. 09 checks over every
+row that no entry was made or sent after its own deadline.
 
 **Forecast grades** (Cambridge requires them). Given by the teacher `teacherOf(student, subject,
-the series' academic year)` names — F0b's contract — or by the coordinator or admin; any other
+the series' academic year, unit)` names — the enrolment of that unit since the rework — or by the
+coordinator or admin; any other
 teacher is refused (403, 05). A teacher's list holds only their own candidates. "Mark forecasts as
 sent" fixes them where the board says so (Cambridge: a change after is refused). A self-study
 candidate's forecast is the coordinator's or not asked for (setting).
 
+## 2a. On the reservations rework's model (8 Oct 2026)
+
+F4 was frozen on 7 Oct at ec7689b while the school's reservations were redone
+(RESERVATIONS_REWORK.md: sessions, offers and items — step A; reservation lines with attempt,
+mode, prior sittings and verification — B; charges, board services and the exceptions registry —
+C). It resumed on 8 Oct on that model, exactly as the rework's §9 (the F4 bullet) and §10 (the F4
+row) say. Main (2a26557) was merged first as its own commit (1a3ba69: 17 textual conflicts, each
+in the trail row of 08:23:13Z), then the model was changed. How each §9 item was checked against
+the code on main, what F4 does now, and the scenario that proves it (`08x4-exam-entries-rework`
+unless said):
+
+| §9 / §10 asks | On main (how it was checked) | F4 now | Proved by |
+|---|---|---|---|
+| entries derive from `lineItemsFor(registrationIds)` | **not on main**: `grep -rn lineItemsFor` found nothing; F0b's `entryItemsFor` read the *subject row's* units, wrong for an item (P1 and P2 under one Mathematics subject) | added to A's `line.services.ts` (the lead, 8 Oct): per line its item and what it enters — `award`, `option` (its components), `units` (under the item's award or a Cambridge component's syllabus), `subject` (the subject row's own mapping, so a converted item still derives) — the series and both deadlines, the attempt F4 enters (`first` after a rejected declaration) beside the one reserved, mode, the prior sitting with source, answer, previous centre and number, grade, level code. `planDerivation` reads it; F0b's `entryItemsFor` now reads it too | "two items of one subject are two lines…"; 08x1's derivation scenarios unchanged; control C18 |
+| retake from `attempt` and history | `registration.attempt`, B's `declaration_rejected` (0045) | `isRetake` from the line's attempt (`retakeSource` 'registration'), else from an earlier entry or result here ('history'); a rejected declaration is a first entry | "a retake comes from the line's attempt; a rejected declaration is entered as a first entry"; C19, C19b |
+| carry forward from the line's verified prior sitting with its previous centre and candidate number; suggest-and-confirm only for a line without one | B's `prior_sitting_series_id`, `prior_sitting_source`, `prior_sitting_verified_outcome`, `prior_centre`, `prior_candidate_number` (0041, 0045); B's `verifyPriorSitting` records the centre and number | an award entry of an item that carries a sitting forward (`needs_prior_series`, a carry-forward option) is `confirmed` from that series, with the previous centre and number when verified at another centre, else the school's centre and the candidate's number then; without a prior sitting on the line, the suggest-and-confirm flow (`exams.carryForward`) as before — only for an item that fixes no route | "a sitting at another centre, verified with its centre and candidate number…", "a sitting here…", "a line with no prior sitting of its own keeps the suggest-and-confirm flow"; C20, C20b |
+| `exam_entry.charge_id` for a cash-in; `chargesOfKind('cash_in', seriesId)` | **not on main** under that name: C's `charge` (0047) has `kind`, `board_series_id`, `registration_id`, no award | `chargesOfKind(kind, seriesId)` added to C's `charge.services.ts`; `exam_entry.charge_id` (FK, one live entry per charge, award entries only). A **paid** cash-in or late cash-in becomes its award entry — the award its line's item enters (A's `item.qualification_id`), else the coordinator adds it by hand with the charge; one accepted but unpaid is listed "cash-in awaiting payment" (the lead, 8 Oct) | "accepted but not paid…", "paid: derived as the award its line's item enters…", "a cash-in that names no line…", "…payment is reversed is flagged"; C21, C22, C29, C33 |
+| `teacherOf(student, subject, unit?, year)` | `teacherOf(studentId, subjectId, year)` on main; A made enrolment per unit (0041, `course_enrolment.unit_id`) | `teacherOf(…, unitId?)` with `pickEnrolment` in `enrolment.services.ts`: the unit's own enrolment, else the subject's, else the one teacher of all its units; forecasts and the check read entries' teachers the same way | "the forecast's teacher is the one who teaches that unit…"; C28, C5 |
+| `exam_board_rule.carry_forward_months` moves to `exam_board` | A added `exam_board.carry_forward_months` (0041, Cambridge 13 in 0042); line rules read it (`gate.priorSeries`) | F4's column is gone (regenerated 0050); the board rules read and edit `exam_board`'s, audited; so the coordinator's period is the one the line rules refuse with | "the carry-forward period is the board's own column…"; C30 |
+| a declared, unverified sitting is listed by the entry check and entered or held by the setting | B's `verification.unverifiedAtDeadline` (`enter_as_declared` default, `hold`) and `holdUnverifiedAtDeadline` | the check flags `prior_sitting_unverified` (entered as declared) or `prior_sitting_held`; under `hold` derivation leaves the line out ('held') and "mark as sent" refuses its entry; the entry list lists such a line beside its subject | "entered as declared (the default)…", "held when the school holds unverified sittings…"; C25, C31, C32 |
+| F4's verification of a result against a declared sitting closes it | B's `verifyPriorSitting` (verification.services); B's doc §9: "F4 adds its source there" | a committed results import verifies every open declared sitting of that series whose student has a result there for what the line enters, through B's own answer (the importer, the result as evidence); a sitting with no result is left to the coordinator | "the board's results verify a declared sitting…"; 09's rule; C24 |
+| F4's "mark as sent" makes a line's board fee "sent" for refunds (C's `refundFor`) | C's seam `entrySentAt(executor, lineId)` returned null; `refundFor` falls back to the effective deadline | wired: the earliest time any entry made from the line was marked sent, withdrawn ones included (the lead, 8 Oct); `refundFor` and the preview carry `sentEntries` and a `boardNote` naming them and when; C's `withdrawEntry` seam in the desk-drop now withdraws the line's entries in its transaction | "a two-unit line with one unit sent…" (preview 1,500 → 500, drop refunds 500), "…with none sent: the board fee comes back in full" (1,500), "the desk drops a paid line past its deadline…"; C23, C27 |
+| MO-10's hard stop per line (§3.3) | A's `line_effective_deadline`, `effectiveDeadlinesOf` (Q-20 included) | each line is cut off at its own deadline (a retake of the board's previous sitting at the retake deadline); a cash-in at its service's deadline; else the series' entry deadline; making (derived or by hand) and sending alike; 09's rule reads the same | "past the entry deadline a retake of the board's previous sitting is still entered and sent…"; 08x1's hard-stop scenarios unchanged; C1, C1b, C2, C26, C26b |
+
+**What else changed with the model.** The test world (`exam-helpers.ts`) is a winter session with
+offers and items (an award item for the Cambridge syllabus, a units item for P1, an award item for
+the whole Pearson award), fee grids per series, and families reserved and paid at the desk with
+`lines` and `consent`; every F4 scenario of September runs on it unchanged except where a sentence
+named a registration. The demo seed (`scripts/exams-demo/seed-exams.ts`) builds the same shape on
+the template's data, with a declared self-study retake that June's results verify, a declared unit
+retake left unverified, and a paid cash-in. The deadlines dashboard shows the retake deadline as an
+instant (the hard stop for a retake of the previous series), as A made it.
+
 ## 3. The entry list and its check
 
 `GET /v1/exams/entry-lists?boardSeriesId=`: one row per live entry with the **board portal's
-fields in the portal's order**, what each row is missing, and the confirmed registrations with no
-entry. The boards' own files are not in hand (DISCOVERY.md F-07), so **every column is marked
+fields in the portal's order**, what each row is missing, the paid lines with no entry (a held
+one says so) and the paid cash-ins with no entry. The boards' own files are not in hand (DISCOVERY.md F-07), so **every column is marked
 assumed** (`ENTRY_LIST_COLUMNS`, `packages/validations/src/exams/exam-entry.validations.ts`) until
 the coordinator checks it against the board's template:
 
@@ -125,7 +178,9 @@ The check flags, per entry: no centre number for the board (Settings); no candid
 series; no legal name; no date of birth; no gender; no UCI where the board requires one; no option
 code where the board requires one; no tier on a tiered syllabus; no forecast grade where the board
 requires one; carry forward incomplete or still to confirm; the registration no longer confirmed;
-access arrangements without a board approval or expired. The screen downloads the rows as CSV
+access arrangements without a board approval or expired; **a declared earlier sitting not verified**
+(entered as declared, or held — the fix links the session's To verify tab); **a cash-in no longer
+paid** (its payment reversed or refunded). The screen downloads the rows as CSV
 (formula-safe, `lib/csv.ts`).
 
 ## 4. The timetable and exam days
@@ -197,6 +252,11 @@ below; the gate reaches nothing here.
 | `students/:studentId/series`, `/timetable`, `/statement`, `/exams`, `/results`, `/sittings` | the student themself, a linked parent (published only), and staff with student records (desk, coordinator, admin); another family's child is "not found" |
 | `certificates`, `certificates/:id/collect`, `certificates/:id/slip` | desk (finance officer, finance admin), coordinator, admin |
 
+No endpoint was added on the rework's model: an entry by hand takes an optional `chargeId` (a paid
+cash-in of that candidate in that series), a results import answers `sittingsVerified` (the declared
+sittings its results verified), the entry list `cashInsToEnter`, and the refund preview (C's)
+`sentEntries` and `boardNote`.
+
 **The national ID.** Its own table; set and read through two endpoints for the coordinator and the
 admin; each read audited without the number; lists, the candidate's page and entry lists carry
 only whether one is recorded (and its last four characters on the candidate's page); the audit
@@ -211,6 +271,19 @@ through a duplicate and 09 checks that no audit row holds any recorded number.
 | **F2** (campus leave), **F3** (attendance) | `getExamsFor(studentId, date)` — the papers a student sits on a school date (YYYY-MM-DD, Cairo), across every board and series: `{ paperId, code, title, entryId, boardSeriesId, seriesName, date, session, startTime, endTime, durationMinutes, extraMinutes, room, seat }[]`, end times counting the candidate's extra time; withdrawn entries left out (a family view: only entries gone to the board). F3 excuses the lessons these overlap; F2 warns a leave request. Also `GET /v1/exams/students/:studentId/exams?date=` | `exam-timetable.services.ts` |
 | **F5** (pathway advisor) | `getSittings(studentId)` — every sitting recorded here, per series and unit or award: `{ boardSeriesId, series: { month, year, label, name, sitting, academicYearStart, academicYear }, boardCode, boardName, kind, code, title, subjectArea, level (an award's igcse / as_level / a_level, or a unit's own igcse / as / a2), tier, entryId, entryStatus, isRetake, grade and mark (the board's latest report), reports[] (every report, latest first), remarks[] (the remark requests on its registration with each paper's outcome), gradeOfRecord: null }`. **`gradeOfRecord` is always null** until the owner answers RF-09; entries without results yet are included (`grade` null). Also `GET /v1/exams/students/:studentId/sittings` | `exam-result.services.ts` |
 | F2, F3, F5 | the candidates, entries and results tables above | schema |
+
+**Provided on the rework's contracts** (RESERVATIONS_REWORK.md §10's F4 row; not on main under these
+names, added as the smallest pieces with the lead's agreement of 8 Oct, and noted in A's
+RESERVATIONS.md §2.12 and C's RESERVATIONS_MONEY.md §10):
+
+| Contract | Where | What |
+|---|---|---|
+| `lineItemsFor(registrationIds, executor?)` | A's `line.services.ts` | per line what its item enters (award; option with its components; units under the item's award or a Cambridge component's syllabus; a `subject` item: the subject row's own mapping), the series with both deadlines, the attempt F4 enters (`first` after a rejected declaration) and the one reserved, mode, teacher, the prior sitting (series, name, source, declared, answer, previous centre and number), the board's carry-forward months, grade, level code. F0b's `entryItemsFor` reads it now |
+| `chargesOfKind(kind, seriesId, executor?)` | C's `charge.services.ts` | a series' accepted charges of a kind (awaiting payment or paid) with each one's deadline |
+| `teacherOf(student, subject, year, unitId?)`, `pickEnrolment(rows, unitId?)` | `enrolment.services.ts` (F0b's) | the unit's own open enrolment, else the subject's, else the one teacher of all its units |
+| `entrySentAt(executor, lineId)`, `sentEntriesOf(executor, lineId)` | C's seam in `refund.services.ts` | the earliest time any entry made from the line was marked sent (withdrawn ones included); `refundFor` and `previewRefund` carry `sentEntries` and a `boardNote` |
+| `withdrawEntry(tx, lineId, reason, staffId, ctx?)` | C's seam in `desk-drop.services.ts` → F4's `withdrawEntriesOfLineInTx`, `tellWithdrawn` | the line's live entries withdrawn in the desk-drop's transaction, each audited, the family told after the commit |
+| `verifyDeclaredSittingsFromResults(series, actor, ctx?)` | `exam-result.services.ts` → B's `verifyPriorSitting` | after a results import commits: each open declared sitting of that series with a result for what its line enters is verified by step B's own answer |
 
 ## 8. Screens
 

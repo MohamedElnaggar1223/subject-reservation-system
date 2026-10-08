@@ -101,6 +101,23 @@ async function main() {
     name: 'Mathematics (IAL)', code: 'IAL-MATHS', council: 'pearson_edexcel', courseFee: 2400, registrationFee: 1600, qualificationLevel: 'as_level', isOfferedAtSchool: true, isCore: false,
   } }))).id;
   await apiResponse(coord.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: ialMaths }, json: { boardCode: 'pearson_edexcel', qualificationId: xma, unitIds: [] } }));
+  // Cambridge A Level Biology (9700): the A Level in one series (AX) and A2 with the AS carried forward (BY).
+  let al = cat.qualifications.find((q) => q.code === '9700' && q.boardCode === 'cambridge' && q.level === 'a_level');
+  if (!al) {
+    const made = await apiResponse(coord.v1.catalogue.qualifications.$post({ json: { boardCode: 'cambridge', code: '9700', title: 'Biology', level: 'a_level', suite: 'Cambridge International AS & A Level', subjectArea: 'Biology', entryMethod: 'syllabus_option' } }));
+    const comp = async (n: string, title: string, unitLevel: 'as' | 'a2') => (await apiResponse(coord.v1.catalogue.units.$post({ json: { boardCode: 'cambridge', code: `9700/${n}`, shortCode: `Paper ${n}`, title, unitLevel, kind: 'component' } }))).id;
+    const c = [await comp('12', 'Multiple Choice', 'as'), await comp('22', 'AS Structured Questions', 'as'), await comp('42', 'A Level Structured Questions', 'a2'), await comp('52', 'Planning, Analysis and Evaluation', 'a2')];
+    await apiResponse(coord.v1.catalogue.qualifications[':id'].units.$put({ param: { id: made.id }, json: { units: c.map((unitId) => ({ unitId, requirement: 'required' as const })) } }));
+    await apiResponse(coord.v1.catalogue.qualifications[':id'].options.$post({ param: { id: made.id }, json: { code: 'AX', label: 'A Level in one series', unitIds: c } }));
+    await apiResponse(coord.v1.catalogue.qualifications[':id'].options.$post({ param: { id: made.id }, json: { code: 'BY', label: 'A2, AS carried forward', unitIds: [c[2]!, c[3]!], carryForward: true } }));
+    cat = await apiResponse(coord.v1.catalogue.$get());
+    al = cat.qualifications.find((q) => q.code === '9700' && q.boardCode === 'cambridge' && q.level === 'a_level')!;
+  }
+  const alOption = (code: string) => al!.options.find((o) => o.code === code)!.id;
+  const alBio = sid('AL-BIO') ?? (await apiResponse(admin.v1.subjects.$post({ json: {
+    name: 'Biology (A Level)', code: 'AL-BIO', council: 'cambridge', courseFee: 12000, registrationFee: 3200, qualificationLevel: 'a_level', isOfferedAtSchool: true, isCore: false,
+  } }))).id;
+  await apiResponse(coord.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: alBio }, json: { boardCode: 'cambridge', qualificationId: al.id, unitIds: [] } }));
 
   // ─── Series and their dates ────────────────────────────────────────────────
   const series = await apiResponse(admin.v1['board-series'].$get({ query: {} }));
@@ -123,6 +140,10 @@ async function main() {
   const igcse = ['0610', '0620', '0580', '0625', '0500'];
   await apiResponse(admin.v1['board-fees'].$put({ query: { seriesId: camNov }, json: {
     rows: igcse.map((c) => ({ keyKind: 'qualification' as const, keyId: qual(c).id, amount: 2600, provisional: false })), reason: 'Cambridge November 2026 fee list (demo)',
+  } }));
+  await apiResponse(admin.v1['board-fees'].$put({ query: { seriesId: camNov }, json: {
+    rows: [{ keyKind: 'option' as const, keyId: alOption('AX'), amount: 4200, provisional: false }, { keyKind: 'option' as const, keyId: alOption('BY'), amount: 2600, provisional: false }],
+    reason: 'Cambridge November 2026 fee list, A Level (demo)',
   } }));
   await apiResponse(admin.v1['board-fees'].$put({ query: { seriesId: pearsonJan }, json: {
     rows: ['WMA11', 'WMA12', 'WME01'].map((c) => ({ keyKind: 'unit' as const, keyId: unit(c), amount: 1600, provisional: false })), reason: 'Pearson January 2027 fee list (demo)',
@@ -148,6 +169,19 @@ async function main() {
       subjectId, courseFee: 9000, teachers: [{ teacherId: tId(teach[code]!), mode: 'in_school' }],
       items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'award', qualificationId: qual(code).id }, boardSeriesId: camNov, availability: 'open', requiredInSeries: false }],
     } }))).items[0]!;
+  }
+  const alOffer = offers.offers.find((o) => o.subjectId === alBio);
+  if (alOffer) for (const it of alOffer.items) itemOf[it.label] = it.id;
+  else {
+    const made = await apiResponse(admin.v1.sessions[':id'].offers.$post({ param: { id: sessionId }, json: {
+      subjectId: alBio, courseFee: 12000, teachers: [{ teacherId: tId('Karim Adel'), mode: 'in_school' }],
+      items: [
+        { label: 'A Level', kind: 'route', enters: { kind: 'option', optionId: alOption('AX') }, boardSeriesId: camNov, availability: 'open', requiredInSeries: false, exclusiveGroup: 'route' },
+        { label: 'A2, carry forward', kind: 'route', enters: { kind: 'option', optionId: alOption('BY') }, boardSeriesId: camNov, availability: 'open', requiredInSeries: false, exclusiveGroup: 'route', sortOrder: 1 },
+      ],
+    } }));
+    itemOf['A Level'] = made.items[0]!;
+    itemOf['A2, carry forward'] = made.items[1]!;
   }
   const mathsOffer = offers.offers.find((o) => o.subjectId === ialMaths);
   if (mathsOffer) for (const it of mathsOffer.items) itemOf[it.label] = it.id;
@@ -175,6 +209,8 @@ async function main() {
     ['Laila Mostafa', 'laila.mostafa', 12, [first('0610'), first('P1')]],
     // A retake of P2 from January 2026, declared: not verified, so the entry check lists it.
     ['Ziad Fouad', 'ziad.fouad', 12, [{ offerItemId: itemOf.P2!, attempt: 'retake', mode: 'in_school', priorSitting: { month: 'january', year: 2026 } }, first('M1')]],
+    // A2 with the AS carried forward from June 2026 at another centre: verified below with its centre and number.
+    ['Yara Nabil', 'yara.nabil', 12, [{ offerItemId: itemOf['A2, carry forward']!, attempt: 'first', mode: 'in_school', priorSitting: { month: 'june', year: 2026 } }]],
   ];
   const students: Record<string, string> = {};
   const lineIds: Record<string, string[]> = {};
@@ -193,11 +229,19 @@ async function main() {
     students[slug] = studentId;
   }
 
-  // A cash-in for Adam's Mathematics AS (P1 and P2 sat; the line's item says the award), paid at the desk.
+  // A cash-in for Adam's Mathematics AS (P1 and P2 sat; the line's item says the award), paid at the desk;
+  // Hana's accepted and not paid yet (listed, not entered).
   const adamP1 = lineIds['adam.sherif']?.[0];
   if (adamP1) {
     const ci = await apiResponse(officer.v1.charges.$post({ json: { studentId: students['adam.sherif']!, kind: 'cash_in', boardServiceId: 'svc-pearson-ci', registrationId: adamP1 } }));
     await apiResponse(officer.v1.registrations.desk.collect.$post({ json: { studentId: students['adam.sherif']!, chargeIds: [ci.id], instrumentUsed: 'cash' } }));
+  }
+  const hanaP1 = lineIds['hana.ibrahim']?.[1];
+  if (hanaP1) await apiResponse(officer.v1.charges.$post({ json: { studentId: students['hana.ibrahim']!, kind: 'cash_in', boardServiceId: 'svc-pearson-ci', registrationId: hanaP1 } }));
+  // Yara's carried-forward sitting verified by the coordinator, with the other centre's numbers.
+  const yaraLine = lineIds['yara.nabil']?.[0];
+  if (yaraLine) {
+    await apiResponse(coord.v1.registrations[':id']['verify-prior'].$post({ param: { id: yaraLine }, json: { outcome: 'verified', prevCentre: 'EG456', prevCandidateNumber: '0219', reason: "seen on the other centre's statement of results" } }));
   }
 
   // ─── Who teaches whom: enrolment from the lines (per unit for the IAL items) ─
@@ -213,6 +257,7 @@ async function main() {
     'adam.sherif': ['Adam Mohamed', 'Sherif', '2009-11-05', 'male', '91234B250102A'],
     'laila.mostafa': ['Laila', 'Mostafa', '2009-06-19', 'female', null],
     'ziad.fouad': ['Ziad', 'Fouad', '2009-09-27', 'male', '91234B250104Z'],
+    'yara.nabil': ['Yara', 'Nabil', '2009-04-08', 'female', null],
   };
   for (const [slug, [fore, sur, dob, gender, uci]] of Object.entries(legal)) {
     await apiResponse(coord.v1.exams.candidates[':studentId'].$put({ param: { studentId: students[slug]! }, json: {

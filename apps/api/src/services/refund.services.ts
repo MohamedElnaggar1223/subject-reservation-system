@@ -29,7 +29,7 @@
  * must not cost the parent money).
  */
 
-import { db, refundWindow, registration, registrationSession, sessionOffer, sessionOfferItem, eq } from '@repo/db';
+import { db, refundWindow, registration, registrationSession, sessionOffer, sessionOfferItem, examEntry, eq, and, isNotNull, asc } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { CreateRefundWindowType, RefundPolicy } from '@repo/validations';
 import { academicYearForDate } from './school-fee.services';
@@ -64,12 +64,29 @@ export async function firstLessonFor(_executor: Executor, _line: { id: string; s
 }
 
 /**
- * F4's seam (§3.9): when the line's entry was marked sent to the board, once exam entries are
- * live. Until then none, and a confirmed line is sent when its effective deadline has passed.
+ * F4's entries made from a line that were marked sent to the board ("mark as sent",
+ * exam-entry.services `submitEntries`), earliest first — withdrawn ones included: the board
+ * received them (whether it refunds the school is its own withdrawal rule, shown as a sentence).
+ * Wired by F4 on resuming (RESERVATIONS_MONEY.md §10).
  */
-export async function entrySentAt(_executor: Executor, _lineId: string): Promise<Date | null> {
-  return null;
+export async function sentEntriesOf(executor: Executor, lineId: string) {
+  const rows = await executor.select({ entryCode: examEntry.entryCode, title: examEntry.title, submittedAt: examEntry.submittedAt, status: examEntry.status })
+    .from(examEntry).where(and(eq(examEntry.registrationId, lineId), isNotNull(examEntry.submittedAt)))
+    .orderBy(asc(examEntry.submittedAt), asc(examEntry.entryCode));
+  return rows.map((r) => ({ ...r, submittedAt: r.submittedAt! }));
 }
+
+/**
+ * F4's seam (§3.9): when the line's entry was marked sent to the board — the earliest time any
+ * of its entries was (the lead, 8 Oct: the board fee is one amount per line, so a partly sent line
+ * is a sent line). None marked: a confirmed line is sent once its effective deadline has passed.
+ */
+export async function entrySentAt(executor: Executor, lineId: string): Promise<Date | null> {
+  return (await sentEntriesOf(executor, lineId))[0]?.submittedAt ?? null;
+}
+
+/** "8 October 2026" in Cairo. */
+const dayWords = (d: Date) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', day: 'numeric', month: 'long', year: 'numeric' }).format(d);
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -118,6 +135,10 @@ export type RefundQuote = {
   boardPart: number;
   /** Whether the line's entry counts as sent to the board now (its board fee then stays). */
   boardSent: boolean;
+  /** F4's entries of the line marked sent by then (code, title, when), earliest first. */
+  sentEntries: { entryCode: string; title: string; submittedAt: Date }[];
+  /** Why the board fee comes back or stays, naming the entries sent and when (null on a converted line). */
+  boardNote: string | null;
   amount: number;
   fullPrice: number;
 };
@@ -162,7 +183,7 @@ export async function refundFor(
     const amount = round2((l.price * percent) / 100);
     return {
       registrationId: l.id, percent, basis: 'windows', byException: !!percentExc, anchor: null, week: null,
-      coursePart: amount, boardPart: 0, boardSent: false, amount, fullPrice: l.price,
+      coursePart: amount, boardPart: 0, boardSent: false, sentEntries: [], boardNote: null, amount, fullPrice: l.price,
     };
   }
 
@@ -181,21 +202,38 @@ export async function refundFor(
   }
   if (percentExc) percent = percentExc.value!;
 
-  // "Sent" is per line: never confirmed, never sent; else F4's mark, else the effective deadline.
+  // "Sent" is per line: never confirmed, never sent; else F4's mark (the earliest entry marked
+  // sent), else the effective deadline.
   let boardSent = false;
-  if (!opts.neverSent && (l.status === 'confirmed' || l.status === 'dropped_pending_receipt')) {
-    const marked = await entrySentAt(executor, l.id);
-    if (marked) boardSent = marked <= at;
-    else {
+  let sentEntries: RefundQuote['sentEntries'] = [];
+  let boardNote: string | null = 'The board fee comes back: the entry has not been sent to the board.';
+  if (opts.neverSent) {
+    boardNote = 'The board fee comes back: the line was never entered with the board.';
+  } else if (l.status === 'confirmed' || l.status === 'dropped_pending_receipt') {
+    const all = await sentEntriesOf(executor, l.id);
+    sentEntries = all.filter((e) => e.submittedAt <= at).map(({ entryCode, title, submittedAt }) => ({ entryCode, title, submittedAt }));
+    const marked = all[0]?.submittedAt ?? null;
+    if (marked) {
+      boardSent = marked <= at;
+      if (boardSent) {
+        const unsent = (await executor.select({ entryCode: examEntry.entryCode }).from(examEntry)
+          .where(and(eq(examEntry.registrationId, l.id), eq(examEntry.status, 'draft')))).map((e) => e.entryCode);
+        boardNote = `The board fee stays with the board: the school sent ${sentEntries.map((e) => `${e.entryCode} ${e.title} on ${dayWords(e.submittedAt)}`).join(', ')}`
+          + `${unsent.length ? ` (${unsent.join(', ')} not sent yet)` : ''}.`;
+      }
+    } else {
       const d = await effectiveDeadlineFor(executor, l);
       boardSent = !!d.at && d.at <= at;
+      if (boardSent) boardNote = `The board fee stays with the board: the ${d.kind === 'retake' ? 'retake deadline' : d.kind === 'exams_start' ? "exams' start" : 'entry deadline'} (${dayWords(d.at!)}) has passed.`;
     }
+  } else {
+    boardNote = 'The board fee comes back: a line not paid was never sent to the board.';
   }
   const coursePart = round2((l.courseFee * percent) / 100);
   const boardPart = boardSent ? 0 : round2(l.boardFee);
   return {
     registrationId: l.id, percent, basis: 'policy', byException: !!percentExc, anchor, week,
-    coursePart, boardPart, boardSent, amount: round2(coursePart + boardPart), fullPrice: l.price,
+    coursePart, boardPart, boardSent, sentEntries, boardNote, amount: round2(coursePart + boardPart), fullPrice: l.price,
   };
 }
 
@@ -219,6 +257,8 @@ export async function previewRefund(registrationId: string) {
     coursePart: q.coursePart,
     boardPart: q.boardPart,
     boardSent: q.boardSent,
+    sentEntries: q.sentEntries,
+    boardNote: q.boardNote,
     basis: q.basis,
   };
 }

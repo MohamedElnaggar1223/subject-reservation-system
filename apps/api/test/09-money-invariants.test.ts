@@ -623,16 +623,51 @@ describe('money invariants over the whole database', () => {
 
   // ─── F4: exam entries (not money, but the hard stop is MO-10's) ─────────────
 
-  it("F4: no entry was made, or sent to the board, after its series' entry deadline (MO-10, A-08)", async () => {
+  it("F4: no entry was made, or sent to the board, after its own deadline (MO-10, A-08): its line's effective deadline, its cash-in's, else its series' entry deadline", async () => {
+    // Since the reservations rework the cut-off is per line (RESERVATIONS_REWORK.md §3.3): a retake of
+    // the board's previous sitting runs to the retake deadline (line_effective_deadline, A's 0042/0044);
+    // a cash-in to its service's deadline; a late board entry granted while Q-20's setting is on moves a
+    // student's (A's lateEntryUntil), so a grant covering the moment is accepted here too.
     const late = await sql(`
-      select e.id, e.created_at, e.submitted_at, s.entry_deadline
-      from exam_entry e join board_series s on s.id = e.board_series_id
-      where s.entry_deadline is not null and (e.created_at > s.entry_deadline or e.submitted_at > s.entry_deadline)`);
+      select e.id, e.created_at, e.submitted_at, d.at as deadline
+      from exam_entry e
+      join board_series s on s.id = e.board_series_id
+      left join registration r on r.id = e.registration_id
+      left join charge c on c.id = e.charge_id
+      cross join lateral (select case
+        when r.id is not null then line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)
+        when c.id is not null then coalesce((select sd.deadline from board_service_deadline sd where sd.board_series_id = c.board_series_id and sd.board_service_id = c.board_service_id), s.entry_deadline)
+        else s.entry_deadline end as at) d
+      where d.at is not null and (e.created_at > d.at or e.submitted_at > d.at)
+        and not exists (select 1 from exception x where x.policy_key = 'deadline.boardEntry' and x.student_id = e.student_id
+          and x.board_series_id = e.board_series_id and x.value_date >= greatest(e.created_at, coalesce(e.submitted_at, e.created_at)))`);
     expect(late).toEqual([]);
-    // There was something to check: 08x1 withdrew an entry after its series' deadline.
+    // There was something to check: 08x1 withdrew an entry after its series' deadline, and 08x4
+    // entered and sent a retake of the board's previous sitting after the entry deadline, before the retake deadline.
     expect((await sql(`
       select 1 from exam_entry e join board_series s on s.id = e.board_series_id
       where e.status = 'withdrawn' and e.withdrawn_at > s.entry_deadline`)).length).toBeGreaterThan(0);
+    expect((await sql(`
+      select 1 from exam_entry e join board_series s on s.id = e.board_series_id join registration r on r.id = e.registration_id
+      where r.attempt = 'retake' and e.created_at > s.entry_deadline and e.submitted_at > s.entry_deadline and e.submitted_at <= s.retake_deadline`)).length).toBeGreaterThan(0);
+  });
+
+  it('F4: an entry from a cash-in is an award entry of that charge\'s student, in its series, from a cash-in or late cash-in; one live entry per charge', async () => {
+    expect(await sql(`
+      select e.id from exam_entry e join charge c on c.id = e.charge_id
+      where e.kind <> 'award' or e.student_id <> c.student_id or e.board_series_id is distinct from c.board_series_id or c.kind not in ('cash_in', 'late_cash_in')`)).toEqual([]);
+    expect(await sql(`select charge_id from exam_entry where charge_id is not null and status <> 'withdrawn' group by charge_id having count(*) > 1`)).toEqual([]);
+    // There was something to check: 08x4 entered two cash-ins (one derived from its line's item, one by hand).
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from exam_entry where charge_id is not null`))[0]?.n)).toBeGreaterThanOrEqual(2);
+  });
+
+  it("F4: a declared sitting verified from the board's results had a result for the line's student in that series", async () => {
+    // F4 answers a declared sitting only from a result (RESERVATIONS_REWORK.md §3.5); the answer is step B's own row.
+    expect(await sql(`
+      select a.entity_id from audit_log a join registration r on r.id = a.entity_id
+      where a.action = 'PRIOR_SITTING_VERIFIED' and a.new_data->>'reason' like '%(results import)'
+        and not exists (select 1 from exam_result x where x.student_id = r.student_id and x.board_series_id = r.prior_sitting_series_id)`)).toEqual([]);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'PRIOR_SITTING_VERIFIED' and new_data->>'reason' like '%(results import)'`))[0]?.n)).toBeGreaterThan(0);
   });
 
   it("F4: an entry from a registration is that registration's student's, in its series; a result from an entry is that entry's candidate's, in its series", async () => {

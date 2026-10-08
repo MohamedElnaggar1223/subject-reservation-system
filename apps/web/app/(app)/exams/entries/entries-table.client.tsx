@@ -34,7 +34,7 @@ import {
 } from './entries-shared';
 
 const RETAKE_SOURCE: Record<string, string> = {
-  registration: 'Marked at registration',
+  registration: 'The reservation says retake',
   history: 'Sat before',
   staff: 'Set by staff',
 };
@@ -533,8 +533,14 @@ function EntryDetails({ e, busy, onChange, onSaveNote }: { e: EntryRow; busy: bo
 
       <div className="space-y-3 rounded-lg border border-border bg-card p-4 text-sm">
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
-          <dt className="text-muted-foreground">Registered subject</dt>
-          <dd>{e.subjectName ? <BoardText>{e.subjectName}</BoardText> : <span>No registration (added by hand)</span>}</dd>
+          <dt className="text-muted-foreground">Reserved subject</dt>
+          <dd>{e.subjectName ? <BoardText>{e.subjectName}</BoardText> : <span>No reservation (added by hand)</span>}</dd>
+          {e.chargeId && (
+            <>
+              <dt className="text-muted-foreground">Cash-in</dt>
+              <dd><Badge tone="info">From a paid cash-in</Badge></dd>
+            </>
+          )}
           {e.registrationId && (
             <>
               <dt className="text-muted-foreground">Registration</dt>

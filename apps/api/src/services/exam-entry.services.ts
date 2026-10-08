@@ -406,9 +406,9 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
           cfCandidateNumber: elsewhere ? prior.previousCandidateNumber : here2?.number ?? null,
           cfOption: `${prior.month}_carry_forward`,
         });
-      } else if (!prior && p.qualificationId) {
-        const q = it.enters.qualification!;
-        suggestCarryForward(reg.studentId, q, p);
+      } else if (!prior && p.qualificationId && !it.enters.option) {
+        // No prior sitting on the line, and the item fixes no route: the suggest-and-confirm flow (Q-02).
+        suggestCarryForward(reg.studentId, it.enters.qualification!, p);
       }
     }
     if (it.declarationRejected && it.enters.option?.carryForward) {
@@ -454,7 +454,8 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
     }
     rows.push({ ...base, outcome: outcomeOf(entries), note: null, entries });
   }
-  return rows.sort((a, b) => a.studentName.localeCompare(b.studentName) || a.subject.name.localeCompare(b.subject.name) || (a.chargeId ? 1 : 0) - (b.chargeId ? 1 : 0));
+  return rows.sort((a, b) => a.studentName.localeCompare(b.studentName) || a.subject.name.localeCompare(b.subject.name)
+    || (a.chargeId ? 1 : 0) - (b.chargeId ? 1 : 0) || (a.item?.label ?? '').localeCompare(b.item?.label ?? ''));
 }
 
 /**
@@ -696,13 +697,46 @@ export async function withdrawEntry(id: string, reason: string, actorId: string,
       { status: 'withdrawn', reason, charge: charge.sentence, refunded: charge.refunded, pastDeadline: pastEntryDeadline(series) }, ctx, tx);
     return { entry: row!, charge, series, wasSent: e.status !== 'draft' };
   });
-  if (out.wasSent) {
-    const family = (await familyOf([out.entry.studentId])).get(out.entry.studentId) ?? [];
-    await createBulkNotifications(family, 'EXAM_ENTRY_WITHDRAWN', 'Exam entry withdrawn',
-      `${out.entry.entryCode} ${out.entry.title} was withdrawn from ${out.series.name}: ${reason}`,
-      { entryId: out.entry.id, boardSeriesId: out.entry.boardSeriesId, url: '/exams/my' });
-  }
+  await tellWithdrawn([out], reason);
   return { entry: out.entry, charge: out.charge };
+}
+
+/**
+ * The desk drops a paid line past its deadline (step C's `deskDrop`, its seam `withdrawEntry`):
+ * every live entry made from the line is withdrawn in the drop's transaction — each locked after
+ * the line (the drop holds the receipt, then the line; an entry's own writers take only the
+ * entry), with what the board does with its fee as the sentence, and its own audit row. Returns
+ * them for the family's notice after the commit (`tellWithdrawn`). Nothing here moves money: the
+ * line's refund is the drop's (`refundFor`, the board fee by the "sent" rule).
+ */
+export async function withdrawEntriesOfLineInTx(tx: Tx, lineId: string, reason: string, actorId: string, ctx?: AuditContext) {
+  const live = await tx.select().from(examEntry)
+    .where(and(eq(examEntry.registrationId, lineId), sql`${examEntry.status} <> 'withdrawn'`)).orderBy(asc(examEntry.id)).for('update');
+  const out: { entry: EntryRow; charge: { refunded: boolean | null; sentence: string }; series: SeriesRow; wasSent: boolean }[] = [];
+  for (const e of live) {
+    const series = await seriesOrThrow(e.boardSeriesId, tx);
+    const rules = await boardRulesFor(e.boardCode, tx);
+    const charge = withdrawalCharge(rules, series, e.status);
+    const [row] = await tx.update(examEntry).set({
+      status: 'withdrawn', withdrawnAt: new Date(), withdrawnBy: actorId, withdrawalReason: reason,
+      withdrawalCharge: charge.sentence, withdrawalRefunded: charge.refunded, updatedAt: new Date(),
+    }).where(and(eq(examEntry.id, e.id), sql`${examEntry.status} <> 'withdrawn'`)).returning();
+    if (!row) continue;
+    await logAction(actorId, 'EXAM_ENTRY_WITHDRAWN', 'exam_entry', e.id, { status: e.status },
+      { status: 'withdrawn', reason, charge: charge.sentence, refunded: charge.refunded, pastDeadline: pastEntryDeadline(series), byDeskDrop: lineId }, ctx, tx);
+    out.push({ entry: row, charge, series, wasSent: e.status !== 'draft' });
+  }
+  return out;
+}
+
+/** After a withdrawal commits: a family whose entry had gone to the board is told. */
+export async function tellWithdrawn(withdrawn: { entry: EntryRow; series: SeriesRow; wasSent: boolean }[], reason: string) {
+  for (const w of withdrawn.filter((x) => x.wasSent)) {
+    const family = (await familyOf([w.entry.studentId])).get(w.entry.studentId) ?? [];
+    await createBulkNotifications(family, 'EXAM_ENTRY_WITHDRAWN', 'Exam entry withdrawn',
+      `${w.entry.entryCode} ${w.entry.title} was withdrawn from ${w.series.name}: ${reason}`,
+      { entryId: w.entry.id, boardSeriesId: w.entry.boardSeriesId, url: '/exams/my' });
+  }
 }
 
 // ─── Forecast grades ─────────────────────────────────────────────────────────

@@ -533,6 +533,17 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
   deadlines, the 08q cases, the migrations 0047–0049 proved after B's.
 - ~~The Statement's charges~~ — done (decision 35).
 - `exception.value`'s drop; reminders per instalment (step D, §3.8).
+- **Provided by F4 on resuming (8 Oct 2026, `feature/exam-entries`; docs/features/EXAM_ENTRIES.md
+  §7)**: `chargesOfKind(kind, seriesId, executor?)` (`charge.services.ts`) — a series' accepted
+  charges of a kind (awaiting payment or paid) with their deadline; F4 enters a **paid** cash-in or
+  late cash-in as its award (`exam_entry.charge_id`; the lead, 8 Oct). The seam `entrySentAt(line)`
+  (`refund.services.ts`) answers the earliest time any entry made from the line was marked sent
+  (withdrawn ones included: a partly sent line is a sent line, the lead, 8 Oct), with
+  `sentEntriesOf(line)`; `refundFor`'s quote and `previewRefund` carry `sentEntries` and a
+  `boardNote` naming the entries sent and when (or why the board fee comes back). The seam
+  `withdrawEntry(tx, line, reason, staff)` (`desk-drop.services.ts`) withdraws the line's live
+  entries in the desk-drop's own transaction (after the receipt and the line), each with its
+  `EXAM_ENTRY_WITHDRAWN` row; the outcome lists `entriesWithdrawn` and the notice the board note.
 
 ---
 

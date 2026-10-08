@@ -1,15 +1,16 @@
 'use client';
 
 /**
- * Deriving a series' entries from its confirmed registrations (F4,
- * docs/features/EXAM_ENTRIES.md §2). The sheet version: a registration list
- * printed beside the syllabus booklet, each line turned into an entry by
- * hand — the syllabus and its option code for Cambridge, each unit and the
- * cash-in for Pearson — with nothing to say which lines were already typed.
- * Here: a preview says, per registration, what it enters, whether each entry
- * is new or already made, and what the coordinator must still choose; one
- * click makes only the new ones. Past the entry deadline the preview shows
- * the school's refusal and there is nothing to commit.
+ * Deriving a series' entries from its confirmed reservation lines and paid cash-ins (F4,
+ * docs/features/EXAM_ENTRIES.md §2, §2a). The sheet version: a registration list printed beside
+ * the syllabus booklet, each line turned into an entry by hand — the syllabus and its option code
+ * for Cambridge, each unit and the cash-in for Pearson — the retakes and carried-forward sittings
+ * remembered from the forms' notes, the cash-ins found in the receipt book, and nothing to say
+ * which lines were already typed. Here: a preview says, per line, what its item enters, whether
+ * each entry is new or already made, the sitting it follows and whether the school has verified
+ * it, and per cash-in whether it is paid; one click makes only the new ones. Each line is cut off
+ * at its own deadline (a retake of the board's previous sitting at the retake deadline); past the
+ * series' entry deadline with nothing still open the preview shows the school's refusal.
  */
 
 import { useState } from 'react';
@@ -20,6 +21,7 @@ import { cn } from '~/lib/utils';
 import { EXAMS_KEY, BoardText, Code, type BoardSeriesRow } from '../exam-f4-shared';
 import { LevelCodeBadge } from '../exams-shared';
 import { DeriveNote, FlashNotice, deriveEntries, type DeriveResult, type DeriveRowData, type Flash } from './entries-shared';
+import { SeriesWords } from '../candidates/series-words';
 
 const STATE: Record<string, { tone: 'success' | 'neutral' | 'warning'; label: string }> = {
   new: { tone: 'success', label: 'New' },
@@ -27,6 +29,15 @@ const STATE: Record<string, { tone: 'success' | 'neutral' | 'warning'; label: st
   elsewhere: { tone: 'warning', label: 'Entered from another registration' },
   // The coordinator withdrew it and the registration is still confirmed: a derivation never enters it again.
   withdrawn: { tone: 'warning', label: 'Withdrawn — not entered again' },
+};
+
+/** A row's outcome when it is not simply made or already made (the reservations rework). */
+const OUTCOME: Partial<Record<DeriveRowData['outcome'], { tone: 'warning' | 'danger' | 'neutral'; label: string }>> = {
+  past_deadline: { tone: 'danger', label: 'Past its deadline' },
+  held: { tone: 'warning', label: 'Held: sitting not verified' },
+  awaiting_payment: { tone: 'warning', label: 'Cash-in awaiting payment' },
+  choose_award: { tone: 'warning', label: 'Choose the award' },
+  not_mapped: { tone: 'warning', label: 'Not mapped' },
 };
 
 export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; studentId: string | null }): React.JSX.Element {
@@ -63,7 +74,7 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
         <div className="max-w-3xl">
           <h2 id="derive-title" className="text-sm font-semibold text-foreground">Derive entries from registrations</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Each confirmed registration becomes what its board takes: a Cambridge syllabus as the award with its option code, Pearson units one by one. See what it would make first; nothing is made until you confirm.
+            Each paid reservation becomes what its item enters with the board: a Cambridge syllabus as the award with its option code, Pearson units one by one, a paid cash-in as its award. See what it would make first; nothing is made until you confirm.
           </p>
         </div>
         <div className="flex gap-2">
@@ -90,7 +101,7 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
           {preview.refusal ? (
             <Notice tone="danger" title="Nothing can be made">{preview.refusal}</Notice>
           ) : preview.summary.registrations === 0 ? (
-            <Notice tone="info">No confirmed registration in this series yet. Registrations become entries once they are confirmed (paid).</Notice>
+            <Notice tone="info">No paid reservation in this series yet. Reservations become entries once they are paid.</Notice>
           ) : preview.summary.newEntries === 0 ? (
             <Notice tone="success">Everything confirmed is already entered: there is nothing new to make.</Notice>
           ) : null}
@@ -108,18 +119,35 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
                 <thead className="border-b border-border bg-muted">
                   <tr>
                     <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Candidate</th>
-                    <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Registered subject</th>
+                    <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Reserved</th>
                     <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">What it enters</th>
                     <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">To do</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {shown.map((r) => (
-                    <tr key={r.registrationId} className={cn(r.outcome === 'not_mapped' && 'bg-amber-50/40 dark:bg-amber-900/10')}>
+                    <tr key={r.registrationId ?? r.chargeId ?? ''} className={cn((r.outcome === 'not_mapped' || r.outcome === 'held' || r.outcome === 'awaiting_payment' || r.outcome === 'choose_award') && 'bg-amber-50/40 dark:bg-amber-900/10', r.outcome === 'past_deadline' && 'bg-red-50/40 dark:bg-red-900/10')}>
                       <td className="px-3 py-2 align-top font-medium text-foreground"><bdi data-i18n-skip="true">{r.studentName}</bdi></td>
                       <td className="px-3 py-2 align-top">
-                        <BoardText>{r.subject.name}</BoardText> <Code className="text-xs text-muted-foreground">{r.subject.code}</Code>
-                        <div className="mt-1"><LevelCodeBadge code={r.levelCode} /></div>
+                        {r.chargeId && !r.registrationId ? (
+                          <span className="flex flex-wrap items-center gap-1.5"><Badge tone="info">Cash-in</Badge> <BoardText>{r.subject.name}</BoardText></span>
+                        ) : (
+                          <>
+                            <BoardText>{r.subject.name}</BoardText> <Code className="text-xs text-muted-foreground">{r.subject.code}</Code>
+                            {r.item && r.item.kind !== 'whole' && <span className="ms-1 text-xs text-muted-foreground">— <BoardText>{r.item.label}</BoardText></span>}
+                            {r.chargeId && <Badge tone="info" className="ms-1">Cash-in</Badge>}
+                          </>
+                        )}
+                        {r.levelCode && <div className="mt-1"><LevelCodeBadge code={r.levelCode} /></div>}
+                        {r.priorSitting && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            <span>Follows</span> <SeriesWords name={r.priorSitting.name} />{' '}
+                            {r.priorSitting.declared && !r.priorSitting.outcome && <Badge tone="warning">Declared, not verified</Badge>}
+                            {r.priorSitting.outcome === 'verified' && <Badge tone="success">Verified</Badge>}
+                            {r.priorSitting.outcome === 'rejected' && <Badge tone="danger">Not confirmed: entered as a first entry</Badge>}
+                          </div>
+                        )}
+                        {OUTCOME[r.outcome] && <div className="mt-1"><Badge tone={OUTCOME[r.outcome]!.tone}>{OUTCOME[r.outcome]!.label}</Badge></div>}
                       </td>
                       <td className="px-3 py-2 align-top">
                         {r.entries.length === 0 ? (
@@ -136,6 +164,9 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
                                 {e.state === 'withdrawn' && <span className="text-xs text-muted-foreground">To enter it again, add it by hand below.</span>}
                                 {e.isRetake && <Badge tone="info">Retake</Badge>}
                                 {e.carryForward === 'suggested' && <Badge tone="warning">Carry forward suggested</Badge>}
+                                {e.carryForward === 'confirmed' && e.cfFromMonth && e.cfFromYear && (
+                                  <Badge tone="info"><span>Carried forward from</span> <SeriesWords name={`${e.cfFromMonth.charAt(0).toUpperCase()}${e.cfFromMonth.slice(1)} ${e.cfFromYear}`} /></Badge>
+                                )}
                               </li>
                             ))}
                           </ul>

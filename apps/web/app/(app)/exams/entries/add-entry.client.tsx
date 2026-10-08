@@ -20,7 +20,7 @@ import { Label } from '~/components/ui/label';
 import { Notice } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
 import { SELECT_CLASS, useCatalogue } from '../exams-shared';
-import { EXAMS_KEY, fetchCandidates, type BoardSeriesRow } from '../exam-f4-shared';
+import { EXAMS_KEY, fetchCandidates, fetchEntryList, type BoardSeriesRow } from '../exam-f4-shared';
 import { EntryLine, FlashNotice, createEntry, type Flash } from './entries-shared';
 
 export function AddEntryPanel({ series, studentId }: { series: BoardSeriesRow; studentId: string | null }): React.JSX.Element {
@@ -33,7 +33,7 @@ export function AddEntryPanel({ series, studentId }: { series: BoardSeriesRow; s
         <div className="max-w-3xl">
           <h2 id="add-entry-title" className="text-sm font-semibold text-foreground">Add an entry by hand</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            For what the registrations cannot make: a cash-in with no unit sat this series, or the unit of a choice (&ldquo;one of M1, S1, D1&rdquo;).
+            For what the reservations cannot make: a paid cash-in whose line does not say the award, a cash-in with no unit sat this series, or the unit of a choice (&ldquo;one of M1, S1, D1&rdquo;).
           </p>
         </div>
         {!open && (
@@ -60,7 +60,11 @@ function AddEntryForm({ series, studentId, onDone, onCancel }: { series: BoardSe
   const [optionCode, setOptionCode] = useState('');
   const [tier, setTier] = useState<Tier | ''>('');
   const [notes, setNotes] = useState('');
+  const [chargeId, setChargeId] = useState('');
   const [error, setError] = useState('');
+  // The candidate's paid cash-ins in this series with no entry (the reservations rework, §3.6): the award entry carries one.
+  const { data: list } = useQuery({ queryKey: [...EXAMS_KEY, 'entry-list', series.id], queryFn: () => fetchEntryList(series.id) });
+  const cashIns = (list?.cashInsToEnter ?? []).filter((c) => c.studentId === candidate);
 
   const awards = useMemo(() => (catalogue?.qualifications ?? []).filter((q) => q.boardCode === series.boardCode && q.isActive).sort((a, b) => a.code.localeCompare(b.code)), [catalogue, series.boardCode]);
   const units = useMemo(() => (catalogue?.units ?? []).filter((u) => u.boardCode === series.boardCode && u.isActive).sort((a, b) => a.code.localeCompare(b.code)), [catalogue, series.boardCode]);
@@ -77,6 +81,7 @@ function AddEntryForm({ series, studentId, onDone, onCancel }: { series: BoardSe
       ...(kind === 'award' ? { qualificationId: itemId } : { unitId: itemId }),
       optionCode: optionCode || null,
       ...(tier ? { tier } : {}),
+      ...(kind === 'award' && chargeId ? { chargeId } : {}),
       notes: notes.trim() || null,
     }),
     onSuccess: (row) => {
@@ -154,6 +159,15 @@ function AddEntryForm({ series, studentId, onDone, onCancel }: { series: BoardSe
               {options.map((o) => (
                 <option key={o.id} value={o.code} data-i18n-skip="true">{o.code}{o.label ? ` — ${o.label}` : ''}</option>
               ))}
+            </select>
+          </div>
+        )}
+        {kind === 'award' && cashIns.length > 0 && (
+          <div className="lg:col-span-2">
+            <Label htmlFor="add-charge" className="mb-1 text-xs text-muted-foreground">The paid cash-in it comes from</Label>
+            <select id="add-charge" value={chargeId} onChange={(e) => setChargeId(e.target.value)} className={SELECT_CLASS}>
+              <option value="">None</option>
+              {cashIns.map((c) => <option key={c.chargeId} value={c.chargeId}>{c.description}</option>)}
             </select>
           </div>
         )}

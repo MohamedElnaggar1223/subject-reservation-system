@@ -659,6 +659,19 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
 - **Replace teacher moves the enrolment per unit** *(changed)*: each replaced line's enrolment in
   each unit its item enters (or in the subject for an item entering none), not the student's other
   units of the subject taught through another session (§2.11).
+- **Provided by F4 on resuming (8 Oct 2026, `feature/exam-entries`; docs/features/EXAM_ENTRIES.md
+  §7)** — the §10 F4 row's contracts that were not on main under their names:
+  `lineItemsFor(registrationIds, executor?)` (`line.services.ts`): per line what its **item** enters
+  (an award, an option with its components, units — the item's award or a Cambridge component's
+  syllabus beside them — or, for a `subject` item, the subject row's own catalogue mapping), its
+  series with both deadlines, the attempt F4 enters (`first` after a rejected declaration) beside
+  the attempt reserved, the mode, the prior sitting with its source, answer, previous centre and
+  candidate number, the student's grade and level code. F0b's `entryItemsFor` stays for its
+  endpoint and now reads the same rows (the subject row's units were wrong for an item since the
+  rework). `teacherOf(student, subject, year, unitId?)` and `pickEnrolment` (`enrolment.services.ts`):
+  the unit's own open enrolment, else the subject's, else the one teacher of all its units.
+  `exam_board.carry_forward_months` is edited through F4's board rules (`PUT
+  /v1/exams/board-rules/:boardCode`, audited); F4's own column on `exam_board_rule` is gone.
 
 ## 3. As built (step 1)
 

@@ -41,6 +41,8 @@ import {
   type Executor, type SeriesRow,
 } from './exam-shared';
 import { boardSeriesName } from './series.services';
+import { lineItemsFor } from './line.services';
+import { verifyPriorSitting, VerificationError } from './verification.services';
 import { parseDelimited, readXlsx, tableFrom, TabularError } from '../lib/tabular';
 
 type Actor = { id: string; role?: string | null };
@@ -225,9 +227,12 @@ export async function importResults(data: ImportResultsType, actor: Actor, ctx?:
   const mappingName = !data.mapping && saved ? saved.name : null;
   if (!data.commit) {
     const { header, lines } = await planImport(series, source.rows, mapping, db);
-    return { series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom, mappingName, header, sample: preview(source.rows), lines, summary: summarize(lines), committed: false, importId: null };
+    return {
+      series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom, mappingName, header, sample: preview(source.rows),
+      lines, summary: summarize(lines), committed: false, importId: null, sittingsVerified: [] as Awaited<ReturnType<typeof verifyDeclaredSittingsFromResults>>,
+    };
   }
-  return db.transaction(async (tx) => {
+  const out = await db.transaction(async (tx) => {
     await advisoryLock(tx, `exam:results:${series.id}`);
     const { header, lines } = await planImport(series, source.rows, mapping, tx);
     const toAdd = lines.filter((l) => l.outcome === 'new' || l.outcome === 'revised');
@@ -250,7 +255,55 @@ export async function importResults(data: ImportResultsType, actor: Actor, ctx?:
     await logAction(actor.id, 'EXAM_RESULTS_IMPORTED', 'board_series', series.id, null, { importId, sourceName: source.name, ...summary }, ctx, tx);
     return { series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom, mappingName, header, sample: preview(source.rows), lines, summary, committed: true, importId };
   });
+  // The board's results answer the sittings families declared in this series (§3.5): after the commit.
+  const sittingsVerified = await verifyDeclaredSittingsFromResults(series, actor, ctx);
+  return { ...out, sittingsVerified };
 }
+
+// ─── A declared sitting verified by the board's results (RESERVATIONS_REWORK.md §3.5, §9) ───
+
+/**
+ * F4 verifies a declared sitting from the board's results (§3.5: "F4 verifies from the board's
+ * results when they are imported"): every line that follows a sitting declared in this series and
+ * not answered yet, whose student has a result here for what the line's item enters (a unit it
+ * enters, or its award), is verified through step B's own answer (`verifyPriorSitting`: the line
+ * stands, its receipt and line locked in B's order, audited PRIOR_SITTING_VERIFIED), with the
+ * importer as the one who answered and the result as the evidence. A sitting with no result for it
+ * is left to the coordinator (a missing line is no rejection). Each line in its own transaction,
+ * after the import has committed; one that changed meanwhile (answered, dropped) is skipped.
+ */
+export async function verifyDeclaredSittingsFromResults(series: SeriesRow, actor: Actor, ctx?: AuditContext) {
+  const open = (await db.execute(sql`
+    select r.id from registration r
+    where r.prior_sitting_series_id = ${series.id}
+      and r.prior_sitting_source in ('declared_by_family', 'declared_by_desk')
+      and r.prior_sitting_verified_outcome is null
+      and r.status in ('pending_approval', 'pending_payment', 'preregistered', 'confirmed')`)).rows as { id: string }[];
+  if (!open.length) return [];
+  const lines = await lineItemsFor(open.map((r) => r.id));
+  const results = await db.select({ studentId: examResult.studentId, unitId: examResult.unitId, qualificationId: examResult.qualificationId, code: examResult.code, grade: examResult.grade })
+    .from(examResult).where(and(eq(examResult.boardSeriesId, series.id), inArray(examResult.studentId, [...new Set(lines.map((l) => l.studentId))])));
+  const verified: { registrationId: string; studentId: string; code: string; grade: string }[] = [];
+  for (const l of lines) {
+    const unitIds = new Set(l.enters.units.map((u) => u.id));
+    const award = l.enters.qualification?.id ?? null;
+    const hit = results.find((x) => x.studentId === l.studentId && ((x.unitId && unitIds.has(x.unitId)) || (award && x.qualificationId === award)));
+    if (!hit) continue;
+    try {
+      await verifyPriorSitting(l.registrationId, {
+        outcome: 'verified',
+        reason: `${series.name}'s results list ${hit.code} for the candidate (results import)`,
+        evidence: `The board's results for ${series.name}: ${hit.code} graded ${hit.grade}`,
+      }, { id: actor.id, role: actor.role ?? 'coordinator' }, ctx);
+      verified.push({ registrationId: l.registrationId, studentId: l.studentId, code: hit.code, grade: hit.grade });
+    } catch (err) {
+      // Answered or changed meanwhile (B's 409s): the coordinator's own answer stands.
+      if (!(err instanceof VerificationError)) throw err;
+    }
+  }
+  return verified;
+}
+
 
 export async function listMappings(boardCode?: string) {
   return db.select().from(examResultMapping).where(boardCode ? eq(examResultMapping.boardCode, boardCode) : undefined).orderBy(asc(examResultMapping.boardCode), asc(examResultMapping.name));
