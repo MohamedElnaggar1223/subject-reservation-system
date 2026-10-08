@@ -51,7 +51,7 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
         <Stat label="Lines" value={<span>{t.lines}</span>} />
         <Stat label="Paid" value={<><span>{t.paid}</span> · <Money amount={t.paidAmount} /></>} />
         <Stat label="Unpaid" value={<><span>{t.unpaid}</span> · <Money amount={t.outstanding} /></>}
-          hint={<><span>{t.families}</span> <span>families</span>{t.awaitingApproval > 0 && <> · <span>{t.awaitingApproval}</span> <span>awaiting the parent</span></>}</>} />
+          hint={<><span>{t.families}</span> <span>families</span>{t.awaitingApproval > 0 && <> · <span>{t.awaitingApproval}</span> <span>awaiting the parent</span></>}{t.depositsHeld > 0 && <> · <span>held from instalments</span> <Money amount={t.depositsHeld} /></>}</>} />
         <Stat label="Overdue" value={<><span>{t.overdue}</span> · <Money amount={t.overdueAmount} /></>} hint={t.provisional ? <><span>{t.provisional}</span> <span>provisional (not payable yet)</span></> : undefined} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -113,6 +113,7 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
                     <Money amount={l.price} />
                     <div className="text-xs text-muted-foreground" title="course + board"><Money amount={l.courseFee} /> + <Money amount={l.boardFee} /></div>
                     {l.provisional && <Badge tone="info">provisional</Badge>}
+                    {l.deposits > 0 && <div className="text-xs text-muted-foreground"><span>held from instalments</span> <Money amount={l.deposits} /> · <span>owes</span> <Money amount={l.outstanding} /></div>}
                   </td>
                   <td className="px-4 py-2 align-top">
                     <Day iso={l.dueAt} />

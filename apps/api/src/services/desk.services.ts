@@ -16,7 +16,7 @@
  *   on one screen.
  */
 
-import { db, payment, paymentRegistration, registration, parentStudentLink, charge, user as userTable, eq, and, inArray, gradeTodayExtras } from '@repo/db';
+import { db, payment, paymentRegistration, registration, parentStudentLink, charge, user as userTable, eq, and, inArray, notInArray, sql, gradeTodayExtras } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { DeskOnboardFamilyType, DeskRegistrationType, DeskCollectType } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
@@ -24,6 +24,7 @@ import { auth } from '../lib/auth';
 import { assertSchoolFeeGate } from './registration.services';
 import { reserveLines, consentStanding, writeConsents, CONSENT_MISSING_REFUSAL, FAMILY_CONSENT_NEEDED } from './reservation.services';
 import { exceptionsOfLines } from './line-exceptions-read.services';
+import { lineDepositsSql } from './escrow.services';
 import { sessionWindow, windowRefusal, subjectsOfItems } from './window.services';
 import { seriesDeadlineGroups, type DeadlineGroup } from './series.services';
 import { getSetting } from './settings.services';
@@ -830,7 +831,19 @@ export async function getStudentSummary(studentId: string) {
   const payOnProvisional = await getSetting('pricing.payOnProvisionalFee');
   const payableNow = (r: (typeof registrations)[number]) =>
     r.status === 'pending_payment' && (!r.priceProvisional || payOnProvisional);
-  const owing = registrations.filter(payableNow).reduce((sum, r) => sum + r.priceAtRegistration, 0);
+  // A line under a live plan owes its price less the deposits held for it (its instalments still
+  // to pay); the charges owed (not instalments — the line counts them — nor a pushed school fee,
+  // which is the fee badge) are owed beside the lines (step C; the statement counts the same).
+  const planLineIds = new Set(exceptions.filter((e) => e.policyKey === 'plan.instalments' && e.registrationId).map((e) => e.registrationId!));
+  const depositRows = planLineIds.size
+    ? await db.execute(sql`select r.id, ${lineDepositsSql('r')} as deposits from registration r where r.id in (${sql.join([...planLineIds].map((id) => sql`${id}`), sql`, `)})`)
+      .then((x) => x.rows as { id: string; deposits: string }[])
+    : [];
+  const depositsOf = new Map(depositRows.map((d) => [d.id, Number(d.deposits)]));
+  const owedCharges = await db.select({ amount: charge.amount }).from(charge)
+    .where(and(eq(charge.studentId, studentId), eq(charge.status, 'pending_payment'), notInArray(charge.kind, ['instalment', 'school_fee_push'])));
+  const owing = round2(registrations.filter(payableNow).reduce((sum, r) => sum + (planLineIds.has(r.id) ? Math.max(0, r.priceAtRegistration - (depositsOf.get(r.id) ?? 0)) : r.priceAtRegistration), 0)
+    + owedCharges.reduce((sum, c) => sum + c.amount, 0));
 
   // The academic record (F0a): grade, cohort, section, status.
   const today = standingToday(student);

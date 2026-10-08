@@ -300,6 +300,19 @@ line under a live plan it answers the plan's last date first.
     first-entry deadline, not the retake deadline. 08q proves both readers on that path (the SQL
     deadline equals the entry deadline; an instalment between the two deadlines is refused).
     *Corrected (the reviewer's final pass): this said no test could show the flag here.*
+35. **One rule for a plan line's money on every screen** (the reviewer's final pass, item 3): paid
+    = the deposits held for it (`lineDepositsSql`, escrow.services — the ledger rows earmarkedHeld
+    sums), owed = its price less them; its instalments are listed under it and never added to any
+    total. The Statement (B's `statementFor`) lists each charge that is not an instalment or a
+    pushed school fee (the fee row counts that) with its price, paid, outstanding and refund — a
+    request the school has not accepted is priced, not yet owed; a cancelled one is listed, not
+    counted. The desk's "Owes now" adds a plan line's rest and the charges owed (the school fee
+    stays its badge); the Money tab's line carries its deposits and owes the rest. 08q checks the
+    three against each other on one family.
+36. **"Also collect now" beside a new reservation** (item 4): B's Reserve takes `deskExtras` and
+    sends the year's fee and the ticked charges in "Reserve and collect" (`collectNow.schoolFeeYear`,
+    `chargeIds`) — one action, the fee first, each part its own payment; "To collect now" keeps
+    the rest. Decision 34's gap is closed.
 33. **The window by subject reads the lines' items** since B (every reservation path takes lines):
     `subjectsOfItems` in window.services gives `sessionWindow` a new reservation's subjects.
 34. **The desk's reservation card is B's `Reserve`**: "Also collect now" (the year's fee and the
@@ -415,6 +428,15 @@ Step C's own rules:
   Controls (red, restored): each expiry's settlement removed, the instalment payments not
   counted in `paymentState`, the window without the lines' subjects, the teacher change's
   `markUsed` removed.
+- The reviewer's final pass: 08q — the release-in-full case reads the 360 (`livePlan` true, then
+  false and payable); a declared retake rejected while paid, reversed, under a plan: the
+  instalment falls due at the entry deadline and is refused between the two deadlines; the
+  statement, the desk's Owes now and the Money tab agree on one family (a plan line paid = its
+  deposits, owed = the rest, its instalments under it and in no total; a pending, a paid and a
+  cancelled charge; captured, nothing owed). Controls (red, restored): the flag read as false in
+  `chargeDeadline` and left out of `charge_effective_deadline`; `livePlan` always true; the
+  statement without the deposits, with the instalments as charges; Owes now without the charges;
+  the Money tab without the deposits.
 - `08r-exceptions-registry.test.ts` (15, with the same exception twice): the policies per caller; grant checks; a family's
   exception for every child and no one else; a one-shot gate used once; a line's price
   exception and its revocation; a charge's; `deadline.payment` re-dated and back; the eight V3
@@ -453,8 +475,15 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
   (finance admin), add a board service, a price adjustment or another charge.
 - **The desk's Student 360**: "To collect now" — subjects waiting, charges and the year's fee,
   ticked and taken in one action (with B's rules: a line on a provisional fee listed, not
-  collected; the parent's consent tick for a line the school reserved). The reservation card is
-  B's Reserve since the final merge; "Also collect now" beside it is not rendered (decision 34). Each line shows the exceptions that touched it, and finance opens the
+  collected; the parent's consent tick for a line the school reserved); a line under a live plan
+  is paid by its instalments, a line whose plan was released in full is offered in full again
+  (`livePlan`, web-36). The reservation card is B's Reserve, with "Also collect now" beside it:
+  the fee and the ticked charges go with "Reserve and collect" (web-39, web-40). "Owes now" is the
+  lines, a plan line's rest and the charges owed.
+- **The Statement** (B's page): a plan line with its deposits as paid and its instalments under it;
+  the charges beside the lines with their status, due date and outstanding; charge payments named
+  "Charges" (web-37, English and Arabic). The Money tab's plan line shows its deposits held and
+  what it still owes (web-38). Each line shows the exceptions that touched it, and finance opens the
   grant form on it.
 - **Board services** (`/exams/services`: admin and coordinator for the catalogue and dates,
   finance admin for the fees and the refund rule; in the Exams nav and the finance admin's):
@@ -502,10 +531,7 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
 - ~~At my final merge, after B~~ — done (decisions 29–33, §1, §7): both expiries settle a plan,
   `paymentState` counts instalments, `refundFor` replaces B's stand-in, the flag in both charge
   deadlines, the 08q cases, the migrations 0047–0049 proved after B's.
-- **The Statement's charges**: B's `statementFor` has a `charges` array (empty) and its page
-  renders it. Filling it needs one rule first — a plan line's instalments are the line's money
-  (counted as the line's paid, not as charges beside it, or the statement counts them twice) —
-  so it is not filled in this merge. *For the lead.*
+- ~~The Statement's charges~~ — done (decision 35).
 - `exception.value`'s drop; reminders per instalment (step D, §3.8).
 
 ---
@@ -537,12 +563,8 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
    `active`, §3.6). The tick runs every minute.
 9. **For B**: render each line's `exceptions` and the student's charges on the Statement and the
    Reserve pages (§10).
-10. **"Also collect now" at the desk's reservation** (decision 34): B's Reserve could take the
-    year's fee and the student's charges in its "Reserve and collect" with one optional prop
-    passing `collectNow.schoolFeeYear` and `chargeIds` (the API takes them). B's component, so
-    not changed here; until then the desk takes them in "To collect now", one more action.
-11. **The Statement's charges** (§10): B's `statementFor` hook is empty until the plan line rule
-    is decided.
+10. ~~"Also collect now" at the desk's reservation~~ — done (decision 36; the lead's item 4).
+11. ~~The Statement's charges~~ — done (decision 35; the lead's item 3).
 
 ---
 
@@ -610,3 +632,8 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
 - 06:10 — main at 7c95950 (A's swap deadlock fix: holdNewLines, the fee grid shared in every path
   that makes lines) merged in with no conflict (ff7f2a7); step C's lock paths take no fee grid or
   fee row; no migration changed, so the dev copy's proof stands.
+- 06:25–07:10 — the reviewer's final pass: item 1 (a released plan line offered at the desk again:
+  `livePlan` on the 360's lines) and item 2 (decision 32 corrected, 08q on the reachable path)
+  pushed as b76eae4, CI green, fast-forwarded onto main; then items 3 (the Statement's charges and
+  one plan-line rule for the Statement, Owes now and the Money tab) and 4 ("Also collect now" with
+  B's Reserve), each with 08q and controls, driven on 3140/3141 (web-37 to web-40).

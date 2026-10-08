@@ -1075,6 +1075,18 @@ running system before Phase 3 closes.
 | Set the refund windows | the policy text on the form | **15–18 inputs, 3 clicks** per session, on the School fees page, absolute dates typed, the form resetting after each row, ends at UTC midnight, no edit | copied from the type's policy at creation; one date (course start) |
 | Remind unpaid families | by hand | not possible (one 24-hour closing reminder); "parents of grade 11" cannot be targeted | a rule once; or "Remind" on the Money tab; any list as an audience |
 
+**Measured on the running system (8 Oct 2026, main 9edefbb, a bare template database; the
+scripts, outputs and screenshots in `.audit/school-forms-evidence/step4/`, the counts in
+`measure-counts.json` there).** New session: 6 inputs, 2 clicks. One subject set up open with a
+teacher: 3 inputs, 3 clicks (self-study only: 2 and 2); the series' grid confirmed: 1 click for
+17 rows; the series' dates on the Board Series page: 6 inputs, 2 clicks. A family reserving
+three subjects with a declared self-study retake: 9 answers, 1 click (7 once the only child and
+the only open session are preselected); the walk-in desk flow with onboarding: 14 inputs, 4
+clicks, three receipts and the slip in one action; the desk collecting family-reserved lines: 2
+inputs, 2 clicks. Lifting a rule for a family: 5 inputs, 1 click. Who has paid: the Money tab.
+The refund windows: none, copied from the type. Reminders: step 3. Seven observations for the
+UI audit are recorded with the counts (FEATURES_PLAN.md F6).
+
 ---
 
 ## 12. Decisions and why

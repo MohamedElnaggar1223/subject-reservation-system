@@ -963,6 +963,49 @@ describe('08q: instalment plans', () => {
     expect(await sql(`select 1 from payment_charge where charge_id = $1`, [p.i[1]!])).toEqual([]);
   });
 
+  it("the statement, the desk's Owes now and the Money tab agree: a plan line paid = its deposits, owed = the rest, its instalments under it and never in the totals; the charges beside the lines", async () => {
+    const st = await subject(adm, 'CQP-ST', 'Statement (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    const f = await onboard(officer, 'cqp-statement', 12);
+    const [l] = await unpaid(f, [st], s1);
+    const p = await plan(f, l!, [750, 750]);
+    await payAtDesk(f, [p.i[0]!]);
+    const custom = (amount: number, description: string) => apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: f.studentId, kind: 'custom', amount, description, reason: 'the statement case' } }));
+    const card = await custom(250, 'Replacement ID card');
+    const coat = await custom(100, 'Lab coat');
+    await payAtDesk(f, [coat.id]);
+    const gone = await custom(40, 'Locker (not wanted)');
+    await apiResponse(officer.api.v1.charges[':id'].cancel.$post({ param: { id: gone.id }, json: { reason: 'not wanted after all' } }));
+
+    // The statement (B's page; step C's numbers).
+    const stmt = await apiResponse(officer.api.v1.statement.$get({ query: { studentId: f.studentId } }));
+    const me = stmt.students[0]!;
+    const line = me.sessions.flatMap((x) => x.lines).find((x) => x.id === l)!;
+    expect(line).toMatchObject({ price: 1500, paid: 750, outstanding: 750, status: 'pending_payment' });
+    expect(line.plan).toMatchObject({ id: p.id, live: true, deposits: 750 });
+    expect(line.plan!.instalments.map((i) => [i.no, i.amount, i.status])).toEqual([[1, 750, 'paid'], [2, 750, 'pending_payment']]);
+    expect(me.charges.map((c) => [c.label, c.status, c.price, c.paid, c.outstanding])).toEqual([
+      ['Replacement ID card', 'pending_payment', 250, 0, 250],
+      ['Lab coat', 'paid', 100, 100, 0],
+      ['Locker (not wanted)', 'cancelled', 0, 0, 0],
+    ]);
+    // The totals add the line and the charges once — the instalments are the line's own money.
+    const fees = me.schoolFees.reduce((a, x) => ({ price: a.price + (x.waived ? 0 : x.amount), paid: a.paid + x.paid, outstanding: a.outstanding + x.outstanding }), { price: 0, paid: 0, outstanding: 0 });
+    expect(me.totals).toMatchObject({ price: 1500 + 350 + fees.price, paid: 750 + 100 + fees.paid, outstanding: 750 + 250 + fees.outstanding });
+    // The desk's Owes now: the plan line's rest and the charge owed (the school fee is its own badge).
+    expect((await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: f.studentId } }))).owing).toBe(1000);
+    // The Money tab: the line owes its rest, its deposits held.
+    const money = await apiResponse(adm.api.v1.sessions[':id'].money.$get({ param: { id: s1 }, query: { filter: 'all' } }));
+    expect(money.lines.find((x) => x.id === l)).toMatchObject({ price: 1500, deposits: 750, outstanding: 750, unpaid: true });
+    // Paid in full by the last instalment: captured, nothing owed, the instalments still listed under it.
+    await payAtDesk(f, [p.i[1]!]);
+    const after = (await apiResponse(officer.api.v1.statement.$get({ query: { studentId: f.studentId } }))).students[0]!;
+    const captured = after.sessions.flatMap((x) => x.lines).find((x) => x.id === l)!;
+    expect(captured).toMatchObject({ status: 'confirmed', paid: 1500, outstanding: 0 });
+    expect(captured.plan).toMatchObject({ live: false, status: 'used', deposits: 0 });
+    expect(after.totals.paid - me.totals.paid).toBe(750);
+    expect((await apiResponse(officer.api.v1.users[':id'].summary.$get({ param: { id: f.studentId } }))).owing).toBe(250);
+  });
+
   it("another line's preregistration capture leaves the plan's deposits alone; held money is never transferred to a sibling", async () => {
     const f = await onboard(officer, 'cqp-prereg', 12);
     const sibling = await apiResponse(officer.api.v1.links['desk-onboard'].$post({

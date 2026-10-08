@@ -315,6 +315,14 @@ export const moneyArabic: Record<string, string> = {
   'Instalments, board services and other charges appear here when the school adds them or you ask for one.': 'تظهر هنا الأقساط وخدمات المجالس والرسوم الأخرى عندما تضيفها المدرسة أو تطلب أحدها.',
   'of': 'من',
   'held for the subject until the last instalment pays it': 'محجوزة للمادة حتى يسددها آخر قسط',
+  // ── The statement's charges and a plan line (the reviewer's final pass, item 3) ──
+  'to pay': 'للدفع',
+  'held for it, paid in instalments': 'محجوزة لها، مدفوعة بالأقساط',
+  'Paid by its instalment plan': 'مدفوعة بخطة أقساطها',
+  'Instalment plan ended': 'انتهت خطة الأقساط',
+  'asked for, awaiting the school': 'مطلوبة، بانتظار المدرسة',
+  'held from instalments': 'محجوز من الأقساط',
+  'owes': 'المستحق',
   'To pay now': 'للدفع الآن',
   'At the school desk': 'في مكتب المدرسة',
   'InstaPay': 'إنستاباي',
@@ -425,6 +433,12 @@ export function translateMoneyText(text: string, exact: (t: string) => string | 
     return r.ar.replace('{who}', parts.who ?? '').replace('{value}', parts.value ?? '').replace('{scope}', parts.scope ?? '');
   }
   const rules: [RegExp, (m: RegExpExecArray) => string][] = [
+    // A plan's instalment on the statement, and the year's fee taken with a reservation at the desk.
+    [/^Instalment (\d+) of (\d+)$/, (m) => `القسط ${m[1]} من ${m[2]}`],
+    [/^Collected EGP ([\d,.]+) in (\d+) payments, the subjects per entry deadline and the charges on their own\.$/,
+      (m) => `تم تحصيل ${m[1]} جنيه في ${m[2]} دفعات: المواد لكل موعد قيد والرسوم كلٌّ على حدة.`],
+    // The year isolated left-to-right (U+2066 … U+2069): bare in Arabic text "2026-2027" reads "2027-2026".
+    [/^The (\d{4}-\d{4}) school fee collected first \(EGP ([\d,.]+)\)\.$/, (m) => `حُصّلت المصاريف الدراسية \u2066${m[1]}\u2069 أولًا (${m[2]} جنيه).`],
     // A policy the caller cannot grant now, as the picker lists it: "label — why".
     [/^(.+) — (not yours to grant|not applied yet|off \(setting\))$/, (m) => `${exact(m[1]!) ?? m[1]} — ${exact(m[2]!) ?? m[2]}`],
     // A student in a picker: "name (Grade 12)".

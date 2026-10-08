@@ -5,8 +5,8 @@
  * subjects waiting for payment, charges (board services, instalments, adjustments) and the year's
  * school fee, pushed or not — ticked and taken in one action, each part its own payment (lines per
  * entry deadline, charges per deadline or plan line, the school fee on its own path, first).
- * `AlsoCollect` offers the same charges and fee beside a reservation (not rendered since step B's
- * Reserve took the desk's reservation card; the API still takes them in `collectNow`).
+ * `AlsoCollect` offers the same charges and fee beside a reservation: B's Reserve sends them with
+ * "Reserve and collect" (`deskExtras` → `collectNow.schoolFeeYear` / `chargeIds`), one action.
  *
  * Step B's rules for the lines, kept here: a line on a provisional board fee is collected once the
  * fee is confirmed (`payableNow`, §3.4), and a line the school reserved (grade 10) takes the
