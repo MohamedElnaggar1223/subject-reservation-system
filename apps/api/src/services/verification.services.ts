@@ -35,7 +35,7 @@ import {
 } from '@repo/db';
 import { hasRole, ROLES, FINANCE_ROLES, type VerifyPriorSittingType } from '@repo/validations';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
-import { effectiveDeadlineFor } from './deadline.services';
+import { effectiveDeadlineFor, effectiveDeadlinesOf } from './deadline.services';
 import { executeReceiptGatedDrop } from './receipt.services';
 import { getSetting } from './settings.services';
 import { createNotification } from './notification.services';
@@ -99,13 +99,19 @@ export async function listToVerify(sessionId: string, show: 'awaiting' | 'decide
   const now = Date.now();
   // Each line's deadlines as effectiveDeadlineFor gives them for its student — a late board entry
   // granted while the setting is on (Q-20) counts, as it does when the line is answered.
-  const deadlines = await Promise.all(rows.map(async (r) => {
-    const key = { boardSeriesId: (r.boardSeriesId as string | null) ?? null, studentId: r.studentId as string };
-    const [own, first] = await Promise.all([
-      effectiveDeadlineFor(db, { ...key, attempt: r.attempt as string, priorSittingSeriesId: (r.priorSittingSeriesId as string | null) ?? null, declarationRejected: Boolean(r.declarationRejected) }),
-      effectiveDeadlineFor(db, { ...key, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false }),
-    ]);
-    return { own: own.at, first: first.at };
+  // The lines' own deadlines in one query (effectiveDeadlinesOf reads the flag and the late
+  // entry); a first entry's deadline once per series and student.
+  const ownOf = await effectiveDeadlinesOf(db, rows.map((r) => r.id as string));
+  const firstOf = new Map<string, Date | null>();
+  for (const r of rows) {
+    const key = `${(r.boardSeriesId as string | null) ?? ''}|${r.studentId as string}`;
+    if (firstOf.has(key)) continue;
+    const d = await effectiveDeadlineFor(db, { boardSeriesId: (r.boardSeriesId as string | null) ?? null, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false, studentId: r.studentId as string });
+    firstOf.set(key, d.at);
+  }
+  const deadlines = rows.map((r) => ({
+    own: ownOf.get(r.id as string)?.at ?? null,
+    first: firstOf.get(`${(r.boardSeriesId as string | null) ?? ''}|${r.studentId as string}`) ?? null,
   }));
   const lines = rows.map((r, i) => {
       const deadline = deadlines[i]!.own;

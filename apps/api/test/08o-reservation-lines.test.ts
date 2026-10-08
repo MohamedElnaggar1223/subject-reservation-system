@@ -492,7 +492,8 @@ describe('08o: reservation lines (step B)', () => {
     expect(await lineOf(id)).toMatchObject({ status: 'dropped_pending_receipt', outcome: 'rejected', declaration_rejected: false });
     expect(await one(`select status, refund_amount_on_return as amount from receipt where id = $1`, [rc.id])).toEqual({ status: 'return_required', amount: '12700.00' });
     // Its own deadline (the retake deadline) has not passed: the board fee is not sent yet, so the
-    // window's percentage applies to the whole price (the case below keeps a sent board fee).
+    // refund is the window's percentage of the course part plus the unsent board fee in full
+    // (3,500 + 9,200 = 12,700); nothing is kept (the case below keeps a sent board fee).
     expect(await one(`select new_data->>'boardSent' as sent, new_data->>'boardFeeKept' as kept from audit_log where action = 'PRIOR_SITTING_REJECTED' and entity_id = $1`, [id]))
       .toEqual({ sent: 'false', kept: '0' });
     expect(await escrowOf(f.studentId)).toEqual(before);
