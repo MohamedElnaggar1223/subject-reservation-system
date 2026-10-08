@@ -1338,6 +1338,158 @@ describe('08t: the rework races — money (step C)', () => {
 });
 
 /**
+ * Step D (RESERVATIONS_REWORK.md §3.8, docs/features/RESERVATIONS_MESSAGES.md): the reminder step
+ * reads a line as unpaid and claims its reminder; a payment can be confirmed at the same moment. The
+ * step locks the line FOR SHARE and reads it again (a statement of its own) before it claims, and the
+ * desk's payment locks it FOR UPDATE, so one waits for the other, both orders: a payment taken first
+ * means no reminder (the line has a payment open, then is paid);
+ * a reminder claimed first goes out and the payment confirms after it (09: no reminder claimed after
+ * its line was paid). (Two schedulers claiming one reminder at once: 08s.)
+ */
+describe('08t: the rework races — reminders (step D)', () => {
+  // (afterAll for this block is imported with the others.)
+  let adm: Client, officer: Client, teacherId: string, itemId: string, sessionId: string, dueDay: string;
+  const RUN_D = Math.random().toString(36).slice(2, 6);
+  const DAY = 86_400_000;
+  const cairoDay = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
+  // 09:30 Cairo on a Cairo day (UTC+2 or +3: the one that reads back right).
+  const cairoNineThirty = (day: string) => {
+    const [y, m, d] = day.split('-').map(Number) as [number, number, number];
+    for (const off of [2, 3]) {
+      const t = new Date(Date.UTC(y, m - 1, d, 9 - off, 30));
+      if (new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(t) === '09:30') return t;
+    }
+    throw new Error('no Cairo 09:30');
+  };
+  const minusDays = (day: string, n: number) => { const [y, m, d] = day.split('-').map(Number) as [number, number, number]; return new Date(Date.UTC(y, m - 1, d - n)).toISOString().slice(0, 10); };
+  const step = async (now: Date) => (await import('../src/services/messages-step.services')).runMessagesStep(now);
+  const claims = (lineId: string) => sql<{ offset_days: number; sent_at: string }>(`select offset_days, sent_at from reminder_sent where target_id = $1 and kind = 'payment_due'`, [lineId]);
+  const reminders = (email: string) => sql(`select 1 from notification n join "user" u on u.id = n.user_id where u.email = $1 and n.type = 'PAYMENT_REMINDER'`, [email]);
+
+  beforeAll(async () => {
+    adm = await admin(`t08d-${RUN_D}`);
+    officer = await staff(adm, 'finance_officer', `t08d-${RUN_D}`);
+    teacherId = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher (08t D ${RUN_D})` } })))!.id;
+    dueDay = cairoDay(new Date(Date.now() + 20 * DAY));
+    sessionId = (await apiResponse(adm.api.v1.sessions.$post({
+      json: {
+        type: 'june', year: academicYearStartOf() + 1, label: `t08d-${RUN_D}`, startDate: new Date(Date.now() - DAY).toISOString(), endDate: new Date(Date.now() + 60 * DAY).toISOString(),
+        courseStartsOn: cairoDay(new Date()), paymentDueAt: new Date(`${dueDay}T10:00:00Z`).toISOString(),
+      },
+    })))!.id;
+    const series = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: academicYearStartOf() + 1, label: `t08d-${RUN_D}`, entryDeadline: new Date(Date.now() + 50 * DAY) } })))!.id;
+    const subjectId = (await apiResponse(adm.api.v1.subjects.$post({ json: { name: `Physics (08t D ${RUN_D})`, code: `T08D-${RUN_D}`, council: 'cambridge', courseFee: 1000, registrationFee: 500, isOfferedAtSchool: true, isCore: false } })))!.id;
+    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: series }, json: { rows: [{ keyKind: 'subject', keyId: subjectId, amount: 500, provisional: false }] } }));
+    itemId = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+      param: { id: sessionId }, json: { subjectId, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: series, availability: 'open', requiredInSeries: false }] },
+    })))!.items[0]!;
+    // Reminders are off when the system is installed: on for these races, off again after.
+    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'reminders.enabled' }, json: { value: true, reason: 'the races need the step' } }));
+  });
+
+  afterAll(async () => {
+    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'reminders.enabled' }, json: { value: false, reason: 'back to as installed' } }));
+  });
+
+  const familyWithALine = async (tag: string) => {
+    const f = await onboard(officer, `t08d-${tag}-${RUN_D}`, 11);
+    const line = (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId, lines: [{ offerItemId: itemId, attempt: 'first', mode: 'in_school', teacherId }], consent: CONSENT } }))).registrations[0]!.id;
+    return { f, line };
+  };
+  const collect = (studentId: string, lineId: string) => apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId, registrationIds: [lineId], instrumentUsed: 'cash', escrowAmountToApply: 0 } }));
+
+  it('a payment taken while the reminder step reads the line: the step waits for the line, reads it being paid, and reminds nothing', async () => {
+    const { f, line } = await familyWithALine('pay-first');
+    // The desk holds the line (FOR UPDATE) while it writes the payment, paused at its creation row.
+    const p = await pauseAtAudits(['PAYMENT_INITIATED']);
+    try {
+      const paying = collect(f.studentId, line);
+      await p.paused('PAYMENT_INITIATED');
+      const reminding = step(cairoNineThirty(minusDays(dueDay, 7)));
+      // The step queues behind the desk on the line (or, were the line not locked, would run to its end).
+      await Promise.race([lockWaiters(2), reminding]);
+      await p.releaseAll();
+      await Promise.all([paying, reminding]);
+    } finally {
+      await p.releaseAll();
+    }
+    expect((await one<{ status: string }>(`select status from registration where id = $1`, [line])).status).toBe('confirmed');
+    expect(await claims(line)).toEqual([]);
+    expect(await reminders(f.parent.email)).toEqual([]);
+  });
+
+  it('a reminder claimed while the payment is taken: the payment waits for the line, the reminder goes out once, before the payment confirms', async () => {
+    const { f, line } = await familyWithALine('remind-first');
+    const p = await pauseAtAudits(['REMINDERS_SENT']);
+    try {
+      const reminding = step(cairoNineThirty(minusDays(dueDay, 7)));
+      await p.paused('REMINDERS_SENT');
+      const paying = collect(f.studentId, line);
+      await lockWaiters(2);
+      await p.releaseAll();
+      await Promise.all([reminding, paying]);
+    } finally {
+      await p.releaseAll();
+    }
+    expect((await one<{ status: string }>(`select status from registration where id = $1`, [line])).status).toBe('confirmed');
+    const c = await claims(line);
+    expect(c.map((x) => Number(x.offset_days))).toEqual([-7]);
+    expect(await reminders(f.parent.email)).toHaveLength(1);
+    const paidAt = (await one<{ at: string }>(`select p.confirmed_at as at from payment p join payment_registration pr on pr.payment_id = p.id where pr.registration_id = $1 and p.status = 'completed'`, [line])).at;
+    expect(new Date(c[0]!.sent_at).getTime()).toBeLessThan(new Date(paidAt).getTime());
+  });
+  it('two senders of the same queued email: each claims it before sending (queued → sending), so it is sent once', async () => {
+    const f = await onboard(officer, `t08d-mail-${RUN_D}`, 11);
+    const when = new Date(Date.now() + 6 * 3_600_000);
+    const s = await apiResponse(adm.api.v1.messages.$post({ json: {
+      audience: { definition: { kind: 'direct', userIds: [f.parent.id] } }, title: 'Two senders, one email', body: 'Two senders pick up this email at once.', language: 'en', channels: ['in_app', 'email'], scheduledAt: when,
+    } }));
+    const svc = await import('../src/services/message.services');
+    await svc.dispatchScheduledMessages(new Date(when.getTime() + 1000));
+    const email = (await one<{ id: string }>(`select id from message_delivery where message_id = $1 and channel = 'email'`, [s.id])).id;
+    const release = await holdRowLock('message_delivery', email);
+    let sends: { sent: number; failed: number }[] = [];
+    try {
+      const a = svc.dispatchQueuedEmails({ messageId: s.id });
+      const b = svc.dispatchQueuedEmails({ messageId: s.id });
+      await lockWaiters(2);
+      await release();
+      sends = await Promise.all([a, b]);
+    } finally {
+      await release().catch(() => {});
+    }
+    expect(sends.reduce((n, x) => n + x.sent, 0)).toBe(1);
+    expect(await one(`select status, attempts from message_delivery where id = $1`, [email])).toEqual({ status: 'sent', attempts: 1 });
+  });
+  it("the reminder step and the admin's change of the session's payment date at once: the step takes the session before its lines (A's order), so neither waits on the other in a cycle (the review of 5c2f2bf, item 3)", async () => {
+    const { line } = await familyWithALine('session-change');
+    // The session's own rule, so the step's group for this line is its own; its row held, so the step
+    // stops there, inside its transaction, after it has taken what it takes before the message.
+    const rule = await apiResponse(adm.api.v1.reminders.rules.$put({ json: { kind: 'payment_due', sessionId, offsetsDays: [-7], repeatEveryDays: null, channels: ['in_app'], templateId: 'tpl-payment-due', active: true, reason: 'this session, seven days ahead' } }));
+    const release = await holdRowLock('reminder_rule', rule.id);
+    const moved = new Date(new Date(`${dueDay}T10:00:00Z`).getTime() + 5 * DAY);
+    let put: { status: number; body: string } | null = null;
+    try {
+      const reminding = step(cairoNineThirty(minusDays(dueDay, 7)));
+      await lockWaiters(1);
+      const changing = adm.api.v1.sessions[':id'].$put({ param: { id: sessionId }, json: { paymentDueAt: moved, reason: 'the payment date moves five days' } })
+        .then(async (r) => ({ status: r.status, body: await r.text() }));
+      // The change queues behind the step (on the session), or — the order before the fix — takes the
+      // session and queues on the line the step holds.
+      await lockWaiters(2);
+      await release();
+      [, put] = await Promise.all([reminding, changing]);
+    } finally {
+      await release().catch(() => {});
+    }
+    expect(put, put?.body).toMatchObject({ status: 200 });
+    // The reminder went out on the date it was claimed for; then the line's date moved.
+    expect((await claims(line)).map((c) => Number(c.offset_days))).toEqual([-7]);
+    expect(new Date((await one<{ d: string }>(`select due_at as d from registration where id = $1`, [line])).d).getTime()).toBe(moved.getTime());
+  });
+});
+
+/**
  * F4's derivation against "mark as sent" on the same entries (the review of 426d565, item 5). A
  * derivation that brings drafts up to date (or links a paid cash-in to its award) locks them all in
  * one statement in id order, as "mark as sent" and every withdrawal lock entries (RESERVATIONS.md

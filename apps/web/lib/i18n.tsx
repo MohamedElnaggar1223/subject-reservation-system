@@ -14,6 +14,7 @@ import { examsArabic, translateExamsText } from './i18n-exams';
 import { sessionsArabic, translateSessionsText } from './i18n-sessions';
 import { moneyArabic, translateMoneyText } from './i18n-money';
 import { reservationsArabic, translateReservationsText } from './i18n-reservations';
+import { messagesArabic, translateMessagesText } from './i18n-messages';
 
 export type Language = 'en' | 'ar';
 
@@ -46,6 +47,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.schoolFees': 'School Fees',
     'nav.schoolFee': 'School Fee',
     'nav.announcements': 'Announcements',
+    'nav.messages': 'Messages',
     'nav.exceptions': 'Exceptions',
     'nav.remarks': 'Remarks',
     'nav.desk': 'The Desk',
@@ -241,6 +243,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.schoolFees': 'المصاريف الدراسية',
     'nav.schoolFee': 'المصاريف الدراسية',
     'nav.announcements': 'الإعلانات',
+    'nav.messages': 'الرسائل',
     'nav.exceptions': 'الاستثناءات',
     'nav.remarks': 'إعادة التصحيح',
     'nav.desk': 'المكتب',
@@ -1533,17 +1536,19 @@ for (const [en, ar] of Object.entries(sessionsArabic)) if (!(en in autoArabicTex
 for (const [en, ar] of Object.entries(moneyArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // Step B's screens (lib/i18n-reservations.ts): Reserve, the statement, To verify, the slip.
 for (const [en, ar] of Object.entries(reservationsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
-// F4 screens (lib/i18n-exams/): likewise only words not already translated — after A's, B's and
-// C's, so a word their screens share with F4's ("Session", "Dropped", "Collected") keeps the
-// rework's Arabic (the review of 093dbd1, item 10).
+// Step D's screens (lib/i18n-messages.ts): Messages, reminders, the Money tab's Remind, the notification types.
+for (const [en, ar] of Object.entries(messagesArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// F4 screens (lib/i18n-exams/): likewise only words not already translated — after A's, B's, C's
+// and D's, so a word their screens share with F4's ("Session", "Dropped", "Collected") keeps the
+// rework's Arabic (the reviews of 093dbd1, item 10, and 54c225f, item 7).
 for (const [en, ar] of Object.entries(examsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
-/** Whether one of the rework's sentence rules (A's, B's, C's) translates this text. */
+/** Whether one of the rework's sentence rules (A's, B's, C's, D's) translates this text. */
 function reworkClaims(text: string): boolean {
   return translateSessionsText(text) !== null || translateMoneyText(text, translateExactText) !== null
-    || translateReservationsText(text) !== null;
+    || translateReservationsText(text) !== null || translateMessagesText(text, translateExactText) !== null;
 }
 
 function translateDynamicText(text: string): string | null {
@@ -1636,6 +1641,9 @@ function translateDynamicText(text: string): string | null {
   // Step B: the Reserve page's results, the pricing basis, the consent and the refusals.
   const reservationText = translateReservationsText(text);
   if (reservationText) return reservationText;
+  // Step D: the messages screens' sentences with a name, a number or a variable in them.
+  const messagesText = translateMessagesText(text, translateExactText);
+  if (messagesText) return messagesText;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

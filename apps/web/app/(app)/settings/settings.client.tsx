@@ -36,6 +36,8 @@ const GROUPS: { id: string; title: string; hint: string }[] = [
   { id: 'catalogue', title: 'Exam catalogue', hint: 'How the school’s level codes read.' },
   // F4: the school as an exam centre.
   { id: 'exams', title: 'Exam entries', hint: 'The school as an exam centre: its numbers with the boards, and the rules the coordinator has not confirmed yet.' },
+  // Step D (RESERVATIONS_REWORK.md §3.8): the reminders' switch and hour; the rules are on Messages > Reminders.
+  { id: 'reminders', title: 'Reminders', hint: 'Whether the reminder rules on Messages > Reminders go out, and at what hour of their day.' },
 ];
 
 type Centres = Record<string, { centreNumber: string | null; route: 'direct' | 'british_council' }>;
@@ -47,8 +49,8 @@ function describeValue(s: Setting, value: unknown): string {
   if (s.input === 'weekdays' && Array.isArray(value)) {
     return [...(value as number[])].sort((a, b) => a - b).map((d) => WEEKDAY_LABELS[d] ?? String(d)).join(', ');
   }
-  // A number with its unit (F4's months, candidates and days before beside the rework's percent and days).
-  if (s.input === 'number' && typeof value === 'number') return s.unit === 'percent' ? `${value}%` : s.unit === 'days' ? `${value} ${value === 1 ? 'day' : 'days'}` : `${value}${s.unit ? ` ${s.unit}` : ''}`;
+  // A number with its unit (F4's months, candidates and days before; D's hour; the rework's percent and days).
+  if (s.input === 'number' && typeof value === 'number') return s.unit === 'percent' ? `${value}%` : s.unit === 'days' ? `${value} ${value === 1 ? 'day' : 'days'}` : s.unit === 'hour' ? `${String(value).padStart(2, '0')}:00` : `${value}${s.unit ? ` ${s.unit}` : ''}`;
   if (s.input === 'refundPolicy') {
     const p = RefundPolicySchema.safeParse(value);
     return p.success ? refundPolicySentence(p.data) : JSON.stringify(value);
@@ -280,7 +282,7 @@ function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (save
                   onChange={(e) => setDraft(e.target.value === '' ? null : Number(e.target.value))}
                   className="w-28 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
-                {s.unit && <span>{s.unit === 'percent' ? '%' : s.unit}</span>}
+                {s.unit && <span>{s.unit === 'percent' ? '%' : s.unit === 'hour' ? ':00, Cairo time' : s.unit}</span>}
               </label>
             )}
             {s.input === 'refundPolicy' && <RefundPolicyEditor value={draft as RefundPolicy} onChange={setDraft} />}

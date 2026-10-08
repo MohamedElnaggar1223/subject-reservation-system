@@ -34,11 +34,13 @@ reads to decide whether a dropped line's board fee comes back.
 
 ## 1. Data model
 
-Migrations `0050_exam_entries.sql` (structure, generated) and `0051_exam_entries_board_rules.sql`
-(custom: each board's rules seeded from the research) — 0041 and 0042 on the frozen branch,
-regenerated on main's journal after the rework's 0049 (each journal `when` later than 0049's; the
-order proved on a copy of the template, `.audit/exams-evidence/rework/migrate-proof-copy.txt`), and
-renumbered again when step D's land. All tables in `packages/db/src/schema.ts`, section "F4".
+Migrations `0056_exam_entries.sql` (structure, generated) and `0057_exam_entries_board_rules.sql`
+(the two columns the reviews added, `exam_entry.withdrawn_with_line` and `staff_set`, then each
+board's rules seeded from the research) — 0041 and 0042 on the frozen branch, 0050 to 0053 on the
+branch, regenerated at the final merge after main's 0055 (step D's last; each journal `when` later,
+the snapshots chained after 0055's; the order proved on a copy of the template migrated with main's
+migrations and then the merge's, `.audit/exams-evidence/rework/migrate-proof-final.txt`). All tables
+in `packages/db/src/schema.ts`, section "F4".
 
 | Table | What it holds | Rules |
 |---|---|---|
@@ -448,7 +450,7 @@ ID in an audit row.
 **Negative controls**, re-run on the rework's model (`.audit/exams-evidence/rework/controls.py`;
 one trail row each; logs — the vitest summary and the failing tests with their messages — in
 `.audit/exams-evidence/rework/controls/`): each guard undone once, its tests red, restored. C1–C17
-are September's guards on the new code (C1, C2 now the per-entry deadline; C8 the index in 0050);
+are September's guards on the new code (C1, C2 now the per-entry deadline; C8 the index in 0056 since the final merge);
 C18–C33 the rework's, C34–C55 the review of 093dbd1's, C56–C65 the review of 426d565's, C66–C69 the review of 54c225f's (the table below them). September's logs stay in the ignored
 `.audit/exams-evidence/controls/`.
 
@@ -482,7 +484,7 @@ C18–C33 the rework's, C34–C55 the review of 093dbd1's, C56–C65 the review 
 | C26, C26b | the line's own deadline (the retake deadline) in derivation; in sending | 08x4 |
 | C27 | the desk-drop withdrawing the line's entries (`withdrawEntry`) | 08x4 |
 | C28 | `teacherOf` with the unit | 08x4 |
-| C29 | the database's one-live-entry-per-cash-in index (0050) | 08x4 |
+| C29 | the database's one-live-entry-per-cash-in index (0056 since the final merge) | 08x4 |
 | C30 | the carry-forward period written to `exam_board` | 08x4 |
 | C32, C33 | the check listing a declared unverified sitting; a cash-in no longer paid | 08x4 |
 | C34 | "mark as sent" refusing a draft whose line is not confirmed or whose cash-in is not paid | 08x4 |
@@ -643,8 +645,8 @@ On the reservations rework's model (8 Oct 2026):
 - **A line moved back** to a series where its sent entry was withdrawn for the move (the review of
   54c225f, item 4): that entry was withdrawn by the coordinator, not with the line, so a derivation
   does not make it there again; the coordinator adds it by hand (with the board, it is a new entry).
-- **Migration numbers**: 0050 and 0051 follow main's 0049; step D's migrations land first, so they
-  are renumbered once more at the final merge (a journal `when` later than D's last).
+- **Migration numbers**: settled at the final merge — 0056 and 0057 after main's 0055 (the branch's
+  0052 and 0053 folded into 0057, as the lead asked).
 - **The demo seed's new shapes** (a carried-forward A2 at another centre, an unpaid cash-in, a
   declared retake verified by June's results) are for the screens; the template's own converted
   session closed on 30 Sep, so the seed opens a new winter session labelled "exams demo".
@@ -737,3 +739,14 @@ On the reservations rework's model (8 Oct 2026, UTC; the trail has a row per ste
   passed, 1 todo) after one red run (09's series rule now for live entries). The API's session
   limit stopped the work there; it resumed at 17:00Z from the worktree's state, type-checks green,
   all 69 controls red once each and restored by 17:30Z.
+- 17:37Z — 54c225f pushed, CI green (run 37817196342).
+- The review of 54c225f (the reviewer: "merge after: 1, 2"): 18:23Z–18:37Z items 1–6 (no migration),
+  08x4's five new scenarios, controls C66–C69, the full suite green in local time and in UTC (32 files,
+  601 passed, 1 todo); 19:08Z all 73 controls red once each and restored; 05030fd pushed, CI green
+  (run 37829899918).
+- The final merge, 19:10Z–: main 2e96b34 (after 061468a; trail rows only since; its last migration
+  0055) merged as its own commit; twelve files conflicted and were resolved (the trail's merge row);
+  F4's migrations regenerated as 0056 and 0057; D's sentence rules in `reworkClaims` and F4's words
+  after D's; the lock step of F4's entries in RESERVATIONS.md §2.1; the order proved on a copy; the
+  running system moved to `igcse_exams_merge_dev` (made from the template, migrated, the demo seed
+  run again) with the API restarted by its PIDs.

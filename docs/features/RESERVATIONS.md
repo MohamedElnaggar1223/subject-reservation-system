@@ -233,6 +233,28 @@ changes nothing elsewhere in this section (fee rows already came before lines).
 id order, before the charges — not its own lines first and the plan lines after, which deadlocked
 against a fee re-price or a series move taking both in id order (08t).
 
+**The reminder step: the sessions, then the lines and charges** (step D, RESERVATIONS_MESSAGES.md
+§2, the review of 5c2f2bf). Its claim row has a foreign key to the line's session, which takes the
+session `FOR KEY SHARE` at the insert; the step therefore takes each group's sessions `FOR KEY SHARE`
+in id order **before** its lines and charges (`FOR SHARE`), as this order puts the session before
+its lines. Taken after the lines, it waited behind `updateSession` / `correctSessionSeries` (the
+session `FOR UPDATE`, then its waiting lines) while holding those lines: a deadlock (08t forces it).
+
+**F4's entries come after their lines** (docs/features/EXAM_ENTRIES.md §7; the reviews of 093dbd1,
+426d565 and 54c225f). "Mark as sent" (`submitEntries`) takes the entries' lines `FOR SHARE` in id
+order, then their cash-ins (`charge`) `FOR SHARE` in id order, then the entries `FOR UPDATE` in id
+order, then their series `FOR SHARE`. A derivation, and an entry added by hand, takes the series
+`FOR SHARE`, then the series' paid lines `FOR SHARE` in id order, then the entries it brings up to
+date or links `FOR UPDATE` in one statement in id order (never one by one in its rows' order: that
+deadlocked against a send, 08t). Every path that ends a paid line (the drops, the swaps, a
+request's approval, a reversal, B's two system drops) and every path that moves one (the admin's
+move, an item's series change, a board change, the series correction) takes the receipt and the
+line first (`FOR UPDATE`), then the line's entries `FOR UPDATE` in id order (`withdrawEntriesOfLineInTx`,
+`entriesFollowMoveInTx`); the family's drops and swaps price their refund only once the line is
+held. So a send and a drop serialize on the line (the send's share against the drop's update), a
+derivation waits for a drop holding a line and plans nothing on it, and a derivation and a send
+never wait on entries in a circle.
+
 **A payment, then the student, for a pushed school fee** (step C, RESERVATIONS_MONEY.md §2).
 `settlePushInTx` runs inside a school-fee payment's confirmation, which holds the payment
 `FOR UPDATE`, and then takes the student `FOR NO KEY UPDATE` to settle the open push of that year

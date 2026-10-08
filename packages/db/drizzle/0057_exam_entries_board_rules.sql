@@ -1,5 +1,11 @@
--- F4 (exam-entry management; regenerated on the reservations rework's journal
--- after 0049 — it was 0042 on the frozen branch): each board's rules for entries, seeded from the
+-- F4, the reviews of 093dbd1 and 426d565 (folded here from the branch's 0052 and 0053 at the
+-- final merge): an entry withdrawn because its line ended is made again if the line is paid
+-- again (withdrawn_with_line); what staff set by hand on an entry is theirs (staff_set).
+ALTER TABLE "exam_entry" ADD COLUMN "withdrawn_with_line" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "exam_entry" ADD COLUMN "staff_set" text[] DEFAULT '{}'::text[] NOT NULL;--> statement-breakpoint
+
+-- F4 (exam-entry management; regenerated at F4's final merge after main's 0055 —
+-- it was 0051 on the branch, 0042 on the frozen branch): each board's rules for entries, seeded from the
 -- research (DISCOVERY_RESEARCH.md §2) and editable by the coordinator and the
 -- admin on the Entries screen (owner decision 3: answers change data, not code).
 -- A board added later has no row: the API reads the lenient defaults and says

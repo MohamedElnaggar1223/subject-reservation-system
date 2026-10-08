@@ -1,1 +1,0 @@
-ALTER TABLE "exam_entry" ADD COLUMN "withdrawn_with_line" boolean DEFAULT false NOT NULL;
