@@ -883,7 +883,7 @@ export async function findOffer(executor: Executor, sessionId: string, term: str
   const byName = pick(offers.filter((o) => words(o.name) === t || words(o.code) === t), 'name')
     ?? (bare !== t ? pick(offers.filter((o) => words(o.name) === bare), 'name') : null);
   if (byName) return byName;
-  const codes = namedCodes(term).filter((c) => !c.startsWith('paper '));
+  const codes = namedCodes(term);
   if (!codes.length || !offers.length) return null;
   const r = await executor.execute(sql`
     select distinct i.offer_id as "offerId" from session_offer_item i
@@ -905,7 +905,7 @@ export async function findItem(executor: Executor, offerId: string, label: strin
   const items = await executor.select({ item: sessionOfferItem, month: boardSeries.month, year: boardSeries.year })
     .from(sessionOfferItem).leftJoin(boardSeries, eq(boardSeries.id, sessionOfferItem.boardSeriesId))
     .where(eq(sessionOfferItem.offerId, offerId))
-    .orderBy(sql`${sessionOfferItem.availability} = 'closed'`, sql`${sessionOfferItem.boardSeriesId} is null`, sessionOfferItem.sortOrder, sessionOfferItem.id);
+    .orderBy(sql`${sessionOfferItem.availability} = 'closed'`, sql`${sessionOfferItem.boardSeriesId} is null`, sessionOfferItem.sortOrder, sessionOfferItem.label, sessionOfferItem.id);
   const units = items.length
     ? await executor.select({ itemId: sessionOfferItemUnit.itemId, code: examUnit.code, shortCode: examUnit.shortCode })
         .from(sessionOfferItemUnit).innerJoin(examUnit, eq(examUnit.id, sessionOfferItemUnit.unitId))

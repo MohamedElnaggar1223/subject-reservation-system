@@ -630,17 +630,54 @@ describe('money invariants over the whole database', () => {
       where r.id is null or r.status <> 'committed' or r.batch_id <> m.import_batch_id or m.source_ref = ''
     `);
     expect(untraced).toEqual([]);
-    // No transaction that wrote money history also wrote a payment, a payment's registrations,
-    // an escrow ledger entry or a receipt (rows a transaction inserts carry its id in xmin; the
-    // ledger and the payment links are never updated, so theirs is always the inserting one).
+    // No transaction that wrote money history also wrote a payment, a payment's registrations or
+    // charges, a charge, an escrow ledger entry or a receipt (rows a transaction inserts carry its id
+    // in xmin; the ledger and the payment links are never updated, so theirs is always the inserting one).
     const moved = await sql(`
       select m.id from money_history m
       where exists (select 1 from escrow_transaction t where t.xmin = m.xmin)
          or exists (select 1 from payment_registration pr where pr.xmin = m.xmin)
+         or exists (select 1 from payment_charge pc where pc.xmin = m.xmin)
+         or exists (select 1 from charge c where c.xmin = m.xmin)
          or exists (select 1 from payment p where p.xmin = m.xmin)
          or exists (select 1 from receipt rc where rc.xmin = m.xmin)
     `);
     expect(moved).toEqual([]);
+  });
+
+  it('F7: every line the import made is a line like any other — priced from the grid with its basis, its two consents on the imported channel, traced to its committed import line, and paid only through a payment', async () => {
+    // The lines the import made, as its IMPORT_REGISTRATION rows list them (08n makes several).
+    const made = await sql<{ id: string }>(`
+      select distinct jsonb_array_elements_text(a.new_data->'registrationIds') as id from audit_log a where a.action = 'IMPORT_REGISTRATION'`);
+    expect(made.length).toBeGreaterThan(0);
+    const ids = made.map((m) => m.id);
+    // Each exists, with a pricing basis equal to its price, never priced at 0 for want of a fee row.
+    const lines = await sql<{ id: string; price: string; basis_total: string | null; rows: number }>(`
+      select r.id, r.price_at_registration as price, (r.pricing_basis->>'total') as basis_total,
+        coalesce(jsonb_array_length(r.pricing_basis->'feeRows'), 0) as rows
+      from registration r where r.id in $1`, [ids]);
+    expect(lines.map((l) => l.id).sort()).toEqual([...ids].sort());
+    expect(lines.filter((l) => l.basis_total === null || Number(l.basis_total) !== Number(l.price) || Number(l.rows) === 0)).toEqual([]);
+    // Both consents, on the imported channel (the sheet's "I confirm my registration").
+    const unconsented = await sql(`
+      select r.id from registration r where r.id in $1
+        and (select count(distinct c.kind) from registration_consent c where c.registration_id = r.id and c.channel = 'imported') < 2`, [ids]);
+    expect(unconsented).toEqual([]);
+    // Each traced to the committed import line whose outcome names it.
+    const untraced = await sql(`
+      select r.id from registration r where r.id in $1
+        and not exists (select 1 from import_row ir where ir.status = 'committed' and ir.outcome->>'registration' = r.id)`, [ids]);
+    expect(untraced).toEqual([]);
+    // A sitting it follows says where it is known from: the student's legacy history, or the desk's declaration.
+    const sourced = await sql(`
+      select r.id from registration r where r.id in $1
+        and r.prior_sitting_series_id is not null and r.prior_sitting_source not in ('legacy', 'declared_by_desk')`, [ids]);
+    expect(sourced).toEqual([]);
+    // Confirmed only by a completed payment covering it (the import makes none).
+    const unpaidConfirmed = await sql(`
+      select r.id from registration r where r.id in $1 and r.status = 'confirmed'
+        and not exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed')`, [ids]);
+    expect(unpaidConfirmed).toEqual([]);
   });
 
   // ─── The reservations rework, step C: charges, plans, the registry (RESERVATIONS_MONEY.md §6) ───
