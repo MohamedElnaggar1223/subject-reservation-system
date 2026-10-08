@@ -20,6 +20,12 @@ idempotent: run twice on the dev copy, the second run inserts nothing), and
 main took A's 0044; each journal `when` is later than main's last, so the migrator applies them
 after it on a database that already has main's (drizzle applies only newer entries).
 
+**Proved** (evidence `proof/*.json`, `dev-drizzle-migrations.txt`): the dev copy migrated at
+origin/main first, then at the branch, records step C's three as rows 46–48; F0a's richer copy and
+the synthetic school shape, each migrated at main with V3's refund rules seeded (a session window
+today, a year's window, a past window, a V3 custom refund percent), give the same refund preview
+for every live line before (main's `refundPercentage`) and after (`refundFor`): 50, 30, 0 and 90.
+
 ### 1.1 `exception` (reshaped, §3.7)
 
 One row lifts one policy of the registry for one holder, optionally narrowed.
