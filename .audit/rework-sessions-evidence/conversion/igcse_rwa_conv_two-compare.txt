@@ -1,0 +1,10 @@
+lines 8; wallets 1; sessions 3; waiting lines with an eligibility answer 5; live lines with a refund preview 6
+statuses: {'confirmed': 1, 'dropped': 1, 'expired': 1, 'pending_payment': 5}
+DIFFERENCES: 0
+ code |     label     | series_label | availability | lines |    statuses     
+------+---------------+--------------+--------------+-------+-----------------
+ 0400 | Whole subject |              | open         |     0 | 
+ 0400 | Whole subject | two          | closed       |     1 | dropped
+ 0417 | Whole subject | two          | open         |     1 | pending_payment
+(3 rows)
+

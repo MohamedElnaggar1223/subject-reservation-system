@@ -712,11 +712,17 @@ export async function replaceTeacher(sessionId: string, offerId: string, data: R
         const key = `${l.studentId}|${units.join(',')}`;
         if (done.has(key)) continue;
         done.add(key);
-        const moved = await tx.update(courseEnrolment).set({ teacherId: to.id, updatedAt: now })
-          .where(and(eq(courseEnrolment.academicYearId, yearId), eq(courseEnrolment.subjectId, offer.subjectId), eq(courseEnrolment.teacherId, data.fromTeacherId),
-            isNull(courseEnrolment.endedOn), eq(courseEnrolment.studentId, l.studentId),
-            units.length ? inArray(courseEnrolment.unitId, units) : isNull(courseEnrolment.unitId)))
-          .returning({ id: courseEnrolment.id });
+        const open = and(eq(courseEnrolment.academicYearId, yearId), eq(courseEnrolment.subjectId, offer.subjectId), eq(courseEnrolment.teacherId, data.fromTeacherId),
+          isNull(courseEnrolment.endedOn), eq(courseEnrolment.studentId, l.studentId));
+        // The student's enrolment in those units where they have one; else the subject's own row —
+        // an enrolment from before the rework (unit_id null) under a converted item entering all
+        // the subject's units (0042), or an item entering none (the review of 40c1447..af33662).
+        let moved = units.length
+          ? await tx.update(courseEnrolment).set({ teacherId: to.id, updatedAt: now }).where(and(open, inArray(courseEnrolment.unitId, units))).returning({ id: courseEnrolment.id })
+          : [];
+        if (!moved.length) {
+          moved = await tx.update(courseEnrolment).set({ teacherId: to.id, updatedAt: now }).where(and(open, isNull(courseEnrolment.unitId))).returning({ id: courseEnrolment.id });
+        }
         enrolmentsMoved += moved.length;
       }
     }

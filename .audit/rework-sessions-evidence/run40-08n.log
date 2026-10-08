@@ -1,0 +1,227 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -0.4 ms (measured within 2 ms)
+stderr | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [fa9e3867-2833-4102-a24e-b4869e143cb5] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[email:stub] To: admin.n08v@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [942b75ac-0d23-4a7a-956f-5baad914e0e0] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [6936744d-90e2-4290-8306-2c8ac0f62848] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [672434ea-6d20-43ab-b63b-1afa76488405] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [585b1117-b6e4-47bc-8026-906c73fd67f2] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [754baf3b-2eb1-48e1-aaca-2059e1ba0cda] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [98b4f6e5-5222-4e61-bd03-7f205bf904a5] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [7c47baf1-c13b-4fee-b777-f1b41d7bda0b] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [dff15721-103f-49a4-8953-5459daea8451] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [a1928f2b-cd84-4261-ac7f-608d16c5fbc0] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [bd87100c-3712-4e93-a398-1cbfc920c51e] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [08e07636-d6eb-477c-963c-ff377eaaf9b0] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [5f1d6ddc-677c-408c-a9d4-198131888510] POST /v1/catalogue/qualifications
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [6d26e9b5-ad3f-4133-b98b-1727f9002590] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [7ee5e807-440f-46d2-a94f-ffe03705c14f] PUT /v1/catalogue/registrable/c3ce6051-48b6-4df1-85a7-9e33a63c9471
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [bb147e7b-7193-4772-9d81-a0cf36848cdc] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [cd086ebe-99a4-4966-9a76-9ede7575d705] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [f513a536-95b6-425d-acd3-12ba24c284f5] POST /v1/sessions/dc6849e1-c95f-4833-b075-bbe632e95d7c/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [cac885bb-cdaa-4526-8757-8b2ba633f272] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-conv-a3wb@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-conv-a3wb@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [f89395ae-2535-4d7f-a8f1-d0a9d07e5209] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [2ed5afca-fd11-4c69-a83d-6c8b3f789789] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [8c1f76e1-aef0-42f3-9d90-444ee4d50ef1] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [2567bf43-2430-487d-a4de-3b5fd446d84f] POST /v1/sessions/59fc5b48-e646-49cc-be6e-862a2596f807/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-conv-a3wb@test.local | Subject: Registration Open — June 2027 — n08v-new-a3wb 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-conv-a3wb@test.local | Subject: Registration Open — June 2027 — n08v-new-a3wb 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [ab537595-306c-4c06-b3e6-8b4223e4040f] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [f9de9399-bf45-4ca4-8109-5ef7957c3a64] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [669941dc-b52b-41c2-a459-5b6e2c80bce6] POST /v1/catalogue/units
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [89a6850c-79fe-4820-bcb2-36a8569389ed] POST /v1/catalogue/units
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [c6bbd953-81d0-49b8-91b4-5313dae54e5f] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [3bce4fa6-287d-4204-abdc-0cea401d25d1] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [87a1c20a-6409-42a0-9c81-5c7f95b0cf96] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [76981c60-12ca-4cc8-8ad7-1fd2d0749a0a] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [c99fea49-0aa1-4020-8f8e-cb059b47a66e] POST /v1/sessions/e30da2ac-5b70-4a31-9320-b630701c1c31/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[email:stub] To: student.n08v-conv-a3wb@test.local | Subject: Registration Open — June 2027 — n08v-rtc-a3wb 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[email:stub] To: parent.n08v-conv-a3wb@test.local | Subject: Registration Open — June 2027 — n08v-rtc-a3wb 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [fd330d86-afda-4996-a2ab-8b1eb2e877f6] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[email:stub] To: parent.n08v-rtc-a3wb@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[email:stub] To: student.n08v-rtc-a3wb@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [2edd7392-fb14-4fa1-af24-74feb87eb787] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [6adcc35c-2a99-4927-82ec-6ff70dce6e35] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [5ae2274b-55f8-4358-be09-a8ecd02b7816] GET /v1/academic/years
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [f8ffce2d-a34f-4e72-9d13-0de12e4c9bef] POST /v1/academic/years
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [a1319331-58ce-494d-aa27-f0fddd7a411c] POST /v1/enrolments/bulk
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line
+[INFO] [2557752d-5c13-4656-a931-fc4acfd87b76] POST /v1/sessions/e30da2ac-5b70-4a31-9320-b630701c1c31/offers/3dc1f1c3-db24-4ca8-b318-b76c61291f4b/replace-teacher
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [9fac54a1-5551-4acb-85b8-de3a3f9e0375] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [7d878f76-6edd-44e8-ab7c-72c51bc4be34] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [3b4c4b72-6782-4b57-bd29-ab34e03daadc] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [b240fee0-3bbd-49b0-89ba-9ffce2b97df8] POST /v1/sessions/eef8e46f-e70d-442c-acbc-011afbd66050/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [1433788e-feb8-4f6e-a45d-a951d084a9d0] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[email:stub] To: parent.n08v-le-a3wb@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[email:stub] To: student.n08v-le-a3wb@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [309aa754-dede-4532-8e99-ac3eb7c15d7c] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [347780da-68da-4fe4-abf3-cd8120f3c70a] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [480a9d98-c458-4ace-b988-2b74380b35de] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[email:stub] To: parent.n08v-le-o-a3wb@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[email:stub] To: student.n08v-le-o-a3wb@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [96293501-d8dd-49b5-ac56-c9a8e1b5f3e0] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [00029036-afdf-4338-bce8-03a721097a04] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [076aeab2-2851-4151-96b6-1a124a92d68a] PUT /v1/settings/exceptions.boardEntryDeadline
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [2d3a38d6-a7c6-4860-8929-66d1e1a98b2d] GET /v1/registrations/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [438b6ea3-3e64-4e3a-a790-6448f136ad46] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [c37d1e5a-205b-44b4-b4ba-c03ed4e097dc] POST /v1/payments/7ec1ac63-62d7-4d84-bb93-846e4bcb2bc6/instapay-reference
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [a70aea1c-0ce5-498c-82f8-13082f444bd9] PUT /v1/settings/exceptions.boardEntryDeadline
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[email:stub] To: parent.n08v-le-a3wb@test.local | Subject: Payment closed at the exam board deadline — Student n08v-le-a3wb 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+[INFO] [184ede30-0a5c-4e78-a860-68aba1d697d3] PUT /v1/settings/exceptions.boardEntryDeadline
+
+ ✓ test/08n-session-offers.test.ts (38 tests | 35 skipped) 3527ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry  489ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line  409ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line  754ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed | 35 skipped (38)
+   Start at  06:37:30
+   Duration  5.60s (transform 613ms, setup 2ms, collect 227ms, tests 3.53s, environment 0ms, prepare 36ms)
+

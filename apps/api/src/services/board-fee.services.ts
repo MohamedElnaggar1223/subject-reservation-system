@@ -15,7 +15,7 @@
 import {
   db, boardSeries, boardFee, examBoard, examUnit, qualification, qualificationOption, subject, registration, paymentRegistration,
   sessionOfferItem, sessionOfferItemFeeKey, sessionOffer, registrationSession,
-  and, eq, inArray, sql, asc,
+  and, or, eq, inArray, sql, asc,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { PutBoardFeesType, ConfirmBoardFeesType, RepriceBoardFeesType, PricingBasis } from '@repo/validations';
@@ -104,6 +104,24 @@ export async function getFeeGrid(seriesId: string) {
   const missing = used
     .filter((u) => u.availability !== 'closed' && !rows.some((r) => r.keyKind === u.keyKind && r.keyId === u.keyId))
     .map((u) => ({ keyKind: u.keyKind, keyId: u.keyId, code: labels.get(`${u.keyKind}|${u.keyId}`)?.code ?? u.keyId, title: labels.get(`${u.keyKind}|${u.keyId}`)?.title ?? '', itemLabel: u.label, subjectName: u.subjectName, sessionName: u.sessionName }));
+  // Waiting lines read from this series' rows that are still provisional though every row their
+  // basis names is confirmed at the amount they recorded: not payable, and no Confirm left to make
+  // them so (09's rule; none should exist — the screen shows any, and "Confirm again" settles them).
+  const stuck = rows.length ? await db.execute(sql`
+    select r.id, r.student_id as "studentId", u.name as "studentName", s.name as "subjectName", w.name as "sessionName",
+      r.price_at_registration::float as price,
+      (select array_agg(distinct f.id) from jsonb_array_elements(r.pricing_basis->'feeRows') fr join board_fee f on f.id = fr->>'id'
+        where f.board_series_id = ${seriesId}) as "feeIds"
+    from registration r
+    join "user" u on u.id = r.student_id join subject s on s.id = r.subject_id join registration_session w on w.id = r.session_id
+    where r.price_provisional and r.status in ('pending_approval', 'pending_payment', 'preregistered')
+      and jsonb_array_length(coalesce(r.pricing_basis->'feeRows', '[]'::jsonb)) > 0
+      and exists (select 1 from jsonb_array_elements(r.pricing_basis->'feeRows') fr join board_fee f on f.id = fr->>'id' where f.board_series_id = ${seriesId})
+      and not exists (select 1 from jsonb_array_elements(r.pricing_basis->'feeRows') fr left join board_fee f on f.id = fr->>'id'
+        where f.id is null or f.provisional or f.amount <> (fr->>'amount')::numeric)
+    order by w.name, s.name, u.name`).then((x) => x.rows as {
+      id: string; studentId: string; studentName: string; subjectName: string; sessionName: string; price: number; feeIds: string[];
+    }[]) : [];
   // The board's other series a grid can be copied from (earlier first).
   const others = await db.select().from(boardSeries).where(and(eq(boardSeries.boardCode, series.boardCode), sql`${boardSeries.id} <> ${seriesId}`))
     .orderBy(sql`${boardSeries.year} desc`, sql`school_month_order(${boardSeries.month}) desc`);
@@ -112,6 +130,7 @@ export async function getFeeGrid(seriesId: string) {
     series: { ...series, name, boardName },
     rows: out,
     missing: [...new Map(missing.map((m) => [`${m.keyKind}|${m.keyId}`, m])).values()],
+    stuck,
     copyFrom: others.filter((o) => counts.some((c) => c.id === o.id)).map((o) => ({ id: o.id, name: boardSeriesName(new Map([[series.boardCode, boardName]]), o), rows: counts.find((c) => c.id === o.id)!.n })),
   };
 }
@@ -154,9 +173,15 @@ export async function putFees(seriesId: string, data: PutBoardFeesType, actorId:
     const now = new Date();
     const changed: Record<string, unknown>[] = [];
     const confirmedByPut: string[] = [];
+    // The rows the request names that exist, FOR UPDATE in one statement in id order (as Confirm
+    // takes them; a reservation takes its rows FOR SHARE in id order): a paste out of id order
+    // never locks them one by one against it (the review of 40c1447..af33662, item 4).
+    const existing = data.rows.length ? await tx.select().from(boardFee)
+      .where(and(eq(boardFee.boardSeriesId, seriesId), or(...data.rows.map((r) => and(eq(boardFee.keyKind, r.keyKind), eq(boardFee.keyId, r.keyId))))))
+      .orderBy(boardFee.id).for('update') : [];
     for (const r of data.rows) {
       if (r.amount === 0 && !r.zeroReason) throw new BoardFeeError('A fee of 0 needs a reason (why the board charges nothing)');
-      const [cur] = await tx.select().from(boardFee).where(and(eq(boardFee.boardSeriesId, seriesId), eq(boardFee.keyKind, r.keyKind), eq(boardFee.keyId, r.keyId))).for('update');
+      const cur = existing.find((x) => x.keyKind === r.keyKind && x.keyId === r.keyId);
       if (!cur) {
         const id = randomUUID();
         await tx.insert(boardFee).values({

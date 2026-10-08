@@ -1,0 +1,74 @@
+{
+ "results": [
+  {
+   "label": "from scratch: new session",
+   "inputs": 6,
+   "clicks": 2
+  },
+  {
+   "label": "from scratch: 17 IGCSE subjects added, a teacher each, the course fee as the subject's",
+   "inputs": 16,
+   "clicks": 67
+  },
+  {
+   "label": "from scratch: the fee list pasted (one series), published",
+   "inputs": 1,
+   "clicks": 4
+  },
+  {
+   "label": "series Cambridge International June 2029 not listed in this academic year's view: dates not measured",
+   "inputs": 0,
+   "clicks": 0
+  },
+  {
+   "label": "from scratch: deadlines of 1 series",
+   "inputs": 0,
+   "clicks": 0
+  },
+  {
+   "label": "copy-from: new session copying the last June",
+   "inputs": 5,
+   "clicks": 2
+  },
+  {
+   "label": "copy-from: fees confirmed (one per series)",
+   "inputs": 0,
+   "clicks": 0
+  },
+  {
+   "label": "copy-from: 1 series need their deadline (as from scratch: 2 inputs, 2 clicks each)",
+   "inputs": 2,
+   "clicks": 2
+  },
+  {
+   "label": "copy-from: 17 subjects came across, 17 with their teacher",
+   "inputs": 0,
+   "clicks": 0
+  }
+ ],
+ "totals": {
+  "fromScratch": {
+   "inputs": 23,
+   "clicks": 73
+  },
+  "copyFrom": {
+   "inputs": 7,
+   "clicks": 4
+  }
+ },
+ "subjects": 17,
+ "perSubjectFirst": [
+  {
+   "inputs": 1,
+   "clicks": 4
+  },
+  {
+   "inputs": 2,
+   "clicks": 8
+  },
+  {
+   "inputs": 3,
+   "clicks": 12
+  }
+ ]
+}

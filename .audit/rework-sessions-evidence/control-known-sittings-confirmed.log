@@ -1,0 +1,210 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: 0.5 ms (measured within 2 ms)
+stderr | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [eaceb3cd-6b97-424f-88a8-ba8cf324ab09] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[email:stub] To: admin.n08v@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [656de16a-46d1-4fda-9072-16e900bd340c] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [1186d049-82e5-45fc-8546-40c2b65b14a2] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [2a2f62d9-4a28-44e0-9543-274a0543e108] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [6f10a36b-e031-4869-ac92-a6346ff287f4] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [a9348207-f5d4-482a-914e-df9675a1c911] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [95c0377b-51ee-49da-aabf-9393a94e2f96] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [b1c1c60d-d460-495a-b85a-02be02828e29] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [48716077-0071-4b03-8c63-a01657ad0eca] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [ec41777d-a412-4f8c-a733-80b9814b8d4f] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [586054cf-ec84-4b6e-87e4-884cd3bd27b9] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [9fe5cdcd-ba6b-4aa2-827a-9f2a975a3294] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [0ae820fc-65b9-4ca6-9584-fe590cb4e804] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [173c6cc0-6264-454b-8537-18933bda08c9] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [8cf3a0e4-d097-4af8-a816-9a08c2243903] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [c779360d-96bd-40c9-87c1-c6da4d82655c] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [83744cb3-631f-400b-81b4-36a9fc93f3f9] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [de9b3995-d97c-4ccd-85f3-c9a344d87eba] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [bf699a51-7f1b-4e7c-8de3-dc418126a800] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [05167805-24a1-486a-8108-2dcaab80d1d6] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [42b38186-2a46-4594-b742-b6f61b045f2f] POST /v1/sessions/bd5ff764-de59-4ffa-ba35-390447393861/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [a4e688f5-a2c6-4d98-8064-545e11f4c5c6] POST /v1/sessions/88dc71b5-6898-4169-ba5e-961c9d03fc13/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [f14ae47b-8745-4b76-bb0f-b5006bce6377] POST /v1/sessions/49238426-9a0c-4a6d-9212-ba1f5d455841/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [2f72bac2-fc74-4dcd-987d-98a64d8825a5] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[email:stub] To: parent.n08v-ks-clhs@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[email:stub] To: student.n08v-ks-clhs@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [6b7efc27-21a0-4f18-a846-fa5c052c6589] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [afb4b6c7-7a4c-4b07-a0d8-d54788ffb192] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [d61de460-31f8-425a-93f1-e80dd422d0f5] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [be604733-6f2d-4e32-a5eb-b3b7ced52d1e] POST /v1/payments/55426785-6fed-4eea-8eb8-a6657f003f0d/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [9960d7f4-794f-434c-8253-0fcd0ddf6404] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[email:stub] To: parent.n08v-ks-clhs@test.local | Subject: Payment confirmed — June 2027 — n08v-ks-a-clhs | Attachments: receipt-55426785-6fed-4eea-8eb8-a6657f003f0d.pdf
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [4fc1c18e-d8a4-49a9-ae09-23d56ea8a8e4] POST /v1/payments/d99c6e67-3d89-4161-9848-5de25c2ee9a3/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [ba8f1fe8-e1fe-48b4-b710-50e4ace3bdbd] POST /v1/registrations/ef26b226-5614-430f-b3f5-7047dfc5a715/request-drop
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[email:stub] To: parent.n08v-ks-clhs@test.local | Subject: Payment confirmed — June 2027 — n08v-ks-b-clhs | Attachments: receipt-d99c6e67-3d89-4161-9848-5de25c2ee9a3.pdf
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [bbfb72de-0ce6-4bfc-9a02-5f55c71e1025] PUT /v1/change-requests/098e4efd-a55a-47e2-a578-b55d545176c7/approve
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[email:stub] To: parent.n08v-ks-clhs@test.local | Subject: Action Required: Student n08v-ks-clhs requested a subject drop 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[email:stub] To: student.n08v-ks-clhs@test.local | Subject: Your drop request was approved 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[email:stub] To: parent.n08v-ks-clhs@test.local | Subject: Escrow balance updated for Student n08v-ks-clhs 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+[INFO] [d274578a-0954-40e4-b029-5bf209233ea4] GET /v1/registrations/offers
+
+ ❯ test/08n-session-offers.test.ts (37 tests | 1 failed | 36 skipped) 2288ms
+   ↓ 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+   ↓ 08n: sessions and offers > the next June copied from it: offers, teachers and items in the next year's series; board fees provisional; audited
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > an IGCSE item is refused in October and January; Cambridge AS defaults to November, Pearson AS to October
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a Cambridge retake of the previous June is reservable until the retake deadline after the entry deadline passed; a first entry is not; a retake of an older sitting is cut off at the entry deadline; the retake is due by the retake deadline
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a retake whose declared sitting the school rejected is a first entry for the board: its deadline is the entry deadline, not the retake deadline (§3.5)
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > the admin's move takes a retake into a series past its entry deadline while the retake deadline is ahead; a first entry not
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > the sweep at the retake deadline closes the waiting retakes of the previous sitting (MO-10 per line)
+   ↓ 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+   ↓ 08n: the line rules (§3.5) > AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can
+   ↓ 08n: the line rules (§3.5) > the same entry twice in one series across two sessions is refused: the board takes one entry
+   ↓ 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted
+   ↓ 08n: the line rules (§3.5) > a carried sitting outside the board's carry-forward period is refused (Cambridge: 13 months); inside it, accepted
+   ↓ 08n: the line rules (§3.5) > self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting
+   ↓ 08n: past a line's own deadline (flags 59, 60) > a family's drop of a paid line whose deadline passed is refused and sent to the desk; a series with no entry deadline is cut off at the start of its exams' day
+   ↓ 08n: the enrolment per unit (§3.2, §10: F1 reads it) > a line of an item entering units is enrolled per unit with its item's teacher; the teaching demand groups per unit
+   ↓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+   ↓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+   ↓ 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+   ↓ 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+   ↓ 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+   ↓ 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+   ↓ 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+   ↓ 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+   ↓ 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+   ↓ 08n: the reviews of 977848d and 40c1447 > an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)
+   ↓ 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+   ↓ 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+   ↓ 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+   ↓ 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+   ↓ 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+   ↓ 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+   ↓ 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+   × 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat 625ms
+     → expected [ [ …(3) ], [ …(3) ] ] to deeply equal [ [ …(3) ] ]
+   ↓ 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+AssertionError: expected [ [ …(3) ], [ …(3) ] ] to deeply equal [ [ …(3) ] ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[33m@@ -2,6 +2,11 @@[39m
+[2m    [[22m
+[2m      "4e30f54f-2386-4106-b38b-79e61b872400",[22m
+[2m      "bebf5908-ed3e-4e78-a95b-3d57a91ace98",[22m
+[2m      "confirmed",[22m
+[2m    ],[22m
+[31m+   [[39m
+[31m+     "ef26b226-5614-430f-b3f5-7047dfc5a715",[39m
+[31m+     "7f1351c9-b626-4801-bf42-700f69408822",[39m
+[31m+     "dropped",[39m
+[31m+   ],[39m
+[2m  ][22m
+
+ ❯ test/08n-session-offers.test.ts:1278:72
+    1276|     const listed = await apiResponse(f.parent.api.v1.registrations.off…
+    1277|     const known = listed!.offers.find((o) => o.subject.id === sub)!.it…
+    1278|     expect(known.map((k) => [k.registrationId, k.seriesId, k.status]))…
+       |                                                                        ^
+    1279|   });
+    1280| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 36 skipped (37)
+   Start at  05:32:34
+   Duration  3.87s (transform 484ms, setup 2ms, collect 193ms, tests 2.29s, environment 0ms, prepare 30ms)
+

@@ -1,0 +1,1405 @@
+
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+> vitest run "test/08k" "test/08l" "test/08m"
+
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: 0.8 ms (measured within 3 ms)
+stderr | test/08k-catalogue-races.test.ts > F0b: races
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08k-catalogue-races.test.ts > F0b: races
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [7ce9e8c8-7e53-4ef8-b3d3-51a461e8374e] POST /api/auth/sign-up/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[email:stub] To: admin.f0br@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [a1d40b17-fe97-4231-b8bb-290d2e64a16b] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [b517d2f7-e076-4b55-97fa-6ecb2818b645] POST /v1/users
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [228bef36-9fa6-436a-9f0f-777711458ab7] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [92b6b587-63d9-4b1e-b5ce-c80ea804b7dd] POST /v1/users
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [856d660f-a7c4-4936-bee7-b922349fa2f2] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [30493daf-2d71-4d25-96a8-0dc80b5c2ac6] POST /v1/users
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [2f313665-31f5-4d49-b9f7-a4528c58a853] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [b1c5391b-fae4-48e8-99e4-91d2cad52034] POST /v1/users
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [f0903d9c-41a7-40c2-8af0-001dc61cbdbe] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [d5b26cd1-9f3d-4c18-8bf9-c753f0aeb052] POST /v1/subjects
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races
+[INFO] [94c3e7bb-c0e8-4534-9949-1c1c09b79ab0] POST /v1/subjects
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [38215438-40b3-4dcd-9f5b-8a8825b7ec2c] POST /v1/sessions
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [b9cf41bc-761a-4303-b0ac-c1dfb837c09f] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [1e74cc4a-fe32-4e5f-9e58-98e2a43e6dcc] POST /v1/teachers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [1dab4868-6f70-44c1-99f0-a1b49c038d12] POST /v1/sessions/494116fa-443c-40a0-b62d-fb9e0165b37d/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [ac4f40da-e3ae-426b-901c-8cf976ae89bd] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [e032fdde-61df-463a-9e6a-4e985b38ad12] POST /v1/sessions/494116fa-443c-40a0-b62d-fb9e0165b37d/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [67ce5be7-e832-412d-9a57-0243e4542c4b] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [e3a0c8c3-65f5-4348-b409-17d07f02e783] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [e01d5a2b-d300-41c2-9981-d0b74f139cac] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [47fd26ee-65fd-4f0e-9418-a2a8a28ebb49] PUT /v1/sessions/494116fa-443c-40a0-b62d-fb9e0165b37d/offers/280659ae-1dbc-42ab-992b-0d876ce66e8d/items/1b881046-f279-46cd-9b33-0e39bb6091a3
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [dbc6bd9f-6ac5-4f90-9313-78d9e0e99aa7] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [0b9d2c50-667e-4d57-9319-2aa4de536532] PUT /v1/sessions/494116fa-443c-40a0-b62d-fb9e0165b37d/offers/e01e60a7-b5b9-438b-bf4f-d04792bac0b9/items/f7d97167-ab98-4e4f-a1b4-cf1a2f0a9e70
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [9fe69b62-3db8-4fea-9c8a-fe1e1e02d0d8] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [f622f32d-f6ac-4a08-b02c-26368925383e] POST /v1/links/desk-onboard
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[email:stub] To: parent.f0br-route@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[email:stub] To: student.f0br-route@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [e28d2e93-6a03-4085-aa6c-22c6e82232cc] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [7c958745-6e98-4035-8a3c-9da5a9d0b9cd] POST /api/auth/sign-in/email
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+[INFO] [9059c2b7-6ac6-4f1f-af8b-e1d4841cb12d] POST /v1/exceptions
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [d971eda9-8cc7-42d1-b979-4979e6f23c69] POST /v1/sessions
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [a45e4520-476f-4b72-8508-8e5aecd6bab0] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [9282bdfc-2b9a-4b6d-8513-50454ff1d2ff] POST /v1/sessions/4eb26895-18e5-4a34-99d8-cb96c9da0f7a/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [193e6d3f-261e-496f-a794-3c004d2a8321] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [6b779d51-b022-446f-9a8d-0a8c478492f1] POST /v1/sessions/4eb26895-18e5-4a34-99d8-cb96c9da0f7a/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [346aeb8f-16c4-4f62-b111-d6f180a3d4d1] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [9fdc57c9-dcbf-47fa-8148-efc5f111d379] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [f7831781-f144-4583-ac08-1a825f4a6191] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [197ecef2-0bd3-4d95-a704-729dffac7a72] PUT /v1/sessions/4eb26895-18e5-4a34-99d8-cb96c9da0f7a/offers/3eb9b711-aaa7-4483-a548-de00225a185c/items/53ddcc21-f378-429e-a68a-c0695c8b0daa
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [dbf9218f-6ca3-493a-a482-3ad3c0342ea8] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [886b97cb-3da4-4c88-aba7-1b563fca49ce] PUT /v1/sessions/4eb26895-18e5-4a34-99d8-cb96c9da0f7a/offers/202c5304-637b-4350-bc1a-cf9215039357/items/928ca2a1-e288-4779-9d51-d96a7edad690
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [709d00c1-ebe3-452c-84ab-e48fdb08d847] PUT /v1/sessions/4eb26895-18e5-4a34-99d8-cb96c9da0f7a
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+[INFO] [8e1d67ff-c719-4ec7-be16-5d1137d652e0] PUT /v1/board-series/842ef126-d565-4007-9fc3-9a78c2b5a446
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [283599a4-7820-4dcb-97e8-c75b601aafe5] POST /v1/sessions
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [16a7190e-8b8f-4fa0-9ee3-222ad0e3a8db] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [1f5b0f30-4286-47c4-ae59-5c9731214364] POST /v1/sessions/193ef1a1-5493-4c76-bee9-01ab3be67985/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [25361bf4-2c47-4614-8c48-0ab5025d88e5] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [6d72a0d0-c585-4f16-8e9b-9b3c56a15f9d] POST /v1/sessions/193ef1a1-5493-4c76-bee9-01ab3be67985/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [2a8e6474-2dbf-47ea-803e-010ef02ee776] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [a4d5e3d2-85e9-43e6-a53d-87801a9fad26] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [ec931f48-8b0f-454b-b2f6-b2fb1b47d296] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [aef048c0-4d84-4eff-ac1c-3d290a7fa30d] PUT /v1/sessions/193ef1a1-5493-4c76-bee9-01ab3be67985/offers/bdf012ae-b7d5-45e6-a2af-7e5f3aeb2faa/items/24e822a5-5243-4610-a6b3-18c7b905c02e
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [4059363a-4519-4f63-a317-e42099092142] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [ebd15b6f-83d5-4921-b663-0716798ddfce] PUT /v1/sessions/193ef1a1-5493-4c76-bee9-01ab3be67985/offers/9a768ec2-1842-441f-b377-903fb7f603d6/items/6939a2a8-8d45-4d31-bfdc-a67fb26c6b65
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [0a452a56-68bb-4b1e-9721-c0a0f623d007] PUT /v1/board-series/31e30889-f44d-4f65-aa00-30be960e9659
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+[INFO] [27dee1bf-e947-480c-9d34-9c68a8a3d937] PUT /v1/sessions/193ef1a1-5493-4c76-bee9-01ab3be67985
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, an open window: it moves, and the extension that would pass it is refused by the database
+[INFO] [6b1830f0-6518-4f8d-ab38-a5aada6efa22] POST /v1/sessions
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, an open window: it moves, and the extension that would pass it is refused by the database
+[INFO] [09f8f6b8-6a07-4813-885d-51b2ccbc2d52] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, an open window: it moves, and the extension that would pass it is refused by the database
+[email:stub] To: student.f0br-route@test.local | Subject: Registration Open — November 2026 – January 2027 — t4-ewlu 
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, an open window: it moves, and the extension that would pass it is refused by the database
+[email:stub] To: parent.f0br-route@test.local | Subject: Registration Open — November 2026 – January 2027 — t4-ewlu 
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, an open window: it moves, and the extension that would pass it is refused by the database
+[INFO] [15812ac5-4c9f-4ffb-94cf-b418b72abc82] PUT /v1/board-series/fd9c5dff-2782-4b30-9770-47ec190d811c
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [b5ba2248-4cc9-4af3-b96e-5a4c24873ff6] POST /v1/subjects
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [d18a8abf-45dc-44c3-9eee-cf3f2fee5499] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [5904fc08-518c-4b1d-968b-48900f202515] POST /v1/sessions/494116fa-443c-40a0-b62d-fb9e0165b37d/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [300f5b06-1576-483e-9fe9-cf97bbbbaf51] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [e7409f25-50d0-46fe-a25b-ace280b96d9e] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [be71f7a5-6975-4a52-8e3e-5637b24b9edb] POST /v1/sessions/4eb26895-18e5-4a34-99d8-cb96c9da0f7a/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [a26b1000-78b8-4600-a47a-754b3366bed7] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [ad98fc18-5521-4f70-bbce-0f258bd1395b] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [ea038d00-efdc-4f50-b3e7-4b04b29203a5] POST /v1/sessions/193ef1a1-5493-4c76-bee9-01ab3be67985/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [d62afdd3-68e8-4c13-8363-cc760cb91d3e] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [6a8e0173-c4a1-4b29-b01a-662d68bb46a6] POST /v1/sessions
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [e7b15975-b96d-4614-be35-174066fabb2c] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [3062a94e-84e5-4911-ba18-bd6d98b0df62] POST /v1/sessions/cd829f63-3550-4ddc-b91b-22457979aa93/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [df62a86f-87a5-4620-b38e-3aa795f141e9] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [54bb157e-6315-4237-8733-d9f38f3567bb] POST /v1/sessions/cd829f63-3550-4ddc-b91b-22457979aa93/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [b9561801-b2fa-4af3-ad82-bb15e7b6d9b1] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [475bf81b-98b4-4d7b-b43a-6ae8445ad3e6] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [e0f83c8d-347f-431a-ace3-eaa0274f242c] POST /v1/sessions/cd829f63-3550-4ddc-b91b-22457979aa93/offers
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [0d5ef33f-9c33-4061-a395-f36c0ad253e8] PUT /v1/board-fees
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [586a5063-5099-44fb-b16f-bd7705be6055] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [60b307cd-6ce3-4ea6-b2ec-7a58c9fc7e4e] POST /v1/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+[INFO] [28a93bda-b2ef-46aa-89d8-2b812518af41] PUT /v1/sessions/cd829f63-3550-4ddc-b91b-22457979aa93/board-series
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix
+[INFO] [856873e1-fa0e-4c11-8f8a-127b139762ad] POST /v1/catalogue/qualifications
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix
+[INFO] [e90e05f1-5861-48c3-b4cc-638eefce1477] POST /v1/catalogue/units
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix
+[INFO] [c8b6af7f-d964-44b0-b37d-c1240df83153] POST /v1/catalogue/units
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix
+[INFO] [1fea1b20-f314-4870-98a1-a45351c21f3b] POST /v1/catalogue/units
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix
+[INFO] [c2a3a1ca-a359-4aa7-bbfc-20dbc1990bcd] POST /v1/catalogue/units
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix
+[INFO] [53927342-7412-44c7-87c0-b823e000cf13] PUT /v1/catalogue/qualifications/920046c4-35a4-4391-8b3f-a7b8440dbd88/units
+
+stdout | test/08k-catalogue-races.test.ts > F0b: races > two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix
+[INFO] [ba237712-ce77-43dc-8d5a-a0b4fd9011cf] PUT /v1/catalogue/qualifications/920046c4-35a4-4391-8b3f-a7b8440dbd88/units
+
+ ❯ test/08k-catalogue-races.test.ts (6 tests | 5 failed) 9351ms
+   × F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it 452ms
+     → A line enters an item of its session's offer
+   × F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused 480ms
+     → expected 200 to be 400 // Object.is equality
+   × F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock 409ms
+     → expected 200 to be 400 // Object.is equality
+   × F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, an open window: it moves, and the extension that would pass it is refused by the database 5134ms
+     → waitFor: timed out
+   × F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4) 186ms
+     → 404 Not Found
+   ✓ F0b: races > two coordinators set an award's units at the same moment: it ends with one of the two sets, never a mix 272ms
+stderr | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [f59b1a4e-e14a-46cc-bcbf-4a52ca33b016] POST /api/auth/sign-up/email
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[email:stub] To: admin.bc@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [b676ada7-5331-4828-ac2a-75e6e596c402] POST /api/auth/sign-in/email
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [177bad12-153c-4673-90cf-115489d2f023] POST /v1/users
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [35a4e24d-6d25-490e-a9ad-be52a7b0b150] POST /api/auth/sign-in/email
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [78552dcb-4c32-4b46-ba16-b6ea3f4aad41] POST /v1/users
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [57d7b705-ac55-496d-b0ab-387472951053] POST /api/auth/sign-in/email
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [6b3d9e12-74c0-4c82-9caf-4697de57be0a] POST /v1/subjects
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [42b3c3c8-c4ae-401c-8bfb-ff7d42d772d7] POST /v1/subjects
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [03eae434-f878-40ff-8cff-81c4f63b2f05] POST /v1/subjects
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [70913a36-fae1-40f9-9aaa-65917974cf08] POST /v1/subjects
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [fb45d924-263c-4ff0-870d-4260083fd652] POST /v1/subjects
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [2589aa01-dfa4-4f8e-801b-8dbe8fa81da6] POST /v1/subjects
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [d497be51-a46b-4b3c-b246-2ea59836649e] POST /v1/links/desk-onboard
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[email:stub] To: parent.bc@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[email:stub] To: student.bc@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [1a059e91-2874-4ec3-91bf-7b3d6cfa543f] POST /api/auth/sign-in/email
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline
+[INFO] [812d57da-dd1f-4e72-973f-68671ede4b64] POST /api/auth/sign-in/email
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [90a8f664-1be8-4bf5-82ed-20a36bb29996] POST /v1/sessions
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [b1df9a62-25b5-40c5-8a18-78a1d520c6b2] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [6f8f8e5a-22d4-46b5-a70e-88b02908a43e] POST /v1/teachers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [98c59cba-46bc-4411-84ca-d0a012bfd423] POST /v1/sessions/5da9ae32-14a7-445d-8094-8a5cf092a5c0/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [3e53f32c-a179-47f1-9357-23a2b4231ff0] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [1a15995e-05ef-48d4-b094-0a69c3f19099] POST /v1/sessions/5da9ae32-14a7-445d-8094-8a5cf092a5c0/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [773fd3bf-fde2-46e6-87d3-8ff860f665b0] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [0746ea1a-dbdd-47f5-b626-418e162540f7] POST /v1/sessions/5da9ae32-14a7-445d-8094-8a5cf092a5c0/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [d4e7e094-a78e-46d9-b8ba-302693074d87] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [9c801d79-49b7-4ae7-bcbe-ac6c55b2f84f] POST /v1/sessions/5da9ae32-14a7-445d-8094-8a5cf092a5c0/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [35b5d11c-a851-4ade-bc83-9acfa50f0d74] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [1b00c6a9-927c-4eaf-8788-30707d6394a4] POST /v1/sessions/5da9ae32-14a7-445d-8094-8a5cf092a5c0/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [e97ddc24-c0f1-4bed-a33b-9feeb5d1363a] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [29962e51-ff95-426a-b5a2-165472ad3127] POST /v1/sessions/5da9ae32-14a7-445d-8094-8a5cf092a5c0/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [86a5511c-aa42-4202-addd-21d4ee1cf1de] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [be8555ca-5c31-44c2-84c7-4dd4c36ce5ce] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [02df5a27-7530-4b69-a379-763f9d503ddb] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+[INFO] [13dfcd53-4e40-4197-979d-23be8c33eeab] PUT /v1/sessions/5da9ae32-14a7-445d-8094-8a5cf092a5c0/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [6bf48687-e4cf-4f45-8d4d-4a604dab92c0] POST /v1/sessions
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [f5c116bc-c94f-40b6-ad29-fcafcd4480c8] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [7561de9a-b438-4f82-863c-7bbf337a1a81] POST /v1/sessions/d7ad77d2-7aaa-4692-8ef8-676d0f50cc50/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [42a4aa81-51fb-4736-bfdf-8cd9c1aea751] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [9c34cdc5-270b-4680-bcb8-135b513c187f] POST /v1/sessions/d7ad77d2-7aaa-4692-8ef8-676d0f50cc50/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [3301e879-0f9e-4384-a498-805d914429ac] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [3deb6649-da5d-467d-b333-6921e0ae5db6] POST /v1/sessions/d7ad77d2-7aaa-4692-8ef8-676d0f50cc50/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [446a17b2-2828-4064-b8ef-ff458e542462] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [d6ea22eb-0f70-4d64-98ea-8335123add5c] POST /v1/sessions/d7ad77d2-7aaa-4692-8ef8-676d0f50cc50/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [564af1e6-b43f-494b-98b0-352e0be233e5] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [faf17c2d-ca94-4644-960f-e86e47f1386b] POST /v1/sessions/d7ad77d2-7aaa-4692-8ef8-676d0f50cc50/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [5979ffed-2345-4d34-8890-5027149306f7] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [a12e3a31-8dfe-47d9-9d02-946233f6af83] POST /v1/sessions/d7ad77d2-7aaa-4692-8ef8-676d0f50cc50/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [ec3a7642-b534-4e33-822b-7e3c6a0b628b] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [f8d4751b-284b-48d2-80f6-6a3aa197db87] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [d2b25176-a575-4b07-9830-3911004853c9] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+[INFO] [ec62f09e-ced2-44bb-8f6c-650acc2efb58] PUT /v1/sessions/d7ad77d2-7aaa-4692-8ef8-676d0f50cc50/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [5036a6f4-c3d8-408d-8b0b-eb5cfb092082] POST /v1/sessions
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [f865934a-ee49-4657-afce-bea19d2c8900] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [e28d96de-ddd8-4aaa-a979-3cbf32cd13af] POST /v1/sessions/317a0c69-c425-4713-b997-7700a2644f87/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [99652e06-364a-4033-903a-d4cf096d1c59] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [21a00297-59db-4ca9-8878-4b8e99e4552f] POST /v1/sessions/317a0c69-c425-4713-b997-7700a2644f87/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [a8fa18da-1ff1-459b-be5d-1537f025500c] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [c6f87a39-c1de-4657-9df5-30bac321b331] POST /v1/sessions/317a0c69-c425-4713-b997-7700a2644f87/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [f5c3ec41-ade7-46bd-806d-2ecb2951f8b3] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [2cb4b13c-8a17-43bd-89a6-82bc52f615b4] POST /v1/sessions/317a0c69-c425-4713-b997-7700a2644f87/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [fa5b7eb2-0770-40b0-9d9a-4708ccaef8b7] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [35ba9364-2e36-4ec7-8e2e-7f31639ea7d9] POST /v1/sessions/317a0c69-c425-4713-b997-7700a2644f87/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [23675ea9-e876-4d85-b517-bd65a48edb0e] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [ba18c746-e2ca-4c7f-81b2-2b8fde91e75c] POST /v1/sessions/317a0c69-c425-4713-b997-7700a2644f87/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [48e04ae3-ea16-434c-8f06-a12a9dffc37d] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [2a556d20-1794-4ace-9e17-47af1cde272f] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [25d10f84-0f3b-4ef4-a2fa-37db286d18cb] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+[INFO] [50544587-b901-4a57-bd86-f79ec5ae5f6a] PUT /v1/sessions/317a0c69-c425-4713-b997-7700a2644f87/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [7bccb5be-29ff-4f18-8e17-566ec65092e1] POST /v1/sessions
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [21eaf54e-8993-41f6-9d4d-9ac31b0ff653] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [28b56027-bf7c-4484-ae2e-86281e229715] POST /v1/sessions/b1394650-8af9-4de4-9c06-9c337284c40f/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [5c63939e-2703-47e7-81d5-50aade619238] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [a134fb84-68cb-4a50-af0c-15d1b8ebcaee] POST /v1/sessions/b1394650-8af9-4de4-9c06-9c337284c40f/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [070ba45e-241f-421c-a780-45db5704b9d8] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [badc5b61-985e-4168-a442-68ab3b61612f] POST /v1/sessions/b1394650-8af9-4de4-9c06-9c337284c40f/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [624d4a76-fd25-4f44-98c1-48a463f0fed9] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [05e8f6b7-ebfc-4465-9da4-a7e0d379c630] POST /v1/sessions/b1394650-8af9-4de4-9c06-9c337284c40f/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [93aeadfb-7aeb-4347-9e06-424d4a37e8ab] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [bc1d8dd6-31e4-4c8f-9e5e-10e37399082d] POST /v1/sessions/b1394650-8af9-4de4-9c06-9c337284c40f/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [6300ec2b-0ace-486c-bb70-c7fe63c95694] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [71fb9a28-1c1d-4108-881f-c7239e1041c8] POST /v1/sessions/b1394650-8af9-4de4-9c06-9c337284c40f/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [856bfdf9-c873-4a1a-b0e1-1cb109124fe7] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [cfed965e-de11-47c0-89c4-33c2e5bab8fc] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+[INFO] [a4d32d30-399c-45c9-91a0-a472ea6604e2] PUT /v1/sessions/b1394650-8af9-4de4-9c06-9c337284c40f/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [2926446f-2d3c-4775-840f-8c4e539eabc5] POST /v1/subjects
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [d350b1a3-d67d-4135-9d11-5e9af17045a9] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [bea8ecaf-9e44-4f2a-b311-0733b413546f] POST /v1/sessions/5da9ae32-14a7-445d-8094-8a5cf092a5c0/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [ebaad3af-70f9-4581-bec9-b385cc2ded3f] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [8b691191-9091-4927-a55a-6b8518c1c4d1] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [31cbfdea-fd2d-4877-b2d6-42c0465a3194] POST /v1/sessions/d7ad77d2-7aaa-4692-8ef8-676d0f50cc50/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [c989af49-900b-418c-a9bd-ceb24db6bc18] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [ab1a2172-3fa9-4bac-83d8-52dbc03a266f] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [16fd6f4c-d341-4fbe-a854-1471e694c35c] POST /v1/sessions/317a0c69-c425-4713-b997-7700a2644f87/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [840c8c99-d0de-4bd0-9ba3-08a35330a2a8] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [89dbbb08-275c-4ef4-be2b-93d1b7f570d5] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [046483ca-23ee-401c-a868-6e80506d6baf] POST /v1/sessions/b1394650-8af9-4de4-9c06-9c337284c40f/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [8cf5d5a1-463b-4828-aa23-ea3d6f7e6f5e] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [a742cdc0-b17c-4ef1-a5b6-3ad65589477d] POST /v1/subjects
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [0a804fd7-d707-455a-876e-c22306b804e0] POST /v1/sessions/5da9ae32-14a7-445d-8094-8a5cf092a5c0/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [422f910b-efe0-4a61-943d-0c6a1c42ff81] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [2657ed06-a30b-4cdb-98b5-6e021a4f9697] POST /v1/sessions/d7ad77d2-7aaa-4692-8ef8-676d0f50cc50/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [c7dfccff-b7f9-4363-86f1-9c5cb36d469a] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [1eb14ee8-b629-453e-8f5b-01faa9384b3d] POST /v1/sessions/317a0c69-c425-4713-b997-7700a2644f87/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [b38b527b-a00e-4162-b0dc-b48d2c08a08f] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [d7b0a04c-707c-4b78-8b03-157d9e83fff1] POST /v1/sessions/b1394650-8af9-4de4-9c06-9c337284c40f/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [df5c818f-9e78-4b28-b43e-8a6a84d00718] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [91125eff-d947-42fe-bff9-127d63c831aa] GET /v1/board-series/inferred
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [6542ade2-ec05-45bd-bc54-e4d9bda398b5] PUT /v1/subjects/7713dacf-7186-4fbe-932b-2c4a222a561f
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [caa6d8eb-ceff-4897-8d70-c3cd336f9849] PUT /v1/subjects/cc8a51ab-657e-4550-86d5-416a9194f940
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not
+[INFO] [9decd5fe-8b7f-457e-b35a-6fd99840e86a] GET /v1/board-series/inferred
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [13b384b4-e837-402d-b04e-ee08308c1010] POST /v1/sessions
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [b677ec8b-2d62-4377-9c9e-ddeaa3271fe1] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [09a8ddf8-a1d6-4c37-8a68-404db992f8b3] POST /v1/sessions/eae43316-1a0e-428b-810a-897a4d55de12/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [ec8a754a-1067-44ed-b07b-33eb649aee64] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [194b937a-23f5-4d87-bba0-7dfeac95d31b] POST /v1/sessions/eae43316-1a0e-428b-810a-897a4d55de12/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [5e134c0b-49bb-4c6b-8ba0-bb314d838e82] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [4122a021-43e0-4f58-baa1-9c8d670dd297] POST /v1/sessions/eae43316-1a0e-428b-810a-897a4d55de12/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [efaa222c-63bd-408c-89e7-58368a3ee266] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [dc9178ee-8283-4d2f-818f-65df8819b405] POST /v1/sessions/eae43316-1a0e-428b-810a-897a4d55de12/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [d05774c5-a4f4-476f-8347-4b48ca88b01f] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [9975d8d6-e08c-43a3-b454-8c43a7c0429a] POST /v1/sessions/eae43316-1a0e-428b-810a-897a4d55de12/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [1034551c-5d8c-4828-975f-a1833cd14983] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [953fe3fc-8bec-46e9-b13e-382662bf7139] POST /v1/sessions/eae43316-1a0e-428b-810a-897a4d55de12/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [bd61f81d-dda4-4f71-bb8a-70107bec1995] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [3776f1b7-8988-461b-be1a-b20e4074ab17] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+[INFO] [38145e31-3a17-407d-83a1-a4e2c1167c33] POST /v1/sessions/eae43316-1a0e-428b-810a-897a4d55de12/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [58b0d917-55aa-492f-a759-48943a12e96b] POST /v1/sessions
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [0dc0195d-efc0-4439-a42c-b59eadc376f6] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [d25cbd85-f36c-4746-951e-0c9cc7fc1cf6] POST /v1/sessions/1257819a-d76e-48ee-84f9-8f5f29f7dbf2/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [77be99b1-50b9-4190-892e-fedd3725c1a0] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [5803ddac-ba22-4353-9ab4-326670d9d5f1] POST /v1/sessions/1257819a-d76e-48ee-84f9-8f5f29f7dbf2/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [217799c4-32af-4b9f-89a4-f490f3d68ad3] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [e0cc0529-5775-49e1-beee-75193ca4b0fc] POST /v1/sessions/1257819a-d76e-48ee-84f9-8f5f29f7dbf2/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [90179d69-ba7e-463a-986a-2d5ec28ff5e1] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [d5dca0d3-f3f0-4eca-9ed4-d9d7e289779f] POST /v1/sessions/1257819a-d76e-48ee-84f9-8f5f29f7dbf2/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [541d66e7-8553-435a-baa0-745387c0c3ed] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [22ec1cd4-440f-4be5-9b0b-a54ee2c27549] POST /v1/sessions/1257819a-d76e-48ee-84f9-8f5f29f7dbf2/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [a5ff2352-69e2-47d7-bcd6-b4f62ebdd9f8] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [29607a67-3312-4845-815c-76650bc10114] POST /v1/sessions/1257819a-d76e-48ee-84f9-8f5f29f7dbf2/offers
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [e9654fa8-6d36-4e2b-b3d1-7d71ecc0ae1d] PUT /v1/board-fees
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [3ef015cd-c6e7-4dcd-bab4-9c35c2e607be] POST /v1/board-series
+
+stdout | test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+[INFO] [422c195a-556a-45b2-9238-8ad04f87df69] POST /v1/sessions/1257819a-d76e-48ee-84f9-8f5f29f7dbf2/offers
+
+ ❯ test/08l-board-change.test.ts (7 tests | 6 failed) 2479ms
+   × F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10) 165ms
+     → 404 Not Found
+   × F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline 121ms
+     → 404 Not Found
+   × F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited 121ms
+     → 404 Not Found
+   × F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5) 106ms
+     → 404 Not Found
+   ✓ F0b: a board change and the entry deadline > a board chosen on the Subjects form takes a re-boarded subject off 'Check these'; another change does not 191ms
+   × F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there 110ms
+     → Board change Subjects form chosen is entered with Cambridge International; Pearson Edexcel November 2026 (t5-zy35) is another board's series
+   × F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board 104ms
+     → Board change Subjects form chosen is entered with Cambridge International; Pearson Edexcel November 2026 (t6-zy35) is another board's series
+stderr | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [201361ed-43bc-4054-a890-ce0a45d6b92f] POST /api/auth/sign-up/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[email:stub] To: admin.ckd@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [02345c6a-ea08-49dd-a7c1-18c46884e056] POST /api/auth/sign-in/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [9b459010-339b-439a-8050-24a142e3679d] POST /v1/users
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [5ca9bde8-1fb6-4580-8df8-aedc8c27b937] POST /api/auth/sign-in/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [759463ec-41a2-4e5d-8a2d-d15315a144e3] POST /v1/users
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [c79a8a26-3166-43d7-bcfd-10471de8dc49] POST /api/auth/sign-in/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [d77cc840-a1c4-43bf-810e-c1a3c639c18b] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [e40a1cf7-6c23-4a3d-8023-6670937b38e1] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [d5ed59a7-a696-4522-89a6-6516ea32753b] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [3536d2f1-2e89-447f-8823-206c407c399d] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [2ab49b28-553c-4f0c-98ea-d05e41b76e07] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [b96c798d-7b30-4044-8882-ae05f47f4e89] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [aec141f3-4e95-4c2b-9a02-99b99aa2bc63] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [48b2fa27-c29c-45fe-a327-07764198211c] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [1ba54661-130a-48cc-809f-b94b1496d2e5] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [39a907b6-fd17-404d-923a-2cb4647654f9] POST /v1/sessions
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[email:stub] To: student.f0br-route@test.local | Subject: Registration Open — November 2026 – January 2027 — t1-ah52 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[email:stub] To: student.bc@test.local | Subject: Registration Open — November 2026 – January 2027 — t1-ah52 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[email:stub] To: parent.f0br-route@test.local | Subject: Registration Open — November 2026 – January 2027 — t1-ah52 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[email:stub] To: parent.bc@test.local | Subject: Registration Open — November 2026 – January 2027 — t1-ah52 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [06384b67-7398-4fee-8422-225280f830f8] POST /v1/board-series
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [293cd84d-c16f-47c0-bdcf-5f83e25cc9ad] POST /v1/teachers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [6affd86c-0afa-45d9-a506-95b3985d6302] POST /v1/sessions/52b2ac48-e284-46c8-b4cf-87df2d53ca04/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [f0129c53-bbbf-4452-89b6-06b6b57f8d06] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [4c259000-00d0-4470-90b3-14441c3f6514] POST /v1/sessions/52b2ac48-e284-46c8-b4cf-87df2d53ca04/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [2df31f34-5a4f-4ee8-b502-ee0e101c449d] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [070a8883-b3d4-42ff-a742-ac3661a247b4] POST /v1/sessions/52b2ac48-e284-46c8-b4cf-87df2d53ca04/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [0ef35d1b-1b55-458c-a252-5b584c6a16bd] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [a8a43fc1-b4dd-4437-81da-9bedd0195afb] POST /v1/sessions/52b2ac48-e284-46c8-b4cf-87df2d53ca04/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [049c589c-3878-4c17-8116-7536b0c35517] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [9a497035-cce3-49af-9eaf-81251a6c050c] POST /v1/sessions/52b2ac48-e284-46c8-b4cf-87df2d53ca04/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [9ff1aeda-8c6b-4d15-b67c-55b28ed64cc5] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [f2872b3c-3455-4552-8ef1-99d2c3b13cf0] POST /v1/sessions/52b2ac48-e284-46c8-b4cf-87df2d53ca04/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [f2809ad7-48af-4499-ad65-9e8045e39523] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [a700ab66-cb4d-4885-9583-c14e408bd670] POST /v1/sessions/52b2ac48-e284-46c8-b4cf-87df2d53ca04/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [7bde0b50-58d6-42fb-986f-7d782d275b71] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [a6e18476-73c3-4ddb-a6b8-c741cfdef9e6] POST /v1/sessions/52b2ac48-e284-46c8-b4cf-87df2d53ca04/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [f71b3f4f-a0ae-49d9-aa69-d41c6d8a0bae] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [cabce026-94b0-4876-b031-684d43f60e2e] POST /v1/sessions/52b2ac48-e284-46c8-b4cf-87df2d53ca04/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [c4c0b656-b00a-4a21-b33c-f9211d924cc4] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [1417d1b3-efb9-4a1c-ad9e-ea3fe7af0819] POST /v1/board-series
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [0c9eeb68-a660-4caf-ac91-91bae5aff3be] POST /v1/board-series
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [34b6423d-ab9c-4bfd-9be3-fb7ed2901ddb] POST /v1/board-series
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [c8b8d7b1-2706-469c-921c-a8f50054ac53] PUT /v1/sessions/52b2ac48-e284-46c8-b4cf-87df2d53ca04/board-series
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+[INFO] [bf1bc243-645c-416d-bc36-13dd80743c32] POST /v1/sessions/52b2ac48-e284-46c8-b4cf-87df2d53ca04/close
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [0a650f28-c8e1-4a60-bc02-243542dbf039] POST /api/auth/sign-up/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[email:stub] To: student.f0br-route@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-ah52 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[email:stub] To: student.bc@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-ah52 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[email:stub] To: parent.f0br-route@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-ah52 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[email:stub] To: parent.bc@test.local | Subject: Registration Closed — November 2026 – January 2027 — t1-ah52 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[email:stub] To: admin.ckw@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [1a58430f-a4ee-4355-8104-1c539ff40f94] POST /api/auth/sign-in/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [ad7e32de-7015-4724-ae21-25802396f1cd] POST /v1/users
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [97b43ce4-b43a-4d7b-b2ea-46cb630240f0] POST /api/auth/sign-in/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [04f1a02d-9480-4e5d-9120-5bb6bf0ca7a4] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [b2974090-6892-4262-8b38-bbc68b42f6a6] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [b28e63bf-82d6-417e-8bcf-a6931f726985] POST /v1/sessions
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [9db83e18-343e-4cb7-b918-0469fcf00b49] POST /v1/board-series
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [c8167f18-4279-4f2c-b2ae-bd0be7e6dd07] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [759ee9e0-eb44-4c29-ac6f-f0805b9ea767] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [dc47bc9e-d960-4612-bfff-14c36499cbdc] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [34bc9d32-1345-48b2-80e6-a1003b23ab60] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [fd52278b-7fd6-493b-b443-753c34b7c862] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [be552954-802a-4a16-87a9-c57a2246b484] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [599343ef-0d15-46f4-a715-84979c89c431] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [3c58bcd0-4e37-484f-aba8-326fbec294c6] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [49630b30-f5b4-4dde-ac4a-434e5e6733b4] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [76fdd949-2733-4ab7-85a7-fcad349b0ac8] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [47ae32a0-61fb-4de7-a954-56b061bf9334] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [fa41b559-94d1-4344-ab5a-d48df6d3c40a] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [f3f2042b-b7f5-47e3-96e8-ae09548f50ae] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [ebacbc91-3569-4151-85c4-53998100616a] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [71f68298-4490-4860-b7c2-55fedc1d54d4] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [6d6caae3-76d7-421d-8d01-76102c4c176f] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [0bba90ff-ca44-411e-a3a5-10041ac36313] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [20231a69-2dcc-4884-af84-89beb3bd27bb] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [c0a3287c-b8c4-4e5e-b2b3-f9f323652e25] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [f04a9e31-aef5-44fd-85c5-03fbf21f50f9] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [9d7d0984-d3fa-4d05-b4e5-caaf3eb7ed5e] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [638e3899-0b96-4159-9bba-68f8c5d2154b] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [50b26bd3-3086-4cf5-bed9-a5d91198d252] POST /v1/links/desk-onboard
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[email:stub] To: parent.ckw-1@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[email:stub] To: student.ckw-1@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [d4270019-ecbe-459a-9023-b0c106ffc563] POST /api/auth/sign-in/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [785dcc40-c75f-4b02-9bd2-01ac163cdb87] POST /api/auth/sign-in/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [1acc715b-4a1f-486b-8189-6360c961890e] POST /v1/registrations/preregister
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [6c3f523b-3db4-4d3f-8a8b-4b6726dd6bdc] POST /v1/payments/initiate
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [ea327495-87dd-43d1-b9f1-6e64db4af9bb] POST /v1/board-series
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [be1472b3-c3f1-4234-bb1a-a63080616b0c] PUT /v1/board-series/1b91dc7b-7b11-4174-9c79-fc2e68a84e02
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [3b159aab-f5d4-449d-85e3-887b02a37685] POST /v1/board-series
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [6a6e64e2-7912-4370-abf2-e4da85e635ae] PUT /v1/board-series/4cee78c3-6df3-4ebf-8c79-758eaf7e7177
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+[INFO] [1fd3d6c8-b7d4-4d9b-8d1d-06c03f94909b] PUT /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/board-series
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [3f637448-4226-4ec4-bda2-885e1b454c1b] POST /api/auth/sign-up/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[email:stub] To: admin.ckp@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [0c674bc1-de01-4aa5-bc5c-a4cb13473101] POST /api/auth/sign-in/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [8921fcec-74eb-44bf-8db8-f268b8361fda] POST /v1/users
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [16f3399c-10b5-4d1b-8867-3c284c87581c] POST /api/auth/sign-in/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [91089704-2110-47cf-a3ac-c9987bdd8e5f] POST /v1/users
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [2cfd84c7-515a-4af6-a48f-49a0c093b2ed] POST /api/auth/sign-in/email
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [940e4845-4c64-4789-9cd8-703cca7f52be] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [e61f244c-7513-4b0f-a3f3-efd1ddf73516] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [8b6cbb4e-f2d8-4b15-821f-30406270447d] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [37fcfb73-45a8-48f5-aced-25576085f179] POST /v1/subjects
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [059949ea-f90d-414d-b115-2ba701e6b239] POST /v1/sessions/89bbfaa4-9d8f-4454-934b-628f2315d8bf/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [5b03f570-2135-4dcf-a905-75e8acff1a4e] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [ccf8191b-555f-4823-8f82-ee9ca261ad40] POST /v1/sessions
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [355c0344-fc1e-448b-84fb-94ce5902b958] POST /v1/board-series
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [ba3e71f1-b8dd-44ce-9150-cd8118b3a787] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [178f1a00-7c7e-4553-ad8d-edbe3448d3dd] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [80c6bb23-93fd-44f6-b645-c5997dde7a55] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [aff233c8-f0d8-4ff5-864b-e67dc733c1aa] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [23249861-e8c2-4cfa-aa9a-772b83be796f] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [909e518e-5bf0-4376-a7d6-5e6e38ce6c18] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [cc8bb212-1c73-4cdb-b280-d6bd697a0fd3] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [6896a5d1-f30e-4a47-9e4d-955a2bc7f342] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [a5f39109-ba57-48e8-949c-9528b2043983] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [23d73a88-f859-4912-97dd-15419a626d2a] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [5e411846-e2bd-4a61-a5ea-c65e1dc5b2a6] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [71b07819-28ba-4fe0-a321-c4ddc97f1ae4] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [eecab248-1285-49ae-84c7-b81d54adb7fd] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [90c3cecb-9c1a-4a2e-bed4-cfbd67847f7a] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [1f3b166a-ee6e-4fc0-a4ec-475c9f5bf486] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [0de28d0d-1d79-4b78-8a79-d982ceec38fe] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [84d40fcb-e1ef-46a4-970c-ab3c834f8955] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [58775328-d09b-4a98-b098-7c90e51856a7] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [2241263a-ed21-41bb-b976-215c6b299b0d] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [26d979d2-42c1-47c9-aeea-ebc8eab124ba] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [1cd650bf-e67a-491f-b6e3-cff6868c7b67] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [85105fea-0c1c-4ae9-9ac6-d5875e42405d] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [4043196d-a376-41bb-8781-6871eb198cd4] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [52ffb68c-63b0-44d7-bb09-97911bb7447d] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [64101eda-67be-45bc-bc01-825ef2f0d39f] POST /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/offers
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [4e01ffb8-8e90-456e-8ccb-330d5b33a8c0] PUT /v1/board-fees
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [538ce999-3a6e-4bc2-993f-994fcebaa1f7] POST /v1/board-series
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [5528e3fb-17d8-49c3-b372-aa09f2a32f6c] POST /v1/board-series
+
+stdout | test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+[INFO] [aada0013-efc9-4e3a-8cd5-d8ad9bad0a4a] PUT /v1/sessions/41466075-b071-4ab7-a3a2-40de39d1edc3/board-series
+
+ ❯ test/08m-checkout-per-series.test.ts (10 tests | 2 failed | 8 skipped) 3338ms
+   ↓ F0b: one checkout per entry deadline > a family's checkout spanning two deadlines is refused, naming each series to pay separately; the summary groups them
+   ↓ F0b: one checkout per entry deadline > series with the same deadline share a checkout
+   ↓ F0b: one checkout per entry deadline > a deadline change that would split an open checkout is refused until it is settled
+   ↓ F0b: one checkout per entry deadline > the desk registers subjects of two deadlines and takes the money in one action: one confirmed payment per deadline, with receipts and takings
+   ↓ F0b: one checkout per entry deadline > the desk collects waiting subjects of two deadlines: one confirmed payment per deadline
+   ↓ F0b: one checkout per entry deadline > escrow shared across the desk's split payments goes to the earliest deadline first; the ledger has a debit per payment
+   ↓ F0b: one checkout per entry deadline > one payment confirmed while the other was closed first: the desk says which it took and which to hand back
+   ↓ F0b: one checkout per entry deadline > the admin's move may not split an open checkout across deadlines
+   × F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled 927ms
+     → expected { status: 404, error: '""' } to deeply equal { status: 409, …(1) }
+   × F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate 1063ms
+     → 404 Not Found
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08m-checkout-per-series.test.ts > F0b: one checkout per entry deadline
+Error: 404 Not Found
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08m-checkout-per-series.test.ts:74:5
+     72|     later = await mkSeries(otherMonth, 'deadlines later');
+     73|     // B, E and G go to the later series; C to Z, whose deadline is X'…
+     74|     await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({
+       |     ^
+     75|       param: { id: windowId },
+     76|       json: {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/14]⎯
+
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08k-catalogue-races.test.ts > F0b: races > a registration racing a change to its window's series is entered by the old routing; the change then sees it
+error: A line enters an item of its session's offer
+ ❯ ../../node_modules/.pnpm/pg@8.16.3/node_modules/pg/lib/client.js:545:17
+ ❯ holdInsert test/08k-catalogue-races.test.ts:34:3
+     32|   await client.connect();
+     33|   await client.query('BEGIN');
+     34|   await client.query(
+       |   ^
+     35|     `insert into registration (id, student_id, session_id, subject_id,…
+     36|      values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment'…
+ ❯ test/08k-catalogue-races.test.ts:70:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/14]⎯
+
+ FAIL  test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the window first: it is extended, and the earlier deadline is refused
+AssertionError: expected 200 to be 400 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 400[39m
+[31m+ 200[39m
+
+ ❯ test/08k-catalogue-races.test.ts:124:25
+    122|       const [ext, dl] = await Promise.all([first!, second!]);
+    123|       expect(ext.status).toBe(200);
+    124|       expect(dl.status).toBe(400);
+       |                         ^
+    125|       expect((await dl.json() as { error: string }).error).toBe("The b…
+    126|       expect(await holds(w, s)).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/14]⎯
+
+ FAIL  test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, a draft window: it moves, and the window that would pass it is refused under its lock
+AssertionError: expected 200 to be 400 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 400[39m
+[31m+ 200[39m
+
+ ❯ test/08k-catalogue-races.test.ts:146:26
+    144|       const [dl, ext] = await Promise.all([first!, second!]);
+    145|       expect(dl.status).toBe(200);
+    146|       expect(ext.status).toBe(400);
+       |                          ^
+    147|       expect((await ext.json() as { error: string }).error).toMatch(/^…
+    148|       expect(await holds(w, s)).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/14]⎯
+
+ FAIL  test/08k-catalogue-races.test.ts > F0b: races > a window's end and its series' deadline changed at the same moment: the window always closes before the deadline (MO-10) > the deadline first, an open window: it moves, and the extension that would pass it is refused by the database
+Error: waitFor: timed out
+ ❯ waitFor test/helpers.ts:427:38
+    425|     const v = await probe();
+    426|     if (v) return v;
+    427|     if (Date.now() > deadline) throw new Error('waitFor: timed out');
+       |                                      ^
+    428|     await new Promise((r) => setTimeout(r, 100));
+    429|   }
+ ❯ test/08k-catalogue-races.test.ts:171:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/14]⎯
+
+ FAIL  test/08k-catalogue-races.test.ts > F0b: races > a registration racing its subject's board change is entered with the new board (review flag 4)
+Error: 404 Not Found
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08k-catalogue-races.test.ts:194:5
+    192|     const cam = await mk('cambridge');
+    193|     const pea = await mk('pearson_edexcel');
+    194|     await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({
+       |     ^
+    195|       param: { id: w }, json: { series: [{ boardSeriesId: cam, isDefau…
+    196|     }));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/14]⎯
+
+ FAIL  test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series is past its entry deadline: nothing moves (MO-10)
+Error: 404 Not Found
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08l-board-change.test.ts:63:5
+     61|     const cam = await series('cambridge', w.year, 'BC passed');
+     62|     const pea = await series('pearson_edexcel', w.year, 'BC passed');
+     63|     await feed(w.id, [{ boardSeriesId: cam, isDefault: true }, { board…
+       |     ^
+     64|     const reg = await prereg(w.id, subj.PAS!);
+     65|     expect(await seriesOf(reg)).toBe(cam);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/14]⎯
+
+ FAIL  test/08l-board-change.test.ts > F0b: a board change and the entry deadline > refused when the new board's series has another entry deadline: a board change keeps the deadline
+Error: 404 Not Found
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08l-board-change.test.ts:81:5
+     79|     const cam = await series('cambridge', w.year, 'BC differs');
+     80|     const pea = await series('pearson_edexcel', w.year, 'BC differs');
+     81|     await feed(w.id, [{ boardSeriesId: cam, isDefault: true }, { board…
+       |     ^
+     82|     await deadline(cam, new Date(w.end.getTime() + days(10)));
+     83|     await deadline(pea, new Date(w.end.getTime() + days(20)));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/14]⎯
+
+ FAIL  test/08l-board-change.test.ts > F0b: a board change and the entry deadline > with the same deadline the registration follows the subject, audited
+Error: 404 Not Found
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08l-board-change.test.ts:96:5
+     94|     const cam = await series('cambridge', w.year, 'BC same');
+     95|     const pea = await series('pearson_edexcel', w.year, 'BC same');
+     96|     await feed(w.id, [{ boardSeriesId: cam, isDefault: true }, { board…
+       |     ^
+     97|     const at = new Date(w.end.getTime() + days(10));
+     98|     await deadline(cam, at);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/14]⎯
+
+ FAIL  test/08l-board-change.test.ts > F0b: a board change and the entry deadline > what the migration inferred is listed for staff to check, until they mark it checked (flag 5)
+Error: 404 Not Found
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08l-board-change.test.ts:115:5
+    113|     const w = await window('inferred');
+    114|     const pea = await series('pearson_edexcel', w.year, 'BC inferred');
+    115|     await feed(w.id, [{ boardSeriesId: pea, isDefault: true }]);
+       |     ^
+    116|     const sub = await subject(adm, 'BC-INF', 'Board change inferred', …
+    117|     const offered = await subject(adm, 'BC-OFF', 'Board change offered…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/14]⎯
+
+ FAIL  test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there
+Error: Board change Subjects form chosen is entered with Cambridge International; Pearson Edexcel November 2026 (t5-zy35) is another board's series
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ offerInSession test/helpers.ts:259:3
+    257|   const seriesId = await suiteSeries(adm, s, sub.council, sub.level);
+    258|   const teacherId = await teacherOfTheSuite(adm);
+    259|   await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+       |   ^
+    260|     param: { id: s.id },
+    261|     json: {
+ ❯ session test/helpers.ts:313:77
+ ❯ window test/08l-board-change.test.ts:34:16
+ ❯ test/08l-board-change.test.ts:173:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/14]⎯
+
+ FAIL  test/08l-board-change.test.ts > F0b: a board change and the entry deadline > a window's route for the subject moves with it (flag 2) > refused when the route would move to another deadline, or the window feeds no series of the new board
+Error: Board change Subjects form chosen is entered with Cambridge International; Pearson Edexcel November 2026 (t6-zy35) is another board's series
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ offerInSession test/helpers.ts:259:3
+    257|   const seriesId = await suiteSeries(adm, s, sub.council, sub.level);
+    258|   const teacherId = await teacherOfTheSuite(adm);
+    259|   await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+       |   ^
+    260|     param: { id: s.id },
+    261|     json: {
+ ❯ session test/helpers.ts:313:77
+ ❯ window test/08l-board-change.test.ts:34:16
+ ❯ test/08l-board-change.test.ts:190:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/14]⎯
+
+ FAIL  test/08m-checkout-per-series.test.ts > F0b: a window's first series may not split an open checkout across deadlines > refused, nothing entered, until the checkout is settled
+AssertionError: expected { status: 404, error: '""' } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "1 checkout still open pays for this window's registrations, which these series would enter with different deadlines — confirm or cancel it first, or route the subjects to series with the same deadline",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "\"\"",[39m
+[31m+   "status": 404,[39m
+[2m  }[22m
+
+ ❯ test/08m-checkout-per-series.test.ts:285:35
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/14]⎯
+
+ FAIL  test/08m-checkout-per-series.test.ts > F0b: MO-21 per series — a draft window feeding October and January > October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate
+Error: 404 Not Found
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08m-checkout-per-series.test.ts:313:5
+    311|     const oct = await mk('october');
+    312|     const jan = await mk('january');
+    313|     await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({
+       |     ^
+    314|       param: { id: w }, json: { series: [{ boardSeriesId: oct, isDefau…
+    315|     }));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/14]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  13 failed | 2 passed | 8 skipped (23)
+   Start at  00:12:57
+   Duration  17.70s (transform 669ms, setup 7ms, collect 428ms, tests 15.17s, environment 1ms, prepare 115ms)
+
+/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @repo/api@ test: `vitest run "test/08k" "test/08l" "test/08m"`
+Exit status 1

@@ -1,0 +1,289 @@
+{
+ "lines": [
+  {
+   "id": "096d04ac-5568-4cca-9b98-92cb1c48e8b1",
+   "status": "confirmed",
+   "price": "1500.00",
+   "course": "1200.00",
+   "board": "300.00",
+   "series": "bs_58852816d51a4d06f90429e9178d598a",
+   "student_id": "22PnmE9vLmtEDZ72Op9T2ZfRhEyotiLs",
+   "session_id": "sess_november-2026",
+   "subject_id": "subj_0625",
+   "payments": [
+    {
+     "payment": "b3fe3f5b-1bbf-4871-8d7c-13ac16fee445",
+     "status": "completed",
+     "amount": "1500.00",
+     "escrow": "0.00"
+    }
+   ]
+  },
+  {
+   "id": "31d4fd58-dd08-4c71-b6be-80e1def94d14",
+   "status": "pending_payment",
+   "price": "1400.00",
+   "course": "1100.00",
+   "board": "300.00",
+   "series": "bs_58852816d51a4d06f90429e9178d598a",
+   "student_id": "22PnmE9vLmtEDZ72Op9T2ZfRhEyotiLs",
+   "session_id": "sess_november-2026",
+   "subject_id": "subj_0452",
+   "payments": [
+    {
+     "payment": "54c97671-5203-4ea3-a924-01cae192423b",
+     "status": "failed",
+     "amount": "1400.00",
+     "escrow": "0.00"
+    },
+    {
+     "payment": "88f36e9a-477e-4c94-a0af-e9a9531699be",
+     "status": "failed",
+     "amount": "1400.00",
+     "escrow": "0.00"
+    },
+    {
+     "payment": "9d291cb3-9aa2-4aab-a748-cc76e9296fd5",
+     "status": "refunded",
+     "amount": "2800.00",
+     "escrow": "0.00"
+    }
+   ]
+  },
+  {
+   "id": "3920a8dc-5669-453b-ad42-d01583477733",
+   "status": "pending_payment",
+   "price": "1400.00",
+   "course": "1100.00",
+   "board": "300.00",
+   "series": "bs_58852816d51a4d06f90429e9178d598a",
+   "student_id": "22PnmE9vLmtEDZ72Op9T2ZfRhEyotiLs",
+   "session_id": "sess_november-2026",
+   "subject_id": "subj_0450",
+   "payments": [
+    {
+     "payment": "6ca374c0-e92c-4bc9-9777-d10566f44b1b",
+     "status": "refunded",
+     "amount": "1400.00",
+     "escrow": "0.00"
+    },
+    {
+     "payment": "c82630f1-f7ed-42c9-bbdb-9d1880b0e620",
+     "status": "refunded",
+     "amount": "4100.00",
+     "escrow": "0.00"
+    }
+   ]
+  },
+  {
+   "id": "47ea908c-adec-4474-9442-90e023c154ee",
+   "status": "pending_payment",
+   "price": "1500.00",
+   "course": "1200.00",
+   "board": "300.00",
+   "series": "bs_58852816d51a4d06f90429e9178d598a",
+   "student_id": "22PnmE9vLmtEDZ72Op9T2ZfRhEyotiLs",
+   "session_id": "sess_november-2026",
+   "subject_id": "subj_0417",
+   "payments": [
+    {
+     "payment": "8a9c616d-d5ff-471b-b59e-e0a2cf623f1c",
+     "status": "failed",
+     "amount": "1500.00",
+     "escrow": "0.00"
+    },
+    {
+     "payment": "c82630f1-f7ed-42c9-bbdb-9d1880b0e620",
+     "status": "refunded",
+     "amount": "4100.00",
+     "escrow": "0.00"
+    }
+   ]
+  },
+  {
+   "id": "9b710920-756a-4fdb-81d4-2ae926979254",
+   "status": "dropped",
+   "price": "1600.00",
+   "course": "1300.00",
+   "board": "300.00",
+   "series": "bs_58852816d51a4d06f90429e9178d598a",
+   "student_id": "22PnmE9vLmtEDZ72Op9T2ZfRhEyotiLs",
+   "session_id": "sess_november-2026",
+   "subject_id": "subj_0400",
+   "payments": [
+    {
+     "payment": "304b11cb-f880-469d-9437-3b1465049571",
+     "status": "completed",
+     "amount": "1600.00",
+     "escrow": "0.00"
+    }
+   ]
+  },
+  {
+   "id": "afe237b0-268e-4606-ad61-b97a99301f4c",
+   "status": "pending_payment",
+   "price": "1400.00",
+   "course": "1100.00",
+   "board": "300.00",
+   "series": "bs_58852816d51a4d06f90429e9178d598a",
+   "student_id": "22PnmE9vLmtEDZ72Op9T2ZfRhEyotiLs",
+   "session_id": "sess_november-2026",
+   "subject_id": "subj_0455",
+   "payments": [
+    {
+     "payment": "1890f93a-8bdc-4c76-bff3-ad31ef1ff41e",
+     "status": "refunded",
+     "amount": "1400.00",
+     "escrow": "0.00"
+    },
+    {
+     "payment": "9d291cb3-9aa2-4aab-a748-cc76e9296fd5",
+     "status": "refunded",
+     "amount": "2800.00",
+     "escrow": "0.00"
+    }
+   ]
+  },
+  {
+   "id": "ba171ce1-b6c7-4397-8224-593017eaed75",
+   "status": "pending_payment",
+   "price": "1200.00",
+   "course": "900.00",
+   "board": "300.00",
+   "series": "bs_58852816d51a4d06f90429e9178d598a",
+   "student_id": "22PnmE9vLmtEDZ72Op9T2ZfRhEyotiLs",
+   "session_id": "sess_november-2026",
+   "subject_id": "subj_0413",
+   "payments": [
+    {
+     "payment": "03b8f5db-4521-4f4d-abec-6c1fbe63cd8f",
+     "status": "failed",
+     "amount": "700.00",
+     "escrow": "500.00"
+    },
+    {
+     "payment": "6a13a50d-671a-4645-ad11-cc90b2330afd",
+     "status": "failed",
+     "amount": "700.00",
+     "escrow": "500.00"
+    },
+    {
+     "payment": "b5f52035-508e-4c36-b40f-38d33c11d606",
+     "status": "failed",
+     "amount": "700.00",
+     "escrow": "500.00"
+    },
+    {
+     "payment": "c82630f1-f7ed-42c9-bbdb-9d1880b0e620",
+     "status": "refunded",
+     "amount": "4100.00",
+     "escrow": "0.00"
+    }
+   ]
+  },
+  {
+   "id": "e458557b-d5cb-40ae-871c-a9f56f0a3014",
+   "status": "expired",
+   "price": "1600.00",
+   "course": "1300.00",
+   "board": "300.00",
+   "series": "bs_936acb8d32599e0fccf11a977a6ea6e9",
+   "student_id": "22PnmE9vLmtEDZ72Op9T2ZfRhEyotiLs",
+   "session_id": "897c0e42-42b3-4d24-9681-7dcff39b1d9c",
+   "subject_id": "subj_0400",
+   "payments": [
+    {
+     "payment": "8a1e473e-e217-41f1-af01-d9b84df3b5fd",
+     "status": "failed",
+     "amount": "1600.00",
+     "escrow": "0.00"
+    }
+   ]
+  }
+ ],
+ "wallets": [
+  {
+   "student_id": "22PnmE9vLmtEDZ72Op9T2ZfRhEyotiLs",
+   "balance": "3610.00",
+   "held": "0.00"
+  }
+ ],
+ "sessions": [
+  {
+   "id": "897c0e42-42b3-4d24-9681-7dcff39b1d9c",
+   "status": "closed",
+   "start_date": "2026-09-27 14:29:11.035+00",
+   "end_date": "2026-09-29 14:30:11.054+00"
+  },
+  {
+   "id": "sess_june-2026",
+   "status": "closed",
+   "start_date": "2026-02-01 00:00:00+00",
+   "end_date": "2026-04-30 23:59:59+00"
+  },
+  {
+   "id": "sess_november-2026",
+   "status": "active",
+   "start_date": "2026-07-01 00:00:00+00",
+   "end_date": "2026-09-30 23:59:59+00"
+  }
+ ],
+ "eligibility": {
+  "31d4fd58-dd08-4c71-b6be-80e1def94d14": {
+   "allowed": true,
+   "code": "ok",
+   "grade": 12,
+   "academicYear": null
+  },
+  "3920a8dc-5669-453b-ad42-d01583477733": {
+   "allowed": true,
+   "code": "ok",
+   "grade": 12,
+   "academicYear": null
+  },
+  "47ea908c-adec-4474-9442-90e023c154ee": {
+   "allowed": true,
+   "code": "ok",
+   "grade": 12,
+   "academicYear": null
+  },
+  "afe237b0-268e-4606-ad61-b97a99301f4c": {
+   "allowed": true,
+   "code": "ok",
+   "grade": 12,
+   "academicYear": null
+  },
+  "ba171ce1-b6c7-4397-8224-593017eaed75": {
+   "allowed": true,
+   "code": "ok",
+   "grade": 12,
+   "academicYear": null
+  }
+ },
+ "refunds": {
+  "096d04ac-5568-4cca-9b98-92cb1c48e8b1": {
+   "percentage": 100,
+   "amount": 1500
+  },
+  "31d4fd58-dd08-4c71-b6be-80e1def94d14": {
+   "percentage": 100,
+   "amount": 1400
+  },
+  "3920a8dc-5669-453b-ad42-d01583477733": {
+   "percentage": 100,
+   "amount": 1400
+  },
+  "47ea908c-adec-4474-9442-90e023c154ee": {
+   "percentage": 100,
+   "amount": 1500
+  },
+  "afe237b0-268e-4606-ad61-b97a99301f4c": {
+   "percentage": 100,
+   "amount": 1400
+  },
+  "ba171ce1-b6c7-4397-8224-593017eaed75": {
+   "percentage": 100,
+   "amount": 1200
+  }
+ }
+}

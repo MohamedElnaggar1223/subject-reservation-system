@@ -96,6 +96,31 @@ function SeriesGrid({ session, series, canEdit }: { session: SessionDetail; seri
         {repriced && (() => { const [a, b, d] = repriced.split('|'); return (
           <Notice tone="success"><span>{a}</span> <span>lines re-priced</span>; <span>{b}</span> <span>listed, untouched (they have a payment)</span>. <span>Difference</span> <Money amount={Number(d)} />.</Notice>
         ); })()}
+        {grid.stuck.length > 0 && (
+          <Notice tone="warning" title={<><span>Lines still provisional on confirmed fees</span> <span>({grid.stuck.length})</span></>}>
+            <p><span>These waiting lines read only confirmed fees here but are still marked provisional, so they cannot be paid.</span> {canEdit && <span>Confirming their fees again makes them payable.</span>}</p>
+            <ul className="mt-2 space-y-1 text-sm">
+              {grid.stuck.map((l) => (
+                <li key={l.id} className="flex flex-wrap gap-x-2">
+                  <bdi data-i18n-skip="true" className="font-medium">{l.studentName}</bdi>
+                  <span className="text-muted-foreground">·</span>
+                  <bdi data-i18n-skip="true">{l.subjectName}</bdi>
+                  <span className="text-muted-foreground">·</span>
+                  <bdi data-i18n-skip="true" className="text-muted-foreground">{l.sessionName}</bdi>
+                  <Money amount={l.price} />
+                </li>
+              ))}
+            </ul>
+            {canEdit && (
+              <div className="mt-2">
+                <Button size="sm" disabled={confirm.isPending}
+                  onClick={() => confirm.mutate([...new Set(grid.stuck.flatMap((l) => l.feeIds))].map((feeId) => ({ feeId })))}>
+                  Confirm their fees again
+                </Button>
+              </div>
+            )}
+          </Notice>
+        )}
         {canEdit && (toReprice > 0 || toList > 0) && (
           <Notice tone="warning" title="A confirmed fee differs from what lines were priced at">
             <span>{toReprice}</span> <span>unpaid lines can be re-priced on their board part;</span> <span>{toList}</span> <span>with a payment stay as they are (finance adjusts them).</span>
