@@ -1,0 +1,138 @@
+
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+> vitest run "test/08t" "-t" "the re-price lands first"
+
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: 0.3 ms (measured within 1 ms)
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [d22f809d-2ff0-4974-9779-c73b6002649a] POST /api/auth/sign-up/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[email:stub] To: admin.t08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [3f3ebf00-a6aa-4367-a2bb-b4c6e6719e7b] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [885cef3a-4453-4c2d-9b6c-6534c60dcc69] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [adb2b89d-4602-4d5e-9ac9-f467e42ecf96] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [43bd994a-d237-42d3-9615-dfeb6febcf37] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [bab04c0a-1751-4c9b-944e-02c54139a16c] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [422a8e0c-9c83-415e-b146-1de272324c45] POST /v1/teachers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [00e77837-1398-49c7-93bc-593490654210] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [e47875db-c84d-4166-91b7-96214c7e211f] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c7591859-98c0-4f3c-9cdf-c63023be2555] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [cb748c9c-9ce6-456e-9584-78dc887b0dc8] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [fa6b317e-5b94-450e-8094-661bad726eca] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [a32d2e35-eefb-4d1f-95fd-0820115da759] POST /v1/sessions/5eb3050b-5cb4-412e-b485-24f0ec0fd57d/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [f343ace5-802a-4a26-80da-048dbf6a573b] POST /v1/sessions/37dd040d-bd4c-4d86-8aa9-7879a1fbd82d/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [dd731d5a-d009-4fef-9f6d-dbbe9f4d5222] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [3238c1e6-92d7-4340-b135-37ce47acf03f] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [2499ba99-5096-4197-a4df-4ad3547436b6] POST /v1/sessions/5eb3050b-5cb4-412e-b485-24f0ec0fd57d/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [5f70ce6b-2252-4680-8955-c3acd66af331] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [d326d357-d953-4760-953c-ba500efdc41e] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [b1165ace-6a44-4a90-9135-d065f2b5f45c] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [34aea34a-5e39-4029-a1a2-f4b4cc45c100] POST /v1/sessions/5eb3050b-5cb4-412e-b485-24f0ec0fd57d/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [1a700531-0642-44da-a92b-9c1f89f76199] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[email:stub] To: parent.t08-rpb-1kyh@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[email:stub] To: student.t08-rpb-1kyh@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [f39dc5a9-caaa-4dc6-944f-61f5dcfcd45f] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [a46d53aa-b094-46a3-a8e6-a2f86240b8c3] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [1ba0dfe9-266c-4858-8ba4-09fa240b681a] POST /v1/board-fees/ed838f1f-902b-446f-a811-c5eb187c4b1a/confirm
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [326d91a3-3013-426a-99b2-0e0bffb1d89b] POST /v1/board-fees/ed838f1f-902b-446f-a811-c5eb187c4b1a/reprice
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [68d3a5eb-ad8f-4e3f-b681-f2429e6f5ee7] POST /v1/payments/initiate
+
+ ❯ test/08t-rework-races.test.ts (10 tests | 1 failed | 9 skipped) 2025ms
+   ↓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+   ↓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+   ↓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused
+   ↓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+   ↓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+   ↓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+   ↓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+   × 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged 575ms
+     → expected 201 to be greater than or equal to 400
+   ↓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+   ↓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 skipped (10)
+   Start at  01:04:23
+   Duration  3.41s (transform 428ms, setup 2ms, collect 154ms, tests 2.03s, environment 0ms, prepare 30ms)
+
+ ELIFECYCLE  Test failed. See above for more details.
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+AssertionError: expected 201 to be greater than or equal to 400
+ ❯ test/08t-rework-races.test.ts:286:24
+    284|       expect((await r.json() as { data: { repriced: { id: string }[] }…
+    285|       const { PRICE_CHANGED_REFUSAL } = await import('../src/services/…
+    286|       expect(p.status).toBeGreaterThanOrEqual(400);
+       |                        ^
+    287|       expect((await p.json() as { error: string }).error).toBe(PRICE_C…
+    288|       expect(await sql(`select 1 from payment_registration where regis…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

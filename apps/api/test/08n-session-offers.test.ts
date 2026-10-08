@@ -1262,6 +1262,37 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
       .toEqual([{ id: lw!.id, teacher_id: both }, { id: lj!.id, teacher_id: teacher2 }].sort((a, b) => a.id.localeCompare(b.id)));
   });
 
+  it("replace teacher on a converted session: an enrolment from before the rework (no unit) under the converted item entering all the subject's units moves with its line", async () => {
+    // 0042's shape: the converted offer's one item enters every unit of the subject; the student's
+    // enrolment is the subject's own row (unit_id null: 0041 added the column, nothing filled it).
+    const sub = await subject(adm, `RWN-VRTC-${RUN}`, `Converted units (08n ${RUN})`, { course: 2000, registration: 4800 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    const jun = await mkSeries('pearson_edexcel', 'june', Y + 1, `n08v-rtc-${RUN}`, { entryDeadline: new Date(Date.now() + days(45)) });
+    const unit = async (code: string) => (await apiResponse(adm.api.v1.catalogue.units.$post({ json: { boardCode: 'pearson_edexcel', code: `${code}-${RUN}`, title: code, unitLevel: 'as', kind: 'unit' } })))!.id;
+    const [u1, u2] = [await unit('WCH11C'), await unit('WCH12C')];
+    await fee(jun, 'unit', u1, 2400);
+    await fee(jun, 'unit', u2, 2400);
+    const leaver = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher V5 (08n ${RUN})` } })))!.id;
+    const conv = await mkJune(`n08v-rtc-${RUN}`);
+    const o = await offer(conv, sub, [{ label: 'Whole subject', kind: 'unit', enters: { kind: 'units', unitIds: [u1, u2] }, boardSeriesId: jun, availability: 'open', requiredInSeries: false }],
+      [{ teacherId: leaver, mode: 'in_school' }]);
+    const f = await onboard(officer, `n08v-rtc-${RUN}`, 12);
+    const [line] = await reserve(f.studentId, conv, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId: leaver }]);
+    const years = await apiResponse(adm.api.v1.academic.years.$get());
+    const yearId = years.find((y) => y.startYear === Y)?.id
+      ?? (await apiResponse(adm.api.v1.academic.years.$post({ json: { startYear: Y, startsOn: `${Y}-09-06`, endsOn: `${Y + 1}-06-25` } })))!.id;
+    await apiResponse(adm.api.v1.enrolments.bulk.$post({ json: { academicYearId: yearId, source: 'registrations', studentIds: [f.studentId], subjectMap: [], exclude: [], commit: true } }));
+    // Back to the pre-rework shape: one enrolment in the subject, no unit.
+    await sql(`delete from course_enrolment where student_id = $1 and subject_id = $2 and unit_id = $3`, [f.studentId, sub, u2]);
+    await sql(`update course_enrolment set unit_id = null where student_id = $1 and subject_id = $2`, [f.studentId, sub]);
+    const r = await apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId']['replace-teacher'].$post({
+      param: { id: conv, offerId: o.id }, json: { fromTeacherId: leaver, toTeacherId: teacher2, reason: 'the teacher left the school' },
+    }));
+    expect(r).toMatchObject({ lines: 1, enrolments: 1 });
+    expect(await sql(`select unit_id, teacher_id from course_enrolment where student_id = $1 and subject_id = $2 and ended_on is null`, [f.studentId, sub]))
+      .toEqual([{ unit_id: null, teacher_id: teacher2 }]);
+    expect((await one<{ t: string }>(`select teacher_id as t from registration where id = $1`, [line!.id])).t).toBe(teacher2);
+  });
+
   it("the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat", async () => {
     const sub = await subject(adm, `RWN-VKS-${RUN}`, `Known sittings (08n ${RUN})`, { course: 1000, registration: 300 });
     const s1 = await mkSeries('cambridge', 'june', Y + 1, `n08v-ks1-${RUN}`, { entryDeadline: new Date(Date.now() + days(30)) });
@@ -1319,14 +1350,22 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
       const [made] = await reserve(f.studentId, june, [line]);
       await expect(reserve(other.studentId, june, [line])).rejects.toThrow(/entry deadline for this series .* has passed/);
       expect(new Date((await lineOf(made!.id)).due_at).getTime()).toBeLessThanOrEqual(until.getTime());
+      // The family pays by InstaPay: the checkout opens and its transfer reference is taken (the
+      // reference check reads each line's deadline with its late entry).
+      const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [made!.id], paymentMethod: 'instapay', escrowAmountToApply: 0 } })))!.id!;
+      await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: pay }, json: { reference: `FT-LATE-${RUN}` } }));
+      expect((await one<{ s: string }>(`select status as s from payment where id = $1`, [pay])).s).toBe('pending_verification');
       // The sweep keeps it: its own deadline is the grant's.
       await runPaymentDeadlines();
       expect(await statusOf(made!.id)).toBe('pending_payment');
+      expect((await one<{ s: string }>(`select status as s from payment where id = $1`, [pay])).s).toBe('pending_verification');
       // Off again: the grant changes nothing; the board's deadline has passed, and the sweep closes it.
       await setting(false);
       await runPaymentDeadlines();
+      // Its open checkout is closed at the deadline first, and the line with it.
       expect(await statusOf(made!.id)).toBe('expired');
-      expect(await one(`select new_data->>'reason' as reason from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [made!.id])).toEqual({ reason: 'entry_deadline' });
+      expect((await one<{ s: string }>(`select status as s from payment where id = $1`, [pay])).s).not.toMatch(/^pending/);
+      expect(await one(`select new_data->>'reason' as reason from audit_log where action = 'REGISTRATION_EXPIRED' and entity_id = $1`, [made!.id])).toEqual({ reason: 'payment_closed' });
     } finally {
       spy.mockRestore();
       // Back to the default for the files after this one (refused when it is already off).

@@ -161,7 +161,8 @@ branch (or by agreement in writing), and marked here.
    the grade-10 exception row or the A-12 setting key.
 2. `routeAndCheck` / the item path — each subject's board (`subject` `FOR SHARE`).
 3. The session's series links (`session_board_series` `FOR SHARE`), then the series rows the
-   lines go to (`FOR SHARE`).
+   lines go to (`FOR SHARE`), then — for a move of lines or a fee write only — **the series' fee
+   grid** (below).
 4. The offers (`FOR SHARE`), then the items (`FOR SHARE`), in id order.
 5. The fee rows the prices read (`board_fee` `FOR SHARE`, id order).
 6. The student's and family's exceptions: read rows `FOR SHARE`, one-shot gates `FOR UPDATE`
@@ -169,20 +170,41 @@ branch (or by agreement in writing), and marked here.
 
 Writers take their row `FOR UPDATE` at its place in this order: a series change of an item,
 an offer's close, an item's untick or availability change, a teacher removal (item/offer
-`FOR UPDATE`); a fee confirm or re-price (`board_fee` `FOR UPDATE`, then the lines
-`FOR UPDATE` in id order); a grant or revocation (exception `FOR UPDATE`). Every path that puts
+`FOR UPDATE`); a fee write or Confirm (the series `FOR SHARE`, its fee grid exclusive, `board_fee`
+`FOR UPDATE`, then the lines `FOR UPDATE` in id order) or a re-price (`board_fee` `FOR SHARE`,
+then the lines); a grant or revocation (exception `FOR UPDATE`). Every path that puts
 a line into a series takes the student lock first and runs `assertLineRules`: the reservation
 paths, an item's series change (per affected student), the grade-10 bulk commit (per student),
 F7's import (per student) and preregistration capture.
 
 **A move of lines** — an item's series change, the admin's move, a board change, the session's
-series correction — takes, after its students and items and **before its lines**, the fee rows
-its lines will read in the series they go to `FOR SHARE` (`lockMoveFeeRows` / `lockFeeRows`,
-`line-moves.services.ts`; the old series' rows carried there first): Confirm's own order, fee
-rows then lines, so a Confirm of one of those rows either lands first (the move reads it
-confirmed) or waits for the move and finds the moved lines by their basis (the review of
-40c1447). The admin's move also takes the items it may move lines to `FOR SHARE` before their
-rows (an item's series change, which takes its item `FOR UPDATE`, waits for it).
+series correction — takes, after its students and items and **before its lines**, the fee grid
+of each series its lines go to (shared), then the fee rows its lines will read there `FOR SHARE`
+(`lockMoveFeeRows` / `lockFeeRows`, `line-moves.services.ts`; the old series' rows carried there
+first): Confirm's own order, fee rows then lines. The admin's move also takes the items it may
+move lines to `FOR SHARE` before them (an item's series change, which takes its item
+`FOR UPDATE`, waits for it).
+
+**The series' fee grid** (`lockFeeGrids`, `apps/api/src/lib/fee-grid-lock.ts`): a
+transaction-scoped advisory lock on the series id (`pg_advisory_xact_lock(4041, hashtext(id))`),
+taken right after the series row and before its fee rows, several in id order. A move takes it
+**shared**; every path that creates or confirms a fee row takes it **exclusive**: the grid's put
+(a save, a pasted list — and a put that confirms a provisional row), its copy from another
+series, copy-from's fees, and Confirm. So no fee row is created or confirmed in a series while a
+move into it is under way: a finance write either commits first (the move then holds the row it
+reads) or waits for the move (and a Confirm then finds the moved lines by their basis). Moves do
+not wait for each other. It is not a mode of the series row because the checkout and a change's
+approval take the series row `FOR SHARE` *after* their lines: any row mode that conflicts with a
+move's would deadlock a Confirm (series, then lines) against them. Neither a reservation nor a
+checkout takes it (a reservation reads its fee rows `FOR SHARE` at the moment it prices). This
+closes the case the rows alone left open — a row that existed nowhere when the move began,
+created and confirmed by finance inside the move's transaction (08t, both orders; with the move's
+lock removed the line is left provisional on a confirmed row). The put's lock alone and Confirm's
+lock alone each close it too; Confirm's is the backstop for a row made by any path that forgets
+the grid. Within it, the grid's put takes the rows it names that exist `FOR UPDATE` **in one
+statement in id order** (as Confirm does; a reservation takes its rows `FOR SHARE` in id order),
+never one by one in the order the list was pasted (08t: a paste out of id order against a
+reservation deadlocked).
 
 **A line's receipt, then the line** (MONEY_AUDIT.md MA-16's order). Wherever a path holds both,
 the receipt (`FOR UPDATE`, `lockReceiptOf` in `receipt.services.ts`) comes first: a payment's
@@ -535,7 +557,30 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
   provisional when every fee row its basis names is confirmed at the amount it recorded (a row
   confirmed at another amount leaves the line to the Re-price). What is not held: a row that
   existed nowhere when the move began and that finance creates and confirms inside the move's
-  transaction (the rule above names such a line).
+  transaction (the rule above names such a line). *Closed after the merge of af33662:* the
+  series' fee grid lock (§2.1), shared by a move, exclusive by every fee create and Confirm.
+- **The Fees tab lists any line still provisional on confirmed fees** *(changed)*: `GET
+  /board-fees` returns `stuck` — the waiting lines read from the series' rows that are provisional
+  though every row their basis names is confirmed at the amount they recorded (09's rule) — with
+  the student, subject, session, price and the series' fee ids; the tab counts and lists them and
+  "Confirm their fees again" (Confirm of those rows at their amounts) makes them payable. None
+  should exist; the list is how one would be seen.
+- **`effectiveDeadlinesOf` reads Q-20's late entry** *(changed)*, as `effectiveDeadlineFor` does
+  with the student (each line's student and series, while the setting is on): the InstaPay
+  reference check, the moves' "past its deadline" checks and the reversal's notice read it.
+- **Replace teacher on a converted session** *(changed)*: the student's enrolments in the item's
+  units where they have them, else the subject's own row (an enrolment from before the rework has
+  no unit, and 0042's converted item enters all the subject's units).
+- **The family's read: a retake open until the later of the retake and the first-entry deadline**
+  *(changed with Q-20, recorded after the review of 40c1447..af33662)*: a late board entry can make
+  the first entry's date later than the retake deadline. And the approval's deadline check (the
+  line's student) and `getAvailableSubjects` (the student) pass the student, so a late entry is
+  read there.
+- **A put that confirms settles the lines** *(changed)*: `PUT /board-fees` saving a provisional
+  row as the board's published fee (the grid's "published" save, a pasted published list) used to
+  confirm the row and leave the lines priced from it provisional and unpayable; it now settles them
+  as Confirm does (`settleLinesOfConfirmed`: at the recorded amount no longer provisional and
+  re-dated; at another amount left for the Re-price) and returns `linesNoLongerProvisional`.
 - **A line that turns provisional on a move is told** *(changed)*: `repriceMovedLines` also
   returns a line whose total stayed but which became provisional (the new series' fee not
   confirmed), and `tellPriceChanged` sends it `PRICE_TO_BE_CONFIRMED` ("The price of X is to be
@@ -772,3 +817,11 @@ guard added since the reviews shown red when undone (trail rows `control`).
   rejected declaration (0044), the grade-10 snapshot, replace-teacher per unit, the pricing.*
   exceptions, Q-20's late entry, the receipt before the line (an 08t race of an approval against
   a reversal), the known sittings; §2.1, §2.6, §2.12, §3's copy-from count and §5 corrected.
+- 03:02Z — af33662 merged to main (with origin/main, b438976). The lead: close the open race.
+  03:12Z — the series' fee grid lock (§2.1), two 08t races (the move first, finance first), the
+  control red with the move's lock removed; and a put that confirms now settles its lines (08p).
+- 03:3xZ — the bounded pass on 40c1447..af33662, "fix forward: 1–5": the published put (08p on a
+  copied grid), replace teacher on a converted session, `effectiveDeadlinesOf` and Q-20 (08n
+  submits a reference), the put's rows in id order (08t, a deadlock in its control), the Fees
+  tab's stuck lines, and 09's rule seen failing (the suite with a move's lock removed); the
+  evidence folder in git.

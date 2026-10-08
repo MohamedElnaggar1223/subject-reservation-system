@@ -1,0 +1,36 @@
+# run16-full-utc.log: the proof of this run, as vitest reported it (the full log, 39852 lines, 3420957 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ✓ test/00-harness.test.ts (4 tests) 1859ms
+ ✓ test/01-desk.test.ts (8 tests) 2072ms
+ ✓ test/02-money.test.ts (4 tests) 2157ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 2434ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 6872ms
+ ✓ test/05-object-access.test.ts (13 tests) 4207ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3663ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1712ms
+ ✓ test/08-money-rules.test.ts (51 tests) 10713ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 11748ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 6557ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 7587ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 5570ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5264ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 9000ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2529ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4069ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 4063ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4620ms
+ ✓ test/08l-board-change.test.ts (7 tests) 7232ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 7154ms
+ ✓ test/08n-session-offers.test.ts (15 tests) 11181ms
+ ✓ test/08p-pricing-policies.test.ts (6 tests) 6040ms
+ ✓ test/08t-rework-races.test.ts (10 tests) 7135ms
+ ✓ test/09-money-invariants.test.ts (30 tests) 325ms
+
+## Summary
+[clock] database minus host: 0.5 ms (measured within 5 ms)
+ Test Files  25 passed (25)
+      Tests  341 passed | 1 todo (342)
+   Start at  22:09:08
+   Duration  143.51s (transform 886ms, setup 44ms, collect 2.52s, tests 135.76s, environment 2ms, prepare 866ms)

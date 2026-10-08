@@ -1,0 +1,34 @@
+# control-recheck-on-move.log: the proof of this run, as vitest reported it (the full log, 3511 lines, 346722 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ❯ test/08n-session-offers.test.ts (27 tests | 1 failed) 17515ms
+
+## Failed tests
+   × 08n: the review of 977848d > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too 381ms
+
+## Failures
+ FAIL  test/08n-session-offers.test.ts > 08n: the review of 977848d > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+- Expected
++ Received
+  {
+-   "error": StringMatching /is already reserved in .+: the board takes one entry/,
+-   "status": 409,
++   "error": "\"\"",
++   "status": 200,
+  }
+ ❯ test/08n-session-offers.test.ts:993:15
+    991|       param: { id: b, offerId: ob.id, itemId: ob.items[0]! }, json: { …
+    992|     }));
+    993|     expect(r).toEqual({ status: 409, error: expect.stringMatching(/is …
+       |               ^
+    994|     expect((await one<{ s: string }>(`select board_series_id as s from…
+    995|   });
+
+## Summary
+[clock] database minus host: -0.2 ms (measured within 1 ms)
+ Test Files  1 failed (1)
+      Tests  1 failed | 26 passed (27)
+   Start at  03:31:44
+   Duration  19.19s (transform 518ms, setup 3ms, collect 225ms, tests 17.52s, environment 0ms, prepare 37ms)

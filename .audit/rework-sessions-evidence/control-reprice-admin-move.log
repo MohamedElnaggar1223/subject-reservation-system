@@ -1,0 +1,174 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -1.0 ms (measured within 1 ms)
+stderr | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [9a28e7f2-16d1-4f48-9097-032a767e79fa] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[email:stub] To: admin.n08v@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [9646c306-f64c-4391-b822-6938e04063d7] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [cc8fcf65-9bf0-404b-8b46-800e4162c573] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [f5408853-e3c2-411f-8dba-23081e253316] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [c03e7461-fafb-49ee-a62d-4ec86ed65f82] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [9e72ad0b-9865-4237-8a67-9e99f293bfa8] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [33e10a61-bddf-4f85-895b-5c515d1b8d8a] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [065dc19d-4f93-4824-988c-29dd17894f5a] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [7cce4f62-4727-4f9e-a577-f6aa04584ea3] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [e04bd33f-a6b1-4409-9140-2354ecb630e2] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [a51f025d-e701-46ed-9e9f-53eb3f1477f7] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [8d201762-a496-42bf-a9a3-f203cac46c5b] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [d941464e-bc18-4098-9591-9c8d252b4cfd] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [713d249d-02f4-4e6a-8e08-4e2ac1012ad8] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [69df6bf0-664b-4f2c-9d17-fa9d7be31fb1] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [3b423f03-cc38-487f-a695-c5e9e31e6991] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [60bae501-8959-4fdd-986f-98bc92198bef] POST /v1/sessions/dcee87fb-78bf-4501-95f7-e4e1835c50c2/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [b59f2ed0-937d-4d5c-9be9-e47a58eaded6] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[email:stub] To: parent.n08v-am-w-a2ev@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[email:stub] To: student.n08v-am-w-a2ev@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [a8d601ca-8e26-4732-9427-1ccb6ccf13ed] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [3bca114b-8dd1-4eaa-9e7d-2e95b824b008] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [d6b45302-5084-4f56-bb28-b4aa13665110] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[email:stub] To: parent.n08v-am-p-a2ev@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[email:stub] To: student.n08v-am-p-a2ev@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [b8b92211-4906-408f-8848-fef02e6ac4d6] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [779f8586-0850-4a68-814e-09e71d1cd168] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [ccdf8b65-a7ae-43db-ac66-e263e832c7f9] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [84193d0c-94a2-47ef-9762-5ed371446034] POST /v1/payments/dc21360e-da39-4120-b9fb-857110faa142/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [63b81f7e-fc00-40fa-adc2-adec9eec1c47] POST /v1/sessions/dcee87fb-78bf-4501-95f7-e4e1835c50c2/board-series/move
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[email:stub] To: parent.n08v-am-p-a2ev@test.local | Subject: Payment confirmed — June 2027 — n08v-a2ev | Attachments: receipt-dc21360e-da39-4120-b9fb-857110faa142.pdf
+
+ ❯ test/08n-session-offers.test.ts (33 tests | 1 failed | 32 skipped) 2265ms
+   ↓ 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+   ↓ 08n: sessions and offers > the next June copied from it: offers, teachers and items in the next year's series; board fees provisional; audited
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > an IGCSE item is refused in October and January; Cambridge AS defaults to November, Pearson AS to October
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a Cambridge retake of the previous June is reservable until the retake deadline after the entry deadline passed; a first entry is not; a retake of an older sitting is cut off at the entry deadline; the retake is due by the retake deadline
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > the admin's move takes a retake into a series past its entry deadline while the retake deadline is ahead; a first entry not
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > the sweep at the retake deadline closes the waiting retakes of the previous sitting (MO-10 per line)
+   ↓ 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+   ↓ 08n: the line rules (§3.5) > AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can
+   ↓ 08n: the line rules (§3.5) > the same entry twice in one series across two sessions is refused: the board takes one entry
+   ↓ 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted
+   ↓ 08n: the line rules (§3.5) > a carried sitting outside the board's carry-forward period is refused (Cambridge: 13 months); inside it, accepted
+   ↓ 08n: the line rules (§3.5) > self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting
+   ↓ 08n: past a line's own deadline (flags 59, 60) > a family's drop of a paid line whose deadline passed is refused and sent to the desk; a series with no entry deadline is cut off at the start of its exams' day
+   ↓ 08n: the enrolment per unit (§3.2, §10: F1 reads it) > a line of an item entering units is enrolled per unit with its item's teacher; the teaching demand groups per unit
+   ↓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+   ↓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+   ↓ 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+   ↓ 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+   ↓ 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+   ↓ 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+   ↓ 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+   ↓ 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+   ↓ 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+   ↓ 08n: the reviews of 977848d and 40c1447 > an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)
+   ↓ 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+   ↓ 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+   ↓ 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+   × 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price 725ms
+     → expected { moved: 2, repriced: +0, …(3) } to match object { moved: 2, repriced: 1 }
+(3 matching properties omitted from actual)
+   ↓ 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+   ↓ 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+AssertionError: expected { moved: 2, repriced: +0, …(3) } to match object { moved: 2, repriced: 1 }
+(3 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "moved": 2,[22m
+[32m-   "repriced": 1,[39m
+[31m+   "repriced": 0,[39m
+[2m  }[22m
+
+ ❯ test/08n-session-offers.test.ts:1121:15
+    1119|       param: { id: june }, json: { registrationIds: [lw!.id, lp!.id], …
+    1120|     }));
+    1121|     expect(r).toMatchObject({ moved: 2, repriced: 1 });
+       |               ^
+    1122|     const there = await subjectRow(other, sub);
+    1123|     // The waiting line reads the other series' row; the paid one keep…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 32 skipped (33)
+   Start at  05:00:27
+   Duration  3.95s (transform 496ms, setup 2ms, collect 210ms, tests 2.27s, environment 0ms, prepare 32ms)
+

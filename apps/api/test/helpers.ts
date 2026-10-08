@@ -732,26 +732,51 @@ export async function refuseAudit(action: string): Promise<() => Promise<void>> 
  * the trigger is dropped on release (test files run one at a time, so no other suite sees it).
  */
 export async function pauseAtAudit(action: string): Promise<() => Promise<void>> {
-  if (!/^[A-Z_]+$/.test(action)) throw new Error(`not an audit action: ${action}`);
+  const p = await pauseAtAudits([action]);
+  return p.releaseAll;
+}
+
+/**
+ * pauseAtAudit for several actions, each released on its own: `paused(action)` waits until a
+ * transaction is held at that action's write, `release(action)` lets it go, `releaseAll()` lets
+ * every one go and drops the trigger.
+ */
+export async function pauseAtAudits(actions: string[]) {
+  for (const a of actions) if (!/^[A-Z_]+$/.test(a)) throw new Error(`not an audit action: ${a}`);
+  const keys = new Map(actions.map((a, i) => [a, 40400 + i]));
   const { default: pg } = await import('pg');
   const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
-  await client.query('select pg_advisory_lock(40400)');
+  for (const k of keys.values()) await client.query(`select pg_advisory_lock(${k})`);
   await sql(`create or replace function test_pause_audit() returns trigger language plpgsql as $$
     begin
-      if new.action = '${action}' then perform pg_advisory_xact_lock(40400); end if;
+      ${[...keys].map(([a, k]) => `if new.action = '${a}' then perform pg_advisory_xact_lock(${k}); end if;`).join('\n      ')}
       return new;
     end $$`);
   await sql(`drop trigger if exists test_pause_audit on audit_log`);
   await sql(`create trigger test_pause_audit before insert on audit_log for each row execute function test_pause_audit()`);
-  let released = false;
-  return async () => {
-    if (released) return;
-    released = true;
-    await client.query('select pg_advisory_unlock(40400)');
-    await client.end();
-    await sql(`drop trigger if exists test_pause_audit on audit_log`);
-    await sql(`drop function if exists test_pause_audit()`);
+  const held = new Set(keys.values());
+  const release = async (action: string) => {
+    const k = keys.get(action)!;
+    if (!held.delete(k)) return;
+    await client.query(`select pg_advisory_unlock(${k})`);
+  };
+  let done = false;
+  return {
+    /** Until a transaction waits at this action's write (an advisory wait on its key). */
+    paused: (action: string, ms = 5000) => waitFor(async () => {
+      const [r] = await sql<{ n: string }>(`select count(*) as n from pg_locks where locktype = 'advisory' and not granted and classid = 0 and objid = $1 and objsubid = 1`, [keys.get(action)!]);
+      return Number(r?.n ?? 0) > 0 || null;
+    }, ms),
+    release,
+    releaseAll: async () => {
+      if (done) return;
+      done = true;
+      for (const a of keys.keys()) await release(a);
+      await client.end();
+      await sql(`drop trigger if exists test_pause_audit on audit_log`);
+      await sql(`drop function if exists test_pause_audit()`);
+    },
   };
 }
 

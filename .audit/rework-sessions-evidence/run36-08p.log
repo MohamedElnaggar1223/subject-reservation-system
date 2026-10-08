@@ -1,0 +1,481 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: 0.2 ms (measured within 2 ms)
+stderr | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [aaa61277-ff6d-40b7-99fe-d178c85dd4dd] POST /api/auth/sign-up/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[email:stub] To: admin.p08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [cf57d450-c1bb-4601-b93a-24d1148c0029] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [6b2d1868-7c12-489f-b17f-78eff241f907] POST /v1/users
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [dc63d848-b3a4-461f-90be-b0f3da9bae5d] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [08ee5998-c6c1-49ee-b2e2-0412223c3f08] POST /v1/users
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [c38a2b96-7081-40b8-b77e-71ee2939b7a1] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [19bcafc3-ec60-4f80-bd00-c0e07e3ac485] POST /v1/teachers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [ba2bc5eb-342c-48f8-8b3b-1120e25f7ca4] POST /v1/sessions
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [3ea905a0-d953-43a3-b1b1-6cc4734ed2e4] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [194d5740-c929-4bce-a76f-51a56e941d5f] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [47bb40a2-6fe2-4c2d-b9bc-6f7bba4d319b] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [34093824-1139-450a-9d75-f786338def8f] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [7c393320-ec27-408d-84b8-f48e17733436] POST /v1/catalogue/qualifications
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [5e93115e-bbd3-4e87-8087-9cf20181056d] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [044af751-1c2c-4673-8bf6-8cb01970edd4] POST /v1/sessions/8f7f0b79-9fb7-4461-9b5d-c97a54ccf9d9/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [bfb3d7f9-a462-4001-a19f-dde3d7a82233] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [c07a3c03-ed22-48d4-8915-b865acf51d51] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [ff252784-ac00-4dc9-97cd-cb3716f2d142] POST /v1/sessions/8f7f0b79-9fb7-4461-9b5d-c97a54ccf9d9/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [d5e2c28f-65fd-415c-8eb6-6c98e45b079d] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [bd80ebab-8922-413b-af3c-5b1dfbda3a0d] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [1f95592d-abbb-42d9-b755-cb6825f2c941] POST /v1/sessions/8f7f0b79-9fb7-4461-9b5d-c97a54ccf9d9/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[INFO] [0c9ad067-36b3-40b4-9385-dc8caa28df3f] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[email:stub] To: parent.p08-a-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[email:stub] To: student.p08-a-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[INFO] [f7bffdc5-02f1-48c2-9ce6-2f75ec4a82fc] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[INFO] [b4d9e55f-6567-454c-9016-f60c3ace1340] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[INFO] [ef16942a-6f18-49e0-9552-7fd9ed1864f9] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[email:stub] To: parent.p08-b-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[email:stub] To: student.p08-b-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[INFO] [cb7b344a-aa35-4b52-bd18-5f67745109b2] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[INFO] [0973258b-a303-44f1-bb57-49075253afd4] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[INFO] [36f3511e-c7e9-4060-bd88-3ea0844e066d] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[email:stub] To: parent.p08-c-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[email:stub] To: student.p08-c-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[INFO] [15ff059d-736d-465e-a754-e38a14f2ecea] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[INFO] [e3339b90-2e8e-40bc-96ac-6162bef286b8] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[INFO] [e3c00b05-6970-4ad0-ab1d-a34f7a453d61] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[email:stub] To: parent.p08-d-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[email:stub] To: student.p08-d-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[INFO] [99ea9e0a-0b8e-4c97-8d24-ab668cefb0b9] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+[INFO] [4c9a614f-0b2b-41b8-843e-40a972d0ddb9] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a one-paper retake costs its own course fee and the qualification's board fee; it is refused with the whole subject, and as a first entry
+[INFO] [aff19d00-c19b-41d6-bef5-8bf620536a81] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a one-paper retake costs its own course fee and the qualification's board fee; it is refused with the whole subject, and as a first entry
+[email:stub] To: parent.p08-one-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a one-paper retake costs its own course fee and the qualification's board fee; it is refused with the whole subject, and as a first entry
+[email:stub] To: student.p08-one-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a one-paper retake costs its own course fee and the qualification's board fee; it is refused with the whole subject, and as a first entry
+[INFO] [b04dcfac-6e63-41b3-9a81-fca8e3c6e99e] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a one-paper retake costs its own course fee and the qualification's board fee; it is refused with the whole subject, and as a first entry
+[INFO] [372fad11-e195-4afd-b253-436dd6ee9142] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+[INFO] [d49cee33-be7f-4882-a4b2-e332794bf38f] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+[email:stub] To: parent.p08-set-a-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+[email:stub] To: student.p08-set-a-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+[INFO] [17e19c82-4f04-4d15-9868-853e94ab3165] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+[INFO] [b6f863ae-66be-4f5f-90a8-baa9c4443981] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+[INFO] [963de6ca-d24e-4ded-9e32-b581a49d4a2a] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+[email:stub] To: parent.p08-set-b-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+[email:stub] To: student.p08-set-b-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+[INFO] [0ff5cca0-0692-43fa-adfd-76f4769b177a] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+[INFO] [710af949-6636-4191-a769-70e8b23b902c] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+[INFO] [e4dc7bcc-047f-4adf-96b0-5c191a193329] PUT /v1/settings/pricing.selfStudyCoursePercent
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+[INFO] [7770228a-189b-4260-b75f-76812d395b0f] PUT /v1/settings/pricing.selfStudyCoursePercent
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [83a1043a-5df9-4a74-ae6d-4d59e4c27d2f] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[email:stub] To: parent.p08-pct-s-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[email:stub] To: student.p08-pct-s-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [1bccc38a-f04d-4cf2-824f-3a61b9ab7d35] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [49fe5d70-692f-4244-bd1f-885c488c697d] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [6ee7a87e-eafe-4d47-a80a-8ea680f98481] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[email:stub] To: parent.p08-pct-r-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[email:stub] To: student.p08-pct-r-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [b8ccf094-5049-4f20-9783-e2201e3e013e] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [e171098f-311a-4bd6-b855-3f5bbc5103e9] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [542ad81b-bbed-4925-80ec-973b624820ef] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[email:stub] To: parent.p08-pct-n-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[email:stub] To: student.p08-pct-n-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [1b7b0906-9516-4a4d-ad71-715f005e021f] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [2f301ec3-9953-4eb9-a937-06d7f7f26917] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[INFO] [cd3a3f45-a0a6-480a-9784-3dd98f8ec138] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[email:stub] To: parent.p08-exc-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[email:stub] To: student.p08-exc-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[INFO] [af7bba11-e589-498a-b496-24b88352da35] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[INFO] [82f2831b-7239-4f0f-a701-89c54f8122bc] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[INFO] [94970310-421f-4fcb-8d87-b6c3bd835ee6] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[email:stub] To: parent.p08-exc2-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[email:stub] To: student.p08-exc2-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[INFO] [30141bba-bed0-41b2-aac9-fec7f667be31] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[INFO] [32595c19-871f-4c36-8193-5c615bba94e0] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[INFO] [796da366-7ff1-494a-b7ca-604809cc6cd2] POST /v1/exceptions
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[INFO] [a4341248-afe0-4091-afea-d0dee7165855] POST /v1/exceptions
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[INFO] [1ffd2814-73f3-4c13-a516-de062d52d40e] POST /v1/exceptions
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+[INFO] [025027a2-90d2-4434-9556-5da3654276f8] POST /v1/exceptions
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace
+[INFO] [19352533-d578-4bb4-b491-c26177b7cf02] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace
+[email:stub] To: parent.p08-prov-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace
+[email:stub] To: student.p08-prov-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace
+[INFO] [f329563b-36c2-4cb6-b8cb-6c6faf5ce88a] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace
+[INFO] [b46236cb-5556-4248-9cee-58bcf66d4333] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace
+[INFO] [90e7f2e0-509f-4c23-8977-541ba2daec8c] POST /v1/payments/initiate
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace
+[INFO] [dfa0cf86-08de-473a-8c9b-ecfd551dc593] POST /v1/registrations/desk/collect
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace
+[INFO] [bd2ba63a-4a2a-436f-b0ed-aea0e057a857] POST /v1/board-fees/713c2a37-7fe9-41a2-8a7f-e39fe5c78bba/confirm
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace
+[INFO] [ec7a3a75-1909-4c79-afbb-c41a40a8fb51] POST /v1/payments/initiate
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [c860fa87-10ca-4dfb-bf0f-14ffd03e9df7] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [b3d8ccf3-6c41-410f-8ede-f0233c5a0633] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [3f85f93a-87f4-4b9b-a491-24ecf6fa260f] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [2265460a-6a7e-4a5d-9f13-aff5dc8efb43] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [59e3d86f-c841-47cb-a2ee-46260eae2d55] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[email:stub] To: parent.p08-put-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[email:stub] To: student.p08-put-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [518a873a-0176-4aa5-ba12-849567afae79] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [d737ec09-42e8-410e-8ab9-a6500c5cd606] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [9cc8e88d-4b4c-4f76-a29e-bb79657b3de1] POST /v1/sessions/8f7f0b79-9fb7-4461-9b5d-c97a54ccf9d9/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [a70866e8-e0d6-4b26-a333-481d5bac1c07] POST /v1/sessions/8f7f0b79-9fb7-4461-9b5d-c97a54ccf9d9/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [39f6a9a1-0a54-4986-a990-acb5cd7e471c] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [0938076a-a85e-4e97-93c8-5ff8e11a8e7f] POST /v1/payments/initiate
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [d6127bf8-1c55-41ac-b966-5bb5862e034d] POST /v1/payments/initiate
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [3c540f41-ad54-47d5-ade7-2f681598e6e8] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [7f90b509-48d5-4b01-ac99-ad206eb02b16] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [8fadeac4-5817-44ea-87ed-152a09c4a2b7] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [537ec650-c93a-4c42-97d8-02aab0b7ca09] POST /v1/sessions/8f7f0b79-9fb7-4461-9b5d-c97a54ccf9d9/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [dc751915-e619-474a-83a8-c639aebd1294] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[email:stub] To: parent.p08-hi-plain-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[email:stub] To: student.p08-hi-plain-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [f94f960b-9717-4bb9-97be-48b27dad8982] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [b1460ad2-9403-44cb-97f2-5a60fdd033e4] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [ea9027f3-13f0-46a1-84c4-5f326887092a] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[email:stub] To: parent.p08-hi-disc-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[email:stub] To: student.p08-hi-disc-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [7db88943-c74b-475d-922c-3b93283a5d13] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [b5d79b03-4de1-4660-985a-20ba87983471] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [74358d60-3e9c-4ebb-a22d-e8883e3dcbcd] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[email:stub] To: parent.p08-hi-open-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[email:stub] To: student.p08-hi-open-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [e8c0e934-bc4d-4a41-b0ca-a5b08e72221e] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [cc0ff3a5-ace4-4dd0-ae19-18b03fdd1712] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [1081e13e-e9ec-4ad4-ba56-e81d86040ea1] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[email:stub] To: parent.p08-hi-failed-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[email:stub] To: student.p08-hi-failed-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [ddf2e1b0-0bc1-4a49-8ae1-26684aea50c8] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [8bbe728e-bb43-461d-82c9-a0a16ce3f82e] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [b3b58b77-d450-455e-a833-f60c14a30ed7] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[email:stub] To: parent.p08-hi-paid-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[email:stub] To: student.p08-hi-paid-u9me@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [084beddf-17ef-4ac0-97c8-698670fb2821] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [b9393eab-17f3-4795-8334-fa7ae4f6bd8f] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [3bd61156-e1a0-4eed-842f-d0f30fc7e0df] POST /v1/exceptions
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [7450044a-4c42-445b-b87f-2c9e7d1c369a] POST /v1/exceptions/2df71b79-4868-488a-8cb4-160f091b5a60/revoke
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [60db1199-ae25-47c1-b666-64acc26b61b2] PUT /v1/settings/pricing.payOnProvisionalFee
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [86bb38d5-abd1-4858-bd96-4c99d53e448d] POST /v1/payments/initiate
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [04ea318b-7b0c-4b47-bfa1-b57fd420aaff] POST /v1/payments/initiate
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [fa00da1f-84be-4caa-8a0d-102ba7f93c95] POST /v1/payments/b9ddffee-7e66-44a8-b412-0f475b6a7f78/cancel
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [4f794d0f-aa75-4cff-b255-17634682ed44] POST /v1/payments/initiate
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [ed8047d1-b57f-4b81-b7b3-8cd01975064e] POST /v1/payments/c84c682f-10b8-4778-8a26-2e4d7e720cea/confirm
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [0cc40d9c-ba40-42ff-a6e1-3ac2aff1c61a] PUT /v1/settings/pricing.payOnProvisionalFee
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[email:stub] To: parent.p08-hi-paid-u9me@test.local | Subject: Payment confirmed — June 2027 — p08-u9me | Attachments: receipt-c84c682f-10b8-4778-8a26-2e4d7e720cea.pdf
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [b6a05abd-9b80-4855-9a57-370589845ddc] POST /v1/board-fees/2b0590a9-2605-466d-a196-12666a3d37bc/confirm
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+[INFO] [1d3608dd-4de1-440e-b4a2-3b0a763ec6e2] POST /v1/board-fees/2b0590a9-2605-466d-a196-12666a3d37bc/reprice
+
+ ✓ test/08p-pricing-policies.test.ts (8 tests) 7791ms
+   ✓ 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%  1244ms
+   ✓ 08p: pricing policies > a one-paper retake costs its own course fee and the qualification's board fee; it is refused with the whole subject, and as a first entry  344ms
+   ✓ 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given  621ms
+   ✓ 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not  909ms
+   ✓ 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line  631ms
+   ✓ 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace  362ms
+   ✓ 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price  385ms
+   ✓ 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told  1698ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  06:10:43
+   Duration  9.48s (transform 493ms, setup 2ms, collect 181ms, tests 7.79s, environment 0ms, prepare 32ms)
+

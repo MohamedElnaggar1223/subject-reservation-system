@@ -1,0 +1,34 @@
+# run39-08n-08p-08t.log: the proof of this run, as vitest reported it (the full log, 8833 lines, 891338 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ❯ test/08n-session-offers.test.ts (38 tests | 1 failed) 22796ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 8141ms
+ ✓ test/08t-rework-races.test.ts (19 tests) 12862ms
+
+## Failed tests
+   × 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line 803ms
+
+## Failures
+ FAIL  test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+AssertionError: expected { reason: 'payment_closed' } to deeply equal { reason: 'entry_deadline' }
+- Expected
++ Received
+  {
+-   "reason": "entry_deadline",
++   "reason": "payment_closed",
+  }
+ ❯ test/08n-session-offers.test.ts:1360:149
+    1358|       await runPaymentDeadlines();
+    1359|       expect(await statusOf(made!.id)).toBe('expired');
+    1360|       expect(await one(`select new_data->>'reason' as reason from audi…
+       |                                                                                                                                                     ^
+    1361|       expect((await one<{ s: string }>(`select status as s from paymen…
+    1362|     } finally {
+
+## Summary
+[clock] database minus host: 0.3 ms (measured within 1 ms)
+ Test Files  1 failed | 2 passed (3)
+      Tests  1 failed | 66 passed (67)
+   Start at  06:36:11
+   Duration  46.13s (transform 564ms, setup 5ms, collect 429ms, tests 43.80s, environment 0ms, prepare 104ms)
