@@ -1,23 +1,27 @@
 # C38: the lead's addition: self-study on a first entry of a taught item is an error, never priced at the share silently
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (55 tests | 5 failed) 11195ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 230ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > a first entry in self-study is a line once the student has the exception: the line uses it once 66ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > history of the session's own series, or of a later one, is not a sitting before it: a first entry, in the review as at the commit 165ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed while November was still running: not a sitting before June, so self-study is a first entry, refused without the exception 59ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > history committed after November ended is still not a sitting for a line of November itself: the same series is the same sitting 195ms
+ ❯ test/08n-import.test.ts (64 tests | 7 failed) 13729ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 203ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > a first entry in self-study is a line once the student has the exception: the line uses it once 61ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > history of the session's own series, or of a later one, is not a sitting before it: a first entry, in the review as at the commit 163ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed while November was still running: not a sitting before June, so self-study is a first entry, refused without the exception 63ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > history committed after November ended is still not a sitting for a line of November itself: the same series is the same sitting 186ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > a course the student dropped is not a sitting: a self-study line after it is a first entry, refused without the exception — history in the system as in the file (the review of 8 Oct, item 3) 126ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 124ms
  Test Files  1 failed (1)
-      Tests  5 failed | 50 passed (55)
-   Duration  13.05s (transform 680ms, setup 2ms, collect 260ms, tests 11.19s, environment 0ms, prepare 35ms)
- ❯ test/08n-import.test.ts:622:91
- ❯ test/08n-import.test.ts:760:114
- ❯ test/08n-import.test.ts:791:92
- ❯ test/08n-import.test.ts:828:71
- ❯ test/08n-import.test.ts:854:71
+      Tests  7 failed | 57 passed (64)
+   Duration  15.73s (transform 710ms, setup 2ms, collect 292ms, tests 13.73s, environment 0ms, prepare 35ms)
+ ❯ test/08n-import.test.ts:626:91
+ ❯ test/08n-import.test.ts:764:114
+ ❯ test/08n-import.test.ts:795:92
+ ❯ test/08n-import.test.ts:832:71
+ ❯ test/08n-import.test.ts:858:71
+ ❯ test/08n-import.test.ts:884:75
+ ❯ test/08n-import.test.ts:1095:96
 
 # failures (messages)
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is
 AssertionError: expected { code: 'self_study_on_taught', …(2) } to deeply equal { code: 'self_study_on_taught', …(2) }
@@ -32,15 +36,15 @@ AssertionError: expected { code: 'self_study_on_taught', …(2) } to deeply equa
 +   "severity": "info",
   }
 
- ❯ test/08n-import.test.ts:622:91
-    620|       });
-    621|       // 4: self-study on a first entry is refused without the student…
-    622|       expect(rowAt(v, 'Live', 4).problems.find((p) => p.code === 'self…
+ ❯ test/08n-import.test.ts:626:91
+    624|       });
+    625|       // 4: self-study on a first entry is refused without the student…
+    626|       expect(rowAt(v, 'Live', 4).problems.find((p) => p.code === 'self…
        |                                                                                           ^
-    623|         code: 'self_study_on_taught', severity: 'error',
-    624|         detail: 'Self-study on a first entry needs the exception: gran…
+    627|         code: 'self_study_on_taught', severity: 'error',
+    628|         detail: 'Self-study on a first entry needs the exception: gran…
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > a first entry in self-study is a line once the student has the exception: the line uses it once
 AssertionError: expected { code: 'self_study_on_taught', …(2) } to match object { severity: 'error' }
@@ -54,10 +58,10 @@ AssertionError: expected { code: 'self_study_on_taught', …(2) } to match objec
 +   "severity": "info",
   }
 
- ❯ test/08n-import.test.ts:760:114
+ ❯ test/08n-import.test.ts:764:114
 
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > history of the session's own series, or of a later one, is not a sitting before it: a first entry, in the review as at the commit
 AssertionError: expected { code: 'self_study_on_taught', …(2) } to match object { code: 'self_study_on_taught', …(1) }
@@ -72,15 +76,15 @@ AssertionError: expected { code: 'self_study_on_taught', …(2) } to match objec
 +   "severity": "info",
   }
 
- ❯ test/08n-import.test.ts:791:92
-    789|       const v = await fetchView(adm, again);
-    790|       for (const n of [3, 4, 5]) {
-    791|         expect(rowAt(v, 'Again', n).problems.find((p) => p.code.starts…
+ ❯ test/08n-import.test.ts:795:92
+    793|       const v = await fetchView(adm, again);
+    794|       for (const n of [3, 4, 5]) {
+    795|         expect(rowAt(v, 'Again', n).problems.find((p) => p.code.starts…
        |                                                                                            ^
-    792|         expect(lineOf(rowAt(v, 'Again', n))).toMatchObject({ attempt: …
-    793|       }
+    796|         expect(lineOf(rowAt(v, 'Again', n))).toMatchObject({ attempt: …
+    797|       }
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed while November was still running: not a sitting before June, so self-study is a first entry, refused without the exception
 AssertionError: expected { code: 'self_study_on_taught', …(2) } to match object { code: 'self_study_on_taught', …(1) }
@@ -95,15 +99,15 @@ AssertionError: expected { code: 'self_study_on_taught', …(2) } to match objec
 +   "severity": "info",
   }
 
- ❯ test/08n-import.test.ts:828:71
-    826|       const id = await stage(adm, laterSheet(), 'after-november-self.x…
-    827|       const r = await mapped(id);
-    828|       expect(r.problems.find((p) => p.code.startsWith('self_study'))).…
+ ❯ test/08n-import.test.ts:832:71
+    830|       const id = await stage(adm, laterSheet(), 'after-november-self.x…
+    831|       const r = await mapped(id);
+    832|       expect(r.problems.find((p) => p.code.startsWith('self_study'))).…
        |                                                                       ^
-    829|       expect(r.plan.line).toMatchObject({ attempt: 'first', priorSitti…
-    830|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
+    833|       expect(r.plan.lines[0]).toMatchObject({ attempt: 'first', priorS…
+    834|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > history committed after November ended is still not a sitting for a line of November itself: the same series is the same sitting
 AssertionError: expected { code: 'self_study_on_taught', …(2) } to match object { code: 'self_study_on_taught', …(1) }
@@ -118,13 +122,58 @@ AssertionError: expected { code: 'self_study_on_taught', …(2) } to match objec
 +   "severity": "info",
   }
 
- ❯ test/08n-import.test.ts:854:71
-    852|       const r = rowAt(await fetchView(adm, id), 'Same', 3);
-    853|       expect(r.plan.line).toMatchObject({ series: expect.stringMatchin…
-    854|       expect(r.problems.find((p) => p.code.startsWith('self_study'))).…
+ ❯ test/08n-import.test.ts:858:71
+    856|       const r = rowAt(await fetchView(adm, id), 'Same', 3);
+    857|       expect(r.plan.lines[0]).toMatchObject({ series: expect.stringMat…
+    858|       expect(r.problems.find((p) => p.code.startsWith('self_study'))).…
        |                                                                       ^
-    855|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
-    856|       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param…
+    859|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
+    860|       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param…
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > a course the student dropped is not a sitting: a self-study line after it is a first entry, refused without the exception — history in the system as in the file (the review of 8 Oct, item 3)
+AssertionError: expected { code: 'self_study_on_taught', …(2) } to deeply equal { code: 'self_study_on_taught', …(2) }
+
+- Expected
++ Received
+
+  {
+    "code": "self_study_on_taught",
+    "detail": "Self-study on a first entry needs the exception: grant it on the Exceptions page or make it a retake with its sitting",
+-   "severity": "error",
++   "severity": "info",
+  }
+
+ ❯ test/08n-import.test.ts:884:75
+    882|         const r = rowAt(v, 'Later drop', n);
+    883|         expect(r.plan.lines).toMatchObject([{ attempt: 'first', mode: …
+    884|         expect(r.problems.find((p) => p.code === 'self_study_on_taught…
+       |                                                                           ^
+    885|           code: 'self_study_on_taught', severity: 'error', detail: 'Se…
+    886|         });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting
+AssertionError: expected { code: 'self_study_on_taught', …(2) } to match object { severity: 'error' }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "severity": "error",
++   "severity": "info",
+  }
+
+ ❯ test/08n-import.test.ts:1095:96
+    1093|       // Self-study: still a first entry — it needs the exception, nev…
+    1094|       expect(rowAt(v, 'Nov carry', 4).plan.lines).toMatchObject([{ att…
+    1095|       expect(rowAt(v, 'Nov carry', 4).problems.find((p) => p.code === …
+       |                                                                                                ^
+    1096|       // The carry-forward note read as a result: the sitting it is ca…
+    1097|       expect(rowAt(v, 'Nov carry', 5).plan.lines).toMatchObject([{ att…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
 

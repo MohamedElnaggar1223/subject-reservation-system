@@ -1,0 +1,51 @@
+# C60: item 5 with C44: the student held before the lines by neither lockStudents nor assertMayRegisterForInTx
+# undone in apps/api/src/services/import/commit.ts
+# summary
+ ❯ test/08n-import.test.ts (64 tests | 2 failed) 17980ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders) 5775ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce) 633ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 62 passed (64)
+   Duration  19.77s (transform 685ms, setup 2ms, collect 294ms, tests 17.98s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:1146:11
+ ❯ test/08n-import.test.ts:1231:23
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders)
+Error: waitFor: timed out
+ ❯ waitFor test/helpers.ts:482:38
+    480|     const v = await probe();
+    481|     if (v) return v;
+    482|     if (Date.now() > deadline) throw new Error('waitFor: timed out');
+       |                                      ^
+    483|     await new Promise((r) => setTimeout(r, 100));
+    484|   }
+ ❯ test/08n-import.test.ts:1146:11
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce)
+AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]
+
+- Expected
++ Received
+
+  [
+    {
+-     "session_id": "c652e574-b532-45d3-8690-c5f39a12ffc5",
++     "session_id": "4a189a8e-3a99-48ab-8287-3d868dc4dae2",
+    },
+  ]
+
+ ❯ test/08n-import.test.ts:1231:23
+    1229|         const lines = await sql<{ session_id: string }>(`select r.sess…
+    1230|           where r.student_id = $1 and r.board_series_id = $2 and i.lab…
+    1231|         expect(lines).toEqual([{ session_id: sess }]);
+       |                       ^
+    1232|         expect(c.status).toBe(200);
+    1233|         expect(d.status).toBe(409);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

@@ -1,38 +1,9 @@
 # C44: the commit holds the student before its lines (assertMayRegisterForInTx), as every reservation path does (s6)
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (55 tests | 1 failed) 11040ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce) 743ms
- Test Files  1 failed (1)
-      Tests  1 failed | 54 passed (55)
-   Duration  13.16s (transform 735ms, setup 2ms, collect 283ms, tests 11.04s, environment 0ms, prepare 37ms)
- ❯ test/08n-import.test.ts:1001:23
+ ✓ test/08n-import.test.ts (64 tests) 13959ms
+ Test Files  1 passed (1)
+      Tests  64 passed (64)
+   Duration  16.23s (transform 710ms, setup 2ms, collect 308ms, tests 13.96s, environment 0ms, prepare 37ms)
 
 # failures (messages)
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
-
- FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce)
-AssertionError: expected [ …(2) ] to deeply equal [ Array(1) ]
-
-- Expected
-+ Received
-
-  [
-    {
-+     "session_id": "83f0074c-6b82-47d9-a381-3ae0620948ff",
-+   },
-+   {
-      "session_id": "83f70e68-438a-497a-82a3-0143a2b00c98",
-    },
-  ]
-
- ❯ test/08n-import.test.ts:1001:23
-    999|         const lines = await sql<{ session_id: string }>(`select r.sess…
-    1000|           where r.student_id = $1 and r.board_series_id = $2 and i.lab…
-    1001|         expect(lines).toEqual([{ session_id: sess }]);
-       |                       ^
-    1002|         expect(c.status).toBe(200);
-    1003|         expect(d.status).toBe(409);
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
-

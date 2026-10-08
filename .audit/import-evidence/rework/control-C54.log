@@ -1,0 +1,35 @@
+# C54: item 5: every student with lines held FOR NO KEY UPDATE in id order before the first line
+# undone in apps/api/src/services/import/commit.ts
+# summary
+ ❯ test/08n-import.test.ts (64 tests | 1 failed) 13216ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders) 850ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 63 passed (64)
+   Duration  15.36s (transform 720ms, setup 3ms, collect 294ms, tests 13.22s, environment 0ms, prepare 37ms)
+ ❯ test/08n-import.test.ts:1149:62
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders)
+AssertionError: expected [ false, true ] to deeply equal [ true, true ]
+
+- Expected
++ Received
+
+  [
+-   true,
++   false,
+    true,
+  ]
+
+ ❯ test/08n-import.test.ts:1149:62
+    1147|             `select count(*) as n from pg_locks l join pg_stat_activit…
+    1148|           // Waiting for the held student, the commit holds neither ch…
+    1149|           expect([await free(fees.P1), await free(fees.M1)]).toEqual([…
+       |                                                              ^
+    1150|           await hold.query('commit');
+    1151|           const out = await apiResponse(commit);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

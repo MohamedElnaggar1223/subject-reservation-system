@@ -1,12 +1,12 @@
 # C4: the commit module may not touch a payment table (re-run on the new base)
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (55 tests | 1 failed) 11345ms
-   × F7: the day-one import > the money record (F-01): history only, never a payment > the import cannot make a payment: the code that commits it touches no payment, escrow or receipt table 6ms
+ ❯ test/08n-import.test.ts (64 tests | 1 failed) 14382ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > the import cannot make a payment: the code that commits it touches no payment, escrow or receipt table 8ms
  Test Files  1 failed (1)
-      Tests  1 failed | 54 passed (55)
-   Duration  13.19s (transform 723ms, setup 2ms, collect 247ms, tests 11.35s, environment 0ms, prepare 36ms)
- ❯ test/08n-import.test.ts:1095:88
+      Tests  1 failed | 63 passed (64)
+   Duration  16.29s (transform 703ms, setup 2ms, collect 305ms, tests 14.38s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:1369:88
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -22,13 +22,13 @@ AssertionError: ../src/services/import/commit.ts: expected [ 'payment' ] to deep
 +   "payment",
 + ]
 
- ❯ test/08n-import.test.ts:1095:88
-    1093|         const text = readFileSync(fileURLToPath(new URL(f, import.meta…
-    1094|         const fromDb = [...text.matchAll(/import\s*\{([^}]*)\}\s*from\…
-    1095|         expect(fromDb.split(',').map((x) => x.trim()).filter((x) => mo…
+ ❯ test/08n-import.test.ts:1369:88
+    1367|         const text = readFileSync(fileURLToPath(new URL(f, import.meta…
+    1368|         const fromDb = [...text.matchAll(/import\s*\{([^}]*)\}\s*from\…
+    1369|         expect(fromDb.split(',').map((x) => x.trim()).filter((x) => mo…
        |                                                                                        ^
-    1096|         expect(/\b(insert|update)\s+(into\s+)?"?(payment|escrow|escrow…
-    1097|       }
+    1370|         expect(/\b(insert|update)\s+(into\s+)?"?(payment|escrow|escrow…
+    1371|       }
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

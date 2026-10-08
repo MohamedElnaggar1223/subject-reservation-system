@@ -109,6 +109,13 @@ CONTROLS = {
     'C58': ('item 7: findOffer\'s name fallback matches the row\'s level', O,
             "  const byName = pick(atLevel(offers.filter((o) => words(o.name) === t || words(o.code) === t)), 'name')",
             "  const byName = pick(offers.filter((o) => words(o.name) === t || words(o.code) === t), 'name')", ['08n-import']),
+    # C44 is green since item 5: lockStudents holds every student before the first line, so the lock
+    # assertMayRegisterForInTx takes is no longer the only one. Both undone, the race must be red.
+    'C60': ('item 5 with C44: the student held before the lines by neither lockStudents nor assertMayRegisterForInTx', C,
+            ("  await lockStudents(tx, [...bySession.keys()].map((k) => k.split('|')[0]!));",
+             '  const eligibility = await assertMayRegisterForInTx(tx, studentId, sessionId);'),
+            ('  void lockStudents;',
+             "  const eligibility = await (await import('../eligibility.services')).mayRegisterFor(studentId, sessionId, tx);"), ['08n-import']),
     # F7's earlier controls, run again on the new base (their guards unchanged)
     'C1': ('the commit claim (re-run on the new base)', C,
            "sql`(${importBatch.status} in ('staged', 'partial') or (${importBatch.status} = 'committing' and ${importBatch.commitStartedAt} < now() - make_interval(mins => ${STALE_CLAIM_MINUTES})))`",
@@ -147,10 +154,15 @@ def run(name: str):
     desc, rel, old, new, files = CONTROLS[name]
     path = os.path.join(API, rel)
     src = open(path).read()
-    if src.count(old) != 1:
-        print(f'{name}\tSKIP\tpattern found {src.count(old)} times in {rel}')
-        return
-    open(path, 'w').write(src.replace(old, new, 1))
+    # One replacement, or several in the same file (a tuple each).
+    olds, news = (old, new) if isinstance(old, tuple) else ((old,), (new,))
+    patched = src
+    for o, n in zip(olds, news):
+        if patched.count(o) != 1:
+            print(f'{name}\tSKIP\tpattern found {patched.count(o)} times in {rel}')
+            return
+        patched = patched.replace(o, n, 1)
+    open(path, 'w').write(patched)
     try:
         env = dict(os.environ, TEST_DB_NAME='igcse_import_ctl_test')
         out = subprocess.run(['pnpm', 'test', '--', *files], cwd=API, env=env, capture_output=True, text=True)

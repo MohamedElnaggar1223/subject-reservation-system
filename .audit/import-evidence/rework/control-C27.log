@@ -1,12 +1,12 @@
 # C27: flag 3: a person's decisions carried by email from every earlier file
 # undone in apps/api/src/services/import.services.ts
 # summary
- ❯ test/08n-import.test.ts (55 tests | 1 failed) 11579ms
+ ❯ test/08n-import.test.ts (64 tests | 1 failed) 13835ms
    × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 50ms
  Test Files  1 failed (1)
-      Tests  1 failed | 54 passed (55)
-   Duration  13.69s (transform 665ms, setup 2ms, collect 238ms, tests 11.58s, environment 0ms, prepare 35ms)
- ❯ test/08n-import.test.ts:494:62
+      Tests  1 failed | 63 passed (64)
+   Duration  15.95s (transform 702ms, setup 2ms, collect 297ms, tests 13.83s, environment 0ms, prepare 35ms)
+ ❯ test/08n-import.test.ts:498:62
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -20,13 +20,13 @@ AssertionError: expected null to be 'karim.lotfy@import.test.local' // Object.is
 + Received: 
 null
 
- ❯ test/08n-import.test.ts:494:62
-    492|       expect(rowAt(v, '2024', 7).edits).toMatchObject({ confirmLink: t…
-    493|       expect(rowAt(v, '2024', 19)).toMatchObject({ decision: 'skip', d…
-    494|       expect(person(v, 'student', `karim.l${D}`).mergedInto).toBe(`kar…
+ ❯ test/08n-import.test.ts:498:62
+    496|       expect(rowAt(v, '2024', 7).edits).toMatchObject({ confirmLink: t…
+    497|       expect(rowAt(v, '2024', 19)).toMatchObject({ decision: 'skip', d…
+    498|       expect(person(v, 'student', `karim.l${D}`).mergedInto).toBe(`kar…
        |                                                              ^
-    495|       expect(v.settings.carryForward).toBe('result');
-    496|       expect(v.summary).toMatchObject({ heldFamilies: 0 });
+    499|       expect(v.settings.carryForward).toBe('result');
+    500|       expect(v.summary).toMatchObject({ heldFamilies: 0 });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

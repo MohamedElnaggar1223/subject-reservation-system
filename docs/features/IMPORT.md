@@ -395,8 +395,10 @@ entry (then "Taught in school instead"), of a provisional fee, of a missing grid
 out), of a retake naming no sitting (then the sitting named), of a unit, of a line whose item staff
 choose, the commit dialog, the result, the session's Money and To verify tabs, and the statement.
 Screenshots: `.audit/import-evidence/rework/screens/f7r-{en,ar}-*.png` (40), and for the review's
-items 2 and 4 `f7s-*.png`: a split line, a code chosen by staff, the result's split rows, and the
-family's Reserve page in Arabic with a closed session (B's and A's sentences in their own Arabic). In Arabic every page of
+items 2 and 4 `f7s-*.png` (`drive/f7s-drive.mjs`, `sheet-split.mts`, `f7s-family.mjs`,
+`seed-family.mts`): a split line, a code chosen by staff, the result's split rows, and the family's
+Reserve page in Arabic — a placeholder family, the session closed by the admin while the page is open,
+the refusal in A's own Arabic ("نافذة التسجيل غير مفتوحة"). In Arabic every page of
 the app reports one React hydration error (the language is read from local storage after the first
 render); it is the same on pages F7 does not touch (`drive/hydration-check.mjs`) and is not F7's.
 
@@ -461,7 +463,8 @@ gives for each):
 | C41 | history before the item's series only | red (green at first: the interim rule covered every case built; a scenario where only the order tells was added) |
 | C42 | findOffer by a unit's code | red |
 | C43 | the rules on lines asked in the review | red |
-| C44 | the commit's student lock | red (green at first: the race was unforced, and a section place also held the student; the race is now forced and touches only the lines) |
+| C44 | the commit's student lock (`assertMayRegisterForInTx`) | red on 669cf84 (green at first: the race was unforced, and a section place also held the student; the race is now forced and touches only the lines); **green on 7003e74**: since item 5 `lockStudents` holds every student before the first line, so this lock is no longer the only one — C60 undoes both |
+| C60 | item 5 with C44: neither `lockStudents` nor `assertMayRegisterForInTx` holds the student | red (the race and the lock order) |
 | C45 | the commit's 403 for lines in a session | red |
 | C1, C4, C5, C6, C9, C11, C25 | the earlier guards, run again on the new base | red |
 | C46 | item 1: the carried sitting of a first entry on an item needing a prior series | red |
@@ -657,6 +660,12 @@ records it.
 - 13:02Z — the trail's correction row for the 27 batch-stamped control rows.
 - 13:09Z — items 1-7 and 9 fixed with their 08n cases (64 tests); 13:08Z the new controls tried (13
   red); 13:11Z the split counted on the real sheet privately (26 lines, 52 lines made).
+- 13:17–13:20Z — gates green on 7003e74: the suite in local time and with TZ=UTC, 29 files, 564
+  passed, 1 todo each; API and web types.
+- 13:20–13:32Z — every control run again on 7003e74, each writing its own trail row as it finished:
+  41 red and C44 green (its lock now doubled by `lockStudents`); C60, both locks undone, red.
+- 13:34–13:38Z — the split driven in English and Arabic, and the family's Reserve page in Arabic with
+  a session closed while open (`f7s-*.png`); the servers left running on 3091/3090 for the lead.
 - Next: the reviewer confirms items 1 and 2 on the diff; the final merge waits for F4 on main (main
   has D at c2d7a78, its migrations to 0054): origin/main merged as its own commit, 0050_import
   regenerated after main's last migration with a later stamp and its snapshot chained, the order

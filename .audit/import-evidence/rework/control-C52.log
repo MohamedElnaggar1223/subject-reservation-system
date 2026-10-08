@@ -1,0 +1,32 @@
+# C52: item 4: the September pattern "… is not open" deleted (it read A's "Registration window is not open")
+# undone in apps/api/../web/lib/i18n-import.ts
+# summary
+ ❯ test/08n-import.test.ts (64 tests | 1 failed) 13886ms
+   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > A's and B's sentences are not the import's: the two the September patterns half-translated have their own words; the rest reach their own translators 6ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 63 passed (64)
+   Duration  15.72s (transform 770ms, setup 2ms, collect 320ms, tests 13.89s, environment 0ms, prepare 36ms)
+ ❯ test/08n-import.test.ts:1245:70
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > A's and B's sentences are not the import's: the two the September patterns half-translated have their own words; the rest reach their own translators
+AssertionError: expected 'Registration window غير مفتوحة' to be null
+
+- Expected: 
+null
+
++ Received: 
+"Registration window غير مفتوحة"
+
+ ❯ test/08n-import.test.ts:1245:70
+    1243|     it('A\'s and B\'s sentences are not the import\'s: the two the Sep…
+    1244|       // The September patterns read these as "Registration window غير…
+    1245|       expect(translateImportText('Registration window is not open')).t…
+       |                                                                      ^
+    1246|       expect(importArabic['Registration window is not open']).toBe('نا…
+    1247|       expect(translateImportText('Registration window is not open — a …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

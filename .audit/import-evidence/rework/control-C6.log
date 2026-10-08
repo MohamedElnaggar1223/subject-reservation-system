@@ -1,25 +1,25 @@
 # C6: a new student's line faces the school-fee gate (re-run on the new base)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (55 tests | 1 failed) 10681ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the school-fee gate is the session's own: a new family owes the year's fee first 92ms
+ ❯ test/08n-import.test.ts (64 tests | 1 failed) 13843ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the school-fee gate is the session's own: a new family owes the year's fee first 84ms
  Test Files  1 failed (1)
-      Tests  1 failed | 54 passed (55)
-   Duration  12.34s (transform 661ms, setup 2ms, collect 257ms, tests 10.68s, environment 0ms, prepare 34ms)
- ❯ test/08n-import.test.ts:657:90
+      Tests  1 failed | 63 passed (64)
+   Duration  15.61s (transform 690ms, setup 2ms, collect 274ms, tests 13.84s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:661:90
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the school-fee gate is the session's own: a new family owes the year's fee first
 TypeError: Cannot read properties of undefined (reading 'detail')
- ❯ test/08n-import.test.ts:657:90
-    655|       try {
-    656|         const v = await fetchView(adm, liveBatch);
-    657|         expect(rowAt(v, 'Live', 3).problems.find((p) => p.code === 're…
+ ❯ test/08n-import.test.ts:661:90
+    659|       try {
+    660|         const v = await fetchView(adm, liveBatch);
+    661|         expect(rowAt(v, 'Live', 3).problems.find((p) => p.code === 're…
        |                                                                                          ^
-    658|           .toBe(`The ${Y}-${Y + 1} school fee (2500.00 EGP) must be pa…
-    659|       } finally {
+    662|           .toBe(`The ${Y}-${Y + 1} school fee (2500.00 EGP) must be pa…
+    663|       } finally {
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

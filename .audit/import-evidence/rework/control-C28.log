@@ -1,12 +1,12 @@
 # C28: flag 3: a possible duplicate of an account already in the system holds its family (duplicate_account)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (55 tests | 1 failed) 10851ms
-   × F7: the day-one import > a re-run of the same file changes nothing > a child under a new email who is already an account in the system holds the family until staff say which 62ms
+ ❯ test/08n-import.test.ts (64 tests | 1 failed) 14164ms
+   × F7: the day-one import > a re-run of the same file changes nothing > a child under a new email who is already an account in the system holds the family until staff say which 39ms
  Test Files  1 failed (1)
-      Tests  1 failed | 54 passed (55)
-   Duration  12.93s (transform 673ms, setup 2ms, collect 258ms, tests 10.85s, environment 0ms, prepare 33ms)
- ❯ test/08n-import.test.ts:513:70
+      Tests  1 failed | 63 passed (64)
+   Duration  16.23s (transform 716ms, setup 2ms, collect 306ms, tests 14.16s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:517:70
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -23,13 +23,13 @@ AssertionError: expected undefined to match object { severity: 'error', …(1) }
 + Received: 
 undefined
 
- ❯ test/08n-import.test.ts:513:70
-    511|       let v = await fetchView(coordinator, id);
-    512|       const k = person(v, 'student', `karim.lotfy2${D}`);
-    513|       expect(k.problems.find((p) => p.code === 'duplicate_account')).t…
+ ❯ test/08n-import.test.ts:517:70
+    515|       let v = await fetchView(coordinator, id);
+    516|       const k = person(v, 'student', `karim.lotfy2${D}`);
+    517|       expect(k.problems.find((p) => p.code === 'duplicate_account')).t…
        |                                                                      ^
-    514|       expect(k.possibleAccounts.map((a) => a.email)).toEqual([`karim.l…
-    515|       expect(v.families.find((f) => f.students.includes(`karim.lotfy2$…
+    518|       expect(k.possibleAccounts.map((a) => a.email)).toEqual([`karim.l…
+    519|       expect(v.families.find((f) => f.students.includes(`karim.lotfy2$…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

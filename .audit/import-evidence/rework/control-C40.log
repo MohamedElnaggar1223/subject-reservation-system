@@ -1,12 +1,12 @@
 # C40: the interim rule (MO-25): history is a sitting only if its series had ended when it was committed
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (55 tests | 1 failed) 11278ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed while November was still running: not a sitting before June, so self-study is a first entry, refused without the exception 70ms
+ ❯ test/08n-import.test.ts (64 tests | 1 failed) 14251ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed while November was still running: not a sitting before June, so self-study is a first entry, refused without the exception 69ms
  Test Files  1 failed (1)
-      Tests  1 failed | 54 passed (55)
-   Duration  13.16s (transform 699ms, setup 2ms, collect 254ms, tests 11.28s, environment 0ms, prepare 35ms)
- ❯ test/08n-import.test.ts:828:71
+      Tests  1 failed | 63 passed (64)
+   Duration  16.13s (transform 745ms, setup 2ms, collect 320ms, tests 14.25s, environment 0ms, prepare 42ms)
+ ❯ test/08n-import.test.ts:832:71
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -25,13 +25,13 @@ AssertionError: expected { code: 'self_study_retake', …(2) } to match object {
 +   "severity": "info",
   }
 
- ❯ test/08n-import.test.ts:828:71
-    826|       const id = await stage(adm, laterSheet(), 'after-november-self.x…
-    827|       const r = await mapped(id);
-    828|       expect(r.problems.find((p) => p.code.startsWith('self_study'))).…
+ ❯ test/08n-import.test.ts:832:71
+    830|       const id = await stage(adm, laterSheet(), 'after-november-self.x…
+    831|       const r = await mapped(id);
+    832|       expect(r.problems.find((p) => p.code.startsWith('self_study'))).…
        |                                                                       ^
-    829|       expect(r.plan.line).toMatchObject({ attempt: 'first', priorSitti…
-    830|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
+    833|       expect(r.plan.lines[0]).toMatchObject({ attempt: 'first', priorS…
+    834|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

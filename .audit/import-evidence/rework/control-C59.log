@@ -1,0 +1,100 @@
+# C59: item 2: a "one paper" note is one line, never split by the papers the subject names
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (64 tests | 1 failed) 14167ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a "one paper" note on a row naming two papers is one line: never split; staff choose the one paper 84ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 63 passed (64)
+   Duration  16.19s (transform 711ms, setup 4ms, collect 295ms, tests 14.17s, environment 0ms, prepare 36ms)
+ ❯ test/08n-import.test.ts:1025:44
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a "one paper" note on a row naming two papers is one line: never split; staff choose the one paper
+AssertionError: expected [ [ …(2) ], [ …(2) ] ] to deeply equal [ null, [] ]
+
+- Expected
++ Received
+
+  [
+-   null,
+-   [],
++   [
++     {
++       "code": "paper 1",
++       "itemLabel": "Paper 1",
++       "offerItemId": "88348019-6ee8-4ca7-84e9-02838cd8d0f7",
++     },
++     {
++       "code": "paper 2",
++       "itemLabel": "Paper 2",
++       "offerItemId": "1ff49779-3637-4f34-b724-0f6a409aa5fe",
++     },
++   ],
++   [
++     {
++       "attempt": "retake",
++       "code": "paper 1",
++       "exists": false,
++       "found": "unit",
++       "itemLabel": "Paper 1",
++       "mode": "in_school",
++       "offerId": "c930cbff-6d7d-431b-b9e9-a0b0e7da901e",
++       "offerItemId": "88348019-6ee8-4ca7-84e9-02838cd8d0f7",
++       "price": {
++         "boardFee": 4800,
++         "boardFeeBase": 4800,
++         "boardPercent": 100,
++         "courseFee": 900,
++         "courseFeeBase": 900,
++         "coursePercent": 100,
++         "provisional": false,
++         "total": 5700,
++       },
++       "priorSitting": null,
++       "series": "Pearson Edexcel November 2026 (t4-iftj)",
++       "sessionId": "a517e378-3d99-4f56-9512-934749864d19",
++       "sessionName": "November 2026 – January 2027 — t4-iftj",
++       "subjectName": "Biology A.S./A.L. (imp)",
++       "teacherId": "da7f602b-2c16-4877-9266-d68a7c7ca968",
++     },
++     {
++       "attempt": "retake",
++       "code": "paper 2",
++       "exists": false,
++       "found": "unit",
++       "itemLabel": "Paper 2",
++       "mode": "in_school",
++       "offerId": "c930cbff-6d7d-431b-b9e9-a0b0e7da901e",
++       "offerItemId": "1ff49779-3637-4f34-b724-0f6a409aa5fe",
++       "price": {
++         "boardFee": 4800,
++         "boardFeeBase": 4800,
++         "boardPercent": 100,
++         "courseFee": 900,
++         "courseFeeBase": 900,
++         "coursePercent": 100,
++         "provisional": false,
++         "total": 5700,
++       },
++       "priorSitting": null,
++       "series": "Pearson Edexcel November 2026 (t4-iftj)",
++       "sessionId": "a517e378-3d99-4f56-9512-934749864d19",
++       "sessionName": "November 2026 – January 2027 — t4-iftj",
++       "subjectName": "Biology A.S./A.L. (imp)",
++       "teacherId": "da7f602b-2c16-4877-9266-d68a7c7ca968",
++     },
++   ],
+  ]
+
+ ❯ test/08n-import.test.ts:1025:44
+    1023|       let r = rowAt(await fetchView(adm, id), 'One paper', 3);
+    1024|       expect(r.data).toMatchObject({ noteOnePaper: true });
+    1025|       expect([r.plan.split, r.plan.lines]).toEqual([null, []]);
+       |                                            ^
+    1026|       expect(r.problems.find((p) => p.code === 'item_unclear')).toEqua…
+    1027|       await putRows(adm, id, { rowIds: [r.id], edits: { offerItemId: i…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

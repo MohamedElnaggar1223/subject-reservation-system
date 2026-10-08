@@ -1,17 +1,19 @@
 # C43: the review asks the rules on lines as the commit will (assertLineRules, rolled back)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (55 tests | 1 failed) 11696ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); Papers 1 and 2 wait for staff to choose 112ms
+ ❯ test/08n-import.test.ts (64 tests | 2 failed) 13767ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 105ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction 341ms
  Test Files  1 failed (1)
-      Tests  1 failed | 54 passed (55)
-   Duration  13.78s (transform 705ms, setup 2ms, collect 282ms, tests 11.70s, environment 0ms, prepare 36ms)
- ❯ test/08n-import.test.ts:934:92
+      Tests  2 failed | 62 passed (64)
+   Duration  15.62s (transform 738ms, setup 2ms, collect 286ms, tests 13.77s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:966:92
+ ❯ test/08n-import.test.ts:1167:122
 
 # failures (messages)
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
- FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); Papers 1 and 2 wait for staff to choose
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper
 AssertionError: expected undefined to deeply equal { code: 'registration_refused', …(2) }
 
 - Expected: 
@@ -24,13 +26,27 @@ AssertionError: expected undefined to deeply equal { code: 'registration_refused
 + Received: 
 undefined
 
- ❯ test/08n-import.test.ts:934:92
-    932|       expect(codes(rowAt(v, 'Units', 3))).toEqual(['unit_row']);
-    933|       expect(rowAt(v, 'Units', 4).plan.line).toMatchObject({ itemLabel…
-    934|       expect(rowAt(v, 'Units', 4).problems.find((p) => p.code === 'reg…
+ ❯ test/08n-import.test.ts:966:92
+    964|       expect(codes(rowAt(v, 'Units', 3))).toEqual(['unit_row']);
+    965|       expect(rowAt(v, 'Units', 4).plan.lines[0]).toMatchObject({ itemL…
+    966|       expect(rowAt(v, 'Units', 4).problems.find((p) => p.code === 'reg…
        |                                                                                            ^
-    935|         code: 'registration_refused', severity: 'error', detail: 'Math…
-    936|       });
+    967|         code: 'registration_refused', severity: 'error', detail: 'Math…
+    968|       });
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction
+AssertionError: expected undefined to be 'Mathematics A.S./A.L. (imp) — P2 take…' // Object.is equality
+
+- Expected: 
+"Mathematics A.S./A.L. (imp) — P2 takes retakes only this cycle"
+
++ Received: 
+undefined
+
+ ❯ test/08n-import.test.ts:1167:122
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 
