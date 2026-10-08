@@ -1,0 +1,7 @@
+Third merge (origin/main 0acd8b5 into d450556), full suite, TZ=UTC, igcse_scheduling_test
+
+ Test Files  37 passed (37)
+      Tests  619 passed | 1 todo (620)
+   Duration  378.79s (transform 1.49s, setup 59ms, collect 5.07s, tests 366.22s, environment 3ms, prepare 1.27s)
+exit=0
+(✓ lines in the log: 335)

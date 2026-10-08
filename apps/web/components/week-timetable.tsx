@@ -170,8 +170,8 @@ function LessonCell({ l, viewer, continued, onOpen }: { l: Lesson; viewer: 'stud
       {!continued && (
         <>
           <span className="block truncate text-xs text-muted-foreground">
-            {l.room && <bdi>{l.room.name}</bdi>}
-            {viewer === 'student' && l.teacher && <>{l.room && ' · '}<bdi>{l.teacher.name}</bdi></>}
+            {l.room ? <bdi>{l.room.name}</bdi> : l.delivery === 'online' && <span>Online</span>}
+            {viewer === 'student' && l.teacher && <>{(l.room || l.delivery === 'online') && ' · '}<bdi>{l.teacher.name}</bdi></>}
           </span>
           {s && <Badge tone={s.tone} className="mt-0.5">{s.label}</Badge>}
         </>
@@ -194,8 +194,8 @@ function LessonLine({ l, viewer, onOpen }: { l: Lesson; viewer: 'student' | 'tea
       <span className="min-w-0 flex-1">
         <span className={cn('block truncate font-medium text-foreground', l.status === 'cancelled' && 'line-through')}><bdi>{l.groupName}</bdi></span>
         <span className="block truncate text-xs text-muted-foreground">
-          {l.room && <bdi>{l.room.name}</bdi>}
-          {viewer === 'student' && l.teacher && <>{l.room && ' · '}<bdi>{l.teacher.name}</bdi></>}
+          {l.room ? <bdi>{l.room.name}</bdi> : l.delivery === 'online' && <span>Online</span>}
+          {viewer === 'student' && l.teacher && <>{(l.room || l.delivery === 'online') && ' · '}<bdi>{l.teacher.name}</bdi></>}
         </span>
       </span>
       {s && <Badge tone={s.tone}>{s.label}</Badge>}

@@ -94,7 +94,7 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
 
   const lessons = usedVersionIds.length
     ? await executor.select({
-      l: timetableLesson, groupName: teachingGroup.name, archivedOn: teachingGroup.archivedOn,
+      l: timetableLesson, groupName: teachingGroup.name, archivedOn: teachingGroup.archivedOn, delivery: teachingGroup.delivery,
       subjectId: subject.id, subjectName: subject.name, subjectCode: subject.code, roomName: room.name,
     }).from(timetableLesson)
       .innerJoin(teachingGroup, eq(teachingGroup.id, timetableLesson.groupId))
@@ -121,7 +121,7 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
   const extraIds = covers.map((c) => c.lessonId).filter((id) => !lessonIds.includes(id));
   if (extraIds.length) {
     lessons.push(...await executor.select({
-      l: timetableLesson, groupName: teachingGroup.name, archivedOn: teachingGroup.archivedOn,
+      l: timetableLesson, groupName: teachingGroup.name, archivedOn: teachingGroup.archivedOn, delivery: teachingGroup.delivery,
       subjectId: subject.id, subjectName: subject.name, subjectCode: subject.code, roomName: room.name,
     }).from(timetableLesson)
       .innerJoin(teachingGroup, eq(teachingGroup.id, timetableLesson.groupId))
@@ -213,6 +213,7 @@ export async function getScheduleRange(target: ScheduleTarget, from: string, to:
         period: x.l.period!, periods, label: periods.length > 1 ? `${first.label}–${last.label}` : first.label,
         startsAt: first.startsAt, endsAt: last.endsAt, length: periods.length,
         room: x.l.roomId ? { id: x.l.roomId, name: x.roomName ?? '' } : null,
+        delivery: x.delivery === 'online' ? 'online' : 'in_school',
         teacher: who, scheduledTeacher: scheduled, status,
         cover: cover ? { assignmentId: cover.id, status: cover.status as 'assigned' | 'cancelled', teacher: coverTeacher } : null,
         needsNewCover: status === 'uncovered' && lost.some((c) => c.lessonId === x.l.id && c.date === d.date),
@@ -493,6 +494,7 @@ export async function calendarFeed(rawToken: string): Promise<string | null> {
           lines.push(`DTEND:${icsTime(cairoInstant(d.date, l.endsAt))}`);
           lines.push(fold(`SUMMARY:${icsText(title)}`));
           if (l.room) lines.push(fold(`LOCATION:${icsText(l.room.name)}`));
+          else if (l.delivery === 'online') lines.push('LOCATION:Online');
           lines.push(fold(`DESCRIPTION:${icsText([`${l.label}`, who ? `Teacher: ${who}` : null, l.status === 'covered' ? 'Cover lesson' : null, l.status === 'uncovered' ? 'The teacher is away' : null].filter(Boolean).join('\n'))}`));
           if (l.status === 'cancelled') lines.push('STATUS:CANCELLED');
           lines.push('END:VEVENT');

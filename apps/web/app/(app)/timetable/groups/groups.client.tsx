@@ -44,6 +44,9 @@ const fetchCatalogue = () => apiResponse(api.v1.catalogue.$get());
 const fetchSections = (academicYearId: string) => apiResponse(api.v1.academic.sections.$get({ query: { academicYearId } }));
 const fetchRooms = () => apiResponse(api.v1.academic.rooms.$get());
 const fetchWaiting = (academicYearId: string) => apiResponse(api.v1.scheduling.groups.waiting.$get({ query: { academicYearId } }));
+type AssignInput = Parameters<(typeof api.v1.scheduling.groups)['assign-teacher']['$post']>[0]['json'];
+const assignNoPreference = (json: AssignInput) => apiResponse(api.v1.scheduling.groups['assign-teacher'].$post({ json }));
+type AssignOutcome = Awaited<ReturnType<typeof assignNoPreference>>;
 type GoAhead = { anyway: true; clashToken: string | null };
 
 /** How a group is taught: in school, online (no room), or by a provider outside the timetable. */
@@ -69,7 +72,7 @@ export default function GroupsClient(): React.JSX.Element {
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Teaching groups</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Who is taught together, by whom, and for how many periods a week. Formed from the course enrolment (self-study forms no group) and from sections; students in two groups of one subject never happen.
+            Who is taught together, by whom, and for how many periods a week. Formed from the course enrolment (self-study forms no group) and from sections; a student is never in two groups of one subject, or of one unit.
           </p>
         </div>
         {years && year && <YearPicker years={years} year={year} onChoose={choose} />}
@@ -268,9 +271,11 @@ function ToPlace({ year, onDone }: { year: AcademicYearRow; onDone: () => void }
   const q = useQuery({ queryKey: [...TT_KEY, 'waiting', year.id], queryFn: () => fetchWaiting(year.id) });
   const [clash, setClash] = useState<{ message: string; retry: () => void } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // What the last "no preference" assignment did: its form goes once its students have a teacher.
+  const [assigned, setAssigned] = useState<{ outcome: AssignOutcome; names: Map<string, string> } | null>(null);
   const today = schoolToday();
   const from = today < year.startsOn ? year.startsOn : today > year.endsOn ? year.startsOn : today;
-  const done = () => { setClash(null); setError(null); qc.invalidateQueries({ queryKey: TT_KEY }); onDone(); };
+  const done = () => { setClash(null); setError(null); setAssigned(null); qc.invalidateQueries({ queryKey: TT_KEY }); onDone(); };
   const fail = (e: unknown, retry: (go: GoAhead) => void) => {
     if (isPublishedClash(e)) setClash({ message: clashMessage(e), retry: () => retry(goAheadWith(e)) });
     else setError(e instanceof Error ? e.message : 'That did not work');
@@ -290,7 +295,7 @@ function ToPlace({ year, onDone }: { year: AcademicYearRow; onDone: () => void }
   if (q.isLoading) return null;
   if (q.isError || !q.data) return <ErrorState title="Who waits for a group did not load" onRetry={() => q.refetch()} />;
   const w = q.data;
-  if (!w.students.length && !w.giveTo.length && !w.noTeacher.length) return null;
+  if (!w.students.length && !w.giveTo.length && !w.noTeacher.length && !assigned) return null;
   const pending = move.isPending || give.isPending;
   return (
     <section aria-labelledby="toplace-title" className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -303,7 +308,7 @@ function ToPlace({ year, onDone }: { year: AcademicYearRow; onDone: () => void }
             {w.giveTo.map((x) => (
               <li key={x.groupId} className="flex flex-wrap items-center gap-2">
                 <bdi className="font-medium">{x.group}</bdi>
-                <span className="text-muted-foreground"><bdi className="tabular-nums">{x.students}</bdi> <span>students enrolled with</span> <bdi>{x.teacher ?? ''}</bdi></span>
+                <span className="text-muted-foreground"><bdi className="tabular-nums">{x.students}</bdi> <span>{x.students === 1 ? 'student enrolled with' : 'students enrolled with'}</span> <bdi>{x.teacher ?? ''}</bdi></span>
                 <Button size="sm" variant="outline" disabled={pending} onClick={() => give.mutate({ groupId: x.groupId, teacherId: x.teacherId })}><span>Give the group to</span> <bdi>{x.teacher ?? ''}</bdi></Button>
               </li>
             ))}
@@ -317,7 +322,7 @@ function ToPlace({ year, onDone }: { year: AcademicYearRow; onDone: () => void }
             {w.students.map((x) => (
               <li key={`${x.studentId}:${x.groupId}`} className="flex flex-wrap items-center gap-2">
                 <bdi className="font-medium">{x.name}</bdi>
-                <span className="text-muted-foreground"><bdi>{x.subject}</bdi> · <span>in</span> <bdi>{x.group}</bdi> · <span>enrolled with</span> <bdi>{x.enrolledTeacher ?? 'no teacher'}</bdi></span>
+                <span className="text-muted-foreground"><bdi>{x.subject}</bdi> · <span>now in</span> <bdi>{x.group}</bdi> · <span>enrolled with</span> <bdi>{x.enrolledTeacher ?? 'no teacher'}</bdi></span>
                 {x.target
                   ? <Button size="sm" variant="outline" disabled={pending} onClick={() => move.mutate({ groupId: x.target!.id, studentId: x.studentId })}><span>Move to</span> <bdi>{x.target.name}</bdi></Button>
                   : <span className="text-xs text-muted-foreground">No group of that teacher yet: make one by hand below, then move them.</span>}
@@ -328,25 +333,63 @@ function ToPlace({ year, onDone }: { year: AcademicYearRow; onDone: () => void }
       )}
       {clash && <PublishedClashNotice className="mt-3" message={clash.message} pending={pending} onAnyway={clash.retry} onCancel={() => setClash(null)} />}
       {error && <Notice tone="danger" className="mt-3">{error}</Notice>}
-      {w.noTeacher.map((n) => <AssignTeacher key={`${n.subjectId}:${n.unitId ?? ''}`} year={year} entry={n} onDone={done} />)}
+      {assigned && <AssignedNotice outcome={assigned.outcome} names={assigned.names} onClose={() => setAssigned(null)} />}
+      {w.noTeacher.map((n) => (
+        <AssignTeacher key={`${n.subjectId}:${n.unitId ?? ''}`} year={year} entry={n}
+          onAssigned={(outcome) => { done(); setAssigned({ outcome, names: new Map(n.students.map((x) => [x.studentId, x.name])) }); }} />
+      ))}
     </section>
   );
 }
 
 type NoTeacher = Awaited<ReturnType<typeof fetchWaiting>>['noTeacher'][number];
 
+/**
+ * What an assignment did, kept on To place after its form has gone: who took the teacher, the
+ * groups that followed, who still waits (and why: a clash in the published timetable, or no group
+ * of that teacher yet) and who was refused (and why).
+ */
+function AssignedNotice({ outcome, names, onClose }: { outcome: AssignOutcome; names: Map<string, string>; onClose: () => void }) {
+  const f = outcome.followed;
+  const nameOf = (studentId: string) => names.get(studentId) ?? '';
+  return (
+    <Notice tone={outcome.refused.length || f.waiting.length ? 'warning' : 'success'} className="mt-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p>
+            <span>Assigned to</span> <bdi>{outcome.teacher.name}</bdi>: <bdi className="tabular-nums">{outcome.assigned.length}</bdi>
+            {f.groupsGiven.length > 0 && <> · <span>groups given their teacher:</span> <bdi>{f.groupsGiven.map((g) => g.groupName).join(', ')}</bdi></>}
+            {f.moved.length > 0 && <> · <span>moved into their teacher’s group:</span> <bdi>{f.moved.map((m) => `${nameOf(m.studentId)} → ${m.toGroupName}`).join(', ')}</bdi></>}
+          </p>
+          {f.waiting.length > 0 && (
+            <>
+              <p>Their group could not follow yet; they are listed above, each with its action:</p>
+              <ul className="list-disc ps-4">
+                {f.waiting.map((x) => <li key={`${x.studentId}:${x.groupId}`}><bdi>{nameOf(x.studentId)}</bdi> · <bdi>{x.groupName}</bdi>: <span>{x.why}</span></li>)}
+              </ul>
+            </>
+          )}
+          {outcome.refused.length > 0 && (
+            <ul className="list-disc ps-4 text-destructive">
+              {outcome.refused.map((x) => <li key={`${x.studentId}:${x.registrationId ?? ''}`}><bdi>{x.name}</bdi>: <span>{x.why}</span></li>)}
+            </ul>
+          )}
+        </div>
+        <Button type="button" size="sm" variant="ghost" onClick={onClose}>Close</Button>
+      </div>
+    </Notice>
+  );
+}
+
 /** "No preference" given its teacher: the students' lines take the teacher (the line's rules), their enrolments and groups follow. */
-function AssignTeacher({ year, entry, onDone }: { year: AcademicYearRow; entry: NoTeacher; onDone: () => void }) {
+function AssignTeacher({ year, entry, onAssigned }: { year: AcademicYearRow; entry: NoTeacher; onAssigned: (outcome: AssignOutcome) => void }) {
   const [chosen, setChosen] = useState<string[]>(entry.students.map((x) => x.studentId));
   const [teacherId, setTeacherId] = useState(entry.teachers[0]?.id ?? '');
   const [reason, setReason] = useState('');
   const assign = useMutation({
-    mutationFn: async () => apiResponse(api.v1.scheduling.groups['assign-teacher'].$post({
-      json: { academicYearId: year.id, subjectId: entry.subjectId, unitId: entry.unitId, studentIds: chosen, teacherId, reason: reason.trim() },
-    })),
-    onSuccess: (r) => { if (!r.refused.length) setReason(''); onDone(); },
+    mutationFn: () => assignNoPreference({ academicYearId: year.id, subjectId: entry.subjectId, unitId: entry.unitId, studentIds: chosen, teacherId, reason: reason.trim() }),
+    onSuccess: (r) => { if (!r.refused.length) setReason(''); onAssigned(r); },
   });
-  const r = assign.data;
   return (
     <form className="mt-3 rounded-lg border border-border p-3" onSubmit={(e) => { e.preventDefault(); if (teacherId && chosen.length && reason.trim().length >= 3) assign.mutate(); }}>
       <h3 className="text-sm font-semibold text-foreground"><span>No teacher yet:</span> <bdi>{entry.subject}</bdi></h3>
@@ -376,16 +419,6 @@ function AssignTeacher({ year, entry, onDone }: { year: AcademicYearRow; entry: 
         <Button type="submit" disabled={!teacherId || !chosen.length || reason.trim().length < 3 || assign.isPending}>{assign.isPending ? 'Assigning…' : `Assign ${chosen.length}`}</Button>
       </div>
       {assign.isError && <p className="mt-2 text-sm text-destructive">{assign.error instanceof Error ? assign.error.message : 'Not assigned'}</p>}
-      {r && (
-        <div className="mt-2 text-sm">
-          <p><span>Assigned:</span> <bdi className="tabular-nums">{r.assigned.length}</bdi>{r.followed.groupsGiven.length > 0 && <> · <span>groups given their teacher:</span> <bdi>{r.followed.groupsGiven.map((g) => g.groupName).join(', ')}</bdi></>}</p>
-          {r.refused.length > 0 && (
-            <ul className="mt-1 list-disc ps-4 text-destructive">
-              {r.refused.map((x) => <li key={`${x.studentId}:${x.registrationId ?? ''}`}><bdi>{x.name}</bdi>: <span>{x.why}</span></li>)}
-            </ul>
-          )}
-        </div>
-      )}
     </form>
   );
 }
@@ -582,7 +615,7 @@ function GroupRowView({ g, teachers, rooms, open, onToggle, onDone, all, year }:
             <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               <Badge tone={kind.tone}>{kind.label}</Badge>
               {g.subject ? <bdi>{`${g.subject.name} (${g.subject.code})`}</bdi> : <span>Not an exam subject</span>}
-              {g.unit && <Badge tone="info"><span>Unit</span> <bdi>{g.unit.shortCode ?? g.unit.code}</bdi></Badge>}
+              {g.unit && <Badge tone="info" className="gap-1"><span>Unit</span> <bdi>{g.unit.shortCode ?? g.unit.code}</bdi></Badge>}
               <DeliveryBadge g={g} />
               {g.archived && <Badge tone="neutral">Retired</Badge>}
             </span>

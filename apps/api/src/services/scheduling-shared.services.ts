@@ -110,11 +110,11 @@ export async function groupMembersBetween(groupIds: string[], from: string, to: 
   const out: MemberInterval[] = [];
   const pending: { studentId: string; groupId: string; from: string; to: string }[] = [];
 
-  // Enrolment and manual groups: their member rows, the later one winning a shared day per subject.
+  // Enrolment and manual groups: their member rows, the later one winning a shared day per enrolment key.
   const explicit = groups.filter((g) => g.kind !== 'section');
   if (explicit.length) {
     const rows = await executor
-      .select({ id: teachingGroupMember.id, groupId: teachingGroupMember.groupId, studentId: teachingGroupMember.studentId, subjectId: teachingGroupMember.subjectId, academicYearId: teachingGroupMember.academicYearId, startedOn: teachingGroupMember.startedOn, endedOn: teachingGroupMember.endedOn, createdAt: teachingGroupMember.createdAt })
+      .select({ id: teachingGroupMember.id, groupId: teachingGroupMember.groupId, studentId: teachingGroupMember.studentId, subjectId: teachingGroupMember.subjectId, unitId: teachingGroupMember.unitId, academicYearId: teachingGroupMember.academicYearId, startedOn: teachingGroupMember.startedOn, endedOn: teachingGroupMember.endedOn, createdAt: teachingGroupMember.createdAt })
       .from(teachingGroupMember)
       .where(and(
         inArray(teachingGroupMember.groupId, explicit.map((g) => g.id)),
@@ -125,7 +125,7 @@ export async function groupMembersBetween(groupIds: string[], from: string, to: 
     const withSubject = rows.filter((r) => r.subjectId);
     const rivals = withSubject.length
       ? await executor
-        .select({ id: teachingGroupMember.id, groupId: teachingGroupMember.groupId, studentId: teachingGroupMember.studentId, subjectId: teachingGroupMember.subjectId, academicYearId: teachingGroupMember.academicYearId, startedOn: teachingGroupMember.startedOn, endedOn: teachingGroupMember.endedOn, createdAt: teachingGroupMember.createdAt })
+        .select({ id: teachingGroupMember.id, groupId: teachingGroupMember.groupId, studentId: teachingGroupMember.studentId, subjectId: teachingGroupMember.subjectId, unitId: teachingGroupMember.unitId, academicYearId: teachingGroupMember.academicYearId, startedOn: teachingGroupMember.startedOn, endedOn: teachingGroupMember.endedOn, createdAt: teachingGroupMember.createdAt })
         .from(teachingGroupMember)
         .where(and(
           inArray(teachingGroupMember.studentId, [...new Set(withSubject.map((r) => r.studentId))]),
@@ -136,7 +136,10 @@ export async function groupMembersBetween(groupIds: string[], from: string, to: 
       : [];
     const all = new Map([...rows, ...rivals].map((r) => [r.id, r]));
     const ends = laterMembershipWins([...all.values()].map((r) => ({
-      id: r.id, studentId: r.studentId, key: r.subjectId ? `${r.academicYearId}|${r.subjectId}` : `group|${r.groupId}`, startedOn: r.startedOn, endedOn: r.endedOn, createdAt: r.createdAt,
+      // One membership per enrolment key (RESERVATIONS_REWORK.md §10): a unit's, else the subject's.
+      // Two units of one subject are two keys, so one unit's group never ends the other's on a day.
+      id: r.id, studentId: r.studentId, key: r.unitId ? `${r.academicYearId}|u:${r.unitId}` : r.subjectId ? `${r.academicYearId}|s:${r.subjectId}` : `group|${r.groupId}`,
+      startedOn: r.startedOn, endedOn: r.endedOn, createdAt: r.createdAt,
     })));
     const periods = await leavingPeriodsOf(rows.map((r) => r.studentId), executor);
     for (const r of rows) {

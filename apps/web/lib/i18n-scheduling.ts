@@ -128,6 +128,9 @@ export const schedulingArabic: Record<string, string> = {
   'You can place it anyway while you rearrange; the clash stays listed and the timetable cannot be published until it is resolved.':
     'يمكنك وضعها على أي حال أثناء إعادة الترتيب؛ يبقى التعارض ظاهرًا ولا يمكن نشر الجدول حتى يُحل.',
   'No lesson periods to show: set up the year\'s default bell schedule on the Bell schedules screen.': 'لا حصص لعرضها: أعدّ جدول الأجراس الافتراضي للعام من شاشة جداول الأجراس.',
+  // The editor's problem lines (getTimetable's problems).
+  'The default bell schedule has no lesson periods on the school days': 'لا حصص في جدول الأجراس الافتراضي في أيام الدراسة',
+  'This year has no default bell schedule — set one up on the Bell schedules screen': 'لا جدول أجراس افتراضي لهذا العام — أعدّه من شاشة جداول الأجراس',
   'Loading the timetable…': 'جارٍ تحميل الجدول…',
   'The timetable did not load': 'لم يتم تحميل الجدول',
   'This is a connection problem, not an empty timetable.': 'هذه مشكلة في الاتصال، وليس جدولًا فارغًا.',
@@ -172,8 +175,8 @@ export const schedulingArabic: Record<string, string> = {
   'It was not published': 'لم يُنشر',
 
   // ── Teaching groups ──
-  'Who is taught together, by whom, and for how many periods a week. Formed from the course enrolment (self-study forms no group) and from sections; students in two groups of one subject never happen.':
-    'من يدرس معًا، ومع من، وكم حصة أسبوعيًا. تُكوَّن من الالتحاق بالمقررات (الدراسة الذاتية لا تكوّن مجموعة) ومن الفصول؛ ولا يكون طالب في مجموعتين لمادة واحدة.',
+  'Who is taught together, by whom, and for how many periods a week. Formed from the course enrolment (self-study forms no group) and from sections; a student is never in two groups of one subject, or of one unit.':
+    'من يدرس معًا، ومع من، وكم حصة أسبوعيًا. تُكوَّن من الالتحاق بالمقررات (الدراسة الذاتية لا تكوّن مجموعة) ومن الفصول؛ ولا يكون طالب في مجموعتين لمادة واحدة أو لوحدة واحدة.',
   'From the course enrolment': 'من الالتحاق بالمقررات',
   'A group for each subject and teacher, with the students taught it in school. Nothing is written until you confirm; running it again adds only who is new.':
     'مجموعة لكل مادة ومعلم، بالطلاب الذين يدرسونها في المدرسة. لا يُكتب شيء حتى تؤكد؛ وتشغيلها مرة أخرى يضيف الجدد فقط.',
@@ -432,9 +435,10 @@ export const schedulingArabic: Record<string, string> = {
   'A teacher changed on a reservation moves the student’s group by itself. These could not be moved yet, or have no teacher yet.': 'تغيير المعلم في الحجز ينقل مجموعة الطالب تلقائيًا. هؤلاء لم يُنقلوا بعد، أو ليس لهم معلم بعد.',
   'Every student of the group now has another teacher': 'كل طلاب المجموعة لهم الآن معلم آخر',
   'students enrolled with': 'طلاب ملتحقون مع',
+  'student enrolled with': 'طالب ملتحق مع',
   'Give the group to': 'إسناد المجموعة إلى',
   'Enrolled with another teacher than their group’s': 'ملتحقون مع معلم غير معلم مجموعتهم',
-  'in': 'في',
+  'now in': 'الآن في',
   'enrolled with': 'ملتحق مع',
   'Move to': 'نقل إلى',
   'No group of that teacher yet: make one by hand below, then move them.': 'لا مجموعة لهذا المعلم بعد: أنشئ واحدة يدويًا أدناه، ثم انقلهم.',
@@ -445,8 +449,10 @@ export const schedulingArabic: Record<string, string> = {
   'Placed in the morning set': 'وُضع في المجموعة الصباحية',
   'Nobody teaches it this cycle': 'لا أحد يدرّسها في هذه الدورة',
   'Assigning…': 'جارٍ الإسناد…',
-  'Assigned:': 'أُسند:',
   'groups given their teacher:': 'مجموعات أُسند إليها معلمها:',
+  'Assigned to': 'أُسند إلى',
+  'moved into their teacher’s group:': 'نُقلوا إلى مجموعة معلمهم:',
+  'Their group could not follow yet; they are listed above, each with its action:': 'لم تتبعهم مجموعتهم بعد؛ هم مذكورون أعلاه، كلٌّ مع إجرائه:',
   'Not assigned': 'لم يُسند',
   'Taught': 'طريقة التدريس',
   'In school': 'في المدرسة',
@@ -488,6 +494,8 @@ function translateInner(text: string): string | null {
   const list = (s: string) => s.split('; ').map((p) => translateInner(p) ?? p).join('؛ ');
   let m: RegExpExecArray | null;
   if ((m = /^It would clash: (.+)$/.exec(text))) return `ستتعارض: ${list(m[1]!)}`;
+  // Why a student waits for their group: the clashes a follow-up would have added.
+  if ((m = /^It would clash in the published timetable: (.+)$/.exec(text))) return `سيتعارض في الجدول المنشور: ${list(m[1]!)}`;
   if ((m = /^Resolve the clashes before publishing \((\d+)\): (.+)$/.exec(text))) return `احلّ التعارضات قبل النشر (${m[1]}): ${list(m[2]!)}`;
   if ((m = /^Placed with (a clash|\d+ clashes): (.+)$/.exec(text))) return `وُضعت مع ${m[1] === 'a clash' ? 'تعارض' : m[1]!.replace(' clashes', ' تعارضات')}: ${list(m[2]!)}`;
 
@@ -562,6 +570,9 @@ function translateInner(text: string): string | null {
     [/^(.+) has (\d+) periods to teach but a limit of (\d+) a week$/, (x) => `لدى ${x[1]}: ${x[2]} حصة لتدريسها لكن حده ${x[3]} أسبوعيًا`],
     [/^A double needs two lesson periods in a row with no break between them, and the bell schedule has none$/, () => 'تحتاج الحصة المزدوجة إلى حصتين متتاليتين بلا استراحة بينهما، ولا يوجد ذلك في جدول الأجراس'],
     [/^The bell schedule has no lesson periods on the school days$/, () => 'لا حصص في جدول الأجراس في أيام الدراسة'],
+    // Why a student waits for their group (the follow-up's reason; the clash form is matched above).
+    [/^No group of (.+) for this subject yet$/, (x) => `لا مجموعة لـ${x[1] === 'no teacher' ? 'بلا معلم' : x[1]} في هذه المادة بعد`],
+    [/^(\d+) (?:group has|groups have) no teacher yet: (.+)$/, (x) => `${x[1] === '1' ? 'مجموعة واحدة' : `${x[1]} مجموعات`} بلا معلم بعد: ${x[2]}`],
     [/^It is locked at a period the bell schedule does not have: unlock it or move it$/, () => 'مثبتة في حصة غير موجودة في جدول الأجراس: ألغِ تثبيتها أو انقلها'],
     // Cover: why a teacher cannot take a lesson, and the refusals.
     [/^(.+) does not teach (.+) — choose a teacher linked to the subject$/, (x) => `${x[1]} لا يدرّس ${x[2]} — اختر معلمًا مرتبطًا بالمادة`],

@@ -54,7 +54,7 @@ import {
   SchedulingError, isUniqueViolation, addDays, readableDate, groupMembersBetween, peakSize, teachersOn, type Tx, type Executor,
 } from './scheduling-shared.services';
 import { todayAtSchool } from '../lib/clock';
-import { guardPublishedTimetable, checkpointPublished } from './timetable-clash.services';
+import { guardPublishedTimetable, checkpointPublished, PUBLISHED_CLASH_REFUSAL } from './timetable-clash.services';
 
 /**
  * The last day of a membership that ends on `lastDay`: a membership that has
@@ -928,9 +928,19 @@ async function attempt<T>(tx: Tx, run: (sp: Tx) => Promise<T>): Promise<{ ok: tr
   try {
     return { ok: true, value: await tx.transaction(async (sp) => run(sp as unknown as Tx)) };
   } catch (err) {
-    if (err instanceof SchedulingError) return { ok: false, why: err.message };
+    if (err instanceof SchedulingError) return { ok: false, why: waitingWhy(err.message) };
     throw err;
   }
+}
+
+/**
+ * A refusal as the reason a student waits. The published-timetable refusal invites a confirmation
+ * and carries its code; nothing here can confirm (the waiting list's Move or Give does, with its own
+ * code), so the reason keeps only the clashes.
+ */
+function waitingWhy(message: string): string {
+  const m = new RegExp(`^${PUBLISHED_CLASH_REFUSAL}, this would add (?:a clash|\\d+ clashes): (.+?)\\.(?: The clashes are not the ones confirmed.*?)? Change it, or confirm to go ahead anyway`, 's').exec(message);
+  return m ? `It would clash in the published timetable: ${m[1]}` : message;
 }
 
 /**

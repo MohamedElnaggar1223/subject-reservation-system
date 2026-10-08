@@ -263,9 +263,20 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
     await apiResponse(coordinator.api.v1.timetables[':id'].publish.$post({ param: { id: v1 }, json: { effectiveFrom: D0 } }));
     // The provider's group is in no timetable; the online lesson is held without a room.
     const day = await apiResponse(coordinator.api.v1.schedule.day.$get({ query: { studentId: s['4']!.studentId, date: plus(D0, 1) } }));
-    expect(day.lessons.map((l) => [l.groupName, l.room])).toEqual([['Biology W — ' + name('c'), null]]);
+    expect(day.lessons.map((l) => [l.groupName, l.room, l.delivery])).toEqual([['Biology W — ' + name('c'), null, 'online']]);
+    // The family's phone calendar says where it is held: online.
+    const link = await apiResponse(s['4']!.student.api.v1.schedule.feed.$post());
+    const ics = await (await s['4']!.student.api.v1.ical[':token'].$get({ param: { token: link.path.split('/').pop()! } })).text();
+    expect(ics).toContain(`SUMMARY:Biology W — ${name('c')}`);
+    expect(ics).toContain('LOCATION:Online');
     const arabicDay = await apiResponse(coordinator.api.v1.schedule.week.$get({ query: { studentId: s['6']!.studentId, date: D0 } }));
     expect(arabicDay.days.flatMap((d) => d.lessons)).toEqual([]);
+    // A student in two units of one subject is a member of both groups: each counts them, and their
+    // week has both (one unit's membership does not end the other's on a shared day).
+    const sizes = Object.fromEntries((await groups()).map((g) => [g.name, g.size]));
+    expect([sizes['Maths W P1 — ' + name('a')], sizes['Maths W P2']]).toEqual([3, 2]);
+    const week1 = await apiResponse(coordinator.api.v1.schedule.week.$get({ query: { studentId: s['1']!.studentId, date: D0 } }));
+    expect(week1.days.flatMap((d) => d.lessons.map((l) => l.groupName)).filter((n) => n.startsWith('Maths')).sort()).toEqual(['Maths W P1 — ' + name('a'), 'Maths W P2']);
     // A group with published lessons is not given to a provider.
     expect(await refused(coordinator.api.v1.scheduling.groups[':id'].$put({ param: { id: gid['Biology W — ' + name('a')]! }, json: { teacherId: t.p!.id, teacherFrom: D0 } })))
       .toEqual({ status: 409, error: expect.stringMatching(/^Biology W — .* has lessons in RW — first: a provider teaches outside the timetable/) });
@@ -362,6 +373,12 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
     expect(await enrolmentOf('3', p1)).toMatchObject({ teacher_id: t.c!.id });
     expect((await membershipsOf('3')).map((m) => m.group)).toEqual(['Maths W P1 — ' + name('b')]);
     expect(body.enrolmentsUpdated).toBe(1);
+    // The desk is told why the group did not follow: the clash, without the confirmation the
+    // coordinator's Move asks for (and without its code).
+    expect(body.groupsFollowed?.waiting).toEqual([expect.objectContaining({ studentId: s['3']!.studentId, groupName: 'Maths W P1 — ' + name('b'), teacherId: t.c!.id })]);
+    const why = body.groupsFollowed!.waiting[0]!.why;
+    expect(why).toMatch(new RegExp(`^It would clash in the published timetable: Student rw-3-${RUN} would be in Homeroom RW-X and Maths W P1 — ${name('a')} at Sunday period 1`));
+    expect(why).not.toMatch(/confirm/);
     const listed = (await waiting()).students.find((x) => x.studentId === s['3']!.studentId)!;
     expect(listed).toMatchObject({ group: 'Maths W P1 — ' + name('b'), enrolledTeacherId: t.c!.id, target: { id: gid['Maths W P1 — ' + name('a')] } });
     // The coordinator's Move shows the clash and its confirmation.

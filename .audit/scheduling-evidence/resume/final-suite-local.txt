@@ -1,0 +1,7 @@
+Final code (third merge plus the fixes of 8 Oct afternoon: the waiting reason, the per-unit key, the screens), full suite, local time (Africa/Cairo), igcse_scheduling_test
+
+ Test Files  37 passed (37)
+      Tests  619 passed | 1 todo (620)
+   Duration  361.95s (transform 1.31s, setup 65ms, collect 4.94s, tests 349.42s, environment 3ms, prepare 1.28s)
+exit=0
+(✓ lines in the log: 328)

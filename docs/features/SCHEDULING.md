@@ -5,7 +5,12 @@ F0a), merged with `origin/main` at e5da650 once F0b landed (§14). The plan is
 FEATURES_PLAN.md §1 "F1", its §2 row and §5's rules, with §0/§0b's "full versions" (the
 generator **and** the aSc/FET exports). The trail is `.audit/scheduling.tsv`; evidence (suite
 logs, control logs, screenshots, scratch scripts) is `.audit/scheduling-evidence/`
-(git-ignored). The progress log is the last section.
+(git-ignored). The progress log is §15.
+
+**Resumed 8 Oct 2026 on the reservations rework's model** (RESERVATIONS_REWORK.md §9's F1 list and
+§10's F1 contract) and the second review round's flags: §17 says what changed, how each item was
+checked against main's code, the lock order, and the proof. Merged with main three times on the
+way (§14); F1's migrations are now `0056`/`0057`, after main's `0055`.
 
 F1 gives the school what its sheet cannot hold: **who is taught together** (teaching groups
 drawn from the course enrolment and the sections, with dated membership), **a week that is
@@ -18,16 +23,19 @@ section; print, CSV, a phone calendar), and **cover** for an absent teacher.
 
 ## 1. Data model
 
-All in `packages/db/src/schema.ts`; migrations `0041_scheduling.sql` (generated; it was 0040
-before main's `0040_catalogue_tier` landed, §14), `0042_scheduling_review.sql` (generated: the
-review round's tables and columns, §16) and `0043_scheduling_review_backfill.sql` (custom,
-idempotent: the teachers groups already had, dated from their year's first day; the leavings of
-students away now; removed covers marked removed by hand).
+All in `packages/db/src/schema.ts`; migrations `0056_scheduling.sql` (generated after main's
+`0055_rework_messages_overdue_text`: every F1 table and column, the review round's and the
+rework's included) and `0057_scheduling_leavings.sql` (custom, idempotent: the leavings of
+students away when it runs, kept in `student_leaving`). F1 never shipped, so its tables start
+empty and need no other backfill (the branch's earlier `0043` rebuilt group teachers for
+databases that had F1's first migration; none is kept). The branch's migrations were
+regenerated at each merge with main (0040 → 0041–0043 → 0050/0051 → 0055/0056 → 0056/0057, §14);
+F4 (two migrations) and F7 (one) land first, so F1's merge renumbers them once more.
 
 | Table | What it holds | Rules |
 |---|---|---|
-| `teaching_group` | a class taught together in one academic year: name, kind (`enrolment` from the course enrolment, `section` for a whole section, `manual`), subject, teacher, **weekly periods**, **double periods**, room type and features needed, a fixed room, the group it was split from, `archived_on` | `section_id` iff kind `section`; `double_periods × 2 ≤ weekly_periods ≤ 30`; one live group per name per year (case-insensitive) |
-| `teaching_group_member` | a student in a group from `started_on` to `ended_on` (inclusive; open while null), the enrolment it came from, the subject (denormalised), who added/ended it and why | one open row per (group, student); **one open group per (student, subject, year)**; `ended_on ≥ started_on − 1` (an *empty stay*: a membership ended before its first day, kept as history) |
+| `teaching_group` | a class taught together in one academic year: name, kind (`enrolment` from the course enrolment, `section` for a whole section, `manual`), subject, **unit** (an IAL paper taught on its own, the rework's enrolment key), teacher, **delivery** (`in_school`; `online`: timetabled, no room), **weekly periods**, **double periods**, room type and features needed, a fixed room, the group it was split from, `archived_on` | `section_id` iff kind `section`; a unit needs a subject and is never a section's; an online group has no room and no room needs; `double_periods × 2 ≤ weekly_periods ≤ 30`; one live group per name per year (case-insensitive) |
+| `teaching_group_member` | a student in a group from `started_on` to `ended_on` (inclusive; open while null), the enrolment it came from, the subject and unit (denormalised: the group's), who added/ended it and why | one open row per (group, student); **one open group per enrolment key** — (student, unit, year) when the unit is set, else (student, subject, year), two partial unique indexes as RESERVATIONS_REWORK.md §10 keys enrolments; `ended_on ≥ started_on − 1` (an *empty stay*: a membership ended before its first day, kept as history) |
 | `schedule_unavailability` | a teacher or a room unavailable on a weekday, at one period or all day, with a note | teacher xor room |
 | `teacher_load_limit` | a teacher's most periods a day and a week, per year | one per (year, teacher) |
 | `group_day_rule` | two groups kept on different days (a = b: a group's own lessons on different days) | ordered pair, unique |
@@ -60,7 +68,9 @@ on a date" — the class list and the editor use them too, so F2 and F3 cannot d
 - **The later membership wins a shared day (ST-16).** F0a leaves both section memberships
   covering the day of a same-day move (`[joined, joined]` in 11A, `[joined, …)` in 11B); the
   reader gives that day to the one that started later (on the same start day, the one recorded
-  later). The same rule holds for two groups of one subject. F0a's rows are not changed.
+  later). The same rule holds for two groups of one enrolment key — one subject with no unit, or
+  one unit; two units of one subject are two keys, so a P1 group never ends the same student's
+  P2 group on a day (fixed 8 Oct, §17). F0a's rows are not changed.
 - **Leaving wins (SO-9).** Nobody is in a group on a day they were away from the school — after
   their last day until the day they came back — and a membership they had been given before the
   leaving was recorded, starting after their last day, never begins (F0a clamps it to one day).
@@ -241,6 +251,50 @@ From `apps/api/src/services/schedule.services.ts` unless noted; types in
 - **`getSchoolDays(from, to)`** (`academic.services.ts`, extended from F0a's `getSchoolDay`) —
   the calendar for a range in a few queries.
 
+**On the rework's model (8 Oct, §17)** — RESERVATIONS_REWORK.md §10's F1 row, as built:
+
+- **`getTeachingDemand(academicYearId)`** (`enrolment.services.ts`) — per (subject, unit,
+  teacher) the students taught in school this year, with `delivery` (the teacher's mode on the
+  item that names them, else on the offer, the year's sessions latest first; `in_school` when no
+  offer names them), the teacher's kind (`provider`: no lessons) and the unit's code and name.
+  Self-study forms no group; "no preference" is a row with `teacherId` null.
+- **The group follows the enrolment** — `upsertEnrolments(tx, yearId, rows, actorId, { source,
+  commit, follow, reason, lockStudents })` (`enrolment.services.ts`): with `follow`, an open
+  enrolment of the same key with another teacher or mode is updated (`ENROLMENT_UPDATED`) and
+  every enrolment made or updated is handed to **`followEnrolments(tx, changes, actorId, ctx)`**
+  (`group.services.ts`) in the same transaction (`'defer'` returns the `changes` for a caller
+  that hands several over at once). B's `changeLineTeacher` (now `changeLineTeacherTx` inside,
+  the line's keys from `lineEnrolmentUnits`), A's `replaceTeacher` (`lockStudents: false`, §17)
+  and F0b's `updateEnrolment` go through it. It returns `groupsFollowed`: `left`, `moved`,
+  `groupsGiven`, `waiting` (each with `why`) and `coversLost`; the caller calls
+  `groupFollowNotices(outcome)` after its commit (cover lost is told). The rules: self-study now
+  → out of the group after today; every open member of the group now with one teacher → the
+  group's teacher changes (dated, from the year's default start; guarded as any change after
+  publishing); otherwise → into the smallest live group of the key whose teacher today is the
+  new one; none, or a move or change that would add a clash in a published timetable → the
+  student stays and waits. **A desk or admin change never fails for a timetable reason.**
+- **Who waits** — `groupsWaiting(academicYearId)` (`GET /v1/scheduling/groups/waiting`): students
+  enrolled with another teacher than their group's (with the group to move to, if one exists),
+  groups whose every member now has another teacher, and "no preference" per subject or unit
+  with the teachers its lines may take. **No preference assigned** — `assignGroupTeacher`
+  (`POST /v1/scheduling/groups/assign-teacher`): B's line rules in the caller's transaction (one
+  `LINE_TEACHER_CHANGED` per line; a refused line reported by name with B's reason), then the
+  groups follow once; one `TEACHING_GROUP_TEACHER_ASSIGNED` row.
+- **For step D's teaching-group audience** (RESERVATIONS_MESSAGES.md §2): **`studentsOfGroup(groupId,
+  date = today, executor)`** (`group.services.ts`) — the students in a group on a date by §2's
+  rules — with `listGroups(academicYearId)` for D's picker. D reads the course enrolments
+  (`getTeachingDemand`) until F1 is on main and switches to these then.
+- **A change after publishing** (changed in round two) — `guardPublishedTimetable(tx, persons,
+  from, { anyway, clashToken, cause, actorId }, change)` and, for a change that is not one
+  function, `checkpointPublished(tx, persons, from)` then `.settle(opts)`: refused (409) with the
+  clashes it adds and `[confirm <code>]`; going ahead needs `anyway` **and** the code of exactly
+  those clashes (`clashConfirmation`), else it is refused again with the list as it is now. The
+  web reads it through `components/published-clash.tsx` (`clashMessage` hides the code,
+  `goAheadWith` sends it back).
+- **For F2 and F3**: `LessonOnDay.delivery` (`in_school` | `online`, added 8 Oct): an online lesson
+  has `room: null` and says Online in the week, on Today and in the phone calendar
+  (`LOCATION:Online`); a provider's group has no lessons, so no register is expected for it. `groupMembersBetween` keys a shared day per enrolment key (§2).
+
 ## 9. Screens
 
 Each replaces a part of the coordinator's sheet (UX_AUDIT.md §4: the Excel version, then ours).
@@ -341,6 +395,42 @@ whole slots; locked means placed), drafts' cards against their groups, members a
 and subjects, cover (one live per lesson and date, never the lesson's own teacher, never two at
 once, always resting on an absence), one live feed link per account.
 
+**The rework and round two (8 Oct)**: `08s6-scheduling-rework.test.ts` (22 scenarios through the
+typed client, on its own years): the teaching demand per unit with delivery; forming per unit,
+an online group without a room, a provider's group with no lessons (and refused periods, a
+published group never given to one, a group given to one later losing its draft cards); a
+student in two units of one subject counted in both groups and both lessons in their week; a
+line's teacher changed at the desk reaching the group of its unit; A's replace-teacher moving
+the June P1 group whole and not the winter P2 group; no preference assigned (a teacher outside
+the line's pool refused by name, then line, enrolment and group follow); no group of the new
+teacher (the student waits, then a group is made and they are Moved); a move clashing in the
+published timetable (the desk's change stands, the student waits, the reason holds the clashes
+and no confirmation); self-study leaving; the enrolment check per unit with the subject-and-unit
+flag; round-two flags 1 (a dated clash in the grid, publish refused, a move refused, the
+generator keeping the two apart), 2 (a carried cover lost inside the publication; a group's
+teacher change removing the cover of its old teacher's absence), 3 (forced orders: a teacher
+change against a publication both ways, two teacher changes for one teacher, forming against an
+add of its student both ways and forming's re-read, cover against a publication both ways, a
+line change against an add of the same student), 4 (a second generation refused, a cancelled one
+writing nothing) and 5 (the roll-over refused with its code, then recorded). 08s0 gains flag 7 (a
+student changing sets counted once); 08s5 sends the confirmation code; 09b gains a live cover never
+against the cover teacher's own lesson, a member's unit equal to its group's, one open group per
+unit or per subject, no published lesson of a provider's group, no room on an online group's
+lessons, no draft card for a provider's group.
+
+Controls of the resumption (rows in the trail, logs in `resume/controls/`), each red once and
+restored: RW1 the follow-up made a no-op; RW2 the whole-group branch off; RW3 the follow-up's
+published check removed; RW4 a provider's group given cards (green at first — forming already
+gave none — until the "given to a provider later" scenario was added); RW5 an online group given
+a room; RW6 the member key by subject only; RW7 the converted line's subject-level fallback off;
+RW8 the subject-and-unit flag never raised; RW9 the waiting reason as the raw refusal; RW10
+`groupMembersBetween`'s shared day by subject; RW11 every lesson read as in school; F1 no `teacherOverlaps`; F2a publishing not judging
+carried covers (08s6 red; 09b's rule shown red with the suite stopped after that scenario, F2a-09b);
+F2b a teacher change not judging cover; F3a–F3e the terms' share lock, the teachers' lock,
+forming's student lock, forming's re-read, cover's term lock; F4a–F4b one generation per draft and
+the cancelled request; F5a–F5b the confirmation code and the roll-over's checkpoint; F7 the
+student load counted once.
+
 **Controls** C1–C17 (each guard undone once, its test red, restored; rows in
 `.audit/scheduling.tsv`, logs in `controls/`): the draft lock; the generator's stale check; the
 publish lock pair (the term lock and the draft's own lock are redundant for one draft — each
@@ -376,6 +466,22 @@ red — and 08s1 gained the assertions that do.
   account, replaceable and revocable.
 - **The student record shows the week** so the desk can answer a family without switching
   screens (the desk comes first).
+- **The group follows the enrolment, and the enrolment follows the line** (the lead, 8 Oct): one
+  path for the desk, A's replace-teacher and the coordinator. **A desk change never fails for a
+  timetable reason**: when the group cannot follow, the student waits on To place with the reason
+  and one action (Move, Give the group, Assign) — the coordinator, not the desk, decides a clash.
+- **Group keys are the enrolment's keys**: a unit when the enrolment has one, else the subject;
+  pre-rework subject-level enrolments stay as they are, and one held beside unit enrolments of the
+  same subject is flagged by the check with its fix named (the coordinator ends one or the other).
+- **Delivery is the offer's**: the item's teacher mode, else the offer's, latest session first;
+  an online group is timetabled without a room; a provider teaches outside the timetable, so its
+  group has no lessons, and a group with published lessons is never given to one.
+- **A dated teacher clash is the engine's** (`teacherOverlaps`): the grid, the generator and
+  publishing judge it alike, from the day the change takes effect.
+- **Going ahead with a clash after publishing needs the code of exactly the clashes shown**, so
+  a confirmation never covers a clash nobody saw.
+- **A waiting student's reason names the clashes only**: the confirmation belongs to the action
+  that would make them (Move, Give), which asks for it itself.
 
 ## 12. Deferred, and why
 
@@ -398,6 +504,17 @@ red — and 08s1 gained the assertions that do.
   periods, most consecutive periods) or room-change minimisation; each could be a weight.
 - **The whole-school print** is per section, teacher or room, not one sheet for the school.
 - **Room and section timetables** are read by the coordinator and the admin only.
+- **The desk is not shown why a group did not follow.** B's teacher change returns
+  `groupsFollowed` with each waiting student's reason, but the desk's screen (B's) does not show
+  it; the coordinator sees the student on To place with the reason. Showing it at the desk is B's
+  screen to change.
+- **Forming makes a group for a subject-level enrolment held beside unit enrolments** (a
+  pre-rework row): the check flags the pair with its fix; forming does not judge it.
+- **Families are not told when their group's teacher changes by the follow-up** (owner question 6
+  still stands); the cover it loses is told.
+- **The Arabic hydration error is not F1's** (§17): every screen that renders text on the
+  server shows it when the language is Arabic before the page loads; `I18nProvider` (main's,
+  since 30 May) is where it is fixed.
 
 ## 13. Questions for the owner (through the coordinator)
 
@@ -419,6 +536,12 @@ red — and 08s1 gained the assertions that do.
    lessons until a new version is published (today they have none for that subject; §12)?
 9. **Going ahead with a clash**: the lead decided a change after publishing may go ahead with a
    clash on the coordinator's confirmation. Should the admin be told, or only the list kept?
+10. **A student who waits for a group** (a desk change with no group of the new teacher yet, or one
+    that would clash): the coordinator sees them on To place. Should the family be told that their
+    timetable changes only when the coordinator places them?
+11. **An IAL subject taught whole and by units at once** for one student (the check's flag): is
+    that ever right (a student retaking one paper while taught the year whole), or always an
+    error to fix?
 
 ## 14. Merging with main
 
@@ -433,6 +556,27 @@ folder (41 applied, no F1 table), then at the merged head (42, the eleven F1 tab
 suite's empty database (the full suite, local time and UTC). Trail rows are written with
 `scripts/trail-row.py` from the merge on; 21 earlier rows written in batches now carry their
 events' own times.
+
+**The resumption's merges (8 Oct)**, each its own commit with two parents, made from lead-env
+with `git merge-tree` (nothing in lead-env touched), the rework's side winning on the model:
+
+1. `2a26557` (the rework's steps A, B, C and step 4) into `94e9d32` → `e8f669d`. Eleven files in
+   conflict: FEATURES_PLAN.md (main's status rows, F1's row updated after), `app.ts` (both route
+   sets), `05-object-access` (main's case, then F1's), `authz-policy.tsv` (main's rework block,
+   then F1's), `i18n.tsx` (main's first, so its words win a shared phrase), the drizzle journal and
+   the 0041–0043 snapshots (main's), audit and notification validations (union). F1's migrations
+   were folded into one generated `0050_scheduling` and the custom `0051_scheduling_leavings`.
+2. `c2d7a78` (step D) and `2858e25` (its plan update) into `7266f26` → `98443e9`: the policy,
+   i18n, audit and notification files by union, the journal and snapshots main's; F1's migrations
+   regenerated as `0055`/`0056`. A first commit named `2858e25` as parent while its files came
+   from `c2d7a78`; it was never pushed, the ref was moved back and the merge redone (trail
+   13:21:49Z); `merge.py` now refuses a parent its tree was not merged from.
+3. `0acd8b5` (D's follow-ups, the messages merge; last migration `0055_rework_messages_overdue_text`)
+   into `d450556`: only the journal and `0055`'s snapshot conflicted (main's); F1's migrations
+   regenerated as `0056_scheduling` and `0057_scheduling_leavings`, stamped after main's. The dev
+   database recreated from the template and migrated with main's folder (56, no F1 table), then
+   F1's (58); the full suite green in local time and UTC (37 files, 619 passed, 1 todo) before the
+   commit.
 
 ## 15. Progress log
 
@@ -472,6 +616,36 @@ events' own times.
 - 05:40–06:03Z — the web: go ahead anyway, a teacher from a date, published clashes, cover
   carried or lost, the unplaced kinds, Today; driven on the dev school in English and Arabic,
   three fixes found (0f42f60, 7a32ba2).
+- 30 Sep 07:00Z — the second review round: eight flags (in the session log); the fixes written
+  07:03–07:18Z and stopped by the spend limit before their tests. Frozen 7 Oct at 2c2a910.
+- **8 Oct 2026**, resumed by a new Opus 5.5 implementer on the rework's model:
+- 11:04Z — the round-two fixes found uncommitted, committed as found (94e9d32).
+- 12:09Z — the lead accepted the five proposals (the follow-up through `upsertEnrolments`, keys,
+  pre-rework rows, no preference, delivery).
+- 12:23Z — merged `2a26557` (e8f669d).
+- 13:03Z — the model and round-two flags 1–3 in code (0af8aef); a teacher's cover judged again when
+  their rules change (7266f26).
+- 13:16–13:21Z — merged `c2d7a78` and `2858e25` (98443e9), the first attempt's parent corrected.
+- 13:42Z — 08s6 (22 scenarios), 08s0's flag 7, 09b's new rules (099b472); 13:43–13:56Z controls
+  RW1–RW8 and F1–F7, all red.
+- 13:58Z — `lockStudents: false` for A's replace-teacher (§17), `studentsOfGroup` for D, the web
+  (d450556).
+- 13:59Z — merging `0acd8b5`; 14:07Z and 14:13Z the suite green in local time and UTC.
+- 14:11Z — the screens driven in English and Arabic; six findings. 14:19Z the Arabic hydration
+  error traced to main's `I18nProvider` (not F1's). 14:23Z the badge, the editor's Arabic and the
+  check's screenshots fixed and retaken.
+- 14:30Z — the waiting reason without the confirmation, the assignment's outcome kept on To
+  place; 14:32Z RW9 red.
+- 14:36Z — the drive's group sizes led to `groupMembersBetween` keying a shared day by subject:
+  reproduced (08s6 red), fixed per enrolment key (green 40 s later). The session limit stopped
+  work 14:37–16:59Z. 17:00Z RW10 red.
+- 17:04Z — no preference assigned and its outcome driven in English and Arabic ("now in" fixed).
+- 17:17Z — the suite green in local time and UTC on the final code; the third merge committed as
+  tested (a201282).
+- 17:22Z — an online lesson says Online in the week, on Today and in the phone calendar
+  (`LessonOnDay.delivery`); 17:23Z RW11 red; 17:24Z the student's week retaken.
+- 17:37Z — the gates on the code committed next: check-types clean, the suite green in local time
+  and UTC (37 files, 619 passed, 1 todo).
 
 ## 16. The review round (Opus 5.5 review of 9569dd9; the lead's decisions applied)
 
@@ -527,3 +701,101 @@ Each flag, what was done, and the proof (scenario, control):
 Found on the way: publishing judged a version by who was in its groups over the whole term, so a
 student who left a group before the version's date made it clash; a version is now judged from
 the day it takes effect.
+
+## 17. On the rework's model, and the second review round (8 Oct 2026)
+
+### 17.1 RESERVATIONS_REWORK.md §9's F1 list, item by item
+
+Each was checked against main's code at `2a26557`, `c2d7a78` and `0acd8b5` (the merges, §14), not
+only the plan:
+
+- **`course_enrolment.unit_id`** — main's (step A): one open row per (student, unit, year) when the
+  unit is set, else per (student, subject, year), two partial unique indexes. F1 reads it as is.
+- **`teaching_group.unit_id` and `delivery`** — F1's (§1): checks that a unit has a subject and no
+  section and that an online group has no room. Proof: 08s6 "forming makes a group per unit and
+  teacher…" (the online group's lessons have no room; the provider's group none); controls RW4, RW5.
+- **One open group per (student, subject, unit, year)** — as the enrolment's two keys (the lead's
+  "mirror A's keys"): the member's unit is its group's (09b), `sameKey`/`memberKey` in every
+  membership path, and the shared reader's later-wins rule per key (fixed 8 Oct: it was per
+  subject, so a student in P1 and P2 groups was read in one). Proof: 08s6 (P1 and P2 both count the
+  student, their week has both); RW6, RW10.
+- **`getTeachingDemand` per (subject, unit, teacher)** with `delivery` and the teacher's kind (§8).
+  Proof: 08s6 "getTeachingDemand groups per subject, unit and teacher…".
+- **`endGroupMembershipsForSubject` and `checkEnrolments` take the unit** — leaving self-study ends
+  only that unit's group; the check pairs a unit line with its unit's enrolment and flags a subject
+  held whole and by units at once, the fix named. Proof: 08s6's self-study and check scenarios; RW8.
+- **A line's teacher, its change or its replacement reaches the group through `upsertEnrolments`**
+  (§10's row) — B and A wrote `course_enrolment` directly; asked of the lead and decided (trail
+  12:09Z): `upsertEnrolments`' `follow`, F1's `followEnrolments` (§8). Proof: 08s6's desk change,
+  A's replace-teacher, the clash and the no-group scenarios; RW1–RW3, RW7.
+- **"No preference" is an enrolment with no teacher until assigned** — a no-teacher group per
+  subject or unit, listed under To place with Assign. Proof: 08s6's no-preference scenario;
+  screenshots `en-11`/`en-12`, `ar-11`/`ar-12`.
+
+### 17.2 The second review round's flags
+
+1. **Dated teacher clashes across intervals** — the engine judges `teacherOverlaps` (pairs of groups
+   one teacher has on a common day, from that day): the grid, the generator and publishing alike;
+   publish's separate check and its own "anyway" went. 08s6 "a teacher change dated inside a draft's
+   time…"; control F1; screenshots `en-03`/`ar-03` (the grid's sentence "… from 1 November 2026").
+2. **Carried covers re-checked after a change** — `recheckCovers` inside the publication's
+   transaction for every cover it carries, and after a group's teacher change or a teacher's rules
+   change from that day (`whyCoverNoLongerHolds`; removal `no_longer_holds`, audited, told). 08s6's
+   two cover scenarios; 09b's rule; F2a, F2a-09b, F2b.
+3. **Lock and race tests for memberships and covers** — the order in §17.3, and 08s6's forced
+   orders (held locks from the test, both orders where both exist); F3a–F3e.
+4. **One generation per draft; a cancelled request writes nothing** (found committed): 08s6; F4a, F4b.
+5. **The roll-over checked as any move; the confirmation code** (found committed): 08s5, 08s6; F5a, F5b.
+6. **0043's group-teacher rebuild** — moot now: F1's tables are created empty (§1).
+7. **A student's load counted once across sets** (`studentPeriods`): 08s0; F7.
+8. **Today's readers on `todayAtSchool()`** — kept.
+
+### 17.3 F1's locks in RESERVATIONS.md §2.1's order
+
+After §2.1's own order (the student first, then lines, then enrolments), F1 takes, as code does:
+
+1. **The students** `FOR NO KEY UPDATE` in id order (`lockMembershipChange`; a path already holding
+   them, as the enrolment's follow-up does through `upsertEnrolments`' `FOR SHARE`, does not take
+   them again). Forming and section groups first take the year's advisory lock
+   `teaching-groups:<year>` (one at a time per year); no path takes it after a student.
+2. **Teaching groups** `FOR UPDATE` in id order, then **their member rows** `FOR UPDATE` in id order.
+3. **The running terms** `FOR SHARE` in id order (the published check: a publication, which takes
+   its term `FOR UPDATE` and then the draft, waits for the change or is seen by it), then **the
+   teachers** concerned `FOR UPDATE` in id order.
+4. Behind the terms, **the change's own rows**: the group's teacher rows, the covers `FOR UPDATE` in
+   id order (`recheckCovers`) and the drafts' cards (`syncDraftCards`). A publication reaches the
+   same drafts and covers only after its term lock, so the two never hold them crosswise.
+
+Cover's own path: the lesson `FOR UPDATE`, the term `FOR SHARE`, the cover teacher `FOR UPDATE`, then
+the cover rows. The generator holds a session-level try-lock `timetable-generate:<id>` outside any
+transaction (a second run is refused, not queued).
+
+**Changed outside F1's files for this order**: `upsertEnrolments(..., { lockStudents: false })` for
+A's replace-teacher, which holds the offer's lines `FOR UPDATE` and then updates enrolments —
+taking the students `FOR SHARE` after its lines, as the follow-up's first version did, turned
+§2.1's order round. Such a call only updates open enrolments it has read under its own locks; a row
+it would create is refused.
+
+**Found, not F1's, reported to the lead**: A's replace-teacher (lines, then enrolments, no student
+lock) and F0a's `recordLeaving` (the student, then enrolments, then the lines it expires) take
+lines and enrolments in opposite orders — on main before F1 and unchanged by it.
+
+### 17.4 Found while driving the screens
+
+- The groups list counted a student in P1 and P2 of one subject in one group only — the shared
+  reader's key (17.1); fixed at its cause, so sizes, weeks, clash checks, class lists, the
+  generator and D's `studentsOfGroup` are right together.
+- An assignment's outcome vanished with its form; it stays on To place now, with who waits and
+  why (the clashes only, no confirmation code).
+- The unit badge read "UnitP1"; the editor's problem lines and "1 students" had no Arabic; "in"
+  before a group read "after" in Arabic (the shared dictionary's "in" is "in 5 min").
+- A student's online lesson showed only its teacher: nothing said it was online. Each lesson now
+  carries its group's delivery (§8).
+- **The Arabic hydration error is main's**: `I18nProvider` reads the language from localStorage
+  in its first client render while the server rendered English; pages F1 never touched show it
+  too (`/sign-in`, `/academic/years`, `/academic/rooms`, `/today`), English never does. Not
+  changed in F1.
+
+The evidence: `.audit/scheduling-evidence/resume/` — the merges' suite summaries, `controls/`
+(RW1–RW10, F1–F7), `unit-key-red.txt` / `unit-key-green.txt`, and `screens/` (English and
+Arabic; placeholders only: Teacher A–F, Provider One, Students and Parents 0–10).

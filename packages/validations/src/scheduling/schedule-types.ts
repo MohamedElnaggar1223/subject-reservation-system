@@ -30,6 +30,8 @@ export type LessonOnDay = {
   endsAt: string;
   length: number;
   room: SchedulePerson | null;
+  /** How the group is taught: an online lesson is held with no room (F1 on the rework). */
+  delivery: 'in_school' | 'online';
   /** Who teaches it that day (cover applied), and who is timetabled. */
   teacher: SchedulePerson | null;
   scheduledTeacher: SchedulePerson | null;

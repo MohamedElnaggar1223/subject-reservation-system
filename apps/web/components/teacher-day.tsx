@@ -86,7 +86,7 @@ export function MyLessonsToday() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-base font-semibold text-foreground"><bdi>{l.groupName}</bdi></span>
-                    <span className="block truncate text-sm text-muted-foreground">{l.room ? <bdi>{l.room.name}</bdi> : 'No room'}{l.status === 'covering' && l.scheduledTeacher && <> · <span>for</span> <bdi>{l.scheduledTeacher.name}</bdi></>}</span>
+                    <span className="block truncate text-sm text-muted-foreground">{l.room ? <bdi>{l.room.name}</bdi> : l.delivery === 'online' ? 'Online' : 'No room'}{l.status === 'covering' && l.scheduledTeacher && <> · <span>for</span> <bdi>{l.scheduledTeacher.name}</bdi></>}</span>
                   </span>
                   {isNow && <Badge tone="success">Now</Badge>}
                   {s && <Badge tone={s.tone}>{s.label}</Badge>}
