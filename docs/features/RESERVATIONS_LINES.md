@@ -1,7 +1,8 @@
 # Reservations rework — step 2, agent B: reservation lines, consent, declared sittings, the Reserve pages, the statement
 
 Branch `feature/rework-reservations` (worktree `.claude/worktrees/rework-reservations`), from
-agent A's `feature/rework-sessions` (5367cf8, then 27e3233; merged at 977848d). The design is
+agent A's `feature/rework-sessions` (5367cf8, then 27e3233; merged at 977848d and at 40c1447,
+which carries A's §2.12). The design is
 `RESERVATIONS_REWORK.md` version 8 (accepted by the owner on 7 Oct 2026 with its §17
 defaults); this is its §9 step 2, agent B, and §3.5, §4.3–§4.6. A's contract is
 `docs/features/RESERVATIONS.md` §1, §2 and §2.11. The plan's rules are FEATURES_PLAN.md §3–§5.
@@ -177,7 +178,8 @@ teacher change (§4) from a line.
 
 One component, `components/reservations/reserve.tsx` (`Reserve`, viewer `student | parent |
 desk`), reads A's offers (`GET /v1/registrations/offers`) and writes through the typed client.
-Per item: a tick; the entry in the forms' words ("First entry, in school", "Retake, self-study",
+Per item: a tick (an item is open per attempt, §2.12: past the entry deadline with the retake
+deadline ahead it says "retakes of the previous sitting only" and offers only retakes); the entry in the forms' words ("First entry, in school", "Retake, self-study",
 "… — name the sitting" when the system does not know it), defaulting to a retake when it does;
 the sitting picker for a declared retake or a carry-forward; the teacher ("No preference" where
 there are several, the one teacher shown where there is one, none in self-study); the price,
@@ -311,8 +313,8 @@ right.
 - **The statement's charges** are C's (`charges: []`).
 - **Remind** on the Money tab and the coordinator's "declared retakes to verify" reminder rule are
   D's; the button is shown disabled and the list is `listToVerify`.
-- **The desk's handling of a line past its deadline**: the desk-drop is C's, and A's staff refusal
-  is promised in RESERVATIONS.md §2.12, which had not landed when this was written.
+- **The desk's handling of a line past its deadline**: the desk-drop is C's; A's §2.12 refuses
+  a family's approval of a drop or swap past the line's deadline.
 - **The swap pickers** name the new line's entry; an old pending swap request (made before the
   rework) reads the subject's whole item, first entry, as §7 maps it.
 
@@ -337,9 +339,16 @@ right.
    it); the receipt status "Ready to Hand Over" has no Arabic, nor do My Registrations' "Pay All",
    "Swap", "Drop" and its refund sentence; a swapped line's note shows the family the dropped line's
    internal id ("Direct swap from registration …").
-6. **A's §2.12** had not landed when this was written: B's lines already pass
-   `priorSittingSource` explicitly (null only with no prior sitting); merge and rerun when it lands.
-7. **C**: `consentStanding` / `writeConsents` for the checkout and the desk; `refundForSystemDrop`
+6. **A's §2.12** is merged (40c1447): B's lines pass `priorSittingSource` explicitly (null only
+   with no prior sitting); the Reserve page and the swap pickers read `item.open` per attempt and
+   each price row's `open` (an object was always truthy, so the merge alone would have offered
+   closed entries: fixed in 2f09f43 and driven with an item past its entry deadline).
+7. **A's `approveChangeRequest` now locks the line before its receipt** (the deadline re-check
+   under the line's lock, then `executeReceiptGatedDrop` takes the receipt): MA-16's order is the
+   receipt first. B's answer to a declared sitting and the hold step take the receipt first, so a
+   parent's approval and a rejection of the same line at the same moment can deadlock (Postgres
+   aborts one). Taking the receipt before the line in the re-check would keep one order.
+8. **C**: `consentStanding` / `writeConsents` for the checkout and the desk; `refundForSystemDrop`
    to replace; `statementFor`'s `charges`. **D**: `DECLARATION_REVIEWED` notifications exist; the
    Remind button waits.
 
@@ -392,3 +401,11 @@ Times UTC, from the trail (`.audit/rework-reservations.tsv`), which holds each e
   the parent's approval; the parent's swap from a paid line to a new one (the line made, the old
   one dropped, consent inherited); the verification setting (its Arabic description and group hint
   were missing: added).
+- 01:37Z — A's 40c1447 (§2.12) merged: four conflicts resolved (prereg imports, swap imports, 08n's
+  helper, the Money tab — A's section filter from the API kept, B's own removed); A's two new 08n
+  call sites converted; the Reserve page and swap pickers read openness per attempt; an item past
+  its entry deadline driven: only retakes offered, a declared retake of the previous sitting
+  reserved.
+- 01:39Z–01:42Z — **gates green on 2f09f43** (the merge and its fixes): the API suite in local time
+  and with `TZ=UTC` (26 files, 376 passed, 1 todo each), API check-types; web check-types on the
+  final tree. The commit after it widens two selects and updates this document and the trail.

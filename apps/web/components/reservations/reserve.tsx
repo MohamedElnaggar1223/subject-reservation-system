@@ -417,11 +417,11 @@ function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings }: {
             <td className="px-3 py-2 align-top">
               {p.on && (
                 <div className="space-y-1.5">
-                  <select aria-label="Entry" className={INPUT_CLASS.replace('w-full', 'w-72')} value={p.entry ?? ''} onChange={(e) => setPick(it, { entry: e.target.value, sitting: '' })}>
+                  <select aria-label="Entry" className={INPUT_CLASS.replace('w-full', 'w-80')} value={p.entry ?? ''} onChange={(e) => setPick(it, { entry: e.target.value, sitting: '' })}>
                     {options.map((x) => <option key={entryKey(x)} value={entryKey(x)}>{entryLabel(x, isKnown(it))}</option>)}
                   </select>
                   {needsSitting && (
-                    <select aria-label="The sitting it follows" className={INPUT_CLASS.replace('w-full', 'w-72')} value={p.sitting} onChange={(e) => setPick(it, { sitting: e.target.value })}>
+                    <select aria-label="The sitting it follows" className={INPUT_CLASS.replace('w-full', 'w-80')} value={p.sitting} onChange={(e) => setPick(it, { sitting: e.target.value })}>
                       <option value="">{it.needsPriorSeries ? 'Carried from the sitting…' : 'From the sitting…'}</option>
                       {sittings.map((s) => <option key={sittingValue(s)} value={sittingValue(s)}>{sittingName(s)}</option>)}
                     </select>
