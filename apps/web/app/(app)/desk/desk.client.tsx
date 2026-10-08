@@ -30,7 +30,7 @@ import { ReasonModal } from '~/components/ui/reason-modal';
 import { Badge, StandingBadge } from '~/components/ui/tone';
 import { StudentAcademicPanel } from '~/components/student-academic-panel';
 import { DeskCollectPanel, AlsoCollect, type Extras } from './desk-collect.client';
-import { Reserve, SlipLink, type ReserveDone } from '~/components/reservations/reserve';
+import { Reserve, SlipLink, Sentences, type ReserveDone } from '~/components/reservations/reserve';
 import { StatementView } from '~/components/reservations/statement';
 
 // ─── Types, derived from their fetchers (CLAUDE.md: Hono RPC everywhere) ──────
@@ -70,7 +70,8 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
   const [studentId, setStudentId] = useState<string | null>(null);
   const [showOnboard, setShowOnboard] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
-  const [message, setMessage] = useState('');
+  // A string, or a reservation's sentences (each shown, and translated, on its own).
+  const [message, setMessage] = useState<string | string[]>('');
   const [errorMsg, setErrorMsg] = useState('');
   const [reverseTarget, setReverseTarget] = useState<{ id: string; label: string; confirmedAt: string | null } | null>(null);
   const [undoTransferTarget, setUndoTransferTarget] = useState<{ id: string; label: string } | null>(null);
@@ -98,7 +99,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
     qc.invalidateQueries({ queryKey: ['desk'] });
     qc.invalidateQueries({ queryKey: ['finance'] });
   };
-  const done = (msg: string) => { setMessage(msg); setErrorMsg(''); refresh(); };
+  const done = (msg: string | string[]) => { setMessage(msg); setErrorMsg(''); refresh(); };
   const fail = (err: Error) => { setErrorMsg(err.message); setMessage(''); };
 
   // ── Desk actions ──────────────────────────────────────────────────────────
@@ -177,7 +178,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
 
       {message && (
         <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400 flex justify-between">
-          <span>{message}</span>
+          <span>{Array.isArray(message) ? <Sentences items={message} /> : message}</span>
           <button className="text-xs underline" onClick={() => setMessage('')}>Dismiss</button>
         </div>
       )}
@@ -361,7 +362,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
           </div>
 
           {showRegister && (
-            <DeskReserveCard key={summary.student.id} studentId={summary.student.id} onDone={(msg) => done(msg)} />
+            <DeskReserveCard key={summary.student.id} studentId={summary.student.id} onDone={(sentences) => done(sentences)} />
           )}
 
           {showStatement && (
@@ -716,7 +717,7 @@ const fetchActiveSessions = () => apiResponse(api.v1.sessions.active.$get());
  * (one payment per entry deadline; a provisional line reserved now, collected once confirmed);
  * the slip to print with the consent texts.
  */
-function DeskReserveCard({ studentId, onDone }: { studentId: string; onDone: (msg: string) => void }) {
+function DeskReserveCard({ studentId, onDone }: { studentId: string; onDone: (sentences: string[]) => void }) {
   const { data: sessions = [] } = useQuery({ queryKey: ['sessions', 'active'], queryFn: fetchActiveSessions });
   const [sessionId, setSessionId] = useState('');
   const [last, setLast] = useState<ReserveDone | null>(null);
@@ -738,7 +739,7 @@ function DeskReserveCard({ studentId, onDone }: { studentId: string; onDone: (ms
       </div>
       {last && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
-          <p>{last.message}</p>
+          <p><Sentences items={last.sentences} /></p>
           {last.desk && last.desk.receipts.length > 0 && (
             <p className="mt-1 text-xs"><span>Receipts to hand over:</span> <span className="font-mono" data-i18n-skip="true">{last.desk.receipts.map((r) => r.receiptNumber).join(', ')}</span></p>
           )}
@@ -748,7 +749,7 @@ function DeskReserveCard({ studentId, onDone }: { studentId: string; onDone: (ms
       {chosen && <AlsoCollect studentId={studentId} value={extras} onChange={setExtras} />}
       {chosen && (
         <Reserve key={`${chosen}|${studentId}`} viewer="desk" studentId={studentId} sessionId={chosen} deskExtras={extras}
-          onDone={(d) => { setLast(d); setExtras({ chargeIds: [], total: 0 }); onDone(d.message); }} />
+          onDone={(d) => { setLast(d); setExtras({ chargeIds: [], total: 0 }); onDone(d.sentences); }} />
       )}
     </div>
   );
