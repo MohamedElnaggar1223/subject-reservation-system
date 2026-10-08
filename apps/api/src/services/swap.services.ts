@@ -41,6 +41,7 @@ import {
   registration,
   registrationSession,
   boardSeries,
+  receipt,
   changeRequest,
   registrationConsent,
   eq,
@@ -102,7 +103,9 @@ export const isParentLinkedToStudent = validateParentStudentLink;
  * exceptions applied.
  */
 type SwapLine = { offerItemId: string; attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study'; teacherId?: string | null;
-  priorSittingSeriesId?: string | null; priorSitting?: { month: SeriesMonth; year: number }; consent?: boolean };
+  priorSittingSeriesId?: string | null; priorSitting?: { month: SeriesMonth; year: number }; consent?: boolean;
+  /** The price the family was shown; the line is refused if it is priced otherwise when made (PRICE_CHANGED_REFUSAL). */
+  expectedPrice?: number };
 
 async function swapQuote(studentId: string, sessionId: string, line: SwapLine) {
   const item = await db.query.sessionOfferItem.findFirst({ where: (i, { eq: eqOp }) => eqOp(i.id, line.offerItemId), with: { offer: true } });
@@ -485,7 +488,11 @@ export async function approveChangeRequest(
     // Priced now, the way a fresh reservation made now would be; the quote on the request
     // (priceAtRequest) is what the parent was shown. Its series, its rules and whether the item
     // is already held are checked when the line is made (reserveLines).
-    swap = await swapQuote(cr.registration.studentId, cr.registration.sessionId, await storedSwapLine(cr, cr.registration.sessionId));
+    // The parent approves the price the request showed (priceAtRequest): the line is made at it or
+    // refused with PRICE_CHANGED_REFUSAL under its locks (reserveLines), as the checkout does.
+    const asked = await storedSwapLine(cr, cr.registration.sessionId);
+    swap = await swapQuote(cr.registration.studentId, cr.registration.sessionId,
+      cr.priceAtRequest != null ? { ...asked, expectedPrice: Number(cr.priceAtRequest) } : asked);
   }
 
   const now = new Date();
@@ -502,6 +509,10 @@ export async function approveChangeRequest(
     // A swap registers a new subject: asked again with the student and window
     // held, before anything else is locked (F0a; see assertMayRegisterForInTx).
     if (cr.type === 'swap') await assertMayRegisterForInTx(tx, cr.registration.studentId, cr.registration.sessionId);
+    // The receipt first (when the line has one), then the line: MA-16's order, the one every drop,
+    // reversal, void and return takes (the lead's decision of 8 Oct; A makes the same change on
+    // its branch, and its version wins at the merge).
+    await tx.select({ id: receipt.id }).from(receipt).where(eq(receipt.registrationId, cr.registrationId)).for('update');
     // Asked again under the line's lock, with its series held: a deadline moved at the same moment waits.
     const [held] = await tx.select({ boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId })
       .from(registration).where(eq(registration.id, cr.registrationId)).for('update');

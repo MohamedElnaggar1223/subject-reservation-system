@@ -38,6 +38,11 @@ export const reservationsArabic: Record<string, string> = {
   '(payable once confirmed)': '(تُدفع حين تُؤكَّد)',
   'Paid per entry deadline:': 'يُدفع لكل موعد قيد:',
   '(retake deadline)': '(موعد الإعادة)',
+  'A payment for this line is in progress: a rejection is refused until the Finance Workbench confirms or rejects it.': 'دفعة هذا السطر قيد التنفيذ: يُرفض عدم التأكيد حتى يؤكدها مكتب المالية أو يرفضها.',
+  'Not paid: the line ends and the family is told it may reserve a first entry.': 'غير مدفوع: ينتهي السطر وتُبلَّغ الأسرة بأنها تستطيع حجز قيد أول.',
+  "Paid and held until the session opens: the line stands as a first entry; its capture or the deadline's refund settles it.": 'مدفوع ومحتجز حتى تُفتح الجلسة: يبقى السطر قيدًا أول؛ ويحسمه تحصيله أو استرداد الموعد.',
+  "Paid, before the board's first-entry deadline: the line stands and is entered as a first entry; finance decides whether anything is owed.": 'مدفوع، قبل موعد القيد الأول للمجلس: يبقى السطر ويُقيَّد قيدًا أول؛ وتقرر المالية إن كان هناك مستحق.',
+  "Paid, after the board's first-entry deadline: the line is dropped and refunded by the refund policy (the paper receipt comes back first).": 'مدفوع، بعد موعد القيد الأول للمجلس: يُسحب السطر ويُسترد وفق سياسة الاسترداد (يُعاد الإيصال الورقي أولًا).',
   'retakes of the previous sitting only': 'إعادات الدورة السابقة فقط',
   'Name the earlier sitting on each retake': 'سمِّ الدورة السابقة لكل إعادة',
   'Refund policy and declaration read and signed by the parent': 'قرأ ولي الأمر سياسة الاسترداد والإقرار ووقّع عليهما',
@@ -169,9 +174,6 @@ export const reservationsArabic: Record<string, string> = {
   'Verify the declared sitting': 'تحقق من الدورة المُصرَّح بها',
   'The sitting is not confirmed': 'الدورة لم تُؤكَّد',
   'The line stands as it is.': 'يبقى السطر كما هو.',
-  "Paid: before the board's first-entry deadline the line stands and is entered as a first entry (finance decides whether anything is owed); after it, the line is dropped and refunded (the paper receipt comes back first).":
-    'مدفوع: قبل موعد القيد الأول للمجلس يبقى السطر ويُقيَّد قيدًا أول (وتقرر المالية إن كان هناك مستحق)؛ وبعده يُسحب السطر ويُسترد (بعد إعادة الإيصال الورقي).',
-  'Not paid: the line ends and the family is told it may reserve a first entry.': 'غير مدفوع: ينتهي السطر وتُبلَّغ الأسرة أنها تستطيع حجز قيد أول.',
   'Previous centre (another centre only)': 'المركز السابق (لمركز آخر فقط)',
   'Previous candidate number': 'رقم الجلوس السابق',
   "What was seen (the board's statement)": 'ما تمت رؤيته (بيان المجلس)',
@@ -209,6 +211,10 @@ export const reservationsArabic: Record<string, string> = {
 };
 
 const MONTHS_AR: Record<string, string> = { January: 'يناير', June: 'يونيو', October: 'أكتوبر', November: 'نوفمبر' };
+const SHORT_MONTHS_AR: Record<string, string> = {
+  Jan: 'يناير', Feb: 'فبراير', Mar: 'مارس', Apr: 'أبريل', May: 'مايو', Jun: 'يونيو',
+  Jul: 'يوليو', Aug: 'أغسطس', Sep: 'سبتمبر', Oct: 'أكتوبر', Nov: 'نوفمبر', Dec: 'ديسمبر',
+};
 const lines = (n: string) => `${n} ${Number(n) === 1 ? 'سطر' : 'أسطر'}`;
 
 /** "100% to week 2 · 50% in week 3 · 0% from week 4" in Arabic. */
@@ -230,6 +236,14 @@ const RULES: [RegExp, (m: RegExpExecArray) => string | null][] = [
   [/^I confirm that I have read the refund policy: of the course fee, (.+), counted from the first lesson\.$/, (m) => {
     const steps = refundSteps(m[1]!);
     return steps ? `أؤكد أنني قرأت سياسة الاسترداد: من رسوم التدريس، ${steps}، محسوبة من أول حصة.` : null;
+  }],
+  // A converted session's acknowledgement, with its refund windows as dates.
+  [/^I confirm that I have read the refund policy: (.+); nothing outside these dates\.$/, (m) => {
+    const parts = m[1]!.split(' · ').map((p) => {
+      const w = /^(\d+)% from (\d{1,2}) (\w{3}) (\d{4}) to (\d{1,2}) (\w{3}) (\d{4})$/.exec(p);
+      return w ? `${w[1]}% من ${w[2]} ${SHORT_MONTHS_AR[w[3]!] ?? w[3]} ${w[4]} إلى ${w[5]} ${SHORT_MONTHS_AR[w[6]!] ?? w[6]} ${w[7]}` : null;
+    });
+    return parts.every((x) => x) ? `أؤكد أنني قرأت سياسة الاسترداد: ${parts.join(' · ')}؛ ولا شيء خارج هذه التواريخ.` : null;
   }],
   // Sentences of the Reserve page's results.
   [/^Sent to your parent for approval: (\d+) lines?\.$/, (m) => `أُرسل إلى ولي أمرك للموافقة: ${lines(m[1]!)}.`],

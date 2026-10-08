@@ -29,6 +29,8 @@ import { requireAuth, requireRole } from '../middleware/access-control.middlewar
 import type { HonoEnv } from '../lib/types';
 import { extractAuditContext } from '../services/audit.services';
 import { verifyPriorSitting, listToVerify, VerificationError } from '../services/verification.services';
+import { refundTermsFor } from '../services/reservation.services';
+import { db, registrationSession, eq } from '@repo/db';
 import { changeLineTeacher, LineTeacherError } from '../services/line-teacher.services';
 import { statementFor, familyOf } from '../services/statement.services';
 import * as linkService from '../services/link.services';
@@ -89,6 +91,21 @@ export const sessionVerifyRoutes = new Hono<HonoEnv>()
       const list = await listToVerify(c.req.valid('param').id, c.req.valid('query').show);
       if (!list) return error(c, 'Session not found', 404);
       return success(c, list);
+    }
+  )
+
+  /**
+   * The refund terms a reservation in this session freezes at consent (§2.6): the session's steps
+   * in weeks, or a converted session's windows as dates — what the family reads before it ticks.
+   */
+  .get('/:id/refund-terms',
+    requireRole(ROLES.STUDENT, ROLES.PARENT, ROLES.COORDINATOR, ...FINANCE_ROLES),
+    zValidator('param', z.object({ id: z.string().min(1) })),
+    async (c) => {
+      const id = c.req.valid('param').id;
+      const [s] = await db.select({ id: registrationSession.id }).from(registrationSession).where(eq(registrationSession.id, id));
+      if (!s) return error(c, 'Session not found', 404);
+      return success(c, { terms: await refundTermsFor(db, id) });
     }
   );
 

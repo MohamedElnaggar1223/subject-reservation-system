@@ -86,10 +86,10 @@ function entryKeys(x: { entersKind: string; qualificationId: string | null; subj
 }
 
 /**
- * The student's known sittings of what an item enters — their lines in other sessions, sat
- * (confirmed) or dropped, in a series, entering the same award, unit or row, or of the same
- * subject — latest first. The same reading as the offers read's `knownSittings`
- * (offers-read.services.ts), so the page and the server agree on what is known.
+ * The student's known sittings of what an item enters — their confirmed lines in other sessions
+ * (sat: a dropped line was never sat, so naming it is a declaration the school verifies), in a
+ * series, entering the same award, unit or row, or of the same subject — latest first. The
+ * Reserve page reads the offers read's `knownSittings` the same way (its confirmed ones).
  */
 export async function knownSittingsOf(executor: Executor, studentId: string, sessionId: string, item: ItemFacts) {
   const r = await executor.execute(sql`
@@ -97,7 +97,7 @@ export async function knownSittingsOf(executor: Executor, studentId: string, ses
       coalesce((select array_agg(u.unit_id) from session_offer_item_unit u where u.item_id = i.id), '{}') as units,
       bs.year, bs.month
     from registration r join session_offer_item i on i.id = r.offer_item_id join board_series bs on bs.id = r.board_series_id
-    where r.student_id = ${studentId} and r.session_id <> ${sessionId} and r.status in ('confirmed', 'dropped')
+    where r.student_id = ${studentId} and r.session_id <> ${sessionId} and r.status = 'confirmed'
     order by bs.year desc, r.created_at desc, r.id desc`);
   const keys = entryKeys(item);
   return (r.rows as { id: string; seriesId: string; subjectId: string; entersKind: string; qualificationId: string | null; units: string[]; year: number; month: string }[])
@@ -148,7 +148,8 @@ export async function resolveReservationLines(
     if (l.priorSitting) {
       if (!it.boardCode) throw new ReservationError(`${name} has no board to name a sitting of`);
       try {
-        priorId = (await findOrCreateSeries(tx, it.boardCode, l.priorSitting.month as SeriesMonth, l.priorSitting.year, '', a.actorId)).id;
+        priorId = (await findOrCreateSeries(tx, it.boardCode, l.priorSitting.month as SeriesMonth, l.priorSitting.year, '', a.actorId,
+          `Created when ${a.declaredBy === 'family' ? 'a family' : 'the desk'} declared a sitting not on record (no dates yet)`)).id;
       } catch (err) {
         if (err instanceof OfferError) throw new ReservationError(err.message, err.status === 404 ? 404 : 400);
         throw err;
@@ -170,6 +171,12 @@ export async function resolveReservationLines(
         throw new ReservationError(`The earlier sitting of ${name} must come before the series it is entered in`);
       }
       source = known.some((k) => k.seriesId === priorId) ? 'known' : a.declaredBy === 'family' ? 'declared_by_family' : 'declared_by_desk';
+      // A family declares a sitting of the board's last two years (§3.5: its picker offers those);
+      // an older one is declared at the desk, which sees the family's papers.
+      if (source === 'declared_by_family' && it.year && it.month
+        && it.year * 12 + schoolMonthIndex(it.month) - (p.year * 12 + schoolMonthIndex(p.month)) > 24) {
+        throw new ReservationError(`A sitting of ${name} more than two years before this series is declared at the finance desk, with the board's statement`);
+      }
     }
 
     // The teacher.
@@ -191,9 +198,10 @@ export async function resolveReservationLines(
 /**
  * The refund steps a line of this session snapshots at consent (§2.6): the session's policy in
  * weeks; for a converted session with none, its absolute refund windows (the session's own, else
- * those of its academic year, as refund.services reads them), as dates.
+ * those of its academic year, as refund.services reads them), as dates. The same terms the family
+ * is shown before it ticks (`GET /sessions/:id/refund-terms`, the checkout's family consent).
  */
-async function refundSnapshotFor(executor: Executor, sessionId: string): Promise<RefundPolicySnapshot> {
+export async function refundTermsFor(executor: Executor, sessionId: string): Promise<RefundPolicySnapshot> {
   const [s] = await executor.select({ refundPolicy: registrationSession.refundPolicy, startDate: registrationSession.startDate })
     .from(registrationSession).where(eq(registrationSession.id, sessionId));
   const policy = s?.refundPolicy as RefundPolicy | null | undefined;
@@ -225,7 +233,7 @@ export async function writeConsents(
   const bySession = new Map<string, RefundPolicySnapshot>();
   for (const l of lines) {
     if (l.snapshot) continue;
-    if (!bySession.has(l.sessionId)) bySession.set(l.sessionId, await refundSnapshotFor(tx, l.sessionId));
+    if (!bySession.has(l.sessionId)) bySession.set(l.sessionId, await refundTermsFor(tx, l.sessionId));
     await tx.update(registration).set({ refundPolicySnapshot: bySession.get(l.sessionId) as unknown as Record<string, unknown> })
       .where(eq(registration.id, l.id));
   }
@@ -249,7 +257,7 @@ export async function inheritConsents(tx: Tx, fromRegistrationId: string, toRegi
     // The dropped line consented before snapshots existed: the new line freezes its session's steps now.
     const lines = await tx.select({ id: registration.id, sessionId: registration.sessionId }).from(registration).where(inArray(registration.id, toRegistrationIds));
     for (const l of lines) {
-      await tx.update(registration).set({ refundPolicySnapshot: (await refundSnapshotFor(tx, l.sessionId)) as unknown as Record<string, unknown> })
+      await tx.update(registration).set({ refundPolicySnapshot: (await refundTermsFor(tx, l.sessionId)) as unknown as Record<string, unknown> })
         .where(eq(registration.id, l.id));
     }
   }
@@ -325,16 +333,19 @@ export async function reserveLines(
 /**
  * What a line dropped by the system on a declared sitting gets back: a rejection after the
  * first-entry deadline (the board fee by the "sent" rule) or `hold` at the deadline (the board
- * fee counted not sent). Until step C's `refundFor(line, at)` lands this is today's computation —
- * the refund windows' (or the custom exception's) percentage of the whole price
- * (refund.services `refundPercentage`), which does not separate the board fee; C replaces this
- * function's body with `refundFor`, the `boardSent` flag saying which rule applies.
+ * fee counted not sent). The design's rule with today's percentage (the refund windows', or the
+ * custom exception's: refund.services `refundPercentage`) until step C's `refundFor(line, at)`
+ * lands and replaces this body:
+ * - the board fee not sent: the percentage of the whole price;
+ * - the board fee sent (the school has paid the board): the percentage of the price less the
+ *   board fee the line recorded (`registration_fee_at_registration`) — that fee is not refunded.
  */
 export async function refundForSystemDrop(
-  line: { sessionId: string; studentId: string; priceAtRegistration: number },
+  line: { sessionId: string; studentId: string; priceAtRegistration: number; registrationFeeAtRegistration: number },
   at: Date,
-  _opts: { boardSent: boolean },
-): Promise<{ amount: number; percentage: number }> {
+  opts: { boardSent: boolean },
+): Promise<{ amount: number; percentage: number; boardFeeKept: number }> {
   const percentage = await refundPercentage(at, line.sessionId, line.studentId);
-  return { amount: round2((line.priceAtRegistration * percentage) / 100), percentage };
+  const boardFeeKept = opts.boardSent ? Math.min(line.priceAtRegistration, Math.max(0, line.registrationFeeAtRegistration)) : 0;
+  return { amount: round2(((line.priceAtRegistration - boardFeeKept) * percentage) / 100), percentage, boardFeeKept: round2(boardFeeKept) };
 }

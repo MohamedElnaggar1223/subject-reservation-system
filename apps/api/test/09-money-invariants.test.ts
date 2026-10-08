@@ -625,12 +625,16 @@ describe('money invariants over the whole database', () => {
       group by r.id having count(a.id) <> 1
     `);
     expect(rows).toEqual([]);
-    // Standing rejected: paid (confirmed, a paid preregistration) or since dropped through the receipt gate.
+    // Standing rejected: paid (confirmed, a paid preregistration), since dropped through the receipt
+    // gate, or paid when rejected and its payment reversed after (a reversal undoes the payment, not
+    // the answer: 08t's reversal race).
     const standing = await sql(`
       select r.id, r.status from registration r
       where r.declaration_rejected
         and not (r.status in ('confirmed', 'dropped', 'dropped_pending_receipt')
-          or (r.status = 'preregistered' and exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed')))
+          or (r.status = 'preregistered' and exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed'))
+          or exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id
+                     where pr.registration_id = r.id and p.status = 'refunded' and p.reversed_at is not null and p.reversed_at >= r.prior_sitting_verified_at))
     `);
     expect(standing).toEqual([]);
     // An expiry or a system drop on a declared sitting followed from it: rejected, or unverified under hold.
@@ -641,7 +645,22 @@ describe('money invariants over the whole database', () => {
            and (r.prior_sitting_verified_outcome is not null or r.prior_sitting_source not in ('declared_by_family', 'declared_by_desk')))
     `);
     expect(ends).toEqual([]);
-    // A line dropped by the system on a declared sitting was refunded at most its price (the drop rule above holds too).
+    // A line the system dropped on a declared sitting (rejected after the first-entry deadline, or
+    // unverified under hold) was refunded at most its price: the escrow credits for its drop plus a
+    // refund still parked on its receipt.
+    const overRefunded = await sql(`
+      select r.id, r.price_at_registration as price,
+        coalesce((select sum(e.amount) from escrow_transaction e where e.related_registration_id = r.id and e.reason = 'drop'), 0)
+          + coalesce((select rc.refund_amount_on_return from receipt rc where rc.registration_id = r.id and rc.status = 'return_required'), 0) as refunded
+      from registration r
+      where exists (select 1 from audit_log a where a.entity_id = r.id
+                    and (a.action = 'LINE_DROPPED_UNVERIFIED' or (a.action = 'PRIOR_SITTING_REJECTED' and a.new_data->>'effect' = 'dropped')))
+        and coalesce((select sum(e.amount) from escrow_transaction e where e.related_registration_id = r.id and e.reason = 'drop'), 0)
+          + coalesce((select rc.refund_amount_on_return from receipt rc where rc.registration_id = r.id and rc.status = 'return_required'), 0) > r.price_at_registration
+    `);
+    expect(overRefunded).toEqual([]);
+    // There was something to check: answers and system drops on declared sittings.
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action in ('PRIOR_SITTING_VERIFIED', 'PRIOR_SITTING_REJECTED')`))[0]?.n)).toBeGreaterThan(0);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'LINE_DROPPED_UNVERIFIED' or (action = 'PRIOR_SITTING_REJECTED' and new_data->>'effect' = 'dropped')`))[0]?.n)).toBeGreaterThan(0);
   });
 });

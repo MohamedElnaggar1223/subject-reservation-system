@@ -13,12 +13,14 @@
  */
 
 import {
-  db, registration, courseEnrolment, sessionOfferTeacher, sessionOfferItemTeacher, teacher, user,
+  db, registration, courseEnrolment, sessionOffer, sessionOfferItem, sessionOfferTeacher, sessionOfferItemTeacher, teacher, user,
   and, eq, isNull, sql, asc,
 } from '@repo/db';
 import type { ChangeLineTeacherType } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
 import { upsertEnrolments } from './enrolment.services';
+import { availabilityConstraints } from './offer.services';
+import { lineExceptions } from './line-exceptions';
 
 export class LineTeacherError extends Error {
   constructor(message: string, public readonly status: 400 | 404 | 409 = 400) {
@@ -30,20 +32,29 @@ const CHANGEABLE = ['pending_approval', 'pending_payment', 'preregistered', 'con
 
 export async function changeLineTeacher(registrationId: string, input: ChangeLineTeacherType, actorId: string, ctx?: AuditContext) {
   return db.transaction(async (tx) => {
-    const [found] = await tx.select({ studentId: registration.studentId }).from(registration).where(eq(registration.id, registrationId));
+    const [found] = await tx.select({ studentId: registration.studentId, offerItemId: registration.offerItemId }).from(registration).where(eq(registration.id, registrationId));
     if (!found) throw new LineTeacherError('Registration not found', 404);
-    // The student first (the enrolment reads it, as a withdrawal holds it), then the line.
+    // A's lock order (RESERVATIONS.md §2.1): the student (the enrolment reads it, as a withdrawal
+    // holds it), the offer, then the item FOR SHARE — so a teacher removed from the offer or the
+    // item closed at the same moment waits for this change or is seen by it — then the line.
     await tx.select({ id: user.id }).from(user).where(eq(user.id, found.studentId)).for('share');
+    if (found.offerItemId) {
+      const [it] = await tx.select({ offerId: sessionOfferItem.offerId }).from(sessionOfferItem).where(eq(sessionOfferItem.id, found.offerItemId));
+      if (it) await tx.select({ id: sessionOffer.id }).from(sessionOffer).where(eq(sessionOffer.id, it.offerId)).for('share');
+      await tx.select({ id: sessionOfferItem.id }).from(sessionOfferItem).where(eq(sessionOfferItem.id, found.offerItemId)).for('share');
+    }
     const [line] = await tx.select().from(registration).where(eq(registration.id, registrationId)).for('update');
     if (!line) throw new LineTeacherError('Registration not found', 404);
     if (!CHANGEABLE.includes(line.status)) throw new LineTeacherError('This line is no longer reserved: its teacher cannot be changed', 409);
     const [facts] = await tx.execute(sql`
       select i.id as "itemId", i.offer_id as "offerId", i.enters_kind as "entersKind", s.name as "subjectName", i.label, i.kind,
+        o.subject_id as "subjectId", o.availability as "offerAvailability", i.availability as "itemAvailability", i.board_series_id as "boardSeriesId", i.session_id as "sessionId",
         rs.session_type as "sessionType", rs.series_year as "seriesYear",
         coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i.id), '{}') as units
       from session_offer_item i join session_offer o on o.id = i.offer_id join subject s on s.id = o.subject_id
       join registration_session rs on rs.id = i.session_id where i.id = ${line.offerItemId}`).then((r) => r.rows as {
         itemId: string; offerId: string; entersKind: string; subjectName: string; label: string; kind: string; sessionType: string; seriesYear: number; units: string[];
+        subjectId: string; offerAvailability: string; itemAvailability: string; boardSeriesId: string | null; sessionId: string;
       }[]);
     if (!facts) throw new LineTeacherError('Registration not found', 404);
     const name = facts.kind === 'whole' ? facts.subjectName : `${facts.subjectName} — ${facts.label}`;
@@ -51,6 +62,18 @@ export async function changeLineTeacher(registrationId: string, input: ChangeLin
     const mode = input.mode ?? (input.teacherId ? 'in_school' : line.mode as 'in_school' | 'self_study');
     if (line.mode === 'self_study' && mode === 'in_school') {
       throw new LineTeacherError(`${name} is reserved as self-study and priced so: to be taught, drop it and reserve it in school`, 409);
+    }
+    // A first entry of a subject the school teaches is not taken outside school unless the student
+    // holds the exception (gate.selfStudyFirstEntry, G-09): a staff change is not the exception.
+    if (mode === 'self_study' && line.mode === 'in_school' && line.attempt === 'first'
+      && !availabilityConstraints(facts.offerAvailability, facts.itemAvailability).selfStudyOnly) {
+      const held = await lineExceptions.active(tx, line.studentId, ['gate.selfStudyFirstEntry'], {
+        sessionId: facts.sessionId, subjectId: facts.subjectId, offerId: facts.offerId, offerItemId: facts.itemId,
+        ...(facts.boardSeriesId ? { boardSeriesId: facts.boardSeriesId } : {}),
+      }, { lock: 'share' });
+      if (!held.length) {
+        throw new LineTeacherError(`${name} is a first entry the school teaches: it is taken in school unless the student holds the self-study exception`, 409);
+      }
     }
     let teacherId: string | null = null;
     if (mode === 'in_school') {

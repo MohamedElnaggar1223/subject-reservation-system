@@ -21,12 +21,12 @@
  *   under `hold` the deadline sweep expires a waiting line (`hold_unverified`) and drops a paid
  *   one through the receipt-gated drop with that day's refund, the board fee counted not sent.
  *
- * Locks: the line first, then its receipt (the lead's order of 8 Oct, the pair A's approval of a
- * change request takes: the line under its deadline re-check, then the receipt-gated drop's
- * receipt), then the line's payments are read. A checkout locks the line too, so a rejection and
- * a checkout of one line run one after the other, and so do a rejection and a parent's approval
- * (08t). A payment reversal and a receipt's void or return still take the receipt first (MA-16,
- * ST-14): docs/features/RESERVATIONS_LINES.md §10 asks for one order.
+ * Locks: the line's receipt first (when it has one), then the line — MA-16's order, the one a
+ * payment reversal, a receipt's void (ST-14) and return, the receipt-gated drop and a parent's
+ * approval of a change request all take (the lead's decision of 8 Oct: receipt first
+ * everywhere) — then the line's payments are read. A checkout locks the line too, so a rejection
+ * and a checkout of one line run one after the other; so do a rejection and a parent's approval,
+ * and a rejection and a reversal (08t, both orders each).
  */
 
 import {
@@ -76,6 +76,7 @@ export async function listToVerify(sessionId: string, show: 'awaiting' | 'decide
       ps.id as "priorSeriesId", ps.board_code as "priorBoard", ps.month as "priorMonth", ps.year as "priorYear", ps.label as "priorLabel", pb.name as "priorBoardName",
       ru.name as "declaredBy", ru.role as "declaredByRole",
       line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) as deadline,
+      line_effective_deadline('first', null, r.board_series_id) as "firstEntryDeadline",
       exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed') as paid,
       exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status in ('pending', 'pending_verification')) as "paymentOpen",
       (select sec.name from section_membership m join section sec on sec.id = m.section_id
@@ -118,6 +119,8 @@ export async function listToVerify(sessionId: string, show: 'awaiting' | 'decide
         declaredAt: new Date(r.declaredAt as string),
         deadline,
         daysLeft: deadline ? Math.ceil((deadline.getTime() - now) / 86_400_000) : null,
+        // Which answer applies to a paid line: before it the line stands as a first entry, after it is dropped.
+        firstEntryDeadlinePassed: !!r.firstEntryDeadline && new Date(r.firstEntryDeadline as string).getTime() <= now,
         outcome: (r.outcome as 'verified' | 'rejected' | null) ?? null,
         decidedAt: r.decidedAt ? new Date(r.decidedAt as string) : null,
         decidedBy: (r.decidedBy as string | null) ?? null,
@@ -139,7 +142,7 @@ async function tellFamily(studentId: string, title: string, body: string, data: 
 type LineRow = {
   id: string; studentId: string; sessionId: string; status: string; attempt: string; mode: string;
   boardSeriesId: string | null; priorSittingSeriesId: string | null; priorSittingSource: string | null;
-  outcome: string | null; priceAtRegistration: number; name: string; sitting: string | null;
+  outcome: string | null; priceAtRegistration: number; registrationFeeAtRegistration: number; name: string; sitting: string | null;
 };
 
 async function loadLine(executor: typeof db | Tx, id: string): Promise<LineRow | null> {
@@ -147,6 +150,7 @@ async function loadLine(executor: typeof db | Tx, id: string): Promise<LineRow |
     select r.id, r.student_id as "studentId", r.session_id as "sessionId", r.status, r.attempt, r.mode, r.board_series_id as "boardSeriesId",
       r.prior_sitting_series_id as "priorSittingSeriesId", r.prior_sitting_source as "priorSittingSource",
       r.prior_sitting_verified_outcome as outcome, r.price_at_registration as "priceAtRegistration",
+      r.registration_fee_at_registration as "registrationFeeAtRegistration",
       case when i.kind = 'whole' then s.name else s.name || ' — ' || i.label end as name,
       pb.name as "priorBoardName", ps.month as "priorMonth", ps.year as "priorYear", ps.label as "priorLabel"
     from registration r join session_offer_item i on i.id = r.offer_item_id join session_offer o on o.id = i.offer_id join subject s on s.id = o.subject_id
@@ -157,15 +161,16 @@ async function loadLine(executor: typeof db | Tx, id: string): Promise<LineRow |
     id: r.id as string, studentId: r.studentId as string, sessionId: r.sessionId as string, status: r.status as string,
     attempt: r.attempt as string, mode: r.mode as string, boardSeriesId: (r.boardSeriesId as string | null) ?? null,
     priorSittingSeriesId: (r.priorSittingSeriesId as string | null) ?? null, priorSittingSource: (r.priorSittingSource as string | null) ?? null,
-    outcome: (r.outcome as string | null) ?? null, priceAtRegistration: Number(r.priceAtRegistration), name: r.name as string,
+    outcome: (r.outcome as string | null) ?? null, priceAtRegistration: Number(r.priceAtRegistration),
+    registrationFeeAtRegistration: Number(r.registrationFeeAtRegistration ?? 0), name: r.name as string,
     sitting: r.priorMonth ? formatSeriesName({ boardName: r.priorBoardName as string, month: r.priorMonth as string, year: Number(r.priorYear), label: (r.priorLabel as string | null) ?? '' }) : null,
   };
 }
 
-/** The line first, then its receipt (as A's approval of a change request); returns the line as it is now. */
+/** The receipt first (when the line has one), then the line — MA-16's order; returns the line as it is now. */
 async function lockLine(tx: Tx, id: string) {
-  await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, id)).for('update');
   await tx.select({ id: receipt.id }).from(receipt).where(eq(receipt.registrationId, id)).for('update');
+  await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, id)).for('update');
   return loadLine(tx, id);
 }
 
@@ -263,7 +268,7 @@ export async function verifyPriorSitting(
     await tx.update(registration).set(decided).where(eq(registration.id, registrationId));
     await logAction(actor.id, 'PRIOR_SITTING_REJECTED', 'registration', registrationId, { status: 'confirmed' },
       { outcome: 'rejected', effect: 'dropped', status: drop.gated ? 'dropped_pending_receipt' : 'dropped', refundAmount: drop.refundAmount,
-        refundPercentage: refund.percentage, boardSent, gated: drop.gated, firstEntryDeadline: first.at!.toISOString(), priorSittingSeriesId: line.priorSittingSeriesId, ...why }, ctx, tx);
+        refundPercentage: refund.percentage, boardSent, boardFeeKept: refund.boardFeeKept, gated: drop.gated, firstEntryDeadline: first.at!.toISOString(), priorSittingSeriesId: line.priorSittingSeriesId, ...why }, ctx, tx);
     return { outcome: 'rejected', effect: 'dropped', refundAmount: drop.refundAmount, refundPercentage: refund.percentage, gated: drop.gated };
   });
 
@@ -298,8 +303,17 @@ export async function holdUnverifiedAtDeadline(now: Date = new Date()) {
   if ((await getSetting('verification.unverifiedAtDeadline')) !== 'hold') return { expired: 0, dropped: 0 };
   // Only a deadline that passed while `hold` was in force: a line whose deadline passed under
   // `enter_as_declared` was entered as declared then, and turning `hold` on later does not undo it.
-  const [since] = await db.select({ at: schoolSetting.updatedAt }).from(schoolSetting).where(eq(schoolSetting.key, 'verification.unverifiedAtDeadline'));
-  if (!since) return { expired: 0, dropped: 0 };
+  // Hold counts from the moment the value became `hold` — its SETTING_CHANGED row — not from the
+  // setting row's own time, which other writes may move. A row set to `hold` with no change on
+  // record (seeded) counts from its own time.
+  const [changed] = await db.execute(sql`
+    select created_at as at from audit_log
+    where action = 'SETTING_CHANGED' and entity_id = 'verification.unverifiedAtDeadline' and new_data->>'value' = 'hold'
+    order by created_at desc limit 1`).then((r) => r.rows as { at: unknown }[]);
+  const [row] = changed ? [] : await db.select({ at: schoolSetting.updatedAt }).from(schoolSetting).where(eq(schoolSetting.key, 'verification.unverifiedAtDeadline'));
+  const sinceAt = changed ? new Date(String(changed.at)) : row?.at ?? null;
+  if (!sinceAt) return { expired: 0, dropped: 0 };
+  const since = { at: sinceAt };
   const due = await db.execute(sql`
     select r.id from registration r
     where r.prior_sitting_source in ('declared_by_family', 'declared_by_desk') and r.prior_sitting_verified_outcome is null

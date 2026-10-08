@@ -66,7 +66,7 @@ import { sessionOpenFor, sessionWindow, windowRefusal, entryDeadlineMessage, sch
 import { effectiveDeadlinesOf, lineDeadlineSql } from './deadline.services';
 import { getSetting } from './settings.services';
 import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
-import { consentStanding, writeConsents, CONSENT_MISSING_REFUSAL, FAMILY_CONSENT_NEEDED } from './reservation.services';
+import { consentStanding, writeConsents, refundTermsFor, CONSENT_MISSING_REFUSAL, FAMILY_CONSENT_NEEDED } from './reservation.services';
 import { holdUnverifiedAtDeadline } from './verification.services';
 import { seriesPastDeadline, seriesDisplayName, windowsOfSeries, seriesDeadlineGroups, mixedDeadlinesSentence } from './series.services';
 import {
@@ -2154,7 +2154,15 @@ export async function getCheckoutSummary(
     openPayment,
     deadlineGroups,
     // Lines the school reserved (grade 10) whose family has not given its own consent yet: the
-    // checkout asks for it (step B, RESERVATIONS_REWORK.md §3.5).
-    familyConsentNeeded: (await consentStanding(db, registrationIds)).schoolOnly,
+    // checkout asks for it (step B, RESERVATIONS_REWORK.md §3.5), showing the refund terms each
+    // line's session freezes when the family ticks.
+    ...(await (async () => {
+      const familyConsentNeeded = (await consentStanding(db, registrationIds)).schoolOnly;
+      const sessions = [...new Set(regs.filter((r) => familyConsentNeeded.includes(r.id)).map((r) => r.sessionId))];
+      return {
+        familyConsentNeeded,
+        familyConsentTerms: await Promise.all(sessions.map(async (sessionId) => ({ sessionId, terms: await refundTermsFor(db, sessionId) }))),
+      };
+    })()),
   };
 }

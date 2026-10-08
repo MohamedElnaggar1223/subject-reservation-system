@@ -75,6 +75,7 @@ export function availabilityConstraints(offer: string, item: string) {
 /** The board's series of (month, year, label), created with no dates when not on record. */
 export async function findOrCreateSeries(
   tx: Tx, boardCode: string, month: SeriesMonth, year: number, label: string, actorId: string | null,
+  reason = 'Created when an item of a session was placed in it (no dates yet)',
 ): Promise<{ id: string; created: boolean }> {
   const { names, months } = await boardNames(tx);
   if (!names.has(boardCode)) throw new OfferError('Board not found', 404);
@@ -92,7 +93,7 @@ export async function findOrCreateSeries(
     return { id: again!.id, created: false };
   }
   await logAction(actorId, 'BOARD_SERIES_CREATED', 'board_series', id, null,
-    { boardCode, month, year, label, reason: 'Created when an item of a session was placed in it (no dates yet)' }, undefined, tx);
+    { boardCode, month, year, label, reason }, undefined, tx);
   return { id, created: true };
 }
 

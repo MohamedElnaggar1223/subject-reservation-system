@@ -62,6 +62,7 @@ unverified) or `hold`.
 | F7 | `reserveLines(..., channel: 'imported')` writes the sheet's confirmation as consent rows |
 | the scheduler | `holdUnverifiedAtDeadline(now)`, called first by `enforcePaymentDeadlines` (§3.4) |
 | F1 | `PUT /v1/registrations/:id/teacher` moves the line's enrolment per unit or subject (§4) |
+| every page that asks for consent | `GET /v1/sessions/:id/refund-terms` → `{ terms }`, from `refundTermsFor(executor, sessionId)`: the snapshot a consent in that session freezes (weeks, or a converted session's dates); the checkout summary's `familyConsentTerms` per session |
 
 ---
 
@@ -74,15 +75,20 @@ unverified) or `hold`.
 
 | The page sends | The line gets | `prior_sitting_source` |
 |---|---|---|
-| a retake (or a carry-forward item, `needs_prior_series`) naming nothing, and the student has a confirmed or dropped line for what the item enters in another session | the latest such sitting | `known` |
-| a retake naming `priorSittingSeriesId` (a series on record) or `priorSitting { month, year }` | that series; for a month and year not on record, a `board_series` row with no dates and an empty label is created (`findOrCreateSeries`) | `known` when it is one of the student's known sittings, else `declared_by_family` (app paths) or `declared_by_desk` (staff paths) |
+| a retake (or a carry-forward item, `needs_prior_series`) naming nothing, and the student has a confirmed line for what the item enters in another session | the latest such sitting | `known` |
+| a retake naming `priorSittingSeriesId` (a series on record) or `priorSitting { month, year }` | that series; for a month and year not on record, a `board_series` row with no dates and an empty label is created (`findOrCreateSeries`, audited `BOARD_SERIES_CREATED` with the reason "Created when a family (or the desk) declared a sitting not on record") | `known` when it is one of the student's known sittings, else `declared_by_family` (app paths) or `declared_by_desk` (staff paths) |
 | a retake with no sitting and nothing known | refused by A's `gate.retakeDeclared` sentence | — |
 | a first entry naming a sitting | refused (a first entry follows no sitting) unless its item carries one forward | — |
 
 The named sitting must be of the item's board and before the item's series; `gate.priorSeries`
-(A) checks the carry-forward period. The family's picker offers the board's sittings of the last
-two years (`declarableSittings` on A's offers read). An F4 result as a `known` source is not
-built: there is no F4 results table yet (§9).
+(A) checks the carry-forward period. A family declares a sitting of the board's last two years
+(24 months before the item's series), as its picker offers (`declarableSittings` on A's offers
+read); an older one is refused with "… is declared at the finance desk, with the board's
+statement", and the desk may declare it. A **known** sitting is one the student sat: a confirmed
+line only — a dropped line was never sat, so naming it is a declaration, listed to verify (the
+review, 8 Oct; the Reserve page and the swap pickers read the offers read's `knownSittings` the
+same way, by their status). An F4 result as a `known` source is not built: there is no F4
+results table yet (§9).
 
 ### 3.2 The To verify list
 
@@ -98,9 +104,12 @@ first. Shown as the Session screen's **To verify** tab (§6.4).
 prevCandidateNumber?, reason, evidence? }` — the coordinator and the admin; the finance desk too,
 with `evidence` (what it was shown: the board's statement), as §3.5 says the desk may verify when
 the family brings it. The centre and candidate number are taken only with `verified`. A sitting
-is answered once (409 after). Locks: the line `FOR UPDATE`, then its receipt (the lead's order
-of 8 Oct, the pair A's approval of a change request takes; §8 decision 12, §10.7), then its
-payments are read.
+is answered once (409 after). Locks: the line's receipt first (when it has one), then the line
+`FOR UPDATE` — MA-16's order, the one the reversal, a receipt's void and return, the
+receipt-gated drop and a parent's approval take (the lead's decision of 8 Oct: receipt first
+everywhere; §8 decision 12, §10.7) — then its payments are read. The To verify modal says,
+before the answer, the one outcome below that applies to the line, and refuses a rejection
+while a payment is open.
 
 | Line when answered | `verified` | `rejected` |
 |---|---|---|
@@ -108,7 +117,7 @@ payments are read.
 | waiting, a payment open | stands | **refused 409**: "A payment for this line is in progress: confirm or reject it in the Finance Workbench first" (08t forces both orders) |
 | paid (confirmed, or a funded preregistration), before the first-entry deadline | stands | **stands** with `declaration_rejected = true` (F4 enters it as a first entry); the family is told; finance decides any price adjustment (C's charge) |
 | a funded preregistration, after that deadline | stands | stands as above: its capture or MO-21's deadline refund settles it |
-| confirmed, after the first-entry deadline | stands | **dropped** through `executeReceiptGatedDrop` (MA-16: the paper receipt comes back before the money moves); the refund from `refundForSystemDrop(line, now, { boardSent })` where `boardSent` is the line's own sent state (its effective deadline passed); recorded on the audit row |
+| confirmed, after the first-entry deadline | stands | **dropped** through `executeReceiptGatedDrop` (MA-16: the paper receipt comes back before the money moves); the refund from `refundForSystemDrop(line, now, { boardSent })` where `boardSent` is the line's own sent state (its effective deadline passed): sent, the window's percentage of the price less the recorded board fee; not sent (a declared retake of the previous sitting before the retake deadline), of the whole price; `boardSent` and `boardFeeKept` on the audit row |
 
 ### 3.4 Unverified at the deadline: the setting and the hold step
 
@@ -122,9 +131,11 @@ line as declared, unverified. `hold`: `holdUnverifiedAtDeadline(now)` runs first
   same tick (which fails the payment and expires the line, as at any deadline);
 - a confirmed line → **dropped** through the receipt-gated drop with that day's refund, the
   board fee counted **not sent** (a held line was never entered), audit `LINE_DROPPED_UNVERIFIED`;
-- only a deadline that passed **while `hold` was in force** counts (after the setting's own
-  `updated_at`): a line whose deadline passed under `enter_as_declared` was entered as declared
-  then, and turning `hold` on later does not reach back (§8, decision 4);
+- only a deadline that passed **while `hold` was in force** counts — from the moment the value
+  became `hold` (its latest `SETTING_CHANGED` row to `hold`; the setting row's own time only for
+  a row never changed through the settings page): a line whose deadline passed under
+  `enter_as_declared` was entered as declared then, and turning `hold` on later does not reach
+  back (§8, decisions 4 and 13);
 - claim before acting (ST-06, ST-12): each line is locked and read again in its own transaction
   and acted on only while still unverified and in the status it was found in. Two schedulers at
   once drop a line once (08t); the drop's own conditional update is a second layer (control
@@ -133,15 +144,19 @@ line as declared, unverified. `hold`: `holdUnverifiedAtDeadline(now)` runs first
 ### 3.5 The refund seam
 
 `refundForSystemDrop(line, at, { boardSent })` (reservation.services) is the one place a system
-drop of a declared sitting computes its refund. It is **today's computation** (the refund
-windows' percentage of the whole price, `refundPercentage`) because C's `refundFor` is not merged;
-`boardSent` is passed correctly now and ignored by today's computation. C replaces the body.
+drop of a declared sitting computes its refund: the design's rule with today's percentage (the
+refund windows', or a custom exception's: `refundPercentage`) until C's `refundFor` merges —
+board fee **sent**: the percentage of `price − registration_fee_at_registration` (the school has
+paid the board); **not sent**: the percentage of the whole price. It returns `boardFeeKept`. C
+replaces the body (the review, 8 Oct, flag 1: before, `boardSent` was ignored and a rejected
+line past its own deadline refunded a board fee the school had already paid).
 
 ## 4. The teacher on a line
 
 `PUT /v1/registrations/:id/teacher { teacherId: string | null, mode?, reason }` — the admin, the
-coordinator and the finance desk (the family asks there). Student `FOR SHARE`, then the line
-`FOR UPDATE`. Rules, each with its sentence:
+coordinator and the finance desk (the family asks there). Locks in A's §2.1 order: the student
+`FOR SHARE`, the offer and the item `FOR SHARE` (a teacher removed or the item closed at the
+same moment waits, or is seen), then the line `FOR UPDATE`. Rules, each with its sentence:
 
 - the teacher must teach the item (its own teachers, else the offer's) and be active;
 - `null` ("no preference") only where the item has several teachers; refused where it has one,
@@ -149,6 +164,9 @@ coordinator and the finance desk (the family asks there). Student `FOR SHARE`, t
 - `mode: 'self_study'` takes the teacher off; a self-study line is **not** moved to taught (it was
   priced as self-study: drop it and reserve it in school); a move to self-study is **not**
   re-priced (a refund is finance's own act);
+- a **first entry** of an item the school teaches is not moved to self-study unless the student
+  holds `gate.selfStudyFirstEntry` (G-09): a staff change is not the exception (the review, 8
+  Oct, flag 7); a retake may move;
 - nothing to change → 409;
 - the line keeps its price; `taken_outside_school` follows the mode; audit
   `LINE_TEACHER_CHANGED`;
@@ -163,7 +181,9 @@ A's "replace teacher" on an offer (every line) is untouched.
 `GET /v1/statement?studentId=` or `?familyId=` — a student sees their own; a parent their linked
 children (by child or by family = themselves); staff with the student-record roles anyone.
 Per student, per session: every line with its price, what completed payments covered, what is
-outstanding, refunded, or waiting on a receipt's return; the due date and days overdue; whether
+outstanding (as A's Money tab's `unpaid`: a line waiting for payment, or a preregistration nobody
+has paid; a line still waiting for the parent's approval is not owed yet), refunded, or waiting
+on a receipt's return; the due date and days overdue; whether
 the board fee is provisional; **why the price is what it is** (`basisText`: "course 14,000 × 50% +
 board 9,200 × 100%", from the line's pricing basis; a converted line shows its recorded split);
 the series and its deadline; the sitting followed, its source and answer; the receipt; the
@@ -207,21 +227,29 @@ reserved (grade 10). "Owes now" (and the family home's owing) leave out a provis
 ### 6.2 The family (§4.4, `/register`)
 
 Child and session pickers (the session preselected when there is one), the school-fee notice
-when the fee is not settled, the `Reserve` card with the two consents (the refund steps written
-out, and the declaration). A student's reservation is sent to the parent for approval; a parent's
+when the fee is not settled, the `Reserve` card with the two consents (the refund terms the tick
+freezes written out — the session's steps in weeks, or a converted session's windows as dates,
+from `GET /v1/sessions/:id/refund-terms` — and the declaration). A student's reservation is sent to the parent for approval; a parent's
 is a direct reservation, or a preregistration when the session has not opened; then **Pay now**
-to the checkout by series. The checkout asks the family's consent for lines the school reserved.
+to the checkout by series. The checkout asks the family's consent for lines the school reserved,
+showing the terms of each line's session (`familyConsentTerms` on the checkout summary). A swap
+the parent approves makes its line at the price the request showed (`priceAtRequest`) or is
+refused with `PRICE_CHANGED_REFUSAL`, as the checkout is; a swap that must ask for consent (the
+dropped line has none to give) shows the same terms.
 
 ### 6.3 The statement (§4.5)
 
 `/statement` for the family; the Student 360's section at the desk. The reservation slip
-(`/reservation-slip/[studentId]?ids=`) prints the lines and the consent texts.
+(`/reservation-slip/[studentId]?ids=`) prints the lines and the consent texts, and marks a
+declared sitting (a retake's or a carry-forward's) "to be verified by the school" until it is
+answered; the Reserve page marks a declared carry-forward the same way.
 
 ### 6.4 The Session screen's tabs (§4.6)
 
 **To verify** (coordinator, admin, finance): Awaiting and Answered; Verify (centre and candidate
 number on a carry-forward, reason; the finance desk's evidence) and Not confirmed (reason), each
-saying what will happen to that line. **Money** (A's): a section filter added, the student linked
+saying the one outcome that applies to that line (unpaid; paid and held; paid before or after the
+first-entry deadline), and refusing a rejection while a payment is open. **Money** (A's): a section filter added, the student linked
 to the statement, **Remind** shown disabled ("Reminders arrive with the messages step", D's),
 Export as A built it.
 
@@ -240,7 +268,7 @@ right.
 
 ## 7. Tests
 
-- **08o-reservation-lines** (15 scenarios): a family reserves in the app (one line per item, the
+- **08o-reservation-lines** (19 scenarios): a family reserves in the app (one line per item, the
   entry chosen, both consents required and recorded, the refund steps frozen); the price shown is
   the price charged; a declared retake (created series, retake price, listed to verify; a first
   entry names none); a known sitting filled and not listed, its retake to the retake deadline;
@@ -252,32 +280,47 @@ right.
   confirmed without; a swap's line inherits consent and refund steps; the teacher on a line (all
   of §4); the desk's reserve only / reserve and collect with a provisional line (and "owes now");
   the family's flow end to end with the statement's numbers equal to the ledger's; `/available`
-  gone.
+  gone. Added after the review (8 Oct): a dropped line is not a known sitting; a converted
+  session freezes its windows as dates (the session's, else its academic year's) and the family
+  reads the same terms; rejected after its own deadline the board fee the school paid is kept
+  (escrow asserted in both cases); the statement's outstanding equals the Money tab's unpaid; a
+  family's declaration bounded to two years and its series' audit reason; a taught first entry
+  not moved to self-study by staff; a swap approved at a changed price refused; hold counting from
+  its change row.
 - **08t** (A's file, extended): two desks at once (the loser 409, one consent pair); a declared
   sitting answered while its line is paid — checkout first, rejection first, verified while
   confirmed; a parent's approval of a drop against the coordinator's rejection of the same paid
-  line, both orders (one waits, nothing deadlocks); the hold step by two schedulers. A's races
+  line, and a payment reversal against the rejection, each in both orders (one waits, nothing
+  deadlocks: receipt first everywhere); the hold step by two schedulers. A's races
   now reserve through the desk's endpoint
   (typed client); the fee-confirm race stays on the services (a request cannot be paused between
   its fee lock and its commit).
 - **05**: cross-family cases for `/statement` (by student and by family), `/to-verify`,
   `/verify-prior`, `/teacher`.
-- **authz-policy.tsv**: rows for the four endpoints; `/registrations/available` removed.
+- **authz-policy.tsv**: rows for the five endpoints (`/sessions/:id/refund-terms` added);
+  `/registrations/available` removed.
 - **09** (B's block, last): every line confirmed since the rework has both consents; a line the
   family or desk consented to has its refund steps frozen (weeks or dates); a declared sitting is
-  answered once, by someone, only a paid line stands rejected, and every `declaration_rejected` /
-  `hold_unverified` expiry and `LINE_DROPPED_UNVERIFIED` follows from its answer; the expiry
-  reasons list gains the two.
+  answered once, by someone, only a line paid when rejected stands rejected (a later reversal
+  leaves it waiting), every `declaration_rejected` / `hold_unverified` expiry and
+  `LINE_DROPPED_UNVERIFIED` follows from its answer, and a line the system dropped was refunded
+  at most its price; the expiry reasons list gains the two.
 - **The suites converted** to lines and consent (`reservationOf`, `swapTo` in helpers.ts); the
   assertions restated are in the trail (08d #13, 08i, 08f's settings count, 09's reasons).
-- **Controls** (each guard undone, its test red; logs `control-*.log`): confirmation's consent
-  check; 0045's trigger; the checkout's family consent; already reserved; the price shown;
-  the rejection's open-payment refusal; the answer's row lock; hold's since-rule (query alone
-  green — doubled by the re-check; both red); the statement's parent link; swap consent
-  inheritance; the teacher pool; self-study to taught; the hold step's lock (alone green —
-  doubled by the drop's conditional update; both red); the rejection's sent state; "owes now"
-  on the desk and the home; the line-before-receipt order (receipt first again: the approval race
-  deadlocks).
+- **Controls** (each guard undone, its test red; logs `control-*.log`, runner
+  `scripts/controls.py` in the evidence). On d828ab7, 18 controls: 16 red, 2 green (the review's
+  count; my first report said 19, wrongly): confirmation's consent check; 0045's trigger; the
+  checkout's family consent; already reserved; the price shown; the rejection's open-payment
+  refusal; the answer's row lock; hold's since-rule in the query alone (green — doubled by the
+  re-check) and in both (red); the statement's parent link; swap consent inheritance; "owes now"
+  on the desk and on the home; the teacher pool; self-study to taught; the hold step's lock alone
+  (green — doubled by the drop's conditional update) and with the drop's condition (red); the
+  rejection's sent state. After the review, 11 more, all red: the answer's lock order (the line
+  first: the approval and reversal races deadlock); the approval's receipt lock (the approval race
+  deadlocks); the sent board fee kept; the academic year's windows; known means confirmed; the
+  checkout's terms; a taught first entry not moved to self-study; the statement's outstanding; the
+  family's two-year bound; hold from its change row; the swap approval's price. The answer's row
+  lock was run again on the receipt-first code (02:24Z) so its log matches the row that cites it.
 
 ## 8. Decisions and why
 
@@ -308,10 +351,12 @@ right.
     checkout take the money, not by series: a Cambridge retake of the previous sitting is its own
     payment.
 11. **The onboarded family stays open**: §11 counts on it.
-12. **The line before its receipt** in the answer to a declared sitting and in the hold step (the
-    lead, 8 Oct), so a parent's approval of a drop and the coordinator's rejection of the same
-    line queue instead of deadlocking (08t forces both orders; the receipt-first order deadlocks
-    there, control `lock-order-receipt-first`). The opposite pair remains elsewhere: §10.7.
+12. **Receipt first, then the line, everywhere** (the lead's decision, 8 Oct, after correcting
+    its earlier note; §10.7): the answer to a declared sitting and the hold step take the line's
+    receipt (when it has one) before the line, as the reversal, a receipt's void and return, the
+    receipt-gated drop and — since this step, as A is asked to do on its branch — a parent's
+    approval of a change request. 08t forces the approval and the reversal against the rejection,
+    both orders each; nothing deadlocks.
 13. **Decided by the lead from the design (8 Oct), formerly questions for the owner:**
     - Q-B1: `hold` acts only on deadlines that pass after it is turned on, as built; a line whose
       deadline had already passed was entered as declared, and F4 lists it as "declared,
@@ -360,23 +405,35 @@ right.
    with no prior sitting); the Reserve page and the swap pickers read `item.open` per attempt and
    each price row's `open` (an object was always truthy, so the merge alone would have offered
    closed entries: fixed in 2f09f43 and driven with an item past its entry deadline).
-7. **One lock order for a line and its receipt is still needed.** B now takes the line before its
-   receipt (the lead's order, matching A's approval re-check and A's preregistration cancel).
-   But a payment reversal (payment, receipts, then lines), a receipt's void (ST-14: "Receipt
-   first, then its registration — the order a drop, a return and a reversal lock them in") and
-   its return take the receipt first, and so does `executeReceiptGatedDrop` itself; MA-16's fix
-   reads "The drop locks the receipt first (the reversal's order)" — the opposite of "MA-16's
-   drop takes the line it drops first". Measured: with B's answer line-first, a coordinator's
-   rejection holding a paid line while finance reverses its payment deadlocks, and Postgres
-   aborts the reversal ("Failed to reverse payment"; scratch run,
-   `scratch-reversal-vs-rejection-line-first.log`, "deadlock detected"); with B receipt-first, the
-   approval race deadlocks instead (control `lock-order-receipt-first`). Either the reversal, the
-   void and the return take the line first (audited code: MA-16, ST-14), or A's approval re-check,
-   A's preregistration cancel and B's answer take the receipt first. A deadlock aborts one side
-   with an error and corrupts nothing, but the order should be one.
+7. **The lock order for a line and its receipt: decided, receipt first (MA-16).** The lead's
+   note of 8 Oct asked B to take the line before its receipt "matching A's approval path (and
+   MA-16's drop takes the line it drops first)". That premise was wrong, and the lead corrected
+   it the same day: MONEY_AUDIT.md MA-16 fixed the order as the receipt first (the reversal's
+   order), and the reversal (payment, receipts, then lines), the void (ST-14: "Receipt first,
+   then its registration — the order a drop, a return and a reversal lock them in"), the return
+   and `executeReceiptGatedDrop` all take it so. Measured before the decision: with B's answer
+   line-first, a rejection holding a paid line while finance reversed its payment deadlocked
+   (Postgres aborted the reversal, "Failed to reverse payment";
+   `scratch-reversal-vs-rejection-line-first.log`); with B's answer receipt-first and A's
+   approval line-first, the approval race deadlocked. **Decision (the lead): receipt first
+   everywhere; the audited paths do not move.** B's answer and hold step take the receipt first
+   (7550f5f's change reverted); A's approval re-check takes the receipt before the line on this
+   branch too (the same change A is making on its own; A's version wins at the merge); A's
+   preregistration cancel is A's to change; A writes the pair into RESERVATIONS.md §2.1 as
+   "receipt, then line (MA-16)". 08t: approval against rejection and reversal against rejection,
+   both orders each, green; controls `lock-order-line-first` and `approval-line-first` red.
 8. **C**: `consentStanding` / `writeConsents` for the checkout and the desk; `refundForSystemDrop`
    to replace; `statementFor`'s `charges`. **D**: `DECLARATION_REVIEWED` notifications exist; the
    Remind button waits.
+9. **Dev databases** migrated through A's 0043 before B's 0045 hold interim lines B's trigger
+   refuses to confirm (lines made between the two with no consent rows): dev only — a production
+   database migrates 0044 and 0045 with the rest and has no such lines; a dev database is
+   recreated from its template.
+10. **F7's import must reserve through `reserveLines(..., channel: 'imported')`** so each imported
+    line carries the sheet's confirmation as its two consent rows (a note for F7's document).
+11. **`findOrCreateSeries` (A's, offer.services) takes an optional audit reason** so a series row
+    created by a declaration says so; A's own callers keep their sentence (a one-parameter,
+    defaulted addition).
 
 ## 11. Questions for the owner
 
@@ -435,3 +492,14 @@ Times UTC, from the trail (`.audit/rework-reservations.tsv`), which holds each e
   (16 passed); control red (deadlock) with the receipt first; a scratch run shows the reversal
   still takes the receipt first and deadlocks against a line-first rejection (§10.7). The lead's
   answers to Q-B1–Q-B3 recorded (§8, decision 13).
+- about 02:20Z (between CI on afb9018 at 02:18Z and the first edit at 02:21Z) — the lead's
+  correction (receipt first everywhere) and the review of d828ab7: "merge after fixes: 1, 2".
+- 02:21Z–03:04Z — the review's fixes, each with a test and a control: (1) the sent board fee kept;
+  (2) receipt first again in the answer and the hold step, the approval's re-check receipt first,
+  the reversal race committed; (3) the dates snapshot, session and academic-year windows; (4)
+  known means confirmed; (6) the refund terms shown (the Reserve page, the swap consent, the
+  grade-10 checkout); (7) the teacher change's locks and the taught first entry; (8) the
+  statement's outstanding; (9) the two-year bound and the series' reason; (10) hold from its
+  change row; (11) the modal's one outcome, the open-payment refusal, the slip's mark; (12) the
+  control count (18 on d828ab7, 16 red and 2 green) and the row-lock log re-run; (13) the swap
+  approval's price, and the notes in §10. Eleven controls red.

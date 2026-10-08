@@ -469,7 +469,7 @@ function RequestSwapModal({
   const [reason, setReason] = useState('');
   const [err, setErr] = useState('');
   // Step B: the swap names its new line (item and entry) from the session's offers.
-  const { choices, policy, isLoading } = useSwapChoices(reg.sessionId, reg.studentId, reg.offerItemId);
+  const { choices, terms, isLoading } = useSwapChoices(reg.sessionId, reg.studentId, reg.offerItemId);
   const consent = useSwapConsent();
   const choice = choices.find((c) => c.key === choiceKey);
   const newPrice = choice?.price ?? 0;
@@ -540,7 +540,7 @@ function RequestSwapModal({
             placeholder="Explain why you want to swap this subject..."
           />
         </div>
-        {consent.needed && <SwapConsent policy={policy} value={consent.ticks} onChange={consent.setTicks} />}
+        {consent.needed && <SwapConsent terms={terms} value={consent.ticks} onChange={consent.setTicks} />}
         {err && <p className="text-sm text-destructive">{err}</p>}
         <div className="flex gap-3">
           <Button variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
@@ -622,7 +622,7 @@ function DirectSwapModal({
   const [choiceKey, setChoiceKey] = useState('');
   const [err, setErr] = useState('');
   // Step B: the swap names its new line (item and entry) from the session's offers.
-  const { choices, policy, isLoading } = useSwapChoices(reg.sessionId, reg.studentId, reg.offerItemId);
+  const { choices, terms, isLoading } = useSwapChoices(reg.sessionId, reg.studentId, reg.offerItemId);
   const consent = useSwapConsent();
   const choice = choices.find((c) => c.key === choiceKey);
   const newPrice = choice?.price ?? 0;
@@ -683,7 +683,7 @@ function DirectSwapModal({
           </div>
         )}
         <RefundPreviewNote registrationId={reg.id} />
-        {consent.needed && <SwapConsent policy={policy} value={consent.ticks} onChange={consent.setTicks} />}
+        {consent.needed && <SwapConsent terms={terms} value={consent.ticks} onChange={consent.setTicks} />}
 
         {err && <p className="text-sm text-destructive">{err}</p>}
         <div className="flex gap-3">

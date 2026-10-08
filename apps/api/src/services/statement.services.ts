@@ -52,7 +52,13 @@ type LineRow = {
   paid_payment_id: string | null; paid_at: string | null; refunded: string | null; consents: { kind: string; channel: string; at: string }[] | null;
 };
 
-const WAITING = ['pending_approval', 'pending_payment'];
+/**
+ * Owed now, as A's Money tab counts it (session-money.services `unpaid`): a line waiting for
+ * payment, or a preregistration nobody has paid yet. A line still waiting for the parent's
+ * approval is not owed until it is approved (it has a due date, not an amount owed).
+ */
+const OWED_STATUSES = ['pending_payment', 'preregistered'];
+const DATED_STATUSES = ['pending_approval', 'pending_payment', 'preregistered'];
 
 async function linesOf(studentIds: string[]) {
   const r = await db.execute(sql`
@@ -86,8 +92,8 @@ async function linesOf(studentIds: string[]) {
   return (r.rows as LineRow[]).map((l) => {
     const price = Number(l.price);
     const paid = l.paid_payment_id ? price : 0;
-    const waiting = WAITING.includes(l.status);
-    const outstanding = waiting && !l.paid_payment_id ? price : 0;
+    const owed = OWED_STATUSES.includes(l.status) && !l.paid_payment_id;
+    const outstanding = owed ? price : 0;
     const dueAt = l.due_at ? new Date(l.due_at) : null;
     const courseFee = Number(l.course_fee);
     const boardFee = Number(l.board_fee);
@@ -111,7 +117,7 @@ async function linesOf(studentIds: string[]) {
       // Escrow credits for a drop or swap, and a refund parked on a receipt that is still out.
       refunded: round2(Number(l.refunded ?? 0)),
       refundAwaitingReceipt: l.receipt_parked === null ? null : Number(l.receipt_parked),
-      dueAt: waiting ? dueAt : null,
+      dueAt: DATED_STATUSES.includes(l.status) && !l.paid_payment_id ? dueAt : null,
       overdueDays: outstanding > 0 && dueAt && dueAt.getTime() < now ? Math.floor((now - dueAt.getTime()) / 86_400_000) : 0,
       provisional: l.provisional,
       basisText: basisText(l.basis, { courseFee, boardFee, provisional: l.provisional }),

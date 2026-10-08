@@ -641,7 +641,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
               <p className="font-semibold text-foreground">The school reserved these subjects for you: confirm before paying</p>
               <label className="flex items-start gap-2">
                 <input type="checkbox" className="mt-0.5 h-4 w-4" checked={refundTick} onChange={(e) => setRefundTick(e.target.checked)} />
-                <span>{refundConsentText(null)}</span>
+                <span>{summary.familyConsentTerms.map((t) => refundConsentText(t.terms)).join(' ')}</span>
               </label>
               <label className="flex items-start gap-2">
                 <input type="checkbox" className="mt-0.5 h-4 w-4" checked={declTick} onChange={(e) => setDeclTick(e.target.checked)} />

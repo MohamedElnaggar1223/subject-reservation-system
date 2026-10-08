@@ -46,7 +46,13 @@ export default function SlipClient({ studentId, ids }: { studentId: string; ids:
                 <td className="py-1.5">
                   <bdi data-i18n-skip="true">{l.label}</bdi>
                   <div className="text-xs text-muted-foreground print:text-black"><bdi data-i18n-skip="true">{l.series ?? ''}</bdi>{l.teacher && <> · <bdi data-i18n-skip="true">{l.teacher}</bdi></>}</div>
-                  {l.priorSitting && <div className="text-xs text-muted-foreground print:text-black"><span>from</span> <bdi data-i18n-skip="true">{l.priorSitting.name}</bdi></div>}
+                  {l.priorSitting && (
+                    <div className="text-xs text-muted-foreground print:text-black">
+                      <span>from</span> <bdi data-i18n-skip="true">{l.priorSitting.name}</bdi>
+                      {(l.priorSitting.source === 'declared_by_family' || l.priorSitting.source === 'declared_by_desk') && !l.priorSitting.outcome && <> · <span>to be verified by the school</span></>}
+                      {l.priorSitting.outcome === 'verified' && <> · <span>verified</span></>}
+                    </div>
+                  )}
                 </td>
                 <td className="py-1.5"><span>{l.attempt === 'retake' ? 'Retake' : 'First entry'}</span>, <span>{l.mode === 'self_study' ? 'self-study' : 'in school'}</span></td>
                 <td className="py-1.5 text-end"><Money amount={l.price} />{l.provisional && <> ⓟ</>}<div className="text-[10px] text-muted-foreground print:text-black" dir="ltr">{l.basisText}</div></td>

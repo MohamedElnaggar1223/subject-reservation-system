@@ -467,9 +467,11 @@ describe('08t: the rework races', () => {
       expect(await state(id)).toEqual({ status: 'confirmed', outcome: 'verified', payments: '1' });
     });
 
-    // The lead's lock order (8 Oct): the line, then its receipt — the pair a parent's approval of a
-    // drop takes (its deadline re-check under the line's lock, then the receipt-gated drop) and the
-    // pair the coordinator's answer takes. Both orders forced: one waits, nothing deadlocks.
+    // One lock order for a line and its receipt (the lead's decision of 8 Oct): the receipt first,
+    // then the line — MA-16's order, taken by a payment reversal, a receipt's void (ST-14) and
+    // return, the receipt-gated drop, a parent's approval of a change request and the
+    // coordinator's answer. Each pair forced in both orders on the line's row lock: one waits,
+    // nothing deadlocks.
     describe("a parent's approval of a drop against the coordinator's rejection of the same paid line", () => {
       const paidDeclared = async (tag: string) => {
         const f = await onboard(officer, `t08-apr-${tag}-${RUN}`, 11);
@@ -528,6 +530,59 @@ describe('08t: the rework races', () => {
       });
     });
 
+    describe("a payment reversal against the coordinator's rejection of the same paid line", () => {
+      const paidAtDesk = async (tag: string) => {
+        const f = await onboard(officer, `t08-rev-${tag}-${RUN}`, 11);
+        const desk = await apiResponse(officer.api.v1.registrations.desk.$post({
+          json: { studentId: f.studentId, sessionId: s1, lines: [declared()], consent: CONSENT, collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+        }));
+        const id = desk.registrations[0]!.id;
+        const reverse = () => finadmin.api.v1.payments[':id'].reverse.$post({ param: { id: desk.payments[0]!.id }, json: { reason: 'race: confirmed by mistake', moneyReturned: true } });
+        return { id, reverse };
+      };
+      const after = (id: string) => one<{ status: string; outcome: string | null; rejected: boolean }>(
+        `select status, prior_sitting_verified_outcome as outcome, declaration_rejected as rejected from registration where id = $1`, [id]);
+
+      it('the rejection first: it holds the receipt and the line; the reversal waits, then reverts the payment', async () => {
+        const { id, reverse } = await paidAtDesk('jf');
+        const release = await holdRowLock('registration', id);
+        let rej: Promise<Res> | undefined;
+        let rev: Promise<Res> | undefined;
+        try {
+          rej = reject(id);
+          await lockWaiters(1);
+          rev = reverse();
+          await lockWaiters(2);
+        } finally {
+          await release();
+        }
+        const [r, v] = await Promise.all([rej!, rev!]);
+        expect(r.status).toBe(200);
+        expect(v.status).toBe(200);
+        // Rejected while paid, it stood as a first entry; the reversal then undid the payment.
+        expect(await after(id)).toEqual({ status: 'pending_payment', outcome: 'rejected', rejected: true });
+      });
+
+      it('the reversal first: the line waits for payment again, and the rejection that waited ends it', async () => {
+        const { id, reverse } = await paidAtDesk('vf');
+        const release = await holdRowLock('registration', id);
+        let rej: Promise<Res> | undefined;
+        let rev: Promise<Res> | undefined;
+        try {
+          rev = reverse();
+          await lockWaiters(1);
+          rej = reject(id);
+          await lockWaiters(2);
+        } finally {
+          await release();
+        }
+        const [v, r] = await Promise.all([rev!, rej!]);
+        expect(v.status).toBe(200);
+        expect(r.status).toBe(200);
+        expect(await after(id)).toEqual({ status: 'expired', outcome: 'rejected', rejected: false });
+      });
+    });
+
     it('the hold step run by two schedulers at once drops a paid unverified line once', async () => {
       const { holdUnverifiedAtDeadline } = await import('../src/services/verification.services');
       const holdSeries = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `t08h-${RUN}`, entryDeadline: new Date(Date.now() + days(30)), retakeDeadline: new Date(Date.now() + days(35)) } })))!.id;
@@ -541,7 +596,9 @@ describe('08t: the rework races', () => {
       const id = desk.registrations[0]!.id;
       await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'verification.unverifiedAtDeadline' }, json: { value: 'hold', reason: 'race: two schedulers' } }));
       await sql(`update board_series set entry_deadline = now() - interval '2 minutes', retake_deadline = now() - interval '30 seconds' where id = $1`, [holdSeries]);
-      await sql(`update school_setting set updated_at = now() - interval '45 seconds' where key = 'verification.unverifiedAtDeadline'`);
+      await sql(`update audit_log set created_at = now() - interval '45 seconds' where id = (select id from audit_log where action = 'SETTING_CHANGED' and entity_id = 'verification.unverifiedAtDeadline' order by created_at desc limit 1)`);
+      // The setting row touched since (not a change of its value): hold still counts from when it became hold.
+      await sql(`update school_setting set updated_at = now() where key = 'verification.unverifiedAtDeadline'`);
       const release = await holdRowLock('registration', id);
       let a: Promise<{ expired: number; dropped: number }> | undefined;
       let b: Promise<{ expired: number; dropped: number }> | undefined;

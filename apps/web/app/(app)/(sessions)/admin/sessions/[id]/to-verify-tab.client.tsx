@@ -135,18 +135,26 @@ function AnswerModal({ row, outcome, finance, sessionId, onClose }: { row: Row; 
     },
     onError: (e) => setFailure(errorText(e)),
   });
+  // The one outcome that applies to this line (§3.5), said before the answer is given.
+  const refusedWhileOpen = outcome === 'rejected' && !row.paid && row.paymentOpen;
   const effect = outcome === 'verified'
     ? 'The line stands as it is.'
-    : row.paid
-      ? 'Paid: before the board\'s first-entry deadline the line stands and is entered as a first entry (finance decides whether anything is owed); after it, the line is dropped and refunded (the paper receipt comes back first).'
-      : 'Not paid: the line ends and the family is told it may reserve a first entry.';
+    : refusedWhileOpen
+      ? 'A payment for this line is in progress: a rejection is refused until the Finance Workbench confirms or rejects it.'
+      : !row.paid
+        ? 'Not paid: the line ends and the family is told it may reserve a first entry.'
+        : row.status === 'preregistered'
+          ? 'Paid and held until the session opens: the line stands as a first entry; its capture or the deadline\'s refund settles it.'
+          : !row.firstEntryDeadlinePassed
+            ? 'Paid, before the board\'s first-entry deadline: the line stands and is entered as a first entry; finance decides whether anything is owed.'
+            : 'Paid, after the board\'s first-entry deadline: the line is dropped and refunded by the refund policy (the paper receipt comes back first).';
   return (
     <Modal title={outcome === 'verified' ? 'Verify the declared sitting' : 'The sitting is not confirmed'} onClose={onClose}>
       <div className="space-y-4">
         <p className="text-sm text-foreground">
           <bdi data-i18n-skip="true">{row.student.name}</bdi> · <bdi data-i18n-skip="true">{row.line.subject}</bdi> · <bdi data-i18n-skip="true">{row.sitting?.name ?? ''}</bdi>
         </p>
-        <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">{effect}</p>
+        <p className={`rounded-lg px-3 py-2 text-sm ${refusedWhileOpen ? 'bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300' : 'bg-muted text-muted-foreground'}`}>{effect}</p>
         {outcome === 'verified' && row.line.carriesForward && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Previous centre (another centre only)" htmlFor="prev-centre">
@@ -168,7 +176,7 @@ function AnswerModal({ row, outcome, finance, sessionId, onClose }: { row: Row; 
         <ErrorLine message={failure} />
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button variant={outcome === 'verified' ? 'default' : 'destructive'} disabled={reason.trim().length < 5 || (finance && evidence.trim().length < 3) || m.isPending}
+          <Button variant={outcome === 'verified' ? 'default' : 'destructive'} disabled={refusedWhileOpen || reason.trim().length < 5 || (finance && evidence.trim().length < 3) || m.isPending}
             onClick={() => { setFailure(null); m.mutate(); }}>
             {outcome === 'verified' ? 'Verify' : 'Not confirmed'}
           </Button>

@@ -29,7 +29,6 @@ import {
   DESK_CONSENT_TEXT,
   IN_SCHOOL_INSTRUMENTS,
   IN_SCHOOL_INSTRUMENT_LABELS,
-  type RefundPolicy,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
@@ -57,6 +56,13 @@ export type DeskResult = Awaited<ReturnType<typeof reserveDesk>>;
 
 export const reserveOffersKey = (sessionId: string, studentId: string) => ['registrations', 'offers', sessionId, studentId] as const;
 
+/** The refund terms a reservation in this session freezes at consent: weeks, or a converted session's dates. */
+export const fetchRefundTerms = (sessionId: string) => apiResponse(api.v1.sessions[':id']['refund-terms'].$get({ param: { id: sessionId } }));
+export function useRefundTerms(sessionId: string | null | undefined) {
+  const q = useQuery({ queryKey: ['sessions', sessionId, 'refund-terms'], queryFn: () => fetchRefundTerms(sessionId!), enabled: !!sessionId, retry: false });
+  return q.data?.terms ?? null;
+}
+
 // ─── Words ───────────────────────────────────────────────────────────────────
 
 const MONTH: Record<string, string> = { january: 'January', june: 'June', october: 'October', november: 'November' };
@@ -66,7 +72,9 @@ const LEVEL_GROUP: Record<string, string> = { igcse: 'O.L.', as_level: 'A.S. / A
 const AVAILABILITY: Record<string, string> = { retake_only: 'Retakes only', self_study_only: 'Self-study only (not taught this cycle)' };
 
 const entryKey = (p: { attempt: string; mode: string }) => `${p.attempt}|${p.mode}`;
-const isKnown = (it: Item) => it.knownSittings.length > 0;
+/** A sitting is known when the student sat it: a confirmed line (a dropped one was never sat, so it is declared). */
+const knownOf = (it: Item) => it.knownSittings.filter((k) => k.status === 'confirmed');
+const isKnown = (it: Item) => knownOf(it).length > 0;
 /** Open per attempt (docs/features/RESERVATIONS.md §2.12): a first entry to the entry deadline, a retake of the previous sitting to the retake deadline. */
 const reservable = (it: Item) => it.open.first || it.open.retake;
 const usable = (p: Price) => !p.noFee && p.open;
@@ -113,6 +121,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
     queryFn: () => fetchReserveOffers(sessionId, viewer === 'student' ? undefined : studentId),
     retry: false,
   });
+  const terms = useRefundTerms(desk ? null : sessionId);
   const [picks, setPicks] = useState<Record<string, Pick>>({});
   const [refundTick, setRefundTick] = useState(false);
   const [declTick, setDeclTick] = useState(false);
@@ -174,7 +183,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
       return { month: month!, year: Number(year) };
     }
     if (c.attempt !== 'retake') return null;
-    const known = c.it.knownSittings.map((k) => declarable.find((x) => x.seriesId === k.seriesId)).filter((x) => !!x);
+    const known = knownOf(c.it).map((k) => declarable.find((x) => x.seriesId === k.seriesId)).filter((x) => !!x);
     return known.sort((a, b) => ym(b.month, b.year) - ym(a.month, a.year))[0] ?? null;
   };
   const deadlineOf = (c: (typeof chosen)[number]): { at: string | null; retake: boolean } => {
@@ -262,7 +271,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
   if (!offers.length) return <EmptyState title="Nothing is offered in this session yet" />;
 
   const groups = [...new Set(offers.map((o) => LEVEL_GROUP[o.subject.level] ?? 'Other'))];
-  const policy = data.session.refundPolicy as RefundPolicy | null;
+
   const payableNow = Math.max(0, total - provisionalTotal - (Number(escrow) > 0 ? Number(escrow) : 0));
 
   return (
@@ -327,7 +336,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
             <>
               <label className="flex items-start gap-2">
                 <input type="checkbox" className="mt-0.5 h-4 w-4" checked={refundTick} onChange={(e) => setRefundTick(e.target.checked)} />
-                <span>{refundConsentText(policy?.steps ? { kind: 'weeks', steps: policy.steps } : null)}</span>
+                <span>{refundConsentText(terms)}</span>
               </label>
               <label className="flex items-start gap-2">
                 <input type="checkbox" className="mt-0.5 h-4 w-4" checked={declTick} onChange={(e) => setDeclTick(e.target.checked)} />
@@ -397,12 +406,13 @@ function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings }: {
             <td className="px-3 py-2 align-top">
               <span>{it.label}</span>
               {it.availability !== 'open' && AVAILABILITY[it.availability] && <> <Badge tone="warning">{AVAILABILITY[it.availability]}</Badge></>}
-              {isKnown(it) && <> <Badge tone="info"><span>sat</span>&nbsp;<bdi data-i18n-skip="true">{it.knownSittings[0]!.series}</bdi></Badge></>}
+              {isKnown(it) && <> <Badge tone="info"><span>sat</span>&nbsp;<bdi data-i18n-skip="true">{knownOf(it)[0]!.series}</bdi></Badge></>}
               {it.held && <> <Badge tone="success">already reserved</Badge></>}
               {!reservable(it) && !it.held && <> <Badge tone="neutral">closed for new entries</Badge></>}
               {!it.open.first && it.open.retake && !it.held && <> <Badge tone="warning">retakes of the previous sitting only</Badge></>}
               {noFee && <> <Badge tone="warning">board fee not set yet</Badge></>}
-              {needsSitting && (attempt === 'retake') && <> <Badge tone="warning">{desk ? 'declared — listed to verify' : 'to be verified by the school'}</Badge></>}
+              {/* A retake or a carry-forward whose sitting the system does not know is declared: the school verifies it. */}
+              {needsSitting && <> <Badge tone="warning">{desk ? 'declared — listed to verify' : 'to be verified by the school'}</Badge></>}
               {it.series && <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{seriesName(o, it)}</bdi></div>}
             </td>
             <td className="px-3 py-2 align-top">
