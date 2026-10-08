@@ -144,7 +144,9 @@ exception on a push or an instalment) and still takes V3's shape.
 
 Every hook reads exceptions through `exception-registry.services.ts` (`activeExceptions`:
 the student's or the family's, active, not past `valid_until`, confirmed if listed under
-"Check these", covering the scope; `FOR SHARE` / `FOR UPDATE` when the caller asks). A's
+"Check these", covering the scope; `FOR SHARE` / `FOR UPDATE` when the caller asks — since
+A's §2.12, `insertLines` prices with `lock: true`, so a reservation holds the price exceptions
+it applies `FOR SHARE` and a revocation waits for it). A's
 adapter (`line-exceptions.ts`) keeps its interface over it; asked for `deadline.payment` on a
 line under a live plan it answers the plan's last date first.
 
@@ -393,3 +395,5 @@ Step C's own rules:
   migrated through 0046, 0045 idempotent; 01:06 — first push (8d61a40), CI green.
 - 01:09–01:41 — the Student 360's family exceptions; `/revocation`; the Exceptions screen and
   Push to families; Arabic; driven headless on 3140/3141 (§8); the suite green (398).
+- 01:46 — A's review fixes and §2.12 (40c1447) merged in, no conflicts (1243e70); 01:50 — the
+  suite green on the merge (408, local time); api and web check-types clean.
