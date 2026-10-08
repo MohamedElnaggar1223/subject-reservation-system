@@ -678,11 +678,19 @@ Added by F7 (the day-one import, 8 Oct; docs/features/IMPORT.md §4.5, §14):
 - **`assertLineRules(…, { lockExceptions: false })`**: the rules read the one-shot exception rows
   without `FOR UPDATE` — only for a check that is rolled back and makes nothing (the import's
   review, a GET); every path that makes lines keeps the lock.
-- **An offer that is not closed takes a course fee above 0** (MO-9; the F7 review of 8 Oct,
-  item 6): `createOffer` and `updateOffer` refuse a course fee of 0 on an open, retake-only or
-  self-study-only offer with "<subject> has no course fee: set the school's course fee before it is
-  open in this session (a line is never priced without one)"; a closed offer may wait for it. The
-  Add subject dialog shows the field empty for a catalogue row with no fee, never 0.
+- **An open or retakes-only offer takes a course fee above 0** (MO-9; the F7 review of 8 Oct,
+  item 6, and the lead's call on the review of 2ca07a4, item 2): `createOffer` and `updateOffer`
+  refuse a course fee of 0 on an open or retake-only offer with "<subject> has no course fee: set the
+  school's course fee before it is open in this session (a line is never priced without one)". A
+  **self-study-only offer may carry 0 with a reason** (`zeroFeeReason` on CreateOffer and UpdateOffer,
+  as a board fee of 0 says why; kept on the offer's audit row): the school may price a subject it does
+  not teach at the board fee alone; without a reason "<subject> is self-study only at a course fee of
+  0: say why (its lines are priced at the board fee alone)"; an offer already self-study only at 0 is
+  edited without giving it again. A closed offer may wait for its fee. **`copyOffersFrom`** applies
+  the same rule: an offer it would open at 0 that is not self-study only comes across closed, named
+  in the copy's summary (`closedNoFee`, also on `SESSION_COPIED`; the Copy dialog lists them). The
+  Add subject dialog shows the field empty for a catalogue row with no fee, never 0, and asks the
+  reason when self-study only at 0, as the offer's drawer does.
 
 ## 3. As built (step 1)
 

@@ -706,7 +706,11 @@ export function translateImportText(text: string): string | null {
     [/^the sheet names (.+), who does not teach (.+) in (.+)$/, (m) => `يذكر الجدول ${m[1]}، وهو لا يدرّس ${m[2]} في ${m[3]}`],
     // A line naming several units or papers (the split): the code no item fits, and staff's choice for each code.
     [/^(.+): choose the item for (.+) \((.+)\)$/, (m) => `${m[1]}: اختر البند لـ ${m[2]} (${m[3]})`],
-    [/^The item for (.+)$/, (m) => `بند ${m[1]}`],
+    [/^The session’s item for the sheet’s code (.+)$/, (m) => `بند الجلسة لرمز الجدول ${m[1]}`],
+    // A "one paper" note (the forms' "(One paper ONLY)") with no single one-paper item.
+    [/^(.+): the note says one paper — choose which \((.+)\)$/, (m) => `${m[1]}: تقول الملاحظة ورقة واحدة — اختر أيّها (${m[2]})`],
+    [/^(.+): the note says one paper, and none of its items is one paper — choose the item \((.+)\)$/,
+      (m) => `${m[1]}: تقول الملاحظة ورقة واحدة، وليس من بنودها ورقة واحدة — اختر البند (${m[2]})`],
     [/^As the sheet’s words find it: (.+)$/, (m) => `كما تجده كلمات الجدول: ${m[1]}`],
     [/^board fee ([\d.,]+) in (.+)$/, (m) => `رسوم المجلس ${m[1]} في ${m[2]}`],
     [/^(.+) has no board fee in (.+) yet — set one on the session's Fees tab$/, (m) => `${m[1]} بلا رسوم مجلس في ${m[2]} بعد — حدّدها في تبويب الرسوم في الجلسة`],

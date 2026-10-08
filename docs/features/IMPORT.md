@@ -220,7 +220,13 @@ For a line whose series and level the admin mapped to its session (`lineOf` in v
      (`line_split`, info, names each code and its item). A code no item of its own fits leaves the
      row `item_unclear` ("…: choose the item for p5 (M1 · P1 · P2)") until staff choose the item
      **for that code only** (`codeItems`); staff may instead choose one item for the whole line. A
-     "one paper" note is one line of one paper, never split: staff choose it.
+     "one paper" note is one line of one paper, never split.
+   - **A "one paper" note is never the whole subject** (the forms' "(One paper ONLY)"; the review of
+     2ca07a4, item 1): when findItem falls back to the whole item (the words name no paper), the
+     line's item is the subject's one-paper item when it has exactly one (a unit counts: it is one
+     paper) and the words name no other paper; else the line is `item_unclear` — "<subject>: the note
+     says one paper — choose which (Paper 4 only (retake) · Paper 5 only (retake))", or "…, and none
+     of its items is one paper — choose the item (…)".
 2. **Attempt, mode and the sitting** (the lead's rules of 8 Oct, MO-25's interim rule):
    - mode: self-study from the answer or the note, or when the item or offer is self-study only;
    - a **retake with source `legacy`** when the student's history has the subject **sat** (not
@@ -273,9 +279,12 @@ For a line whose series and level the admin mapped to its session (`lineOf` in v
    the sections they place students in.
 4. **Each ready family in its own transaction** (its view worked out again):
    - its `import_row`s held `FOR UPDATE`, only lines not yet committed taken;
-   - sections locked, then accounts (no password: "Forgot password" sets one), links (a link to an
-     existing account only once confirmed on its line), section places, `registration_history`,
-     course enrolments (`upsertEnrolments`, source `import`);
+   - sections locked; then **the family's students already in the system, `FOR NO KEY UPDATE` in id
+     order, before any row that names a subject** (`lockStudents`; history, enrolments and lines
+     share-lock the subject, and a subject's board change takes the students before the subject —
+     the review of 2ca07a4, item 3); then accounts (no password: "Forgot password" sets one), links (a
+     link to an existing account only once confirmed on its line), section places,
+     `registration_history`, course enrolments (`upsertEnrolments`, source `import`);
    - **lines in a session** (`reserveImportLines`): **every student of the family with lines held
      `FOR NO KEY UPDATE` in id order before the first line** (`lockStudents`, RESERVATIONS.md §2.1;
      the review of 8 Oct, item 5: no student's line, fee row or one-shot exception is locked while
@@ -316,11 +325,16 @@ makes are priced and wait for payment; nothing is paid.
 - **`assertLineRules(…, { lockExceptions: false })`** (A's `line-rules.services.ts`): the review's
   rolled-back check reads the one-shot exception rows without `FOR UPDATE` (a GET holds no row);
   every path that makes lines keeps the lock.
-- **MO-9 on the offer** (A's `offer.services.ts`, the review of 8 Oct, item 6): an offer that is not
-  closed is refused with a course fee of 0, at creation and on update, naming the subject ("Astronomy
-  has no course fee: set the school's course fee before it is open in this session (a line is never
-  priced without one)"); A's Add subject dialog shows the field empty, not 0, for a catalogue row
-  with no fee (an import-added subject has none). Named in RESERVATIONS.md §2.12.
+- **MO-9 on the offer** (A's `offer.services.ts` and `offer.validations.ts`; the review of 8 Oct,
+  item 6, and the lead's call on the review of 2ca07a4, item 2): an open or retakes-only offer is
+  refused with a course fee of 0, at creation and on update, naming the subject ("Astronomy has no
+  course fee: set the school's course fee before it is open in this session (a line is never priced
+  without one)"); a self-study-only offer may be 0 with a reason (`zeroFeeReason`, on its audit row);
+  a closed one may wait. `copyOffersFrom` brings an offer it would open at 0 that is not self-study
+  only across closed, named in its summary (`closedNoFee`) and in the Copy dialog. A's Add subject
+  dialog shows the field empty, not 0, for a catalogue row with no fee (an import-added subject has
+  none), and asks the reason for self-study only at 0, as the offer's drawer does. Named in
+  RESERVATIONS.md §2.12.
 - **03-v3-flows**: F7's scenario of review flag 1b restated on the new model (an item with no fee row
   in its series refused on the student's request, the parent's direct reservation and the desk,
   naming the grid; reserved at its price once finance sets the row).
@@ -339,8 +353,9 @@ makes are priced and wait for payment; nothing is paid.
   not open", "… has no price yet", "… is not at …'s level") are deleted — they read A's "Registration
   window is not open" as "Registration window غير مفتوحة" — "does not teach" is anchored to the
   import's sentence ("the sheet names …, who does not teach … in …") with exact keys for A's two
-  sentences, the grade-10 core sentence is left to A's translator, and "Add …" is only the import's
-  aria-label ("Add Astronomy to the catalogue"). A scan of every string in apps/api/src and
+  sentences, the grade-10 core sentence is left to A's translator, "Add …" is only the import's
+  aria-label ("Add Astronomy to the catalogue"), and a code's item select is "The session's item for
+  the sheet's code p5" (the review of 2ca07a4, item 4: "The item for …" was too general). A scan of every string in apps/api/src and
   apps/web/app through the import's translator found what it still catches: the rework's line
   refusals the import shows on a line (the same words on the Reserve page) and none of B's.
   MO-9's sentence is in A's dictionary (`i18n-sessions.ts`).
@@ -404,7 +419,7 @@ render); it is the same on pages F7 does not touch (`drive/hydration-check.mjs`)
 
 ## 9. Tests
 
-`apps/api/test/08n-import.test.ts` (64 tests), fixtures in `import-fixtures.ts`.
+`apps/api/test/08n-import.test.ts` (67 tests), fixtures in `import-fixtures.ts`.
 
 | Scenario | Test |
 |---|---|
@@ -424,6 +439,9 @@ render); it is the same on pages F7 does not touch (`drive/hydration-check.mjs`)
 | **a dropped course** (review item 3) | a self-study line after a course dropped in the system's history, and after one dropped in the same file: a first entry, refused without the exception |
 | **the lock order** (review item 5) | one family, two students: the commit waits for the student held second in id order, and for the one held first, holding neither child's fee row meanwhile; both lines made |
 | **MO-9's course fee** (review item 6) | the import-added subject: an open offer at 0 refused naming it; closed it is kept; opening it at 0, or setting 0 once open, refused; opened with its fee |
+| **a one-paper note** (review of 2ca07a4, item 1) | the forms' "Retake in School 100% fees (One paper ONLY) From June Y": on a subject with a whole item and "Paper 4 only (retake)", a retake of Paper 4 (declared June Y), never the whole subject; with two one-paper items, item_unclear naming them; with none, item_unclear naming the items |
+| **the course fee, decided** (review of 2ca07a4, item 2) | open and retakes-only at 0 refused; self-study only at 0 refused without a reason, made with one (the reason on its audit row), edited without it again, made retakes-only at 0 refused; copied into the next session, an open offer at 0 comes across closed and named, the self-study one as it is |
+| **students before subjects** (review of 2ca07a4, item 3) | a subject held FOR UPDATE (a board change): the commit waiting on it already holds the family's student; released, the history row is made |
 | **the level** (review item 7) | an unmapped A.S. line never finds the IGCSE offer of the same name; it finds the A.S. one once offered |
 | **the Arabic** (review item 4) | translateImportText on A's and B's sentences (none caught; A's two have their own keys; the grade-10 core sentence and MO-9's are A's translator's; other screens' "Add …" untouched) and on the import's own |
 | the interim rule (MO-25) | committed on 15 November: a first entry; on 1 December: a legacy retake of Cambridge November Y; never for a line of November itself |
@@ -473,10 +491,15 @@ gives for each):
 | C59 | item 2: a "one paper" note never split | red |
 | C50, C51 | item 3: a dropped course not a sitting, in the file and in the system | red |
 | C52, C53 | item 4: the deleted "… is not open" pattern; "Add …" only as the import's own | red |
-| C54 | item 5: every student locked before the first line | red (in the order where the student held is second) |
+| C54 | item 5: every student locked before the first line (since 2ca07a4's item 3, both `lockStudents` calls undone) | red (in the order where the student held is second) |
 | C55 | item 5: the dry run without exception locks | red (the GET waits) |
 | C56, C57 | item 6: course fee 0 refused on an open offer, at creation and on update | red |
 | C58 | item 7: the name fallback at the line's level | red |
+| C61 | 2ca07a4 item 1: a one-paper note never the whole subject | red |
+| C62, C63 | 2ca07a4 item 2: self-study only at 0 says why; self-study only may be 0 | red |
+| C64 | 2ca07a4 item 2: a copy closes an offer it would open at 0 | red |
+| C65 | 2ca07a4 item 3: the students held before any row naming a subject | red |
+| C66 | 2ca07a4 item 4: "The item for …" only as the import's own | red |
 
 The earlier controls whose code main removed (C3, C13, C14, C19–C22: `getRetakeSubjectIds`,
 `prepareRegistrationInputs`, inactive import subjects) are superseded by C32, C36–C41.
@@ -560,6 +583,12 @@ records it.
 - **A course fee of 0 is refused on an offer that is not closed** (item 6, MO-9), in A's service, so
   an import-added subject (no fee) cannot be opened and priced at the board fee alone.
 - **A name matches at the line's level, or not at all** (item 7).
+- **A one-paper note is one paper** (the review of 2ca07a4, item 1): the whole subject never stands in
+  for it; the one one-paper item, else staff choose.
+- **Self-study only may be priced at the board fee alone** (the lead's call, 2ca07a4 item 2): a course
+  fee of 0 with a reason on a self-study-only offer; never on an open or retakes-only one; a copy does
+  not open one at 0.
+- **The family's students before any subject** (2ca07a4 item 3): locked right after the sections.
 - **Self-study on a first entry is an error on the line, never priced at the share silently** (the
   lead's addition): `gate.selfStudyFirstEntry` refuses it without the student's exception; the
   import shows it before the commit, with the way out.

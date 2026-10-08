@@ -12,6 +12,13 @@
  */
 
 export const sessionsArabic: Record<string, string> = {
+  // MO-9 (F7's review of 2ca07a4, item 2): a self-study-only subject at 0 says why; a copy names what came across closed.
+  'Why the course fee is 0': 'سبب أن رسوم التدريس 0',
+  'Self-study only at 0: its lines are priced at the board fee alone.': 'دراسة ذاتية فقط برسوم 0: تُسعَّر سطورها برسوم المجلس وحدها.',
+  'Say why the course fee is 0 (at least 5 characters)': 'اذكر سبب أن رسوم التدريس 0 (5 أحرف على الأقل)',
+  'Copied; some subjects came across closed': 'نُسخت؛ وبعض المواد جاءت مغلقة',
+  'No teacher to teach them:': 'لا معلم لتدريسها:',
+  'No course fee (open them once it is set):': 'بلا رسوم تدريس (افتحها حين تُحدَّد):',
   // ── Sessions ──
   'Sessions': 'الجلسات',
   'New session': 'جلسة جديدة',
@@ -337,6 +344,9 @@ export function translateSessionsText(text: string): string | null {
       () => 'تغيّر سعر مادة أو أكثر أثناء فتح هذه الصفحة (أكد المجلس رسومه) — راجع السعر الجديد وادفع مرة أخرى'],
     [/^(.+) is already in this session$/, (m) => `${m[1]} موجودة في هذه الجلسة بالفعل`],
     [/^Who teaches (.+)\? An open subject names its teachers — or make it self-study only$/, (m) => `من يدرّس ${m[1]}؟ المادة المفتوحة تحدد معلميها — أو اجعلها دراسة ذاتية فقط`],
+    // MO-9: self-study only at 0 says why (F7's review of 2ca07a4, item 2).
+    [/^(.+) is self-study only at a course fee of 0: say why \(its lines are priced at the board fee alone\)$/,
+      (m) => `${m[1]} دراسة ذاتية فقط برسوم تدريس 0: اذكر السبب (تُسعَّر سطورها برسوم المجلس وحدها)`],
     // MO-9: an open subject carries the school's course fee (F7's review of 8 Oct, item 6).
     [/^(.+) has no course fee: set the school's course fee before it is open in this session \(a line is never priced without one\)$/,
       (m) => `${m[1]} بلا رسوم تدريس: حدّد رسوم التدريس في المدرسة قبل فتحها في هذه الجلسة (لا يُسعَّر سطر من دونها)`],

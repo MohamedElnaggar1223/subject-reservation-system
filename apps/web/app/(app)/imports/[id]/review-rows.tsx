@@ -379,7 +379,7 @@ function LineSection({ v, row, editable, save }: { v: ImportView; row: ImportRow
               {split.map((p) => (
                 <label key={p.code} className="flex flex-wrap items-center gap-2">
                   <bdi data-i18n-skip="true" className="w-24 font-medium">{p.code}</bdi>
-                  <select aria-label={`The item for ${p.code}`} className={cn(SELECT, 'min-w-64 flex-1')} disabled={save.isPending} value={edits.codeItems?.[p.code] ?? ''}
+                  <select aria-label={`The session’s item for the sheet’s code ${p.code}`} className={cn(SELECT, 'min-w-64 flex-1')} disabled={save.isPending} value={edits.codeItems?.[p.code] ?? ''}
                     onChange={(e) => {
                       const next = { ...(edits.codeItems ?? {}) };
                       if (e.target.value) next[p.code] = e.target.value; else delete next[p.code];

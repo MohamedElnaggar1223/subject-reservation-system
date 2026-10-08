@@ -36,7 +36,7 @@ import {
 import { getSetting } from '../settings.services';
 import { judgeEligibility, mayRegisterFor, type Eligibility } from '../eligibility.services';
 import { schoolFeeGateReason } from '../school-fee.services';
-import { findOffer, findItem, findItemsByCode, findOrCreateSeries, availabilityConstraints, OfferError } from '../offer.services';
+import { findOffer, findItem, findItemsByCode, namedCodes, findOrCreateSeries, availabilityConstraints, OfferError } from '../offer.services';
 import { priceLine, PricingError } from '../pricing.services';
 import { assertLineRules, LineRuleError, type RuleLine } from '../line-rules.services';
 import { effectiveDeadlineFor, deadlinePassedSentence } from '../deadline.services';
@@ -752,7 +752,9 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     targets: { target: Target; code: string | null; found: ImportLinePlan['found'] }[];
     offerName: string | null; unclear: string | null; split: ImportRowPlan['split'];
   };
-  const findCache = new Map<string, { offerId: string; offerName: string; item: Target | null; how: ImportLinePlan['found'] | null; candidates: string[] } | null>();
+  const findCache = new Map<string, {
+    offerId: string; offerName: string; item: Target | null; how: ImportLinePlan['found'] | null; candidates: string[]; onePaper: { id: string; label: string }[];
+  } | null>();
   /**
    * The offer and the item or items the line's words name in the session: findOffer and findItem; a
    * line naming several units or papers that no single item enters is split, one item per code
@@ -774,15 +776,32 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       if (!offer) findCache.set(key, null);
       else {
         const it = await findItem(db, offer.offer.id, label, where);
+        const onePaper = it.candidates.filter((c) => c.kind === 'one_paper' || c.kind === 'unit').map((c) => ({ id: c.id, label: c.label }));
+        // A "one paper" note (the forms' "(One paper ONLY)") is never the whole subject (the review of 2ca07a4,
+        // item 1): when the words name no paper, findItem falls back to the whole item. Unless findItem found a
+        // one-paper item (or a unit, itself one paper), the line's item is the subject's one-paper item when it
+        // has exactly one and the words name no other paper; else staff choose among them.
+        let foundId = it.item?.id ?? null;
+        let how: ImportLinePlan['found'] | null = it.how;
+        if (d.noteOnePaper && !(it.item && (it.item.kind === 'one_paper' || it.item.kind === 'unit'))) {
+          const papersNamed = namedCodes(label).filter((c) => /^paper \d/.test(c));
+          foundId = !papersNamed.length && onePaper.length === 1 ? onePaper[0]!.id : null;
+          how = foundId ? 'paper' : null;
+        }
         findCache.set(key, {
-          offerId: offer.offer.id, offerName: offer.offer.name, item: it.item ? await itemFacts(it.item.id) : null, how: it.how,
-          candidates: it.candidates.map((c) => c.label),
+          offerId: offer.offer.id, offerName: offer.offer.name, item: foundId ? await itemFacts(foundId) : null, how,
+          candidates: it.candidates.map((c) => c.label), onePaper,
         });
       }
     }
     const f = findCache.get(key)!;
     if (!f) return { targets: [], offerName: null, unclear: null, split: null };
     if (f.item) return { targets: [{ target: f.item, code: null, found: f.how! }], offerName: f.offerName, unclear: null, split: null };
+    if (d.noteOnePaper) {
+      return { targets: [], offerName: f.offerName, split: null, unclear: f.onePaper.length
+        ? `${f.offerName}: the note says one paper — choose which (${f.onePaper.map((x) => x.label).join(' · ')})`
+        : `${f.offerName}: the note says one paper, and none of its items is one paper — choose the item (${f.candidates.join(' · ') || 'no item'})` };
+    }
     // A "one paper" note is one line of one paper, whatever papers the subject's words name: staff choose it.
     const parts = d.noteOnePaper ? null : await findItemsByCode(db, f.offerId, label, { ...where, chosen: e.codeItems ?? null });
     if (!parts) return { targets: [], offerName: f.offerName, unclear: `${f.offerName}: ${f.candidates.join(' · ') || 'no item fits'}`, split: null };

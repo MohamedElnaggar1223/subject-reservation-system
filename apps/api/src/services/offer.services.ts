@@ -392,14 +392,22 @@ async function sessionForChange(tx: Tx, sessionId: string, lock: 'share' | 'upda
 }
 
 /**
- * MO-9: a line is never priced from a course fee nobody set. An offer the school opens (any
- * availability but closed) has a course fee above 0; a closed offer may keep 0 (F7's review of 8 Oct,
- * item 6: a catalogue row the day-one import adds carries no fee, and the Add subject dialog read it).
+ * MO-9: a line is never priced from a course fee nobody set. An open or retakes-only offer has a
+ * course fee above 0 (F7's review of 8 Oct, item 6: a catalogue row the day-one import adds carries no
+ * fee, and the Add subject dialog read it). A self-study-only offer may carry 0 with a reason, as a
+ * board fee may: the school may price a subject it does not teach at the board fee alone (the lead's
+ * call on F7's review of 2ca07a4, item 2). A closed offer may keep 0 until it opens. `wasZeroSelfStudy`:
+ * the offer is already self-study only at 0, its reason given then.
  */
-function assertCourseFeeFor(availability: string, courseFee: number, subjectName: string) {
-  if (availability !== 'closed' && !(courseFee > 0)) {
-    throw new OfferError(`${subjectName} has no course fee: set the school's course fee before it is open in this session (a line is never priced without one)`);
+function assertCourseFeeFor(availability: string, courseFee: number, subjectName: string, zeroFeeReason?: string | null, wasZeroSelfStudy = false) {
+  if (availability === 'closed' || courseFee > 0) return;
+  if (availability === 'self_study_only') {
+    if (!wasZeroSelfStudy && !zeroFeeReason?.trim()) {
+      throw new OfferError(`${subjectName} is self-study only at a course fee of 0: say why (its lines are priced at the board fee alone)`);
+    }
+    return;
   }
+  throw new OfferError(`${subjectName} has no course fee: set the school's course fee before it is open in this session (a line is never priced without one)`);
 }
 
 function assertTeachersFor(availability: string, teacherCount: number, subjectName: string) {
@@ -423,7 +431,7 @@ export async function createOffer(sessionId: string, data: CreateOfferType, acto
       if (dup) throw new OfferError(`${s.name} is already in this session`, 409);
       const teachers = await resolveTeachers(tx, s.id, data.teachers, actorId);
       assertTeachersFor(data.availability, teachers.length, s.name);
-      assertCourseFeeFor(data.availability, data.courseFee, s.name);
+      assertCourseFeeFor(data.availability, data.courseFee, s.name, data.zeroFeeReason);
       const offerId = randomUUID();
       const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(sessionOffer).where(eq(sessionOffer.sessionId, sessionId)) as [{ n: number }];
       await tx.insert(sessionOffer).values({
@@ -437,7 +445,8 @@ export async function createOffer(sessionId: string, data: CreateOfferType, acto
       const itemIds: string[] = [];
       for (const d of drafts) itemIds.push(await insertItem(tx, session, { id: offerId, subjectId: s.id }, s, d, actorId));
       await logAction(actorId, 'SESSION_OFFER_CREATED', 'session_offer', offerId, null,
-        { sessionId, subjectId: s.id, availability: data.availability, courseFee: data.courseFee, teachers, items: itemIds, grade10Core: data.grade10Core }, ctx, tx);
+        { sessionId, subjectId: s.id, availability: data.availability, courseFee: data.courseFee, teachers, items: itemIds, grade10Core: data.grade10Core,
+          ...(data.courseFee > 0 ? {} : { zeroFeeReason: data.zeroFeeReason ?? null }) }, ctx, tx);
       return { id: offerId, items: itemIds };
     });
   } catch (err) {
@@ -482,12 +491,15 @@ export async function updateOffer(sessionId: string, offerId: string, data: Upda
     const availability = data.availability ?? offer.availability;
     assertTeachersFor(availability, teachers.length, subjectRow.name);
     // Checked when the change sets the fee or opens the offer (an offer converted with 0 keeps its other edits).
-    if (data.courseFee !== undefined || data.availability !== undefined) assertCourseFeeFor(availability, data.courseFee ?? offer.courseFee, subjectRow.name);
-    const { reason, teachers: _t, ...fields } = data;
+    if (data.courseFee !== undefined || data.availability !== undefined) {
+      assertCourseFeeFor(availability, data.courseFee ?? offer.courseFee, subjectRow.name, data.zeroFeeReason,
+        offer.availability === 'self_study_only' && !(Number(offer.courseFee) > 0));
+    }
+    const { reason, teachers: _t, zeroFeeReason, ...fields } = data;
     const [updated] = await tx.update(sessionOffer).set({ ...fields, updatedAt: new Date() }).where(eq(sessionOffer.id, offerId)).returning();
     await logAction(actorId, 'SESSION_OFFER_UPDATED', 'session_offer', offerId,
       { availability: offer.availability, courseFee: offer.courseFee, grade10Core: offer.grade10Core, teachers: current.map((t) => t.teacherId) },
-      { ...fields, teachers: teachers.map((t) => t.teacherId), reason: reason ?? null }, ctx, tx);
+      { ...fields, teachers: teachers.map((t) => t.teacherId), reason: reason ?? null, ...(zeroFeeReason ? { zeroFeeReason } : {}) }, ctx, tx);
     return updated!;
   });
 }
@@ -780,6 +792,7 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
   let feesCopied = 0;
   const feesToCopy: { seriesId: string; src: typeof boardFee.$inferSelect }[] = [];
   let closedNoTeacher = 0;
+  const closedNoFee: string[] = [];
   for (const o of offers) {
     if (have.has(o.subjectId)) continue;
     const [s] = await tx.select().from(subject).where(eq(subject.id, o.subjectId));
@@ -791,8 +804,13 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
     const wanted = closedByConversion(o) ? (s.isOfferedAtSchool ? 'open' : 'self_study_only') : o.availability;
     // "Who teaches it?" (§3.2): an open subject with no active teacher comes across closed, to be
     // opened once it names one — never open with nobody to teach it.
-    const availability = wanted === 'open' && keep.length === 0 ? 'closed' : wanted;
-    if (availability !== wanted) closedNoTeacher++;
+    const taught = wanted === 'open' && keep.length === 0 ? 'closed' : wanted;
+    if (taught !== wanted) closedNoTeacher++;
+    // MO-9 (the lead's call on F7's review of 2ca07a4, item 2): an offer it would open at a course fee of
+    // 0 that is not self-study only comes across closed, named in the summary, to be opened once the
+    // school sets its fee.
+    const availability = taught !== 'closed' && taught !== 'self_study_only' && !(Number(o.courseFee) > 0) ? 'closed' : taught;
+    if (availability !== taught) closedNoFee.push(s.name);
     await tx.insert(sessionOffer).values({
       id: offerId, sessionId: session.id, subjectId: o.subjectId, availability, courseFee: o.courseFee,
       grade10Core: o.grade10Core, notes: o.notes, sortOrder: o.sortOrder, createdBy: actorId,
@@ -838,8 +856,8 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
     }).onConflictDoNothing().returning({ id: boardFee.id });
     feesCopied += made.length;
   }
-  await logAction(actorId, 'SESSION_COPIED', 'session', session.id, null, { fromSessionId: from.id, from: from.name, offers: copied, feesCopiedProvisional: feesCopied, closedNoTeacher }, undefined, tx);
-  return { offers: copied, feesCopied, closedNoTeacher };
+  await logAction(actorId, 'SESSION_COPIED', 'session', session.id, null, { fromSessionId: from.id, from: from.name, offers: copied, feesCopiedProvisional: feesCopied, closedNoTeacher, closedNoFee }, undefined, tx);
+  return { offers: copied, feesCopied, closedNoTeacher, closedNoFee };
 }
 
 // ─── Reading ─────────────────────────────────────────────────────────────────

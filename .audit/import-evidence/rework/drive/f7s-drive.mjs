@@ -71,7 +71,7 @@ await step('split', async () => {
 await step('code unclear', async () => {
   await openRow('Mathematics (P1 & P5)');
   await shot('02-code-unclear'); await lineSection('02-code-unclear'); out('UNCLEAR ROW:\n' + await editor());
-  const sel = page.locator('select[aria-label="The item for p5"], select[aria-label="بند p5"]').first();
+  const sel = page.locator('select[aria-label="The session’s item for the sheet’s code p5"], select[aria-label="بند الجلسة لرمز الجدول p5"]').first();
   const opts = await sel.locator('option').allInnerTexts();
   out('p5 options: ' + opts.join(' | '));
   const m1 = opts.find((o) => /— M1/.test(o));

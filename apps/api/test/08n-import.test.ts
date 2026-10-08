@@ -1023,10 +1023,55 @@ describe('F7: the day-one import', () => {
       let r = rowAt(await fetchView(adm, id), 'One paper', 3);
       expect(r.data).toMatchObject({ noteOnePaper: true });
       expect([r.plan.split, r.plan.lines]).toEqual([null, []]);
-      expect(r.problems.find((p) => p.code === 'item_unclear')).toEqual({ code: 'item_unclear', severity: 'error', detail: 'Biology A.S./A.L. (imp): Paper 1 · Paper 2' });
+      expect(r.problems.find((p) => p.code === 'item_unclear')).toEqual({ code: 'item_unclear', severity: 'error', detail: 'Biology A.S./A.L. (imp): the note says one paper — choose which (Paper 1 · Paper 2)' });
       await putRows(adm, id, { rowIds: [r.id], edits: { offerItemId: items['Paper 2']!, attempt: 'first' } });
       r = rowAt(await fetchView(adm, id), 'One paper', 3);
       expect(r.plan.lines.map((l) => [l.itemLabel, l.found])).toEqual([['Paper 2', 'staff']]);
+      await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
+    });
+
+    it('the forms\' "(One paper ONLY)" is never the whole subject: the subject\'s one one-paper item, else staff choose among them (the review of 2ca07a4, item 1)', async () => {
+      const cambridge = await seriesOfSession(sess, 'cambridge');
+      const offerOf = async (name: string, code: string, papers: string[]) => {
+        const subjectId = (await apiResponse(adm.api.v1.subjects.$post({ json: {
+          name, code, council: 'cambridge', qualificationLevel: 'as_level', courseFee: 0, registrationFee: 0, isOfferedAtSchool: true, isCore: false,
+        } }))).id;
+        await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: sess }, json: {
+          subjectId, availability: 'open', courseFee: 1000, grade10Core: false, teachers: [{ teacherId: teacher, mode: 'in_school' }],
+          items: [
+            { label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: cambridge, availability: 'open', requiredInSeries: false },
+            ...papers.map((label) => ({ label, kind: 'one_paper' as const, enters: { kind: 'subject' as const }, boardSeriesId: cambridge, availability: 'retake_only' as const, requiredInSeries: false })),
+          ],
+        } }));
+        await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: cambridge }, json: { rows: [{ keyKind: 'subject', keyId: subjectId, amount: 500, provisional: false }] } }));
+      };
+      await offerOf('Imp Chemistry One', 'IMP-ONE-CHE', ['Paper 4 only (retake)']);
+      await offerOf('Imp Physics Two', 'IMP-ONE-PHY', ['Paper 4 only (retake)', 'Paper 5 only (retake)']);
+      await offerOf('Imp Geography None', 'IMP-ONE-GEO', []);
+      const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', '', ''];
+      // The forms' own wording of a one-paper retake (SCHOOL_FORMS.md §2).
+      const note = `Retake in School 100% fees (One paper ONLY) From June ${Y}`;
+      const row = (subject: string): Cell[] => ['Third Child', '11K', 'A.S.', subject, 'Teacher of the IAL units (imp)', '01073737373', `onepaper.child${D}`, 'Third Parent', `onepaper.parent${D}`, '01074747474', 'I confirm my registration', 'No', note];
+      const id = await stage(adm, workbook([{ name: 'One paper only', rows: [[`Nov. ${Y} Session`], header,
+        row('Imp Chemistry One'), row('Imp Physics Two'), row('Imp Geography None'),
+      ] }]), 'one-paper-only.xlsx', 'school_sheet');
+      expect((await putSettings(adm, id, { series: { [`november-${Y}-as_level`]: { mode: 'window', sessionId: sess } }, enrol: false, createSections: false })).status).toBe(200);
+      const v = await fetchView(adm, id);
+      const chem = rowAt(v, 'One paper only', 3);
+      expect(chem.data).toMatchObject({ noteOnePaper: true, noteRetake: true });
+      // One one-paper item: the line's, a retake of the sitting the note names (declared, to verify) — not the whole subject.
+      expect(chem.plan.lines).toMatchObject([{ subjectName: 'Imp Chemistry One', itemLabel: 'Paper 4 only (retake)', found: 'paper', attempt: 'retake', mode: 'in_school',
+        priorSitting: { month: 'june', year: Y, source: 'declared_by_desk', from: 'note' } }]);
+      expect(chem.problems.filter((p) => p.severity === 'error')).toEqual([]);
+      // Two: staff choose which; none: staff choose the item, the note's paper not being on offer.
+      expect(rowAt(v, 'One paper only', 4).plan.lines).toEqual([]);
+      expect(rowAt(v, 'One paper only', 4).problems.find((p) => p.code === 'item_unclear')).toEqual({
+        code: 'item_unclear', severity: 'error', detail: 'Imp Physics Two: the note says one paper — choose which (Paper 4 only (retake) · Paper 5 only (retake))',
+      });
+      expect(rowAt(v, 'One paper only', 5).plan.lines).toEqual([]);
+      expect(rowAt(v, 'One paper only', 5).problems.find((p) => p.code === 'item_unclear')).toEqual({
+        code: 'item_unclear', severity: 'error', detail: 'Imp Geography None: the note says one paper, and none of its items is one paper — choose the item (Whole subject)',
+      });
       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
     });
 
@@ -1157,6 +1202,36 @@ describe('F7: the day-one import', () => {
       }
     });
 
+    it('the commit holds a family\'s students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3)', async () => {
+      const { studentId, student, parent: par } = await onboard(officer, 'imp-subj-order', 11);
+      const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
+      const id = await stage(coordinator, workbook([{ name: 'Subject order', rows: [[`Nov. ${Y} Session`], header,
+        // History of a catalogue subject (a row naming it), in a class with no section this year.
+        ['Student imp-subj-order', '11Z', 'O.L.', 'Combined Science', 'Ms Salma', '01111111111', student.email, 'Parent imp-subj-order', par.email, '01000000000', 'I confirm my registration', 'No'],
+      ] }]), 'subject-order.xlsx', 'school_sheet');
+      expect((await putSettings(coordinator, id, { enrol: false, createSections: false })).status).toBe(200);
+      expect(rowAt(await fetchView(coordinator, id), 'Subject order', 3).problems.filter((p) => p.severity === 'error')).toEqual([]);
+      const { default: pg } = await import('pg');
+      const release = await holdRowLock('subject', subj.CSCI!);
+      try {
+        const commit = coordinator.api.v1.imports[':id'].commit.$post({ param: { id } });
+        await waitFor(async () => Number((await one<{ n: string }>(
+          `select count(*) as n from pg_locks l join pg_stat_activity a on a.pid = l.pid where not l.granted and l.locktype <> 'advisory' and a.datname = current_database()`)).n) >= 1 || null);
+        // Waiting for the subject, the commit holds the student already (its history row comes after).
+        const c = new pg.Client({ connectionString: process.env.DATABASE_URL });
+        await c.connect();
+        let held = false;
+        try { await c.query('begin'); await c.query('select id from "user" where id = $1 for no key update nowait', [studentId]); }
+        catch (err) { if ((err as { code?: string }).code === '55P03') held = true; else throw err; }
+        finally { await c.query('rollback').catch(() => {}); await c.end(); }
+        expect(held).toBe(true);
+        await release();
+        expect((await apiResponse(commit)).result.created).toMatchObject({ history: 1 });
+      } finally {
+        await release().catch(() => {});
+      }
+    });
+
     it('the review asks the rules on lines without holding an exception row: a GET answers while the student\'s gate exception is held by another transaction', async () => {
       const { studentId, student, parent: par } = await onboard(officer, 'imp-gate', 11);
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
@@ -1272,7 +1347,11 @@ describe('F7: the day-one import', () => {
     it('the import\'s own sentences read in Arabic, with A\'s line refusals it shows on a line', () => {
       expect(translateImportText('the sheet names Mr Teacher, who does not teach Biology in Winter 2026')).toBe('يذكر الجدول Mr Teacher، وهو لا يدرّس Biology في Winter 2026');
       expect(translateImportText('Mathematics A.S./A.L.: choose the item for p5 (M1 · P1 · P2)')).toBe('Mathematics A.S./A.L.: اختر البند لـ p5 (M1 · P1 · P2)');
-      expect(translateImportText('The item for paper 2')).toBe('بند paper 2');
+      expect(translateImportText('The session’s item for the sheet’s code paper 2')).toBe('بند الجلسة لرمز الجدول paper 2');
+      // Only the import's own sentence: another screen's "The item for …" is not the import's (the review of 2ca07a4, item 4).
+      expect(translateImportText('The item for paper 2')).toBeNull();
+      expect(translateImportText('Imp Physics Two: the note says one paper — choose which (Paper 4 only (retake) · Paper 5 only (retake))'))
+        .toBe('Imp Physics Two: تقول الملاحظة ورقة واحدة — اختر أيّها (Paper 4 only (retake) · Paper 5 only (retake))');
       expect(translateImportText('As the sheet’s words find it: Paper 2')).toBe('كما تجده كلمات الجدول: Paper 2');
       expect(translateImportText('Add Astronomy to the catalogue')).toBe('أضف Astronomy إلى الدليل');
       expect(translateImportText('Mathematics — P2 takes retakes only this cycle')).toBe('Mathematics — P2 للإعادة فقط هذه الدورة');
@@ -1476,6 +1555,53 @@ describe('F7: the day-one import', () => {
       expect((await refused(putSettings(coordinator, id, { enrol: false }))).status).toBe(409);
       expect(await sql(`select 1 from "user" where email = $1`, [`extra${D}`])).toEqual([]);
       await audited([id], ['IMPORT_STAGED', 'IMPORT_DISCARDED']);
+    });
+
+    it('MO-9\'s course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2)', async () => {
+      const winter = await session(adm, 'Winter session (import, course fee)', 'november', 'igcse', { ...openWindow(), activate: true, seriesYear: seriesYearInAcademicYear('november', Y) });
+      const cambridge = await seriesOfSession(winter, 'cambridge');
+      const teacher = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: 'Teacher of the fee rule (imp)' } })))!.id;
+      const subjectOf = async (name: string, code: string) => (await apiResponse(adm.api.v1.subjects.$post({ json: {
+        name, code, council: 'cambridge', qualificationLevel: 'igcse', courseFee: 0, registrationFee: 0, isOfferedAtSchool: true, isCore: false,
+      } }))).id;
+      const taught = await subjectOf('Fee Rule Taught (imp)', 'IMP-FEE-T');
+      const untaught = await subjectOf('Fee Rule Untaught (imp)', 'IMP-FEE-U');
+      const offerJson = (subjectId: string, availability: 'open' | 'retake_only' | 'self_study_only', courseFee: number, zeroFeeReason?: string) => ({
+        subjectId, availability, courseFee, grade10Core: false, teachers: availability === 'self_study_only' ? [] : [{ teacherId: teacher, mode: 'in_school' as const }],
+        items: [{ label: 'Whole subject', kind: 'whole' as const, enters: { kind: 'subject' as const }, boardSeriesId: cambridge, availability: 'open' as const, requiredInSeries: false }],
+        ...(zeroFeeReason ? { zeroFeeReason } : {}),
+      });
+      const post = (sessionId: string, json: ReturnType<typeof offerJson>) => adm.api.v1.sessions[':id'].offers.$post({ param: { id: sessionId }, json });
+      // Open and retakes-only: refused at 0, naming the subject.
+      const noFee = 'Fee Rule Taught (imp) has no course fee: set the school\'s course fee before it is open in this session (a line is never priced without one)';
+      expect(await refused(post(winter, offerJson(taught, 'open', 0)))).toEqual({ status: 400, error: noFee });
+      expect(await refused(post(winter, offerJson(taught, 'retake_only', 0)))).toEqual({ status: 400, error: noFee });
+      // Self-study only: 0 needs a reason, as a board fee of 0 does; with one it is made, the reason on its audit row.
+      expect(await refused(post(winter, offerJson(untaught, 'self_study_only', 0)))).toEqual({
+        status: 400, error: 'Fee Rule Untaught (imp) is self-study only at a course fee of 0: say why (its lines are priced at the board fee alone)',
+      });
+      const selfOffer = await apiResponse(post(winter, offerJson(untaught, 'self_study_only', 0, 'priced at the board fee alone this cycle')));
+      expect(await one(`select new_data->>'zeroFeeReason' as reason from audit_log where action = 'SESSION_OFFER_CREATED' and entity_id = $1`, [selfOffer.id]))
+        .toEqual({ reason: 'priced at the board fee alone this cycle' });
+      // Edited without a new reason while it stays self-study only at 0; made retakes-only at 0, refused.
+      const put = (json: { availability?: 'retake_only' | 'self_study_only'; courseFee?: number; notes?: string }) =>
+        adm.api.v1.sessions[':id'].offers[':offerId'].$put({ param: { id: winter, offerId: selfOffer.id }, json });
+      await apiResponse(put({ availability: 'self_study_only', courseFee: 0, notes: 'the board fee only' }));
+      expect((await refused(put({ availability: 'retake_only', courseFee: 0 }))).error).toBe('Fee Rule Untaught (imp) has no course fee: set the school\'s course fee before it is open in this session (a line is never priced without one)');
+      // The taught one open with its fee; then (as an offer saved before the rule) at 0.
+      const openOffer = await apiResponse(post(winter, offerJson(taught, 'open', 900)));
+      await sql(`update session_offer set course_fee = 0 where id = $1`, [openOffer.id]);
+      // Copied into the next winter session: the open one at 0 comes across closed and named; the self-study one at 0 as it is.
+      const next = await session(adm, 'Winter session (import, course fee, copy)', 'november', 'igcse', { ...openWindow(), activate: true, seriesYear: seriesYearInAcademicYear('november', Y) });
+      const copied = await apiResponse(adm.api.v1.sessions[':id']['copy-from'].$post({ param: { id: next }, json: { fromSessionId: winter } }));
+      expect(copied.closedNoFee).toEqual(['Fee Rule Taught (imp)']);
+      expect(await sql(`select s.name, o.availability, o.course_fee::float as fee from session_offer o join subject s on s.id = o.subject_id
+        where o.session_id = $1 and s.code in ('IMP-FEE-T', 'IMP-FEE-U') order by s.code`, [next])).toEqual([
+        { name: 'Fee Rule Taught (imp)', availability: 'closed', fee: 0 },
+        { name: 'Fee Rule Untaught (imp)', availability: 'self_study_only', fee: 0 },
+      ]);
+      await audited([next], ['SESSION_CREATED', 'SESSION_COPIED']);
+      for (const id of [winter, next]) await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id }, json: { reason: 'import scenario done' } }));
     });
 
     it('the list of imports: every file, its state and its counts', async () => {

@@ -315,6 +315,11 @@ async function commitFamily(
   if (sectionTargets.size) {
     await tx.select({ id: section.id }).from(section).where(inArray(section.id, [...sectionTargets.keys()])).orderBy(section.id).for('update');
   }
+  // Then the family's students already in the system, FOR NO KEY UPDATE in id order, before any row
+  // that names a subject (history, enrolments, lines share-lock it): the student before the subject, as
+  // RESERVATIONS.md §2.1 orders it and a subject's board change takes them (the review of 2ca07a4,
+  // item 3). A student this commit makes is its own row, seen by nobody else until it commits.
+  await lockStudents(tx, studentsHere.filter((p) => p.matched?.role === 'student').map((p) => p.matched!.id));
 
   // Accounts: matched, or made now (no password: the family sets one with "Forgot password").
   const userIdOf = new Map<string, string>();
@@ -452,7 +457,9 @@ async function commitFamily(
   }
   // Every student with lines held FOR NO KEY UPDATE, in id order, before the first line (RESERVATIONS.md
   // §2.1: the student first; the review of 8 Oct, item 5): no student's line, fee row or one-shot
-  // exception is locked while another student of the family is still to be locked.
+  // exception is locked while another student of the family is still to be locked. The ones already
+  // in the system are held since the section locks; this covers every student with lines whatever the
+  // path that made them.
   await lockStudents(tx, [...bySession.keys()].map((k) => k.split('|')[0]!));
   for (const [k, list] of [...bySession].sort(([a], [b]) => a.localeCompare(b))) {
     const [studentId, sessionId] = k.split('|') as [string, string];
