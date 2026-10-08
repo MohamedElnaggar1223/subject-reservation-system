@@ -4,8 +4,8 @@
 # expected red: ['a clash across boards flagged']
 # result: RED as expected
 
- ❯ test/08x2-exam-days-results.test.ts (14 tests | 1 failed) 4159ms
-   × F4: exam days, results and certificates > the exam timetable > each candidate's own timetable, extra time counted; a clash across boards flagged, and how it is handled noted 17ms
+ ❯ test/08x2-exam-days-results.test.ts (14 tests | 1 failed) 3853ms
+   × F4: exam days, results and certificates > the exam timetable > each candidate's own timetable, extra time counted; a clash across boards flagged, and how it is handled noted 14ms
      → expected [] to have a length of 1 but got +0
  Test Files  1 failed (1)
       Tests  1 failed | 13 passed (14)

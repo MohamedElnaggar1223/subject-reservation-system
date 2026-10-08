@@ -4,25 +4,25 @@
 # expected red: ["a retake comes from the line's attempt"]
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 7 failed) 26142ms
-   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry 171ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 7 failed) 27678ms
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry 140ms
      → expected [ [ 'XW97', false, null, …(1) ] ] to deeply equal [ [ 'XW97', true, …(2) ] ]
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it 17ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it 20ms
      → expected [ false, null ] to deeply equal [ true, 'registration' ]
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its draft was made: the next derivation brings the draft up to date as a first entry, audited 13ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its draft was made: the next derivation brings the draft up to date as a first entry, audited 18ms
      → expected false to be true // Object.is equality
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake verified after derivation: nothing changes and nothing is flagged 71ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake verified after derivation: nothing changes and nothing is flagged 77ms
      → expected false to be true // Object.is equality
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a coordinator's untick on a draft stays: the next derivation does not tick it again, and the check does not flag it 338ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a coordinator's untick on a draft stays: the next derivation does not tick it again, and the check does not flag it 337ms
      → expected false to be true // Object.is equality
-   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent 48ms
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent 29ms
      → expected { …(16) } to match object { is_retake: true, …(1) }
-   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > a declared retake rejected past the first-entry deadline is dropped: its sent entry withdrawn with it, the board fee kept (the review of 093dbd1, item 1) 13ms
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > a declared retake rejected past the first-entry deadline is dropped: its sent entry withdrawn with it, the board fee kept (the review of 093dbd1, item 1) 5ms
      → expected { …(10) } to match object { boardSent: true, boardPart: +0 }
  Test Files  1 failed (1)
-      Tests  7 failed | 44 passed (51)
+      Tests  7 failed | 49 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 7055d427-a734-46ee-b5b8-8bbb02fe5a2a: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 33b8faa4-1922-4de5-99b8-02786b107cf3: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry
@@ -38,7 +38,7 @@ AssertionError: expected [ [ 'XW97', false, null, …(1) ] ] to deeply equal [ [
 [32m-     "registration",[39m
 [31m+     false,[39m
 [31m+     null,[39m
-[2m      "364cd9e3-46f6-4e41-bfba-4169a1bc8a3b",[22m
+[2m      "e50553fc-f3de-43b9-8a88-995eb9acb31e",[22m
 [2m    ],[22m
 [2m  ][22m
 
@@ -65,13 +65,13 @@ AssertionError: expected [ false, null ] to deeply equal [ true, 'registration' 
 [31m+   null,[39m
 [2m  ][22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:643:46
-    641|       await derive(nov(), af.ra!.studentId);
-    642|       const e = await only('ra');
-    643|       expect([e.is_retake, e.retake_source]).toEqual([true, 'registrat…
+ ❯ test/08x4-exam-entries-rework.test.ts:667:46
+    665|       await derive(nov(), af.ra!.studentId);
+    666|       const e = await only('ra');
+    667|       expect([e.is_retake, e.retake_source]).toEqual([true, 'registrat…
        |                                              ^
-    644|       await send(e.id);
-    645|       expect(await verify(al.ra!, { outcome: 'rejected', reason: 'no s…
+    668|       await send(e.id);
+    669|       expect(await verify(al.ra!, { outcome: 'rejected', reason: 'no s…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
 
@@ -84,13 +84,13 @@ AssertionError: expected false to be true // Object.is equality
 [32m- true[39m
 [31m+ false[39m
 
- ❯ test/08x4-exam-entries-rework.test.ts:657:27
-    655|       await derive(nov(), af.rb!.studentId);
-    656|       const e = await only('rb');
-    657|       expect(e.is_retake).toBe(true);
+ ❯ test/08x4-exam-entries-rework.test.ts:681:27
+    679|       await derive(nov(), af.rb!.studentId);
+    680|       const e = await only('rb');
+    681|       expect(e.is_retake).toBe(true);
        |                           ^
-    658|       await verify(al.rb!, { outcome: 'rejected', reason: 'no such sit…
-    659|       expect((await rowOf(e.id)).problems).toContain('retake_differs_f…
+    682|       await verify(al.rb!, { outcome: 'rejected', reason: 'no such sit…
+    683|       expect((await rowOf(e.id)).problems).toContain('retake_differs_f…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
 
@@ -103,13 +103,13 @@ AssertionError: expected false to be true // Object.is equality
 [32m- true[39m
 [31m+ false[39m
 
- ❯ test/08x4-exam-entries-rework.test.ts:681:44
-    679|       expect((await rowOf(e.id)).problems).not.toContain('retake_diffe…
-    680|       expect(await derive(nov(), af.rc!.studentId)).toMatchObject({ cr…
-    681|       expect((await only('rc')).is_retake).toBe(true);
+ ❯ test/08x4-exam-entries-rework.test.ts:705:44
+    703|       expect((await rowOf(e.id)).problems).not.toContain('retake_diffe…
+    704|       expect(await derive(nov(), af.rc!.studentId)).toMatchObject({ cr…
+    705|       expect((await only('rc')).is_retake).toBe(true);
        |                                            ^
-    682|     });
-    683| 
+    706|     });
+    707| 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
 
@@ -122,13 +122,13 @@ AssertionError: expected false to be true // Object.is equality
 [32m- true[39m
 [31m+ false[39m
 
- ❯ test/08x4-exam-entries-rework.test.ts:762:28
-    760|       await derive(nov(), hu.studentId);
-    761|       const [e] = await entriesOf(nov(), hu.studentId);
-    762|       expect(e!.is_retake).toBe(true);
+ ❯ test/08x4-exam-entries-rework.test.ts:786:28
+    784|       await derive(nov(), hu.studentId);
+    785|       const [e] = await entriesOf(nov(), hu.studentId);
+    786|       expect(e!.is_retake).toBe(true);
        |                            ^
-    763|       await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param…
-    764|       expect((await one<{ s: string[] }>(`select staff_set as s from e…
+    787|       await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param…
+    788|       expect((await one<{ s: string[] }>(`select staff_set as s from e…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
 
@@ -146,13 +146,13 @@ AssertionError: expected { …(16) } to match object { is_retake: true, …(1) }
 [31m+   "retake_source": null,[39m
 [2m  }[22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:930:18
-    928|       expect(await entriesOf(juneSeries, jf.j4!.studentId)).toEqual([]…
-    929|       const [e2] = await entriesOf(juneSeries, jf.j2!.studentId);
-    930|       expect(e2).toMatchObject({ is_retake: true, retake_source: 'regi…
+ ❯ test/08x4-exam-entries-rework.test.ts:977:18
+    975|       expect(await entriesOf(juneSeries, jf.j4!.studentId)).toEqual([]…
+    976|       const [e2] = await entriesOf(juneSeries, jf.j2!.studentId);
+    977|       expect(e2).toMatchObject({ is_retake: true, retake_source: 'regi…
        |                  ^
-    931|       const deadline = new Date((await one<{ d: string }>(`select entr…
-    932|       expect(new Date(e2!.created_at).getTime()).toBeGreaterThan(deadl…
+    978|       const deadline = new Date((await one<{ d: string }>(`select entr…
+    979|       expect(new Date(e2!.created_at).getTime()).toBeGreaterThan(deadl…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
 
@@ -170,13 +170,13 @@ AssertionError: expected { …(10) } to match object { boardSent: true, boardPar
 [31m+   "boardSent": false,[39m
 [2m  }[22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:958:22
-    956|     it("a declared retake rejected past the first-entry deadline is dr…
-    957|       const before = await refundPreview(jf.j2!, j2);
-    958|       expect(before).toMatchObject({ boardSent: true, boardPart: 0 });
+ ❯ test/08x4-exam-entries-rework.test.ts:1005:22
+    1003|     it("a declared retake rejected past the first-entry deadline is dr…
+    1004|       const before = await refundPreview(jf.j2!, j2);
+    1005|       expect(before).toMatchObject({ boardSent: true, boardPart: 0 });
        |                      ^
-    959|       const r = await apiResponse(coord.api.v1.registrations[':id']['v…
-    960|       expect(r).toMatchObject({ outcome: 'rejected', effect: 'dropped'…
+    1006|       const r = await apiResponse(coord.api.v1.registrations[':id']['v…
+    1007|       expect(r).toMatchObject({ outcome: 'rejected', effect: 'dropped'…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
 

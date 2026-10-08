@@ -539,7 +539,7 @@ export async function updateItem(sessionId: string, offerId: string, itemId: str
       const item = await itemForChange(tx, offerId, itemId);
       const { reason, teachers, feeKeys, boardSeriesId, ...fields } = data;
       const { lines: moved, repriced } = boardSeriesId && boardSeriesId !== item.boardSeriesId
-        ? await changeItemSeries(tx, session, subjectRow, item, boardSeriesId, actorId, reason ?? null, locked)
+        ? await changeItemSeries(tx, session, subjectRow, item, boardSeriesId, actorId, reason ?? null, locked, ctx)
         : { lines: [], repriced: [] as RepricedLine[] };
       if (teachers !== undefined) await writeItemTeachers(tx, itemId, teachers?.length ? await resolveTeachers(tx, offer.subjectId, teachers, actorId) : []);
       if (feeKeys) await writeFeeKeys(tx, itemId, feeKeys);
@@ -560,7 +560,7 @@ export async function updateItem(sessionId: string, offerId: string, itemId: str
 /** Move an item to another series of its board, with its live lines (in the caller's transaction). */
 async function changeItemSeries(
   tx: Tx, session: SessionRow, subjectRow: typeof subject.$inferSelect, item: typeof sessionOfferItem.$inferSelect,
-  targetId: string, actorId: string | null, reason: string | null, locked: Set<string>,
+  targetId: string, actorId: string | null, reason: string | null, locked: Set<string>, ctx?: AuditContext,
 ) {
   const level = await levelOf(tx, subjectRow.qualificationLevel, {
     kind: item.entersKind, qualificationId: item.qualificationId, optionId: item.qualificationOptionId,
@@ -594,7 +594,7 @@ async function changeItemSeries(
   }
   // F4's entries of the lines (after the lines, §2.1): a sent one refuses the change, the drafts are
   // withdrawn with it and made again in the target series (the review of 426d565, item 2).
-  const sent = await entriesFollowMoveInTx(tx, lines.map((l) => l.id), "the line's item moved to another series", actorId);
+  const sent = await entriesFollowMoveInTx(tx, lines.map((l) => l.id), "the line's item moved to another series", actorId, ctx);
   if (sent) throw new OfferError(sent, 409);
   await attachSeries(tx, session.id, targetId, actorId);
   await tx.update(sessionOfferItem).set({ boardSeriesId: targetId, updatedAt: now }).where(eq(sessionOfferItem.id, item.id));

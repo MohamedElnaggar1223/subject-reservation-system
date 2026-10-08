@@ -547,6 +547,30 @@ describe('F4 on the reservations rework', () => {
       expect(live[0]!.id).not.toBe(old!.id);
     });
 
+    it("what staff set on an entry withdrawn with its line is carried to the entry made again after a second payment (the review of 54c225f, item 3)", async () => {
+      const sr = await onboard(w.officer, 'x-xw-sr', 12);
+      const [line] = await reserve(sr, [w.first(w.items.sc, w.teacherId)]) as [string];
+      await derive(w.series.cambridgeNov, sr.studentId);
+      const [e] = await entriesOf(w.series.cambridgeNov, sr.studentId);
+      expect(e!.option_code).toBeNull();
+      await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param: { id: e!.id }, json: { optionCode: 'B2' } }));
+      const pay = (await one<{ id: string }>(`select p.id from payment p join payment_registration pr on pr.payment_id = p.id where pr.registration_id = $1 and p.status = 'completed'`, [line])).id;
+      await apiResponse(w.finadmin.api.v1.payments[':id'].reverse.$post({ param: { id: pay }, json: { reason: 'confirmed by mistake', moneyReturned: true } }));
+      const again = await apiResponse(sr.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [line], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
+      await apiResponse(w.officer.api.v1.payments[':id'].confirm.$post({ param: { id: again.id! }, json: { instrumentUsed: 'cash' } }));
+      expect(await derive(w.series.cambridgeNov, sr.studentId)).toMatchObject({ created: 1 });
+      const made = await one<{ id: string; option_code: string | null; staff_set: string[] }>(
+        `select id, option_code, staff_set from exam_entry where registration_id = $1 and status = 'draft'`, [line]);
+      expect(made).toMatchObject({ option_code: 'B2', staff_set: ['option'] });
+      expect(made.id).not.toBe(e!.id);
+    });
+
+    it('an option chosen on an entry added by hand is staff\'s (the review of 54c225f, item 3)', async () => {
+      const sh = await onboard(w.officer, 'x-xw-sh', 12);
+      const e = await apiResponse(coord.api.v1.exams.entries.$post({ json: { studentId: sh.studentId, boardSeriesId: w.series.cambridgeNov, qualificationId: w.catalogue.cSyllabus, optionCode: 'A1' } }));
+      expect((await one<{ s: string[] }>(`select staff_set as s from exam_entry where id = $1`, [e.id])).s).toEqual(['option']);
+    });
+
     it('"mark as sent" refuses an entry whose line is no longer confirmed, naming it (the backstop should a path end a line and leave its entries)', async () => {
       const [e] = await entriesOf(w.series.cambridgeNov, pf.nl!.studentId);
       // No path leaves this state now (each withdraws the entries in its own transaction); it is
@@ -787,12 +811,12 @@ describe('F4 on the reservations rework', () => {
     const uci: Record<string, string> = {};
     let june: string;
     beforeAll(async () => {
-      for (const k of ['kz', 'kr', 'ka', 'vi', 'vp', 'vf', 'ku', 'kv']) kf[k] = await onboard(w.officer, `x-xw-${k}`, 12);
+      for (const k of ['kz', 'kr', 'ka', 'vi', 'vp', 'vf', 'ku', 'kv', 'kp']) kf[k] = await onboard(w.officer, `x-xw-${k}`, 12);
       // Pearson's June series, as a declaration names it (made by the first one to, if none has yet).
       const [z] = await reserve(kf.kz!, [retake(w.items.sp1, { month: 'june', year: Y })]);
       june = (await one<{ s: string }>(`select prior_sitting_series_id as s from registration where id = $1`, [z!])).s;
       let n = 611;
-      for (const k of ['kr', 'ka', 'vi', 'vp', 'vf', 'ku', 'kv']) {
+      for (const k of ['kr', 'ka', 'vi', 'vp', 'vf', 'ku', 'kv', 'kp']) {
         uci[k] = `91234B26${String(n++).padStart(4, '0')}E`;
         await apiResponse(coord.api.v1.exams.candidates[':studentId'].$put({ param: { studentId: kf[k]!.studentId }, json: { uci: uci[k] } }));
       }
@@ -839,6 +863,29 @@ describe('F4 on the reservations rework', () => {
       await derive(w.series.pearsonJan, kf.kr!.studentId);
       expect((await entriesOf(w.series.pearsonJan, kf.kr!.studentId)).map((e) => [e.entry_code, e.is_retake, e.retake_source, e.registration_id]))
         .toEqual([[`${T}WMA11`, true, 'history', kr]]);
+    });
+
+    it("a family's own declaration the results on record show is verified with no person as its answerer, the reason naming the result and its importer (the review of 54c225f, item 2)", async () => {
+      await apiResponse(w.adm.api.v1.exams.results.import.$post({ json: {
+        boardSeriesId: june, commit: true, source: { text: `UCI,Unit Code,Grade,UMS\n${uci.kp},${T}WMA11,B,70`, name: 'June results, one more page' },
+      } }));
+      const importedAt = new Date((await one<{ at: string }>(`select created_at as at from exam_result where student_id = $1 and board_series_id = $2`, [kf.kp!.studentId, june])).at);
+      // The parent reserves the retake in the app and declares the June sitting.
+      const [line] = await apiResponse(kf.kp!.parent.api.v1.registrations.direct.$post({ json: {
+        sessionId: w.sessionId, studentId: kf.kp!.studentId, lines: [retake(w.items.sp1, { month: 'june', year: Y })], consent: CONSENT,
+      } }));
+      expect((await lineOf(line!.id)).outcome).toBe('verified');
+      expect(await verifiedBy(line!.id)).toBeNull();
+      const a = await one<{ user_id: string | null; n: Record<string, unknown> }>(
+        `select user_id, new_data as n from audit_log where entity_id = $1 and action = 'PRIOR_SITTING_VERIFIED'`, [line!.id]);
+      expect(a.user_id).toBeNull();
+      expect(a.n).toMatchObject({
+        answeredFrom: 'results_on_record',
+        reason: `Pearson Edexcel June ${Y}'s results on record list ${T}WMA11 for the candidate, imported by Admin x-xw on ${dayWords(importedAt)} (verified at declaration)`,
+      });
+      // The To verify tab names no person: the results on record.
+      const decided = await apiResponse(coord.api.v1.sessions[':id']['to-verify'].$get({ param: { id: w.sessionId }, query: { show: 'decided' } }));
+      expect(decided.lines.find((l) => l.id === line!.id)).toMatchObject({ decidedBy: null, decidedFrom: 'results_on_record' });
     });
 
     it("an award's result verifies a line that enters the award, never a unit line of an award cashed in by units (the review of 426d565, item 1)", async () => {
@@ -1079,6 +1126,58 @@ describe('F4 on the reservations rework', () => {
       await apiResponse(correct());
       expect([await seriesOfLine(p.ld), await seriesOfLine(p.ls)]).toEqual([to, to]);
       await withdrawnWithLine(p.ld, "the session's series was corrected");
+    });
+  });
+
+  describe('after a move (the review of 54c225f, items 1 and 3)', () => {
+    const at = (n: number) => new Date(Date.now() + n * DAY);
+    let from: string, to: string, sess: string, item: string;
+    beforeAll(async () => {
+      const deadline = at(20);
+      const mk = async (label: string) => (await apiResponse(w.adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label, entryDeadline: deadline } }))).id;
+      from = await mk('exams xw after a');
+      to = await mk('exams xw after b');
+      for (const s of [from, to]) await fee(s, 'qualification', w.catalogue.cSyllabus);
+      sess = (await apiResponse(w.adm.api.v1.sessions.$post({ json: {
+        type: 'june', year: Y + 1, label: 'exams xw after', startDate: new Date(Date.now() - DAY).toISOString(), endDate: at(3).toISOString(),
+        courseStartsOn: cairoDate(new Date()), paymentDueAt: at(3).toISOString(),
+      } })))!.id;
+      const bio = await subject('BIOAF', 'Biology after moves', 'cambridge', 'as_level');
+      const whole = (boardSeriesId: string, label: string) =>
+        ({ label, kind: 'whole', enters: { kind: 'award', qualificationId: w.catalogue.cSyllabus }, boardSeriesId, availability: 'open', requiredInSeries: false });
+      [item] = await offer(sess, bio, 1000, [w.teacherId], [whole(from, 'Whole subject'), whole(to, 'Whole subject, the other series')]) as [string, string];
+    });
+    const move = (id: string) => apiResponse(w.adm.api.v1.sessions[':id']['board-series'].move.$post({
+      param: { id: sess }, json: { registrationIds: [id], boardSeriesId: to, reason: 'sat in the other series (scenario)' },
+    }));
+
+    it("a sent entry withdrawn so its line could move: dropped in the new series before anything is sent there, the board fee comes back (item 1)", async () => {
+      const f = await onboard(w.officer, 'x-xw-sn', 12);
+      const [line] = await reserve(f, [w.first(item)], sess) as [string];
+      await derive(from, f.studentId);
+      const [e] = await entriesOf(from, f.studentId);
+      await apiResponse(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [e!.id] } }));
+      await apiResponse(coord.api.v1.exams.entries[':id'].withdraw.$post({ param: { id: e!.id }, json: { reason: 'withdrawn with the board so the line can move (scenario)' } }));
+      await move(line);
+      const before = await refundPreview(f, line);
+      // The send in the series it left is not this series' (the lead: "withdrawn included" is the line's own series).
+      expect(before).toMatchObject({ boardSent: false, boardPart: 500, sentEntries: [] });
+      const drop = await apiResponse(f.parent.api.v1.registrations[':id'].drop.$post({ param: { id: line }, json: { reason: 'the family moved away (scenario)' } }));
+      expect(drop).toMatchObject({ refundAmount: before.amount });
+      expect(before.amount).toBe(before.coursePart + 500);
+      expect(await credited(line)).toBe(before.amount);
+    });
+
+    it("what staff set on a draft withdrawn by the move is carried to the entry made in the new series (item 3)", async () => {
+      const f = await onboard(w.officer, 'x-xw-so', 12);
+      const [line] = await reserve(f, [w.first(item)], sess) as [string];
+      await derive(from, f.studentId);
+      const [e] = await entriesOf(from, f.studentId);
+      await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param: { id: e!.id }, json: { optionCode: 'A1' } }));
+      await move(line);
+      expect(await derive(to, f.studentId)).toMatchObject({ created: 1 });
+      expect(await one<{ option_code: string | null; staff_set: string[] }>(
+        `select option_code, staff_set from exam_entry where registration_id = $1 and status = 'draft'`, [line])).toEqual({ option_code: 'A1', staff_set: ['option'] });
     });
   });
 

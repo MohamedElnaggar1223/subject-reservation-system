@@ -4,8 +4,8 @@
 # expected red: ['are read only by the coordinator and the admin']
 # result: RED as expected
 
- ❯ test/08x1-exam-entries.test.ts (17 tests | 1 failed) 4146ms
-   × F4: candidates and entries > national IDs > are read only by the coordinator and the admin, each read audited without the number; never in a list, a log or an audit row 15ms
+ ❯ test/08x1-exam-entries.test.ts (17 tests | 1 failed) 3825ms
+   × F4: candidates and entries > national IDs > are read only by the coordinator and the admin, each read audited without the number; never in a list, a log or an audit row 13ms
      → expected { status: 400, …(1) } to deeply equal { status: 409, …(1) }
  Test Files  1 failed (1)
       Tests  1 failed | 16 passed (17)

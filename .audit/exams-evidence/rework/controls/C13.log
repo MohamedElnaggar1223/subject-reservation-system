@@ -4,8 +4,8 @@
 # expected red: ['a withdrawal and an amendment of the same entry at once']
 # result: RED as expected
 
- ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 4399ms
-   × F4: races > a withdrawal and an amendment of the same entry at once run one after the other: the second finds it withdrawn 247ms
+ ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 4466ms
+   × F4: races > a withdrawal and an amendment of the same entry at once run one after the other: the second finds it withdrawn 288ms
      → expected 'Failed to change the entry' to be 'This entry was withdrawn: add a new o…' // Object.is equality
  Test Files  1 failed (1)
       Tests  1 failed | 7 passed (8)

@@ -4,14 +4,16 @@
 # expected red: ["the admin's move: a sent entry refuses it"]
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 1 failed) 24825ms
-   × F4 on the reservations rework > a line moved to another series takes its drafts with it, and a sent entry refuses the move (the review of 426d565, item 2) > the admin's move: a sent entry refuses it, naming the entry; a draft is withdrawn with its line and made again where the line goes 706ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 27521ms
+   × F4 on the reservations rework > a line moved to another series takes its drafts with it, and a sent entry refuses the move (the review of 426d565, item 2) > the admin's move: a sent entry refuses it, naming the entry; a draft is withdrawn with its line and made again where the line goes 730ms
      → expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+   × F4 on the reservations rework > after a move (the review of 54c225f, items 1 and 3) > what staff set on a draft withdrawn by the move is carried to the entry made in the new series (item 3) 355ms
+     → expected 1 row, got 2 for: select option_code, staff_set from exam_entry where registration_id = $1 and status = 'draft'
  Test Files  1 failed (1)
-      Tests  1 failed | 50 passed (51)
+      Tests  2 failed | 54 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 21f62af9-e077-458e-ba4d-0b72ff40baa7: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+[results] Could not verify the declared sitting of line ad37eefb-f2bb-4dfc-b517-7fe9fb4c68da: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a line moved to another series takes its drafts with it, and a sent entry refuses the move (the review of 426d565, item 2) > the admin's move: a sent entry refuses it, naming the entry; a draft is withdrawn with its line and made again where the line goes
 AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
@@ -26,13 +28,26 @@ AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 
 [31m+   "status": 200,[39m
 [2m  }[22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:1011:41
-    1009|         param: { id: sess }, json: { registrationIds: [id], boardSerie…
-    1010|       });
-    1011|       expect(await refused(move(p.ls))).toEqual({ status: 409, error: …
+ ❯ test/08x4-exam-entries-rework.test.ts:1058:41
+    1056|         param: { id: sess }, json: { registrationIds: [id], boardSerie…
+    1057|       });
+    1058|       expect(await refused(move(p.ls))).toEqual({ status: 409, error: …
        |                                         ^
-    1012|       expect([await seriesOfLine(p.ls), await statusOf(p.sent.id)]).to…
-    1013|       await apiResponse(move(p.ld));
+    1059|       expect([await seriesOfLine(p.ls), await statusOf(p.sent.id)]).to…
+    1060|       await apiResponse(move(p.ld));
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > after a move (the review of 54c225f, items 1 and 3) > what staff set on a draft withdrawn by the move is carried to the entry made in the new series (item 3)
+Error: expected 1 row, got 2 for: select option_code, staff_set from exam_entry where registration_id = $1 and status = 'draft'
+ ❯ one test/helpers.ts:69:32
+     67| export async function one<T = Json>(text: string, params: unknown[] = …
+     68|   const rows = await sql<T>(text, params);
+     69|   if (rows.length !== 1) throw new Error(`expected 1 row, got ${rows.l…
+       |                                ^
+     70|   return rows[0] as T;
+     71| }
+ ❯ test/08x4-exam-entries-rework.test.ts:1179:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

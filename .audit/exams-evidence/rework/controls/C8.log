@@ -4,13 +4,13 @@
 # expected red: ['no seat holds two candidates', 'the same free seat at once']
 # result: RED as expected
 
- ❯ test/08x2-exam-days-results.test.ts (14 tests | 2 failed) 3935ms
-   × F4: exam days, results and certificates > rooms and seats > a sitting is seated room by room, candidates of a paper together; no seat holds two candidates 47ms
+ ❯ test/08x2-exam-days-results.test.ts (14 tests | 2 failed) 3886ms
+   × F4: exam days, results and certificates > rooms and seats > a sitting is seated room by room, candidates of a paper together; no seat holds two candidates 40ms
      → expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
-   × F4: exam days, results and certificates > rooms and seats > invigilators: one room each per sitting; a teacher keeps only the register of their own room 27ms
+   × F4: exam days, results and certificates > rooms and seats > invigilators: one room each per sitting; a teacher keeps only the register of their own room 32ms
      → expected [ [ 'XD Hall', 3, 1, 1 ], …(1) ] to deeply equal [ [ 'XD Hall', 2, 1, 1 ], …(1) ]
- ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 3835ms
-   × F4: races > two coordinators put two candidates in the same free seat at once: one is seated, the other told whose it is 48ms
+ ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 3902ms
+   × F4: races > two coordinators put two candidates in the same free seat at once: one is seated, the other told whose it is 83ms
      → expected [ true, true ] to deeply equal [ false, true ]
  Test Files  2 failed (2)
       Tests  3 failed | 19 passed (22)

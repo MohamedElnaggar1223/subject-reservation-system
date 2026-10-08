@@ -4,10 +4,10 @@
 # expected red: ['send each deadline reminder once', 'leaves no claim and no notice behind']
 # result: RED as expected
 
- ❯ test/08x3-exam-races.test.ts (8 tests | 2 failed) 4552ms
-   × F4: races > two scheduler instances on the same tick send each deadline reminder once 19ms
+ ❯ test/08x3-exam-races.test.ts (8 tests | 2 failed) 4282ms
+   × F4: races > two scheduler instances on the same tick send each deadline reminder once 18ms
      → expected 6 to be 2 // Object.is equality
-   × F4: races > a reminder that fails leaves no claim and no notice behind; the next tick sends it 23ms
+   × F4: races > a reminder that fails leaves no claim and no notice behind; the next tick sends it 21ms
      → expected [ { '?column?': 1 } ] to have a length of +0 but got 1
  Test Files  1 failed (1)
       Tests  2 failed | 6 passed (8)

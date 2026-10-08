@@ -546,6 +546,10 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
   `withdrawEntry(tx, line, reason, staff)` (`desk-drop.services.ts`) withdraws the line's live
   entries in the desk-drop's own transaction (after the receipt and the line), each with its
   `EXAM_ENTRY_WITHDRAWN` row; the outcome lists `entriesWithdrawn` and the notice the board note.
+  After the review of 54c225f (the lead's decision): `sentEntriesOf` counts only the entries of the
+  series the line is in now — "withdrawn included" narrowed to the line's own series, because a move
+  is the school's act and the old series' entry was withdrawn for it; a line moved and dropped
+  before anything is sent in its new series gets its board fee back.
   After the review of 093dbd1: `deskDrop` prices with `refundFor(tx, …)` after the receipt and the
   line are locked; `reversePayment` withdraws each reverted line's entries in its transaction (its answer
   unchanged; a line paid again is derived again).

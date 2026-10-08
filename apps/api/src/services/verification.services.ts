@@ -81,6 +81,8 @@ export async function listToVerify(sessionId: string, show: 'awaiting' | 'decide
     select r.id, r.status, r.attempt, r.mode, r.price_at_registration as price, r.prior_sitting_source as source, r.created_at as "declaredAt",
       r.prior_sitting_verified_outcome as outcome, r.prior_sitting_verified_at as "decidedAt", r.declaration_rejected as "declarationRejected",
       vu.name as "decidedBy",
+      (select a.new_data->>'answeredFrom' from audit_log a where a.entity_id = r.id and a.action = 'PRIOR_SITTING_VERIFIED'
+        order by a.created_at desc limit 1) as "answeredFrom",
       u.id as "studentId", u.name as "studentName", u.student_id as "studentNumber",
       s.name as "subjectName", i.label as "itemLabel", i.kind as "itemKind", i.needs_prior_series as "carriesForward",
       ps.id as "priorSeriesId", ps.board_code as "priorBoard", ps.month as "priorMonth", ps.year as "priorYear", ps.label as "priorLabel", pb.name as "priorBoardName",
@@ -147,6 +149,8 @@ export async function listToVerify(sessionId: string, show: 'awaiting' | 'decide
         outcome: (r.outcome as 'verified' | 'rejected' | null) ?? null,
         decidedAt: r.decidedAt ? new Date(r.decidedAt as string) : null,
         decidedBy: (r.decidedBy as string | null) ?? null,
+        /** 'results_on_record': no person answered — the school's results showed the sitting (F4). */
+        decidedFrom: (r.answeredFrom as string | null) ?? null,
         declarationRejected: Boolean(r.declarationRejected),
       };
     });
@@ -228,7 +232,11 @@ async function paymentState(tx: Tx, registrationId: string) {
 export async function recordVerifiedInTx(
   tx: Tx,
   registrationId: string,
-  a: { actorId: string; now: Date; reason: string; evidence?: string; prevCentre?: string; prevCandidateNumber?: string },
+  a: {
+    /** Null: no person answered — a family's declaration the school's results on record show (F4). */
+    actorId: string | null; now: Date; reason: string; evidence?: string; prevCentre?: string; prevCandidateNumber?: string;
+    answeredFrom?: 'results_on_record';
+  },
   ctx?: AuditContext,
 ) {
   const [row] = await tx.update(registration).set({
@@ -239,7 +247,8 @@ export async function recordVerifiedInTx(
     inArray(registration.priorSittingSource, [...DECLARED]))).returning({ source: registration.priorSittingSource, series: registration.priorSittingSeriesId });
   if (!row) return false;
   await logAction(a.actorId, 'PRIOR_SITTING_VERIFIED', 'registration', registrationId, { priorSittingSource: row.source },
-    { outcome: 'verified', priorSittingSeriesId: row.series, reason: a.reason, ...(a.evidence ? { evidence: a.evidence } : {}), previousCentreRecorded: !!a.prevCentre }, ctx, tx);
+    { outcome: 'verified', priorSittingSeriesId: row.series, reason: a.reason, ...(a.evidence ? { evidence: a.evidence } : {}), previousCentreRecorded: !!a.prevCentre,
+      ...(a.answeredFrom ? { answeredFrom: a.answeredFrom } : {}) }, ctx, tx);
   return true;
 }
 

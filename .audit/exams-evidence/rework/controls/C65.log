@@ -4,8 +4,8 @@
 # expected red: ['a derivation bringing drafts up to date while they are marked as sent']
 # result: RED as expected
 
- ❯ test/08t-rework-races.test.ts (37 tests | 1 failed) 33534ms
-   × 08t: F4 — a derivation bringing drafts up to date while they are marked as sent > two drafts brought up to date as both are sent: the send waits for the derivation, nothing deadlocks 1826ms
+ ❯ test/08t-rework-races.test.ts (37 tests | 1 failed) 34881ms
+   × 08t: F4 — a derivation bringing drafts up to date while they are marked as sent > two drafts brought up to date as both are sent: the send waits for the derivation, nothing deadlocks 1878ms
  Test Files  1 failed (1)
       Tests  1 failed | 36 passed (37)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08t-rework-races.test.ts

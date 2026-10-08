@@ -4,15 +4,15 @@
 # expected red: ['absent and pending verify nothing', 'a sitting graded absent waits']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 2 failed) 27663ms
-   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an import verifies the declared sittings it shows with a real grade, as the one who imported them; absent and pending verify nothing 118ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 27782ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an import verifies the declared sittings it shows with a real grade, as the one who imported them; absent and pending verify nothing 109ms
      → expected [ …(2) ] to deeply equal [ Array(1) ]
-   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the one declaring it, the reason naming the result and its importer; a sitting graded absent waits for the coordinator 93ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the one declaring it, the reason naming the result and its importer; a sitting graded absent waits for the coordinator 97ms
      → expected 'verified' to be null
  Test Files  1 failed (1)
-      Tests  2 failed | 49 passed (51)
+      Tests  2 failed | 54 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 9a80b51e-f219-47be-baeb-92cf975baf36: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 9531eb88-774d-410e-9036-e4687f7cd92f: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an import verifies the declared sittings it shows with a real grade, as the one who imported them; absent and pending verify nothing
@@ -22,17 +22,17 @@ AssertionError: expected [ …(2) ] to deeply equal [ Array(1) ]
 [31m+ Received[39m
 
 [2m  [[22m
-[2m    "0f36eaa7-02b4-43e8-bb20-0a181162e894",[22m
-[31m+   "403f1b37-699a-4cb6-8767-c9685af07026",[39m
+[31m+   "2468e3a5-c6ea-4d43-8e7f-3736cee552a8",[39m
+[2m    "15698117-1ffb-4086-97b2-c1a03cf9abcb",[22m
 [2m  ][22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:813:66
-    811|       } }));
-    812|       expect(done).toMatchObject({ committed: true, verificationFailed…
-    813|       expect(done.sittingsVerified.map((v) => v.registrationId)).toEqu…
+ ❯ test/08x4-exam-entries-rework.test.ts:837:66
+    835|       } }));
+    836|       expect(done).toMatchObject({ committed: true, verificationFailed…
+    837|       expect(done.sittingsVerified.map((v) => v.registrationId)).toEqu…
        |                                                                  ^
-    814|       expect((await lineOf(vi)).outcome).toBe('verified');
-    815|       expect((await lineOf(vp)).outcome).toBeNull();
+    838|       expect((await lineOf(vi)).outcome).toBe('verified');
+    839|       expect((await lineOf(vp)).outcome).toBeNull();
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -45,13 +45,13 @@ null
 [31m+ Received:[39m 
 "verified"
 
- ❯ test/08x4-exam-entries-rework.test.ts:833:42
-    831|         evidence: `The board's results for Pearson Edexcel June ${Y}: …
-    832|       });
-    833|       expect((await lineOf(ka)).outcome).toBeNull();
+ ❯ test/08x4-exam-entries-rework.test.ts:857:42
+    855|         evidence: `The board's results for Pearson Edexcel June ${Y}: …
+    856|       });
+    857|       expect((await lineOf(ka)).outcome).toBeNull();
        |                                          ^
-    834|       const toVerify = await apiResponse(coord.api.v1.sessions[':id'][…
-    835|       expect(toVerify.lines.map((l) => l.id)).toContain(ka);
+    858|       const toVerify = await apiResponse(coord.api.v1.sessions[':id'][…
+    859|       expect(toVerify.lines.map((l) => l.id)).toContain(ka);
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

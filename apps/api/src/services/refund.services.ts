@@ -30,7 +30,7 @@
  * must not cost the parent money).
  */
 
-import { db, refundWindow, registration, registrationSession, sessionOffer, sessionOfferItem, examEntry, eq, and, isNotNull, asc } from '@repo/db';
+import { db, refundWindow, registration, registrationSession, sessionOffer, sessionOfferItem, examEntry, eq, and, isNotNull, asc, sql } from '@repo/db';
 import { randomUUID } from 'crypto';
 import type { CreateRefundWindowType, RefundPolicy } from '@repo/validations';
 import { academicYearForDate } from './school-fee.services';
@@ -66,15 +66,19 @@ export async function firstLessonFor(_executor: Executor, _line: { id: string; s
 
 /**
  * F4's entries made from a line that were marked sent to the board ("mark as sent",
- * exam-entry.services `submitEntries`), earliest first — withdrawn ones included: the board
- * received them (whether it refunds the school is its own withdrawal rule, shown as a sentence;
- * the family's board fee stays either way, the lead's decision of 8 Oct). The one seam `refundFor`
- * reads (the review of 093dbd1, item 9: C's `entrySentAt` stand-in removed); the earliest one's
- * time is when the line's board fee became sent. Wired by F4 on resuming (RESERVATIONS_MONEY.md §10).
+ * exam-entry.services `submitEntries`) in the series the line is in now, earliest first — withdrawn
+ * ones included: the board received them (whether it refunds the school is its own withdrawal rule,
+ * shown as a sentence; the family's board fee stays either way, the lead's decision of 8 Oct). An
+ * entry of a series the line has since left is not counted: a move is the school's act, and the old
+ * series' entry was withdrawn for it (the lead, the review of 54c225f, item 1). The one seam
+ * `refundFor` reads (the review of 093dbd1, item 9: C's `entrySentAt` stand-in removed); the
+ * earliest one's time is when the line's board fee became sent. Wired by F4 on resuming
+ * (RESERVATIONS_MONEY.md §10).
  */
 export async function sentEntriesOf(executor: Executor, lineId: string) {
   const rows = await executor.select({ entryCode: examEntry.entryCode, title: examEntry.title, submittedAt: examEntry.submittedAt, status: examEntry.status })
-    .from(examEntry).where(and(eq(examEntry.registrationId, lineId), isNotNull(examEntry.submittedAt)))
+    .from(examEntry).where(and(eq(examEntry.registrationId, lineId), isNotNull(examEntry.submittedAt),
+      sql`${examEntry.boardSeriesId} = (select r.board_series_id from registration r where r.id = ${lineId})`))
     .orderBy(asc(examEntry.submittedAt), asc(examEntry.entryCode));
   return rows.map((r) => ({ ...r, submittedAt: r.submittedAt! }));
 }

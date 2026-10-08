@@ -4,21 +4,21 @@
 # expected red: ['two items of one subject are two lines']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 6 failed) 27025ms
-   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > two items of one subject are two lines, each entered as its own unit with its own line 84ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 6 failed) 27115ms
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > two items of one subject are two lines, each entered as its own unit with its own line 82ms
      → expected [ [ …(3) ], [ …(3) ] ] to deeply equal [ [ …(3) ], [ …(3) ] ]
-   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's 17ms
-   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified 160ms
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's 14ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified 121ms
      → expected 4 to be 2 // Object.is equality
-   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 49ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 45ms
      → expected { status: 409, …(1) } to deeply equal { status: 409, …(1) }
-   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when 8ms
-   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > the same line with none sent: the board fee comes back in full 23ms
+   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when 7ms
+   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > the same line with none sent: the board fee comes back in full 20ms
      → expected 0 to be greater than 0
  Test Files  1 failed (1)
-      Tests  6 failed | 45 passed (51)
+      Tests  6 failed | 50 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line c67a96ba-f347-40b9-8a34-e5f6009e28af: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line d866680d-7e9e-481e-823f-ab4e831fbc16: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > what a line's item enters (lineItemsFor) > two items of one subject are two lines, each entered as its own unit with its own line
@@ -29,7 +29,7 @@ AssertionError: expected [ [ …(3) ], [ …(3) ] ] to deeply equal [ [ …(3) ]
 
 [33m@@ -2,15 +2,19 @@[39m
 [2m    [[22m
-[2m      "0d59d39a-fa50-4c1a-a3bf-0c47e093ef31",[22m
+[2m      "207c2fbc-2d0d-43d5-b0ba-6593cee3f915",[22m
 [2m      "P1",[22m
 [2m      [[22m
 [2m        "unit:XWWMA11",[22m
@@ -38,7 +38,7 @@ AssertionError: expected [ [ …(3) ], [ …(3) ] ] to deeply equal [ [ …(3) ]
 [2m      ],[22m
 [2m    ],[22m
 [2m    [[22m
-[2m      "94703ffa-c8a1-43d8-ba95-20c9ff480bed",[22m
+[2m      "1b301f4f-47d9-4e99-9d1c-f9f5dea32129",[22m
 [2m      "P2",[22m
 [2m      [[22m
 [31m+       "unit:XWWMA11",[39m

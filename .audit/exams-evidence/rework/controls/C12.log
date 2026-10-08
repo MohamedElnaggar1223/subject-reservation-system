@@ -4,8 +4,8 @@
 # expected red: ['number the same series at once']
 # result: RED as expected
 
- ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 9495ms
-   × F4: races > two coordinators number the same series at once: every candidate one number, every number one candidate 5052ms
+ ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 10008ms
+   × F4: races > two coordinators number the same series at once: every candidate one number, every number one candidate 5091ms
  Test Files  1 failed (1)
       Tests  1 failed | 7 passed (8)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x3-exam-races.test.ts

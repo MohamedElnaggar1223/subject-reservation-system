@@ -438,7 +438,7 @@ export async function mapRegistrable(subjectId: string, data: MapRegistrableType
 
     const before = await tx.select({ unitId: subjectUnit.unitId }).from(subjectUnit).where(eq(subjectUnit.subjectId, subjectId));
     // The board changes: its live registrations follow it (IS-14).
-    const change = s.council !== data.boardCode ? await applyBoardChange(tx, s, data.boardCode, actorId, locked, names) : { moved: [], repriced: [] as RepricedLine[] };
+    const change = s.council !== data.boardCode ? await applyBoardChange(tx, s, data.boardCode, actorId, locked, names, ctx) : { moved: [], repriced: [] as RepricedLine[] };
     const moved = change.moved;
     repricedOut = change.repriced;
     await tx.update(subject).set({ qualificationId: q?.id ?? null, updatedAt: new Date() }).where(eq(subject.id, subjectId));
@@ -475,14 +475,14 @@ function levelWord(level: string): string {
  * 40c1447), the lines (id order), the series involved.
  */
 export async function applyBoardChange(
-  tx: Tx, s: typeof subject.$inferSelect, newBoard: string, actorId: string | null, locked: Set<string>, names?: Map<string, string>,
+  tx: Tx, s: typeof subject.$inferSelect, newBoard: string, actorId: string | null, locked: Set<string>, names?: Map<string, string>, ctx?: AuditContext,
 ) {
   const boardNamesNow = names ?? (await boardNames(tx));
   await boardOrThrow(newBoard, tx);
   const plan = await followBoardChange(tx, s, newBoard, boardNamesNow, actorId, locked);
   // F4's entries of the lines that move (after the lines, §2.1): a sent one refuses the change, the
   // drafts are withdrawn with it and made again in the new board's series (the review of 426d565, item 2).
-  const sent = await entriesFollowMoveInTx(tx, plan.moved.map((m) => m.id), "the subject's board changed", actorId);
+  const sent = await entriesFollowMoveInTx(tx, plan.moved.map((m) => m.id), "the subject's board changed", actorId, ctx);
   if (sent) throw new CatalogueError(sent, 409);
   await tx.update(subject).set({ council: newBoard, qualificationId: null, updatedAt: new Date() }).where(eq(subject.id, s.id));
   await tx.delete(subjectUnit).where(eq(subjectUnit.subjectId, s.id));

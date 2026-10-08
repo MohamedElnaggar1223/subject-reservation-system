@@ -34,7 +34,7 @@
 import {
   db, examEntry, examBoard, examBoardRule, examSeriesState, registration, qualification, qualificationOption,
   qualificationOptionUnit, qualificationUnit, examUnit, boardSeries, user, teacher, charge,
-  eq, and, inArray, sql, asc, isNull,
+  eq, and, inArray, sql, asc, desc, isNull,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
@@ -113,13 +113,15 @@ type PlannedEntry = {
   optionCode: string | null;
   tier: string | null;
   isRetake: boolean;
-  retakeSource: 'registration' | 'history' | null;
+  retakeSource: 'registration' | 'history' | 'staff' | null;
   carryForward: 'none' | 'suggested' | 'confirmed';
   cfFromMonth: string | null;
   cfFromYear: number | null;
   cfCentreNumber: string | null;
   cfCandidateNumber: string | null;
   cfOption: string | null;
+  /** What staff set by hand, carried over from the entry this one re-makes (a line paid again, or moved). */
+  staffSet: string[];
 };
 
 /**
@@ -141,7 +143,7 @@ export type LineExpect = {
  * a retake when the line says so or the candidate's history here does, the history the source
  * when both do (the review of 426d565, item 3).
  */
-export type EntryExpect = LineExpect & { retakeSource: 'registration' | 'history' | null };
+export type EntryExpect = LineExpect & { retakeSource: 'registration' | 'history' | 'staff' | null };
 
 type GovernedFields = Pick<EntryRow, 'kind' | 'isRetake' | 'retakeSource' | 'carryForward' | 'cfFromMonth' | 'cfFromYear' | 'cfCentreNumber' | 'cfCandidateNumber' | 'cfOption' | 'optionCode' | 'staffSet'>;
 
@@ -345,6 +347,12 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
     effectiveDeadlinesOf(executor, regs.map((r) => r.id)),
   ]);
   const existing = inSeries.filter((e) => e.status !== 'withdrawn');
+  // Entries of these lines withdrawn with them (in any series: a line may have moved) that staff
+  // had set by hand — what a re-made entry carries over (the review of 54c225f, item 3).
+  const remade = regs.length
+    ? await executor.select().from(examEntry).where(and(inArray(examEntry.registrationId, regs.map((r) => r.id)), eq(examEntry.status, 'withdrawn'),
+      eq(examEntry.withdrawnWithLine, true), sql`cardinality(${examEntry.staffSet}) > 0`)).orderBy(desc(examEntry.withdrawnAt))
+    : [];
   // Withdrawn by the coordinator: never made again. Withdrawn with its line (a drop, a reversal): made
   // again if the line is paid again (the review of 093dbd1, item 1).
   const withdrawn = inSeries.filter((e) => e.status === 'withdrawn' && !e.withdrawnWithLine);
@@ -359,9 +367,26 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
   const here = monthIndex(series.month, series.year);
   const itemOf = new Map(items.map((i) => [i.registrationId, i]));
 
-  const fresh = (p: Omit<PlannedEntry, 'isRetake' | 'retakeSource' | 'carryForward' | 'cfFromMonth' | 'cfFromYear' | 'cfCentreNumber' | 'cfCandidateNumber' | 'cfOption'>): PlannedEntry => ({
-    ...p, isRetake: false, retakeSource: null, carryForward: 'none', cfFromMonth: null, cfFromYear: null, cfCentreNumber: null, cfCandidateNumber: null, cfOption: null,
+  const fresh = (p: Omit<PlannedEntry, 'isRetake' | 'retakeSource' | 'carryForward' | 'cfFromMonth' | 'cfFromYear' | 'cfCentreNumber' | 'cfCandidateNumber' | 'cfOption' | 'staffSet'>): PlannedEntry => ({
+    ...p, isRetake: false, retakeSource: null, carryForward: 'none', cfFromMonth: null, cfFromYear: null, cfCentreNumber: null, cfCandidateNumber: null, cfOption: null, staffSet: [],
   });
+  /**
+   * An entry withdrawn with its line (a reversal, a move) that staff had set by hand: the entry the
+   * derivation makes again for that line and unit or award takes what staff set, and the mark (the
+   * review of 54c225f, item 3). The latest withdrawn one counts.
+   */
+  const carriedFor = (registrationId: string, p: PlannedEntry) => remade.find((e) => e.registrationId === registrationId && e.kind === p.kind
+    && (p.kind === 'unit' ? e.unitId === p.unitId : e.qualificationId === p.qualificationId));
+  const carriedValues = (c: EntryRow): Partial<PlannedEntry> => {
+    const v: Partial<PlannedEntry> = { staffSet: [...c.staffSet] };
+    if (c.staffSet.includes('retake')) Object.assign(v, { isRetake: c.isRetake, retakeSource: c.retakeSource as PlannedEntry['retakeSource'] });
+    if (c.staffSet.includes('carry')) {
+      Object.assign(v, { carryForward: c.carryForward as PlannedEntry['carryForward'], cfFromMonth: c.cfFromMonth, cfFromYear: c.cfFromYear,
+        cfCentreNumber: c.cfCentreNumber, cfCandidateNumber: c.cfCandidateNumber, cfOption: c.cfOption });
+    }
+    if (c.staffSet.includes('option')) Object.assign(v, { optionCode: c.optionCode, tier: c.tier });
+    return v;
+  };
   const earlierUnit = (sid: string, u: { id: string; code: string }) =>
     history.some((h) => h.studentId === sid && (h.unitId === u.id || (h.code === u.code && h.boardCode === series.boardCode)) && monthIndex(h.month, h.year) < here);
   const earlierAward = (sid: string, q: { id: string; code: string; level: string }) =>
@@ -459,7 +484,8 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
       const d = lineDiff(found, { ...expect, retake: p.isRetake, retakeSource: p.retakeSource });
       if (d.any) { state = 'refresh'; patch = d.patch; }
     }
-    return { ...p, state, existingEntryId: found?.id ?? gone?.id ?? null, ...(patch ? { patch } : {}) };
+    const carried = state === 'new' && owner.registrationId ? carriedFor(owner.registrationId, p) : undefined;
+    return { ...p, ...(carried ? carriedValues(carried) : {}), state, existingEntryId: found?.id ?? gone?.id ?? null, ...(patch ? { patch } : {}) };
   };
   const outcomeOf = (entries: DeriveRow['entries']): DeriveRow['outcome'] =>
     entries.some((e) => e.state === 'new' || e.state === 'refresh' || e.state === 'link') ? 'ready' : entries.some((e) => e.state === 'withdrawn') ? 'withdrawn' : 'entered';
@@ -613,7 +639,7 @@ export async function deriveEntries(data: DeriveEntriesType, actorId: string, ct
       kind: e.kind, unitId: e.unitId, qualificationId: e.qualificationId, entryCode: e.entryCode, title: e.title,
       optionCode: e.optionCode, tier: e.tier, isRetake: e.isRetake, retakeSource: e.retakeSource,
       carryForward: e.carryForward, cfFromMonth: e.cfFromMonth, cfFromYear: e.cfFromYear, cfCentreNumber: e.cfCentreNumber,
-      cfCandidateNumber: e.cfCandidateNumber, cfOption: e.cfOption, createdBy: actorId,
+      cfCandidateNumber: e.cfCandidateNumber, cfOption: e.cfOption, staffSet: e.staffSet, createdBy: actorId,
     })));
     const created = values.length
       ? await tx.insert(examEntry).values(values).onConflictDoNothing().returning({ id: examEntry.id })
@@ -711,6 +737,8 @@ export async function createEntry(data: CreateEntryType, actorId: string, ctx?: 
         chargeId: data.chargeId ?? null,
         kind: data.unitId ? 'unit' : 'award', unitId: data.unitId ?? null, qualificationId: data.qualificationId ?? null,
         entryCode: target.entryCode, title: target.title, optionCode: data.optionCode ?? null, tier: data.tier ?? target.tier,
+        // An option chosen by hand is staff's: a derivation never brings it back (the review of 54c225f, item 3).
+        staffSet: data.optionCode ? ['option'] : [],
         notes: data.notes ?? null, createdBy: actorId,
       }).returning();
       await logAction(actorId, 'EXAM_ENTRY_CREATED', 'exam_entry', row!.id, null,

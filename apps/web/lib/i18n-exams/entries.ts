@@ -469,6 +469,8 @@ export const entriesArabic: Record<string, string> = {
   'Check against the results on record': 'طابِق مع النتائج المسجلة',
   '1 sitting was verified from the results on record.': 'تم التحقق من دورة واحدة من النتائج المسجلة.',
   'No sitting awaiting an answer has a result on record yet.': 'لا توجد بعد نتيجة مسجلة لأي دورة بانتظار الإجابة.',
+  // A family's declaration verified at once from the school's results: no person answered it.
+  'The results on record': 'النتائج المسجلة',
   '1 could not be checked: answer it below.': 'تعذر فحص واحدة: أجب عنها أدناه.',
 };
 

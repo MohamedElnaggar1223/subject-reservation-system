@@ -4,15 +4,15 @@
 # expected red: ['entered as declared (the default)', 'held when the school holds unverified sittings']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 2 failed) 25881ms
-   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified 158ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 28556ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified 179ms
      → expected [ 'missing_candidate_number', …(4) ] to include 'prior_sitting_unverified'
-   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 30ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 33ms
      → expected [ 'missing_candidate_number', …(4) ] to include 'prior_sitting_held'
  Test Files  1 failed (1)
-      Tests  2 failed | 49 passed (51)
+      Tests  2 failed | 54 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 98f5f50d-4d9a-4cdc-8820-57eb1c056ef3: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 02dc523d-8008-4ba4-a9b2-9bd6e7c06198: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified

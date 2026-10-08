@@ -4,13 +4,13 @@
 # expected red: ['an entry by hand on a line not paid is refused']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 1 failed) 27514ms
-   × F4 on the reservations rework > a line not paid is never entered (the review of 426d565, item 4) > an entry by hand on a line not paid is refused 349ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 1 failed) 27310ms
+   × F4 on the reservations rework > a line not paid is never entered (the review of 426d565, item 4) > an entry by hand on a line not paid is refused 297ms
      → expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
  Test Files  1 failed (1)
-      Tests  1 failed | 50 passed (51)
+      Tests  1 failed | 55 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 86f7c908-96e5-4149-82e1-85f75332abcf: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 268b81d9-ca2b-47a6-bfaa-46853b9214e0: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a line not paid is never entered (the review of 426d565, item 4) > an entry by hand on a line not paid is refused
@@ -26,7 +26,7 @@ AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 
 [31m+   "status": 201,[39m
 [2m  }[22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:1091:10
+ ❯ test/08x4-exam-entries-rework.test.ts:1190:10
 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

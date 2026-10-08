@@ -4,23 +4,23 @@
 # expected red: ['reads as results saved']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 1 failed) 26811ms
-   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator 93ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 1 failed) 28185ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator 75ms
  Test Files  1 failed (1)
-      Tests  1 failed | 50 passed (51)
+      Tests  1 failed | 55 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator
 Error: Failed to read the results
  ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
- ❯ test/08x4-exam-entries-rework.test.ts:864:16
-    862|       let done = null as Awaited<ReturnType<typeof importing>> | null;
-    863|       try {
-    864|         done = await importing();
+ ❯ test/08x4-exam-entries-rework.test.ts:911:16
+    909|       let done = null as Awaited<ReturnType<typeof importing>> | null;
+    910|       try {
+    911|         done = await importing();
        |                ^
-    865|       } finally {
-    866|         await release();
+    912|       } finally {
+    913|         await release();
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

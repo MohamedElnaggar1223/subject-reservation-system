@@ -185,7 +185,21 @@ the final merge's (main after D's 0055; F4's migrations as 0056 and 0057).
 | 3. a retake the history shows unticked after a rejection; staff's values brought back | a retake when the line or the history says so, the history kept as the source when both do (the review of 093dbd1's item 9 undone): a rejected declaration never unticks a retake the school's records show. What staff set by hand — a retake ticked or unticked, a carry forward or its numbers, an option — is recorded on the entry (`exam_entry.staff_set`) and a derivation never compares or brings it back | "a retake the candidate's history here shows stays one…", "a coordinator's untick on a draft stays…", "another centre's candidate number typed by hand on a draft stays…"; C55, C61, C62 |
 | 4. the 09 rule's second clause; entries on unpaid lines | the clause is dropped (not an invariant between a second payment and the next derivation, nor after a coordinator's withdrawal); an entry by hand on a line not paid is refused (409); a derivation and an entry by hand take the lines FOR SHARE after the series, so one racing a drop waits for it and enters nothing on the dropped line | "an entry by hand on a line not paid is refused", "a derivation racing the family's drop of the line…"; C63, C64 |
 | 5. derivation's deadlock with "mark as sent" | the drafts a derivation brings up to date and the entries it links are locked in one statement in id order before any is changed, as "mark as sent" and every withdrawal take entries | 08t "a derivation bringing drafts up to date while they are marked as sent…"; C65 |
-| 7. the verification at declaration attributed to the importer | the one acting is the one declaring (the reservation's actor: the desk, a parent, a student), as `prior_sitting_verified_by` and on the audit row; the reason names the result, who imported it and when | "a retake declared after its sitting is on record is verified at once, by the one declaring it…"; C48, C52 |
+| 7. the verification at declaration attributed to the importer | the one acting is the one declaring (the reservation's actor: the desk, a parent, a student), as `prior_sitting_verified_by` and on the audit row; the reason names the result, who imported it and when — for a family, no person since the review of 54c225f (below) | "a retake declared after its sitting is on record is verified at once, by the one declaring it…"; C48, C52 |
+
+### The review of 54c225f (8 Oct 2026)
+
+The reviewer re-ran 54c225f (596 passed), confirmed the six items above, found no deadlock, and
+gave "merge after: 1, 2". The lead's list, before the final merge:
+
+| Item | Now | Proved by |
+|---|---|---|
+| 1. after a move, the old series' send still counted | `sentEntriesOf` counts only the entries of the series the line is in now: a move is the school's act, and the old series' entry was withdrawn for it — the lead's "withdrawn included" narrowed to the line's own series (§10) | "a sent entry withdrawn so its line could move: dropped in the new series before anything is sent there, the board fee comes back"; C66 |
+| 2. a family recorded as verifying its own declaration | at declaration the declarer answers only when they are staff; a family's declaration names no person (`prior_sitting_verified_by` null, the audit row's user null) and is marked `answeredFrom: 'results_on_record'`, the reason naming the result, its importer and the day; the To verify tab shows "The results on record"; B's 09 rule "answered by someone" accepts that mark | "a family's own declaration the results on record show is verified with no person as its answerer…"; C67 |
+| 3. staff's values lost on a re-made entry | a derivation that makes again an entry withdrawn with its line (after a reversal and a second payment, or a move) carries over what staff had set and the mark; an option chosen on an entry added by hand is staff's | "…carried to the entry made again after a second payment", "…carried to the entry made in the new series", "an option chosen on an entry added by hand is staff's"; C68, C69 |
+| 4. a line moved back | §11 | — |
+| 5. the request context; the correction's refusal | the item's series change and the board change pass the request's context to the withdrawals of their move (the subject form's route now passes it too); the session's series correction refuses with a typed `SessionError` (409), its route honouring the status | the move scenarios |
+| 6. the trail's estimated time | a correction row with the relay's time from the lead's log (14:05:05Z) | `.audit/exam-entries.tsv` |
 
 **What else changed with the model.** The test world (`exam-helpers.ts`) is a winter session with
 offers and items (an award item for the Cambridge syllabus, a units item for P1, an award item for
@@ -388,9 +402,9 @@ at the desk with lines and consent), cases in `05` and rules in `09`. Every Sept
 | a certificate collected once (a race test) | 08x3 "a certificate collected at two desks at once"; 08x2 "collected once at the desk…" |
 | national IDs hidden from roles without the need | 08x1 "national IDs … read only by the coordinator and the admin…"; 05; 09 |
 
-**On the rework's model** (`08x4-exam-entries-rework`, 51 scenarios: §2a's tables — 18 of them
-for the rework's items, 23 for the review of 093dbd1 and 10 for the review of 426d565, listed after
-them — and one race in `08t-rework-races`):
+**On the rework's model** (`08x4-exam-entries-rework`, 56 scenarios: §2a's tables — 18 of them
+for the rework's items, 23 for the review of 093dbd1, 10 for the review of 426d565 and 5 for the
+review of 54c225f, listed after them — and one race in `08t-rework-races`):
 
 | §9 / §10 item | Scenario |
 |---|---|
@@ -416,6 +430,7 @@ them — and one race in `08t-rework-races`):
 | review of 426d565, item 3 | "a retake the candidate's history here shows stays one after the declaration is rejected…", "a coordinator's untick on a draft stays…", "another centre's candidate number typed by hand on a draft stays…" |
 | review of 426d565, item 4 | "an entry by hand on a line not paid is refused"; "a derivation racing the family's drop of the line: it waits for the line and enters nothing on the dropped line" (the drop held at its audit row with the line) |
 | review of 426d565, item 5 | 08t "two drafts brought up to date as both are sent: the send waits for the derivation, nothing deadlocks" (the derivation held at its first update with its entries locked; the students named so its rows' order and the ids' cross) |
+| review of 54c225f, items 1-3 | "a sent entry withdrawn so its line could move: dropped in the new series … the board fee comes back"; "a family's own declaration the results on record show is verified with no person as its answerer…"; "what staff set … carried to the entry made again after a second payment", "… carried to the entry made in the new series", "an option chosen on an entry added by hand is staff's" |
 | review of 426d565, item 7 | "a retake declared after its sitting is on record is verified at once, by the one declaring it…" (the desk officer on the row and as the verifier; the reason names the admin who imported the result and the day) |
 
 Races (08x3): two derivations, two numberings, a withdrawal against an amendment, one seat for two
@@ -434,7 +449,7 @@ ID in an audit row.
 one trail row each; logs — the vitest summary and the failing tests with their messages — in
 `.audit/exams-evidence/rework/controls/`): each guard undone once, its tests red, restored. C1–C17
 are September's guards on the new code (C1, C2 now the per-entry deadline; C8 the index in 0050);
-C18–C33 the rework's, C34–C55 the review of 093dbd1's, C56–C65 the review of 426d565's (the table below them). September's logs stay in the ignored
+C18–C33 the rework's, C34–C55 the review of 093dbd1's, C56–C65 the review of 426d565's, C66–C69 the review of 54c225f's (the table below them). September's logs stay in the ignored
 `.audit/exams-evidence/controls/`.
 
 | Control | Undone | Red |
@@ -485,6 +500,9 @@ C18–C33 the rework's, C34–C55 the review of 093dbd1's, C56–C65 the review 
 | C61, C62 | staff-set values never compared nor brought back; a change by hand recorded as staff-set | 08x4 |
 | C63, C64 | no entry by hand on a line not paid; derivation holding the series' paid lines | 08x4 |
 | C65 | derivation locking its entries in one id-ordered statement | 08t |
+| C66 | "sent" only in the line's own series | 08x4 |
+| C67 | a family's declaration answered by no person | 08x4 |
+| C68, C69 | staff's values carried to a re-made entry; an option chosen by hand recorded as staff's | 08x4 |
 
 ## 10. Decisions and why
 
@@ -569,9 +587,16 @@ After the review of 093dbd1 (8 Oct 2026):
 - **Staff's hand beats the line's answer** (the review of 426d565): a coordinator who unticks a
   retake or types another centre's number knows something the line does not; the derivation and
   the check leave such values alone (`staff_set`), as they leave a retake the history shows.
-- **The one who declares answers at declaration** (the review of 426d565): the importer was not
-  acting then; the declaration is what was checked, so its actor is on the row, and the reason
-  says whose import was the evidence.
+- **The one who declares answers at declaration — when staff** (the reviews of 426d565 and
+  54c225f): the importer was not acting then; the desk's declaration is checked in the desk's name.
+  A parent or a student never answers their own declaration: no person is recorded, the row says
+  the school's results on record answered it, and the reason says whose import was the evidence.
+- **"Sent" is the line's own series** (the lead, the review of 54c225f, narrowing "withdrawn
+  included"): an entry of the line marked sent counts, withdrawn or not, only in the series the line
+  is in now. A move is the school's act and the old series' entry was withdrawn for it, so a family
+  dropping the line in its new series before anything is sent there gets the board fee back.
+- **Staff's values follow a re-made entry** (the review of 54c225f): an entry withdrawn with its
+  line and made again (a second payment, a move) takes what staff had set on it, with the mark.
 - **Recorded, no change (the lead, item 8).** "Withdrawn included" keeps the family's board fee even
   when the board refunded the school for an entry withdrawn in time: the board fee is one amount per
   line, sent once any entry of it went. A paid line the school never entered keeps its board fee on
@@ -615,6 +640,9 @@ On the reservations rework's model (8 Oct 2026):
   grade on record is verified at declaration, and the To verify tab checks the awaiting ones. B's
   `knownSittingsOf` reading F4's results and sent entries — so the family's Reserve page pre-sets
   the retake — is B's, and the lead gives it to B once F4 lands.
+- **A line moved back** to a series where its sent entry was withdrawn for the move (the review of
+  54c225f, item 4): that entry was withdrawn by the coordinator, not with the line, so a derivation
+  does not make it there again; the coordinator adds it by hand (with the board, it is a new entry).
 - **Migration numbers**: 0050 and 0051 follow main's 0049; step D's migrations land first, so they
   are renumbered once more at the final merge (a journal `when` later than D's last).
 - **The demo seed's new shapes** (a carried-forward A2 at another centre, an unpaid cash-in, a

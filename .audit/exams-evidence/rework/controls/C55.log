@@ -4,15 +4,15 @@
 # expected red: ['stays one after the declaration is rejected', 'is verified at once, by the one declaring it']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 2 failed) 25794ms
-   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake the candidate's history here shows stays one after the declaration is rejected: the history is its source (the review of 426d565, item 3) 381ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 27485ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake the candidate's history here shows stays one after the declaration is rejected: the history is its source (the review of 426d565, item 3) 344ms
      → expected [ true, 'registration' ] to deeply equal [ true, 'history' ]
-   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the one declaring it, the reason naming the result and its importer; a sitting graded absent waits for the coordinator 126ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the one declaring it, the reason naming the result and its importer; a sitting graded absent waits for the coordinator 98ms
      → expected [ [ 'XWWMA11', true, …(2) ] ] to deeply equal [ Array(1) ]
  Test Files  1 failed (1)
-      Tests  2 failed | 49 passed (51)
+      Tests  2 failed | 54 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line c225b0e3-e9f4-4f78-baad-ced3d6f1dc12: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line b755d30e-103e-4e73-9122-45aa122f9fc3: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake the candidate's history here shows stays one after the declaration is rejected: the history is its source (the review of 426d565, item 3)
@@ -27,13 +27,13 @@ AssertionError: expected [ true, 'registration' ] to deeply equal [ true, 'histo
 [31m+   "registration",[39m
 [2m  ][22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:750:48
-    748|       await derive(nov(), hr.studentId);
-    749|       const [e] = await entriesOf(nov(), hr.studentId);
-    750|       expect([e!.is_retake, e!.retake_source]).toEqual([true, 'history…
+ ❯ test/08x4-exam-entries-rework.test.ts:774:48
+    772|       await derive(nov(), hr.studentId);
+    773|       const [e] = await entriesOf(nov(), hr.studentId);
+    774|       expect([e!.is_retake, e!.retake_source]).toEqual([true, 'history…
        |                                                ^
-    751|       expect(await verify(line, { outcome: 'rejected', reason: 'not th…
-    752|       expect((await rowOf(e!.id)).problems).not.toContain('retake_diff…
+    775|       expect(await verify(line, { outcome: 'rejected', reason: 'not th…
+    776|       expect((await rowOf(e!.id)).problems).not.toContain('retake_diff…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -49,17 +49,17 @@ AssertionError: expected [ [ 'XWWMA11', true, …(2) ] ] to deeply equal [ Array
 [2m      true,[22m
 [32m-     "history",[39m
 [31m+     "registration",[39m
-[2m      "3b5832f6-4e92-4ac4-9fe7-53cc50abbbd5",[22m
+[2m      "2057c9d6-9608-4eb5-8b19-654b5cad912a",[22m
 [2m    ],[22m
 [2m  ][22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:841:10
-    839|       await derive(w.series.pearsonJan, kf.kr!.studentId);
-    840|       expect((await entriesOf(w.series.pearsonJan, kf.kr!.studentId)).…
-    841|         .toEqual([[`${T}WMA11`, true, 'history', kr]]);
+ ❯ test/08x4-exam-entries-rework.test.ts:865:10
+    863|       await derive(w.series.pearsonJan, kf.kr!.studentId);
+    864|       expect((await entriesOf(w.series.pearsonJan, kf.kr!.studentId)).…
+    865|         .toEqual([[`${T}WMA11`, true, 'history', kr]]);
        |          ^
-    842|     });
-    843| 
+    866|     });
+    867| 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

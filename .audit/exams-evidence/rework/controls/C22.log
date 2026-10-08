@@ -4,15 +4,15 @@
 # expected red: ['accepted but not paid']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 2 failed) 26882ms
-   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered 61ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 27329ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered 55ms
      → expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
-   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > paid: derived as the award its line's item enters, with exam_entry.charge_id 49ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > paid: derived as the award its line's item enters, with exam_entry.charge_id 35ms
      → expected { registrationId: null, …(12) } to match object { outcome: 'ready', …(1) }
  Test Files  1 failed (1)
-      Tests  2 failed | 49 passed (51)
+      Tests  2 failed | 54 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 190a58e4-a482-466f-8552-b3e8397e4201: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line faa03d0e-350f-4007-8de5-478ffa8750f3: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered

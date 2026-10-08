@@ -4,13 +4,13 @@
 # expected red: ["the family's direct swap"]
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 1 failed) 27105ms
-   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct swap 288ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 1 failed) 27396ms
+   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct swap 279ms
      → expected 1500 to be 1000 // Object.is equality
  Test Files  1 failed (1)
-      Tests  1 failed | 50 passed (51)
+      Tests  1 failed | 55 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 11ca9374-2773-4373-988e-7793cb03174c: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line a9b78151-2ae5-42ed-a13d-b5fe6d98c37d: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct swap
@@ -22,14 +22,14 @@ AssertionError: expected 1500 to be 1000 // Object.is equality
 [32m- 1000[39m
 [31m+ 1500[39m
 
- ❯ sendDuring test/08x4-exam-entries-rework.test.ts:599:38
-    597|       expect(sent).toEqual({ submitted: 1, skipped: 0 });
-    598|       // The board fee stays with the board: the course part alone com…
-    599|       expect(await credited(lineId)).toBe(before.coursePart);
+ ❯ sendDuring test/08x4-exam-entries-rework.test.ts:623:38
+    621|       expect(sent).toEqual({ submitted: 1, skipped: 0 });
+    622|       // The board fee stays with the board: the course part alone com…
+    623|       expect(await credited(lineId)).toBe(before.coursePart);
        |                                      ^
-    600|       const [w1] = await entriesOfLine(lineId);
-    601|       expect(w1).toMatchObject({ status: 'withdrawn', withdrawn_with_l…
- ❯ test/08x4-exam-entries-rework.test.ts:618:7
+    624|       const [w1] = await entriesOfLine(lineId);
+    625|       expect(w1).toMatchObject({ status: 'withdrawn', withdrawn_with_l…
+ ❯ test/08x4-exam-entries-rework.test.ts:642:7
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

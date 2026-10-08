@@ -1040,10 +1040,15 @@ describe('money invariants over the whole database', () => {
 
   it('a declared sitting is answered once, by someone, and only a paid line stands with its declaration rejected (§3.5)', async () => {
     // Answered: who and when; a declared one only (the database checks the outcome's who and when).
+    // Who: a person — or, for a family's own declaration verified at once, the school's results on
+    // record (F4; the review of 54c225f, item 2: a family never answers its own declaration), which
+    // its audit row says, with no person on it.
     const answered = await sql(`
       select r.id from registration r
       where r.prior_sitting_verified_outcome is not null
-        and (r.prior_sitting_verified_by is null or r.prior_sitting_source not in ('declared_by_family', 'declared_by_desk'))
+        and (r.prior_sitting_source not in ('declared_by_family', 'declared_by_desk')
+          or (r.prior_sitting_verified_by is null and not exists (select 1 from audit_log a where a.entity_id = r.id
+            and a.action = 'PRIOR_SITTING_VERIFIED' and a.user_id is null and a.new_data->>'answeredFrom' = 'results_on_record')))
     `);
     expect(answered).toEqual([]);
     // One answer each: one PRIOR_SITTING_VERIFIED or PRIOR_SITTING_REJECTED row per answered line.

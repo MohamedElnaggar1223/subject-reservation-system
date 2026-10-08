@@ -4,13 +4,13 @@
 # expected red: ['a certificate collected at two desks at once', 'collected once at the desk']
 # result: RED as expected
 
- ❯ test/08x2-exam-days-results.test.ts (14 tests | 2 failed) 4086ms
-   × F4: exam days, results and certificates > certificates > collected once at the desk, with the collector and a slip to sign; a second hand-over is told who took it 14ms
+ ❯ test/08x2-exam-days-results.test.ts (14 tests | 2 failed) 3907ms
+   × F4: exam days, results and certificates > certificates > collected once at the desk, with the collector and a slip to sign; a second hand-over is told who took it 10ms
      → expected 200 to be 409 // Object.is equality
-   × F4: exam days, results and certificates > certificates > an unclaimed certificate is kept for the retention period, then may be destroyed with a reason 21ms
+   × F4: exam days, results and certificates > certificates > an unclaimed certificate is kept for the retention period, then may be destroyed with a reason 16ms
      → expected { status: 400, …(1) } to deeply equal { status: 409, …(1) }
- ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 3724ms
-   × F4: races > a certificate collected at two desks at once: collected once, the other officer told who took it 231ms
+ ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 3911ms
+   × F4: races > a certificate collected at two desks at once: collected once, the other officer told who took it 274ms
      → expected true to be false // Object.is equality
  Test Files  2 failed (2)
       Tests  3 failed | 19 passed (22)

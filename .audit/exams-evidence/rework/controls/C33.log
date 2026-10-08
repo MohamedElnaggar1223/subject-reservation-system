@@ -4,15 +4,15 @@
 # expected red: ['a cash-in whose payment is reversed is flagged']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 2 failed) 26324ms
-   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a cash-in whose payment is reversed is flagged on its entry (cash_in_not_paid) 38ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 28106ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a cash-in whose payment is reversed is flagged on its entry (cash_in_not_paid) 43ms
      → expected [ 'missing_candidate_number', …(4) ] to include 'cash_in_not_paid'
-   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1) 168ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1) 160ms
      → expected [ 'missing_candidate_number', …(4) ] to include 'cash_in_not_paid'
  Test Files  1 failed (1)
-      Tests  2 failed | 49 passed (51)
+      Tests  2 failed | 54 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 1be509eb-f937-48bf-b965-c0e0aaa647a3: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 46c41c4a-caee-43ca-b45b-fb2f55cdca4c: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a cash-in whose payment is reversed is flagged on its entry (cash_in_not_paid)

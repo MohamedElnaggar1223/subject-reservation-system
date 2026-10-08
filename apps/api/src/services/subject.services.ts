@@ -14,6 +14,7 @@ import { applyBoardChange, lockStudentsOfSubject, tellBoardChangePrices } from '
 import { withStudentsFirst } from '../lib/student-locks';
 import { randomUUID } from 'crypto';
 import type { CreateSubjectType, UpdateSubjectType } from '@repo/validations';
+import type { AuditContext } from './audit.services';
 
 /**
  * Check whether a subject code is already taken.
@@ -135,7 +136,7 @@ export async function getSubjectById(id: string) {
  * does not create an invalid state (e.g. non-school subject without customPrice).
  * Returns the updated subject or undefined if not found.
  */
-export async function updateSubject(id: string, data: UpdateSubjectType, actorId?: string) {
+export async function updateSubject(id: string, data: UpdateSubjectType, actorId?: string, ctx?: AuditContext) {
   let repriced: Awaited<ReturnType<typeof applyBoardChange>>['repriced'] = [];
   const updatedRow = await withStudentsFirst((extra) => db.transaction(async (tx) => {
     // A board change moves lines into series: their students before the subject (§6).
@@ -152,7 +153,7 @@ export async function updateSubject(id: string, data: UpdateSubjectType, actorId
     // the old board's catalogue links (catalogue.services.ts applyBoardChange).
     const { council, ...rest } = data;
     if (council && council !== current.council) {
-      repriced = (await applyBoardChange(tx, current, council, actorId ?? null, locked)).repriced;
+      repriced = (await applyBoardChange(tx, current, council, actorId ?? null, locked, undefined, ctx)).repriced;
     }
     // A new level no longer fits the old award and units: they are cleared,
     // for the Catalogue screen to map again.

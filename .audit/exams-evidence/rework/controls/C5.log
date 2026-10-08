@@ -4,23 +4,23 @@
 # expected red: ['flags a missing forecast grade', "the P1 teacher gives P1's, not P2's", 'F4 exam entries']
 # result: RED as expected
 
- ❯ test/05-object-access.test.ts (16 tests | 1 failed) 6731ms
-   × object-level access between families > F4 exam entries: another family reads none of A's exams; a teacher reaches only their own candidates and room; the gate nothing 2250ms
-     → teacher sets B's forecast answered 200: {"success":true,"data":{"id":"642f0525-c444-4151-a2bb-82047e1e39fe","studentId":"PnynjRqH6jwnsmcmZFoFkQ3Qn17HLN0t","boardSeriesId":"bf4de1fb-b7d0-45ab-999a-395446cfc1cf","boardCode":"cambridge","regis: expected 200 to be greater than or equal to 400
- ❯ test/08x1-exam-entries.test.ts (17 tests | 1 failed) 3317ms
-   × F4: candidates and entries > the entry list and its check > flags a missing forecast grade (Cambridge requires one) and every other gap; the teacher of the subject fills it 40ms
+ ❯ test/05-object-access.test.ts (16 tests | 1 failed) 6371ms
+   × object-level access between families > F4 exam entries: another family reads none of A's exams; a teacher reaches only their own candidates and room; the gate nothing 2180ms
+     → teacher sets B's forecast answered 200: {"success":true,"data":{"id":"d3cfa349-d87d-4e71-9dc5-21cd6ad4ac2f","studentId":"W5Tyerjs5y9SvSSIDQCXqwWJExvHV73p","boardSeriesId":"dafb4ccf-307d-4e65-9ae7-161c79277aeb","boardCode":"cambridge","regis: expected 200 to be greater than or equal to 400
+ ❯ test/08x1-exam-entries.test.ts (17 tests | 1 failed) 3347ms
+   × F4: candidates and entries > the entry list and its check > flags a missing forecast grade (Cambridge requires one) and every other gap; the teacher of the subject fills it 39ms
      → expected { status: 200, error: '""' } to deeply equal { status: 403, …(1) }
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 1 failed) 25809ms
-   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's 30ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 1 failed) 26707ms
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's 29ms
      → expected { status: 200, error: '""' } to deeply equal { status: 403, …(1) }
  Test Files  3 failed (3)
-      Tests  3 failed | 81 passed (84)
+      Tests  3 failed | 86 passed (89)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x1-exam-entries.test.ts test/08x4-exam-entries-rework.test.ts test/05-object-access.test.ts
-[results] Could not verify the declared sitting of line e0b07455-8ca5-4f61-bbc3-be0a2b7d13c8: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line da74b1fb-1e39-4b9a-9011-4438a1de5ece: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/05-object-access.test.ts > object-level access between families > F4 exam entries: another family reads none of A's exams; a teacher reaches only their own candidates and room; the gate nothing
-AssertionError: teacher sets B's forecast answered 200: {"success":true,"data":{"id":"642f0525-c444-4151-a2bb-82047e1e39fe","studentId":"PnynjRqH6jwnsmcmZFoFkQ3Qn17HLN0t","boardSeriesId":"bf4de1fb-b7d0-45ab-999a-395446cfc1cf","boardCode":"cambridge","regis: expected 200 to be greater than or equal to 400
+AssertionError: teacher sets B's forecast answered 200: {"success":true,"data":{"id":"d3cfa349-d87d-4e71-9dc5-21cd6ad4ac2f","studentId":"W5Tyerjs5y9SvSSIDQCXqwWJExvHV73p","boardSeriesId":"dafb4ccf-307d-4e65-9ae7-161c79277aeb","boardCode":"cambridge","regis: expected 200 to be greater than or equal to 400
  ❯ refusedAs test/05-object-access.test.ts:30:96
      28|   const body = (await res.json().catch(() => ({}))) as { error?: unkno…
      29|   attempts.push([label, String(res.status), typeof body.error === 'str…

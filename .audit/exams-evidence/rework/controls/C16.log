@@ -4,11 +4,11 @@
 # expected red: ['a teacher keeps only the register of their own room', 'F4 exam entries']
 # result: RED as expected
 
- ❯ test/05-object-access.test.ts (16 tests | 1 failed) 7444ms
-   × object-level access between families > F4 exam entries: another family reads none of A's exams; a teacher reaches only their own candidates and room; the gate nothing 2350ms
-     → teacher reads room B's register answered 200: {"success":true,"data":{"paper":{"id":"61fbcd87-4746-4e96-b00e-2e52c6924766","code":"OA497/12","title":"Paper 1","examDate":"2026-11-27","session":"am","startTime":"09:00","durationMinutes":60},"serie: expected 200 to be greater than or equal to 400
- ❯ test/08x2-exam-days-results.test.ts (14 tests | 1 failed) 3663ms
-   × F4: exam days, results and certificates > rooms and seats > invigilators: one room each per sitting; a teacher keeps only the register of their own room 52ms
+ ❯ test/05-object-access.test.ts (16 tests | 1 failed) 6944ms
+   × object-level access between families > F4 exam entries: another family reads none of A's exams; a teacher reaches only their own candidates and room; the gate nothing 2351ms
+     → teacher reads room B's register answered 200: {"success":true,"data":{"paper":{"id":"0376d060-e1df-40d9-b132-10750d0791ce","code":"OA497/12","title":"Paper 1","examDate":"2026-11-27","session":"am","startTime":"09:00","durationMinutes":60},"serie: expected 200 to be greater than or equal to 400
+ ❯ test/08x2-exam-days-results.test.ts (14 tests | 1 failed) 3552ms
+   × F4: exam days, results and certificates > rooms and seats > invigilators: one room each per sitting; a teacher keeps only the register of their own room 67ms
      → expected 200 to be 403 // Object.is equality
  Test Files  2 failed (2)
       Tests  2 failed | 28 passed (30)
@@ -16,7 +16,7 @@
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/05-object-access.test.ts > object-level access between families > F4 exam entries: another family reads none of A's exams; a teacher reaches only their own candidates and room; the gate nothing
-AssertionError: teacher reads room B's register answered 200: {"success":true,"data":{"paper":{"id":"61fbcd87-4746-4e96-b00e-2e52c6924766","code":"OA497/12","title":"Paper 1","examDate":"2026-11-27","session":"am","startTime":"09:00","durationMinutes":60},"serie: expected 200 to be greater than or equal to 400
+AssertionError: teacher reads room B's register answered 200: {"success":true,"data":{"paper":{"id":"0376d060-e1df-40d9-b132-10750d0791ce","code":"OA497/12","title":"Paper 1","examDate":"2026-11-27","session":"am","startTime":"09:00","durationMinutes":60},"serie: expected 200 to be greater than or equal to 400
  ❯ refusedAs test/05-object-access.test.ts:30:96
      28|   const body = (await res.json().catch(() => ({}))) as { error?: unkno…
      29|   attempts.push([label, String(res.status), typeof body.error === 'str…

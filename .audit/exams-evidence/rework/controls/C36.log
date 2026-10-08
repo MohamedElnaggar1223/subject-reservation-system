@@ -4,17 +4,17 @@
 # expected red: ['a drop request the parent approves', 'a swap request the parent approves', "a drop request's approval"]
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 3 failed) 27141ms
-   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a drop request the parent approves: the line's entry is withdrawn with it, the family told 36ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 3 failed) 27065ms
+   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a drop request the parent approves: the line's entry is withdrawn with it, the family told 25ms
      → expected [ [ 'submitted', false, null ] ] to deeply equal [ [ 'withdrawn', true, …(1) ] ]
-   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a swap request the parent approves: the old line's draft is withdrawn with it; the new line is the one to enter 69ms
+   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a swap request the parent approves: the old line's draft is withdrawn with it; the new line is the one to enter 52ms
      → expected [ [ 'draft', false, null ] ] to deeply equal [ [ 'withdrawn', true, …(1) ] ]
-   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > a drop request's approval 257ms
+   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > a drop request's approval 256ms
      → expected { …(6) } to match object { status: 'withdrawn', …(1) }
  Test Files  1 failed (1)
-      Tests  3 failed | 48 passed (51)
+      Tests  3 failed | 53 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line 1eef8ace-c937-4d9c-899d-9f0990d8fde1: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 70079289-8f58-45cc-8ae1-b565f6fe6d80: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a drop request the parent approves: the line's entry is withdrawn with it, the family told
@@ -87,14 +87,14 @@ AssertionError: expected { …(6) } to match object { status: 'withdrawn', …(1
 [31m+   "withdrawn_with_line": false,[39m
 [2m  }[22m
 
- ❯ sendDuring test/08x4-exam-entries-rework.test.ts:601:18
-    599|       expect(await credited(lineId)).toBe(before.coursePart);
-    600|       const [w1] = await entriesOfLine(lineId);
-    601|       expect(w1).toMatchObject({ status: 'withdrawn', withdrawn_with_l…
+ ❯ sendDuring test/08x4-exam-entries-rework.test.ts:625:18
+    623|       expect(await credited(lineId)).toBe(before.coursePart);
+    624|       const [w1] = await entriesOfLine(lineId);
+    625|       expect(w1).toMatchObject({ status: 'withdrawn', withdrawn_with_l…
        |                  ^
-    602|       expect(w1!.submitted_at).not.toBeNull();
-    603|       expect(await sql<{ n: Record<string, unknown> }>(`select new_dat…
- ❯ test/08x4-exam-entries-rework.test.ts:613:7
+    626|       expect(w1!.submitted_at).not.toBeNull();
+    627|       expect(await sql<{ n: Record<string, unknown> }>(`select new_dat…
+ ❯ test/08x4-exam-entries-rework.test.ts:637:7
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
 

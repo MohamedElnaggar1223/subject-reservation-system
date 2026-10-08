@@ -4,16 +4,18 @@
 # expected red: ['is verified at once, by the one declaring it']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (51 tests | 2 failed) 26473ms
-   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the one declaring it, the reason naming the result and its importer; a sitting graded absent waits for the coordinator 78ms
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 3 failed) 26878ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the one declaring it, the reason naming the result and its importer; a sitting graded absent waits for the coordinator 77ms
      → expected null to be 'verified' // Object.is equality
-   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an award's result verifies a line that enters the award, never a unit line of an award cashed in by units (the review of 426d565, item 1) 107ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a family's own declaration the results on record show is verified with no person as its answerer, the reason naming the result and its importer (the review of 54c225f, item 2) 41ms
+     → expected null to be 'verified' // Object.is equality
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an award's result verifies a line that enters the award, never a unit line of an award cashed in by units (the review of 426d565, item 1) 92ms
      → expected [ …(2) ] to deeply equal [ Array(1) ]
  Test Files  1 failed (1)
-      Tests  2 failed | 49 passed (51)
+      Tests  3 failed | 53 passed (56)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-[results] Could not verify the declared sitting of line f1504cf5-2c99-4f54-8172-2ac635990070: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+[results] Could not verify the declared sitting of line bfecdf75-c371-4b33-96af-17b08fe8ad7a: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the one declaring it, the reason naming the result and its importer; a sitting graded absent waits for the coordinator
 AssertionError: expected null to be 'verified' // Object.is equality
@@ -24,15 +26,34 @@ AssertionError: expected null to be 'verified' // Object.is equality
 [31m+ Received:[39m 
 null
 
- ❯ test/08x4-exam-entries-rework.test.ts:823:42
-    821|       const kr = await declare('kr');
-    822|       const ka = await declare('ka');
-    823|       expect((await lineOf(kr)).outcome).toBe('verified');
+ ❯ test/08x4-exam-entries-rework.test.ts:847:42
+    845|       const kr = await declare('kr');
+    846|       const ka = await declare('ka');
+    847|       expect((await lineOf(kr)).outcome).toBe('verified');
        |                                          ^
-    824|       // The desk declared it (the review of 426d565, item 7): the adm…
-    825|       expect(await verifiedBy(kr)).toBe(w.officer.id);
+    848|       // The desk declared it (the review of 426d565, item 7): the adm…
+    849|       expect(await verifiedBy(kr)).toBe(w.officer.id);
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a family's own declaration the results on record show is verified with no person as its answerer, the reason naming the result and its importer (the review of 54c225f, item 2)
+AssertionError: expected null to be 'verified' // Object.is equality
+
+[32m- Expected:[39m 
+"verified"
+
+[31m+ Received:[39m 
+null
+
+ ❯ test/08x4-exam-entries-rework.test.ts:877:48
+    875|         sessionId: w.sessionId, studentId: kf.kp!.studentId, lines: [r…
+    876|       } }));
+    877|       expect((await lineOf(line!.id)).outcome).toBe('verified');
+       |                                                ^
+    878|       expect(await verifiedBy(line!.id)).toBeNull();
+    879|       const a = await one<{ user_id: string | null; n: Record<string, …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an award's result verifies a line that enters the award, never a unit line of an award cashed in by units (the review of 426d565, item 1)
 AssertionError: expected [ …(2) ] to deeply equal [ Array(1) ]
@@ -41,17 +62,17 @@ AssertionError: expected [ …(2) ] to deeply equal [ Array(1) ]
 [31m+ Received[39m
 
 [2m  [[22m
-[31m+   "d204f80d-b91a-4a39-950b-46fdf0cdcf07",[39m
-[2m    "c5c9b53c-8a1d-46d9-9f11-720ae196c36a",[22m
+[31m+   "ec3bf08b-0edb-46c9-8e14-29e44860ca72",[39m
+[2m    "e2e92562-6a35-4414-b58c-0a11483bf638",[22m
 [2m  ][22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:851:66
-    849|         boardSeriesId: june, commit: true, source: { text: `UCI,Unit C…
-    850|       } }));
-    851|       expect(done.sittingsVerified.map((v) => v.registrationId)).toEqu…
+ ❯ test/08x4-exam-entries-rework.test.ts:898:66
+    896|         boardSeriesId: june, commit: true, source: { text: `UCI,Unit C…
+    897|       } }));
+    898|       expect(done.sittingsVerified.map((v) => v.registrationId)).toEqu…
        |                                                                  ^
-    852|       expect((await lineOf(ku)).outcome).toBeNull();
-    853|       expect((await lineOf(kv)).outcome).toBe('verified');
+    899|       expect((await lineOf(ku)).outcome).toBeNull();
+    900|       expect((await lineOf(kv)).outcome).toBe('verified');
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
 

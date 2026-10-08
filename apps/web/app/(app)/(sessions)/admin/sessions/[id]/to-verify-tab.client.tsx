@@ -117,7 +117,7 @@ export default function ToVerifyTab({ session, viewerRole }: { session: SessionD
                       <>
                         {r.outcome === 'verified' ? <Badge tone="success">verified</Badge> : <Badge tone="danger">not confirmed</Badge>}
                         {r.declarationRejected && <div className="text-xs text-muted-foreground">stands as a first entry</div>}
-                        <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{r.decidedBy ?? ''}</bdi> · <Day iso={r.decidedAt} /></div>
+                        <div className="text-xs text-muted-foreground">{r.decidedBy ? <bdi data-i18n-skip="true">{r.decidedBy}</bdi> : r.decidedFrom === 'results_on_record' ? <span>The results on record</span> : null} · <Day iso={r.decidedAt} /></div>
                       </>
                     )}
                   </td>

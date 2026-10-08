@@ -30,7 +30,7 @@ import {
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  seriesLabel, seriesAcademicYearStart, academicYearShortLabel,
+  seriesLabel, seriesAcademicYearStart, academicYearShortLabel, hasRole, STAFF_ROLES,
   type ImportResultsType, type ResultMappingType,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
@@ -398,22 +398,27 @@ export async function verifyDeclaredOfSession(sessionId: string, actor: Actor, c
  * At declaration (the review of 093dbd1, item 3; the owner: a result on record here is a known
  * sitting): inside the reservation's own transaction, a line just made that declares a sitting
  * with a real grade on record for what it enters is verified at once — step B's verified answer
- * (`recordVerifiedInTx`), the result as the evidence. The one acting is the one who declared (the
- * reservation's actor: the desk, a parent, a student); the reason names the result and who
- * imported it, who was not acting then (the review of 426d565, item 7).
+ * (`recordVerifiedInTx`), the result as the evidence. The one answering is the one who declared when
+ * they are staff (the desk: the review of 426d565, item 7); a family's own declaration names no
+ * person — a parent or a student does not answer their own declaration — and is marked answered
+ * from the results on record (the review of 54c225f, item 2). The reason names the result, who
+ * imported it and when.
  */
 export async function verifyDeclaredAtDeclarationInTx(tx: Tx, lineIds: string[], actorId: string, ctx?: AuditContext) {
   const matches = await sittingMatches(tx, lineIds);
   const verified: string[] = [];
+  if (!matches.length) return verified;
+  const [declarer] = await tx.select({ role: user.role }).from(user).where(eq(user.id, actorId));
+  const staff = !!declarer && hasRole(declarer.role, ...STAFF_ROLES);
   const importers = new Map((await (matches.some((m) => m.importedBy)
     ? tx.select({ id: user.id, name: user.name }).from(user).where(inArray(user.id, [...new Set(matches.map((m) => m.importedBy).filter((x): x is string => !!x))]))
     : Promise.resolve([] as { id: string; name: string }[]))).map((u) => [u.id, u.name]));
   for (const m of matches) {
     const by = (m.importedBy && importers.get(m.importedBy)) || 'an account since removed';
     const done = await recordVerifiedInTx(tx, m.registrationId, {
-      actorId, now: new Date(),
+      actorId: staff ? actorId : null, now: new Date(),
       reason: `${m.seriesName}'s results on record list ${m.code} for the candidate, imported by ${by} on ${schoolDate(m.importedAt)} (verified at declaration)`,
-      evidence: matchEvidence(m),
+      evidence: matchEvidence(m), ...(staff ? {} : { answeredFrom: 'results_on_record' as const }),
     }, ctx);
     if (done) verified.push(m.registrationId);
   }

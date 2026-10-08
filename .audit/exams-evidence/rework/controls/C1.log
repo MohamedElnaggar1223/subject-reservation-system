@@ -4,27 +4,27 @@
 # expected red: ['past the deadline a new entry is refused', 'F4: no entry was made, or sent to the board, after its own deadline']
 # result: RED as expected
 
- ❯ test/08x1-exam-entries.test.ts (17 tests | 2 failed) 4272ms
-   × F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > past the deadline a new entry is refused, and a draft cannot be sent; a withdrawal is allowed with the board's fee shown 13ms
+ ❯ test/08x1-exam-entries.test.ts (17 tests | 2 failed) 3912ms
+   × F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > past the deadline a new entry is refused, and a draft cannot be sent; a withdrawal is allowed with the board's fee shown 11ms
      → expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
-   × F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after 5ms
+   × F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after 4ms
      → expected 2 to be 1 // Object.is equality
- ❯ test/09-money-invariants.test.ts (54 tests | 14 failed) 326ms
-   × money invariants over the whole database > there is money to check: every kind of movement happened in the suites above 215ms
+ ❯ test/09-money-invariants.test.ts (54 tests | 14 failed) 303ms
+   × money invariants over the whole database > there is money to check: every kind of movement happened in the suites above 198ms
      → reversed: expected 0 to be greater than 0
    × money invariants over the whole database > there are board series to check: windows feeding several, entries in them, entries closed at a deadline 1ms
      → expired_at_a_series_deadline: expected 0 to be greater than 0
    × money invariants over the whole database > no waiting line is still provisional when every fee row it was priced from is confirmed at the amount it recorded (a Confirm reaches every line read from its rows) 1ms
      → expected 0 to be greater than 0
-   × money invariants over the whole database > F0a: nothing waits for, and nothing was captured into, a series its student may not sit 50ms
+   × money invariants over the whole database > F0a: nothing waits for, and nothing was captured into, a series its student may not sit 52ms
      → expected 0 to be greater than 0
-   × money invariants over the whole database > F4: no entry was made, or sent to the board, after its own deadline (MO-10, A-08): its line's effective deadline, its cash-in's, else its series' entry deadline 7ms
+   × money invariants over the whole database > F4: no entry was made, or sent to the board, after its own deadline (MO-10, A-08): its line's effective deadline, its cash-in's, else its series' entry deadline 4ms
      → expected [ { …(4) } ] to deeply equal []
    × money invariants over the whole database > F4: no live entry of a line no longer paid — every path that ends a paid line withdraws its entries in its own transaction (the review of 093dbd1, item 1) 1ms
      → expected 0 to be greater than 0
-   × money invariants over the whole database > F4: an entry from a cash-in is an award entry of that charge's student, in its series, from a cash-in or late cash-in; one live entry per charge 2ms
+   × money invariants over the whole database > F4: an entry from a cash-in is an award entry of that charge's student, in its series, from a cash-in or late cash-in; one live entry per charge 1ms
      → expected 0 to be greater than or equal to 2
-   × money invariants over the whole database > F4: a declared sitting verified from the board's results had a result for the line's student in that series 2ms
+   × money invariants over the whole database > F4: a declared sitting verified from the board's results had a result for the line's student in that series 1ms
      → expected 0 to be greater than 0
    × money invariants over the whole database > F4: an entry from a registration is that registration's student's, in its series; a result from an entry is that entry's candidate's, in its series 1ms
      → expected 0 to be greater than 0
@@ -50,7 +50,7 @@ AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 
 [31m+ Received[39m
 
 [2m  {[22m
-[32m-   "error": "The entry deadline for Cambridge International November 2026 (exams xe) (8 October 2026 at 20:01) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)",[39m
+[32m-   "error": "The entry deadline for Cambridge International November 2026 (exams xe) (8 October 2026 at 21:37) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)",[39m
 [32m-   "status": 409,[39m
 [31m+   "error": "\"\"",[39m
 [31m+   "status": 201,[39m
@@ -132,9 +132,9 @@ AssertionError: expected [ { …(4) } ] to deeply equal []
 [32m- [][39m
 [31m+ [[39m
 [31m+   {[39m
-[31m+     "created_at": "2026-10-08 17:01:36.948624+00",[39m
-[31m+     "deadline": "2026-10-08 17:01:36.943569+00",[39m
-[31m+     "id": "5e0d2689-17fc-4d2b-aa10-4c8c7bc8cede",[39m
+[31m+     "created_at": "2026-10-08 18:37:26.178526+00",[39m
+[31m+     "deadline": "2026-10-08 18:37:26.173549+00",[39m
+[31m+     "id": "b0cfb135-c25a-4eb6-8e0d-15a20c44507c",[39m
 [31m+     "submitted_at": null,[39m
 [31m+   },[39m
 [31m+ ][39m
@@ -206,7 +206,7 @@ AssertionError: expected [ Array(1) ] to deeply equal []
 [32m- [][39m
 [31m+ [[39m
 [31m+   {[39m
-[31m+     "id": "32c341e4-e46d-4c81-b920-539c6361fab1",[39m
+[31m+     "id": "5c451ee2-7523-46f3-aa05-2b16665a433c",[39m
 [31m+   },[39m
 [31m+ ][39m
 
@@ -258,7 +258,7 @@ AssertionError: expected 0 to be greater than 0
 
  FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > a declared sitting is answered once, by someone, and only a paid line stands with its declaration rejected (§3.5)
 AssertionError: expected 0 to be greater than 0
- ❯ test/09-money-invariants.test.ts:1096:162
+ ❯ test/09-money-invariants.test.ts:1101:162
 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/16]⎯
