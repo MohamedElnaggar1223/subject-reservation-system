@@ -94,11 +94,15 @@ export const seriesText = (s: Series) => `${s.type[0]!.toUpperCase()}${s.type.sl
 const CONFIRM_RE = /confirm my registration|drop the course/i;
 // The staff's note and the forms' own options (SCHOOL_FORMS.md §2.5): "Self Study 50% School fees",
 // "Retake in School 100% fees (All Papers)", "… (One paper ONLY) From June 2026", "Dropped 20% School fees".
-const FEE_RE = /school fees|refund\s*\d|self\s*study|external|retake|2nd entry|second entry|one paper|\bpaper\s+only\b/i;
+const FEE_RE = /school fees|refund\s*\d|self\s*study|external|retake|2nd entry|second entry|one paper|\bpaper\b[\s\d/a-z]{0,12}\bonly\b/i;
 /** What a fee note carries and a name or an entry-type answer does not: a percentage, "fees", a refund. */
 const FEE_MARKER = /\d+(?:\.\d+)?\s*%|\bfees?\b|refund/i;
-/** A one-paper retake: "(One paper ONLY)", and the ICT form's "(Theory Paper ONLY)" (SCHOOL_FORMS.md §2, form 14). */
-const ONE_PAPER_RE = /one\s*paper|\bpaper\s+only\b/i;
+/**
+ * A one-paper retake: "(One paper ONLY)", the ICT form's "(Theory Paper ONLY)" and the June forms'
+ * "(Paper 41/42 ONLY)" (SCHOOL_FORMS.md §2.2): "paper", a paper's name or code, "only". "(All Papers)"
+ * and "(ONLY 2nd entry)" are not (08n reads every wording of §2).
+ */
+const ONE_PAPER_RE = /one\s*paper|\bpaper\b[\s\d/a-z]{0,12}\bonly\b/i;
 const YESNO_RE = /^(yes|no)$/i;
 
 /** A fee note (IS-08): its kind and percentage. */

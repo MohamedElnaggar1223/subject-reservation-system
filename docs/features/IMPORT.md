@@ -235,7 +235,9 @@ For a line whose series and level the admin mapped to its session (`lineOf` in v
      paper) and the words name no other paper; else the line is `item_unclear` — "<subject>: the note
      says one paper — choose which (Paper 4 only (retake) · Paper 5 only (retake))", or "…, and none
      of its items is one paper — choose the item (…)". A note says one paper with "one paper" or
-     "paper only" — the ICT form's "(Theory Paper ONLY)" among them (the review of a326890, item 1).
+     "paper", a paper's name or code, "only" — the ICT form's "(Theory Paper ONLY)" (the review of
+     a326890, item 1) and the June forms' "(Paper 41/42 ONLY)" (the review of d2fa2cd); 08n reads
+     every retake and self-study wording of SCHOOL_FORMS.md §2 so a new one cannot slip through.
 2. **Attempt, mode and the sitting** (the lead's rules of 8 Oct, MO-25's interim rule):
    - mode: self-study from the answer or the note, or when the item or offer is self-study only;
    - a **retake with source `legacy`** when the student's history has the subject **sat** (not
@@ -454,6 +456,7 @@ render); it is the same on pages F7 does not touch (`drive/hydration-check.mjs`)
 | **the course fee, decided** (review of 2ca07a4, item 2) | open and retakes-only at 0 refused; self-study only at 0 refused without a reason, made with one (the reason on its audit row), edited without it again, made retakes-only at 0 refused; copied into the next session, an open offer at 0 comes across closed and named, the self-study one as it is |
 | **students before subjects** (review of 2ca07a4, item 3) | a subject held FOR UPDATE (a board change): the commit waiting on it already holds the family's student; released, the history row is made |
 | **the level** (review item 7) | an unmapped A.S. line never finds the IGCSE offer of the same name; it finds the A.S. one once offered |
+| **d2fa2cd's round** | "(Paper 41/42 ONLY)" item_unclear among the one-paper items, never the whole subject; readEntryNote over the 29 retake and self-study wordings of SCHOOL_FORMS.md §2 |
 | **a326890's round** | the ICT form's "(Theory Paper ONLY)" a one-paper retake; a forms export whose parent names and entry-type column say "Retake" keeps its fee notes in the fee column; a copy records the reason of a self-study-only offer at 0 (copied, and converted while closed, through New session) |
 | **the harness's pause** (found by the race's red runs) | 00-harness: `pauseAtAudits().paused` does not count a transaction of another database waiting on the same key (the suites run side by side on one server) |
 | **the Arabic** (review item 4) | translateImportText on A's and B's sentences (none caught; A's two have their own keys; the grade-10 core sentence and MO-9's are A's translator's; other screens' "Add …" untouched) and on the import's own |
@@ -518,6 +521,7 @@ gives for each):
 | C70 | a326890 item 1: "(Theory Paper ONLY)" a one-paper retake | red |
 | C71 | a326890 item 2: a drifted fee note carries a fee marker | red |
 | C72 | a326890 item 3: a copy records a self-study-only offer's reason at 0 | red |
+| C73 | d2fa2cd: "(Paper 41/42 ONLY)" a one-paper retake | red |
 
 The earlier controls whose code main removed (C3, C13, C14, C19–C22: `getRetakeSubjectIds`,
 `prepareRegistrationInputs`, inactive import subjects) are superseded by C32, C36–C41.
@@ -739,6 +743,8 @@ records it.
 - 18:48–19:06Z — on d2fa2cd: types green; the suites side by side green (569 passed, 1 todo each);
   every control with its own row: 52 red, C44 green as since 7003e74 (C60 covers it).
 - 19:15Z — pushed e513992 (one push from a326890); CI 37829496639 green (569 passed, 1 todo).
+- 19:24–19:26Z — the review of d2fa2cd (merge after: 1): "(Paper 41/42 ONLY)" read as one paper, every
+  §2 wording read in 08n; C73 red; the real sheet's counts unchanged (privately).
 - Next: the reviewer confirms items 1 and 2 on the diff; the final merge waits for F4 on main (main
   has D at c2d7a78, its migrations to 0054): origin/main merged as its own commit, 0050_import
   regenerated after main's last migration with a later stamp and its snapshot chained, the order

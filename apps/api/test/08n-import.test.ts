@@ -8,6 +8,7 @@ import { schoolSheet, sclRoster, moneyRecord, workbook, zip, serial, years, live
 import { translateImportText, importArabic } from '../../web/lib/i18n-import';
 import { translateSessionsText } from '../../web/lib/i18n-sessions';
 import { translateReservationsText } from '../../web/lib/i18n-reservations';
+import { readEntryNote } from '../src/services/import/normalise';
 
 /**
  * F7 — the day-one import (FEATURES_PLAN.md F7; IMPORT_SPIKE.md).
@@ -1069,6 +1070,7 @@ describe('F7: the day-one import', () => {
       await offerOf('Imp Physics Two', 'IMP-ONE-PHY', ['Paper 4 only (retake)', 'Paper 5 only (retake)']);
       await offerOf('Imp Geography None', 'IMP-ONE-GEO', []);
       await offerOf('Imp ICT Theory', 'IMP-ONE-ICT', ['Paper 1 only (retake)']);
+      await offerOf('Imp Biology Components', 'IMP-ONE-BIO', ['Paper 4 only (retake)', 'Paper 6 only (retake)']);
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', '', ''];
       // The forms' own wording of a one-paper retake (SCHOOL_FORMS.md §2).
       const note = `Retake in School 100% fees (One paper ONLY) From June ${Y}`;
@@ -1077,6 +1079,8 @@ describe('F7: the day-one import', () => {
         row('Imp Chemistry One'), row('Imp Physics Two'), row('Imp Geography None'),
         // The ICT form's own wording (SCHOOL_FORMS.md §2, form 14): one paper too.
         row('Imp ICT Theory', 'Yes', `Retake Self Study 50% fees (Theory Paper ONLY) From June ${Y}`),
+        // The June forms' commonest wording (SCHOOL_FORMS.md §2.2: Biology, Chemistry, Combined Science, Computer Science, Physics).
+        row('Imp Biology Components', 'Yes', `Retake Self Study 50% fees (Paper 41/42 ONLY) From June ${Y}`),
       ] }]), 'one-paper-only.xlsx', 'school_sheet');
       expect((await putSettings(adm, id, { series: { [`november-${Y}-as_level`]: { mode: 'window', sessionId: sess } }, enrol: false, createSections: false })).status).toBe(200);
       const v = await fetchView(adm, id);
@@ -1100,6 +1104,53 @@ describe('F7: the day-one import', () => {
       expect(ict.data).toMatchObject({ noteOnePaper: true, noteRetake: true, selfStudy: true });
       expect(ict.plan.lines).toMatchObject([{ subjectName: 'Imp ICT Theory', itemLabel: 'Paper 1 only (retake)', found: 'paper', attempt: 'retake', mode: 'self_study',
         priorSitting: { month: 'june', year: Y, source: 'declared_by_desk', from: 'note' } }]);
+      // "(Paper 41/42 ONLY)": one paper, which one for staff to choose among the one-paper items — never the whole subject.
+      const comp = rowAt(v, 'One paper only', 7);
+      expect(comp.data).toMatchObject({ noteOnePaper: true, noteRetake: true, selfStudy: true });
+      expect(comp.plan.lines).toEqual([]);
+      expect(comp.problems.find((p) => p.code === 'item_unclear')).toEqual({
+        code: 'item_unclear', severity: 'error', detail: 'Imp Biology Components: the note says one paper — choose which (Paper 4 only (retake) · Paper 6 only (retake))',
+      });
+      // Every retake and self-study wording of the forms (SCHOOL_FORMS.md §2), read: a new one cannot slip through unread.
+      const one = (retake: boolean, onePaper: boolean, sitting: { type: string; year: number } | null = null) => ({ retake, onePaper, sitting });
+      const wordings: [string, ReturnType<typeof one>][] = [
+        // §2.2 Arabic O.L.: the five entry types.
+        ['First Entry in School 100% fees (All Papers)', one(false, false)],
+        ['Retake in School 100% fees (All Papers)', one(true, false)],
+        ['Retake Self Study 50% fees (All Papers)', one(true, false)],
+        ['Retake in School 100% fees (One paper ONLY) From June 2026', one(true, true, { type: 'june', year: 2026 })],
+        ['Retake Self Study 50% fees (One paper ONLY) From June 2026', one(true, true, { type: 'june', year: 2026 })],
+        // §2.2 the teacher choice's self-study options and "SS Y/N".
+        ['Self study (Only for 2nd entry ONLY)', one(true, false)],
+        ['Self Study 50% (Second entry ONLY)', one(true, false)],
+        ['Self Study 50% (ONLY 2nd entry)', one(true, false)],
+        ['Self Study 50% fees (ONLY 2nd entry)', one(true, false)],
+        ['Self Study 50%', one(false, false)],
+        // §2.2 "Paper 41/42" (with the forms' answers), the ICT and the Mathematics one-paper questions.
+        ['Retake Self Study 50% fees (Paper 41/42 ONLY) From June 2026', one(true, true, { type: 'june', year: 2026 })],
+        ['Retake Self Study 50% fees (Paper 41/42 ONLY) From November 2025', one(true, true, { type: 'november', year: 2025 })],
+        ['Retake Self Study 50% fees (Paper 41/42 ONLY)', one(true, true)],
+        ['Retake Self Study 50% fees (Theory Paper ONLY) From November 2026', one(true, true, { type: 'november', year: 2026 })],
+        ['Retake Self Study 50% fees (One Paper ONLY) 1H', one(true, true)],
+        // §2.3 A.S./A.L.: per unit, the routes, the components.
+        ['A.S. Paper 1 (WBI11/01) Self Study 50% 2nd entry ONLY', one(true, false)],
+        ['A.2. Paper 5 (WBI15/01) First entry 100% June 2027', one(false, false)],
+        ['Self Study 50% School fees (2nd entry ONLY)', one(true, false)],
+        ['Self Study (ONLY 2nd entry)', one(true, false)],
+        ['Physics A.2. (Self Study 50% fees in June 2027)', one(false, false)],
+        ['A.2. Self Study 50% (Carry forward on June 2026)', one(false, false)],
+        ['Self study 50% (second entry only)', one(true, false)],
+        // §2.4 November: the forms' descriptions and the Biology retake checkboxes (the series makes it a retake, §4.5).
+        ['(SECOND ENTRY - SELF STUDY ONLY)', one(true, false)],
+        ['Retake Self Study 50% fees (One Paper ONLY) Paper 2', one(true, true)],
+        ['(50% SELF STUDY) Papers 1–4 from November 2025', one(false, false, { type: 'november', year: 2025 })],
+        // The sheet's own notes (IS-08) and the reviewer's checks.
+        ['Self Study 50% School fees', one(false, false)],
+        ['Retake (Self Study ONLY)', one(true, false)],
+        ['(Second entry ONLY)', one(true, false)],
+        ['Dropped 20% School fees', one(false, false)],
+      ];
+      for (const [w, want] of wordings) expect([w, readEntryNote(w)]).toEqual([w, want]);
       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
     });
 
