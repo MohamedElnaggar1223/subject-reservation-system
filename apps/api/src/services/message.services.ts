@@ -120,7 +120,7 @@ export async function deliverInTx(
           id: notificationId, userId: m.recipientId, type: msg.notificationType, title: r.title, body: r.body,
           data: { messageId: msg.id, ...(m.about ? { studentId: m.about } : {}) },
         });
-        deliveries.push({ id: randomUUID(), messageId: msg.id, recipientId: m.recipientId, studentId: m.about, channel, status: 'sent', title: r.title, body: r.body, notificationId, attempts: 1, sentAt: now });
+        deliveries.push({ id: randomUUID(), messageId: msg.id, recipientId: m.recipientId, studentId: m.about, channel, status: 'sent', title: r.title, body: r.body, notificationId, attempts: 1, sentAt: new Date() });
       } else if (channel === 'email') {
         deliveries.push({ id: randomUUID(), messageId: msg.id, recipientId: m.recipientId, studentId: m.about, channel, status: 'queued', title: r.title, body: r.body, address: m.email });
       }
@@ -251,8 +251,8 @@ export async function dispatchScheduledMessages(now: Date = new Date()) {
         const resolved = await resolveAudience(def, { sessionId: ctxSession }, tx, now);
         assertFillable(texts, resolved.fills);
         const d = await deliverInTx(tx, m, texts, resolved, resolved.members.map((member) => ({ member })), now);
-        await tx.update(message).set({ status: 'sent', sentAt: now, recipientCount: d.people }).where(eq(message.id, id));
-        await tx.update(messageAudience).set({ resolvedCount: d.people, resolvedAt: now }).where(eq(messageAudience.id, m.audienceId));
+        await tx.update(message).set({ status: 'sent', sentAt: new Date(), recipientCount: d.people }).where(eq(message.id, id));
+        await tx.update(messageAudience).set({ resolvedCount: d.people, resolvedAt: new Date() }).where(eq(messageAudience.id, m.audienceId));
         await logAction(null, 'MESSAGE_SENT', 'message', id, { status: 'scheduled', scheduledAt: m.scheduledAt.toISOString() },
           { status: 'sent', audience: resolved.label, people: d.people, deliveries: d.deliveries, dispatchedBy: 'scheduler' }, undefined, tx);
         return true;
@@ -376,7 +376,7 @@ export async function listMessages(viewer: Viewer, q: { status?: string; source?
       waiting: mine.filter((c) => c.channel === channel && (c.status === 'queued' || c.status === 'sending')).reduce((s, c) => s + c.n, 0),
     });
     out.push({
-      id: r.id, status: r.status, source: r.source, title: r.title ?? r.templateTitle ?? '', templateName: r.templateName ?? null, channels: r.channels,
+      id: r.id, status: r.status, source: r.source, title: r.title ?? r.templateName ?? r.templateTitle ?? '', templateName: r.templateName ?? null, channels: r.channels,
       scheduledAt: r.scheduledAt, sentAt: r.sentAt, createdAt: r.createdAt, people: r.recipientCount ?? r.resolvedCount ?? null, error: r.error, cancelReason: r.cancelReason,
       audience: { kind: r.audienceKind, label: aud.label }, createdBy: r.createdByName ?? null, reminderKind: r.reminderKind ?? null,
       deliveries: { in_app: of('in_app'), email: of('email') },

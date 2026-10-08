@@ -5,7 +5,7 @@
  * with its family, its price and what it is made of, its due date and the days overdue; filters
  * (unpaid, overdue, provisional, paid, by subject) and an export. Every number is the ledger's:
  * the takings, the receipts and the workbench are unchanged. (Charges join it in step C; the
- * "Remind" batch in step D.)
+ * "Remind" batch in step D: remind.client.tsx.)
  */
 
 import { useState } from 'react';
@@ -16,6 +16,7 @@ import { Badge } from '~/components/ui/tone';
 import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
 import { downloadCsv, toCsv } from '~/lib/csv';
 import { SessionCharges } from './session-charges.client';
+import { Remind } from './remind.client';
 import {
   fetchMoney, moneyKey, Money, Day, INPUT_CLASS, LINE_STATUS_LABEL, LINE_STATUS_TONE, type SessionDetail,
 } from '../sessions-shared';
@@ -76,8 +77,8 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* "Remind" sends the payment reminder to these families now (a batch audience): step D's
-              messages and reminders (RESERVATIONS_REWORK.md §3.8). Until it lands it does nothing. */}
-          <Button variant="outline" size="sm" disabled title="Reminders arrive with the messages step">Remind</Button>
+              messages and reminders (RESERVATIONS_REWORK.md §3.8, remind.client.tsx). */}
+          <Remind sessionId={session.id} filter={filter} offerId={offerId} sectionId={sectionId} />
           <Button variant="outline" size="sm" onClick={exportCsv} disabled={!data.lines.length}>Export</Button>
         </div>
       </div>

@@ -1,0 +1,226 @@
+admin@igcse.local (en) → http://localhost:3130/admin/dashboard
+shot d-01-new-message
+shot d-02-composed-preview
+shot d-03-sent
+shot d-04-scheduled
+MEASURE an announcement to parents of grade 11, and one for tomorrow (the same people): 4 inputs, 4 clicks
+shot d-05-log
+LOG:
+Messages
+
+Families read these in their notifications (and by email); nobody can delete one. Reminders go out on their own, once each.
+
+New message
+Sent
+Reminders
+Texts
+Sent and scheduled
+All
+Sent by staff
+Reminders
+Before messages
+WHEN	TO	MESSAGE	IN THE APP	EMAIL	STATUS	
+7 Nov 2026 09:18
+School Admin
+	
+All parents
+	
+Parents evening
+	—	—	Scheduled	
+Cancel
+
+28 Oct 2026 10:18
+School Admin
+	
+Grade 12 students
+	
+Grade 12 briefing
+Announcement could not be sent
+shot d-06-deliveries
+shot d-07-reminders
+shot d-08-rule-saved
+MEASURE a reminder rule set once (the payment rule for every session: its days): 2 inputs, 2 clicks
+shot d-09-texts
+shot d-10-money-tab
+shot d-11-remind-dialog
+REMIND DIALOG:
+Remind these families
+
+The payment reminder, now, to the parents and the student of each family ticked: what they owe in this session and by when.
+
+Student D10
+EGP 29,000 · due 22 Oct 2026
+Student D5
+EGP 28,700 · due 22 Oct 2026
+Student D7
+EGP 14,500 · due 22 Oct 2026
+Student D9
+EGP 14,200 · due 22 Oct 2026
+
+Preview — the copy for Student D10
+
+Payment due — June 2027 · موعد الدفع — June 2027
+
+Dear Parent D10, EGP 29,000 for Student D10 (Biology and Chemistry) is due on 22 October 2026. You can pay in the app or at the school's finance desk.
+
+عزيزي ولي الأمر Parent D10، مبلغ 29,000 جنيه الخاص بـ Student D10 (Biology وChemistry) مستحق في 22 أكتوبر 2026. يمكنكم الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.
+
+Also by email
+Cancel
+Remind
+4
+families
+shot d-12-remind-sent
+MEASURE the Money tab's Remind to the families it shows: 0 inputs, 2 clicks
+shot d-13-settings
+admin@igcse.local (ar) → http://localhost:3130/admin/dashboard
+dir=rtl lang=ar
+shot d-20-ar-new-message
+AR NEW:
+الرسائل
+
+تقرأ الأسر هذه الرسائل في إشعاراتها (وبالبريد الإلكتروني)؛ ولا يمكن لأحد حذفها. وتُرسل التذكيرات تلقائيًا، كل تذكير مرة واحدة.
+
+رسالة جديدة
+المُرسلة
+التذكيرات
+النصوص
+رسالة جديدة
+
+إلى الجميع، أو صف، أو أولياء أمور صف، أو قائمة تحتفظ بها المدرسة، أو أشخاص تختارهم.
+
+إلى من
+الجميع أو صف
+قائمة في النظام
+أشخاص مختارون
+كل المستخدمين
+كل الطلاب
+كل أولياء الأمور
+طلاب الصف 10
+طلاب الصف 11
+طلاب الصف 12
+أولياء أمور الصف 10
+أولياء أمور الصف 11
+أولياء أمور الصف 12
+
+5
+ 
+أشخاص
+ أولياء أمور الصف 11
+
+Parent D1 (ولي أمر, Student D1) · Parent D3 (ولي أمر, Student D3) · Parent D5 (ولي أمر, Student D5) · Parent D9 (ولي أمر, Student D9) · Parent D6 (ولي أمر, Student D6)
+
+احفظ هذه القائمة في الاختيار باسم (اختياري)
+ما الذي
+النص
+اكتب النص
+موعد السداد
+دفعة متأخرة
+انتهاء الحجز
+shot d-21-ar-log
+shot d-22-ar-reminders
+AR REMINDERS:
+الرسائل
+
+تقرأ الأسر هذه الرسائل في إشعاراتها (وبالبريد الإلكتروني)؛ ولا يمكن لأحد حذفها. وتُرسل التذكيرات تلقائيًا، كل تذكير مرة واحدة.
+
+رسالة جديدة
+المُرسلة
+التذكيرات
+النصوص
+تُرسل التذكيرات في يومها الساعة 09:00 بتوقيت القاهرة. الإعدادات
+موعد الدفع (الأسطر والأقساط والرسوم)
+
+كل الجلسات
+
+قبل 7 أيام, قبل 3 أيام, يوم الموعد, بعد 3 أيام
+
+ثم كل 3 أيام حتى السداد
+
+في التطبيق وبالبريد الإلكتروني · موعد السداد · بعد الموعد: دفعة متأخرة
+
+مفعّل
+تغيير
+قاعدة خاصة بجلسة
+موعد الرسوم المدرسية
+
+المدرسة كلها
+
+قبل 14 أيام, قبل 7 أيام, يوم الموعد
+
+ثم كل 7 أيام حتى السداد
+
+shot d-23-ar-texts
+shot d-24-ar-remind-dialog
+AR REMIND:
+تذكير هذه الأسر
+
+تذكير الدفع الآن إلى أولياء الأمور والطالب في كل أسرة محددة: ما عليهم في هذه الجلسة وموعده.
+
+Student D10
+29,000 جنيه · مستحق 22 أكتوبر 2026
+Student D5
+28,700 جنيه · مستحق 22 أكتوبر 2026
+Student D7
+14,500 جنيه · مستحق 22 أكتوبر 2026
+Student D9
+14,200 جنيه · مستحق 22 أكتوبر 2026
+
+معاينة — النسخة الخاصة بـ Student D10
+
+Payment due — June 2027 · موعد الدفع — June 2027
+
+Dear Parent D10, EGP 29,000 for Student D10 (Biology and Chemistry) is due on 22 October 2026. You can pay in the app or at the school's finance desk.
+
+عزيزي ولي الأمر Parent D10، مبلغ 29,000 جنيه الخاص بـ Student D10 (Biology وChemistry) مستحق في 22 أكتوبر 2026. يمكنكم الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.
+
+وبالبريد الإلكتروني أيضًا
+إلغاء
+تذكير
+4
+أسر
+shot d-25-ar-settings
+officer.mona@igcse.local (en) → http://localhost:3130/desk
+officer nav has Messages: 1
+OFFICER tabs: New message | Sent | Texts
+OFFICER lists: A session's unpaid families | The holders of a charge
+shot d-30-officer
+parent.d5@rwd.local (en) → http://localhost:3130/approvals
+shot d-40-parent-notifications
+PARENT:
+Notifications
+5
+All
+Mark all read
+⏰
+PAYMENT REMINDER
+Just now
+
+Payment due — June 2027 · موعد الدفع — June 2027
+
+Dear Parent D5, EGP 28,700 for Student D5 (Biology and Mathematics) is due on 22 October 2026. You can pay in the app or at the school's finance desk.
+
+عزيزي ولي الأمر Parent D5، مبلغ 28,700 جنيه الخاص بـ Student D5 (Biology وMathematics) مستحق في 22 أكتوبر 2026. يمكنكم الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.
+
+📢
+ANNOUNCEMENT
+Just now
+
+Grade 11 parents evening
+
+Dear Parent D5, the grade 11 parents evening is on Thursday at 17:00. Please come with Student D5.
+
+⏰
+PAYMENT REMINDER
+parent delete buttons: 0
+parent.d5@rwd.local (ar) → http://localhost:3130/approvals
+shot d-41-parent-notifications-ar
+ERRORS: 
+admin@igcse.local (ar) pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on 
+admin@igcse.local (ar) pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on 
+admin@igcse.local (ar) pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on 
+admin@igcse.local (ar) pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on 
+admin@igcse.local (ar) pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on 
+parent.d5@rwd.local (ar) pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on 
+parent.d5@rwd.local (ar) pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on 
+parent.d5@rwd.local (ar) pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on 

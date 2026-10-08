@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { apiResponse, academicYearStartOf } from '@repo/validations';
+import { apiResponse, academicYearStartOf, academicYearLabel } from '@repo/validations';
 import {
   admin, staff, onboard, refused, one, sql, money, app, waitFor, pauseAtAudits, lockWaiters, notificationsFor, CONSENT, type Client,
 } from './helpers';
@@ -127,7 +127,7 @@ describe('08s: messages and reminders', () => {
     expect(due.titleEn).toBe('Payment due — {session}');
     expect(due.titleAr).toBe('موعد الدفع — {session}');
     // WhatsApp is a channel with no sender: refused wherever it is asked for.
-    const wa = await refused(adm.api.v1.messages.$post({ json: { audience: { savedId: 'aud-parents-grade-11' }, title: 'A message on WhatsApp', body: 'This should not go out on WhatsApp.', channels: ['in_app', 'whatsapp'] } }));
+    const wa = await refused(adm.api.v1.messages.$post({ json: { audience: { definition: { kind: 'direct', userIds: [coordinator.id] } }, title: 'A message on WhatsApp', body: 'This should not go out on WhatsApp.', channels: ['in_app', 'whatsapp'] } }));
     expect(wa.status).toBe(400);
     expect(wa.error).toContain('WhatsApp is not connected yet');
     expect((await refused(finadmin.api.v1.reminders.rules.$put({ json: { kind: 'payment_due', sessionId: null, offsetsDays: [-7], repeatEveryDays: null, channels: ['whatsapp'], templateId: TPL.paymentDue, active: true, reason: 'try WhatsApp' } }))).status).toBe(400);
@@ -504,7 +504,7 @@ describe('08s: messages and reminders', () => {
       expect(of(good.parent.id, 'email')).toMatchObject({ status: 'sent', error: null });
       const mine = await apiResponse(bad.parent.api.v1.notifications.$get({ query: {} }));
       expect(mine.find((x) => (x.data as { messageId?: string } | null)?.messageId === sent.id)).toMatchObject({ title: 'Results day', emailSentAt: null });
-      const log = (await apiResponse(adm.api.v1.messages.$get({ query: { limit: '50' } }))).find((m) => m.id === sent.id)!;
+      const log = (await apiResponse(adm.api.v1.messages.$get({ query: { source: 'staff', limit: '200' } }))).find((m) => m.id === sent.id)!;
       expect(log.deliveries).toEqual({ in_app: { sent: 2, failed: 0, waiting: 0 }, email: { sent: 1, failed: 1, waiting: 0 } });
     } finally {
       await sql(`update "user" set email = $1 where id = $2`, [bad.parent.email, bad.parent.id]);
@@ -558,5 +558,109 @@ describe('08s: messages and reminders', () => {
     await step(cairoAt(shift(dueDay, -2), 9, 30));
     expect(await offsetsOf(line)).toEqual([-3]);
     expect(money((await one<{ n: string }>(`select count(*) as n from notification n join "user" u on u.id = n.user_id where u.email = $1 and n.type = 'PAYMENT_REMINDER'`, [f.parent.email])).n)).toBe(1);
+  });
+  // ─── Claims under concurrency: a scheduled message, a cancel, an email ───────
+
+  it('two ticks at the same minute send a scheduled message once: the second finds it locked and leaves it', async () => {
+    const g = await onboard(officer, `s08-tick2-${RUN}`, 10);
+    const when = new Date(Date.now() + 3 * 3_600_000);
+    const s = await apiResponse(adm.api.v1.messages.$post({ json: {
+      audience: { definition: { kind: 'direct', userIds: [g.parent.id] } }, title: 'Sent once by two ticks', body: 'Two scheduler ticks run at once; this goes out once.', language: 'en', channels: ['in_app'], scheduledAt: when,
+    } }));
+    const p = await pauseAtAudits(['MESSAGE_SENT']);
+    try {
+      const first = step(new Date(when.getTime() + 1000));
+      await p.paused('MESSAGE_SENT');
+      // The second tick runs to its end while the first holds the message: it skips it (were the
+      // message not claimed by its lock, the second would queue behind the first instead).
+      const second = step(new Date(when.getTime() + 1000));
+      await Promise.race([second, lockWaiters(2)]);
+      await p.releaseAll();
+      const [a, b] = await Promise.all([first, second]);
+      expect([a.scheduledSent, b.scheduledSent].sort()).toEqual([0, 1]);
+    } finally {
+      await p.releaseAll();
+    }
+    expect(await notificationsFor(g.parent.email, 'SCHOOL_MESSAGE')).toHaveLength(1);
+    expect(await sql(`select 1 from message_delivery where message_id = $1`, [s.id])).toHaveLength(1);
+  });
+
+  it('a cancel landing while the tick sends the message waits for it, and is refused: the message was sent', async () => {
+    const g = await onboard(officer, `s08-cxl-${RUN}`, 10);
+    const when = new Date(Date.now() + 4 * 3_600_000);
+    const s = await apiResponse(adm.api.v1.messages.$post({ json: {
+      audience: { definition: { kind: 'direct', userIds: [g.parent.id] } }, title: 'Cancelled too late', body: 'The admin cancels this while the tick is sending it.', language: 'en', channels: ['in_app'], scheduledAt: when,
+    } }));
+    const p = await pauseAtAudits(['MESSAGE_SENT']);
+    let cancel: Awaited<ReturnType<typeof refused>> | null = null;
+    try {
+      const ticking = step(new Date(when.getTime() + 1000));
+      await p.paused('MESSAGE_SENT');
+      const cancelling = refused(adm.api.v1.messages[':id'].cancel.$post({ param: { id: s.id }, json: { reason: 'changed my mind' } }));
+      await lockWaiters(2);
+      await p.releaseAll();
+      [, cancel] = await Promise.all([ticking, cancelling]);
+    } finally {
+      await p.releaseAll();
+    }
+    expect(cancel).toEqual({ status: 409, error: 'This message was already sent: only a scheduled message can be cancelled' });
+    expect((await one<{ status: string }>(`select status from message where id = $1`, [s.id])).status).toBe('sent');
+    expect(await notificationsFor(g.parent.email, 'SCHOOL_MESSAGE')).toHaveLength(1);
+    expect(await sql(`select 1 from audit_log where action = 'MESSAGE_CANCELLED' and entity_id = $1`, [s.id])).toEqual([]);
+  });
+
+  it('an email claimed by a sender that stopped half way is marked failed at the next tick, never sent again', async () => {
+    const g = await onboard(officer, `s08-stop-${RUN}`, 10);
+    const when = new Date(Date.now() + 5 * 3_600_000);
+    const s = await apiResponse(adm.api.v1.messages.$post({ json: {
+      audience: { definition: { kind: 'direct', userIds: [g.parent.id] } }, title: 'A sender stopped', body: 'The process sending this email stopped half way.', language: 'en', channels: ['in_app', 'email'], scheduledAt: when,
+    } }));
+    const { dispatchScheduledMessages } = await import('../src/services/message.services');
+    await dispatchScheduledMessages(new Date(when.getTime() + 1000));
+    // The aftermath of a crash between the claim and the send, built by hand (as expireByHand builds one).
+    await sql(`update message_delivery set status = 'sending', attempts = 1, updated_at = now() - interval '20 minutes' where message_id = $1 and channel = 'email'`, [s.id]);
+    await step(new Date(when.getTime() + 60_000));
+    const d = await one<{ status: string; attempts: number; error: string }>(`select status, attempts, error from message_delivery where message_id = $1 and channel = 'email'`, [s.id]);
+    expect(d).toEqual({ status: 'failed', attempts: 1, error: 'Interrupted while sending: it may or may not have reached the person, and it is not sent again' });
+  });
+
+  it("a session the old 24-hour closing reminder already reached is not reminded again on its day −1", async () => {
+    const f = await onboard(officer, `s08-n002-${RUN}`, 12);
+    const end = cairoAt(shift(dueDay, 20), 23, 59);
+    const legacy = (await apiResponse(adm.api.v1.sessions.$post({
+      json: { type: 'june', year: Y + 1, label: `s08-n002-${RUN}`, startDate: new Date(Date.now() - DAY).toISOString(), endDate: end.toISOString(), courseStartsOn: cairoDay(new Date()), paymentDueAt: cairoAt(dueDay, 12).toISOString() },
+    })))!.id;
+    // NOT-002 ran before step D: it set reminder_sent_at. The rule still reminds 7 days before; its day −1 was NOT-002's.
+    await sql(`update registration_session set reminder_sent_at = now() where id = $1`, [legacy]);
+    await step(cairoAt(shift(cairoDay(end), -7), 9, 0));
+    expect(await offsetsOf(legacy, 'session_closing')).toEqual([-7]);
+    await step(cairoAt(shift(cairoDay(end), -1), 9, 0));
+    expect(await offsetsOf(legacy, 'session_closing')).toEqual([-7]);
+    expect((await notificationsFor(f.parent.email, 'SESSION_CLOSING_SOON')).filter((n) => n.title.includes(`s08-n002-${RUN}`))).toHaveLength(1);
+  });
+  it('a pushed school fee is reminded by the school-fee rule, 14 days before its date; paid, its reminders stop', async () => {
+    const next = academicYearLabel(academicYearStartOf() + 1);
+    const [existing] = await sql<{ id: string }>(`select id from school_fee_schedule where academic_year = $1 and grade is null`, [next]);
+    const made = existing ? null : await apiResponse(finadmin.api.v1['school-fees'].schedules.$post({ json: { academicYear: next, amount: 5000, opensAt: new Date(Date.now() - DAY).toISOString() } }));
+    try {
+      const f = await onboard(officer, `s08-fee-${RUN}`, 11);
+      const feeDay = shift(cairoDay(new Date()), 25);
+      await apiResponse(finadmin.api.v1['school-fees'].push.$post({ json: { academicYear: next, studentIds: [f.studentId], dueAt: cairoAt(feeDay, 12) } }));
+      const push = (await one<{ id: string; amount: string }>(`select id, amount from charge where student_id = $1 and kind = 'school_fee_push'`, [f.studentId]));
+      await step(cairoAt(shift(feeDay, -14), 9, 0));
+      expect(await offsetsOf(push.id, 'school_fee_due')).toEqual([-14]);
+      const [n] = await notificationsFor(f.parent.email, 'PAYMENT_REMINDER');
+      expect(n!.title).toBe(`School fee due — Student s08-fee-${RUN} · موعد الرسوم المدرسية — Student s08-fee-${RUN}`);
+      expect(n!.body).toContain(`the school fee for Student s08-fee-${RUN}, EGP ${Number(push.amount).toLocaleString('en-US')}, is due on ${enDay(feeDay)}`);
+      // Paid at the desk through the school-fee path, which settles the push: nothing more.
+      await apiResponse(officer.api.v1['school-fees']['desk-pay'].$post({ json: { studentId: f.studentId, instrumentUsed: 'cash', academicYear: next } }));
+      expect((await one<{ status: string }>(`select status from charge where id = $1`, [push.id])).status).toBe('paid');
+      await step(cairoAt(shift(feeDay, -7), 9, 0));
+      await step(cairoAt(feeDay, 9, 0));
+      expect(await offsetsOf(push.id, 'school_fee_due')).toEqual([-14]);
+    } finally {
+      // The schedule gates every suite that registers in that year: it never outlives this test (as 08q's).
+      if (made) await sql(`delete from school_fee_schedule where id = $1`, [made.id]);
+    }
   });
 });

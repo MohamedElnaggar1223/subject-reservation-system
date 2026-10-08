@@ -64,6 +64,9 @@ const NO_OPEN_LINE_PAYMENT = sql`not exists (select 1 from payment_registration 
 const NO_LIVE_PLAN = sql`not exists (select 1 from exception e where e.policy_key = 'plan.instalments' and e.status = 'active' and e.registration_id = r.id)`;
 const NO_OPEN_CHARGE_PAYMENT = sql`not exists (select 1 from payment_charge pc join payment p on p.id = pc.payment_id
   where pc.charge_id = c.id and p.status in ('pending', 'pending_verification'))`;
+/** A pushed school fee (alias c) whose student has a school-fee payment open for its year: being paid. */
+const SCHOOL_FEE_PAYMENT_OPEN = sql`exists (select 1 from payment p where p.student_id = c.student_id and p.purpose = 'school_fee'
+  and p.academic_year = c.academic_year and p.status in ('pending', 'pending_verification'))`;
 const WAITING_LINE = sql`(r.status in ('pending_approval', 'pending_payment') or (r.status = 'preregistered' and not exists (
   select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed')))`;
 const DEADLINE = sql.raw('line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)');
@@ -93,8 +96,7 @@ async function candidates(kind: ReminderKind, now: Date, payOnProvisional: boole
       const rows = (await db.execute(sql`
         select c.id, c.student_id, c.due_at, c.created_at from charge c
         where c.kind = 'school_fee_push' and c.status = 'pending_payment'
-          and not exists (select 1 from payment p where p.student_id = c.student_id and p.purpose = 'school_fee' and p.academic_year = c.academic_year
-            and p.status in ('pending', 'pending_verification'))
+          and not ${SCHOOL_FEE_PAYMENT_OPEN}
         order by c.id`)).rows as Record<string, unknown>[];
       return rows.map((c) => ({ targetKind: 'charge' as const, targetId: c.id as string, anchor: asDate(c.due_at), since: asDate(c.created_at), studentId: c.student_id as string, sessionId: null }));
     }
@@ -192,13 +194,23 @@ export async function runReminders(now: Date = new Date()) {
 type Live = { item: Due; amount: number; label: string; dueAt: Date; sessionName: string | null };
 
 /**
- * Lock the group's targets (`FOR SHARE`, in id order) and read them again: only what is still
- * owed, unverified or ahead is reminded. Returns what each live target contributes.
+ * Lock the group's targets (`FOR SHARE`, in id order), then read them again in a statement of its
+ * own — under READ COMMITTED each statement sees what committed before it began, so a payment or
+ * an answer that held the row and committed while the lock waited is seen: only what is still owed
+ * (no payment open on it), unverified or ahead is reminded. Returns what each live target
+ * contributes.
  */
+async function lockShare(tx: Tx, table: 'registration' | 'charge', ids: string[]) {
+  if (!ids.length) return;
+  await tx.execute(sql`select id from ${sql.raw(table)} where id in (${sql.join(ids.map((x) => sql`${x}`), sql`, `)}) order by id for share`);
+}
+
 async function lockAndRecheck(tx: Tx, kind: ReminderKind, items: Due[], now: Date, payOnProvisional: boolean): Promise<Live[]> {
   const ids = (k: TargetKind) => items.filter((i) => i.targetKind === k).map((i) => i.targetId).sort();
   const live: Live[] = [];
   const lineIds = ids('line');
+  await lockShare(tx, 'registration', [...new Set([...lineIds, ...ids('verification')])].sort());
+  await lockShare(tx, 'charge', ids('charge'));
   if (lineIds.length) {
     const rows = (await tx.execute(sql`
       select r.id, r.price_at_registration as price, s.name as subject, i.label, i.kind as "itemKind", rs.name as "sessionName", r.due_at
@@ -206,7 +218,7 @@ async function lockAndRecheck(tx: Tx, kind: ReminderKind, items: Due[], now: Dat
       join registration_session rs on rs.id = r.session_id
       where r.id in (${sql.join(lineIds.map((x) => sql`${x}`), sql`, `)})
         and ${OWED_LINE} and (not r.price_provisional or ${payOnProvisional}) and ${NO_OPEN_LINE_PAYMENT} and ${NO_LIVE_PLAN}
-      order by r.id for share of r`)).rows as Record<string, unknown>[];
+      order by r.id`)).rows as Record<string, unknown>[];
     for (const r of rows) {
       const item = items.find((i) => i.targetKind === 'line' && i.targetId === r.id)!;
       // The due date it was found with: a line re-dated meanwhile is reminded on its new day, not now.
@@ -220,7 +232,8 @@ async function lockAndRecheck(tx: Tx, kind: ReminderKind, items: Due[], now: Dat
       select c.id, c.amount, c.description, c.due_at, rs.name as "sessionName" from charge c
       left join registration r on r.id = c.registration_id left join registration_session rs on rs.id = r.session_id
       where c.id in (${sql.join(chargeIds.map((x) => sql`${x}`), sql`, `)}) and c.status = 'pending_payment' and ${NO_OPEN_CHARGE_PAYMENT}
-      order by c.id for share of c`)).rows as Record<string, unknown>[];
+        and not (c.kind = 'school_fee_push' and ${SCHOOL_FEE_PAYMENT_OPEN})
+      order by c.id`)).rows as Record<string, unknown>[];
     for (const c of rows) {
       const item = items.find((i) => i.targetKind === 'charge' && i.targetId === c.id)!;
       if (asDate(c.due_at).getTime() !== item.anchor.getTime()) continue;
@@ -232,7 +245,7 @@ async function lockAndRecheck(tx: Tx, kind: ReminderKind, items: Due[], now: Dat
   if (verifyIds.length) {
     const rows = (await tx.execute(sql`select r.id from registration r where r.id in (${sql.join(verifyIds.map((x) => sql`${x}`), sql`, `)})
       and r.prior_sitting_verified_outcome is null and r.status in ('pending_approval', 'pending_payment', 'preregistered', 'confirmed')
-      order by r.id for share of r`)).rows as { id: string }[];
+      order by r.id`)).rows as { id: string }[];
     for (const r of rows) {
       const item = items.find((i) => i.targetKind === 'verification' && i.targetId === r.id)!;
       live.push({ item, amount: 0, label: '', dueAt: item.anchor, sessionName: null });
@@ -276,11 +289,11 @@ async function sendGroup(kind: ReminderKind, items: Due[], now: Date, payOnProvi
       });
       const msg = { id: messageId, channels: rule.channels, notificationType: NOTIFICATION_TYPE[kind], language: 'both' };
       await tx.insert(message).values({
-        ...msg, audienceId, templateId, context: { reminderKind: kind }, source: 'reminder', reminderRuleId: rule.id, status: 'sent', sentAt: now,
+        ...msg, audienceId, templateId, context: { reminderKind: kind, dueAt: now.toISOString() }, source: 'reminder', reminderRuleId: rule.id, status: 'sent', sentAt: new Date(),
       });
       const claims = await tx.insert(reminderSent).values(live.map((l) => ({
         id: randomUUID(), ruleId: rule.id, kind, targetKind: l.item.targetKind, targetId: l.item.targetId, anchorOn: anchorDay(l.item.anchor),
-        offsetDays: l.item.offset, studentId: l.item.studentId, sessionId: l.item.sessionId, messageId, sentAt: now,
+        offsetDays: l.item.offset, studentId: l.item.studentId, sessionId: l.item.sessionId, messageId,
       }))).onConflictDoNothing({ target: [reminderSent.kind, reminderSent.targetKind, reminderSent.targetId, reminderSent.anchorOn, reminderSent.offsetDays] })
         .returning({ targetKind: reminderSent.targetKind, targetId: reminderSent.targetId });
       if (!claims.length) throw new NothingClaimed();
@@ -288,7 +301,7 @@ async function sendGroup(kind: ReminderKind, items: Due[], now: Date, payOnProvi
       const targets = await targetsOf(tx, kind, won);
       const d = await deliverInTx(tx, msg, texts, { session: null }, targets, now);
       await tx.update(message).set({ recipientCount: d.people }).where(eq(message.id, messageId));
-      await tx.update(messageAudience).set({ resolvedCount: d.people, resolvedAt: now }).where(eq(messageAudience.id, audienceId));
+      await tx.update(messageAudience).set({ resolvedCount: d.people, resolvedAt: new Date() }).where(eq(messageAudience.id, audienceId));
       await logAction(null, 'REMINDERS_SENT', 'message', messageId, null, {
         kind, ruleId: rule.id, sessionId: rule.sessionId, offsets, claimed: won.length,
         targets: won.map((w) => `${w.item.targetKind}:${w.item.targetId}:${w.item.offset}`), people: d.people, deliveries: d.deliveries,
