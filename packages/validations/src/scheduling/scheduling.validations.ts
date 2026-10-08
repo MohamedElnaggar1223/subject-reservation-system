@@ -39,6 +39,8 @@ export const FormGroups = z.object({
   weeklyPeriods: z.number().int().min(0).max(30).optional(),
   /** Go ahead although it puts someone in two lessons at once in a published timetable (the clash is recorded and listed). */
   anyway: z.boolean().optional(),
+  /** The confirmation code of the clashes shown (from the refusal): going ahead covers exactly those. */
+  clashToken: z.string().max(32).nullable().optional(),
 });
 export type FormGroupsType = z.infer<typeof FormGroups>;
 
@@ -78,6 +80,8 @@ export const UpdateGroup = z.object({
   teacherFrom: DateOnlySchema.optional(),
   /** Go ahead although it puts someone in two lessons at once in a published timetable (the clash is recorded and listed). */
   anyway: z.boolean().optional(),
+  /** The confirmation code of the clashes shown (from the refusal): going ahead covers exactly those. */
+  clashToken: z.string().max(32).nullable().optional(),
   weeklyPeriods: z.number().int().min(0).max(30).optional(),
   doublePeriods: z.number().int().min(0).max(15).optional(),
   ...RoomNeeds,
@@ -89,6 +93,8 @@ export const AddGroupMembers = z.object({
   startsOn: DateOnlySchema.optional(),
   /** Go ahead although it puts someone in two lessons at once in a published timetable (the clash is recorded and listed). */
   anyway: z.boolean().optional(),
+  /** The confirmation code of the clashes shown (from the refusal): going ahead covers exactly those. */
+  clashToken: z.string().max(32).nullable().optional(),
 });
 export type AddGroupMembersType = z.infer<typeof AddGroupMembers>;
 
@@ -108,6 +114,8 @@ export const SplitGroup = z.object({
   startsOn: DateOnlySchema.optional(),
   /** Go ahead although it puts someone in two lessons at once in a published timetable (the clash is recorded and listed). */
   anyway: z.boolean().optional(),
+  /** The confirmation code of the clashes shown (from the refusal): going ahead covers exactly those. */
+  clashToken: z.string().max(32).nullable().optional(),
 });
 export type SplitGroupType = z.infer<typeof SplitGroup>;
 
@@ -118,6 +126,8 @@ export const MergeGroups = z.object({
   startsOn: DateOnlySchema.optional(),
   /** Go ahead although it puts someone in two lessons at once in a published timetable (the clash is recorded and listed). */
   anyway: z.boolean().optional(),
+  /** The confirmation code of the clashes shown (from the refusal): going ahead covers exactly those. */
+  clashToken: z.string().max(32).nullable().optional(),
 });
 export type MergeGroupsType = z.infer<typeof MergeGroups>;
 
@@ -192,6 +202,10 @@ export const PublishTimetable = z.object({
   note: z.string().max(500).nullable().optional(),
   /** Publish although some lessons are not on the grid (they are not taught until a later version places them). */
   acceptUnplaced: z.boolean().optional(),
+  /** Publish although a teacher changed during the version's time would teach two of its lessons at once (recorded). */
+  anyway: z.boolean().optional(),
+  /** The confirmation code of the clashes shown (from the refusal): going ahead covers exactly those. */
+  clashToken: z.string().max(32).nullable().optional(),
 });
 export type PublishTimetableType = z.infer<typeof PublishTimetable>;
 

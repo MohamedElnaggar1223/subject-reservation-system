@@ -36,17 +36,22 @@ function generatorModule(): string {
 }
 
 /** `generate(input, options)`, on a worker thread. */
-export function generateInWorker(input: EngineInput, options: GenerateOptions = {}): Promise<GenerateResult> {
+export function generateInWorker(input: EngineInput, options: GenerateOptions = {}, signal?: AbortSignal): Promise<GenerateResult> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new SchedulingError('The request was cancelled before the generator ran, so nothing was written', 409)); return; }
     const worker = new Worker(WORKER_SOURCE, { eval: true, workerData: { moduleUrl: generatorModule(), input, options } });
     let settled = false;
     const finish = (fn: () => void) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
       fn();
       void worker.terminate();
     };
+    // A cancelled request stops its search: the thread is ended and nothing comes back to write.
+    const onAbort = () => finish(() => reject(new SchedulingError('The request was cancelled while the generator ran, so nothing was written', 409)));
+    signal?.addEventListener('abort', onAbort, { once: true });
     const timer = setTimeout(() => finish(() => reject(new SchedulingError(
       `The generator ran past ${GENERATOR_TIME_LIMIT_MS / 1000} seconds and was stopped; nothing was written — lock more lessons, or run it with fewer steps`, 409,
     ))), GENERATOR_TIME_LIMIT_MS);

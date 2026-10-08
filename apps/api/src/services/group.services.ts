@@ -292,6 +292,12 @@ export async function formGroups(data: FormGroupsType, actorId: string, ctx?: Au
     let accepted: { message: string }[] = [];
     if (data.commit) {
       const commit = async () => {
+      // The groups it adds to, then the students it moves, each in id order (as addMembersTx locks a
+      // group, then its students): a change to the same students elsewhere waits, then sees this one.
+      const targetIds = plans.filter((p) => p.groupId && p.action !== 'unchanged').map((p) => p.groupId!).sort();
+      if (targetIds.length) await tx.select({ id: teachingGroup.id }).from(teachingGroup).where(inArray(teachingGroup.id, targetIds)).orderBy(asc(teachingGroup.id)).for('update');
+      const movingIds = [...new Set(plans.flatMap((p) => p.adding.map((a) => a.studentId)))].sort();
+      if (movingIds.length) await tx.select({ id: user.id }).from(user).where(inArray(user.id, movingIds)).orderBy(asc(user.id)).for('update');
       const touched: string[] = [];
       for (const p of plans) {
         if (p.action === 'unchanged') continue;
@@ -326,7 +332,7 @@ export async function formGroups(data: FormGroupsType, actorId: string, ctx?: Au
       }
       };
       const adding = plans.flatMap((p) => p.adding.map((a) => a.studentId));
-      accepted = (await guardPublishedTimetable(tx, { studentIds: adding }, startsOn, { anyway: data.anyway, cause: 'Groups formed from the course enrolment', actorId }, commit)).accepted;
+      accepted = (await guardPublishedTimetable(tx, { studentIds: adding }, startsOn, { anyway: data.anyway, clashToken: data.clashToken, cause: 'Groups formed from the course enrolment', actorId }, commit)).accepted;
       if (created || added || removed) {
         await logAction(actorId, 'TEACHING_GROUPS_FORMED', 'academic_year', y.id, null, { created, added, removed, startsOn, clashesAccepted: accepted.map((c) => c.message) }, ctx, tx);
       }
@@ -446,7 +452,7 @@ export async function updateGroup(id: string, data: UpdateGroupType, actorId: st
         teacherFrom = defaultStart(y!, data.teacherFrom);
         const [t] = nextTeacher ? await tx.select({ name: teacher.name }).from(teacher).where(eq(teacher.id, nextTeacher)) : [];
         accepted = (await guardPublishedTimetable(tx, { teacherIds: nextTeacher ? [nextTeacher] : [] }, teacherFrom,
-          { anyway: data.anyway, cause: `${g.name}: teacher changed to ${t?.name ?? 'nobody'}`, actorId },
+          { anyway: data.anyway, clashToken: data.clashToken, cause: `${g.name}: teacher changed to ${t?.name ?? 'nobody'}`, actorId },
           () => setGroupTeacher(tx, id, nextTeacher, teacherFrom!, `Teacher changed from ${readableDate(teacherFrom!)}`, actorId))).accepted;
       }
       const linked = nextTeacher !== g.teacherId ? await linkTeacherToSubject(tx, nextTeacher, g.subjectId) : false;
@@ -531,7 +537,7 @@ export async function addGroupMembers(groupId: string, data: AddGroupMembersType
       const [y] = await tx.select().from(academicYear).where(eq(academicYear.id, g.academicYearId));
       const startsOn = defaultStart(y!, data.startsOn);
       const { result: r, accepted } = await guardPublishedTimetable(tx, { studentIds: data.studentIds }, startsOn,
-        { anyway: data.anyway, cause: `Added to ${g.name}`, actorId }, () => addMembersTx(tx, groupId, data.studentIds, startsOn, actorId));
+        { anyway: data.anyway, clashToken: data.clashToken, cause: `Added to ${g.name}`, actorId }, () => addMembersTx(tx, groupId, data.studentIds, startsOn, actorId));
       const clashesAccepted = accepted.map((c) => c.message);
       if (r.added) await logAction(actorId, 'TEACHING_GROUP_MEMBERS_ADDED', 'teaching_group', groupId, null, { studentIds: data.studentIds, startsOn, ...r, clashesAccepted }, ctx, tx);
       return { ...r, clashesAccepted };
@@ -579,7 +585,8 @@ export async function splitGroup(groupId: string, data: SplitGroupType, actorId:
       const strangers = all.filter((s) => !inGroup.has(s));
       if (strangers.length) throw new SchedulingError(`${strangers.length} of the chosen students ${strangers.length === 1 ? 'is' : 'are'} not in ${g.name}`);
       const made: { id: string; name: string; students: number }[] = [];
-      const { accepted } = await guardPublishedTimetable(tx, { studentIds: all }, startsOn, { anyway: data.anyway, cause: `Split from ${g.name}`, actorId }, async () => {
+      const partTeachers = data.parts.map((p) => (p.teacherId !== undefined ? p.teacherId : g.teacherId)).filter((x): x is string => !!x);
+      const { accepted } = await guardPublishedTimetable(tx, { studentIds: all, teacherIds: partTeachers }, startsOn, { anyway: data.anyway, clashToken: data.clashToken, cause: `Split from ${g.name}`, actorId }, async () => {
         for (const p of data.parts) {
           await assertTeacher(tx, p.teacherId);
           const id = randomUUID();
@@ -627,7 +634,7 @@ export async function mergeGroups(data: MergeGroupsType, actorId: string, ctx?: 
     let movedStudents = 0;
     const moving = (await tx.select({ studentId: teachingGroupMember.studentId }).from(teachingGroupMember)
       .where(and(inArray(teachingGroupMember.groupId, others.map((g) => g.id)), isNull(teachingGroupMember.endedOn)))).map((m) => m.studentId);
-    const { accepted } = await guardPublishedTimetable(tx, { studentIds: moving }, startsOn, { anyway: data.anyway, cause: `Merged into ${into.name}`, actorId }, async () => {
+    const { accepted } = await guardPublishedTimetable(tx, { studentIds: moving }, startsOn, { anyway: data.anyway, clashToken: data.clashToken, cause: `Merged into ${into.name}`, actorId }, async () => {
       for (const g of others) {
         const members = await tx.select({ studentId: teachingGroupMember.studentId }).from(teachingGroupMember)
           .where(and(eq(teachingGroupMember.groupId, g.id), isNull(teachingGroupMember.endedOn)));

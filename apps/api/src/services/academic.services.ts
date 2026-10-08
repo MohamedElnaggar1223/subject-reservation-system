@@ -14,12 +14,12 @@
  */
 
 import {
-  db, academicYear, academicTerm, calendarEntry, bellSchedule, bellPeriod, room, section, sectionMembership, user, teacher, studentLeaving,
+  db, academicYear, academicTerm, calendarEntry, bellSchedule, bellPeriod, room, section, sectionMembership, user, teacher, studentLeaving, timetable,
   eq, and, ne, inArray, isNull, sql, asc, gradeTodayExtras,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  academicYearLabel, academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, schoolDateString,
+  academicYearLabel, academicYearShortLabel, academicYearStartOf, gradeInAcademicYear,
   type CreateAcademicYearType, type UpdateAcademicYearType, type CreateTermType, type UpdateTermType,
   type CreateCalendarEntryType, type CreateBellScheduleType, type UpdateBellScheduleType, type ReplaceBellPeriodsType,
   type CreateRoomType, type UpdateRoomType, type CreateSectionType, type UpdateSectionType,
@@ -327,7 +327,7 @@ export async function getSchoolDays(from: string, to: string) {
 
 /** Today's school day, in Cairo time. */
 export async function getSchoolToday() {
-  return getSchoolDay(schoolDateString(new Date()));
+  return getSchoolDay(todayAtSchool());
 }
 
 // ─── Bell schedules ──────────────────────────────────────────────────────────
@@ -654,7 +654,7 @@ export async function addSectionMembers(sectionId: string, data: AddSectionMembe
     // once in a published timetable (refused with the clashes, or recorded when the coordinator
     // goes ahead anyway). Loaded here to keep the academic module free of a static cycle.
     const { guardPublishedTimetable } = await import('./timetable-clash.services');
-    const { accepted } = await guardPublishedTimetable(tx, { studentIds: toAdd }, startsOn, { anyway: data.anyway, cause: `Moved to ${s.name}`, actorId }, change)
+    const { accepted } = await guardPublishedTimetable(tx, { studentIds: toAdd }, startsOn, { anyway: data.anyway, clashToken: data.clashToken, cause: `Moved to ${s.name}`, actorId }, change)
       .catch((err: unknown) => { throw err instanceof Error && 'status' in err ? new AcademicError(err.message, (err as { status: 400 | 404 | 409 }).status) : err; });
     const clashesAccepted = accepted.map((c) => c.message);
     if (toAdd.length) {
@@ -675,7 +675,7 @@ export async function endSectionMembership(sectionId: string, membershipId: stri
       .for('update');
     if (!m) throw new AcademicError('Membership not found', 404);
     if (m.endedOn) throw new AcademicError('That student already left this section', 409);
-    const endedOn = data.endedOn ?? schoolDateString(new Date());
+    const endedOn = data.endedOn ?? todayAtSchool();
     if (endedOn < m.startedOn) throw new AcademicError('A membership cannot end before it started');
     const [updated] = await tx.update(sectionMembership)
       .set({ endedOn, endReason: data.reason, endedBy: actorId })
@@ -728,6 +728,24 @@ export async function rollOverSections(data: RollOverSectionsType, actorId: stri
     const graduating: { id: string; name: string; section: string }[] = [];
     let sectionsCreated = 0;
     let studentsMoved = 0;
+
+    // F1: a student rolled into a section of a year that already has a published timetable takes that
+    // section's lessons from its first day — checked as any move is (refused with the clashes, or
+    // recorded when the coordinator confirms exactly those). Loaded here to keep this module free of a
+    // static cycle.
+    let checkpoint: Awaited<ReturnType<typeof import('./timetable-clash.services')['checkpointPublished']>> | null = null;
+    if (data.commit) {
+      const [published] = await tx.select({ id: timetable.id }).from(timetable)
+        .where(and(eq(timetable.academicYearId, to.id), eq(timetable.status, 'published'))).limit(1);
+      if (published) {
+        const candidates = sources.length
+          ? (await tx.select({ studentId: sectionMembership.studentId }).from(sectionMembership)
+            .where(and(inArray(sectionMembership.sectionId, sources.map((x) => x.id)), isNull(sectionMembership.endedOn)))).map((r) => r.studentId)
+          : [];
+        const { checkpointPublished } = await import('./timetable-clash.services');
+        checkpoint = await checkpointPublished(tx, { studentIds: candidates }, to.startsOn);
+      }
+    }
 
     for (const src of sources) {
       const members = await tx
@@ -783,11 +801,17 @@ export async function rollOverSections(data: RollOverSectionsType, actorId: stri
         studentsMoved += moving.length;
       }
     }
+    const clashesAccepted = checkpoint
+      ? (await checkpoint.settle({ anyway: data.anyway, clashToken: data.clashToken, cause: `Rolled into ${academicYearLabel(to.startYear)}`, actorId })
+        .catch((err: unknown) => { throw err instanceof Error && 'status' in err ? new AcademicError(err.message, (err as { status: 400 | 404 | 409 }).status) : err; }))
+        .map((c) => c.message)
+      : [];
     if (data.commit && (sectionsCreated || studentsMoved)) {
       await logAction(actorId, 'SECTIONS_ROLLED_OVER', 'academic_year', to.id, { from: academicYearLabel(from.startYear) },
-        { to: academicYearLabel(to.startYear), sectionsCreated, studentsMoved, graduating: graduating.length }, ctx, tx);
+        { to: academicYearLabel(to.startYear), sectionsCreated, studentsMoved, graduating: graduating.length, ...(clashesAccepted.length ? { clashesAccepted } : {}) }, ctx, tx);
     }
     return {
+      ...(clashesAccepted.length ? { clashesAccepted } : {}),
       from: { id: from.id, label: academicYearLabel(from.startYear) },
       to: { id: to.id, label: academicYearLabel(to.startYear) },
       committed: data.commit,

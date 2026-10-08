@@ -106,6 +106,7 @@ export function canonicalInput(input: EngineInput): string {
     overlaps: [...input.overlaps].map((o) => [o.a, o.b].sort().join('|') + `|${o.students}`).sort(),
     dayRules: [...input.dayRules].map((r) => [r.a, r.b].sort().join('|')).sort(),
     roomsRequired: input.roomsRequired,
+    studentPeriods: input.studentPeriods ? Object.entries(input.studentPeriods).sort((a, b) => a[0].localeCompare(b[0])) : null,
   });
 }
 
@@ -601,8 +602,11 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
   // Each student's periods of lessons in the week, over all their groups.
   const groupPeriods = new Map<number, number>();
   for (let l = 0; l < L; l++) groupPeriods.set(lGroup[l]!, (groupPeriods.get(lGroup[l]!) ?? 0) + lLen[l]!);
+  // A student's load is counted over the groups they are in at the same time (the model gives it);
+  // without it, over all their groups.
   const studentNeeds = new Map<string, number>();
-  groups.forEach((grp, gi) => { for (const st of grp.students) studentNeeds.set(st, (studentNeeds.get(st) ?? 0) + (groupPeriods.get(gi) ?? 0)); });
+  if (input.studentPeriods) for (const [st, n] of Object.entries(input.studentPeriods)) studentNeeds.set(st, n);
+  else groups.forEach((grp, gi) => { for (const st of grp.students) studentNeeds.set(st, (studentNeeds.get(st) ?? 0) + (groupPeriods.get(gi) ?? 0)); });
   for (let l = 0; l < L; l++) {
     if (lCell[l]! >= 0) continue;
     const g = lGroup[l]!;

@@ -198,6 +198,8 @@ export const AddSectionMembers = z.object({
   // published timetable (their new section's lessons against their own); the
   // clash is recorded and listed on the Timetables screen.
   anyway: z.boolean().optional(),
+  /** The confirmation code of the clashes shown (from the refusal): going ahead covers exactly those. */
+  clashToken: z.string().max(32).nullable().optional(),
 });
 export type AddSectionMembersType = z.infer<typeof AddSectionMembers>;
 
@@ -222,5 +224,10 @@ export const RollOverSections = z.object({
   commit: z.boolean().default(false),
   // Optional new names by source section id; default: the grade digits bumped.
   names: z.record(z.string(), z.string().trim().min(1).max(20)).optional(),
+  // F1: go ahead although students rolled into an existing section of a year
+  // with a published timetable would be in two lessons at once (recorded).
+  anyway: z.boolean().optional(),
+  /** The confirmation code of the clashes shown (from the refusal): going ahead covers exactly those. */
+  clashToken: z.string().max(32).nullable().optional(),
 });
 export type RollOverSectionsType = z.infer<typeof RollOverSections>;

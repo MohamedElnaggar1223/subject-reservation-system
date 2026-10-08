@@ -90,6 +90,12 @@ export type EngineInput = {
   dayRules: EngineDayRule[];
   /** The school has rooms in use, so every placed lesson needs one. */
   roomsRequired: boolean;
+  /**
+   * Each student's most periods of lessons in a week at any one time, over
+   * the groups they are in together (a student who changed sets mid-term is
+   * not in both at once). When absent, a student's groups are all counted.
+   */
+  studentPeriods?: Record<string, number>;
 };
 
 // ─── Output ──────────────────────────────────────────────────────────────────

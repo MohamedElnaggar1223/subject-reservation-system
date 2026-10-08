@@ -106,7 +106,7 @@ export const timetableRoutes = new Hono<HonoEnv>()
   /** POST /:id/generate — place every unlocked lesson (locked ones stay); the explanations for what could not be placed. */
   .post('/:id/generate', zValidator('param', IdParam), zValidator('json', GenerateTimetable), async (c) => {
     try {
-      return success(c, await timetables.generateTimetable(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
+      return success(c, await timetables.generateTimetable(c.req.valid('param').id, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c), c.req.raw.signal));
     } catch (err) {
       const f = fail(err, 'Failed to generate the timetable');
       return error(c, f.message, f.status);

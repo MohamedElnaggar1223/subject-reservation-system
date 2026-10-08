@@ -42,6 +42,7 @@ import {
 } from './scheduling-shared.services';
 import { sectionsBetween } from './academic.services';
 import { generateInWorker } from './generator-runner';
+import { versionWindows, versionTeacherClashes, settleClashes } from './timetable-clash.services';
 import { todayAtSchool } from '../lib/clock';
 
 // ─── Loading ─────────────────────────────────────────────────────────────────
@@ -170,6 +171,7 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
     overlaps: overlapsOf(members),
     dayRules: dayRules.map((r) => ({ a: r.groupAId, b: r.groupBId })),
     roomsRequired: rooms.some((r) => r.isActive),
+    studentPeriods: studentPeriodsOf(members, lessons),
   };
   return {
     timetable: tt,
@@ -200,6 +202,33 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
       teachers: teachers.map((t) => ({ id: t.id, name: t.name, isActive: t.isActive })).sort((a, b) => a.name.localeCompare(b.name)),
     },
   };
+}
+
+/**
+ * Each student's most periods of lessons a week at any one time: on each day
+ * one of their memberships starts, the periods of the groups they are in that
+ * day, summed. A student who changed sets is counted once for the subject.
+ */
+function studentPeriodsOf(members: { studentId: string; groupId: string; from: string; to: string }[], lessons: { groupId: string; length: number }[]) {
+  const periodsOf = new Map<string, number>();
+  for (const l of lessons) periodsOf.set(l.groupId, (periodsOf.get(l.groupId) ?? 0) + l.length);
+  const byStudent = new Map<string, typeof members>();
+  for (const m of members) {
+    if (!byStudent.has(m.studentId)) byStudent.set(m.studentId, []);
+    byStudent.get(m.studentId)!.push(m);
+  }
+  const out: Record<string, number> = {};
+  for (const [studentId, list] of [...byStudent.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    let most = 0;
+    for (const day of new Set(list.map((m) => m.from))) {
+      const groups = new Set(list.filter((m) => m.from <= day && m.to >= day).map((m) => m.groupId));
+      let n = 0;
+      for (const g of groups) n += periodsOf.get(g) ?? 0;
+      most = Math.max(most, n);
+    }
+    out[studentId] = most;
+  }
+  return out;
 }
 
 // ─── Versions ────────────────────────────────────────────────────────────────
@@ -302,6 +331,15 @@ export async function getTimetable(id: string) {
   if (!model.grid.days.length) problems.push(model.grid.bellScheduleName ? 'The default bell schedule has no lesson periods on the school days' : 'This year has no default bell schedule — set one up on the Bell schedules screen');
   const noTeacher = model.display.groups.filter((g) => !g.teacherId);
   if (noTeacher.length) problems.push(`${noTeacher.length} ${noTeacher.length === 1 ? 'group has' : 'groups have'} no teacher yet: ${noTeacher.map((g) => g.name).join(', ')}`);
+  // A group's teacher changed at a date later in the term: the grid judges the teachers of its first
+  // day, so the lessons the incoming teacher would meet are listed here (and judged again at publish).
+  if (model.timetable.status === 'draft') {
+    const seen = new Set(clashes.filter((c) => c.kind === 'teacher_busy').map((c) => [...c.lessonIds].sort().join('|')));
+    for (const c of await versionTeacherClashes(db, { id, name: model.timetable.name }, model.asOf, model.term.endsOn)) {
+      if (seen.has([c.lessonAId, c.lessonBId].sort().join('|'))) continue;
+      problems.push(`${c.message.replace(/ \([^()]*\)$/, '')}, after a change of teacher: move one of the two lessons, or change the date of the change`);
+    }
+  }
   return {
     timetable: model.timetable,
     term: model.term,
@@ -403,14 +441,33 @@ function startingPoint(input: EngineInput): EngineInput {
  * (deterministic: the same draft and rules give the same timetable), locked
  * lessons kept. Written only if nothing changed while it ran.
  */
-export async function generateTimetable(id: string, data: GenerateTimetableType, actorId: string, ctx?: AuditContext) {
+export async function generateTimetable(id: string, data: GenerateTimetableType, actorId: string, ctx?: AuditContext, signal?: AbortSignal) {
+  // One run per draft at a time, across every server: a session lock on a connection of its own, which
+  // ends with the connection if the server does.
+  const client = await db.$client.connect();
+  try {
+    const { rows } = await client.query<{ locked: boolean }>('select pg_try_advisory_lock(hashtext($1)) as locked', [`timetable-generate:${id}`]);
+    if (!rows[0]?.locked) throw new SchedulingError('The generator is already running on this draft — wait for it to finish, then look again', 409);
+    try {
+      return await generateLocked(id, data, actorId, ctx, signal);
+    } finally {
+      await client.query('select pg_advisory_unlock(hashtext($1))', [`timetable-generate:${id}`]);
+    }
+  } finally {
+    client.release();
+  }
+}
+
+async function generateLocked(id: string, data: GenerateTimetableType, actorId: string, ctx: AuditContext | undefined, signal: AbortSignal | undefined) {
   const before = await loadTimetableModel(id);
   if (before.timetable.status !== 'draft') throw new SchedulingError('A published timetable does not change — make a new draft from it', 409);
   if (!before.input.days.length) throw new SchedulingError('This year has no lesson periods to place lessons in — set up the default bell schedule first', 409);
   const start = startingPoint(before.input);
   const started = Date.now();
   // On a worker thread: the API keeps answering while it searches.
-  const result = await generateInWorker(start, { iterations: data.iterations });
+  const result = await generateInWorker(start, { iterations: data.iterations }, signal);
+  // The request was cancelled while it searched: nothing is written.
+  if (signal?.aborted) throw new SchedulingError('The request was cancelled while the generator ran, so nothing was written', 409);
   const durationMs = Date.now() - started;
   const run = {
     id: randomUUID(), timetableId: id, startedBy: actorId, durationMs, inputHash: result.inputHash, outputHash: result.outputHash,
@@ -485,22 +542,34 @@ export async function publishTimetable(id: string, data: PublishTimetableType, a
     const publishedAt = new Date();
     await tx.update(timetable).set({ status: 'published', effectiveFrom: data.effectiveFrom, publishedBy: actorId, publishedAt, publishNote: data.note ?? null, updatedAt: publishedAt })
       .where(eq(timetable.id, id));
+    // A group's teacher changed at a date inside this version's time teaches its lessons from then: the
+    // engine judged the teachers of its first day, so the rest are judged here — refused with the
+    // clashes, or recorded against this version when the coordinator confirms exactly those.
+    const window = (await versionWindows(tx, data.effectiveFrom)).find((w) => w.id === id);
+    const teacherClashes = window ? await versionTeacherClashes(tx, { id, name: t.name }, window.from, window.to) : [];
+    const clashesAccepted = await settleClashes(tx, teacherClashes, { anyway: data.anyway, clashToken: data.clashToken, cause: `Published ${t.name}`, actorId });
     const changedGroups = await changedGroupsSince(tx, previous?.id ?? null, id);
     const covers = await carryCoversOver(tx, id, term.id, data.effectiveFrom, t.name, actorId);
     await logAction(actorId, 'TIMETABLE_PUBLISHED', 'timetable', id, { status: 'draft' },
       { status: 'published', effectiveFrom: data.effectiveFrom, replaces: previous?.id ?? null, lessons: model.input.lessons.length, unplaced: unplaced.length, changedGroups: changedGroups.length, note: data.note ?? null,
-        coversMoved: covers.moved, coversRemoved: covers.removed }, ctx, tx);
-    return { term, previous, changedGroups, name: t.name, unplaced: unplaced.length, covers };
+        coversMoved: covers.moved, coversRemoved: covers.removed, clashesAccepted: clashesAccepted.map((c) => c.message) }, ctx, tx);
+    return { term, previous, changedGroups, name: t.name, unplaced: unplaced.length, covers, clashesAccepted: clashesAccepted.map((c) => c.message) };
   });
   // After the commit: tell the people whose timetable this is (or changed for), and those whose cover is gone.
   const notified = await notifyPublished(id, result.term, data.effectiveFrom, result.changedGroups, !!result.previous)
     .catch((err) => { console.error('[timetable] publish notices failed:', err); return { students: 0, parents: 0, teachers: 0 }; });
   const cover = await import('./cover.services');
-  await cover.coverChangeNotices(result.covers.removed, 'timetable_changed', { effectiveFrom: data.effectiveFrom })
+  // Each cover carried over is judged again against this version: a cover teacher who now teaches at
+  // that time, is away, or would pass their day's limit loses it (and is told, as is the class).
+  const lost = await cover.recheckCarriedCovers(result.covers.moved, actorId, result.name)
+    .catch((err) => { console.error('[timetable] re-judging carried cover failed:', err); return [] as string[]; });
+  const moved = result.covers.moved.filter((c) => !lost.includes(c));
+  const removed = [...result.covers.removed, ...lost];
+  await cover.coverChangeNotices(removed, 'timetable_changed', { effectiveFrom: data.effectiveFrom })
     .catch((err) => console.error('[timetable] cover notices failed:', err));
   return {
     id, effectiveFrom: data.effectiveFrom, replaces: result.previous?.id ?? null, changedGroups: result.changedGroups.length, unplaced: result.unplaced, notified,
-    coversMoved: await cover.describeCovers(result.covers.moved), coversRemoved: await cover.describeCovers(result.covers.removed),
+    coversMoved: await cover.describeCovers(moved), coversRemoved: await cover.describeCovers(removed), clashesAccepted: result.clashesAccepted,
   };
 }
 

@@ -20,7 +20,7 @@
  */
 
 import {
-  db, teacherAbsence, coverAssignment, timetableLesson, teachingGroup, teacher, subjectTeacher, subject, scheduleUnavailability, teacherLoadLimit,
+  db, teacherAbsence, coverAssignment, timetableLesson, teachingGroup, teacher, subjectTeacher, subject, scheduleUnavailability, teacherLoadLimit, academicTerm, timetable,
   user, eq, and, inArray, isNull, sql, asc, desc, gte, lte, ne,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -179,12 +179,15 @@ export async function suggestCover(lessonId: string, date: string) {
 async function judgeCandidate(
   teacherId: string, name: string, date: string, periods: number[], weekday: number, academicYearId: string,
   qualifiedIds: Set<string> | null, subjectName: string | null, termStart: string, executor: typeof db | Tx = db,
+  /** The lesson being judged when the teacher already covers it (a carried-over cover): not their own clash. */
+  exceptLessonId?: string,
 ): Promise<Candidate> {
   const reasons: string[] = [];
   const qualified = qualifiedIds === null || qualifiedIds.has(teacherId);
   if (!qualified) reasons.push(`does not teach ${subjectName}`);
   const day = await getScheduleFor({ teacherId }, date);
-  const busy = day.lessons.filter((l) => (l.status === 'scheduled' || l.status === 'covering' || l.status === 'uncovered') && l.periods.some((p) => periods.includes(p)));
+  const theirs = day.lessons.filter((l) => l.lessonId !== exceptLessonId);
+  const busy = theirs.filter((l) => (l.status === 'scheduled' || l.status === 'covering' || l.status === 'uncovered') && l.periods.some((p) => periods.includes(p)));
   for (const b of busy) reasons.push(b.status === 'covering' ? `covers ${b.groupName} then` : `teaches ${b.groupName} then`);
   const [away] = await executor.select().from(teacherAbsence)
     .where(and(eq(teacherAbsence.teacherId, teacherId), isNull(teacherAbsence.cancelledAt), lte(teacherAbsence.startsOn, date), gte(teacherAbsence.endsOn, date)));
@@ -192,7 +195,7 @@ async function judgeCandidate(
   const off = await executor.select().from(scheduleUnavailability)
     .where(and(eq(scheduleUnavailability.academicYearId, academicYearId), eq(scheduleUnavailability.teacherId, teacherId), eq(scheduleUnavailability.weekday, weekday)));
   if (off.some((o) => o.period === null || periods.includes(o.period))) reasons.push('is not available then');
-  const lessonsThatDay = day.lessons.filter((l) => l.status === 'scheduled' || l.status === 'covering' || l.status === 'uncovered').reduce((n, l) => n + l.length, 0);
+  const lessonsThatDay = theirs.filter((l) => l.status === 'scheduled' || l.status === 'covering' || l.status === 'uncovered').reduce((n, l) => n + l.length, 0);
   const [lim] = await executor.select().from(teacherLoadLimit).where(and(eq(teacherLoadLimit.academicYearId, academicYearId), eq(teacherLoadLimit.teacherId, teacherId)));
   if (lim?.maxPerDay != null && lessonsThatDay + periods.length > lim.maxPerDay) reasons.push(`would teach more than ${lim.maxPerDay} periods that day`);
   const [{ n }] = (await executor.select({ n: sql<number>`count(*)::int` }).from(coverAssignment)
@@ -209,6 +212,10 @@ export async function assignCover(data: AssignCoverType, actorId: string, ctx?: 
     // The lesson's row, then the cover teacher's: two assignments for one lesson, or for one teacher, wait for each other.
     const [lessonRow] = await tx.select().from(timetableLesson).where(eq(timetableLesson.id, data.lessonId)).for('update');
     if (!lessonRow) throw new SchedulingError('Lesson not found', 404);
+    // The term's row, shared: a version being published (which locks it) waits for this arrangement
+    // and carries it over; one published first makes this lesson not held that date, and it is refused.
+    await tx.select({ id: academicTerm.id }).from(academicTerm).innerJoin(timetable, eq(timetable.termId, academicTerm.id))
+      .where(eq(timetable.id, lessonRow.timetableId)).for('share', { of: academicTerm });
     const held = await lessonOnDate(data.lessonId, data.date);
     if (!held) throw new SchedulingError('That lesson does not take place on that date', 404);
     const g = held.group;
@@ -293,6 +300,42 @@ export async function removeCover(id: string, data: RemoveCoverType, actorId: st
     await coverChangeNotices([r.id], 'by_hand').catch((err) => console.error('[cover] notices failed:', err));
     return r;
   });
+}
+
+// ─── Cover carried over to a new version ─────────────────────────────────────
+
+/**
+ * After a version is published, each cover it carried over is judged again
+ * against it, as a new assignment would be (the cover teacher's own lessons
+ * in the new version, their covers, an absence, a period they cannot teach,
+ * their day's limit). One that no longer holds is removed ('timetable_changed')
+ * and returned, for the confirmation and the notices.
+ */
+export async function recheckCarriedCovers(ids: string[], actorId: string, versionName: string): Promise<string[]> {
+  const lost: string[] = [];
+  for (const id of ids) {
+    await db.transaction(async (tx) => {
+      const [c] = await tx.select().from(coverAssignment).where(eq(coverAssignment.id, id)).for('update');
+      if (!c || c.status !== 'assigned' || !c.coverTeacherId) return;
+      const [t] = await tx.select().from(teacher).where(eq(teacher.id, c.coverTeacherId)).for('update');
+      const held = await lessonOnDate(c.lessonId, c.date);
+      let reasons: string[];
+      if (!held) reasons = ['the lesson is not held that day'];
+      else {
+        const lessonPeriods = held.day.periods.filter((p) => p.kind === 'lesson');
+        const periods = Array.from({ length: held.lesson.length }, (_, k) => held.lesson.period! + k).filter((p) => p <= lessonPeriods.length);
+        const [term] = held.day.term ? await tx.select({ startsOn: academicTerm.startsOn }).from(academicTerm).where(eq(academicTerm.id, held.day.term.id)) : [];
+        const judged = await judgeCandidate(t!.id, t!.name, c.date, periods, held.lesson.weekday!, held.group.academicYearId, null, null, term?.startsOn ?? c.date, tx, c.lessonId);
+        reasons = judged.reasons.filter((r) => !r.startsWith('does not teach'));
+      }
+      if (!reasons.length) return;
+      await tx.update(coverAssignment).set({
+        status: 'removed', removal: 'timetable_changed', removeReason: `${versionName}: ${t?.name ?? 'the cover teacher'} ${reasons.join('; ')}`, removedAt: new Date(), removedBy: actorId,
+      }).where(eq(coverAssignment.id, id));
+      lost.push(id);
+    });
+  }
+  return lost;
 }
 
 // ─── Telling people an arrangement is gone ───────────────────────────────────

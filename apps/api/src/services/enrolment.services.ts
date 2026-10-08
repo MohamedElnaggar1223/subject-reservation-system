@@ -29,11 +29,12 @@ import {
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
-  academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, schoolDateString, seriesAcademicYearStart,
+  academicYearShortLabel, academicYearStartOf, gradeInAcademicYear, seriesAcademicYearStart,
   type CreateEnrolmentType, type UpdateEnrolmentType, type EndEnrolmentType, type BulkEnrolType, type EnrolSectionType,
   type BatchEnrolRowType, type ListEnrolmentsQueryType, type EnrolmentMode, type EnrolmentSource,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
+import { todayAtSchool } from '../lib/clock';
 import { endGroupMembershipsForSubject } from './group.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -173,7 +174,7 @@ async function teacherOrThrow(tx: Tx, teacherId: string) {
 }
 
 function clampStart(y: { startsOn: string; endsOn: string }, wanted?: string) {
-  const today = schoolDateString(new Date());
+  const today = todayAtSchool();
   const start = wanted ?? (today < y.startsOn ? y.startsOn : today > y.endsOn ? y.endsOn : today);
   if (start < y.startsOn || start > y.endsOn) throw new EnrolmentError(`The start date falls inside the school year (${y.startsOn} – ${y.endsOn})`);
   return start;
@@ -234,7 +235,7 @@ export async function updateEnrolment(id: string, data: UpdateEnrolmentType, act
     const [updated] = await tx.update(courseEnrolment).set({ mode, teacherId, updatedAt: new Date() }).where(eq(courseEnrolment.id, id)).returning();
     // F1: studied alone from now on — they leave the subject's teaching group after today.
     const groupsLeft = mode === 'self_study' && e.mode !== 'self_study'
-      ? await endGroupMembershipsForSubject(tx, e.studentId, e.subjectId, e.academicYearId, schoolDateString(new Date()), 'Now studies this subject alone', actorId)
+      ? await endGroupMembershipsForSubject(tx, e.studentId, e.subjectId, e.academicYearId, todayAtSchool(), 'Now studies this subject alone', actorId)
       : 0;
     await logAction(actorId, 'ENROLMENT_UPDATED', 'enrolment', id, { mode: e.mode, teacherId: e.teacherId }, { mode, teacherId, teacherLinkedToSubject: linked, ...(groupsLeft ? { groupsLeft } : {}) }, ctx, tx);
     return updated!;
@@ -247,7 +248,7 @@ export async function endEnrolment(id: string, data: EndEnrolmentType, actorId: 
     const [e] = await tx.select().from(courseEnrolment).where(eq(courseEnrolment.id, id)).for('update');
     if (!e) throw new EnrolmentError('Enrolment not found', 404);
     if (e.endedOn) throw new EnrolmentError('This enrolment already ended', 409);
-    const endedOn = data.endedOn ?? schoolDateString(new Date());
+    const endedOn = data.endedOn ?? todayAtSchool();
     if (endedOn < e.startedOn) throw new EnrolmentError('An enrolment cannot end before it started');
     const [updated] = await tx.update(courseEnrolment).set({ endedOn, endReason: data.reason, endedBy: actorId, updatedAt: new Date() })
       .where(eq(courseEnrolment.id, id)).returning();
