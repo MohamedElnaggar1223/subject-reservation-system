@@ -84,7 +84,9 @@ Evidence (`.audit/*-evidence/`: control logs, screenshots, measurements) is forc
 trail, but a run's log is kept as its proof — the vitest summary and, for a red run, the failing
 tests and their messages — not the request log of the whole suite; nothing over 300 KB goes in.
 CI's first step fails on any larger file under `.audit` (once an agent force-added 109 MB of
-full-suite logs).
+full-suite logs), and on any 11-digit mobile number in a trail (`.audit/*.tsv`) or a document (once a trail row
+carried two phone numbers from the school's sheet; row numbers and counts are the only thing of
+the sheet that may be written down).
 
 ## The desk comes first
 
