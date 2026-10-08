@@ -399,7 +399,10 @@ right.
 ## 9. Deferred, and why
 
 - **An F4 result as a `known` sitting**: no F4 results table exists; `knownSittingsOf` reads
-  earlier lines only. F4 adds its source there.
+  earlier lines only. F4 adds its source there. *(F4, after the review of 093dbd1: a declared
+  sitting with a real grade on record is verified at declaration inside `reserveLines`, the
+  importer answering through `recordVerifiedInTx`, and the To verify tab checks the awaiting ones;
+  `knownSittingsOf` reading F4's results and sent entries stays B's — EXAM_ENTRIES.md §7.)*
 - **`refundFor`** is C's; `refundForSystemDrop` is the seam (§3.5).
 - **The statement's charges** are C's (`charges: []`).
 - **Remind** on the Money tab and the coordinator's "declared retakes to verify" reminder rule are

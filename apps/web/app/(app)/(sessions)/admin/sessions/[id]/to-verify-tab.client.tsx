@@ -27,12 +27,23 @@ type Row = Awaited<ReturnType<typeof fetchToVerify>>['lines'][number];
 export const toVerifyKey = (id: string) => ['sessions', id, 'to-verify'] as const;
 const answer = (id: string, json: InferRequestType<(typeof api.v1.registrations)[':id']['verify-prior']['$post']>['json']) =>
   apiResponse(api.v1.registrations[':id']['verify-prior'].$post({ param: { id }, json }));
+// F4 (the review of 093dbd1, item 3): the awaiting sittings checked against the results on record.
+const checkResults = (sessionId: string) => apiResponse(api.v1.exams.results['verify-declared'].$post({ json: { sessionId } }));
 
 export default function ToVerifyTab({ session, viewerRole }: { session: SessionDetail; viewerRole: string }): React.JSX.Element {
   const [show, setShow] = useState<'awaiting' | 'decided'>('awaiting');
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: [...toVerifyKey(session.id), show], queryFn: () => fetchToVerify(session.id, show) });
   const [acting, setActing] = useState<{ row: Row; outcome: 'verified' | 'rejected' } | null>(null);
   const finance = hasRole(viewerRole, ...FINANCE_ROLES) && viewerRole !== ROLES.ADMIN;
+  const qc = useQueryClient();
+  const [checked, setChecked] = useState<{ verified: number; failed: number } | null>(null);
+  const [checkFailure, setCheckFailure] = useState<string | null>(null);
+  const check = useMutation({
+    mutationFn: () => checkResults(session.id),
+    onMutate: () => setCheckFailure(null),
+    onSuccess: (r) => { setChecked({ verified: r.verified.length, failed: r.failed }); qc.invalidateQueries({ queryKey: toVerifyKey(session.id) }); },
+    onError: (e) => { setChecked(null); setCheckFailure(errorText(e)); },
+  });
   if (isLoading) return <LoadingState />;
   if (isError || !data) return <ErrorState onRetry={() => refetch()} />;
   return (
@@ -41,6 +52,11 @@ export default function ToVerifyTab({ session, viewerRole }: { session: SessionD
         <p className="max-w-3xl text-sm text-muted-foreground">
           Retakes and carried sittings declared by a family or at the desk. Verified, the line stands. Not confirmed: a line not yet paid ends and the family may reserve a first entry; a paid line stands as a first entry before the board&apos;s first-entry deadline, and is dropped with its refund after it.
         </p>
+        {!finance && show === 'awaiting' && data.lines.length > 0 && (
+          <Button type="button" variant="outline" size="sm" disabled={check.isPending} onClick={() => check.mutate()}>
+            {check.isPending ? 'Checking…' : 'Check against the results on record'}
+          </Button>
+        )}
         <div className="flex rounded-lg border border-border bg-card p-0.5 text-sm" role="group" aria-label="Show">
           {(['awaiting', 'decided'] as const).map((s) => (
             <button key={s} type="button" aria-pressed={show === s} onClick={() => setShow(s)}
@@ -50,6 +66,14 @@ export default function ToVerifyTab({ session, viewerRole }: { session: SessionD
           ))}
         </div>
       </div>
+      {checkFailure && <Notice tone="danger">{checkFailure}</Notice>}
+      {checked && (
+        <Notice tone={checked.failed ? 'warning' : 'info'}>
+          {checked.verified === 0 ? 'No sitting awaiting an answer has a result on record yet.'
+            : checked.verified === 1 ? '1 sitting was verified from the results on record.' : `${checked.verified} sittings were verified from the results on record.`}
+          {checked.failed > 0 && <> {checked.failed === 1 ? '1 could not be checked: answer it below.' : `${checked.failed} could not be checked: answer them below.`}</>}
+        </Notice>
+      )}
       {data.lines.length === 0 ? <EmptyState title={show === 'awaiting' ? 'Nothing to verify' : 'Nothing answered yet'} /> : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
           <table className="w-full min-w-[900px] text-sm">

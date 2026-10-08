@@ -381,6 +381,19 @@ export const resultsArabic: Record<string, string> = {
   'Upload failed': 'فشل الرفع',
 };
 
+/** The file store's kinds as its sentences name them (UPLOAD_PURPOSES' labels, lower case): "a …", "the …". */
+const uploadKindArabic: Record<string, [string, string]> = {
+  'profile photo': ['صورة الملف الشخصي', 'صورة الملف الشخصي'],
+  'personal document': ['مستند شخصي', 'المستند الشخصي'],
+  'instapay transfer screenshot': ['لقطة شاشة لتحويل InstaPay', 'لقطة شاشة التحويل'],
+  'signed remark consent': ['موافقة موقّعة على إعادة التصحيح', 'الموافقة الموقّعة على إعادة التصحيح'],
+  'supporting document': ['مستند داعم', 'المستند الداعم'],
+  'authorised collector photo': ['صورة المفوَّض بالاستلام', 'صورة المفوَّض بالاستلام'],
+  'absence excuse note': ['عذر غياب', 'عذر الغياب'],
+  'import file': ['ملف استيراد', 'ملف الاستيراد'],
+};
+const UPLOAD_KINDS = Object.keys(uploadKindArabic).join('|');
+
 export const resultsRules: Rule[] = [
   // Counted phrases the screens build as one node
   [/^in (\d+) days$/, (m) => `بعد ${m[1]} يومًا`],
@@ -397,6 +410,6 @@ export const resultsRules: Rule[] = [
     (m) => `احتفظ بهذه الشهادة حتى ${m[1]} (${m[2]} شهرًا بعد وصولها) قبل إتلافها`],
   [/^The statement of entry for (.+) is not ready yet$/, (m) => `بيان القيد لدورة ${m[1]} ليس جاهزًا بعد`],
   // Uploads (the file store's sentences)
-  [/^Your account cannot upload an? (.+)$/, (m) => `لا يستطيع حسابك رفع ${m[1]}`],
-  [/^Say which student the (.+) is for$/, (m) => `حدّد الطالب الذي يخص ${m[1]}`],
+  [new RegExp(`^Your account cannot upload an? (${UPLOAD_KINDS})$`), (m) => `لا يستطيع حسابك رفع ${uploadKindArabic[m[1]!]![0]}`],
+  [new RegExp(`^Say which student the (${UPLOAD_KINDS}) is for$`), (m) => `حدّد الطالب الذي يخصه ${uploadKindArabic[m[1]!]![1]}`],
 ];

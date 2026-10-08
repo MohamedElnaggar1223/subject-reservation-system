@@ -83,6 +83,7 @@ import {
   notifyEscrowBalanceChanged,
 } from './notification.services';
 import { createReceiptsForRegistrations } from './receipt.services';
+import { withdrawEntriesOfLineInTx, tellWithdrawn } from './exam-entry.services';
 import { creditHeld } from './escrow.services';
 import { assertMayRegisterFor, mayRegisterFor, type EligibilityCause } from './eligibility.services';
 import { gradeLabel } from '@repo/validations';
@@ -1624,6 +1625,7 @@ export async function reversePayment(
   // officer could hand a receipt over between the check and the void.
   let voidedReceiptNumbers: string[] = [];
   let registrationsReverted = 0;
+  const withdrawnEntries: Awaited<ReturnType<typeof withdrawEntriesOfLineInTx>> = [];
   const reversedAt = new Date();
 
   await db.transaction(async (tx) => {
@@ -1683,6 +1685,11 @@ export async function reversePayment(
         .where(and(inArray(registration.id, regIds), eq(registration.status, 'confirmed')))
         .returning({ id: registration.id });
       registrationsReverted = reverted.length;
+      // The board's entries of a line no longer paid are withdrawn with its payment (F4; the review
+      // of 093dbd1, item 1): marked withdrawn with the line, made again if the line is paid again.
+      for (const r of [...reverted].sort((a, b) => a.id.localeCompare(b.id))) {
+        withdrawnEntries.push(...await withdrawEntriesOfLineInTx(tx, r.id, `the payment was reversed: ${reason}`, financeAdminId, auditCtx));
+      }
 
       const voided = await tx
         .update(receipt)
@@ -1735,6 +1742,7 @@ export async function reversePayment(
     voidedReceiptNumbers,
     registrationsReverted,
   }).catch((err) => console.error('[notification] PAYMENT_REVERSED failed:', err));
+  await tellWithdrawn(withdrawnEntries, `the payment was reversed: ${reason}`).catch((err) => console.error('[notification] F4 entries withdrawn (reversal) failed:', err));
 
   return { reversed: true, registrationsReverted };
 }

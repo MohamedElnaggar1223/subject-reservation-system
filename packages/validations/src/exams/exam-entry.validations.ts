@@ -347,6 +347,9 @@ export const ENTRY_PROBLEMS = [
   'prior_sitting_unverified',
   'prior_sitting_held',
   'cash_in_not_paid',
+  // The review of 093dbd1, item 2: its line was answered after the entry was made.
+  'retake_differs_from_line',
+  'carry_forward_differs_from_line',
 ] as const;
 export type EntryProblem = (typeof ENTRY_PROBLEMS)[number];
 export const ENTRY_PROBLEM_LABELS: Record<EntryProblem, string> = {
@@ -366,6 +369,8 @@ export const ENTRY_PROBLEM_LABELS: Record<EntryProblem, string> = {
   prior_sitting_unverified: 'Declared earlier sitting not verified yet — entered as declared (the To verify tab)',
   prior_sitting_held: 'Declared earlier sitting not verified — held, not sent until it is (the To verify tab)',
   cash_in_not_paid: 'Its cash-in is no longer paid — collect it again or withdraw the entry',
+  retake_differs_from_line: "Its reservation's retake answer changed after the entry was made — amend the entry's retake",
+  carry_forward_differs_from_line: "Its reservation's earlier sitting was answered after the entry was made — amend the carry forward (series, centre, candidate number, option)",
 };
 
 /**
@@ -615,6 +620,9 @@ export const ResultsQuery = z.object({
 });
 
 export const PublishResults = z.object({ boardSeriesId: z.string().min(1) });
+
+/** The To verify tab's check of a session's declared sittings against the results on record. */
+export const VerifyDeclaredFromResults = z.object({ sessionId: z.string().min(1) });
 
 // ─── Certificates ────────────────────────────────────────────────────────────
 

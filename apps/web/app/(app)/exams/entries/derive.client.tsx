@@ -29,6 +29,9 @@ const STATE: Record<string, { tone: 'success' | 'neutral' | 'warning'; label: st
   elsewhere: { tone: 'warning', label: 'Entered from another registration' },
   // The coordinator withdrew it and the registration is still confirmed: a derivation never enters it again.
   withdrawn: { tone: 'warning', label: 'Withdrawn — not entered again' },
+  // The review of 093dbd1: a draft its line's answer has changed since, and a cash-in's award already entered.
+  refresh: { tone: 'warning', label: 'Draft brought up to date with the reservation' },
+  link: { tone: 'success', label: 'Already entered: linked to this cash-in' },
 };
 
 /** A row's outcome when it is not simply made or already made (the reservations rework). */
@@ -59,7 +62,8 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
       queryClient.invalidateQueries({ queryKey: EXAMS_KEY });
       setPreview(null);
       setError('');
-      setFlash({ tone: 'success', title: r.created === 1 ? 'Made 1 new entry.' : `Made ${r.created} new entries.` });
+      setFlash({ tone: 'success', title: r.created === 1 ? 'Made 1 new entry.' : `Made ${r.created} new entries.`,
+        ...(r.updated ? { lines: [r.updated === 1 ? '1 entry brought up to date.' : `${r.updated} entries brought up to date.`] } : {}) });
     },
     onError: (err: Error) => setError(err.message),
   });
@@ -93,6 +97,9 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
           <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-foreground">
             <span>{preview.summary.registrations === 1 ? '1 paid reservation' : `${preview.summary.registrations} paid reservations`}</span>
             <span className="font-semibold">{preview.summary.newEntries === 1 ? '1 new entry to make' : `${preview.summary.newEntries} new entries to make`}</span>
+            {preview.summary.updates > 0 && (
+              <span className="font-semibold">{preview.summary.updates === 1 ? '1 entry to bring up to date' : `${preview.summary.updates} entries to bring up to date`}</span>
+            )}
             {preview.summary.notMapped > 0 && (
               <span className="text-amber-700 dark:text-amber-400">{preview.summary.notMapped === 1 ? '1 subject not mapped' : `${preview.summary.notMapped} subjects not mapped`}</span>
             )}
@@ -102,7 +109,7 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
             <Notice tone="danger" title="Nothing can be made">{preview.refusal}</Notice>
           ) : preview.summary.registrations === 0 ? (
             <Notice tone="info">No paid reservation in this series yet. Reservations become entries once they are paid.</Notice>
-          ) : preview.summary.newEntries === 0 ? (
+          ) : preview.summary.newEntries === 0 && preview.summary.updates === 0 ? (
             <Notice tone="success">Everything paid is already entered: there is nothing new to make.</Notice>
           ) : null}
 
@@ -184,10 +191,10 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
             <p className="text-sm text-muted-foreground">Nothing new and nothing to choose. Untick the box above to see every registration.</p>
           ) : null}
 
-          {!preview.refusal && preview.summary.newEntries > 0 && (
+          {!preview.refusal && (preview.summary.newEntries > 0 || preview.summary.updates > 0) && (
             <div className="flex justify-end">
               <Button type="button" disabled={commit.isPending} onClick={() => commit.mutate()}>
-                {commit.isPending ? 'Working…' : preview.summary.newEntries === 1 ? 'Make the 1 new entry' : `Make the ${preview.summary.newEntries} new entries`}
+                {commit.isPending ? 'Working…' : preview.summary.newEntries === 0 ? 'Bring them up to date' : preview.summary.newEntries === 1 ? 'Make the 1 new entry' : `Make the ${preview.summary.newEntries} new entries`}
               </Button>
             </div>
           )}

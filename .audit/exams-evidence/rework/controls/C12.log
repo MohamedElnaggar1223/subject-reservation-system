@@ -4,7 +4,7 @@
 # expected red: ['number the same series at once']
 # result: RED as expected
 
- ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 9669ms
+ ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 9532ms
    × F4: races > two coordinators number the same series at once: every candidate one number, every number one candidate 5026ms
  Test Files  1 failed (1)
       Tests  1 failed | 7 passed (8)

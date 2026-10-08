@@ -25,7 +25,7 @@
 
 import {
   db, examResult, examResultImport, examResultMapping, examEntry, examCandidate, examCandidateNumber, examSeriesState, examUnit,
-  qualification, qualificationUnit, registration, remarkRequest, boardSeries, user,
+  qualification, qualificationUnit, registration, registrationSession, remarkRequest, boardSeries, user,
   eq, and, inArray, sql, asc, desc, isNull,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -38,11 +38,11 @@ import { createBulkNotifications } from './notification.services';
 import { getFileContent, FileError } from './file.services';
 import {
   ExamError, advisoryLock, boardNameMap, boardRulesFor, familyOf, seriesOrThrow, studentOrThrow,
-  type Executor, type SeriesRow,
+  type Executor, type SeriesRow, type Tx,
 } from './exam-shared';
 import { boardSeriesName } from './series.services';
 import { lineItemsFor } from './line.services';
-import { verifyPriorSitting, VerificationError } from './verification.services';
+import { verifyPriorSitting, recordVerifiedInTx, VerificationError } from './verification.services';
 import { parseDelimited, readXlsx, tableFrom, TabularError } from '../lib/tabular';
 
 type Actor = { id: string; role?: string | null };
@@ -229,7 +229,8 @@ export async function importResults(data: ImportResultsType, actor: Actor, ctx?:
     const { header, lines } = await planImport(series, source.rows, mapping, db);
     return {
       series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom, mappingName, header, sample: preview(source.rows),
-      lines, summary: summarize(lines), committed: false, importId: null, sittingsVerified: [] as Awaited<ReturnType<typeof verifyDeclaredSittingsFromResults>>,
+      lines, summary: summarize(lines), committed: false, importId: null,
+      sittingsVerified: [] as Awaited<ReturnType<typeof verifyDeclaredSittingsFromResults>>['verified'], verificationFailed: 0, verificationNote: null as string | null,
     };
   }
   const out = await db.transaction(async (tx) => {
@@ -255,22 +256,108 @@ export async function importResults(data: ImportResultsType, actor: Actor, ctx?:
     await logAction(actor.id, 'EXAM_RESULTS_IMPORTED', 'board_series', series.id, null, { importId, sourceName: source.name, ...summary }, ctx, tx);
     return { series: { id: series.id, name: series.name }, sourceName: source.name, mapping, mappingFrom, mappingName, header, sample: preview(source.rows), lines, summary, committed: true, importId };
   });
-  // The board's results answer the sittings families declared in this series (§3.5): after the commit.
-  const sittingsVerified = await verifyDeclaredSittingsFromResults(series, actor, ctx);
-  return { ...out, sittingsVerified };
+  // The board's results answer the sittings families declared in this series (§3.5): after the
+  // commit, by the importer. A failure there never reads as a failed import: the results are saved
+  // (the review of 093dbd1, item 7).
+  const v = await verifyDeclaredSittingsFromResults(series, actor, ctx);
+  return {
+    ...out, sittingsVerified: v.verified, verificationFailed: v.failed,
+    verificationNote: v.failed ? `Results saved; the verification of ${v.failed} declared sitting${v.failed === 1 ? '' : 's'} failed — answer ${v.failed === 1 ? 'it' : 'them'} on the session's To verify tab` : null,
+  };
 }
 
 // ─── A declared sitting verified by the board's results (RESERVATIONS_REWORK.md §3.5, §9) ───
 
 /**
+ * A grade that is no evidence of a sitting: absent, pending, withheld, to be issued — the boards'
+ * markers (Cambridge X, Q, Y; "ABS", "PENDING") — or nothing (the review of 093dbd1, item 7).
+ */
+const NOT_A_SITTING = new Set(['X', 'Q', 'Y', 'ABS', 'ABSENT', 'PENDING', 'WITHHELD', 'W', '-', '']);
+export const isRealGrade = (grade: string | null | undefined) => !!grade && !NOT_A_SITTING.has(grade.trim().toUpperCase());
+
+type SittingMatch = { registrationId: string; studentId: string; code: string; grade: string; seriesName: string; importedBy: string | null; importedAt: Date };
+
+/**
+ * For lines that follow a declared sitting not answered yet, the result on record in that sitting
+ * for what each line's item enters (a unit it enters, or its award) with a real grade — the latest
+ * report. Lines with none are not returned: a missing result rejects nothing (results files are
+ * partial, F-07; the coordinator answers).
+ */
+async function sittingMatches(executor: Executor, lineIds: string[]): Promise<SittingMatch[]> {
+  if (!lineIds.length) return [];
+  const open = (await executor.execute(sql`
+    select r.id from registration r
+    where r.id in (${sql.join(lineIds.map((id) => sql`${id}`), sql`, `)})
+      and r.prior_sitting_source in ('declared_by_family', 'declared_by_desk')
+      and r.prior_sitting_verified_outcome is null and r.prior_sitting_series_id is not null
+      and r.status in ('pending_approval', 'pending_payment', 'preregistered', 'confirmed')`)).rows as { id: string }[];
+  if (!open.length) return [];
+  const lines = await lineItemsFor(open.map((r) => r.id), executor);
+  const seriesIds = [...new Set(lines.map((l) => l.priorSitting?.seriesId).filter((x): x is string => !!x))];
+  const results = seriesIds.length
+    ? await executor.select({
+      studentId: examResult.studentId, boardSeriesId: examResult.boardSeriesId, unitId: examResult.unitId, qualificationId: examResult.qualificationId,
+      code: examResult.code, grade: examResult.grade, createdBy: examResult.createdBy, createdAt: examResult.createdAt,
+    }).from(examResult)
+      .where(and(inArray(examResult.boardSeriesId, seriesIds), inArray(examResult.studentId, [...new Set(lines.map((l) => l.studentId))])))
+      .orderBy(desc(examResult.createdAt))
+    : [];
+  const out: SittingMatch[] = [];
+  for (const l of lines) {
+    const p = l.priorSitting;
+    if (!p) continue;
+    const unitIds = new Set(l.enters.units.map((u) => u.id));
+    const award = l.enters.qualification?.id ?? null;
+    // The latest report of what the line enters there; it verifies only when it is a real grade.
+    const hit = results.find((x) => x.studentId === l.studentId && x.boardSeriesId === p.seriesId
+      && ((x.unitId && unitIds.has(x.unitId)) || (award && x.qualificationId === award)));
+    if (!hit || !isRealGrade(hit.grade)) continue;
+    out.push({ registrationId: l.registrationId, studentId: l.studentId, code: hit.code, grade: hit.grade, seriesName: p.name, importedBy: hit.createdBy, importedAt: hit.createdAt });
+  }
+  return out;
+}
+
+const matchReason = (m: SittingMatch, how: string) => `${m.seriesName}'s results list ${m.code} for the candidate (${how})`;
+const matchEvidence = (m: SittingMatch) => `The board's results for ${m.seriesName}: ${m.code} graded ${m.grade}`;
+
+/**
+ * Verify, through step B's own answer (`verifyPriorSitting`: the line stands, its receipt and line
+ * locked in B's order, audited PRIOR_SITTING_VERIFIED), every one of these lines whose declared
+ * sitting has a result on record — each in its own transaction, after the caller's commit. The one
+ * who answers is the actor given (the importer, or the coordinator acting from the To verify tab),
+ * with their own role; the result is the evidence. A line answered or changed meanwhile (B's 409)
+ * is skipped; any other failure is counted, never thrown: the caller's work has committed.
+ */
+async function verifyMatches(lineIds: string[], actor: Actor, how: string, ctx?: AuditContext) {
+  const role = actor.role ?? (await db.select({ role: user.role }).from(user).where(eq(user.id, actor.id)))[0]?.role ?? null;
+  const verified: { registrationId: string; studentId: string; code: string; grade: string }[] = [];
+  let failed = 0;
+  let matches: SittingMatch[] = [];
+  try {
+    matches = await sittingMatches(db, lineIds);
+  } catch (err) {
+    console.error('[results] Could not match declared sittings:', err);
+    return { verified, failed: lineIds.length };
+  }
+  for (const m of matches) {
+    try {
+      await verifyPriorSitting(m.registrationId, { outcome: 'verified', reason: matchReason(m, how), evidence: matchEvidence(m) }, { id: actor.id, role: role ?? '' }, ctx);
+      verified.push({ registrationId: m.registrationId, studentId: m.studentId, code: m.code, grade: m.grade });
+    } catch (err) {
+      if (err instanceof VerificationError && err.status === 409) continue;
+      failed++;
+      console.error(`[results] Could not verify the declared sitting of line ${m.registrationId}:`, err);
+    }
+  }
+  return { verified, failed };
+}
+
+/**
  * F4 verifies a declared sitting from the board's results (§3.5: "F4 verifies from the board's
- * results when they are imported"): every line that follows a sitting declared in this series and
- * not answered yet, whose student has a result here for what the line's item enters (a unit it
- * enters, or its award), is verified through step B's own answer (`verifyPriorSitting`: the line
- * stands, its receipt and line locked in B's order, audited PRIOR_SITTING_VERIFIED), with the
- * importer as the one who answered and the result as the evidence. A sitting with no result for it
- * is left to the coordinator (a missing line is no rejection). Each line in its own transaction,
- * after the import has committed; one that changed meanwhile (answered, dropped) is skipped.
+ * results when they are imported"): after an import of a series commits, every line following a
+ * sitting declared in that series and not answered yet, with a real grade on record there for what
+ * its item enters, is verified by the importer. A sitting with no result for it is left to the
+ * coordinator (a missing line is no rejection).
  */
 export async function verifyDeclaredSittingsFromResults(series: SeriesRow, actor: Actor, ctx?: AuditContext) {
   const open = (await db.execute(sql`
@@ -279,27 +366,43 @@ export async function verifyDeclaredSittingsFromResults(series: SeriesRow, actor
       and r.prior_sitting_source in ('declared_by_family', 'declared_by_desk')
       and r.prior_sitting_verified_outcome is null
       and r.status in ('pending_approval', 'pending_payment', 'preregistered', 'confirmed')`)).rows as { id: string }[];
-  if (!open.length) return [];
-  const lines = await lineItemsFor(open.map((r) => r.id));
-  const results = await db.select({ studentId: examResult.studentId, unitId: examResult.unitId, qualificationId: examResult.qualificationId, code: examResult.code, grade: examResult.grade })
-    .from(examResult).where(and(eq(examResult.boardSeriesId, series.id), inArray(examResult.studentId, [...new Set(lines.map((l) => l.studentId))])));
-  const verified: { registrationId: string; studentId: string; code: string; grade: string }[] = [];
-  for (const l of lines) {
-    const unitIds = new Set(l.enters.units.map((u) => u.id));
-    const award = l.enters.qualification?.id ?? null;
-    const hit = results.find((x) => x.studentId === l.studentId && ((x.unitId && unitIds.has(x.unitId)) || (award && x.qualificationId === award)));
-    if (!hit) continue;
-    try {
-      await verifyPriorSitting(l.registrationId, {
-        outcome: 'verified',
-        reason: `${series.name}'s results list ${hit.code} for the candidate (results import)`,
-        evidence: `The board's results for ${series.name}: ${hit.code} graded ${hit.grade}`,
-      }, { id: actor.id, role: actor.role ?? 'coordinator' }, ctx);
-      verified.push({ registrationId: l.registrationId, studentId: l.studentId, code: hit.code, grade: hit.grade });
-    } catch (err) {
-      // Answered or changed meanwhile (B's 409s): the coordinator's own answer stands.
-      if (!(err instanceof VerificationError)) throw err;
-    }
+  return verifyMatches(open.map((r) => r.id), actor, 'results import', ctx);
+}
+
+/**
+ * The same match from the session's To verify tab (the review of 093dbd1, item 3): every declared
+ * sitting of the session still awaiting an answer, checked against the results on record, verified
+ * by the coordinator (or admin) who asked.
+ */
+export async function verifyDeclaredOfSession(sessionId: string, actor: Actor, ctx?: AuditContext) {
+  const [s] = await db.select({ id: registrationSession.id }).from(registrationSession).where(eq(registrationSession.id, sessionId));
+  if (!s) throw new ExamError('Session not found', 404);
+  const open = (await db.execute(sql`
+    select r.id from registration r
+    where r.session_id = ${sessionId}
+      and r.prior_sitting_source in ('declared_by_family', 'declared_by_desk')
+      and r.prior_sitting_verified_outcome is null
+      and r.status in ('pending_approval', 'pending_payment', 'preregistered', 'confirmed')`)).rows as { id: string }[];
+  const r = await verifyMatches(open.map((x) => x.id), actor, 'results on record, from the To verify tab', ctx);
+  return { awaiting: open.length, verified: r.verified, failed: r.failed };
+}
+
+/**
+ * At declaration (the review of 093dbd1, item 3; the owner: a result on record here is a known
+ * sitting): inside the reservation's own transaction, a line just made that declares a sitting
+ * with a real grade on record for what it enters is verified at once — step B's verified answer
+ * (`recordVerifiedInTx`), the one who imported that result as the one who answered, the result as
+ * the evidence. A result whose importer's account is gone verifies nothing (the coordinator answers).
+ */
+export async function verifyDeclaredAtDeclarationInTx(tx: Tx, lineIds: string[], ctx?: AuditContext) {
+  const matches = await sittingMatches(tx, lineIds);
+  const verified: string[] = [];
+  for (const m of matches) {
+    if (!m.importedBy) continue;
+    const done = await recordVerifiedInTx(tx, m.registrationId, {
+      actorId: m.importedBy, now: new Date(), reason: matchReason(m, 'results on record at declaration'), evidence: matchEvidence(m),
+    }, ctx);
+    if (done) verified.push(m.registrationId);
   }
   return verified;
 }

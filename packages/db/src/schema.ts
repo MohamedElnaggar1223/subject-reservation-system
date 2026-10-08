@@ -3426,6 +3426,9 @@ export const examEntry = pgTable(
     // What the board does with its fee, as the withdrawal was told (information only).
     withdrawalCharge: text("withdrawal_charge"),
     withdrawalRefunded: boolean("withdrawal_refunded"),
+    // Withdrawn because its line ended (a drop, a swap, a reversal, a system drop): a derivation
+    // makes it again if the line is paid again — unlike the coordinator's own withdrawal.
+    withdrawnWithLine: boolean("withdrawn_with_line").notNull().default(false),
     notes: text("notes"),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

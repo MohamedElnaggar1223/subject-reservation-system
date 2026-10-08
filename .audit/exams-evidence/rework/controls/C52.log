@@ -1,0 +1,31 @@
+# C52: a sitting verified at declaration is answered by someone other than the importer
+# undone in: apps/api/src/services/exam-result.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['is verified at once, by the importer']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 1 failed) 20651ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the importer; a sitting graded absent waits for the coordinator 104ms
+     → expected 'IpbZ3AJ07w5rRMhCzSiCDC9Tduc1zxoX' to be 'xaogwdHflnkbOM5ZlHmZvKOUBvqIZa6D' // Object.is equality
+ Test Files  1 failed (1)
+      Tests  1 failed | 40 passed (41)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 07860e4b-4198-4512-9320-bff911792d0d: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the importer; a sitting graded absent waits for the coordinator
+AssertionError: expected 'IpbZ3AJ07w5rRMhCzSiCDC9Tduc1zxoX' to be 'xaogwdHflnkbOM5ZlHmZvKOUBvqIZa6D' // Object.is equality
+
+Expected: [32m"xaogwdHflnkbOM5ZlHmZvKOUBvqIZa6D"[39m
+Received: [31m"IpbZ3AJ07w5rRMhCzSiCDC9Tduc1zxoX"[39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:782:36
+    780|       const ka = await declare('ka');
+    781|       expect((await lineOf(kr)).outcome).toBe('verified');
+    782|       expect(await verifiedBy(kr)).toBe(w.adm.id);
+       |                                    ^
+    783|       const a = await answer(kr);
+    784|       expect(a.user_id).toBe(w.adm.id);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

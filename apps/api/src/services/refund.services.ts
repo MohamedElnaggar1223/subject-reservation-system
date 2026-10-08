@@ -13,7 +13,8 @@
  *   `course_starts_on` › the session's. Then a `refund.percent` exception replaces the step.
  *   **The percent applies to the course fee**; the board fee comes back in full while the entry
  *   has **not been sent** and not at all after: a line never confirmed was never sent; a confirmed
- *   line is sent by F4's mark when F4 is live (the seam `entrySentAt`), else once its effective
+ *   line is sent from the earliest time any of its entries was marked sent (F4's `sentEntriesOf`,
+ *   withdrawn ones included: a partly sent line is a sent line, the lead, 8 Oct), else once its effective
  *   deadline (the retake deadline, the entry deadline, or its series' exams' start) has passed.
  *   A custom-priced line (course = the total, board = 0) refunds its total by the course rule.
  * - **A converted line** (`legacy.converted`, or a session with no policy) refunds as V3 did:
@@ -66,23 +67,16 @@ export async function firstLessonFor(_executor: Executor, _line: { id: string; s
 /**
  * F4's entries made from a line that were marked sent to the board ("mark as sent",
  * exam-entry.services `submitEntries`), earliest first — withdrawn ones included: the board
- * received them (whether it refunds the school is its own withdrawal rule, shown as a sentence).
- * Wired by F4 on resuming (RESERVATIONS_MONEY.md §10).
+ * received them (whether it refunds the school is its own withdrawal rule, shown as a sentence;
+ * the family's board fee stays either way, the lead's decision of 8 Oct). The one seam `refundFor`
+ * reads (the review of 093dbd1, item 9: C's `entrySentAt` stand-in removed); the earliest one's
+ * time is when the line's board fee became sent. Wired by F4 on resuming (RESERVATIONS_MONEY.md §10).
  */
 export async function sentEntriesOf(executor: Executor, lineId: string) {
   const rows = await executor.select({ entryCode: examEntry.entryCode, title: examEntry.title, submittedAt: examEntry.submittedAt, status: examEntry.status })
     .from(examEntry).where(and(eq(examEntry.registrationId, lineId), isNotNull(examEntry.submittedAt)))
     .orderBy(asc(examEntry.submittedAt), asc(examEntry.entryCode));
   return rows.map((r) => ({ ...r, submittedAt: r.submittedAt! }));
-}
-
-/**
- * F4's seam (§3.9): when the line's entry was marked sent to the board — the earliest time any
- * of its entries was (the lead, 8 Oct: the board fee is one amount per line, so a partly sent line
- * is a sent line). None marked: a confirmed line is sent once its effective deadline has passed.
- */
-export async function entrySentAt(executor: Executor, lineId: string): Promise<Date | null> {
-  return (await sentEntriesOf(executor, lineId))[0]?.submittedAt ?? null;
 }
 
 /** "8 October 2026" in Cairo. */

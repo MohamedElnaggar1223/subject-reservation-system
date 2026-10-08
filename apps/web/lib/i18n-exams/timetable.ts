@@ -380,7 +380,7 @@ const FIELD_AR: Record<string, string> = {
 export const timetableRules: Rule[] = [
   // Papers and the pasted timetable
   [/^This series already has paper (.+)$/, (m) => `في هذه الدورة الورقة ${m[1]} بالفعل`],
-  [/^(.+) already has paper (.+)$/, (m) => `في ${m[1]} الورقة ${m[2]} بالفعل`],
+  [/^(.+) already has paper ((?=[0-9A-Z/-]*\d)[0-9A-Z/-]+)$/, (m) => `في ${m[1]} الورقة ${m[2]} بالفعل`],
   [/^(.+) has attendance recorded: it stays on the timetable$/, (m) => `سُجِّل الحضور في ${m[1]}: تبقى في الجدول`],
   [/^Say which column holds: (.+)$/, (m) => `حدّد العمود الذي يحوي: ${(m[1] ?? '').split(', ').map((f) => FIELD_AR[f] ?? f).join('، ')}`],
   [/^(\d+) line\(s\) cannot be read — fix or remove them first$/, (m) => `${m[1]} سطر تتعذر قراءته - صحّحها أو احذفها أولًا`],
@@ -397,7 +397,7 @@ export const timetableRules: Rule[] = [
   [/^(.+) has rows A–([A-Z]) and seats 1–(\d+)$/, (m) => `في ${m[1]} الصفوف A–${m[2]} والمقاعد 1–${m[3]}`],
   [/^Seat ([A-Z]\d{1,2}) in (.+) is already (.+)'s$/, (m) => `المقعد ${m[1]} في ${m[2]} يشغله ${m[3]} بالفعل`],
   [/^(.+) already invigilates (.+) in this sitting$/, (m) => `${m[1]} يراقب ${m[2]} بالفعل في هذه الجلسة`],
-  [/^(.+) is no longer in use$/, (m) => `${m[1]} لم تعد مستخدمة`],
+  [/^The room (.+) is no longer in use$/, (m) => `القاعة ${m[1]} لم تعد مستخدمة`],
   // Special consideration
   [/^This candidate has no entry in (.+)$/, (m) => `ليس لهذا المرشح قيد في ${m[1]}`],
   [/^That paper is not in (.+)$/, (m) => `تلك الورقة ليست في ${m[1]}`],

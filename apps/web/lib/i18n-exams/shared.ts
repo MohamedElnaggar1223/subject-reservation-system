@@ -4,6 +4,7 @@
  * which stays as the board writes it).
  */
 import type { Rule } from './index';
+import { withdrawReasonAr } from './entries';
 
 export const sharedArabic: Record<string, string> = {
   // ── Entry statuses and what the board would refuse ──
@@ -68,7 +69,8 @@ export const sharedArabic: Record<string, string> = {
   'Mark': 'العلامة',
   'Seat': 'المقعد',
   'Room': 'القاعة',
-  'Session': 'الفترة',
+  // A paper's morning or afternoon (the rework's "Session" is a reservation session: الجلسة).
+  'Time of day': 'الفترة',
   'Start': 'البداية',
   'End': 'النهاية',
   'Duration': 'المدة',
@@ -135,12 +137,13 @@ export const sharedRules: Rule[] = [
   [/^Your statement of entry and exam timetable for (.+) are ready\. Check your name, entries and papers, and tell the school at once if anything is wrong\.$/,
     (m) => `بيان القيد وجدول الامتحانات لدورة ${m[1]} جاهزان. راجع اسمك وقيودك وأوراقك، وأبلغ المدرسة فورًا إن كان هناك خطأ.`],
   [/^The exam timetable for (.+) was updated\. Check your papers again\.$/, (m) => `حُدِّث جدول امتحانات ${m[1]}. راجع أوراقك مرة أخرى.`],
-  [/^(.+) results$/, (m) => `نتائج ${m[1]}`],
+  [/^(.+ (?:January|February|March|April|May|June|July|August|September|October|November|December) \d{4}(?: \([^)]+\))?) results$/, (m) => `نتائج ${m[1]}`],
   [/^Your results for (.+) are in\. See them on your exam results page; the school will tell you when certificates arrive\.$/,
     (m) => `صدرت نتائجك في ${m[1]}. تجدها في صفحة نتائج امتحاناتك؛ وستبلغك المدرسة عند وصول الشهادات.`],
   [/^The (.+) certificate has arrived\. The candidate, or a parent, can collect it at the school office and sign for it; bring an ID\.$/,
     (m) => `وصلت شهادة ${m[1]}. يمكن للمرشح أو أحد الوالدين استلامها من مكتب المدرسة والتوقيع عليها؛ أحضر إثبات هوية.`],
-  [/^(\S+) (.+) was withdrawn from (.+): (.+)$/, (m) => `سُحب قيد ${m[1]} ${m[2]} من ${m[3]}: ${m[4]}`],
+  [/^((?=[0-9A-Z/-]*\d)[0-9A-Z/-]{2,12}) (.+) was withdrawn from (.+ (?:January|February|March|April|May|June|July|August|September|October|November|December) \d{4}(?: \([^)]+\))?): (.+)$/,
+    (m) => `سُحب قيد ${m[1]} ${m[2]} من ${m[3]}: ${withdrawReasonAr(m[4]!)}`],
   [/^(\S+) (.+) is now on (\d{4}-\d{2}-\d{2}), (morning|afternoon|evening), from (\d{2}:\d{2}) \((\d+) minutes\)\.$/,
     (m) => `${m[1]} ${m[2]} أصبحت يوم ${m[3]}، ${m[4] === 'morning' ? 'صباحًا' : m[4] === 'afternoon' ? 'مساءً' : 'ليلًا'}، من ${m[5]} (${m[6]} دقيقة).`],
   [/^Some of your papers in (.+) moved — see your exam timetable\.$/, (m) => `تغيّر موعد بعض أوراقك في ${m[1]} - راجع جدول امتحاناتك.`],

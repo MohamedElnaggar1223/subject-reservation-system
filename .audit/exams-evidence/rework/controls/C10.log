@@ -4,12 +4,12 @@
 # expected red: ['every attempt kept']
 # result: RED as expected
 
- ❯ test/08x2-exam-days-results.test.ts (14 tests | 5 failed) 4224ms
-   × F4: exam days, results and certificates > results > a results file read through a mapping; every attempt kept — an earlier series' and a board's revised report beside the first 67ms
-     → expected { series: { …(2) }, …(11) } to match object { mappingFrom: 'saved', …(2) }
-   × F4: exam days, results and certificates > results > publication shows results to families and gives each registration the board's grade, keeping one already recorded 15ms
+ ❯ test/08x2-exam-days-results.test.ts (14 tests | 5 failed) 4240ms
+   × F4: exam days, results and certificates > results > a results file read through a mapping; every attempt kept — an earlier series' and a board's revised report beside the first 61ms
+     → expected { series: { …(2) }, …(13) } to match object { mappingFrom: 'saved', …(2) }
+   × F4: exam days, results and certificates > results > publication shows results to families and gives each registration the board's grade, keeping one already recorded 28ms
      → expected { published: 10, candidates: 3, …(2) } to match object { published: 6, candidates: 3, …(1) }
-   × F4: exam days, results and certificates > certificates > received for the candidates with published results; the families are told to collect 3ms
+   × F4: exam days, results and certificates > certificates > received for the candidates with published results; the families are told to collect 4ms
    × F4: exam days, results and certificates > certificates > collected once at the desk, with the collector and a slip to sign; a second hand-over is told who took it 2ms
    × F4: exam days, results and certificates > certificates > an unclaimed certificate is kept for the retention period, then may be destroyed with a reason 2ms
      → expected '""' to match /^Keep this certificate until \d{4}-\d…/
@@ -19,8 +19,8 @@
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x2-exam-days-results.test.ts > F4: exam days, results and certificates > results > a results file read through a mapping; every attempt kept — an earlier series' and a board's revised report beside the first
-AssertionError: expected { series: { …(2) }, …(11) } to match object { mappingFrom: 'saved', …(2) }
-(23 matching properties omitted from actual)
+AssertionError: expected { series: { …(2) }, …(13) } to match object { mappingFrom: 'saved', …(2) }
+(25 matching properties omitted from actual)
 
 [32m- Expected[39m
 [31m+ Received[39m

@@ -84,7 +84,7 @@ function RegisterPage({ data, roomName, rows, last }: { data: RegisterData; room
           <div className="flex gap-2"><dt className="text-muted-foreground">Series</dt><dd className="font-semibold"><BoardText>{data.series.name}</BoardText></dd></div>
           <div className="flex gap-2"><dt className="text-muted-foreground">Room</dt><dd className="font-semibold">{roomName ? <Name>{roomName}</Name> : <span className="text-amber-700 dark:text-amber-400">No seat yet</span>}</dd></div>
           <div className="flex gap-2"><dt className="text-muted-foreground">Date</dt><dd className="font-semibold"><DateText date={p.examDate} weekday long /></dd></div>
-          <div className="flex items-center gap-2"><dt className="text-muted-foreground">Session</dt><dd><SessionBadge session={p.session} /></dd></div>
+          <div className="flex items-center gap-2"><dt className="text-muted-foreground">Time of day</dt><dd><SessionBadge session={p.session} /></dd></div>
           <div className="flex gap-2">
             <dt className="text-muted-foreground">Start</dt>
             <dd className="font-semibold"><TimeSpan start={p.startTime} end={endOf(p.startTime, p.durationMinutes)} /> <span className="font-normal text-muted-foreground">(<Minutes n={p.durationMinutes} />)</span></dd>

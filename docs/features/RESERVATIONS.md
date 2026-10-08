@@ -672,6 +672,25 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
   the unit's own open enrolment, else the subject's, else the one teacher of all its units.
   `exam_board.carry_forward_months` is edited through F4's board rules (`PUT
   /v1/exams/board-rules/:boardCode`, audited); F4's own column on `exam_board_rule` is gone.
+- **Changed by F4 after the review of 093dbd1 (8 Oct 2026; docs/features/EXAM_ENTRIES.md §2a,
+  §7)** — the smallest call in each path that ends a paid line, so no entry stays live with the
+  board after its line ends: `swap.services.ts` `executeDirectDrop`, `approveChangeRequest` (a drop
+  or a swap request) and `executeDirectSwap` take the line's receipt (`lockReceiptOf`), then the
+  line `FOR UPDATE`, and only then price the refund with `refundFor(tx, …)` — "mark as sent" takes
+  the line `FOR SHARE`, so a mark landing meanwhile counts (item 4) — and after the drop leg call
+  F4's `withdrawEntriesOfLineInTx(tx, line, reason, parent)` ('the family dropped the subject' /
+  'the family swapped the subject'), `tellWithdrawn` after the commit (item 1). In step B's
+  files: `reservation.services.ts` `reserveLines` calls F4's `verifyDeclaredAtDeclarationInTx(tx,
+  declared lines)` after the consents (a declared sitting with a real grade on record is verified
+  at once, item 3); `verification.services.ts` exports `recordVerifiedInTx` (the verified answer,
+  used by `verifyPriorSitting` and that call), its rejection after the first-entry deadline and its
+  `hold` drop withdraw the line's entries, and the hold drop passes `neverSent` only when
+  `sentEntriesOf` is empty (item 5; the family's notice says the board fee stays when the entry had
+  gone). In step C's: `desk-drop.services.ts` prices with `refundFor(tx, …)` after the receipt and
+  the line; `payment.services.ts` `reversePayment` withdraws the entries of each reverted line (id
+  order), its answer unchanged; `refund.services.ts` loses the stand-in `entrySentAt`
+  (`sentEntriesOf` is the seam). B's To verify tab gains "Check against the results on record" (`POST
+  /v1/exams/results/verify-declared`, admin and coordinator). Each is proved in 08x4 with a control.
 
 ## 3. As built (step 1)
 

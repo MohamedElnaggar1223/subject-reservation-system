@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
-import { onboard, refused, one, sql, audited, notified, money, CONSENT, type Client } from './helpers';
+import {
+  onboard, refused, one, sql, audited, notified, notificationsFor, money, pauseAtAudits, lockWaiters, refuseAudit, runPaymentDeadlines, waitFor, CONSENT, type Client,
+} from './helpers';
 import { examWorld, type ExamWorld, type Family, type Line } from './exam-helpers';
 
 /**
@@ -60,6 +62,20 @@ describe('F4 on the reservations rework', () => {
   const fee = (seriesId: string, keyKind: 'qualification' | 'unit' | 'option', keyId: string, amount = 500) =>
     apiResponse(w.adm.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind, keyId, amount, provisional: false }] } }));
   const reserve = async (f: Family, ls: Line[], sessionId?: string) => (await w.reserve(f, ls, true, sessionId)).map((r) => r.id);
+  const refundPreview = (f: Family, registrationId: string) => apiResponse(f.parent.api.v1.receipts['refund-preview'].$get({ query: { registrationId } }));
+  /** What the line's refunds credited to the family's escrow. */
+  const credited = async (registrationId: string) =>
+    money((await one<{ s: string }>(`select coalesce(sum(amount), 0) as s from escrow_transaction where related_registration_id = $1 and type = 'credit'`, [registrationId])).s);
+  const entriesOfLine = (lineId: string) => sql<{ id: string; entry_code: string; status: string; withdrawn_with_line: boolean; withdrawal_reason: string | null; submitted_at: string | null }>(
+    `select id, entry_code, status, withdrawn_with_line, withdrawal_reason, submitted_at from exam_entry where registration_id = $1 order by created_at, entry_code`, [lineId]);
+  /** Every entry of the line withdrawn with it for this reason (made again if it is paid again), each audited (the review of 093dbd1, item 1). */
+  const withdrawnWithLine = async (lineId: string, reason: string) => {
+    const rows = await entriesOfLine(lineId);
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.map((r) => [r.status, r.withdrawn_with_line, r.withdrawal_reason])).toEqual(rows.map(() => ['withdrawn', true, reason]));
+    await audited(rows.map((r) => r.id), rows.map(() => 'EXAM_ENTRY_WITHDRAWN'));
+    return rows;
+  };
 
   // The catalogue and offers this file adds to the world's session.
   let pMaths: string, itemP1: string, itemP2: string;      // one subject, an item per unit, each with its own teacher
@@ -360,6 +376,49 @@ describe('F4 on the reservations rework', () => {
       const row = (await entryList(w.series.pearsonJan)).rows.find((r) => r.chargeId === studentCharge)!;
       expect(row.problems).toContain('cash_in_not_paid');
     });
+
+    const paymentOf = async (chargeId: string) =>
+      (await one<{ id: string }>(`select p.id from payment p join payment_charge pc on pc.payment_id = p.id where pc.charge_id = $1 and p.status = 'completed'`, [chargeId])).id;
+
+    it("a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1)", async () => {
+      const b = w.families.b;
+      const line = w.regs.b[w.subjects.spx]!;
+      await derive(w.series.pearsonJan, b.studentId);
+      const award = (await entriesOf(w.series.pearsonJan, b.studentId)).find((e) => e.kind === 'award')!;
+      expect([award.entry_code, award.registration_id, award.charge_id]).toEqual([`${T}XMA01`, line, null]);
+      const c = await apiResponse(w.officer.api.v1.charges.$post({ json: { studentId: b.studentId, kind: 'cash_in', boardServiceId: 'svc-pearson-ci', registrationId: line } }));
+      await apiResponse(w.officer.api.v1.registrations.desk.collect.$post({ json: { studentId: b.studentId, chargeIds: [c.id], instrumentUsed: 'cash' } }));
+      expect((await entryList(w.series.pearsonJan)).cashInsToEnter.find((x) => x.chargeId === c.id)).toMatchObject({ awardEntered: true });
+      const preview = await derive(w.series.pearsonJan, b.studentId, false);
+      const row = preview.rows.find((r) => r.chargeId === c.id)!;
+      expect(row).toMatchObject({ outcome: 'ready', note: 'The award is already entered: this cash-in is linked to it' });
+      expect(row.entries.map((e) => [e.state, e.existingEntryId])).toEqual([['link', award.id]]);
+      expect(preview.summary).toMatchObject({ newEntries: 0, updates: 1 });
+      expect(await derive(w.series.pearsonJan, b.studentId)).toMatchObject({ created: 0, updated: 1 });
+      expect((await one<{ c: string | null }>(`select charge_id as c from exam_entry where id = $1`, [award.id])).c).toBe(c.id);
+      expect((await entryList(w.series.pearsonJan)).cashInsToEnter.map((x) => x.chargeId)).not.toContain(c.id);
+      expect((await one<{ n: Record<string, unknown> }>(`select new_data as n from audit_log where entity_id = $1 and action = 'EXAM_ENTRY_UPDATED'`, [award.id])).n)
+        .toMatchObject({ chargeId: c.id, reason: 'linked to the paid cash-in of its award' });
+      // Its payment reversed: the award entry is flagged, and "mark as sent" refuses it, naming it.
+      await apiResponse(w.finadmin.api.v1.payments[':id'].reverse.$post({ param: { id: await paymentOf(c.id) }, json: { reason: 'collected twice by mistake', moneyReturned: true } }));
+      expect((await entryList(w.series.pearsonJan)).rows.find((r) => r.entryId === award.id)!.problems).toContain('cash_in_not_paid');
+      expect(await refused(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [award.id] } })))
+        .toEqual({ status: 409, error: `${T}XMA01 Mathematics ${T} for Student x-xw-b is not sent: its cash-in is not paid — withdraw the entry` });
+      expect((await one<{ status: string }>(`select status from exam_entry where id = $1`, [award.id])).status).toBe('draft');
+    });
+
+    it('a paid cash-in that names no line, whose award was entered by hand without it, is linked to that entry', async () => {
+      const ch = await onboard(w.officer, 'x-xw-ch', 12);
+      const e = await apiResponse(coord.api.v1.exams.entries.$post({ json: { studentId: ch.studentId, boardSeriesId: w.series.pearsonJan, qualificationId: w.catalogue.pAward } }));
+      expect(e.chargeId).toBeNull();
+      const c = await apiResponse(w.officer.api.v1.charges.$post({ json: { studentId: ch.studentId, kind: 'cash_in', boardServiceId: 'svc-pearson-ci', boardSeriesId: w.series.pearsonJan, level: 'as_a_level' } }));
+      await apiResponse(w.officer.api.v1.registrations.desk.collect.$post({ json: { studentId: ch.studentId, chargeIds: [c.id], instrumentUsed: 'cash' } }));
+      const preview = await derive(w.series.pearsonJan, ch.studentId, false);
+      expect(preview.rows.map((r) => [r.chargeId, r.outcome, r.entries.map((x) => [x.state, x.existingEntryId])])).toEqual([[c.id, 'ready', [['link', e.id]]]]);
+      expect(await derive(w.series.pearsonJan, ch.studentId)).toMatchObject({ created: 0, updated: 1 });
+      expect((await one<{ c: string | null }>(`select charge_id as c from exam_entry where id = $1`, [e.id])).c).toBe(c.id);
+      expect((await entryList(w.series.pearsonJan)).cashInsToEnter.map((x) => x.chargeId)).not.toContain(c.id);
+    });
   });
 
   describe('"mark as sent" is what makes a line\'s board fee sent for its refund (step C\'s refundFor)', () => {
@@ -400,6 +459,12 @@ describe('F4 on the reservations rework', () => {
       const drop = await apiResponse(fam.r1!.parent.api.v1.registrations[':id'].drop.$post({ param: { id: lines.r1! }, json: { reason: 'refund check: one unit sent' } }));
       expect(drop).toMatchObject({ refundPercentage: 50, refundAmount: 500 });
       expect(await wallet()).toBe(was + 500);
+      // Both units' entries are withdrawn with the line (the review of 093dbd1, item 1); the family
+      // is told of the one that had gone to the board.
+      expect((await withdrawnWithLine(lines.r1!, 'the family dropped the subject')).map((e) => [e.entry_code, !!e.submitted_at]))
+        .toEqual([[`${T}WMA11`, true], [`${T}WMA12`, false]]);
+      expect((await notified('parent.x-xw-r1@test.local', 'EXAM_ENTRY_WITHDRAWN', 1))[0]!.body)
+        .toBe(`${T}WMA11 Pure Mathematics 1 was withdrawn from Pearson Edexcel January ${Y + 1} (exams xw): the family dropped the subject`);
     });
 
     it('the same line with none sent: the board fee comes back in full', async () => {
@@ -409,8 +474,358 @@ describe('F4 on the reservations rework', () => {
       const drop = await apiResponse(fam.r2!.parent.api.v1.registrations[':id'].drop.$post({ param: { id: lines.r2! }, json: { reason: 'refund check: none sent' } }));
       expect(drop).toMatchObject({ refundAmount: 1500 });
       expect(money((await one<{ b: string }>(`select balance as b from escrow where student_id = $1`, [fam.r2!.studentId])).b)).toBe(was + 1500);
+      // Its drafts withdrawn with it: the family refunded 1,500 has nothing left to be sent (item 1).
+      expect((await withdrawnWithLine(lines.r2!, 'the family dropped the subject')).map((e) => e.entry_code)).toEqual([`${T}WMA11`, `${T}WMA12`]);
+      expect(await entriesOf(w.series.pearsonJan, fam.r2!.studentId)).toEqual([]);
+      expect(await notificationsFor('parent.x-xw-r2@test.local', 'EXAM_ENTRY_WITHDRAWN')).toEqual([]);
     });
   });
+
+  describe('every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1)', () => {
+    const pf: Record<string, Family> = {};
+    const pl: Record<string, string> = {};
+    beforeAll(async () => {
+      for (const k of ['dq', 'sq', 'ds', 'rv', 'nl']) {
+        pf[k] = await onboard(w.officer, `x-xw-${k}`, 12);
+        pl[k] = (await reserve(pf[k]!, [w.first(w.items.sc, w.teacherId)]))[0]!;
+        await derive(w.series.cambridgeNov, pf[k]!.studentId);
+      }
+      // Three of them sent to the board: those families are told when the entries are withdrawn.
+      for (const k of ['dq', 'ds', 'rv']) {
+        const [e] = await entriesOf(w.series.cambridgeNov, pf[k]!.studentId);
+        await apiResponse(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [e!.id] } }));
+      }
+    });
+    const cambridgeNov = `Cambridge International November ${Y} (exams xw)`;
+
+    it("a drop request the parent approves: the line's entry is withdrawn with it, the family told", async () => {
+      const cr = await apiResponse(pf.dq!.student.api.v1.registrations[':id']['request-drop'].$post({ param: { id: pl.dq! }, json: { reason: 'too much this term' } }));
+      await apiResponse(pf.dq!.parent.api.v1['change-requests'][':id'].approve.$put({ param: { id: cr.id }, json: {} }));
+      expect((await lineOf(pl.dq!)).status).toBe('dropped');
+      const [e] = await withdrawnWithLine(pl.dq!, 'the family dropped the subject');
+      expect(e!.submitted_at).not.toBeNull();
+      expect((await notified('parent.x-xw-dq@test.local', 'EXAM_ENTRY_WITHDRAWN', 1))[0]!.body)
+        .toBe(`${T}97 Biology ${T} was withdrawn from ${cambridgeNov}: the family dropped the subject`);
+    });
+
+    it("a swap request the parent approves: the old line's draft is withdrawn with it; the new line is the one to enter", async () => {
+      const cr = await apiResponse(pf.sq!.student.api.v1.registrations[':id']['request-swap'].$post({
+        param: { id: pl.sq! }, json: { line: w.first(w.items.spx), reason: 'prefers mathematics' },
+      }));
+      await apiResponse(pf.sq!.parent.api.v1['change-requests'][':id'].approve.$put({ param: { id: cr.id }, json: {} }));
+      expect((await lineOf(pl.sq!)).status).toBe('dropped');
+      await withdrawnWithLine(pl.sq!, 'the family swapped the subject');
+      // A draft never went to the board: nobody is told of it.
+      expect(await notificationsFor('parent.x-xw-sq@test.local', 'EXAM_ENTRY_WITHDRAWN')).toEqual([]);
+      expect(await entriesOf(w.series.cambridgeNov, pf.sq!.studentId)).toEqual([]);
+    });
+
+    it("the family's direct swap: the old line's sent entry is withdrawn with it, the family told", async () => {
+      await apiResponse(pf.ds!.parent.api.v1.registrations[':id'].swap.$post({ param: { id: pl.ds! }, json: { line: w.first(w.items.spx), reason: 'timetable clash' } }));
+      expect((await lineOf(pl.ds!)).status).toBe('dropped');
+      await withdrawnWithLine(pl.ds!, 'the family swapped the subject');
+      expect((await notified('parent.x-xw-ds@test.local', 'EXAM_ENTRY_WITHDRAWN', 1))[0]!.body)
+        .toBe(`${T}97 Biology ${T} was withdrawn from ${cambridgeNov}: the family swapped the subject`);
+    });
+
+    it('a payment reversal: the entry is withdrawn with the line; paid again, the next derivation makes it again', async () => {
+      const pay = (await one<{ id: string }>(`select p.id from payment p join payment_registration pr on pr.payment_id = p.id where pr.registration_id = $1 and p.status = 'completed'`, [pl.rv!])).id;
+      const r = await apiResponse(w.finadmin.api.v1.payments[':id'].reverse.$post({ param: { id: pay }, json: { reason: 'bounced transfer', moneyReturned: true } }));
+      expect(r).toEqual({ reversed: true, registrationsReverted: 1 });
+      expect((await lineOf(pl.rv!)).status).toBe('pending_payment');
+      const [old] = await withdrawnWithLine(pl.rv!, 'the payment was reversed: bounced transfer');
+      expect((await notified('parent.x-xw-rv@test.local', 'EXAM_ENTRY_WITHDRAWN', 1))[0]!.body)
+        .toBe(`${T}97 Biology ${T} was withdrawn from ${cambridgeNov}: the payment was reversed: bounced transfer`);
+      // Unpaid, it is not derived; paid again, it is entered again (withdrawn with its line, not by the coordinator).
+      expect((await derive(w.series.cambridgeNov, pf.rv!.studentId, false)).rows).toEqual([]);
+      const again = await apiResponse(pf.rv!.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [pl.rv!], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
+      await apiResponse(w.officer.api.v1.payments[':id'].confirm.$post({ param: { id: again.id! }, json: { instrumentUsed: 'cash' } }));
+      expect((await lineOf(pl.rv!)).status).toBe('confirmed');
+      expect(await derive(w.series.cambridgeNov, pf.rv!.studentId)).toMatchObject({ created: 1 });
+      const live = await entriesOf(w.series.cambridgeNov, pf.rv!.studentId);
+      expect(live.map((e) => [e.entry_code, e.status, e.registration_id])).toEqual([[`${T}97`, 'draft', pl.rv]]);
+      expect(live[0]!.id).not.toBe(old!.id);
+    });
+
+    it('"mark as sent" refuses an entry whose line is no longer confirmed, naming it (the backstop should a path end a line and leave its entries)', async () => {
+      const [e] = await entriesOf(w.series.cambridgeNov, pf.nl!.studentId);
+      // No path leaves this state now (each withdraws the entries in its own transaction); it is
+      // made by hand, as a path that forgot to would leave it, and put back after.
+      await sql(`update registration set status = 'dropped' where id = $1`, [pl.nl!]);
+      try {
+        expect(await refused(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [e!.id] } })))
+          .toEqual({ status: 409, error: `${T}97 Biology ${T} for Student x-xw-nl is not sent: its reservation is dropped — withdraw the entry` });
+        expect((await one<{ status: string }>(`select status from exam_entry where id = $1`, [e!.id])).status).toBe('draft');
+      } finally {
+        await sql(`update registration set status = 'confirmed' where id = $1`, [pl.nl!]);
+      }
+      expect(await apiResponse(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [e!.id] } }))).toEqual({ submitted: 1, skipped: 0 });
+    });
+  });
+
+  describe('a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4)', () => {
+    const qf: Record<string, Family> = {};
+    const ql: Record<string, string> = {};
+    beforeAll(async () => {
+      for (const k of ['qd', 'qa', 'qs']) {
+        qf[k] = await onboard(w.officer, `x-xw-${k}`, 12);
+        ql[k] = (await reserve(qf[k]!, [w.first(w.items.sc, w.teacherId)]))[0]!;
+        await derive(w.series.cambridgeNov, qf[k]!.studentId);
+      }
+    });
+    /**
+     * "Mark as sent" held at its audit row — inside its transaction, the line held FOR SHARE — while
+     * `end` runs: the path that ends the line waits for the line, then prices its refund.
+     */
+    const sendDuring = async (f: Family, lineId: string, end: () => Promise<unknown>) => {
+      const before = await refundPreview(f, lineId);
+      expect(before).toMatchObject({ boardPart: 500, boardSent: false });
+      const [e] = await entriesOf(w.series.cambridgeNov, f.studentId);
+      const p = await pauseAtAudits(['EXAM_ENTRIES_SUBMITTED']);
+      let sent: unknown;
+      try {
+        const sending = apiResponse(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [e!.id] } }));
+        await p.paused('EXAM_ENTRIES_SUBMITTED');
+        const ending = end();
+        await lockWaiters(2);
+        await p.release('EXAM_ENTRIES_SUBMITTED');
+        sent = await sending;
+        await ending;
+      } finally {
+        await p.releaseAll();
+      }
+      expect(sent).toEqual({ submitted: 1, skipped: 0 });
+      // The board fee stays with the board: the course part alone comes back.
+      expect(await credited(lineId)).toBe(before.coursePart);
+      const [w1] = await entriesOfLine(lineId);
+      expect(w1).toMatchObject({ status: 'withdrawn', withdrawn_with_line: true });
+      expect(w1!.submitted_at).not.toBeNull();
+      expect(await sql<{ n: Record<string, unknown> }>(`select new_data as n from audit_log where entity_id = $1 and action = 'EXAM_ENTRY_WITHDRAWN'`, [w1!.id])).toHaveLength(1);
+    };
+
+    it("the family's direct drop", async () => {
+      await sendDuring(qf.qd!, ql.qd!, () => apiResponse(qf.qd!.parent.api.v1.registrations[':id'].drop.$post({ param: { id: ql.qd! }, json: { reason: 'race: sent meanwhile' } })));
+      await notified('parent.x-xw-qd@test.local', 'EXAM_ENTRY_WITHDRAWN', 1);
+    });
+
+    it("a drop request's approval", async () => {
+      const cr = await apiResponse(qf.qa!.student.api.v1.registrations[':id']['request-drop'].$post({ param: { id: ql.qa! }, json: { reason: 'race: sent meanwhile' } }));
+      await sendDuring(qf.qa!, ql.qa!, () => apiResponse(qf.qa!.parent.api.v1['change-requests'][':id'].approve.$put({ param: { id: cr.id }, json: {} })));
+      await notified('parent.x-xw-qa@test.local', 'EXAM_ENTRY_WITHDRAWN', 1);
+    });
+
+    it("the family's direct swap", async () => {
+      await sendDuring(qf.qs!, ql.qs!, () => apiResponse(qf.qs!.parent.api.v1.registrations[':id'].swap.$post({ param: { id: ql.qs! }, json: { line: w.first(w.items.spx), reason: 'race: sent meanwhile' } })));
+      await notified('parent.x-xw-qs@test.local', 'EXAM_ENTRY_WITHDRAWN', 1);
+    });
+  });
+
+  describe("an entry follows its line's answer given after it was made (the review of 093dbd1, item 2)", () => {
+    const af: Record<string, Family> = {};
+    const al: Record<string, string> = {};
+    beforeAll(async () => {
+      for (const k of ['ra', 'rb', 'rc', 'ca', 'cc', 'cd', 'ce', 'cs']) af[k] = await onboard(w.officer, `x-xw-${k}`, 12);
+      for (const k of ['ra', 'rb', 'rc']) al[k] = (await reserve(af[k]!, [retake(w.items.sc, { month: 'june', year: Y }, { teacherId: w.teacherId })]))[0]!;
+      for (const k of ['ca', 'cc', 'cd', 'ce', 'cs']) al[k] = (await reserve(af[k]!, [carry(itemCF, { month: 'june', year: Y })]))[0]!;
+    });
+    const nov = () => w.series.cambridgeNov;
+    const verify = (id: string, json: { outcome: 'verified' | 'rejected'; reason: string; prevCentre?: string; prevCandidateNumber?: string }) =>
+      apiResponse(coord.api.v1.registrations[':id']['verify-prior'].$post({ param: { id }, json }));
+    const only = async (k: string) => (await entriesOf(nov(), af[k]!.studentId))[0]!;
+    const rowOf = async (entryId: string) => (await entryList(nov())).rows.find((r) => r.entryId === entryId)!;
+    const send = (id: string) => apiResponse(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [id] } }));
+    const updatedRow = (id: string) => one<{ p: Record<string, unknown>; n: Record<string, unknown> }>(
+      `select previous_data as p, new_data as n from audit_log where entity_id = $1 and action = 'EXAM_ENTRY_UPDATED' order by created_at desc limit 1`, [id]);
+
+    it('a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it', async () => {
+      await derive(nov(), af.ra!.studentId);
+      const e = await only('ra');
+      expect([e.is_retake, e.retake_source]).toEqual([true, 'registration']);
+      await send(e.id);
+      expect(await verify(al.ra!, { outcome: 'rejected', reason: 'no such sitting on the board statement' })).toMatchObject({ outcome: 'rejected', effect: 'stands' });
+      const row = await rowOf(e.id);
+      expect(row.values).toMatchObject({ retake: 'Y' });
+      expect(row.problems).toContain('retake_differs_from_line');
+      // A derivation leaves a sent entry alone: the coordinator amends it with the board.
+      expect(await derive(nov(), af.ra!.studentId)).toMatchObject({ created: 0, updated: 0 });
+      expect((await only('ra')).is_retake).toBe(true);
+    });
+
+    it("a retake rejected after its draft was made: the next derivation brings the draft up to date as a first entry, audited", async () => {
+      await derive(nov(), af.rb!.studentId);
+      const e = await only('rb');
+      expect(e.is_retake).toBe(true);
+      await verify(al.rb!, { outcome: 'rejected', reason: 'no such sitting on the board statement' });
+      expect((await rowOf(e.id)).problems).toContain('retake_differs_from_line');
+      const preview = await derive(nov(), af.rb!.studentId, false);
+      expect(preview.summary).toMatchObject({ newEntries: 0, updates: 1 });
+      expect(preview.rows.map((r) => [r.outcome, r.entries.map((x) => x.state)])).toEqual([['ready', ['refresh']]]);
+      expect(await derive(nov(), af.rb!.studentId)).toMatchObject({ created: 0, updated: 1 });
+      expect(await only('rb')).toMatchObject({ id: e.id, status: 'draft', is_retake: false, retake_source: null });
+      const row = await rowOf(e.id);
+      expect(row.values).toMatchObject({ retake: 'N' });
+      expect(row.problems).not.toContain('retake_differs_from_line');
+      expect(await updatedRow(e.id)).toMatchObject({
+        p: { isRetake: true, retakeSource: 'registration' }, n: { isRetake: false, retakeSource: null, reason: "brought up to date with the reservation's answered sitting" },
+      });
+      // Up to date: nothing more to change.
+      expect((await derive(nov(), af.rb!.studentId, false)).summary).toMatchObject({ newEntries: 0, updates: 0 });
+    });
+
+    it('a retake verified after derivation: nothing changes and nothing is flagged', async () => {
+      await derive(nov(), af.rc!.studentId);
+      const e = await only('rc');
+      await verify(al.rc!, { outcome: 'verified', reason: 'the board statement shows it' });
+      expect((await rowOf(e.id)).problems).not.toContain('retake_differs_from_line');
+      expect(await derive(nov(), af.rc!.studentId)).toMatchObject({ created: 0, updated: 0 });
+      expect((await only('rc')).is_retake).toBe(true);
+    });
+
+    it('a carry forward declared and not verified is derived as suggested, not confirmed', async () => {
+      await derive(nov(), af.ca!.studentId);
+      const e = await only('ca');
+      expect([e.option_code, e.carry_forward, e.cf_from_month, e.cf_from_year, e.cf_centre_number]).toEqual(['BY', 'suggested', 'june', Y, 'EG123']);
+      const row = await rowOf(e.id);
+      expect(row.problems).toContain('carry_forward_to_confirm');
+      expect(row.problems).not.toContain('carry_forward_differs_from_line');
+    });
+
+    it('verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number', async () => {
+      const e = await only('ca');
+      await verify(al.ca!, { outcome: 'verified', prevCentre: 'EG998', prevCandidateNumber: '0453', reason: "seen on the other centre's statement" });
+      expect((await rowOf(e.id)).problems).toContain('carry_forward_differs_from_line');
+      expect(await derive(nov(), af.ca!.studentId)).toMatchObject({ created: 0, updated: 1 });
+      expect(await only('ca')).toMatchObject({ id: e.id, option_code: 'BY', carry_forward: 'confirmed', cf_from_month: 'june', cf_from_year: Y, cf_centre_number: 'EG998', cf_candidate_number: '0453' });
+      const row = await rowOf(e.id);
+      expect(row.problems).not.toContain('carry_forward_differs_from_line');
+      expect(row.problems).not.toContain('carry_forward_to_confirm');
+      expect(row.values).toMatchObject({ previousCentre: 'EG998', previousCandidate: '0453' });
+    });
+
+    it("verified here after derivation: the next derivation confirms the suggested carry forward", async () => {
+      await derive(nov(), af.cc!.studentId);
+      const e = await only('cc');
+      expect(e.carry_forward).toBe('suggested');
+      await verify(al.cc!, { outcome: 'verified', reason: 'our own June results' });
+      const row = await rowOf(e.id);
+      expect(row.problems).toContain('carry_forward_to_confirm');
+      expect(row.problems).not.toContain('carry_forward_differs_from_line');
+      expect(await derive(nov(), af.cc!.studentId)).toMatchObject({ updated: 1 });
+      expect(await only('cc')).toMatchObject({ carry_forward: 'confirmed', cf_centre_number: 'EG123' });
+      expect((await rowOf(e.id)).problems).not.toContain('carry_forward_to_confirm');
+    });
+
+    it('rejected before derivation: entered as a first entry with no carry forward, the option left to choose', async () => {
+      await verify(al.cd!, { outcome: 'rejected', reason: 'no June result for this candidate' });
+      const done = await derive(nov(), af.cd!.studentId);
+      expect(done.rows.map((r) => r.note)).toEqual([`The declared sitting was not confirmed: Biology A Level ${T} is entered as a first entry — choose the option that enters every component`]);
+      expect(await only('cd')).toMatchObject({ option_code: null, carry_forward: 'none', cf_from_month: null });
+    });
+
+    it('rejected after derivation: the draft loses the carry forward and its option; a sent entry keeps them and is flagged', async () => {
+      await derive(nov(), af.ce!.studentId);
+      await derive(nov(), af.cs!.studentId);
+      const draft = await only('ce');
+      const sent = await only('cs');
+      expect([draft.option_code, draft.carry_forward, sent.option_code, sent.carry_forward]).toEqual(['BY', 'suggested', 'BY', 'suggested']);
+      await send(sent.id);
+      for (const k of ['ce', 'cs']) expect(await verify(al[k]!, { outcome: 'rejected', reason: 'no June result for this candidate' })).toMatchObject({ effect: 'stands' });
+      expect((await rowOf(draft.id)).problems).toContain('carry_forward_differs_from_line');
+      expect((await rowOf(sent.id)).problems).toContain('carry_forward_differs_from_line');
+      expect(await derive(nov(), af.ce!.studentId)).toMatchObject({ updated: 1 });
+      expect(await only('ce')).toMatchObject({ id: draft.id, option_code: null, carry_forward: 'none', cf_from_month: null, cf_from_year: null, cf_centre_number: null, cf_candidate_number: null });
+      expect((await rowOf(draft.id)).problems).not.toContain('carry_forward_differs_from_line');
+      expect(await derive(nov(), af.cs!.studentId)).toMatchObject({ updated: 0 });
+      expect(await only('cs')).toMatchObject({ id: sent.id, option_code: 'BY', carry_forward: 'suggested', status: 'submitted' });
+    });
+  });
+
+  describe("a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9)", () => {
+    const kf: Record<string, Family> = {};
+    const uci: Record<string, string> = {};
+    let june: string;
+    beforeAll(async () => {
+      for (const k of ['kz', 'kr', 'ka', 'vi', 'vp', 'vf']) kf[k] = await onboard(w.officer, `x-xw-${k}`, 12);
+      // Pearson's June series, as a declaration names it (made by the first one to, if none has yet).
+      const [z] = await reserve(kf.kz!, [retake(w.items.sp1, { month: 'june', year: Y })]);
+      june = (await one<{ s: string }>(`select prior_sitting_series_id as s from registration where id = $1`, [z!])).s;
+      let n = 611;
+      for (const k of ['kr', 'ka', 'vi', 'vp', 'vf']) {
+        uci[k] = `91234B26${String(n++).padStart(4, '0')}E`;
+        await apiResponse(coord.api.v1.exams.candidates[':studentId'].$put({ param: { studentId: kf[k]!.studentId }, json: { uci: uci[k] } }));
+      }
+    });
+    const declare = async (k: string) => (await reserve(kf[k]!, [retake(w.items.sp1, { month: 'june', year: Y })]))[0]!;
+    const answer = (id: string) => one<{ user_id: string; n: { reason: string; evidence: string } }>(
+      `select user_id, new_data as n from audit_log where entity_id = $1 and action = 'PRIOR_SITTING_VERIFIED'`, [id]);
+    const verifiedBy = async (id: string) => (await one<{ by: string | null }>(`select prior_sitting_verified_by as by from registration where id = $1`, [id])).by;
+
+    it("an import verifies the declared sittings it shows with a real grade, as the one who imported them; absent and pending verify nothing", async () => {
+      const vi = await declare('vi');
+      const vp = await declare('vp');
+      const done = await apiResponse(w.adm.api.v1.exams.results.import.$post({ json: {
+        boardSeriesId: june, commit: true,
+        source: { text: `UCI,Unit Code,Grade,UMS\n${uci.kr},${T}WMA11,C,60\n${uci.ka},${T}WMA11,X,\n${uci.vi},${T}WMA11,A,80\n${uci.vp},${T}WMA11,PENDING,`, name: 'June results (admin)' },
+      } }));
+      expect(done).toMatchObject({ committed: true, verificationFailed: 0, verificationNote: null });
+      expect(done.sittingsVerified.map((v) => v.registrationId)).toEqual([vi]);
+      expect((await lineOf(vi)).outcome).toBe('verified');
+      expect((await lineOf(vp)).outcome).toBeNull();
+      expect(await verifiedBy(vi)).toBe(w.adm.id);
+      expect((await answer(vi)).user_id).toBe(w.adm.id);
+    });
+
+    it('a retake declared after its sitting is on record is verified at once, by the importer; a sitting graded absent waits for the coordinator', async () => {
+      const kr = await declare('kr');
+      const ka = await declare('ka');
+      expect((await lineOf(kr)).outcome).toBe('verified');
+      expect(await verifiedBy(kr)).toBe(w.adm.id);
+      const a = await answer(kr);
+      expect(a.user_id).toBe(w.adm.id);
+      expect(a.n).toMatchObject({
+        reason: `Pearson Edexcel June ${Y}'s results list ${T}WMA11 for the candidate (results on record at declaration)`,
+        evidence: `The board's results for Pearson Edexcel June ${Y}: ${T}WMA11 graded C`,
+      });
+      expect((await lineOf(ka)).outcome).toBeNull();
+      const toVerify = await apiResponse(coord.api.v1.sessions[':id']['to-verify'].$get({ param: { id: w.sessionId }, query: { show: 'awaiting' } }));
+      expect(toVerify.lines.map((l) => l.id)).toContain(ka);
+      expect(toVerify.lines.map((l) => l.id)).not.toContain(kr);
+      // Item 9: the line says retake and so does the history (June's result): the source is the line's.
+      await derive(w.series.pearsonJan, kf.kr!.studentId);
+      expect((await entriesOf(w.series.pearsonJan, kf.kr!.studentId)).map((e) => [e.entry_code, e.is_retake, e.retake_source, e.registration_id]))
+        .toEqual([[`${T}WMA11`, true, 'registration', kr]]);
+    });
+
+    it("a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator", async () => {
+      const vf = await declare('vf');
+      const importing = () => apiResponse(coord.api.v1.exams.results.import.$post({ json: {
+        boardSeriesId: june, commit: true, source: { text: `UCI,Unit Code,Grade,UMS\n${uci.vf},${T}WMA11,B,70`, name: 'June results, a late page' },
+      } }));
+      const release = await refuseAudit('PRIOR_SITTING_VERIFIED');
+      let done = null as Awaited<ReturnType<typeof importing>> | null;
+      try {
+        done = await importing();
+      } finally {
+        await release();
+      }
+      expect(done).toMatchObject({
+        committed: true, sittingsVerified: [], verificationFailed: 1,
+        verificationNote: "Results saved; the verification of 1 declared sitting failed — answer it on the session's To verify tab",
+      });
+      expect(await sql(`select grade from exam_result where student_id = $1 and board_series_id = $2`, [kf.vf!.studentId, june])).toEqual([{ grade: 'B' }]);
+      expect((await lineOf(vf)).outcome).toBeNull();
+      const checked = await apiResponse(coord.api.v1.exams.results['verify-declared'].$post({ json: { sessionId: w.sessionId } }));
+      expect(checked.verified.map((v) => v.registrationId)).toEqual([vf]);
+      expect(checked.failed).toBe(0);
+      expect(checked.awaiting).toBeGreaterThan(1);
+      const a = await answer(vf);
+      expect(a.user_id).toBe(coord.id);
+      expect(a.n.reason).toBe(`Pearson Edexcel June ${Y}'s results list ${T}WMA11 for the candidate (results on record, from the To verify tab)`);
+      // Asked again: nothing more to answer.
+      expect((await apiResponse(coord.api.v1.exams.results['verify-declared'].$post({ json: { sessionId: w.sessionId } }))).verified).toEqual([]);
+    });
+  });
+
 
   describe('each line cut off at its own deadline; the desk\'s drop past it withdraws the entries', () => {
     let june: string, juneSeries: string, j1: string, j2: string, j3: string, j4: string;
@@ -475,10 +890,91 @@ describe('F4 on the reservations rework', () => {
       const e = await one<{ id: string; status: string; withdrawal_reason: string }>(`select id, status, withdrawal_reason from exam_entry where registration_id = $1`, [j1]);
       expect(e).toMatchObject({ status: 'withdrawn', withdrawal_reason: 'the family moved abroad' });
       await audited([e.id], ['EXAM_ENTRY_WITHDRAWN']);
-      expect((await one<{ d: { byDeskDrop: string } }>(`select new_data as d from audit_log where entity_id = $1 and action = 'EXAM_ENTRY_WITHDRAWN'`, [e.id])).d.byDeskDrop).toBe(j1);
+      expect((await one<{ d: { withLine: string } }>(`select new_data as d from audit_log where entity_id = $1 and action = 'EXAM_ENTRY_WITHDRAWN'`, [e.id])).d.withLine).toBe(j1);
       const told = await notified(`parent.x-xw-j1@test.local`, 'EXAM_ENTRY_WITHDRAWN', 1);
       expect(told[0]!.body).toBe(`${T}97 Biology ${T} was withdrawn from Cambridge International June ${Y + 1} (exams xw june): the family moved abroad`);
       expect((await notified(`parent.x-xw-j1@test.local`, 'DROP_SWAP_PROCESSED', 1))[0]!.body).toContain(`The board fee stays with the board: the school sent ${T}97`);
+    });
+
+    it("a declared retake rejected past the first-entry deadline is dropped: its sent entry withdrawn with it, the board fee kept (the review of 093dbd1, item 1)", async () => {
+      const before = await refundPreview(jf.j2!, j2);
+      expect(before).toMatchObject({ boardSent: true, boardPart: 0 });
+      const r = await apiResponse(coord.api.v1.registrations[':id']['verify-prior'].$post({ param: { id: j2 }, json: { outcome: 'rejected', reason: 'no November result for this candidate' } }));
+      expect(r).toMatchObject({ outcome: 'rejected', effect: 'dropped', refundAmount: before.amount });
+      expect((await lineOf(j2)).status).toBe('dropped');
+      expect(await credited(j2)).toBe(before.amount);
+      const [e] = await withdrawnWithLine(j2, 'the declared sitting was not confirmed after the first-entry deadline');
+      expect(e!.submitted_at).not.toBeNull();
+      expect((await notified('parent.x-xw-j2@test.local', 'EXAM_ENTRY_WITHDRAWN', 1))[0]!.body)
+        .toBe(`${T}97 Biology ${T} was withdrawn from Cambridge International June ${Y + 1} (exams xw june): the declared sitting was not confirmed after the first-entry deadline`);
+    });
+  });
+
+  describe("step B's hold at the deadline drops a paid line and withdraws its entries; a sent one keeps its board fee (the review of 093dbd1, items 1 and 5)", () => {
+    let holdSeries: string, holdSession: string, h1: string, h2: string;
+    const hf: Record<string, Family> = {};
+    beforeAll(async () => {
+      holdSeries = (await apiResponse(w.adm.api.v1['board-series'].$post({ json: {
+        boardCode: 'cambridge', month: 'june', year: Y + 1, label: 'exams xw hold', entryDeadline: new Date(Date.now() + 5 * DAY), retakeDeadline: new Date(Date.now() + 10 * DAY),
+      } }))).id;
+      await fee(holdSeries, 'qualification', w.catalogue.cSyllabus);
+      holdSession = (await apiResponse(w.adm.api.v1.sessions.$post({ json: {
+        type: 'june', year: Y + 1, label: 'exams xw hold', startDate: new Date(Date.now() - DAY).toISOString(), endDate: new Date(Date.now() + 3 * DAY).toISOString(),
+        courseStartsOn: cairoDate(new Date()), paymentDueAt: new Date(Date.now() + 3 * DAY).toISOString(),
+      } })))!.id;
+      const bio = await subject('BIOH', 'Biology hold', 'cambridge', 'as_level');
+      const [item] = await offer(holdSession, bio, 1000, [w.teacherId], [
+        { label: 'Whole subject', kind: 'whole', enters: { kind: 'award', qualificationId: w.catalogue.cSyllabus }, boardSeriesId: holdSeries, availability: 'open', requiredInSeries: false },
+      ]) as [string];
+      for (const k of ['h1', 'h2']) hf[k] = await onboard(w.officer, `x-xw-${k}`, 12);
+      // Retakes of the board's previous sitting (November), declared at the desk and not verified: entered as declared.
+      [h1] = await reserve(hf.h1!, [retake(item, { month: 'november', year: Y })], holdSession) as [string];
+      [h2] = await reserve(hf.h2!, [retake(item, { month: 'november', year: Y })], holdSession) as [string];
+      await derive(holdSeries, hf.h1!.studentId);
+      await derive(holdSeries, hf.h2!.studentId);
+      // H1's entry goes to the board under "enter as declared"; H2's stays a draft.
+      const [e1] = await entriesOf(holdSeries, hf.h1!.studentId);
+      await apiResponse(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [e1!.id] } }));
+    });
+
+    it('the school turns hold on, the deadline passes: the sent line keeps its board fee and its entry is withdrawn; the unsent one gets it back', async () => {
+      const p1 = await refundPreview(hf.h1!, h1);
+      const p2 = await refundPreview(hf.h2!, h2);
+      expect(p1).toMatchObject({ boardSent: true, boardPart: 0 });
+      expect(p2).toMatchObject({ boardSent: false, boardPart: 500 });
+      await apiResponse(w.adm.api.v1.settings[':key'].$put({ param: { key: 'verification.unverifiedAtDeadline' }, json: { value: 'hold', reason: 'scenario: the school holds unverified sittings (Q-22)' } }));
+      try {
+        // Hold in force (its SETTING_CHANGED row: after the entries were made and sent) before the
+        // retake deadline passed, a millisecond later; the sweep runs once that moment is behind it.
+        const [on] = await sql<{ id: string }>(`select id from audit_log where action = 'SETTING_CHANGED' and entity_id = 'verification.unverifiedAtDeadline' order by created_at desc limit 1`);
+        await sql(`update board_series set entry_deadline = now() - interval '2 minutes',
+          retake_deadline = (select created_at + interval '1 millisecond' from audit_log where id = $1) where id = $2`, [on!.id, holdSeries]);
+        const passes = new Date((await one<{ d: string }>(`select retake_deadline as d from board_series where id = $1`, [holdSeries])).d).getTime();
+        await waitFor(async () => (Date.now() > passes + 50 && (await one<{ ok: boolean }>(`select now() > $1::timestamptz + interval '50 milliseconds' as ok`, [new Date(passes).toISOString()])).ok) || null);
+        const run = await runPaymentDeadlines();
+        expect(run.unverifiedDropped).toBeGreaterThanOrEqual(2);
+        for (const id of [h1, h2]) expect((await lineOf(id)).status).toBe('dropped');
+        // The board fee stays with the board for the line whose entry was sent; the other gets it back.
+        expect(await credited(h1)).toBe(p1.amount);
+        expect(await credited(h2)).toBe(p2.amount);
+        expect(p2.amount - p1.amount).toBe(500);
+        const reason = 'the declared sitting was not verified by its deadline (the school holds such lines)';
+        const [s1] = await withdrawnWithLine(h1, reason);
+        const [s2] = await withdrawnWithLine(h2, reason);
+        expect([!!s1!.submitted_at, !!s2!.submitted_at]).toEqual([true, false]);
+        const dropped = async (id: string) => (await one<{ n: Record<string, unknown> }>(`select new_data as n from audit_log where entity_id = $1 and action = 'LINE_DROPPED_UNVERIFIED'`, [id])).n;
+        expect(await dropped(h1)).toMatchObject({ status: 'dropped', boardSent: true, entriesWithdrawn: 1, setting: 'hold' });
+        expect(await dropped(h2)).toMatchObject({ status: 'dropped', boardSent: false, entriesWithdrawn: 1, setting: 'hold' });
+        expect((await notified('parent.x-xw-h1@test.local', 'EXAM_ENTRY_WITHDRAWN', 1))[0]!.body)
+          .toBe(`${T}97 Biology ${T} was withdrawn from Cambridge International June ${Y + 1} (exams xw hold): the declared sitting was not verified by its deadline`);
+        expect(await notificationsFor('parent.x-xw-h2@test.local', 'EXAM_ENTRY_WITHDRAWN')).toEqual([]);
+        const told = async (email: string) => (await notified(email, 'DECLARATION_REVIEWED', 1))[0]!.body;
+        expect(await told('parent.x-xw-h1@test.local')).toContain('so its entry was withdrawn and it has been dropped');
+        expect(await told('parent.x-xw-h1@test.local')).toContain('(the board fee stays with the board: the entry had been sent)');
+        expect(await told('parent.x-xw-h2@test.local')).toContain('so it was not entered and has been dropped');
+      } finally {
+        await apiResponse(w.adm.api.v1.settings[':key'].$put({ param: { key: 'verification.unverifiedAtDeadline' }, json: { value: 'enter_as_declared', reason: 'scenario done' } }));
+      }
     });
   });
 });

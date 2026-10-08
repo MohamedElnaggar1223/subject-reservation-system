@@ -37,12 +37,14 @@
 
 import {
   db, registration, receipt, paymentRegistration, payment, paymentCharge, charge, parentStudentLink, schoolSetting,
-  and, eq, inArray, sql,
+  and, eq, inArray, isNull, sql,
 } from '@repo/db';
 import { hasRole, ROLES, FINANCE_ROLES, type VerifyPriorSittingType } from '@repo/validations';
 import { logAction, logActions, expiryEntries, type AuditContext } from './audit.services';
 import { effectiveDeadlineFor, effectiveDeadlinesOf } from './deadline.services';
 import { executeReceiptGatedDrop } from './receipt.services';
+import { withdrawEntriesOfLineInTx, tellWithdrawn } from './exam-entry.services';
+import { sentEntriesOf } from './refund.services';
 import { getSetting } from './settings.services';
 import { createNotification } from './notification.services';
 import { refundFor } from './refund.services';
@@ -215,6 +217,32 @@ async function paymentState(tx: Tx, registrationId: string) {
 
 // ─── Verify or reject ────────────────────────────────────────────────────────
 
+/**
+ * The verified answer, written in the caller's transaction with the line held (the coordinator's
+ * answer below; F4's match at declaration, which verifies a sitting the school's own results show,
+ * the one who imported them as the one who answered): the line stands, the outcome with who and
+ * when, a carry-forward's previous centre and number recorded (never listed: the audit row says
+ * only that they were), one PRIOR_SITTING_VERIFIED row. Only an unanswered declared sitting is
+ * answered; returns whether it was.
+ */
+export async function recordVerifiedInTx(
+  tx: Tx,
+  registrationId: string,
+  a: { actorId: string; now: Date; reason: string; evidence?: string; prevCentre?: string; prevCandidateNumber?: string },
+  ctx?: AuditContext,
+) {
+  const [row] = await tx.update(registration).set({
+    priorSittingVerifiedOutcome: 'verified', priorSittingVerifiedAt: a.now, priorSittingVerifiedBy: a.actorId, updatedAt: a.now,
+    ...(a.prevCentre ? { priorCentre: a.prevCentre } : {}),
+    ...(a.prevCandidateNumber ? { priorCandidateNumber: a.prevCandidateNumber } : {}),
+  }).where(and(eq(registration.id, registrationId), isNull(registration.priorSittingVerifiedOutcome),
+    inArray(registration.priorSittingSource, [...DECLARED]))).returning({ source: registration.priorSittingSource, series: registration.priorSittingSeriesId });
+  if (!row) return false;
+  await logAction(a.actorId, 'PRIOR_SITTING_VERIFIED', 'registration', registrationId, { priorSittingSource: row.source },
+    { outcome: 'verified', priorSittingSeriesId: row.series, reason: a.reason, ...(a.evidence ? { evidence: a.evidence } : {}), previousCentreRecorded: !!a.prevCentre }, ctx, tx);
+  return true;
+}
+
 export type VerifyOutcome =
   | { outcome: 'verified' }
   | { outcome: 'rejected'; effect: 'expired' }
@@ -239,6 +267,7 @@ export async function verifyPriorSitting(
   const before = await loadLine(db, registrationId);
   if (!before) throw new VerificationError('Registration not found', 404);
 
+  let withdrawn: Awaited<ReturnType<typeof withdrawEntriesOfLineInTx>> = [];
   const result = await db.transaction(async (tx): Promise<VerifyOutcome> => {
     const line = await lockLine(tx, registrationId);
     if (!line) throw new VerificationError('Registration not found', 404);
@@ -253,14 +282,9 @@ export async function verifyPriorSitting(
     const why = { reason: input.reason, ...(input.evidence ? { evidence: input.evidence } : {}) };
 
     if (input.outcome === 'verified') {
-      await tx.update(registration).set({
-        ...decided,
-        ...(input.prevCentre ? { priorCentre: input.prevCentre } : {}),
-        ...(input.prevCandidateNumber ? { priorCandidateNumber: input.prevCandidateNumber } : {}),
-      }).where(eq(registration.id, registrationId));
-      // The previous centre and candidate number are recorded, never listed (§3.5): the row says only that they were.
-      await logAction(actor.id, 'PRIOR_SITTING_VERIFIED', 'registration', registrationId, { priorSittingSource: line.priorSittingSource },
-        { outcome: 'verified', priorSittingSeriesId: line.priorSittingSeriesId, ...why, previousCentreRecorded: !!input.prevCentre }, ctx, tx);
+      await recordVerifiedInTx(tx, registrationId, {
+        actorId: actor.id, now, reason: input.reason, evidence: input.evidence, prevCentre: input.prevCentre, prevCandidateNumber: input.prevCandidateNumber,
+      }, ctx);
       return { outcome: 'verified' };
     }
 
@@ -306,6 +330,8 @@ export async function verifyPriorSitting(
     const drop = await executeReceiptGatedDrop(tx, {
       registrationId, studentId: line.studentId, refundAmount: refund.amount, refundReason: 'drop', initiatedBy: actor.id,
     });
+    // The board's entries of the dropped line withdrawn with it (F4; the review of 093dbd1, item 1).
+    withdrawn = await withdrawEntriesOfLineInTx(tx, registrationId, 'the declared sitting was not confirmed after the first-entry deadline', actor.id, ctx);
     await tx.update(registration).set(decided).where(eq(registration.id, registrationId));
     await logAction(actor.id, 'PRIOR_SITTING_REJECTED', 'registration', registrationId, { status: 'confirmed' },
       { outcome: 'rejected', effect: 'dropped', status: drop.gated ? 'dropped_pending_receipt' : 'dropped', refundAmount: drop.refundAmount,
@@ -313,6 +339,8 @@ export async function verifyPriorSitting(
     return { outcome: 'rejected', effect: 'dropped', refundAmount: drop.refundAmount, refundPercentage: refund.percent, gated: drop.gated };
   });
 
+  await tellWithdrawn(withdrawn, 'the declared sitting was not confirmed after the first-entry deadline')
+    .catch((err) => console.error('[verification] Could not tell the family of the withdrawn entries:', err));
   if (result.outcome === 'rejected') {
     const sitting = before.sitting ?? 'the sitting declared';
     const body = result.effect === 'expired'
@@ -385,13 +413,18 @@ export async function holdUnverifiedAtDeadline(now: Date = new Date()) {
         // Paid since this tick found it waiting: its receipt was made after lockLine looked for one
         // (MA-16's order); left to the next tick, which takes the receipt first.
         if (found !== 'confirmed') return null;
-        // A held line was never entered: its board fee is counted not sent (refundFor's neverSent).
-        const refund = await refundFor(tx, id, now, { neverSent: true });
+        // A held line was never entered — its board fee is counted not sent (refundFor's neverSent) —
+        // unless an entry of it had gone to the board under "enter as declared" before the school
+        // turned `hold` on: then its board fee follows the per-line "sent" rule (the review of
+        // 093dbd1, item 5), and the entry is withdrawn with the line (item 1).
+        const sent = await sentEntriesOf(tx, id);
+        const refund = await refundFor(tx, id, now, { neverSent: sent.length === 0 });
         const drop = await executeReceiptGatedDrop(tx, { registrationId: id, studentId: line.studentId, refundAmount: refund.amount, refundReason: 'drop', initiatedBy: line.studentId });
+        const entries = await withdrawEntriesOfLineInTx(tx, id, 'the declared sitting was not verified by its deadline (the school holds such lines)', null);
         await logAction(null, 'LINE_DROPPED_UNVERIFIED', 'registration', id, { status: 'confirmed' },
           { status: drop.gated ? 'dropped_pending_receipt' : 'dropped', refundAmount: drop.refundAmount, refundPercentage: refund.percent, gated: drop.gated,
-            deadline: d.at.toISOString(), setting: 'hold', priorSittingSeriesId: line.priorSittingSeriesId }, undefined, tx);
-        return { line, effect: 'dropped' as const, deadline: d.at, drop };
+            deadline: d.at.toISOString(), setting: 'hold', priorSittingSeriesId: line.priorSittingSeriesId, boardSent: refund.boardSent, entriesWithdrawn: entries.length }, undefined, tx);
+        return { line, effect: 'dropped' as const, deadline: d.at, drop, boardSent: refund.boardSent, entries };
       });
       if (!done) continue;
       if (done.effect === 'expired') expired++;
@@ -399,7 +432,8 @@ export async function holdUnverifiedAtDeadline(now: Date = new Date()) {
       const sitting = done.line.sitting ?? 'the sitting declared';
       const body = done.effect === 'expired'
         ? `${sitting} for ${done.line.name} was not confirmed by the board's deadline (${schoolDate(done.deadline)}), so the reservation has ended.`
-        : `${sitting} for ${done.line.name} was not confirmed by the board's deadline (${schoolDate(done.deadline)}), so it was not entered and has been dropped: ${done.drop.gated ? `bring the paper receipt back to the finance desk to release EGP ${done.drop.refundAmount.toFixed(2)} to your escrow` : `EGP ${done.drop.refundAmount.toFixed(2)} was returned to your escrow`}.`;
+        : `${sitting} for ${done.line.name} was not confirmed by the board's deadline (${schoolDate(done.deadline)}), so ${done.boardSent ? 'its entry was withdrawn and it has been dropped' : 'it was not entered and has been dropped'}: ${done.drop.gated ? `bring the paper receipt back to the finance desk to release EGP ${done.drop.refundAmount.toFixed(2)} to your escrow` : `EGP ${done.drop.refundAmount.toFixed(2)} was returned to your escrow`}${done.boardSent ? ' (the board fee stays with the board: the entry had been sent)' : ''}.`;
+      if (done.effect === 'dropped') await tellWithdrawn(done.entries, 'the declared sitting was not verified by its deadline').catch(() => undefined);
       await tellFamily(done.line.studentId, 'Declared sitting not confirmed in time', body, { registrationId: id, effect: done.effect })
         .catch((err) => console.error('[verification] Could not tell the family:', err));
     } catch (err) {

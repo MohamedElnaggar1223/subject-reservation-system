@@ -177,7 +177,7 @@ export async function setSittingRooms(data: SetSittingRoomsType, actorId: string
     for (const r of data.rooms) {
       const rr = found.find((x) => x.id === r.roomId);
       if (!rr) throw new ExamError('Room not found', 404);
-      if (!rr.isActive) throw new ExamError(`${rr.name} is no longer in use`, 409);
+      if (!rr.isActive) throw new ExamError(`The room ${rr.name} is no longer in use`, 409);
     }
     const seats = await tx.select().from(examSeat).where(and(eq(examSeat.examDate, data.examDate), eq(examSeat.session, data.session)));
     const before = await tx.select().from(examRoomSitting).where(and(eq(examRoomSitting.examDate, data.examDate), eq(examRoomSitting.session, data.session)));

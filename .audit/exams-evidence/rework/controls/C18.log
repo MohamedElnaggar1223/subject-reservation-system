@@ -4,19 +4,22 @@
 # expected red: ['two items of one subject are two lines']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 5 failed) 9681ms
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 6 failed) 24249ms
    × F4 on the reservations rework > what a line's item enters (lineItemsFor) > two items of one subject are two lines, each entered as its own unit with its own line 86ms
      → expected [ [ …(3) ], [ …(3) ] ] to deeply equal [ [ …(3) ], [ …(3) ] ]
-   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's 21ms
-   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified 149ms
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's 18ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified 157ms
      → expected 4 to be 2 // Object.is equality
-   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 52ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 57ms
      → expected { status: 409, …(1) } to deeply equal { status: 409, …(1) }
-   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when 8ms
+   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when 13ms
+   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > the same line with none sent: the board fee comes back in full 29ms
+     → expected 0 to be greater than 0
  Test Files  1 failed (1)
-      Tests  5 failed | 13 passed (18)
+      Tests  6 failed | 35 passed (41)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+[results] Could not verify the declared sitting of line 2e52dc9c-8b93-4d10-bf04-ba7427df8bfe: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > what a line's item enters (lineItemsFor) > two items of one subject are two lines, each entered as its own unit with its own line
 AssertionError: expected [ [ …(3) ], [ …(3) ] ] to deeply equal [ [ …(3) ], [ …(3) ] ]
@@ -26,7 +29,7 @@ AssertionError: expected [ [ …(3) ], [ …(3) ] ] to deeply equal [ [ …(3) ]
 
 [33m@@ -2,15 +2,19 @@[39m
 [2m    [[22m
-[2m      "9210aeac-f3f7-4a5a-8e26-853fb11892e8",[22m
+[2m      "657297bb-a172-4d23-a5b3-5b3aa6aec2ee",[22m
 [2m      "P1",[22m
 [2m      [[22m
 [2m        "unit:XWWMA11",[22m
@@ -35,7 +38,7 @@ AssertionError: expected [ [ …(3) ], [ …(3) ] ] to deeply equal [ [ …(3) ]
 [2m      ],[22m
 [2m    ],[22m
 [2m    [[22m
-[2m      "282e2eaf-d28a-484e-898e-8cd5a73194e1",[22m
+[2m      "9bd4077f-c8f8-4ffe-8901-baf3be60159c",[22m
 [2m      "P2",[22m
 [2m      [[22m
 [31m+       "unit:XWWMA11",[39m
@@ -45,27 +48,27 @@ AssertionError: expected [ [ …(3) ], [ …(3) ] ] to deeply equal [ [ …(3) ]
 [2m    ],[22m
 [2m  ][22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:122:124
-    120|       lines.dP1 = p1!; lines.dP2 = p2!;
-    121|       const preview = await derive(w.series.pearsonJan, fam.d!.student…
-    122|       expect(preview.rows.map((r) => [r.registrationId, r.item?.label,…
+ ❯ test/08x4-exam-entries-rework.test.ts:138:124
+    136|       lines.dP1 = p1!; lines.dP2 = p2!;
+    137|       const preview = await derive(w.series.pearsonJan, fam.d!.student…
+    138|       expect(preview.rows.map((r) => [r.registrationId, r.item?.label,…
        |                                                                                                                            ^
-    123|         [p1, 'P1', [`unit:${T}WMA11`]],
-    124|         [p2, 'P2', [`unit:${T}WMA12`]],
+    139|         [p1, 'P1', [`unit:${T}WMA11`]],
+    140|         [p2, 'P2', [`unit:${T}WMA12`]],
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's
 TypeError: Cannot read properties of undefined (reading 'id')
- ❯ test/08x4-exam-entries-rework.test.ts:137:103
-    135|       expect(units).toEqual([{ unit: `${T}WMA11`, teacher: w.teacherId…
-    136|       const [e1, e2] = await entriesOf(w.series.pearsonJan, fam.d!.stu…
-    137|       expect(await apiResponse(w.teacher.api.v1.exams.entries[':id'].f…
+ ❯ test/08x4-exam-entries-rework.test.ts:153:103
+    151|       expect(units).toEqual([{ unit: `${T}WMA11`, teacher: w.teacherId…
+    152|       const [e1, e2] = await entriesOf(w.series.pearsonJan, fam.d!.stu…
+    153|       expect(await apiResponse(w.teacher.api.v1.exams.entries[':id'].f…
        |                                                                                                       ^
-    138|       expect(await refused(w.teacher.api.v1.exams.entries[':id'].forec…
-    139|         .toEqual({ status: 403, error: "Only the candidate's teacher f…
+    154|       expect(await refused(w.teacher.api.v1.exams.entries[':id'].forec…
+    155|         .toEqual({ status: 403, error: "Only the candidate's teacher f…
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified
 AssertionError: expected 4 to be 2 // Object.is equality
@@ -76,15 +79,15 @@ AssertionError: expected 4 to be 2 // Object.is equality
 [32m- 2[39m
 [31m+ 4[39m
 
- ❯ test/08x4-exam-entries-rework.test.ts:243:53
-    241|       expect(list.rows.find((r) => r.studentId === fam.e!.studentId)!.…
-    242|       expect(list.rows.find((r) => r.studentId === fam.f!.studentId)!.…
-    243|       expect(list.summary.prior_sitting_unverified).toBe(2);
+ ❯ test/08x4-exam-entries-rework.test.ts:259:53
+    257|       expect(list.rows.find((r) => r.studentId === fam.e!.studentId)!.…
+    258|       expect(list.rows.find((r) => r.studentId === fam.f!.studentId)!.…
+    259|       expect(list.summary.prior_sitting_unverified).toBe(2);
        |                                                     ^
-    244|       expect(list.rows.find((r) => r.studentId === fam.f!.studentId)!.…
-    245|     });
+    260|       expect(list.rows.find((r) => r.studentId === fam.f!.studentId)!.…
+    261|     });
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes
 AssertionError: expected { status: 409, …(1) } to deeply equal { status: 409, …(1) }
@@ -98,25 +101,38 @@ AssertionError: expected { status: 409, …(1) } to deeply equal { status: 409, 
 [2m    "status": 409,[22m
 [2m  }[22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:258:12
-    256|         const [fe] = await entriesOf(w.series.pearsonJan, fam.f!.stude…
-    257|         expect(await refused(coord.api.v1.exams.entries.submit.$post({…
-    258|           .toEqual({ status: 409, error: `${T}WMA12 follows a declared…
+ ❯ test/08x4-exam-entries-rework.test.ts:274:12
+    272|         const [fe] = await entriesOf(w.series.pearsonJan, fam.f!.stude…
+    273|         expect(await refused(coord.api.v1.exams.entries.submit.$post({…
+    274|           .toEqual({ status: 409, error: `${T}WMA12 follows a declared…
        |            ^
-    259|         expect((await one<{ status: string }>(`select status from exam…
-    260|         // The coordinator verifies it: it goes.
+    275|         expect((await one<{ status: string }>(`select status from exam…
+    276|         // The coordinator verifies it: it goes.
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when
 TypeError: Cannot read properties of undefined (reading 'id')
- ❯ test/08x4-exam-entries-rework.test.ts:391:90
-    389|       expect(before.boardNote).toBe('The board fee comes back: the ent…
-    390|       const [u1] = await entriesOf(w.series.pearsonJan, fam.r1!.studen…
-    391|       await apiResponse(coord.api.v1.exams.entries.submit.$post({ json…
+ ❯ test/08x4-exam-entries-rework.test.ts:450:90
+    448|       expect(before.boardNote).toBe('The board fee comes back: the ent…
+    449|       const [u1] = await entriesOf(w.series.pearsonJan, fam.r1!.studen…
+    450|       await apiResponse(coord.api.v1.exams.entries.submit.$post({ json…
        |                                                                                          ^
-    392|       const sentAt = new Date((await one<{ at: string }>(`select submi…
-    393|       const after = await preview(fam.r1!, lines.r1!);
+    451|       const sentAt = new Date((await one<{ at: string }>(`select submi…
+    452|       const after = await preview(fam.r1!, lines.r1!);
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > the same line with none sent: the board fee comes back in full
+AssertionError: expected 0 to be greater than 0
+ ❯ withdrawnWithLine test/08x4-exam-entries-rework.test.ts:74:25
+     72|   const withdrawnWithLine = async (lineId: string, reason: string) => {
+     73|     const rows = await entriesOfLine(lineId);
+     74|     expect(rows.length).toBeGreaterThan(0);
+       |                         ^
+     75|     expect(rows.map((r) => [r.status, r.withdrawn_with_line, r.withdra…
+     76|     await audited(rows.map((r) => r.id), rows.map(() => 'EXAM_ENTRY_WI…
+ ❯ test/08x4-exam-entries-rework.test.ts:478:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
 

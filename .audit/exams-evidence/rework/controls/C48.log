@@ -1,0 +1,63 @@
+# C48: a declared sitting the results on record show is not verified at declaration
+# undone in: apps/api/src/services/reservation.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['is verified at once, by the importer']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 2 failed) 20923ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the importer; a sitting graded absent waits for the coordinator 94ms
+     → expected null to be 'verified' // Object.is equality
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator 87ms
+     → expected { series: { …(2) }, …(13) } to match object { committed: true, …(3) }
+ Test Files  1 failed (1)
+      Tests  2 failed | 39 passed (41)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 56716c09-5f03-44b3-9be2-2fb73d9fb537: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+[results] Could not verify the declared sitting of line 5972d077-583a-41e5-93ba-7e146e933aa4: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the importer; a sitting graded absent waits for the coordinator
+AssertionError: expected null to be 'verified' // Object.is equality
+
+[32m- Expected:[39m 
+"verified"
+
+[31m+ Received:[39m 
+null
+
+ ❯ test/08x4-exam-entries-rework.test.ts:781:42
+    779|       const kr = await declare('kr');
+    780|       const ka = await declare('ka');
+    781|       expect((await lineOf(kr)).outcome).toBe('verified');
+       |                                          ^
+    782|       expect(await verifiedBy(kr)).toBe(w.adm.id);
+    783|       const a = await answer(kr);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator
+AssertionError: expected { series: { …(2) }, …(13) } to match object { committed: true, …(3) }
+(26 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "committed": true,[22m
+[2m    "sittingsVerified": [],[22m
+[32m-   "verificationFailed": 1,[39m
+[32m-   "verificationNote": "Results saved; the verification of 1 declared sitting failed — answer it on the session's To verify tab",[39m
+[31m+   "verificationFailed": 2,[39m
+[31m+   "verificationNote": "Results saved; the verification of 2 declared sittings failed — answer them on the session's To verify tab",[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:811:20
+    809|         await release();
+    810|       }
+    811|       expect(done).toMatchObject({
+       |                    ^
+    812|         committed: true, sittingsVerified: [], verificationFailed: 1,
+    813|         verificationNote: "Results saved; the verification of 1 declar…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

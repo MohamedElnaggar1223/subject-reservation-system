@@ -11,7 +11,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   IdParam, ImportResults, ResultsQuery, PublishResults, ListCertificatesQuery, ReceiveCertificates, CollectCertificate, DisposeCertificate,
-  DeadlinesQuery, BoardCodeSchema, AttachCertificateSlip,
+  DeadlinesQuery, BoardCodeSchema, AttachCertificateSlip, VerifyDeclaredFromResults,
 } from '@repo/validations';
 import { z } from 'zod';
 import { success, error } from '../lib/response';
@@ -40,6 +40,20 @@ export const examResultRoutes = new Hono<HonoEnv>()
 
   .get('/results/mappings', requireAcademic(), zValidator('query', z.object({ boardCode: BoardCodeSchema.optional() })), async (c) =>
     success(c, await results.listMappings(c.req.valid('query').boardCode)))
+
+  /**
+   * POST /exams/results/verify-declared — the session's declared sittings still awaiting an answer,
+   * checked against the results on record and verified by the one asking (the To verify tab;
+   * the review of 093dbd1, item 3).
+   */
+  .post('/results/verify-declared', requireAcademic(), zValidator('json', VerifyDeclaredFromResults), async (c) => {
+    try {
+      return success(c, await results.verifyDeclaredOfSession(c.req.valid('json').sessionId, c.get('user')!, extractAuditContext(c)));
+    } catch (err) {
+      const f = fail(err, 'Failed to check the declared sittings');
+      return error(c, f.message, f.status);
+    }
+  })
 
   .post('/results/publish', requireAcademic(), zValidator('json', PublishResults), async (c) => {
     try {

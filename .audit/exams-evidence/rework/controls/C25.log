@@ -4,12 +4,13 @@
 # expected red: ['held when the school holds unverified sittings']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 9929ms
-   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 47ms
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 1 failed) 23025ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 73ms
      → expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
  Test Files  1 failed (1)
-      Tests  1 failed | 17 passed (18)
+      Tests  1 failed | 40 passed (41)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 76b794a2-7ac4-48a5-8b5d-88dc5b98e8bd: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes
@@ -25,13 +26,13 @@ AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 
 [31m+   "status": 200,[39m
 [2m  }[22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:258:12
-    256|         const [fe] = await entriesOf(w.series.pearsonJan, fam.f!.stude…
-    257|         expect(await refused(coord.api.v1.exams.entries.submit.$post({…
-    258|           .toEqual({ status: 409, error: `${T}WMA12 follows a declared…
+ ❯ test/08x4-exam-entries-rework.test.ts:274:12
+    272|         const [fe] = await entriesOf(w.series.pearsonJan, fam.f!.stude…
+    273|         expect(await refused(coord.api.v1.exams.entries.submit.$post({…
+    274|           .toEqual({ status: 409, error: `${T}WMA12 follows a declared…
        |            ^
-    259|         expect((await one<{ status: string }>(`select status from exam…
-    260|         // The coordinator verifies it: it goes.
+    275|         expect((await one<{ status: string }>(`select status from exam…
+    276|         // The coordinator verifies it: it goes.
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

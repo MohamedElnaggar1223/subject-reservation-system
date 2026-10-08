@@ -1,0 +1,57 @@
+# C50: any grade verifies a sitting (absent and pending too)
+# undone in: apps/api/src/services/exam-result.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['absent and pending verify nothing', 'a sitting graded absent waits']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 2 failed) 21021ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an import verifies the declared sittings it shows with a real grade, as the one who imported them; absent and pending verify nothing 161ms
+     → expected [ …(2) ] to deeply equal [ Array(1) ]
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the importer; a sitting graded absent waits for the coordinator 110ms
+     → expected 'verified' to be null
+ Test Files  1 failed (1)
+      Tests  2 failed | 39 passed (41)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 230c48e9-ed4a-4094-b1ec-a7d4eaae4c86: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > an import verifies the declared sittings it shows with a real grade, as the one who imported them; absent and pending verify nothing
+AssertionError: expected [ …(2) ] to deeply equal [ Array(1) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[31m+   "df8d80a5-11e7-4221-8878-8afe3e7891c0",[39m
+[2m    "49bb2760-652c-44c6-b623-7d1e0c80ea45",[22m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:771:66
+    769|       } }));
+    770|       expect(done).toMatchObject({ committed: true, verificationFailed…
+    771|       expect(done.sittingsVerified.map((v) => v.registrationId)).toEqu…
+       |                                                                  ^
+    772|       expect((await lineOf(vi)).outcome).toBe('verified');
+    773|       expect((await lineOf(vp)).outcome).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the importer; a sitting graded absent waits for the coordinator
+AssertionError: expected 'verified' to be null
+
+[32m- Expected:[39m 
+null
+
+[31m+ Received:[39m 
+"verified"
+
+ ❯ test/08x4-exam-entries-rework.test.ts:789:42
+    787|         evidence: `The board's results for Pearson Edexcel June ${Y}: …
+    788|       });
+    789|       expect((await lineOf(ka)).outcome).toBeNull();
+       |                                          ^
+    790|       const toVerify = await apiResponse(coord.api.v1.sessions[':id'][…
+    791|       expect(toVerify.lines.map((l) => l.id)).toContain(ka);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

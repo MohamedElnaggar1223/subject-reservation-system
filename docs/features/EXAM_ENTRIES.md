@@ -152,6 +152,26 @@ unless said):
 | F4's "mark as sent" makes a line's board fee "sent" for refunds (C's `refundFor`) | C's seam `entrySentAt(executor, lineId)` returned null; `refundFor` falls back to the effective deadline | wired: the earliest time any entry made from the line was marked sent, withdrawn ones included (the lead, 8 Oct); `refundFor` and the preview carry `sentEntries` and a `boardNote` naming them and when; C's `withdrawEntry` seam in the desk-drop now withdraws the line's entries in its transaction | "a two-unit line with one unit sent…" (preview 1,500 → 500, drop refunds 500), "…with none sent: the board fee comes back in full" (1,500), "the desk drops a paid line past its deadline…"; C23, C27 |
 | MO-10's hard stop per line (§3.3) | A's `line_effective_deadline`, `effectiveDeadlinesOf` (Q-20 included) | each line is cut off at its own deadline (a retake of the board's previous sitting at the retake deadline); a cash-in at its service's deadline; else the series' entry deadline; making (derived or by hand) and sending alike; 09's rule reads the same | "past the entry deadline a retake of the board's previous sitting is still entered and sent…"; 08x1's hard-stop scenarios unchanged; C1, C1b, C2, C26, C26b |
 
+### The review of 093dbd1 (8 Oct 2026)
+
+The Opus 5.5 reviewer re-ran the gates on 093dbd1, confirmed the thirteen claims and asked for two
+fixes before the merge, with nine more items from the lead. What each now does (every scenario is
+`08x4`'s; every control is in `.audit/exams-evidence/rework/controls.py`):
+
+| Item | Now | Proved by |
+|---|---|---|
+| 1. an entry sent after its line was dropped and refunded | **every path that ends a paid line withdraws its live entries in its own transaction**, by F4's `withdrawEntriesOfLineInTx` (each entry `withdrawn_with_line`, audited, the family told after the commit when it had gone to the board): the desk's drop, the family's drop, a drop or swap request's approval, the family's swap, a payment's reversal, step B's rejection after the first-entry deadline and its `hold` drop. "Mark as sent" takes the entries' lines `FOR SHARE` (id order) and their cash-ins `FOR SHARE` before the entries (§2.1) and refuses, with a 409 naming the entry, one whose line is not confirmed or whose cash-in is not paid. An entry withdrawn with its line is made again if the line is paid again (one withdrawn by the coordinator is not) | "every other path that ends a paid line…" (approval of a drop and of a swap, the direct swap, the reversal and the second payment), the two refund scenarios (the family's drop), "a declared retake rejected past the first-entry deadline…", "step B's hold…", "a paid cash-in whose award…reversed, it is flagged and not sent", "\"mark as sent\" refuses an entry whose line is no longer confirmed"; C34–C41 |
+| 2. an entry never follows an answer given after it was made | `lineDiff(entry, what the line says now)`: the check compares retake, carry forward (series), and a sitting at another centre's centre and candidate number with the line, and flags `retake_differs_from_line` or `carry_forward_differs_from_line` (the coordinator amends a sent entry); a derivation brings a **draft** up to date (`refresh`, audited `EXAM_ENTRY_UPDATED`); a declared sitting not verified is carried forward as **suggested**, confirmed once verified; a rejected one loses its carry forward and its carry-forward option | eight scenarios under "an entry follows its line's answer given after it was made" (before and after derivation, verified and rejected, retake and carry forward, draft and sent); C45–C47 |
+| 3. a result on record is a known sitting | at declaration, inside the reservation's transaction (B's `reserveLines`), a declared sitting with a real grade on record for what the line enters is verified at once through B's own answer (`recordVerifiedInTx`), the one who imported the result answering; the session's To verify tab has "Check against the results on record" (`POST /v1/exams/results/verify-declared`), verified by the coordinator who asks. B's `knownSittingsOf` reading F4's results and sent entries is B's (the lead gives it to B) | "a retake declared after its sitting is on record is verified at once…", "…the To verify tab's check answers it later"; C48, C49 |
+| 4. a refund priced before the line is locked | the desk's drop, the family's drop, a request's approval and the family's swap take the receipt, then the line `FOR UPDATE`, and only then price with `refundFor(tx, …)`: a "mark as sent" landing meanwhile is counted (the board fee kept). The desk's drop has no window in practice (it needs the line's deadline passed, and sending needs it not), so its race is not staged | "a refund is priced after the line is locked…" (the direct drop, a drop request's approval, the direct swap, each with "mark as sent" held at its audit row inside its transaction); C42–C44 |
+| 5. the hold sweep always counted the board fee not sent | `neverSent` only when `sentEntriesOf` is empty: a line entered as declared, sent, then held keeps its board fee; the family's notice says the entry was withdrawn and the board fee stays | "step B's hold at the deadline…" (one line sent, one a draft); C53 |
+| 6. a paid cash-in whose award is already entered is never linked | the derivation links it (`link`): the award entry of a whole-award line, or one added by hand without a cash-in, takes the charge (audited); the entry list stops listing the cash-in ("Derive it" while it waits); its reversal is flagged and stops the entry being sent | "a paid cash-in whose award a whole-award line already entered…", "…whose award was entered by hand without it…"; C54 |
+| 7. verifying from results is loose | only a real grade verifies (not absent, pending, withheld: `isRealGrade`); the one who answers is the importer (or the coordinator asking from To verify, with their own role); a failure after the import commits is counted and reported — "Results saved; the verification of n declared sittings failed — answer them on the session's To verify tab" — never a failed import | "an import verifies … with a real grade, as the one who imported them…", "a verification failing after the import commits…"; C50–C52 |
+| 8. recorded, no change | see §10: "withdrawn included" keeps the family's board fee when the board refunded the school; a paid line the school never entered keeps its board fee on a desk drop past the deadline (C's decision 4) | — |
+| 9. cosmetic | C's `entrySentAt` stand-in removed (`refundFor` reads `sentEntriesOf`, the one seam); the line's retake word is the source when history says retake too (`registration`); the withdrawal audit row's key is `withLine` (every path now) | the item-3 scenario's derivation; C55 |
+| 10. F4's Arabic rules before the rework's | F4's dictionary now loads after A's, B's and C's (a shared word keeps the rework's Arabic: "Session", "Dropped", "Collected"); F4's sentence rules still run before F0b's broad one, but never on a text one of the rework's rules translates; the broad rules narrowed ("… results" needs a series' month and year; "… was withdrawn from …" an entry code and a series; the room's "no longer in use" names the room; the file store's sentences their own kinds); F4's timetable says "Time of day" for a paper's morning or afternoon. A scan of every string outside F4's files found one text F4 took that was not its own (C's escrow sentence); now none | the Reserve, statement and To verify screens driven in Arabic (`screens/review-*`); the trail's row for the order |
+| 11. privacy | the evidence note below | — |
+
 **What else changed with the model.** The test world (`exam-helpers.ts`) is a winter session with
 offers and items (an award item for the Cambridge syllabus, a units item for P1, an award item for
 the whole Pearson award), fee grids per series, and families reserved and paid at the desk with
@@ -180,7 +200,9 @@ code where the board requires one; no tier on a tiered syllabus; no forecast gra
 requires one; carry forward incomplete or still to confirm; the registration no longer confirmed;
 access arrangements without a board approval or expired; **a declared earlier sitting not verified**
 (entered as declared, or held — the fix links the session's To verify tab); **a cash-in no longer
-paid** (its payment reversed or refunded). The screen downloads the rows as CSV
+paid** (its payment reversed or refunded); **the line's answer changed after the entry was made**
+(its retake, or its carry forward — series, centre, candidate number, option — the line says
+otherwise now: amend the entry; a draft is brought up to date by the next derivation). The screen downloads the rows as CSV
 (formula-safe, `lib/csv.ts`).
 
 ## 4. The timetable and exam days
@@ -252,9 +274,13 @@ below; the gate reaches nothing here.
 | `students/:studentId/series`, `/timetable`, `/statement`, `/exams`, `/results`, `/sittings` | the student themself, a linked parent (published only), and staff with student records (desk, coordinator, admin); another family's child is "not found" |
 | `certificates`, `certificates/:id/collect`, `certificates/:id/slip` | desk (finance officer, finance admin), coordinator, admin |
 
-No endpoint was added on the rework's model: an entry by hand takes an optional `chargeId` (a paid
-cash-in of that candidate in that series), a results import answers `sittingsVerified` (the declared
-sittings its results verified), the entry list `cashInsToEnter`, and the refund preview (C's)
+One endpoint was added on the rework's model, after the review of 093dbd1: `POST
+results/verify-declared` (`{ sessionId }`; admin, coordinator) — the session's declared sittings
+still awaiting an answer checked against the results on record, from the To verify tab. Otherwise
+the answers grew: an entry by hand takes an optional `chargeId` (a paid cash-in of that candidate
+in that series); a results import answers `sittingsVerified`, `verificationFailed` and
+`verificationNote`; a derivation `updated` and `summary.updates` (drafts brought up to date, cash-ins
+linked); the entry list `cashInsToEnter` (with `awardEntered`); the refund preview (C's)
 `sentEntries` and `boardNote`.
 
 **The national ID.** Its own table; set and read through two endpoints for the coordinator and the
@@ -281,15 +307,20 @@ RESERVATIONS.md §2.12 and C's RESERVATIONS_MONEY.md §10):
 | `lineItemsFor(registrationIds, executor?)` | A's `line.services.ts` | per line what its item enters (award; option with its components; units under the item's award or a Cambridge component's syllabus; a `subject` item: the subject row's own mapping), the series with both deadlines, the attempt F4 enters (`first` after a rejected declaration) and the one reserved, mode, teacher, the prior sitting (series, name, source, declared, answer, previous centre and number), the board's carry-forward months, grade, level code. F0b's `entryItemsFor` reads it now |
 | `chargesOfKind(kind, seriesId, executor?)` | C's `charge.services.ts` | a series' accepted charges of a kind (awaiting payment or paid) with each one's deadline |
 | `teacherOf(student, subject, year, unitId?)`, `pickEnrolment(rows, unitId?)` | `enrolment.services.ts` (F0b's) | the unit's own open enrolment, else the subject's, else the one teacher of all its units |
-| `entrySentAt(executor, lineId)`, `sentEntriesOf(executor, lineId)` | C's seam in `refund.services.ts` | the earliest time any entry made from the line was marked sent (withdrawn ones included); `refundFor` and `previewRefund` carry `sentEntries` and a `boardNote` |
-| `withdrawEntry(tx, lineId, reason, staffId, ctx?)` | C's seam in `desk-drop.services.ts` → F4's `withdrawEntriesOfLineInTx`, `tellWithdrawn` | the line's live entries withdrawn in the desk-drop's transaction, each audited, the family told after the commit |
-| `verifyDeclaredSittingsFromResults(series, actor, ctx?)` | `exam-result.services.ts` → B's `verifyPriorSitting` | after a results import commits: each open declared sitting of that series with a result for what its line enters is verified by step B's own answer |
+| `sentEntriesOf(executor, lineId)` | C's seam in `refund.services.ts` (the stand-in `entrySentAt` removed after the review of 093dbd1) | the entries made from the line marked sent, earliest first (withdrawn ones included): the earliest one's time is when the board fee became sent; `refundFor` and `previewRefund` carry `sentEntries` and a `boardNote` |
+| `withdrawEntriesOfLineInTx(tx, lineId, reason, actorId, ctx?)`, `tellWithdrawn(withdrawn, reason)` | `exam-entry.services.ts`, called by every path that ends a paid line (the review of 093dbd1, item 1) | the line's live entries withdrawn in the path's own transaction, after its receipt and line, each `withdrawn_with_line` with its `EXAM_ENTRY_WITHDRAWN` row; the family told after the commit of each that had gone to the board |
+| the calls, file by file | `desk-drop.services.ts` `deskDrop` (C's seam `withdrawEntry`); `swap.services.ts` `executeDirectDrop`, `approveChangeRequest` (a drop or a swap request), `executeDirectSwap`; `payment.services.ts` `reversePayment` (each reverted line, in id order); `verification.services.ts` `verifyPriorSitting` (the rejection after the first-entry deadline) and `holdUnverifiedAtDeadline` (the `hold` drop) | one call each, after the path's drop leg in its transaction, and `tellWithdrawn` after its commit; the four drops and swaps price their refund with `refundFor(tx, …)` after the receipt and the line are locked (item 4); the hold drop passes `neverSent` only when `sentEntriesOf` is empty (item 5) |
+| `verifyDeclaredSittingsFromResults(series, actor, ctx?)` | `exam-result.services.ts` → B's `verifyPriorSitting` | after a results import commits: each open declared sitting of that series with a **real grade** for what its line enters is verified by step B's own answer, the importer answering; a failure is counted (`verificationFailed`), never thrown |
+| `verifyDeclaredAtDeclarationInTx(tx, lineIds)` | `exam-result.services.ts`, called by B's `reserveLines` (`reservation.services.ts`) → B's `recordVerifiedInTx` (`verification.services.ts`, the verified answer as a function of its own) | in the reservation's transaction, a declared sitting with a real grade on record is verified at once, the one who imported the result as `prior_sitting_verified_by` (B's 09 rule: answered by someone) |
+| `verifyDeclaredOfSession(sessionId, actor)` | `exam-result.services.ts`; `POST /v1/exams/results/verify-declared`; B's To verify tab (`to-verify-tab.client.tsx`, one button) | the session's awaiting declared sittings checked against the results on record, verified by the coordinator who asks |
 
 ## 8. Screens
 
 All under `/exams`, in the nav of the roles that use them (`components/nav-shell.tsx`); each page
 guards its own roles on the server. Strings are English in the code and Arabic through
-`lib/i18n-exams/` (one dictionary per area, rules before F0b's broad ones); board names, codes,
+`lib/i18n-exams/` (one dictionary per area, loaded after the rework's A, B and C so a shared word
+keeps theirs; its sentence rules before F0b's broad ones, but never on a text a rework rule
+translates — the review of 093dbd1, item 10); board names, codes,
 candidate numbers and people's names are marked `data-i18n-skip` and stay as written. Each file's
 header comment gives its spreadsheet version in full; the short form is below. Every screen was
 driven in headless Chrome as its role in English and Arabic (`.audit/exams-evidence/screens/`,
@@ -309,6 +340,13 @@ driven in headless Chrome as its role in English and Arabic (`.audit/exams-evide
 | **Results** `/exams/results` | coordinator, admin | each grade found by candidate number in the broadsheet and typed across; a remark overwrites the first grade | the file uploaded or pasted, read through a mapping saved per board (guessed the first time, shown beside the first rows); every line says what it will do before saving; nothing overwritten; one Publish per series |
 | **Certificates** `/exams/certificates` | desk (finance officer, finance admin), coordinator, admin | envelopes in a box, a notebook of who took which; two officers can hand the same one twice | name or student ID then Enter opens the certificate ready to hand over; collector, relation and the ID seen (a choice); a printable slip to sign, its scan attachable later; a second desk is told who took it; unclaimed past retention listed to return or destroy with a reason |
 | **My exams** `/exams/my` | student, parent (published only); the desk and coordinator with `?student=` | the statement of entry handed out in class and lost; papers highlighted on the board's PDF; the seat on a list at the hall door; results as a photo in a group chat | on the phone: the next exams first with end times counting extra time, room and seat, clashes with how they are handled; the statement of entry as sent, with one line to check it; results once published, a changed grade beside the earlier one |
+
+**The evidence's people** (the review of 093dbd1, item 11). The committed screenshots
+(`.audit/exams-evidence/rework/screens/`) and the drive's output (`drive/f4-drive.out`,
+`f4-drive-held.out`) show the demo seed's people — legal names, dates of birth, UCIs and candidate
+numbers. They are the repository's own fictional seed (`scripts/exams-demo/seed-exams.ts` and the
+template it builds on), not real families, teachers or students, so they stay. Nothing from the
+school's own sheet or forms appears in them, in the tests or in the seed, and none may.
 
 The Settings screen shows the exam settings (centre numbers and entry route per board, carry
 forward, self-study forecasts, certificate retention, candidates per invigilator, reminder days)
@@ -334,7 +372,8 @@ at the desk with lines and consent), cases in `05` and rules in `09`. Every Sept
 | a certificate collected once (a race test) | 08x3 "a certificate collected at two desks at once"; 08x2 "collected once at the desk…" |
 | national IDs hidden from roles without the need | 08x1 "national IDs … read only by the coordinator and the admin…"; 05; 09 |
 
-**On the rework's model** (`08x4-exam-entries-rework`, 18 scenarios, §2a's table):
+**On the rework's model** (`08x4-exam-entries-rework`, 41 scenarios: §2a's tables — 18 of them
+for the rework's items, 23 for the review of 093dbd1, listed after them):
 
 | §9 / §10 item | Scenario |
 |---|---|
@@ -349,6 +388,12 @@ at the desk with lines and consent), cases in `05` and rules in `09`. Every Sept
 | a cash-in entry carrying its charge | "accepted but not paid: listed as 'cash-in awaiting payment', not entered"; "paid: derived as the award its line's item enters, with exam_entry.charge_id"; "a cash-in that names no line: the coordinator adds its award by hand, with the charge"; "a cash-in whose payment is reversed is flagged on its entry" |
 | mark as sent → the board fee sent for `refundFor` | "a two-unit line with one unit sent: the board fee stays, the course part by the policy…" (preview 1,500 before: 50% of the 1,000 course fee plus the 1,000 board fee; 500 after; the drop refunds 500); "the same line with none sent: the board fee comes back in full" (1,500) |
 | MO-10 per line; the desk-drop's withdrawal | "past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent"; "the desk drops a paid line past its deadline: its entries are withdrawn with it…" |
+| review item 1: every path that ends a paid line withdraws its entries | the two refund scenarios (the family's drop: both units withdrawn, the sent one told); "a drop request the parent approves…"; "a swap request the parent approves…"; "the family's direct swap…"; "a payment reversal: … paid again, the next derivation makes it again"; "a declared retake rejected past the first-entry deadline is dropped…"; "step B's hold at the deadline…"; "\"mark as sent\" refuses an entry whose line is no longer confirmed, naming it" (the state made by hand: no path leaves it now) and, for a cash-in, "…reversed, it is flagged and not sent" |
+| review item 4: the refund priced under the line's lock | "a refund is priced after the line is locked…": the family's direct drop, a drop request's approval, the family's direct swap — "mark as sent" held at its audit row (`pauseAtAudits`) with the line `FOR SHARE`, the path queued behind it (`lockWaiters(2)`), then released: the board fee kept, the entry withdrawn as sent |
+| review item 2: the entry follows the line's answer | a retake rejected after it was sent (flagged, left alone), after its draft (brought up to date, audited), verified after (nothing); a carry forward declared (suggested), verified at another centre after (flagged, then the centre and number), verified here after (confirmed), rejected before (a first entry, no option), rejected after (the draft loses carry forward and option; a sent one is flagged) |
+| review items 3, 7, 9: results | "an import verifies the declared sittings it shows with a real grade, as the one who imported them; absent and pending verify nothing"; "a retake declared after its sitting is on record is verified at once, by the importer…" (with the retake source the line's); "a verification failing after the import commits reads as results saved; the To verify tab's check answers it later, as the coordinator" |
+| review item 5: hold and a sent entry | "step B's hold at the deadline…": the sent line keeps its board fee, the draft's gets it back, both withdrawn |
+| review item 6: a cash-in linked to its award | "a paid cash-in whose award a whole-award line already entered is linked to that entry…"; "a paid cash-in that names no line, whose award was entered by hand without it, is linked to that entry" |
 
 Races (08x3): two derivations, two numberings, a withdrawal against an amendment, one seat for two
 candidates, two results imports, a certificate at two desks, two scheduler instances, a failed
@@ -366,7 +411,7 @@ ID in an audit row.
 one trail row each; logs — the vitest summary and the failing tests with their messages — in
 `.audit/exams-evidence/rework/controls/`): each guard undone once, its tests red, restored. C1–C17
 are September's guards on the new code (C1, C2 now the per-entry deadline; C8 the index in 0050);
-C18–C33 the rework's (the table below them). September's logs stay in the ignored
+C18–C33 the rework's, C34–C55 the review of 093dbd1's (the table below them). September's logs stay in the ignored
 `.audit/exams-evidence/controls/`.
 
 | Control | Undone | Red |
@@ -402,6 +447,16 @@ C18–C33 the rework's (the table below them). September's logs stay in the igno
 | C29 | the database's one-live-entry-per-cash-in index (0050) | 08x4 |
 | C30 | the carry-forward period written to `exam_board` | 08x4 |
 | C32, C33 | the check listing a declared unverified sitting; a cash-in no longer paid | 08x4 |
+| C34 | "mark as sent" refusing a draft whose line is not confirmed or whose cash-in is not paid | 08x4 |
+| C35–C40 | the entries withdrawn by the family's drop; a request's approval; the family's swap; a payment reversal; B's rejection after the first-entry deadline; B's hold drop | 08x4 |
+| C41 | an entry withdrawn with its line made again once the line is paid again | 08x4 |
+| C42–C44 | the refund priced after the line's lock: the family's drop; a request's approval; the family's swap | 08x4 (the races) |
+| C45, C46, C47 | the check comparing an entry with its line now; a draft brought up to date; a declared sitting carried forward as suggested until verified | 08x4 |
+| C48, C49 | a sitting on record verified at declaration; the To verify tab's check | 08x4 |
+| C50, C51, C52 | only a real grade verifies; a failure after the import reported, not thrown; the importer answers | 08x4 |
+| C53 | the hold drop's board fee by "sent" | 08x4 |
+| C54 | a paid cash-in linked to its award already entered | 08x4 |
+| C55 | the line's retake as the source when history says so too | 08x4 |
 
 ## 10. Decisions and why
 
@@ -460,6 +515,30 @@ On the reservations rework's model (8 Oct 2026; the trail's build rows of 09:05Z
   the entries `FOR UPDATE` after the line), so a drop never leaves a live entry behind and a failed
   drop withdraws nothing; the family is told of each withdrawal after the commit.
 
+After the review of 093dbd1 (8 Oct 2026):
+
+- **Every path that ends a paid line withdraws, not only the desk's.** One call in each path's own
+  transaction, after its drop leg, so the board is never sent an entry the family is no longer
+  paying for; and "mark as sent" refuses one whose line or cash-in is no longer paid, as the
+  backstop. An entry so withdrawn carries `withdrawn_with_line`: a line paid again (a reversal
+  undone by a second payment) is derived again, while an entry the coordinator withdrew is never
+  made again. Withdrawing a sent entry from the board is still the coordinator's act there; the app
+  records it and says what the board does with its fee.
+- **A sent entry is flagged, a draft is changed.** The line's answer can come after the entry
+  (a sitting verified or rejected later). What the board has is not changed by the app: the check
+  asks the coordinator to amend it. A draft has not gone, so the next derivation brings it up to
+  date, audited. A declared sitting's carry forward is a suggestion until it is verified.
+- **Prices after locks.** A path that ends a line prices its refund only once it holds the receipt
+  and the line; "mark as sent" holds the line `FOR SHARE` — so the two serialize and the price sees
+  whichever came first.
+- **A result on record answers a declaration at once**, in the reservation's transaction, through
+  B's own verified answer with the importer as the one who answered (B's 09 rule: answered by
+  someone). Only a real grade is evidence of a sitting.
+- **Recorded, no change (the lead, item 8).** "Withdrawn included" keeps the family's board fee even
+  when the board refunded the school for an entry withdrawn in time: the board fee is one amount per
+  line, sent once any entry of it went. A paid line the school never entered keeps its board fee on
+  a desk drop past the deadline (C's decision 4: past the line's deadline it counts as sent).
+
 ## 11. Deferred, and why
 
 - **Each board's real formats.** The entry-list columns, the results files and the broadsheet
@@ -479,9 +558,10 @@ On the reservations rework's model (8 Oct 2026; the trail's build rows of 09:05Z
   F4 and is the app shell's; the pages render correctly after it. The English mismatch the
   translator caused on Suspense pages was fixed here (`localizeDom` records an attribute's source
   in English only once Arabic needs it).
-- **Word collisions in the Arabic dictionaries.** A few words ("Session", "Withdrawn", "Grade")
-  are already translated by earlier features' dictionaries in their own sense; the exam pages use
-  longer phrases where it matters, and the single word keeps the first translation.
+- **Word collisions in the Arabic dictionaries.** A few words ("Session", "Withdrawn", "Grade",
+  "Dropped", "Collected") are translated by earlier features' dictionaries in their own sense; the
+  rework's keep theirs (F4's dictionary loads after them), and the exam pages use longer phrases
+  where it matters ("Time of day" for a paper's morning or afternoon).
 - **The published count** after a revised report counts each report row, so a series with a
   remark says one more than its candidates' grades. The families see the latest grade either way.
 - **The entry-list CSV carries no "assumed" line** (a portal import would reject it); the screen and
@@ -492,16 +572,11 @@ On the reservations rework's model (8 Oct 2026; the trail's build rows of 09:05Z
 
 On the reservations rework's model (8 Oct 2026):
 
-- **An F4 result as a `known` sitting at reservation time** (§3.5: "known — an earlier line or an
-  F4 result"): B's `knownSittingsOf` still reads earlier lines only (its document §9 left this to
-  F4). F4 verifies a declared sitting from results after the fact instead; making a result a
-  `known` sitting changes B's reservation path and its offers read (a sitting with no line), so it
-  is left for B's owner and the lead to place.
-- **Other system drops do not withdraw entries**: the desk-drop does (C's seam); a paid line dropped
-  by B's rejection after the first-entry deadline or by `hold` at its deadline keeps its entries,
-  which the check then flags ("its registration is no longer confirmed — withdraw the entry"). Under
-  `hold` such a line was never entered; after a rejection the entry may have gone (its board fee
-  stays, §3.5), so withdrawing it is the coordinator's act with the board.
+- **An F4 result as a `known` sitting on the Reserve page** (§3.5: "known — an earlier line or an
+  F4 result"): F4's side is built (the review of 093dbd1, item 3): a declared sitting with a real
+  grade on record is verified at declaration, and the To verify tab checks the awaiting ones. B's
+  `knownSittingsOf` reading F4's results and sent entries — so the family's Reserve page pre-sets
+  the retake — is B's, and the lead gives it to B once F4 lands.
 - **Migration numbers**: 0050 and 0051 follow main's 0049; step D's migrations land first, so they
   are renumbered once more at the final merge (a journal `when` later than D's last).
 - **The demo seed's new shapes** (a carried-forward A2 at another centre, an unpaid cash-in, a
@@ -572,3 +647,19 @@ On the reservations rework's model (8 Oct 2026, UTC; the trail has a row per ste
 - 10:04Z — gates green on the final tree: api and web check-types; the full suite in local time and
   in UTC, 32 files, 561 passed, 1 todo each (`.audit/exams-evidence/rework/suite-{local,utc}-final.log`).
   Ready for the Opus 5.5 review.
+- 11:57Z — the review of 093dbd1 received (the reviewer: "merge after fixes: 1, 2"), with the lead's
+  eleven items.
+- 12:02Z–12:12Z — items 1–7 and 9 in the code (one migration, 0052: `exam_entry.withdrawn_with_line`;
+  the times are the edit scripts' own); the API's session limit stopped the work there, during item
+  10, and it resumed where it stood (the worktree's uncommitted state kept).
+- 12:18Z–12:55Z — item 10: every string outside F4's files scanned against F4's rules, the order
+  changed and the broad rules narrowed; 08x4's 23 new scenarios, all green (41); controls C34–C55.
+- 12:55Z — the first full run red twice (02: the reversal's answer had grown a field, now unchanged;
+  09: the hold scenario's deadline set before its entries existed, now after hold's own row); 09
+  gained the rule "no live entry of a line no longer paid".
+- 12:58Z–13:11Z — `igcse_exams_dev` migrated to 0052 and the API restarted by its PIDs; the full suite
+  green in local time and in UTC (32 files, 585 passed, 1 todo each); the rework's Reserve,
+  statement and To verify screens and F4's new states driven in English and Arabic
+  (`.audit/exams-evidence/rework/screens/review-*`); web check-types green.
+- 13:13Z–13:29Z — all 59 controls red once each with their guard undone, restored; api check-types
+  green on the final tree.

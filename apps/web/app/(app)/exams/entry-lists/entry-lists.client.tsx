@@ -59,6 +59,8 @@ const FIX_OF: Record<EntryProblem, Fix> = {
   prior_sitting_unverified: 'verify',
   prior_sitting_held: 'verify',
   cash_in_not_paid: 'desk',
+  retake_differs_from_line: 'entries',
+  carry_forward_differs_from_line: 'entries',
 };
 const FIX_LABEL: Record<Fix, string> = {
   candidate: 'Candidate details',
@@ -377,7 +379,7 @@ function Unentered({ data, series }: { data: EntryListData; series: BoardSeriesR
               <li key={c.chargeId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
                 <span><bdi data-i18n-skip="true" className="font-medium text-foreground">{c.studentName}</bdi> <span className="text-muted-foreground">·</span> <BoardText>{c.description}</BoardText></span>
                 <Button asChild size="sm" variant="outline">
-                  <Link href={`/exams/entries?series=${series.id}&student=${c.studentId}` as never}>{c.registrationId ? 'Derive it' : 'Add the award by hand'}</Link>
+                  <Link href={`/exams/entries?series=${series.id}&student=${c.studentId}` as never}>{c.registrationId || c.awardEntered ? 'Derive it' : 'Add the award by hand'}</Link>
                 </Button>
               </li>
             ))}

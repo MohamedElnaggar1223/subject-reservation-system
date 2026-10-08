@@ -4,13 +4,18 @@
 # expected red: ["a retake comes from the line's attempt"]
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 9779ms
-   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry 134ms
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 3 failed) 24717ms
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry 296ms
      → expected [ [ 'XW97', true, …(2) ] ] to deeply equal [ [ 'XW97', false, null, …(1) ] ]
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it 78ms
+     → expected [ 'missing_candidate_number', …(5) ] to include 'retake_differs_from_line'
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its draft was made: the next derivation brings the draft up to date as a first entry, audited 63ms
+     → expected [ 'missing_candidate_number', …(5) ] to include 'retake_differs_from_line'
  Test Files  1 failed (1)
-      Tests  1 failed | 17 passed (18)
+      Tests  3 failed | 38 passed (41)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+[results] Could not verify the declared sitting of line 13c97838-da73-4b21-b6a8-1c38cd48dc53: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry
 AssertionError: expected [ [ 'XW97', true, …(2) ] ] to deeply equal [ [ 'XW97', false, null, …(1) ] ]
@@ -25,17 +30,41 @@ AssertionError: expected [ [ 'XW97', true, …(2) ] ] to deeply equal [ [ 'XW97'
 [32m-     null,[39m
 [31m+     true,[39m
 [31m+     "registration",[39m
-[2m      "02dc31b6-69ed-4145-8be9-bf81af11905b",[22m
+[2m      "7637dca4-93c7-481f-b5ad-73d3b9959ade",[22m
 [2m    ],[22m
 [2m  ][22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:165:10
-    163|         .toEqual([[`${T}97`, true, 'registration', rt]]);
-    164|       expect((await entriesOf(w.series.cambridgeNov, fam.rj!.studentId…
-    165|         .toEqual([[`${T}97`, false, null, rj]]);
+ ❯ test/08x4-exam-entries-rework.test.ts:181:10
+    179|         .toEqual([[`${T}97`, true, 'registration', rt]]);
+    180|       expect((await entriesOf(w.series.cambridgeNov, fam.rj!.studentId…
+    181|         .toEqual([[`${T}97`, false, null, rj]]);
        |          ^
-    166|       const list = await entryList(w.series.cambridgeNov);
-    167|       expect(list.rows.find((r) => r.studentId === fam.rt!.studentId)!…
+    182|       const list = await entryList(w.series.cambridgeNov);
+    183|       expect(list.rows.find((r) => r.studentId === fam.rt!.studentId)!…
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it
+AssertionError: expected [ 'missing_candidate_number', …(5) ] to include 'retake_differs_from_line'
+ ❯ test/08x4-exam-entries-rework.test.ts:648:28
+    646|       const row = await rowOf(e.id);
+    647|       expect(row.values).toMatchObject({ retake: 'Y' });
+    648|       expect(row.problems).toContain('retake_differs_from_line');
+       |                            ^
+    649|       // A derivation leaves a sent entry alone: the coordinator amend…
+    650|       expect(await derive(nov(), af.ra!.studentId)).toMatchObject({ cr…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its draft was made: the next derivation brings the draft up to date as a first entry, audited
+AssertionError: expected [ 'missing_candidate_number', …(5) ] to include 'retake_differs_from_line'
+ ❯ test/08x4-exam-entries-rework.test.ts:659:44
+    657|       expect(e.is_retake).toBe(true);
+    658|       await verify(al.rb!, { outcome: 'rejected', reason: 'no such sit…
+    659|       expect((await rowOf(e.id)).problems).toContain('retake_differs_f…
+       |                                            ^
+    660|       const preview = await derive(nov(), af.rb!.studentId, false);
+    661|       expect(preview.summary).toMatchObject({ newEntries: 0, updates: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
 

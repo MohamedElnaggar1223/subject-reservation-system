@@ -123,6 +123,57 @@ type PlannedEntry = {
 };
 
 /**
+ * What a line says now about the fields its reservation governs on an entry (the review of 093dbd1,
+ * item 2): whether it is a retake (the attempt as F4 reads it: a rejected declaration is a first
+ * entry), the sitting it carries forward from (suggested while declared and not verified, confirmed
+ * once known or verified, with the other centre's numbers when verified there), and — a rejected
+ * declaration — the sitting no entry may carry from, with the award's carry-forward option codes.
+ */
+export type LineExpect = {
+  retake: boolean;
+  carry: { state: 'confirmed' | 'suggested'; month: string; year: number; otherCentre: boolean; centre: string | null; number: string | null } | null;
+  rejectedFrom: { month: string; year: number; optionCodes: string[] } | null;
+};
+
+type GovernedFields = Pick<EntryRow, 'kind' | 'isRetake' | 'retakeSource' | 'carryForward' | 'cfFromMonth' | 'cfFromYear' | 'cfCentreNumber' | 'cfCandidateNumber' | 'cfOption' | 'optionCode'>;
+
+/**
+ * How an entry differs from what its line says now: `retake` and `carry` are what the board sees
+ * (the check flags them; a draft is brought up to date by the next derivation, a sent entry is
+ * amended by the coordinator); `confirm` is a suggested carry forward whose sitting has since been
+ * verified (a draft is confirmed by the next derivation; `carry_forward_to_confirm` flags it).
+ * `patch` is what the derivation writes on a draft. Fields the line does not govern (a retake from
+ * history or set by staff, a carry forward suggested from history) are never compared.
+ */
+export function lineDiff(e: GovernedFields, x: LineExpect) {
+  const retake = (x.retake && !e.isRetake) || (!x.retake && e.isRetake && e.retakeSource === 'registration');
+  let carry = false;
+  let confirm = false;
+  if (e.kind === 'award' && x.carry) {
+    if (e.carryForward === 'none' || e.cfFromMonth !== x.carry.month || e.cfFromYear !== x.carry.year) carry = true;
+    else if (x.carry.otherCentre && (e.cfCentreNumber !== x.carry.centre || e.cfCandidateNumber !== x.carry.number)) carry = true;
+    else if (x.carry.state === 'confirmed' && e.carryForward === 'suggested') confirm = true;
+  }
+  const carriesRejected = !!x.rejectedFrom && e.carryForward !== 'none' && e.cfFromMonth === x.rejectedFrom.month && e.cfFromYear === x.rejectedFrom.year;
+  const rejectedOption = !!x.rejectedFrom && !!e.optionCode && x.rejectedFrom.optionCodes.includes(e.optionCode);
+  if (e.kind === 'award' && (carriesRejected || rejectedOption)) carry = true;
+  const patch: Partial<EntryRow> = {};
+  if (retake) Object.assign(patch, { isRetake: x.retake, retakeSource: x.retake ? 'registration' : null });
+  if ((carry || confirm) && x.carry) {
+    Object.assign(patch, {
+      carryForward: x.carry.state, cfFromMonth: x.carry.month, cfFromYear: x.carry.year, cfOption: `${x.carry.month}_carry_forward`,
+      cfCentreNumber: x.carry.otherCentre ? x.carry.centre : (x.carry.centre ?? e.cfCentreNumber),
+      cfCandidateNumber: x.carry.otherCentre ? x.carry.number : (x.carry.number ?? e.cfCandidateNumber),
+    });
+  }
+  if (carry && x.rejectedFrom) {
+    if (carriesRejected) Object.assign(patch, { carryForward: 'none', cfFromMonth: null, cfFromYear: null, cfCentreNumber: null, cfCandidateNumber: null, cfOption: null });
+    if (rejectedOption) Object.assign(patch, { optionCode: null });
+  }
+  return { retake, carry, confirm, any: retake || carry || confirm, patch };
+}
+
+/**
  * One row of a derivation: a line (`registrationId`) or a cash-in charge (`chargeId`).
  * - 'ready': something new to enter; 'entered': all of it is; 'withdrawn': the coordinator withdrew
  *   it and the line still stands — a derivation never makes it again (adding it back is a
@@ -134,6 +185,9 @@ type PlannedEntry = {
  *   (`verification.unverifiedAtDeadline = hold`);
  * - 'awaiting_payment': an accepted cash-in not paid yet — entered once paid;
  * - 'choose_award': a paid cash-in whose award the line's item does not say — added by hand.
+ * An entry's state: 'new'; 'exists'; 'elsewhere' (entered from another line or cash-in);
+ * 'withdrawn' (by the coordinator: not made again); 'refresh' (a draft brought up to date with what
+ * its line says now); 'link' (a paid cash-in's award already entered without it: linked to it).
  */
 type DeriveRow = {
   registrationId: string | null;
@@ -147,7 +201,14 @@ type DeriveRow = {
   note: string | null;
   deadline: { at: Date | null; kind: string | null };
   priorSitting: { name: string; source: string | null; outcome: string | null; declared: boolean } | null;
-  entries: (PlannedEntry & { state: 'new' | 'exists' | 'elsewhere' | 'withdrawn'; existingEntryId: string | null })[];
+  /** What the line says now (null for a cash-in): the check compares sent entries with it. */
+  expect: LineExpect | null;
+  entries: (PlannedEntry & {
+    state: 'new' | 'exists' | 'elsewhere' | 'withdrawn' | 'refresh' | 'link';
+    existingEntryId: string | null;
+    /** 'refresh': what changes on the draft. */
+    patch?: Partial<EntryRow>;
+  })[];
 };
 
 /** The catalogue pieces derivation reads: each award's options (with components) and unit map. */
@@ -274,7 +335,14 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
     effectiveDeadlinesOf(executor, regs.map((r) => r.id)),
   ]);
   const existing = inSeries.filter((e) => e.status !== 'withdrawn');
-  const withdrawn = inSeries.filter((e) => e.status === 'withdrawn');
+  // Withdrawn by the coordinator: never made again. Withdrawn with its line (a drop, a reversal): made
+  // again if the line is paid again (the review of 093dbd1, item 1).
+  const withdrawn = inSeries.filter((e) => e.status === 'withdrawn' && !e.withdrawnWithLine);
+  const awardIdsHere = [...new Set(existing.filter((e) => e.kind === 'award' && e.qualificationId).map((e) => e.qualificationId!))];
+  const awardsHere = awardIdsHere.length
+    ? await executor.select({ id: qualification.id, code: qualification.code, title: qualification.title, level: qualification.level, entryMethod: qualification.entryMethod, tier: qualification.tier })
+      .from(qualification).where(inArray(qualification.id, awardIdsHere))
+    : [];
   const rules = await boardRulesFor(series.boardCode, executor);
   const centre = await centreFor(series.boardCode);
   const nameOf = new Map(students.map((s) => [s.id, s.name]));
@@ -364,16 +432,27 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
     return { planned: null, note: null };
   };
 
-  const stateOf = (sid: string, p: PlannedEntry, owner: { registrationId?: string | null; chargeId?: string | null }) => {
+  const stateOf = (sid: string, p: PlannedEntry, owner: { registrationId?: string | null; chargeId?: string | null }, expect: LineExpect | null = null) => {
     const same = (e: (typeof inSeries)[number]) => e.studentId === sid && (p.kind === 'unit' ? e.unitId === p.unitId : e.qualificationId === p.qualificationId);
     const found = existing.find(same);
     const mine = (e: (typeof inSeries)[number]) => (owner.registrationId ? e.registrationId === owner.registrationId : e.chargeId === owner.chargeId);
     const gone = !found ? withdrawn.find((e) => same(e) && mine(e)) : undefined;
-    const state = found ? (mine(found) || (!found.registrationId && !found.chargeId) ? 'exists' as const : 'elsewhere' as const) : gone ? 'withdrawn' as const : 'new' as const;
-    return { ...p, state, existingEntryId: found?.id ?? gone?.id ?? null };
+    let state: DeriveRow['entries'][number]['state'] = found
+      ? (mine(found) || (!found.registrationId && !found.chargeId && !!owner.registrationId) ? 'exists' : 'elsewhere')
+      : gone ? 'withdrawn' : 'new';
+    let patch: Partial<EntryRow> | undefined;
+    // A paid cash-in whose award is already entered without one (from a whole-award line, or by
+    // hand): linked to it (the review of 093dbd1, item 6).
+    if (owner.chargeId && found && !found.chargeId) state = 'link';
+    // A draft made from this line, which the line's answer has changed since: brought up to date.
+    if (state === 'exists' && found && mine(found) && found.status === 'draft' && expect && owner.registrationId) {
+      const d = lineDiff(found, expect);
+      if (d.any) { state = 'refresh'; patch = d.patch; }
+    }
+    return { ...p, state, existingEntryId: found?.id ?? gone?.id ?? null, ...(patch ? { patch } : {}) };
   };
   const outcomeOf = (entries: DeriveRow['entries']): DeriveRow['outcome'] =>
-    entries.some((e) => e.state === 'new') ? 'ready' : entries.some((e) => e.state === 'withdrawn') ? 'withdrawn' : 'entered';
+    entries.some((e) => e.state === 'new' || e.state === 'refresh' || e.state === 'link') ? 'ready' : entries.some((e) => e.state === 'withdrawn') ? 'withdrawn' : 'entered';
 
   const rows: DeriveRow[] = [];
   for (const reg of regs) {
@@ -385,26 +464,40 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
       subject: { id: it.subject.id, name: it.subject.name, code: it.subject.code },
       item: { label: it.item.label, kind: it.item.kind }, levelCode: it.levelCode, deadline: { at: d.at, kind: d.kind },
       priorSitting: prior ? { name: prior.name, source: prior.source, outcome: prior.outcome, declared: prior.declared } : null,
+      expect: null as LineExpect | null,
     };
     const { planned, note } = plan(it);
     if (!planned) {
       rows.push({ ...base, outcome: 'not_mapped', note: `${it.subject.name} is not mapped on the Catalogue: say what it enters with ${series.boardName} first`, entries: [] });
       continue;
     }
-    // The line says it is a retake (a rejected declaration reads as a first entry, §3.5).
-    if (it.attempt === 'retake') for (const p of planned) if (!p.isRetake) Object.assign(p, { isRetake: true, retakeSource: 'registration' });
-    // Carry forward from the line's own prior sitting, where the item carries one forward.
+    // The line says it is a retake (a rejected declaration reads as a first entry, §3.5): the line's
+    // word is the source even when history says so too (the review of 093dbd1, item 9).
+    if (it.attempt === 'retake') for (const p of planned) Object.assign(p, { isRetake: true, retakeSource: 'registration' });
+    // Carry forward from the line's own prior sitting, where the item carries one forward: suggested
+    // while the sitting is declared and not verified, confirmed once known or verified (item 2).
     const carries = !!prior && (it.item.needsPriorSeries || !!it.enters.option?.carryForward) && !it.declarationRejected;
+    const here2 = prior ? numbers.find((x) => x.studentId === reg.studentId && x.seriesId === prior.seriesId) : undefined;
+    const expect: LineExpect = {
+      retake: it.attempt === 'retake',
+      carry: carries && prior ? {
+        state: prior.declared && prior.outcome !== 'verified' ? 'suggested' : 'confirmed', month: prior.month, year: prior.year,
+        otherCentre: !!prior.previousCentre,
+        centre: prior.previousCentre ? prior.previousCentre : here2?.centreNumber ?? centre.centreNumber,
+        number: prior.previousCentre ? prior.previousCandidateNumber : here2?.number ?? null,
+      } : null,
+      rejectedFrom: it.declarationRejected && prior && it.enters.qualification ? {
+        month: prior.month, year: prior.year,
+        optionCodes: cat.options.filter((o) => o.qualificationId === it.enters.qualification!.id && o.carryForward).map((o) => o.code),
+      } : null,
+    };
+    base.expect = expect;
     let lineNote = note;
     for (const p of planned.filter((x) => x.kind === 'award')) {
-      if (carries && prior) {
-        const here2 = numbers.find((x) => x.studentId === reg.studentId && x.seriesId === prior.seriesId);
-        const elsewhere = !!prior.previousCentre;
+      if (expect.carry) {
         Object.assign(p, {
-          carryForward: 'confirmed', cfFromMonth: prior.month, cfFromYear: prior.year,
-          cfCentreNumber: elsewhere ? prior.previousCentre : here2?.centreNumber ?? centre.centreNumber,
-          cfCandidateNumber: elsewhere ? prior.previousCandidateNumber : here2?.number ?? null,
-          cfOption: `${prior.month}_carry_forward`,
+          carryForward: expect.carry.state, cfFromMonth: expect.carry.month, cfFromYear: expect.carry.year,
+          cfCentreNumber: expect.carry.centre, cfCandidateNumber: expect.carry.number, cfOption: `${expect.carry.month}_carry_forward`,
         });
       } else if (!prior && p.qualificationId && !it.enters.option) {
         // No prior sitting on the line, and the item fixes no route: the suggest-and-confirm flow (Q-02).
@@ -415,7 +508,7 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
       lineNote = `The declared sitting was not confirmed: ${it.subject.name} is entered as a first entry — choose the option that enters every component`;
       for (const p of planned) if (p.kind === 'award') p.optionCode = null;
     }
-    const entries = planned.map((p) => stateOf(reg.studentId, p, { registrationId: reg.id }));
+    const entries = planned.map((p) => stateOf(reg.studentId, p, { registrationId: reg.id }, expect));
     if (passed(d)) {
       rows.push({ ...base, outcome: entries.every((e) => e.state === 'exists') ? 'entered' : 'past_deadline', note: entryStopSentence(series.name, d), entries });
       continue;
@@ -430,13 +523,18 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
   // Paid cash-ins become their award's entry; an accepted one awaiting payment is listed, not entered.
   for (const c of cashIns) {
     const it = c.registrationId ? itemOf.get(c.registrationId) : undefined;
-    const q = it?.enters.qualification && it.enters.qualification.entryMethod === 'units_cash_in' ? it.enters.qualification : null;
+    // The award: the one the line's item enters; else, when the candidate already has exactly one
+    // award cashed in by units entered here with no cash-in on it, that one (item 6).
+    const unlinked = awardsHere.filter((a) => a.entryMethod === 'units_cash_in'
+      && existing.some((e) => e.studentId === c.studentId && e.kind === 'award' && e.qualificationId === a.id && !e.chargeId));
+    const q = it?.enters.qualification && it.enters.qualification.entryMethod === 'units_cash_in' ? it.enters.qualification
+      : !it && unlinked.length === 1 ? unlinked[0]! : null;
     const d = chargeEntryDeadline(c, series);
     const base = {
       registrationId: null, chargeId: c.id, studentId: c.studentId, studentName: nameOf.get(c.studentId) ?? '',
       subject: it ? { id: it.subject.id, name: it.subject.name, code: it.subject.code } : { id: '', name: c.description, code: '' },
       item: it ? { label: it.item.label, kind: it.item.kind } : null, levelCode: it?.levelCode ?? '', deadline: { at: d.at, kind: d.kind },
-      priorSitting: null,
+      priorSitting: null, expect: null,
     };
     if (c.status !== 'paid') {
       rows.push({ ...base, outcome: 'awaiting_payment', note: `Cash-in awaiting payment: ${c.description} (EGP ${c.amount.toFixed(2)}) — entered once it is paid`, entries: [] });
@@ -448,11 +546,12 @@ async function planDerivation(series: SeriesRow, studentId: string | undefined, 
     }
     const p = awardEntry(c.studentId, q, null, null);
     const entries = [stateOf(c.studentId, p, { chargeId: c.id })];
-    if (passed(d)) {
+    // Linking a cash-in to the award already entered is not a new entry: no deadline stops it.
+    if (passed(d) && entries[0]!.state !== 'link') {
       rows.push({ ...base, outcome: entries[0]!.state === 'exists' ? 'entered' : 'past_deadline', note: entryStopSentence(series.name, d), entries });
       continue;
     }
-    rows.push({ ...base, outcome: outcomeOf(entries), note: null, entries });
+    rows.push({ ...base, outcome: outcomeOf(entries), note: entries[0]!.state === 'link' ? 'The award is already entered: this cash-in is linked to it' : null, entries });
   }
   return rows.sort((a, b) => a.studentName.localeCompare(b.studentName) || a.subject.name.localeCompare(b.subject.name)
     || (a.chargeId ? 1 : 0) - (b.chargeId ? 1 : 0) || (a.item?.label ?? '').localeCompare(b.item?.label ?? ''));
@@ -472,6 +571,8 @@ export async function deriveEntries(data: DeriveEntriesType, actorId: string, ct
     registrations: rows.filter((r) => r.registrationId).length,
     newEntries: rows.filter((r) => r.outcome === 'ready').reduce((n, r) => n + r.entries.filter((e) => e.state === 'new').length, 0),
     notMapped: rows.filter((r) => r.outcome === 'not_mapped').length,
+    // Drafts brought up to date with their line's answer, and paid cash-ins linked to their award (the review of 093dbd1).
+    updates: rows.filter((r) => r.outcome === 'ready').reduce((n, r) => n + r.entries.filter((e) => e.state === 'refresh' || e.state === 'link').length, 0),
   });
   const refusalOf = (s: SeriesRow, rows: DeriveRow[]) =>
     pastEntryDeadline(s) && !rows.some((r) => r.outcome === 'ready') ? hardStopSentence(s) : null;
@@ -480,7 +581,7 @@ export async function deriveEntries(data: DeriveEntriesType, actorId: string, ct
     return {
       series: { id: series.id, name: series.name, entryDeadline: series.entryDeadline, retakeDeadline: series.retakeDeadline },
       pastDeadline: pastEntryDeadline(series), refusal: refusalOf(series, rows),
-      committed: false, created: 0, rows, summary: summarize(rows),
+      committed: false, created: 0, updated: 0, rows, summary: summarize(rows),
     };
   }
   return db.transaction(async (tx) => {
@@ -504,9 +605,36 @@ export async function deriveEntries(data: DeriveEntriesType, actorId: string, ct
       await logAction(actorId, 'EXAM_ENTRIES_DERIVED', 'board_series', locked.id, null,
         { count: created.length, entryIds: created.map((c) => c.id), studentId: data.studentId ?? null }, ctx, tx);
     }
+    // A draft brought up to date with what its line says now (a sitting answered after the entry
+    // was made), and a paid cash-in linked to its award already entered — each guarded on the
+    // state it was planned from, each audited.
+    let updated = 0;
+    for (const r of rows.filter((x) => x.outcome === 'ready')) {
+      for (const e of r.entries) {
+        if (e.state === 'refresh' && e.existingEntryId && e.patch) {
+          const [before] = await tx.select().from(examEntry).where(and(eq(examEntry.id, e.existingEntryId), eq(examEntry.status, 'draft'))).for('update');
+          if (!before) continue;
+          const [row] = await tx.update(examEntry).set({ ...e.patch, updatedAt: new Date() }).where(and(eq(examEntry.id, before.id), eq(examEntry.status, 'draft'))).returning();
+          if (!row) continue;
+          const keys = Object.keys(e.patch);
+          await logAction(actorId, 'EXAM_ENTRY_UPDATED', 'exam_entry', before.id,
+            Object.fromEntries(keys.map((k) => [k, (before as Record<string, unknown>)[k] ?? null])),
+            { ...e.patch, reason: "brought up to date with the reservation's answered sitting" }, ctx, tx);
+          updated++;
+        }
+        if (e.state === 'link' && e.existingEntryId && r.chargeId) {
+          const [row] = await tx.update(examEntry).set({ chargeId: r.chargeId, updatedAt: new Date() })
+            .where(and(eq(examEntry.id, e.existingEntryId), isNull(examEntry.chargeId), sql`${examEntry.status} <> 'withdrawn'`)).returning({ id: examEntry.id });
+          if (!row) continue;
+          await logAction(actorId, 'EXAM_ENTRY_UPDATED', 'exam_entry', row.id, { chargeId: null },
+            { chargeId: r.chargeId, reason: 'linked to the paid cash-in of its award' }, ctx, tx);
+          updated++;
+        }
+      }
+    }
     return {
       series: { id: locked.id, name: locked.name, entryDeadline: locked.entryDeadline, retakeDeadline: locked.retakeDeadline },
-      pastDeadline: pastEntryDeadline(locked), refusal: null, committed: true, created: created.length, rows, summary: summarize(rows),
+      pastDeadline: pastEntryDeadline(locked), refusal: null, committed: true, created: created.length, updated, rows, summary: summarize(rows),
     };
   });
 }
@@ -637,18 +765,43 @@ export async function updateEntry(id: string, data: UpdateEntryType, actorId: st
  * after it is refused — the school sends no late entries. An entry whose line follows a declared
  * sitting still unverified is not sent while the school holds such lines
  * (`verification.unverifiedAtDeadline = hold`). Sending is what makes a line's board fee "sent"
- * for its refund (step C's `refundFor` reads `entrySentAt`).
+ * for its refund (step C's `refundFor` reads `sentEntriesOf`).
  */
 export async function submitEntries(data: SubmitEntriesType, actorId: string, ctx?: AuditContext) {
   const at = data.submittedAt ?? new Date();
   if (at.getTime() > Date.now() + 5 * 60_000) throw new ExamError('The time the entries went to the board cannot be in the future', 400);
   return db.transaction(async (tx) => {
+    // What the entries were made from (an entry's line and cash-in never change), then those lines
+    // FOR SHARE in id order and the cash-ins FOR SHARE, before the entries (§2.1: a line before what
+    // is made from it). A drop, a swap or a reversal that ends a line holds it FOR UPDATE and
+    // withdraws its entries in its transaction: the two run one after the other (the review of
+    // 093dbd1, item 1).
+    const refs = await tx.select({ id: examEntry.id, registrationId: examEntry.registrationId, chargeId: examEntry.chargeId })
+      .from(examEntry).where(inArray(examEntry.id, data.entryIds));
+    if (refs.length !== new Set(data.entryIds).size) throw new ExamError('Entry not found', 404);
+    const lineIds = [...new Set(refs.map((r) => r.registrationId).filter((x): x is string => !!x))].sort();
+    const chargeIds = [...new Set(refs.map((r) => r.chargeId).filter((x): x is string => !!x))].sort();
+    const lineStatus = new Map((lineIds.length
+      ? await tx.select({ id: registration.id, status: registration.status }).from(registration).where(inArray(registration.id, lineIds)).orderBy(asc(registration.id)).for('share')
+      : []).map((l) => [l.id, l.status]));
+    const chargeStatus = new Map((chargeIds.length
+      ? await tx.select({ id: charge.id, status: charge.status }).from(charge).where(inArray(charge.id, chargeIds)).orderBy(asc(charge.id)).for('share')
+      : []).map((c) => [c.id, c.status]));
     const rows = await tx.select().from(examEntry).where(inArray(examEntry.id, data.entryIds)).orderBy(asc(examEntry.id)).for('update');
-    if (rows.length !== new Set(data.entryIds).size) throw new ExamError('Entry not found', 404);
     const seriesIds = [...new Set(rows.map((r) => r.boardSeriesId))].sort();
     const seriesById = new Map<string, SeriesRow>();
     for (const sid of seriesIds) seriesById.set(sid, await seriesOrThrow(sid, tx, 'share'));
     const drafts = rows.filter((r) => r.status === 'draft');
+    // A draft whose line is no longer paid, or whose cash-in is not paid, is not sent: the board
+    // would be paid for an entry the family is no longer paying for.
+    const unpaid = drafts.find((d) => (d.registrationId && lineStatus.get(d.registrationId) !== 'confirmed') || (d.chargeId && chargeStatus.get(d.chargeId) !== 'paid'));
+    if (unpaid) {
+      const [who] = await tx.select({ name: user.name }).from(user).where(eq(user.id, unpaid.studentId));
+      const why = unpaid.registrationId && lineStatus.get(unpaid.registrationId) !== 'confirmed'
+        ? `its reservation is ${(lineStatus.get(unpaid.registrationId) ?? 'gone').replace(/_/g, ' ')}`
+        : 'its cash-in is not paid';
+      throw new ExamError(`${unpaid.entryCode} ${unpaid.title} for ${who?.name ?? 'the candidate'} is not sent: ${why} — withdraw the entry`, 409);
+    }
     const deadlines = await deadlinesOfEntries(tx, drafts, seriesById);
     const late = drafts.find((d) => passed(deadlines.get(d.id)!, at));
     if (late) throw new ExamError(entryStopSentence(seriesById.get(late.boardSeriesId)!.name, deadlines.get(late.id)!), 409);
@@ -702,14 +855,18 @@ export async function withdrawEntry(id: string, reason: string, actorId: string,
 }
 
 /**
- * The desk drops a paid line past its deadline (step C's `deskDrop`, its seam `withdrawEntry`):
- * every live entry made from the line is withdrawn in the drop's transaction — each locked after
- * the line (the drop holds the receipt, then the line; an entry's own writers take only the
- * entry), with what the board does with its fee as the sentence, and its own audit row. Returns
- * them for the family's notice after the commit (`tellWithdrawn`). Nothing here moves money: the
- * line's refund is the drop's (`refundFor`, the board fee by the "sent" rule).
+ * Every path that ends a paid line withdraws the live entries made from it, in its own
+ * transaction (the review of 093dbd1, item 1): the desk's drop (step C's `deskDrop`, its seam
+ * `withdrawEntry`), the family's drop and swap and a change request's approval (swap.services),
+ * a payment's reversal (payment.services) and step B's two system drops — a rejection after the
+ * first-entry deadline and `hold` at the deadline (verification.services). Each entry is locked
+ * after the line (the path holds the receipt, then the line; "mark as sent" takes the line FOR
+ * SHARE before its entries), withdrawn with what the board does with its fee as the sentence and
+ * marked `withdrawn_with_line` (a derivation makes it again if the line is paid again), with its
+ * own audit row. Returns them for the family's notice after the commit (`tellWithdrawn`). Nothing
+ * here moves money: the line's refund is its path's (`refundFor`, the board fee by the "sent" rule).
  */
-export async function withdrawEntriesOfLineInTx(tx: Tx, lineId: string, reason: string, actorId: string, ctx?: AuditContext) {
+export async function withdrawEntriesOfLineInTx(tx: Tx, lineId: string, reason: string, actorId: string | null, ctx?: AuditContext) {
   const live = await tx.select().from(examEntry)
     .where(and(eq(examEntry.registrationId, lineId), sql`${examEntry.status} <> 'withdrawn'`)).orderBy(asc(examEntry.id)).for('update');
   const out: { entry: EntryRow; charge: { refunded: boolean | null; sentence: string }; series: SeriesRow; wasSent: boolean }[] = [];
@@ -719,11 +876,11 @@ export async function withdrawEntriesOfLineInTx(tx: Tx, lineId: string, reason: 
     const charge = withdrawalCharge(rules, series, e.status);
     const [row] = await tx.update(examEntry).set({
       status: 'withdrawn', withdrawnAt: new Date(), withdrawnBy: actorId, withdrawalReason: reason,
-      withdrawalCharge: charge.sentence, withdrawalRefunded: charge.refunded, updatedAt: new Date(),
+      withdrawalCharge: charge.sentence, withdrawalRefunded: charge.refunded, withdrawnWithLine: true, updatedAt: new Date(),
     }).where(and(eq(examEntry.id, e.id), sql`${examEntry.status} <> 'withdrawn'`)).returning();
     if (!row) continue;
     await logAction(actorId, 'EXAM_ENTRY_WITHDRAWN', 'exam_entry', e.id, { status: e.status },
-      { status: 'withdrawn', reason, charge: charge.sentence, refunded: charge.refunded, pastDeadline: pastEntryDeadline(series), byDeskDrop: lineId }, ctx, tx);
+      { status: 'withdrawn', reason, charge: charge.sentence, refunded: charge.refunded, pastDeadline: pastEntryDeadline(series), withLine: lineId }, ctx, tx);
     out.push({ entry: row, charge, series, wasSent: e.status !== 'draft' });
   }
   return out;
@@ -909,6 +1066,15 @@ async function assess(entries: EntryRow[]) {
   ]);
   const numbers = new Map<string, Map<string, string>>();
   for (const sid of seriesIds) numbers.set(sid, await numbersIn(sid, entries.filter((e) => e.boardSeriesId === sid).map((e) => e.studentId)));
+  // What each entry's line says now (the review of 093dbd1, item 2): the derivation's own plan per
+  // series (one student's when the entries are one student's), so the check compares an entry with
+  // its line by the same rule that made it — a sitting answered after the entry was made shows.
+  const expectOf = new Map<string, LineExpect>();
+  for (const sid of seriesIds.filter((x) => entries.some((e) => e.boardSeriesId === x && e.registrationId && e.status !== 'withdrawn'))) {
+    const its = [...new Set(entries.filter((e) => e.boardSeriesId === sid).map((e) => e.studentId))];
+    const planned = await planDerivation(await seriesOrThrow(sid), its.length === 1 ? its[0] : undefined, db);
+    for (const r of planned) if (r.registrationId && r.expect) expectOf.set(r.registrationId, r.expect);
+  }
   // Each entry's line: its own, or the line its cash-in names; and each cash-in's state.
   const chargeIds = [...new Set(entries.map((e) => e.chargeId).filter((x): x is string => !!x))];
   const charges = chargeIds.length
@@ -970,6 +1136,15 @@ async function assess(entries: EntryRow[]) {
     if (e.chargeId && chargeById.get(e.chargeId)?.status !== 'paid') out.push('cash_in_not_paid');
     // A declared earlier sitting not verified yet: entered as declared, or held (Q-22's setting).
     if (e.registrationId && reg?.declaredUnverified) out.push(verification === 'hold' ? 'prior_sitting_held' : 'prior_sitting_unverified');
+    // Its line's answer changed what the board should see (retake, carry forward, the previous
+    // centre and number) after the entry was made: the coordinator amends it (a draft is brought up
+    // to date by the next derivation).
+    const x = e.registrationId ? expectOf.get(e.registrationId) : undefined;
+    if (x) {
+      const d = lineDiff(e, x);
+      if (d.retake) out.push('retake_differs_from_line');
+      if (d.carry) out.push('carry_forward_differs_from_line');
+    }
     const aa = (e.accessArrangements ?? c?.accessArrangements ?? []) as string[];
     if (aa.length && (!c?.accessArrangementsRef || (c.accessArrangementsUntil && c.accessArrangementsUntil < today))) out.push('access_arrangements_unapproved');
     return out;
@@ -1093,9 +1268,16 @@ export async function getEntryList(boardSeriesId: string) {
   const cashInStudents = paidCashIns.length
     ? new Map((await db.select({ id: user.id, name: user.name }).from(user).where(inArray(user.id, [...new Set(paidCashIns.map((c) => c.studentId))]))).map((x) => [x.id, x.name]))
     : new Map<string, string>();
+  // A cash-in whose award is already entered without one is linked by the next derivation (the
+  // review of 093dbd1, item 6): it says so, and leaves the list once linked.
+  const unlinkedAwards = paidCashIns.length
+    ? await db.select({ studentId: examEntry.studentId }).from(examEntry).innerJoin(qualification, eq(qualification.id, examEntry.qualificationId))
+      .where(and(eq(examEntry.boardSeriesId, series.id), eq(examEntry.kind, 'award'), isNull(examEntry.chargeId), sql`${examEntry.status} <> 'withdrawn'`, eq(qualification.entryMethod, 'units_cash_in')))
+    : [];
   const cashInsToEnter = paidCashIns.filter((c) => !enteredCharges.has(c.id)).map((c) => ({
     chargeId: c.id, studentId: c.studentId, studentName: cashInStudents.get(c.studentId) ?? '', description: c.description, kind: c.kind,
     registrationId: c.registrationId, deadline: c.deadline,
+    awardEntered: unlinkedAwards.some((u) => u.studentId === c.studentId),
   }));
   const summary = Object.fromEntries(ENTRY_PROBLEMS.map((p) => [p, rows.filter((r) => r.problems.includes(p)).length])) as Record<EntryProblem, number>;
   return {

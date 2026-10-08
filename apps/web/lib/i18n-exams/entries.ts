@@ -453,6 +453,44 @@ export const entriesArabic: Record<string, string> = {
   'Failed to record the forecasts as sent': 'تعذر تسجيل الدرجات المتوقعة كمُرسلة',
   'Failed to build the entry list': 'تعذر إعداد قائمة القيد',
   "Failed to save the board's rules": 'تعذر حفظ قواعد المجلس',
+  // The review of 093dbd1: entries follow their line's answer; a cash-in linked to its award; the board's results at declaration.
+  'Draft brought up to date with the reservation': 'مسودة حُدِّثت وفق الحجز',
+  'Already entered: linked to this cash-in': 'مقيد بالفعل: رُبط بطلب الشهادة (Cash-in) هذا',
+  'The award is already entered: this cash-in is linked to it': 'المؤهل مقيد بالفعل: رُبط به طلب الشهادة (Cash-in) هذا',
+  'Bring them up to date': 'حدّثها',
+  '1 entry to bring up to date': 'قيد واحد يحتاج إلى تحديث',
+  '1 entry brought up to date.': 'حُدِّث قيد واحد.',
+  "Its reservation's retake answer changed after the entry was made — amend the entry's retake":
+    'تغيّرت إجابة الحجز عن الإعادة بعد إنشاء القيد - عدّل الإعادة في القيد',
+  "Its reservation's earlier sitting was answered after the entry was made — amend the carry forward (series, centre, candidate number, option)":
+    'أُجيب عن الدورة السابقة في الحجز بعد إنشاء القيد - عدّل الترحيل (الدورة، المركز، رقم المرشح، الخيار)',
+  "brought up to date with the reservation's answered sitting": 'حُدِّث وفق الدورة السابقة التي أُجيب عنها في الحجز',
+  'linked to the paid cash-in of its award': 'رُبط بطلب الشهادة (Cash-in) المدفوع لمؤهله',
+  'Check against the results on record': 'طابِق مع النتائج المسجلة',
+  '1 sitting was verified from the results on record.': 'تم التحقق من دورة واحدة من النتائج المسجلة.',
+  'No sitting awaiting an answer has a result on record yet.': 'لا توجد بعد نتيجة مسجلة لأي دورة بانتظار الإجابة.',
+  '1 could not be checked: answer it below.': 'تعذر فحص واحدة: أجب عنها أدناه.',
+};
+
+/** Why an entry was withdrawn with its line (the paths that end a paid line), as the family's notice names it. */
+const withdrawReasonArabic: Record<string, string> = {
+  'the family dropped the subject': 'سحبت الأسرة المادة',
+  'the family swapped the subject': 'استبدلت الأسرة المادة',
+  'the declared sitting was not confirmed after the first-entry deadline': 'لم تُؤكَّد الدورة المُصرَّح بها بعد آخر موعد للقيد الأول',
+  'the declared sitting was not verified by its deadline (the school holds such lines)': 'لم يُتحقق من الدورة المُصرَّح بها بحلول موعدها (تُعلِّق المدرسة هذه السطور)',
+  'the declared sitting was not verified by its deadline': 'لم يُتحقق من الدورة المُصرَّح بها بحلول موعدها',
+};
+export function withdrawReasonAr(reason: string): string {
+  const known = withdrawReasonArabic[reason];
+  if (known) return known;
+  const reversed = /^the payment was reversed: (.+)$/.exec(reason);
+  return reversed ? `أُلغي الدفع: ${reversed[1]}` : reason;
+}
+
+/** A reservation line's status as the refusal to send names it. */
+const lineStatusArabic: Record<string, string> = {
+  dropped: 'مسحوب', 'dropped pending receipt': 'مسحوب بانتظار الإيصال', swapped: 'مُستبدَل', expired: 'منتهٍ',
+  rejected: 'مرفوض', 'pending payment': 'بانتظار الدفع', 'pending approval': 'بانتظار الموافقة', preregistered: 'مسجل مبدئيًا', gone: 'محذوف',
 };
 
 export const entriesRules: Rule[] = [
@@ -529,4 +567,15 @@ export const entriesRules: Rule[] = [
     (m) => `يبقى رسم المجلس لدى المجلس: انقضى ${m[1] === 'retake deadline' ? 'آخر موعد للإعادة' : m[1] === 'entry deadline' ? 'آخر موعد للقيد' : 'بدء الامتحانات'} (${dateAr(m[2]!)}).`],
   [/^A cash-in enters an award: choose the award it cashes in$/, () => 'طلب الشهادة (Cash-in) يقيّد مؤهلًا: اختر المؤهل الذي يطلب شهادته'],
   [/^That cash-in is not this candidate's in this series$/, () => 'طلب الشهادة (Cash-in) هذا ليس لهذا المرشح في هذه الدورة'],
+  // The review of 093dbd1: "mark as sent" refuses a draft whose line or cash-in is no longer paid.
+  [/^(\S+) (.+) for (.+) is not sent: its reservation is (.+) — withdraw the entry$/,
+    (m) => `لم يُرسل ${m[1]} ${m[2]} لـ ${m[3]}: حجزه ${lineStatusArabic[m[4]!] ?? m[4]} - اسحب القيد`],
+  [/^(\S+) (.+) for (.+) is not sent: its cash-in is not paid — withdraw the entry$/,
+    (m) => `لم يُرسل ${m[1]} ${m[2]} لـ ${m[3]}: طلب الشهادة (Cash-in) غير مدفوع - اسحب القيد`],
+  [/^(\d+) entries to bring up to date$/, (m) => `${m[1]} قيود تحتاج إلى تحديث`],
+  [/^(\d+) entries brought up to date\.$/, (m) => `حُدِّث ${m[1]} قيود.`],
+  [/^(\d+) sittings were verified from the results on record\.$/, (m) => `تم التحقق من ${m[1]} دورات من النتائج المسجلة.`],
+  [/^(\d+) could not be checked: answer them below\.$/, (m) => `تعذر فحص ${m[1]}: أجب عنها أدناه.`],
+  [/^Results saved; the verification of (\d+) declared sittings? failed — answer (?:it|them) on the session's To verify tab$/,
+    (m) => `حُفظت النتائج؛ تعذر التحقق من ${m[1]} من الدورات المُصرَّح بها - أجب عنها في تبويب للتحقق في الجلسة`],
 ];

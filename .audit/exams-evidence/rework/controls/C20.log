@@ -4,13 +4,16 @@
 # expected red: ['a sitting at another centre, verified with its centre and candidate number']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 9881ms
-   × F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting at another centre, verified with its centre and candidate number, is carried forward with them 66ms
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 2 failed) 24537ms
+   × F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting at another centre, verified with its centre and candidate number, is carried forward with them 103ms
      → expected [ [ 'XW9700', 'BY', …(5) ] ] to deeply equal [ [ 'XW9700', 'BY', …(5) ] ]
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number 28ms
+     → expected [ 'missing_candidate_number', …(6) ] to include 'carry_forward_differs_from_line'
  Test Files  1 failed (1)
-      Tests  1 failed | 17 passed (18)
+      Tests  2 failed | 39 passed (41)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+[results] Could not verify the declared sitting of line 7c0e59ac-ed49-4e45-9d76-dd7cd19feca6: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting at another centre, verified with its centre and candidate number, is carried forward with them
 AssertionError: expected [ [ 'XW9700', 'BY', …(5) ] ] to deeply equal [ [ 'XW9700', 'BY', …(5) ] ]
@@ -31,8 +34,15 @@ AssertionError: expected [ [ 'XW9700', 'BY', …(5) ] ] to deeply equal [ [ 'XW9
 [2m    ],[22m
 [2m  ][22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:195:10
+ ❯ test/08x4-exam-entries-rework.test.ts:211:10
 
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number
+AssertionError: expected [ 'missing_candidate_number', …(6) ] to include 'carry_forward_differs_from_line'
+ ❯ test/08x4-exam-entries-rework.test.ts:696:44
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

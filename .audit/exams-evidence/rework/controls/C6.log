@@ -4,10 +4,10 @@
 # expected red: ['flags a missing forecast grade']
 # result: RED as expected
 
- ❯ test/08x1-exam-entries.test.ts (17 tests | 3 failed) 4279ms
-   × F4: candidates and entries > the entry list and its check > flags a missing forecast grade (Cambridge requires one) and every other gap; the teacher of the subject fills it 19ms
+ ❯ test/08x1-exam-entries.test.ts (17 tests | 3 failed) 5206ms
+   × F4: candidates and entries > the entry list and its check > flags a missing forecast grade (Cambridge requires one) and every other gap; the teacher of the subject fills it 51ms
      → expected [] to deeply equal [ 'missing_forecast' ]
-   × F4: candidates and entries > the entry list and its check > Pearson's list asks for the UCI, not a forecast; the board's rules are data the coordinator changes 33ms
+   × F4: candidates and entries > the entry list and its check > Pearson's list asks for the UCI, not a forecast; the board's rules are data the coordinator changes 73ms
      → expected +0 to be 5 // Object.is equality
    × F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after 8ms
      → expected +0 to be 1 // Object.is equality

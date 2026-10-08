@@ -36,6 +36,7 @@ import { findOrCreateSeries, OfferError } from './offer.services';
 import { PRICE_CHANGED_REFUSAL, round2 } from './pricing.services';
 import { schoolMonthIndex } from './series.services';
 import { academicYearForDate } from './school-fee.services';
+import { verifyDeclaredAtDeclarationInTx } from './exam-result.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -324,6 +325,10 @@ export async function reserveLines(
     throw new ReservationError(PRICE_CHANGED_REFUSAL, 409);
   }
   if (channel) await writeConsents(tx, inserted.map((r) => r.id), { channel, confirmedBy: a.requestedBy });
+  // A declared sitting the school's own results show is verified at once (F4; the review of
+  // 093dbd1, item 3), in this transaction: the one who imported the result answers.
+  const declared = inserted.filter((r) => r.priorSittingSource === 'declared_by_family' || r.priorSittingSource === 'declared_by_desk').map((r) => r.id);
+  if (declared.length) await verifyDeclaredAtDeclarationInTx(tx, declared);
   return inserted;
 }
 

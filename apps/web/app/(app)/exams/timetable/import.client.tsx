@@ -182,7 +182,7 @@ export function ImportPanel({ data }: { data: PapersData }): React.JSX.Element {
                   <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Paper</th>
                   <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Title</th>
                   <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Date</th>
-                  <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Session</th>
+                  <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Time of day</th>
                   <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Start</th>
                   <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Duration</th>
                   <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">In the catalogue</th>

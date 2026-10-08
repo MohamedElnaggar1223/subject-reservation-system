@@ -1,0 +1,64 @@
+# C45: the entry check does not compare an entry with its line's answer now
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['a retake rejected after its entry was sent', 'verified at another centre after derivation', 'rejected after derivation: the draft loses']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 4 failed) 21151ms
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it 85ms
+     → expected [ 'missing_candidate_number', …(5) ] to include 'retake_differs_from_line'
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its draft was made: the next derivation brings the draft up to date as a first entry, audited 67ms
+     → expected [ 'missing_candidate_number', …(5) ] to include 'retake_differs_from_line'
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number 30ms
+     → expected [ 'missing_candidate_number', …(6) ] to include 'carry_forward_differs_from_line'
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > rejected after derivation: the draft loses the carry forward and its option; a sent entry keeps them and is flagged 86ms
+     → expected [ 'missing_candidate_number', …(6) ] to include 'carry_forward_differs_from_line'
+ Test Files  1 failed (1)
+      Tests  4 failed | 37 passed (41)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 23ab6b18-f9fc-4c29-9fab-c3ca74f46433: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its entry was sent: the entry still says retake, and the check asks the coordinator to amend it
+AssertionError: expected [ 'missing_candidate_number', …(5) ] to include 'retake_differs_from_line'
+ ❯ test/08x4-exam-entries-rework.test.ts:648:28
+    646|       const row = await rowOf(e.id);
+    647|       expect(row.values).toMatchObject({ retake: 'Y' });
+    648|       expect(row.problems).toContain('retake_differs_from_line');
+       |                            ^
+    649|       // A derivation leaves a sent entry alone: the coordinator amend…
+    650|       expect(await derive(nov(), af.ra!.studentId)).toMatchObject({ cr…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a retake rejected after its draft was made: the next derivation brings the draft up to date as a first entry, audited
+AssertionError: expected [ 'missing_candidate_number', …(5) ] to include 'retake_differs_from_line'
+ ❯ test/08x4-exam-entries-rework.test.ts:659:44
+    657|       expect(e.is_retake).toBe(true);
+    658|       await verify(al.rb!, { outcome: 'rejected', reason: 'no such sit…
+    659|       expect((await rowOf(e.id)).problems).toContain('retake_differs_f…
+       |                                            ^
+    660|       const preview = await derive(nov(), af.rb!.studentId, false);
+    661|       expect(preview.summary).toMatchObject({ newEntries: 0, updates: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number
+AssertionError: expected [ 'missing_candidate_number', …(6) ] to include 'carry_forward_differs_from_line'
+ ❯ test/08x4-exam-entries-rework.test.ts:696:44
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > rejected after derivation: the draft loses the carry forward and its option; a sent entry keeps them and is flagged
+AssertionError: expected [ 'missing_candidate_number', …(6) ] to include 'carry_forward_differs_from_line'
+ ❯ test/08x4-exam-entries-rework.test.ts:733:48
+    731|       await send(sent.id);
+    732|       for (const k of ['ce', 'cs']) expect(await verify(al[k]!, { outc…
+    733|       expect((await rowOf(draft.id)).problems).toContain('carry_forwar…
+       |                                                ^
+    734|       expect((await rowOf(sent.id)).problems).toContain('carry_forward…
+    735|       expect(await derive(nov(), af.ce!.studentId)).toMatchObject({ up…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+

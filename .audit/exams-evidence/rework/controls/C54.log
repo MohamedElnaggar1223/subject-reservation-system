@@ -1,0 +1,72 @@
+# C54: a paid cash-in whose award is already entered is not linked to it
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['a whole-award line already entered is linked to that entry', 'entered by hand without it, is linked to that entry']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 2 failed) 20765ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1) 98ms
+     → expected { registrationId: null, …(12) } to match object { outcome: 'ready', …(1) }
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in that names no line, whose award was entered by hand without it, is linked to that entry 317ms
+     → expected [ [ …(3) ] ] to deeply equal [ [ …(3) ] ]
+ Test Files  1 failed (1)
+      Tests  2 failed | 39 passed (41)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 82912d19-e77e-4758-9d00-1c039b63e681: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1)
+AssertionError: expected { registrationId: null, …(12) } to match object { outcome: 'ready', …(1) }
+(18 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "note": "The award is already entered: this cash-in is linked to it",[39m
+[32m-   "outcome": "ready",[39m
+[31m+   "note": null,[39m
+[31m+   "outcome": "entered",[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:394:19
+    392|       const preview = await derive(w.series.pearsonJan, b.studentId, f…
+    393|       const row = preview.rows.find((r) => r.chargeId === c.id)!;
+    394|       expect(row).toMatchObject({ outcome: 'ready', note: 'The award i…
+       |                   ^
+    395|       expect(row.entries.map((e) => [e.state, e.existingEntryId])).toE…
+    396|       expect(preview.summary).toMatchObject({ newEntries: 0, updates: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in that names no line, whose award was entered by hand without it, is linked to that entry
+AssertionError: expected [ [ …(3) ] ] to deeply equal [ [ …(3) ] ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    [[22m
+[2m      "e988d1d3-af69-4023-83fd-e0f79926cbb4",[22m
+[32m-     "ready",[39m
+[31m+     "entered",[39m
+[2m      [[22m
+[2m        [[22m
+[32m-         "link",[39m
+[31m+         "elsewhere",[39m
+[2m          "21cb20ca-aa6f-4ff4-a9c4-d4282ae705dc",[22m
+[2m        ],[22m
+[2m      ],[22m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:417:116
+    415|       await apiResponse(w.officer.api.v1.registrations.desk.collect.$p…
+    416|       const preview = await derive(w.series.pearsonJan, ch.studentId, …
+    417|       expect(preview.rows.map((r) => [r.chargeId, r.outcome, r.entries…
+       |                                                                                                                    ^
+    418|       expect(await derive(w.series.pearsonJan, ch.studentId)).toMatchO…
+    419|       expect((await one<{ c: string | null }>(`select charge_id as c f…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

@@ -16,7 +16,7 @@
 
 import { db, registration, changeRequest, receipt, eq, and } from '@repo/db';
 import { logAction, type AuditContext } from './audit.services';
-import { executeReceiptGatedDrop } from './receipt.services';
+import { executeReceiptGatedDrop, lockReceiptOf } from './receipt.services';
 import { refundFor, refundSentence } from './refund.services';
 import { effectiveDeadlineFor } from './deadline.services';
 import { mayRegisterFor } from './eligibility.services';
@@ -58,10 +58,14 @@ export async function deskDrop(registrationId: string, staffId: string, reason: 
     .where(and(eq(changeRequest.registrationId, registrationId), eq(changeRequest.status, 'pending_approval')));
   if (pending.length) throw new DeskDropError('A drop or swap request is pending on this line: the parent answers it, or the student cancels it, first', 409);
 
-  // The refund locks now (V3 §6.12): the course fee by the policy, the board fee by "sent".
-  const quote = await refundFor(db, registrationId, now);
   let withdrawn: Awaited<ReturnType<typeof withdrawEntry>> = [];
+  let quote = null as Awaited<ReturnType<typeof refundFor>> | null;
   const result = await db.transaction(async (tx) => {
+    // The receipt, then the line (MA-16's order), and only then the price (the review of 093dbd1,
+    // item 4): the refund locks now (V3 §6.12), the course fee by the policy, the board fee by "sent".
+    await lockReceiptOf(tx, registrationId);
+    await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, registrationId)).for('update');
+    quote = await refundFor(tx, registrationId, now);
     const drop = await executeReceiptGatedDrop(tx, {
       registrationId, studentId: reg.studentId, refundAmount: quote.amount, refundReason: 'drop', initiatedBy: staffId,
     });

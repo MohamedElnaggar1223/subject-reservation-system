@@ -4,37 +4,38 @@
 # expected red: ['entered as declared (the default)', 'held when the school holds unverified sittings']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 2 failed) 10866ms
-   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified 209ms
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 2 failed) 21892ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified 180ms
      → expected [ 'missing_candidate_number', …(4) ] to include 'prior_sitting_unverified'
-   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 35ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 67ms
      → expected [ 'missing_candidate_number', …(4) ] to include 'prior_sitting_held'
  Test Files  1 failed (1)
-      Tests  2 failed | 16 passed (18)
+      Tests  2 failed | 39 passed (41)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line beeb850a-6038-4f3b-84ca-b22c6b8d073a: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified
 AssertionError: expected [ 'missing_candidate_number', …(4) ] to include 'prior_sitting_unverified'
- ❯ test/08x4-exam-entries-rework.test.ts:241:81
-    239|       await derive(w.series.pearsonJan, fam.f!.studentId);
-    240|       const list = await entryList(w.series.pearsonJan);
-    241|       expect(list.rows.find((r) => r.studentId === fam.e!.studentId)!.…
+ ❯ test/08x4-exam-entries-rework.test.ts:257:81
+    255|       await derive(w.series.pearsonJan, fam.f!.studentId);
+    256|       const list = await entryList(w.series.pearsonJan);
+    257|       expect(list.rows.find((r) => r.studentId === fam.e!.studentId)!.…
        |                                                                                 ^
-    242|       expect(list.rows.find((r) => r.studentId === fam.f!.studentId)!.…
-    243|       expect(list.summary.prior_sitting_unverified).toBe(2);
+    258|       expect(list.rows.find((r) => r.studentId === fam.f!.studentId)!.…
+    259|       expect(list.summary.prior_sitting_unverified).toBe(2);
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes
 AssertionError: expected [ 'missing_candidate_number', …(4) ] to include 'prior_sitting_held'
- ❯ test/08x4-exam-entries-rework.test.ts:252:31
-    250|         const list = await entryList(w.series.pearsonJan);
-    251|         const fRow = list.rows.find((r) => r.studentId === fam.f!.stud…
-    252|         expect(fRow.problems).toContain('prior_sitting_held');
+ ❯ test/08x4-exam-entries-rework.test.ts:268:31
+    266|         const list = await entryList(w.series.pearsonJan);
+    267|         const fRow = list.rows.find((r) => r.studentId === fam.f!.stud…
+    268|         expect(fRow.problems).toContain('prior_sitting_held');
        |                               ^
-    253|         expect(fRow.problems).not.toContain('prior_sitting_unverified'…
-    254|         const preview = await derive(w.series.pearsonJan, fam.f!.stude…
+    269|         expect(fRow.problems).not.toContain('prior_sitting_unverified'…
+    270|         const preview = await derive(w.series.pearsonJan, fam.f!.stude…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

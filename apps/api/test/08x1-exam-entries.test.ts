@@ -94,7 +94,7 @@ describe('F4: candidates and entries', () => {
   describe('entries derived from confirmed registrations per component', () => {
     it('a preview says what each registration enters; the commit makes each entry once', async () => {
       const preview = await apiResponse(coord.api.v1.exams.entries.derive.$post({ json: { boardSeriesId: w.series.pearsonJan, commit: false } }));
-      expect(preview.summary).toEqual({ registrations: 3, newEntries: 5, notMapped: 0 });
+      expect(preview.summary).toEqual({ registrations: 3, newEntries: 5, notMapped: 0, updates: 0 });
       const byStudent = (id: string) => preview.rows.filter((r) => r.studentId === id).flatMap((r) => r.entries.map((e) => `${e.kind}:${e.entryCode}`)).sort();
       expect(byStudent(a)).toEqual([`unit:${w.T}WMA11`]);
       // A whole Pearson award: its required units and the cash-in.

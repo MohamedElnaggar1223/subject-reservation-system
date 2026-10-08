@@ -1527,16 +1527,24 @@ Object.assign(autoArabicText, foundationArabic);
 // F0b screens (lib/i18n-catalogue.ts): only words the app does not already
 // translate, so a shared word keeps the Arabic the other screens use.
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
-// F4 screens (lib/i18n-exams/): likewise only words not already translated.
-for (const [en, ar] of Object.entries(examsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // The reservations rework's screens (lib/i18n-sessions.ts): the same rule.
 for (const [en, ar] of Object.entries(sessionsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // Step C's money screens (lib/i18n-money.ts): the same rule.
 for (const [en, ar] of Object.entries(moneyArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // Step B's screens (lib/i18n-reservations.ts): Reserve, the statement, To verify, the slip.
 for (const [en, ar] of Object.entries(reservationsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// F4 screens (lib/i18n-exams/): likewise only words not already translated — after A's, B's and
+// C's, so a word their screens share with F4's ("Session", "Dropped", "Collected") keeps the
+// rework's Arabic (the review of 093dbd1, item 10).
+for (const [en, ar] of Object.entries(examsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
+
+/** Whether one of the rework's sentence rules (A's, B's, C's) translates this text. */
+function reworkClaims(text: string): boolean {
+  return translateSessionsText(text) !== null || translateMoneyText(text, translateExactText) !== null
+    || translateReservationsText(text) !== null;
+}
 
 function translateDynamicText(text: string): string | null {
   const gradeMatch = /^Grade (\d+)$/.exec(text);
@@ -1611,9 +1619,11 @@ function translateDynamicText(text: string): string | null {
   const f0aRefusal = translateFoundationRefusal(text);
   if (f0aRefusal) return f0aRefusal;
   // F4: exam entries' sentences with names, codes and dates in them — before
-  // F0b's, whose broad "X: Y with Z" rule would take F4's sentences.
+  // F0b's, whose broad "X: Y with Z" rule would take F4's sentences; but never a
+  // sentence the rework's rules (A's, B's, C's below) translate: theirs keep the
+  // order they have on main (the review of 093dbd1, item 10).
   const f4Text = translateExamsText(text);
-  if (f4Text) return f4Text;
+  if (f4Text && !reworkClaims(text)) return f4Text;
   // F0b: the catalogue's, the series' and the enrolment's sentences with names in them.
   const f0bText = translateCatalogueText(text);
   if (f0bText) return f0bText;

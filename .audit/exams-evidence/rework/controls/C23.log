@@ -4,15 +4,26 @@
 # expected red: ['a two-unit line with one unit sent']
 # result: RED as expected
 
- ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 2 failed) 10047ms
-   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when 28ms
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 7 failed) 24910ms
+   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when 39ms
      → expected { …(10) } to match object { percentage: 50, …(4) }
-   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > the desk drops a paid line past its deadline: its entries are withdrawn with it, the board fee kept (sent), the notice naming what was sent 25ms
+   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct drop 261ms
+     → expected 1500 to be 1000 // Object.is equality
+   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > a drop request's approval 260ms
+     → expected 1500 to be 1000 // Object.is equality
+   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct swap 277ms
+     → expected 1500 to be 1000 // Object.is equality
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > the desk drops a paid line past its deadline: its entries are withdrawn with it, the board fee kept (sent), the notice naming what was sent 34ms
      → expected 'The board fee stays with the board: t…' to be 'The board fee stays with the board: t…' // Object.is equality
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > a declared retake rejected past the first-entry deadline is dropped: its sent entry withdrawn with it, the board fee kept (the review of 093dbd1, item 1) 12ms
+     → expected { …(10) } to match object { boardSent: true, boardPart: +0 }
+   × F4 on the reservations rework > step B's hold at the deadline drops a paid line and withdraws its entries; a sent one keeps its board fee (the review of 093dbd1, items 1 and 5) > the school turns hold on, the deadline passes: the sent line keeps its board fee and its entry is withdrawn; the unsent one gets it back 17ms
+     → expected { …(10) } to match object { boardSent: true, boardPart: +0 }
  Test Files  1 failed (1)
-      Tests  2 failed | 16 passed (18)
+      Tests  7 failed | 34 passed (41)
  ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+[results] Could not verify the declared sitting of line 3d52c2f5-cc5c-426b-b793-a7a4b149f9c1: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when
 AssertionError: expected { …(10) } to match object { percentage: 50, …(4) }
@@ -32,15 +43,75 @@ AssertionError: expected { …(10) } to match object { percentage: 50, …(4) }
 [2m    "percentage": 50,[22m
 [2m  }[22m
 
- ❯ test/08x4-exam-entries-rework.test.ts:394:21
-    392|       const sentAt = new Date((await one<{ at: string }>(`select submi…
-    393|       const after = await preview(fam.r1!, lines.r1!);
-    394|       expect(after).toMatchObject({ percentage: 50, coursePart: 500, b…
+ ❯ test/08x4-exam-entries-rework.test.ts:453:21
+    451|       const sentAt = new Date((await one<{ at: string }>(`select submi…
+    452|       const after = await preview(fam.r1!, lines.r1!);
+    453|       expect(after).toMatchObject({ percentage: 50, coursePart: 500, b…
        |                     ^
-    395|       expect(after.sentEntries.map((e) => e.entryCode)).toEqual([`${T}…
-    396|       expect(after.boardNote).toBe(`The board fee stays with the board…
+    454|       expect(after.sentEntries.map((e) => e.entryCode)).toEqual([`${T}…
+    455|       expect(after.boardNote).toBe(`The board fee stays with the board…
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct drop
+AssertionError: expected 1500 to be 1000 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1000[39m
+[31m+ 1500[39m
+
+ ❯ sendDuring test/08x4-exam-entries-rework.test.ts:599:38
+    597|       expect(sent).toEqual({ submitted: 1, skipped: 0 });
+    598|       // The board fee stays with the board: the course part alone com…
+    599|       expect(await credited(lineId)).toBe(before.coursePart);
+       |                                      ^
+    600|       const [w1] = await entriesOfLine(lineId);
+    601|       expect(w1).toMatchObject({ status: 'withdrawn', withdrawn_with_l…
+ ❯ test/08x4-exam-entries-rework.test.ts:607:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > a drop request's approval
+AssertionError: expected 1500 to be 1000 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1000[39m
+[31m+ 1500[39m
+
+ ❯ sendDuring test/08x4-exam-entries-rework.test.ts:599:38
+    597|       expect(sent).toEqual({ submitted: 1, skipped: 0 });
+    598|       // The board fee stays with the board: the course part alone com…
+    599|       expect(await credited(lineId)).toBe(before.coursePart);
+       |                                      ^
+    600|       const [w1] = await entriesOfLine(lineId);
+    601|       expect(w1).toMatchObject({ status: 'withdrawn', withdrawn_with_l…
+ ❯ test/08x4-exam-entries-rework.test.ts:613:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct swap
+AssertionError: expected 1500 to be 1000 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1000[39m
+[31m+ 1500[39m
+
+ ❯ sendDuring test/08x4-exam-entries-rework.test.ts:599:38
+    597|       expect(sent).toEqual({ submitted: 1, skipped: 0 });
+    598|       // The board fee stays with the board: the course part alone com…
+    599|       expect(await credited(lineId)).toBe(before.coursePart);
+       |                                      ^
+    600|       const [w1] = await entriesOfLine(lineId);
+    601|       expect(w1).toMatchObject({ status: 'withdrawn', withdrawn_with_l…
+ ❯ test/08x4-exam-entries-rework.test.ts:618:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
 
  FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > the desk drops a paid line past its deadline: its entries are withdrawn with it, the board fee kept (sent), the notice naming what was sent
 AssertionError: expected 'The board fee stays with the board: t…' to be 'The board fee stays with the board: t…' // Object.is equality
@@ -48,13 +119,56 @@ AssertionError: expected 'The board fee stays with the board: t…' to be 'The b
 Expected: [32m"The board fee stays with the board: the [7mschool sent XW97 Biology XW on [27m8 October 2026."[39m
 Received: [31m"The board fee stays with the board: the [7mentry deadline ([27m8 October 2026[7m) has passed[27m."[39m
 
- ❯ test/08x4-exam-entries-rework.test.ts:473:30
-    471|       const [sentAt] = await sql<{ at: string }>(`select submitted_at …
-    472|       expect(done).toMatchObject({ boardSent: true, refundBoardPart: 0…
-    473|       expect(done.boardNote).toBe(`The board fee stays with the board:…
+ ❯ test/08x4-exam-entries-rework.test.ts:888:30
+    886|       const [sentAt] = await sql<{ at: string }>(`select submitted_at …
+    887|       expect(done).toMatchObject({ boardSent: true, refundBoardPart: 0…
+    888|       expect(done.boardNote).toBe(`The board fee stays with the board:…
        |                              ^
-    474|       expect(done.entriesWithdrawn.map((x) => [x.entryCode, x.wasSent]…
-    475|       const e = await one<{ id: string; status: string; withdrawal_rea…
+    889|       expect(done.entriesWithdrawn.map((x) => [x.entryCode, x.wasSent]…
+    890|       const e = await one<{ id: string; status: string; withdrawal_rea…
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > a declared retake rejected past the first-entry deadline is dropped: its sent entry withdrawn with it, the board fee kept (the review of 093dbd1, item 1)
+AssertionError: expected { …(10) } to match object { boardSent: true, boardPart: +0 }
+(8 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "boardPart": 0,[39m
+[32m-   "boardSent": true,[39m
+[31m+   "boardPart": 500,[39m
+[31m+   "boardSent": false,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:901:22
+    899|     it("a declared retake rejected past the first-entry deadline is dr…
+    900|       const before = await refundPreview(jf.j2!, j2);
+    901|       expect(before).toMatchObject({ boardSent: true, boardPart: 0 });
+       |                      ^
+    902|       const r = await apiResponse(coord.api.v1.registrations[':id']['v…
+    903|       expect(r).toMatchObject({ outcome: 'rejected', effect: 'dropped'…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > step B's hold at the deadline drops a paid line and withdraws its entries; a sent one keeps its board fee (the review of 093dbd1, items 1 and 5) > the school turns hold on, the deadline passes: the sent line keeps its board fee and its entry is withdrawn; the unsent one gets it back
+AssertionError: expected { …(10) } to match object { boardSent: true, boardPart: +0 }
+(8 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "boardPart": 0,[39m
+[32m-   "boardSent": true,[39m
+[31m+   "boardPart": 500,[39m
+[31m+   "boardSent": false,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:943:18
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
 

@@ -1,0 +1,43 @@
+# C38: a payment reversal leaves the reverted lines' entries live
+# undone in: apps/api/src/services/payment.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['a payment reversal']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 1 failed) 21499ms
+   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a payment reversal: the entry is withdrawn with the line; paid again, the next derivation makes it again 14ms
+     → expected [ [ 'submitted', false, null ] ] to deeply equal [ [ 'withdrawn', true, …(1) ] ]
+ Test Files  1 failed (1)
+      Tests  1 failed | 40 passed (41)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line ef69bb6d-28c8-4da8-a857-d449e924bd5f: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a payment reversal: the entry is withdrawn with the line; paid again, the next derivation makes it again
+AssertionError: expected [ [ 'submitted', false, null ] ] to deeply equal [ [ 'withdrawn', true, …(1) ] ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    [[22m
+[32m-     "withdrawn",[39m
+[32m-     true,[39m
+[32m-     "the payment was reversed: bounced transfer",[39m
+[31m+     "submitted",[39m
+[31m+     false,[39m
+[31m+     null,[39m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ withdrawnWithLine test/08x4-exam-entries-rework.test.ts:75:85
+     73|     const rows = await entriesOfLine(lineId);
+     74|     expect(rows.length).toBeGreaterThan(0);
+     75|     expect(rows.map((r) => [r.status, r.withdrawn_with_line, r.withdra…
+       |                                                                                     ^
+     76|     await audited(rows.map((r) => r.id), rows.map(() => 'EXAM_ENTRY_WI…
+     77|     return rows;
+ ❯ test/08x4-exam-entries-rework.test.ts:536:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

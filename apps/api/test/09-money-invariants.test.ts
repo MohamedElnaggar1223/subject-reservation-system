@@ -652,6 +652,22 @@ describe('money invariants over the whole database', () => {
       where r.attempt = 'retake' and e.created_at > s.entry_deadline and e.submitted_at > s.entry_deadline and e.submitted_at <= s.retake_deadline`)).length).toBeGreaterThan(0);
   });
 
+  it('F4: no live entry of a line no longer paid — every path that ends a paid line withdraws its entries in its own transaction (the review of 093dbd1, item 1)', async () => {
+    expect(await sql(`
+      select e.id, e.status, r.status as line from exam_entry e join registration r on r.id = e.registration_id
+      where e.status <> 'withdrawn' and r.status <> 'confirmed'`)).toEqual([]);
+    // An entry withdrawn with its line belongs to a line that ended, or was paid again and entered
+    // again (a reversal undone): never to a line still confirmed with no live entry of that unit or award.
+    expect(await sql(`
+      select e.id from exam_entry e join registration r on r.id = e.registration_id
+      where e.withdrawn_with_line and r.status = 'confirmed'
+        and not exists (select 1 from exam_entry n where n.registration_id = e.registration_id and n.status <> 'withdrawn'
+          and n.kind = e.kind and n.unit_id is not distinct from e.unit_id and n.qualification_id is not distinct from e.qualification_id)`)).toEqual([]);
+    // There was something to check: 08x4 ended paid lines by each path, with entries made and sent.
+    expect((await sql(`select 1 from exam_entry where withdrawn_with_line and submitted_at is not null`)).length).toBeGreaterThan(0);
+    expect((await sql(`select 1 from exam_entry where withdrawn_with_line and submitted_at is null`)).length).toBeGreaterThan(0);
+  });
+
   it('F4: an entry from a cash-in is an award entry of that charge\'s student, in its series, from a cash-in or late cash-in; one live entry per charge', async () => {
     expect(await sql(`
       select e.id from exam_entry e join charge c on c.id = e.charge_id

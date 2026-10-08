@@ -211,7 +211,7 @@ function PapersSection({ data }: { data: PapersData }) {
         <table className="w-full min-w-[980px] text-sm print:min-w-0">
           <thead className="border-b border-border bg-muted">
             <tr>
-              <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Session</th>
+              <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Time of day</th>
               <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Time</th>
               <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Duration</th>
               <th scope="col" className="px-3 py-2 text-start font-semibold text-muted-foreground">Paper</th>
@@ -345,7 +345,7 @@ function PaperFields({ draft, onChange, idPrefix, sessionTouched, onSessionTouch
         />
       </div>
       <div>
-        <Label htmlFor={`${idPrefix}-session`} className="mb-1 text-xs text-muted-foreground">Session</Label>
+        <Label htmlFor={`${idPrefix}-session`} className="mb-1 text-xs text-muted-foreground">Time of day</Label>
         <select
           id={`${idPrefix}-session`} value={draft.session} className={cn(SELECT_CLASS, 'w-36')}
           onChange={(e) => { onSessionTouched(); onChange({ ...draft, session: e.target.value as ExamSession }); }}

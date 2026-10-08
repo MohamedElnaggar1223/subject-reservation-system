@@ -1,0 +1,41 @@
+# C55: a retake the history also shows keeps the source 'history' though the line says retake
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['is verified at once, by the importer']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (41 tests | 1 failed) 20950ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the importer; a sitting graded absent waits for the coordinator 137ms
+     → expected [ Array(1) ] to deeply equal [ [ 'XWWMA11', true, …(2) ] ]
+ Test Files  1 failed (1)
+      Tests  1 failed | 40 passed (41)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 3c659ba9-dab2-43ac-a41b-231cd09c5524: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the importer; a sitting graded absent waits for the coordinator
+AssertionError: expected [ Array(1) ] to deeply equal [ [ 'XWWMA11', true, …(2) ] ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    [[22m
+[2m      "XWWMA11",[22m
+[2m      true,[22m
+[32m-     "registration",[39m
+[31m+     "history",[39m
+[2m      "73177236-9c7d-4141-b3a4-21adbfe65a88",[22m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:796:10
+    794|       await derive(w.series.pearsonJan, kf.kr!.studentId);
+    795|       expect((await entriesOf(w.series.pearsonJan, kf.kr!.studentId)).…
+    796|         .toEqual([[`${T}WMA11`, true, 'registration', kr]]);
+       |          ^
+    797|     });
+    798| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
