@@ -375,5 +375,15 @@ amount and the date filled in.
   running over their rows.
 - 08:05–08:30 — the screens (Messages, Remind, Settings, the families' paragraphs), Arabic.
 - 08:11 — the migration proof on both copies.
-- 08:15–09:00 — the drive (screens, counts), fixes; 05, 08t, 09 blocks; the re-read under the lock;
-  the concurrency tests; the controls.
+- 08:15–08:30 — the drive in headless Chrome (screens, the step counts, Arabic); fixes (the log's
+  titles, "The whole school", the audience's words translated); 05, 08t, 09 blocks; the re-read
+  under the lock (found forcing the desk race); the concurrency tests (two ticks, a cancel during a
+  send, two email senders, an interrupted email).
+- 08:33–08:37 — fifteen controls red, restored, green (`controls/`).
+- 08:46 — the suite green in local time (526 passed) on the tree before the school-fee case.
+- 08:48 — ad671b0 pushed (the screens, Remind, 05/08t/09, the proof, the controls, this document).
+- 08:52 — the suite green with TZ=UTC at ad671b0 (527 passed); the local run beside it hit the
+  container's shared memory (an environment failure, named in the trail) and is repeated alone.
+- 08:57 — the suite green in local time at ad671b0, alone (527 passed); 08:58 — CI green on ad671b0
+  (run 37752256592). The dev servers left running for the lead: API 3131, web 3130, igcse_rwd_dev
+  (seeded with Parent/Student D5–D10, a June 2027 session open now, sections 11A and 12A).
