@@ -1,0 +1,71 @@
+{
+  "source": "igcse_catalogue_synth",
+  "copy": "igcse_rwc_proof_synth",
+  "seeded_at_main": [
+    "session sess_november-2026: a window at 50% today",
+    "the academic year 2026-2027 (session sy-w-oct): a window at 30% today",
+    "session sy-w-jun: only a past window (0% today)",
+    "a V3 custom refund percent of 90 for the student in session sy-w-nov"
+  ],
+  "migrations": {
+    "source": 41,
+    "at_main": 45,
+    "at_branch": 48
+  },
+  "rows": "4 confirmed, 16 lines, 0 exceptions, 0 refund windows",
+  "lines": [
+    {
+      "id": "096d04ac-5568-4cca-9b98-92cb1c48e8b1",
+      "before": {
+        "percentage": 50,
+        "amount": 750
+      },
+      "after": {
+        "percentage": 50,
+        "amount": 750,
+        "basis": "windows"
+      },
+      "match": true
+    },
+    {
+      "id": "sy-r1",
+      "before": {
+        "percentage": 30,
+        "amount": 900
+      },
+      "after": {
+        "percentage": 30,
+        "amount": 900,
+        "basis": "windows"
+      },
+      "match": true
+    },
+    {
+      "id": "sy-r3",
+      "before": {
+        "percentage": 0,
+        "amount": 0
+      },
+      "after": {
+        "percentage": 0,
+        "amount": 0,
+        "basis": "windows"
+      },
+      "match": true
+    },
+    {
+      "id": "sy-r5",
+      "before": {
+        "percentage": 90,
+        "amount": 2700
+      },
+      "after": {
+        "percentage": 90,
+        "amount": 2700,
+        "basis": "windows"
+      },
+      "match": true
+    }
+  ],
+  "all_match": true
+}

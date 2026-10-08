@@ -1,0 +1,2 @@
+ALTER TABLE "exception" ALTER COLUMN "policy_key" SET NOT NULL;--> statement-breakpoint
+ALTER TABLE "exception" ADD CONSTRAINT "exception_one_holder" CHECK (num_nonnulls("exception"."student_id", "exception"."family_id") = 1);

@@ -1,0 +1,4 @@
+admin@igcse.local → http://localhost:3000/admin/dashboard
+STEP series-dates FAILED: TimeoutError: locator.getAttribute: Timeout 30000ms exceeded.
+TOTAL: inputs 5 clicks 1
+ERRORS: none

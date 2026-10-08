@@ -1,0 +1,88 @@
+parent.hany@igcse.local → http://localhost:3000/approvals
+session options: Choose… / June 2028
+offer rows: 0
+ROWS: 
+STEP register FAILED: TimeoutError: locator.check: Timeout 30000ms exceeded.
+STATEMENT:
+Statement
+
+Every line with its price and why, what is paid and what is still owed, and the payments — one per exam board deadline.
+
+Show ended lines (expired, rejected)
+Salma Hany
+
+Grade 12 · STU-20260927-C022B
+
+Price
+
+EGP 3,100
+
+Paid
+
+EGP 3,100
+
+Outstanding
+
+EGP 0
+
+Escrow
+
+EGP 3,610
+
+November 2026 – January 2027 — November IGCSE
+LINE	PRICE	PAID	OUTSTANDING	DUE	RECEIPT	STATUS
+
+Art & Design
+First entry, in school · Cambridge International November 2026
+	EGP 1,600
+course 1,300 + board 300 (recorded before the rework)
+	EGP 1,600
+refunded EGP 1,600
+	—	—	RCP-9B71092075
+Voided
+	Dropped
+
+Physics
+First entry, in school · Cambridge International November 2026
+	EGP 1,500
+course 1,200 + board 300 (recorded before the rework)
+	EGP 1,500	—	—	RCP-096D04AC55
+With Parent
+	Confirmed
+Payments
+
+One payment per entry deadline: each series is paid for on its own.
+
+28 Sep 2026 · Subjects (cash)
+Physics · RCP-096D04AC55
+Cambridge International November 2026
+EGP 1,500
+Paid
+27 Sep 2026 · Subjects (cash)
+Accounting · RCP-31D4FD58DD, Economics · RCP-AFE237B026-R2
+Cambridge International November 2026
+EGP 2,800
+Reversed
+27 Sep 2026 · Subjects (cash)
+Economics · RCP-AFE237B026-R2
+Cambridge International November 2026
+EGP 1,400
+Reversed
+27 Sep 2026 · Subjects (cash)
+Business Studies · RCP-3920A8DC56
+Cambridge International November 2026
+EGP 1,400
+Reversed
+27 Sep 2026 · Subjects (cash)
+Art & Design · RCP-9B71092075
+Cambridge International November 2026
+EGP 1,600
+Paid
+20 Aug 2026 · Subjects (cash)
+Business Studies · RCP-3920A8DC56, Information and Communication Technology · RCP-47EA908CAD, Physical Education · RCP-BA171CE1B6
+Cambridge International November 2026
+EGP 4,100
+Reversed
+shot 03-statement
+TOTAL: inputs 2 clicks 0
+ERRORS: none

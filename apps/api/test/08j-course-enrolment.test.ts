@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, lockWaiters, schoolToday, type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, lockWaiters, schoolToday, teachOffer, sessionName, type Client, reservationOf } from './helpers';
 
 /** Hold the year's enrolment lock (upsertEnrolments' advisory lock) from outside, so two commits queue behind it together. */
 async function holdEnrolmentLock(academicYearId: string): Promise<() => Promise<void>> {
@@ -70,6 +68,9 @@ describe('F0b: course enrolment', () => {
       param: { id: section }, json: { studentIds: [s.s1!.studentId, s.s2!.studentId, s.s3!.studentId] },
     }));
     june = await session(adm, 'June (IGCSE, enrolment)', 'june', 'igcse', futureWindow());
+    // Who teaches English and Mathematics this cycle (the reservations rework: a line names one of its offer's teachers).
+    await teachOffer(adm, june, subj.ENG!, [tA, tB]);
+    await teachOffer(adm, june, subj.MAT!, [tA, tB]);
   });
 
   describe('one at a time', () => {
@@ -154,7 +155,7 @@ describe('F0b: course enrolment', () => {
     it('from registrations: the teacher each registration names, and self-study where it was taken outside school', async () => {
       // s3 preregisters English with teacher A, and Physics (not taught here, so outside school).
       await apiResponse(s.s3!.parent.api.v1.registrations.preregister.$post({
-        json: { sessionId: june, subjectIds: [subj.ENG!, subj.PHY!], studentId: s.s3!.studentId, subjectOptions: { [subj.ENG!]: { teacherId: tA } } },
+        json: { sessionId: june, ...(await reservationOf(june, [subj.ENG!, subj.PHY!], { teachers: { [subj.ENG!]: tA } })), studentId: s.s3!.studentId },
       }));
       const r = await apiResponse(coordinator.api.v1.enrolments.bulk.$post({
         json: { academicYearId: thisYear, source: 'registrations', studentIds: [s.s3!.studentId], subjectMap: [], exclude: [], commit: true },
@@ -204,12 +205,12 @@ describe('F0b: course enrolment', () => {
     it('a registration without an enrolment is flagged, and the registration stands', async () => {
       // s4 preregisters Biology, which nobody enrolled them in.
       const reg = (await apiResponse(s.s4!.parent.api.v1.registrations.preregister.$post({
-        json: { sessionId: june, subjectIds: [subj.BIO!], studentId: s.s4!.studentId },
+        json: { sessionId: june, ...(await reservationOf(june, [subj.BIO!])), studentId: s.s4!.studentId },
       })))[0]!;
       expect(reg.status).toBe('preregistered');
       const flags = await apiResponse(coordinator.api.v1.enrolments.check.$get({ query: { academicYearId: thisYear } }));
       expect(flags.registeredNotEnrolled.filter((f) => f.studentId === s.s4!.studentId).map((f) => [f.subjectName, f.window, f.registrationStatus]))
-        .toEqual([['Biology (enrolment)', 'June (IGCSE, enrolment)', 'preregistered']]);
+        .toEqual([['Biology (enrolment)', await sessionName(june), 'preregistered']]);
       // s1 is enrolled in English and registered nowhere this year.
       expect(flags.enrolledNotRegistered.filter((f) => f.studentId === s.s1!.studentId).map((f) => [f.subjectName, f.teacherName, f.section]))
         .toContainEqual(['English (enrolment)', 'teacher enr-a', 'EN-11A']);
@@ -227,7 +228,7 @@ describe('F0b: course enrolment', () => {
       // s2 is taught Mathematics by B; their registration names A (both teach it).
       await apiResponse(adm.api.v1.subjects[':id'].teachers.$put({ param: { id: subj.MAT! }, json: { teacherIds: [tA, tB] } }));
       await apiResponse(s.s2!.parent.api.v1.registrations.preregister.$post({
-        json: { sessionId: june, subjectIds: [subj.MAT!], studentId: s.s2!.studentId, subjectOptions: { [subj.MAT!]: { teacherId: tA } } },
+        json: { sessionId: june, ...(await reservationOf(june, [subj.MAT!], { teachers: { [subj.MAT!]: tA } })), studentId: s.s2!.studentId },
       }));
       const flags = await apiResponse(coordinator.api.v1.enrolments.check.$get({ query: { academicYearId: thisYear, studentId: s.s2!.studentId } }));
       expect(flags.teacherDiffers.map((f) => [f.subjectName, f.registrationTeacher, f.teacherName])).toEqual([['Mathematics (enrolment)', 'teacher enr-a', 'teacher enr-b']]);

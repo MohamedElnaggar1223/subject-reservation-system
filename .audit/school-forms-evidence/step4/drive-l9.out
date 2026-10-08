@@ -1,0 +1,67 @@
+finadmin.rana@igcse.local → http://localhost:3000/desk
+EXCEPTIONS:
+Exceptions
+
+One rule lifted for one student or one family — a price, a refund, a deadline, a gate, a payment plan. Every hook reads them; everything is audited.
+
+Grant an exception
+Student
+Pick a student…
+Salma Hany (Grade 12)
+For
+This student
+The whole family
+Policy
+Self-study share of the course fee
+Self-study share of the board fee
+Retake in school: share of the course fee
+One-paper retake: share of its course fee
+Discount (%)
+Discount (EGP)
+Custom price
+Refund percent
+Course start for refunds
+Session window extension
+Payment due date
+Late board entry — not yours to grant
+School fee waiver
+Self-study on a first entry
+An item not open to them — not yours to grant
+First entry without a required item — not yours to grant
+No prior sitting, or outside the carry-forward period — not yours to grant
+Two items of one exclusive group — not yours to grant
+A second line on one entry in a series — not yours to grant
+Grade 10 without a core subject — not yours to grant
+Grade 10: sit a series other than June — not yours to grant
+Instalment plan
+Value (%)
+Scope
+
+Leave it empty for every session.
+
+Session
+Any
+June 2028
+June 2027 — IGCSE
+November 2026 – January 2027 — November IGCSE
+June 2026 — I
+buttons: Grant | Active | Used | Lapsed | Revoked | All
+GRANT FORM text: Exceptions |  | One rule lifted for one student or one family — a price, a refund, a deadline, a gate, a payment plan. Every hook reads them; everything is audited. |  | Grant an exception | Student | Pick a student… | Salma Hany (Grade 12) | For | This student | The whole family | Policy | Self-study share of the course fee | Self-study share of the board fee | Retake in school: share of the course fee | One-paper retake: share of its course fee | Discount (%) | Discount (EGP) | Custom price | Refund percent | Course start for refunds | Session window extension | Payment due date | Late board entry — not yours to grant | School fee waiver | Self-study on a first entry | An item not open to them — not yours to grant | First entry without a required item — not yours to grant | No prior sitting, or outside the carry-forward period — not yours to grant | Two items of one exclusive group — not yours to grant | A second line on one entry in a series — not yours to grant | Grade 10 without a core subject — not yours to grant | Grade 10: sit a series other than June — not yours to grant | Instalment plan | Value (%) | Scope |  | Leave it empty for every session. |  | Session | Any | June 2028 | June 2027 — IGCSE | November 2026 – January 2027 — November IGCSE | June 2026 — I
+GRANT FORM inputs:
+0: input[search] Student = 
+1: select Student = Pick a student…/Salma Hany (Grade 12)
+2: input[radio] exc-holder = on
+3: input[radio] exc-holder = on
+4: select Policy = Self-study share of the course fee/Self-study share of the board fee/Retake in school: share of the course fee/One-paper
+5: input[number] Value (%) = 
+6: select Session = Any/June 2028/June 2027 — IGCSE/November 2026 – January 2027 — November IGCSE/June 2026 — IGCSE
+7: select Subject (any session) = Any/Accounting (0452)/Arabic Language (0544)/Art & Design (0400)/Biology (0610)/Business Studies (0450)/Chemistry (0620)
+8: select Subject in a session = Any
+9: select Item (paper, unit or route) = Any
+10: input Reason = 
+11: input[date] Valid until (optional) = 
+GRANT FORM buttons: Grant | Active | Used | Lapsed | Revoked | All
+shot 01-grant-form
+STEP exceptions FAILED: TimeoutError: locator.click: Timeout 30000ms exceeded.
+TOTAL: inputs 1 clicks 1
+ERRORS: none

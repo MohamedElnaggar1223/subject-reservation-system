@@ -1,0 +1,124 @@
+admin@igcse.local → http://localhost:3000/admin/dashboard
+shot 01-new-filled
+created → http://localhost:3000/admin/sessions/a2944615-40a9-44a9-a93e-91350a48410a · inputs 6 clicks 2
+SESSION HEAD:
+← Sessions
+June 2028
+Open
+
+Reserve 7 Oct 2026 07:43 – 6 Jan 2027 07:43
+Course starts 22 Oct 2026
+Due 22 Nov 2026 07:43
+
+Refunds: 100% to week 2 · 50% in week 3 · 0% from week 4
+
+Edit
+Close
+Correct the series
+Deadlines
+Cambridge International June 2028
+Dates not set
+Subjects
+Fees
+Money
+Grade 10
+To verify
+
+17 subjects
+
+Copy from…
+Add subject
+O.L.
+SUBJECT	BOARD	TEACHERS	WHAT CAN BE ENTERED	COURSE FEE	BOARD FEE	LINES
+Accounting
+Closed
+Series has no dates
+	Cambridge International	—	Whole subject	EGP 1,100	
+EGP 300
+provisional
+	0
+Arabic Language
+Closed
+Grade 10 core
+Series has no dates
+	Cambridge International	—	Whole subject	EGP 900	
+EGP 300
+provisional
+	0
+Art & Design
+Closed
+Series has no dates
+
+shot 02-created
+ADD SUBJECT text:
+Add a subject
+Subject
+
+Every active subject is already in this session.
+
+Cancel
+Add subject
+ADD SUBJECT inputs:
+0: input Subject = 
+ADD SUBJECT buttons:  | Cancel | Add subject
+shot 03-add-subject
+STEP add-1 FAILED: TimeoutError: locator.selectOption: Timeout 30000ms exceeded.
+STEP add-2 FAILED: TimeoutError: locator.click: Timeout 30000ms exceeded.
+STEP add-3 FAILED: TimeoutError: locator.click: Timeout 30000ms exceeded.
+SUBJECTS TAB:
+← Sessions
+June 2028
+Open
+
+Reserve 7 Oct 2026 07:43 – 6 Jan 2027 07:43
+Course starts 22 Oct 2026
+Due 22 Nov 2026 07:43
+
+Refunds: 100% to week 2 · 50% in week 3 · 0% from week 4
+
+Edit
+Close
+Correct the series
+Deadlines
+Cambridge International June 2028
+Dates not set
+Subjects
+Fees
+Money
+Grade 10
+To verify
+
+17 subjects
+
+Copy from…
+Add subject
+O.L.
+SUBJECT	BOARD	TEACHERS	WHAT CAN BE ENTERED	COURSE FEE	BOARD FEE	LINES
+Accounting
+Closed
+Series has no dates
+	Cambridge International	—	Whole subject	EGP 1,100	
+EGP 300
+provisional
+	0
+Arabic Language
+Closed
+Grade 10 core
+Series has no dates
+	Cambridge International	—	Whole subject	EGP 900	
+shot 05-subjects
+STEP fees FAILED: TimeoutError: locator.click: Timeout 30000ms exceeded.
+DEADLINES bits:
+Deadlines
+Dates not set
+Series has no dates
+Series has no dates
+Series has no dates
+Series has no dates
+Series has no dates
+Series has no dates
+Series has no dates
+Series has no dates
+STEP deadlines FAILED: TimeoutError: locator.click: Timeout 30000ms exceeded.
+TOTAL so far: inputs 6 clicks 3
+ERRORS: none

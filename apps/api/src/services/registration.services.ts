@@ -6,8 +6,8 @@
  * - Parent approves or rejects pending requests
  * - Parent directly registers for a linked child (auto-approved)
  * - Admin overrides parent approval with mandatory audit reason
- * - Core subject validation for Grade 10 June sessions
- * - Available subject filtering (excludes already-registered subjects)
+ * - Core subject validation for Grade 10 June sessions (gate.grade10Core, line-rules)
+ * - Lines and consent since the reservations rework (reservation.services reserveLines)
  *
  * Status flow:
  * Student-initiated:  pending_approval → (parent approves) → pending_payment → (payment) → confirmed
@@ -22,22 +22,14 @@
 import {
   db,
   registration,
-  paymentRegistration,
   subject,
-  registrationSession,
-  parentStudentLink,
-  user,
-  subjectTeacher,
-  registrationHistory,
+  exception,
   eq,
   ne,
   and,
   inArray,
-  notInArray,
-  isNotNull,
   gradeTodayExtras,
 } from '@repo/db';
-import { randomUUID } from 'crypto';
 import type {
   RequestRegistrationType,
   DirectRegistrationType,
@@ -53,192 +45,37 @@ import {
   notifyRegistrationDecision,
   notifyDirectRegistrationCreated,
 } from './notification.services';
-import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterFor, type Eligibility } from './eligibility.services';
-import { computeRegistrationPricing } from './pricing.services';
+import { assertMayRegisterFor, assertMayRegisterForInTx, type Eligibility } from './eligibility.services';
 import { schoolFeeGateReason } from './school-fee.services';
-import { applyPricingExceptions } from './exception.services';
-import { sessionWindow, entryDeadlineMessage } from './window.services';
-import { routeAndCheck, routeSubjects } from './series.services';
-import type { SubjectRegistrationOptionsType } from '@repo/validations';
+import { sessionWindow, windowRefusal, subjectsOfItems } from './window.services';
+import { reserveLines } from './reservation.services';
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
 
 /**
  * Refuse unless the series is open for this student (window.services.ts):
- * for a registration, its own board series' deadline decides (F0b).
+ * for a line, its own effective deadline decides; for a new reservation (`null`), each new
+ * line's deadline is checked when it is made.
  */
-async function assertWindowOpen(studentId: string, sessionId: string, boardSeriesId: string | null) {
-  const w = await sessionWindow(studentId, sessionId, boardSeriesId);
+async function assertWindowOpen(
+  studentId: string, sessionId: string,
+  line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null; declarationRejected: boolean | null; subjectId?: string | null } | null,
+  /** A new reservation's lines: with the session closed, a subject-scoped extension opens its subject alone (step C). */
+  newLines?: readonly { offerItemId: string }[],
+) {
+  const subjectIds = newLines ? await subjectsOfItems(db, newLines.map((l) => l.offerItemId)) : undefined;
+  const w = await sessionWindow(studentId, sessionId, line, db, new Date(), subjectIds);
   if (w.open) return;
-  throw new Error(w.entryDeadlinePassed ? entryDeadlineMessage(w.entryDeadline!) : 'Registration window is not open');
-}
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-/**
- * Insert new registrations, each entered in the board series its window
- * routes its subject to (F0b), refusing a subject the window enters in no
- * series or in one past its entry deadline (MO-10, per series). Runs in the
- * caller's transaction after assertMayRegisterForInTx, so the window row is
- * held and its routing cannot change under the insert. Every path that
- * creates a registration comes here.
- */
-export async function insertRoutedRegistrations(
-  tx: Tx,
-  sessionId: string,
-  subjects: { id: string; name: string; council: string }[],
-  records: Omit<typeof registration.$inferInsert, 'boardSeriesId'>[],
-) {
-  const routes = await routeAndCheck(tx, sessionId, subjects, true);
-  return tx
-    .insert(registration)
-    .values(records.map((r) => ({ ...r, boardSeriesId: routes.get(r.subjectId) ?? null })))
-    .returning();
+  throw new Error(windowRefusal(w));
 }
 
 /**
- * Subject IDs the student has previously sat (confirmed) or dropped in
- * OTHER sessions — registering one of these again is a retake (V3 §6.9).
- * F7: a registration the school recorded before the system (the day-one
- * import's history, registered or dropped) counts the same way when it is a
- * past sitting: its series is earlier than this window's (the window's own
- * series is the same sitting) AND that series had already ended when the file
- * was committed (the history row's creation). The second part is the lead's
- * interim rule (review flag 2) until the owner decides whether history with no
- * payment behind it may unlock the outside-school price at all: a row for a
- * series still running or still to come when it was imported is what the
- * school planned, not what the student sat.
+ * The school-fee gate every reservation path asks before its lines (D-H: the fee of the series'
+ * academic year at the student's grade in it, F0a; a waiver lifts it).
  */
-async function getRetakeSubjectIds(
-  studentId: string,
-  excludeSessionId: string,
-  executor: typeof db | Tx = db,
-): Promise<Set<string>> {
-  const [prior, history, [win]] = await Promise.all([
-    executor.select({ subjectId: registration.subjectId }).from(registration).where(and(
-      eq(registration.studentId, studentId),
-      ne(registration.sessionId, excludeSessionId),
-      inArray(registration.status, ['confirmed', 'dropped']),
-    )),
-    executor.select({
-      subjectId: registrationHistory.subjectId, sessionType: registrationHistory.sessionType, seriesYear: registrationHistory.seriesYear,
-      committedAt: registrationHistory.createdAt,
-    })
-      .from(registrationHistory).where(and(
-        eq(registrationHistory.studentId, studentId),
-        inArray(registrationHistory.outcome, ['registered', 'dropped']),
-        isNotNull(registrationHistory.subjectId),
-      )),
-    executor.select({ sessionType: registrationSession.sessionType, seriesYear: registrationSession.seriesYear })
-      .from(registrationSession).where(eq(registrationSession.id, excludeSessionId)),
-  ]);
-  const windowOrder = win ? seriesOrder(win.sessionType, win.seriesYear) : -Infinity;
-  const satBefore = history.filter((h) =>
-    seriesOrder(h.sessionType, h.seriesYear) < windowOrder && seriesEndedBy(h.sessionType, h.seriesYear, h.committedAt));
-  return new Set([...prior.map((r) => r.subjectId), ...satBefore.map((h) => h.subjectId!)]);
-}
-
-/**
- * Shared V3 pre-insert pipeline for both request and direct registration:
- * level match, teacher validation, retake detection, pricing engine, and
- * the school-fee gate. Returns per-subject computed values keyed by
- * subject ID.
- *
- * `eligibility` is the path's own mayRegisterFor answer (F0a): the fee gate
- * reads the series' academic year and the student's grade in it from it.
- */
-export async function prepareRegistrationInputs(
-  studentId: string,
-  sess: { id: string; qualificationLevel: string },
-  subjects: {
-    id: string;
-    qualificationLevel: string;
-    courseFee: number;
-    registrationFee: number;
-    isOfferedAtSchool: boolean;
-    name: string;
-  }[],
-  subjectOptions: Record<string, SubjectRegistrationOptionsType> | undefined,
-  eligibility: Eligibility,
-  // F7: the import reads inside its family's transaction (the teacher links
-  // and the history it has just written); every other caller reads committed data.
-  executor: typeof db | Tx = db,
-) {
-  // Level match: an IGCSE session only takes IGCSE subjects, etc.
-  const wrongLevel = subjects.filter((s) => s.qualificationLevel !== sess.qualificationLevel);
-  if (wrongLevel.length > 0) {
-    throw new Error(
-      `These subjects don't match the session's qualification level: ${wrongLevel.map((s) => s.name).join(', ')}`
-    );
-  }
-
-  // A subject with no price is not yet for sale (F7 review flag 1): every path
-  // that registers — the family's request, the parent's direct registration,
-  // the desk, a preregistration, an admin override, the import — stops here.
-  // The catalogue price is what counts: a pricing exception may still bring a
-  // priced subject down to nothing (a scholarship).
-  const unpriced = subjects.filter((s) => s.courseFee + s.registrationFee <= 0);
-  if (unpriced.length > 0) {
-    throw new Error(
-      `${unpriced.map((s) => s.name).join(', ')} ${unpriced.length === 1 ? 'has' : 'have'} no price yet: the admin sets the fees on Subjects before anyone can register`
-    );
-  }
-
-  // School-fee gate (D-H): unpaid school fee blocks registration — the fee
-  // of the series' academic year at the student's grade in it (F0a).
+export async function assertSchoolFeeGate(studentId: string, eligibility: Eligibility) {
   const gate = await schoolFeeGateReason(studentId, eligibility);
   if (gate) throw new Error(gate);
-
-  // Teacher validation: chosen teacher must be linked to that subject
-  const requestedTeacherIds = Object.values(subjectOptions ?? {})
-    .map((o) => o.teacherId)
-    .filter((t): t is string => !!t);
-  const teacherLinks = requestedTeacherIds.length
-    ? await executor.select({ subjectId: subjectTeacher.subjectId, teacherId: subjectTeacher.teacherId })
-        .from(subjectTeacher).where(inArray(subjectTeacher.teacherId, requestedTeacherIds))
-    : [];
-
-  const retakeSet = await getRetakeSubjectIds(studentId, sess.id, executor);
-
-  const result = new Map<
-    string,
-    {
-      pricing: ReturnType<typeof computeRegistrationPricing>;
-      isRetake: boolean;
-      teacherId: string | null;
-    }
-  >();
-
-  for (const sub of subjects) {
-    const opts = subjectOptions?.[sub.id] ?? {};
-    const isRetake = retakeSet.has(sub.id);
-
-    // Hook 1 (§6.3): per-student pricing exceptions apply after the 50% rule
-    const pricing = await applyPricingExceptions(
-      studentId,
-      sess.id,
-      sub.id,
-      computeRegistrationPricing(sub, {
-        isRetake,
-        takeOutsideSchool: opts.takeOutsideSchool ?? false,
-      })
-    );
-
-    let teacherId: string | null = null;
-    if (opts.teacherId && !pricing.isOutsideSchool) {
-      const linked = teacherLinks.some(
-        (l) => l.subjectId === sub.id && l.teacherId === opts.teacherId
-      );
-      if (!linked) {
-        throw new Error(`The chosen teacher is not linked to ${sub.name}`);
-      }
-      teacherId = opts.teacherId;
-    }
-
-    result.set(sub.id, { pricing, isRetake, teacherId });
-  }
-
-  return result;
 }
 
 /**
@@ -288,194 +125,20 @@ async function studentHasApprovedParent(studentId: string): Promise<boolean> {
   return !!link;
 }
 
-/**
- * Return the subject IDs for which a student already has a non-dropped,
- * non-rejected registration in the given session.
- * Used to prevent duplicate registrations.
- */
-async function getExistingRegistrationSubjectIds(
-  studentId: string,
-  sessionId: string
-): Promise<string[]> {
-  const existing = await db.query.registration.findMany({
-    where: (r, { eq, and, notInArray }) =>
-      and(
-        eq(r.studentId, studentId),
-        eq(r.sessionId, sessionId),
-        notInArray(r.status, ['dropped', 'rejected', 'expired'])
-      ),
-    columns: { subjectId: true },
-  });
-  return existing.map((r) => r.subjectId);
-}
-
 // ─── Public Service Functions ────────────────────────────────────────────────
 
-/**
- * Validate that a Grade 10 student's registration request includes all
- * mandatory core subjects for a June session.
- *
- * The grade is the student's grade in the series' academic year (F0a,
- * A-05), not today's: a student starting grade 10 in September is grade 10
- * for the June after it, whatever the date the window opens.
- *
- * Returns { valid: true } for non-Grade-10 students or non-June sessions.
- * Returns { valid: false, missingCoreSubjects } when core subjects are missing.
- */
-export async function validateCoreSubjectRequirements(
-  studentId: string,
-  sessionId: string,
-  subjectIds: string[]
-): Promise<{
-  valid: boolean;
-  missingCoreSubjects: { id: string; name: string; code: string }[];
-}> {
-  // Fails closed: mayRegisterFor throws when the student or session is
-  // missing, so the CORE-003 rule is never skipped silently.
-  const eligibility = await mayRegisterFor(studentId, sessionId);
-
-  // Core requirement only applies to Grade 10 in the June session
-  if (eligibility.grade !== 10 || eligibility.series.sessionType !== 'june') {
-    return { valid: true, missingCoreSubjects: [] };
-  }
-
-  const coreSubjects = await db.query.subject.findMany({
-    where: (s, { eq, and }) => and(eq(s.isCore, true), eq(s.isActive, true)),
-    columns: { id: true, name: true, code: true },
-  });
-
-  const missingCoreSubjects = coreSubjects.filter(
-    (core) => !subjectIds.includes(core.id)
-  );
-
-  return {
-    valid: missingCoreSubjects.length === 0,
-    missingCoreSubjects,
-  };
-}
+// The grade-10 core rule (A-05) is a rule on the lines now: gate.grade10Core in
+// assertLineRules (line-rules.services.ts) reads the session's core offers.
 
 /**
- * Return all active subjects that a student has not yet registered for
- * in the given session. Used to populate the registration form.
+ * Student submits a reservation request: one line per item ticked (RESERVATIONS_REWORK.md
+ * §3.5, §4.4), with both consents. The lines wait for a parent's approval.
  *
- * Subjects the student already has a non-terminal registration for
- * (pending_approval, pending_payment, confirmed) are excluded so the
- * list never contains duplicates of what the student has already acted
- * on. This includes core subjects — the frontend is responsible for
- * pre-selecting + locking any missing core subjects for Grade 10 June
- * (see register.client.tsx).
- */
-export type AvailableSubjectRow = {
-  id: string;
-  name: string;
-  code: string;
-  council: string;
-  qualificationLevel: string;
-  courseFee: number;
-  registrationFee: number;
-  priceInSchool: number;
-  isOfferedAtSchool: boolean;
-  customPrice: number | null;
-  isActive: boolean;
-  isCore: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  teachers: { id: string; name: string }[];
-  isRetake: boolean;
-  pricing: { courseFee: number; registrationFee: number; total: number; isOutsideSchool: boolean };
-  outsidePricing: { courseFee: number; registrationFee: number; total: number; isOutsideSchool: boolean } | null;
-  /** F0b: the board series the subject would be entered in (null: the window feeds none). */
-  boardSeries: { id: string; name: string; entryDeadline: Date | null } | null;
-};
-
-// Explicit return type: the drizzle relational inference chained through
-// Hono RPC + JSONParsed exceeds TS instantiation depth in the web compile
-// and silently degrades the client type — a concrete type short-circuits it.
-export async function getAvailableSubjects(
-  studentId: string,
-  sessionId: string
-): Promise<AvailableSubjectRow[]> {
-  // F0a: nothing is available in a series the student may not register for
-  if (!(await mayRegisterFor(studentId, sessionId)).allowed) return [];
-
-  const sess = await db.query.registrationSession.findFirst({
-    where: (s, { eq }) => eq(s.id, sessionId),
-    columns: { id: true, qualificationLevel: true },
-  });
-  if (!sess) return [];
-
-  const alreadyRegistered = await getExistingRegistrationSubjectIds(
-    studentId,
-    sessionId
-  );
-
-  const subjects = await db.query.subject.findMany({
-    where: (s, { eq, and, notInArray }) => {
-      const conditions = [
-        eq(s.isActive, true),
-        eq(s.qualificationLevel, sess.qualificationLevel),
-      ];
-      if (alreadyRegistered.length > 0) {
-        conditions.push(notInArray(s.id, alreadyRegistered));
-      }
-      return and(...conditions);
-    },
-    with: {
-      subjectTeachers: {
-        with: { teacher: { columns: { id: true, name: true, isActive: true } } },
-      },
-    },
-    orderBy: (s, { asc }) => [asc(s.name)],
-  });
-
-  // V3 enrichment: teachers to pick from, retake flag, and both price
-  // variants so the UI can show exactly what each choice costs.
-  const retakeSet = await getRetakeSubjectIds(studentId, sessionId);
-
-  // F0b: the series each subject would be entered in. A subject the window
-  // enters in no series, or in one past its entry deadline, is not offered.
-  const routing = await routeSubjects(db, sessionId, subjects);
-  const now = new Date();
-  const offered = subjects.filter((s) => {
-    if (!routing.feedsSeries) return true;
-    const r = routing.routes.get(s.id);
-    return !!r && !(r.entryDeadline && r.entryDeadline <= now);
-  });
-
-  return offered.map(({ subjectTeachers, ...sub }) => {
-    const route = routing.routes.get(sub.id) ?? null;
-    const isRetake = retakeSet.has(sub.id);
-    const inSchoolPricing = computeRegistrationPricing(sub, {
-      isRetake,
-      takeOutsideSchool: false,
-    });
-    const outsidePricing =
-      !sub.isOfferedAtSchool || isRetake
-        ? computeRegistrationPricing(sub, { isRetake, takeOutsideSchool: true })
-        : null;
-
-    return {
-      ...sub,
-      teachers: subjectTeachers
-        .map((st) => st.teacher)
-        .filter((t) => t.isActive)
-        .map((t) => ({ id: t.id, name: t.name })),
-      isRetake,
-      pricing: inSchoolPricing,
-      outsidePricing,
-      boardSeries: route ? { id: route.boardSeriesId, name: route.name, entryDeadline: route.entryDeadline } : null,
-    };
-  });
-}
-
-/**
- * Student submits a registration request for a set of subjects.
- *
- * - Session must be active.
- * - All subjects must be active.
- * - No duplicate registrations in the same session.
- * - Grade 10 June sessions must include all core subjects.
- * - Created with status 'pending_approval'; parent must approve before payment.
+ * - The student may register for the session's series (F0a), and has a parent to approve.
+ * - The session is open for the student (or an extension); each line's own deadline is checked
+ *   when it is made.
+ * - The school-fee gate, then the lines (reservation.services reserveLines: the sitting a retake
+ *   follows, the rules, the price, the series, the consent rows on the app channel).
  */
 export async function createRegistrationRequest(
   studentId: string,
@@ -501,72 +164,19 @@ export async function createRegistrationRequest(
   });
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
-  // as open for this student — never past the board's entry deadline (MO-10)
-  await assertWindowOpen(studentId, sess.id, null);
-
-  const subjects = await db.query.subject.findMany({
-    where: (s, { eq, and, inArray }) =>
-      and(eq(s.isActive, true), inArray(s.id, data.subjectIds)),
-  });
-  if (subjects.length !== data.subjectIds.length) {
-    throw new Error('One or more subjects are invalid or inactive');
-  }
-
-  const alreadyRegistered = await getExistingRegistrationSubjectIds(
-    studentId,
-    data.sessionId
-  );
-  const duplicates = data.subjectIds.filter((id) => alreadyRegistered.includes(id));
-  if (duplicates.length > 0) {
-    throw new Error('Some subjects are already registered for this session');
-  }
-  // F0b: each subject's board series is open (asked again in the transaction).
-  await routeAndCheck(db, data.sessionId, subjects);
-
-  const coreCheck = await validateCoreSubjectRequirements(
-    studentId,
-    data.sessionId,
-    data.subjectIds
-  );
-  if (!coreCheck.valid) {
-    const names = coreCheck.missingCoreSubjects.map((s) => s.name).join(', ');
-    throw new Error(
-      `Grade 10 June session requires all core subjects. Missing: ${names}`
-    );
-  }
-
-  const prepared = await prepareRegistrationInputs(
-    studentId,
-    sess,
-    subjects,
-    data.subjectOptions,
-    eligibility
-  );
-
-  const records = subjects.map((sub) => {
-    const p = prepared.get(sub.id)!;
-    return {
-      id: randomUUID(),
-      studentId,
-      sessionId: data.sessionId,
-      subjectId: sub.id,
-      priceAtRegistration: p.pricing.total,
-      courseFeeAtRegistration: p.pricing.courseFee,
-      registrationFeeAtRegistration: p.pricing.registrationFee,
-      isRetake: p.isRetake,
-      takenOutsideSchool: p.pricing.isOutsideSchool,
-      teacherId: p.teacherId,
-      wasCoreAtRegistration: sub.isCore,
-      status: 'pending_approval' as const,
-      requestedBy,
-    };
-  });
+  // as open for this student — never past a line's own deadline (MO-10)
+  await assertWindowOpen(studentId, sess.id, null, data.lines);
+  await assertSchoolFeeGate(studentId, eligibility);
 
   // Asked again with the student and window held, so a withdrawal or a
-  // correction racing this request either lands first or expires it (F0a).
+  // correction racing this request either lands first or expires it (F0a);
+  // each line is checked, priced and entered in its item's series (insertLines).
   const inserted = await db.transaction(async (tx) => {
     await assertMayRegisterForInTx(tx, studentId, data.sessionId);
-    return insertRoutedRegistrations(tx, data.sessionId, subjects, records);
+    return reserveLines(tx, {
+      studentId, sessionId: data.sessionId, lines: data.lines, status: 'pending_approval', requestedBy, eligibility,
+      declaredBy: 'family', channel: 'app',
+    });
   });
 
   // NOT-003: Notify all linked parents of the new request (fire-and-forget)
@@ -575,31 +185,32 @@ export async function createRegistrationRequest(
       where: (u, { eq: eqOp }) => eqOp(u.id, studentId),
       columns: { name: true },
     });
-    const totalCost = records.reduce((sum, r) => sum + r.priceAtRegistration, 0);
-
+    const names = await subjectNames(inserted.map((r) => r.subjectId));
     notifyRegistrationRequestReceived({
       studentId,
       studentName: studentUser?.name ?? 'Student',
       sessionName: sess.name,
-      subjects: subjects.map((sub) => ({
-        name: sub.name,
-        price: prepared.get(sub.id)!.pricing.total,
-      })),
-      totalCost,
+      subjects: inserted.map((r) => ({ name: names.get(r.subjectId) ?? 'Subject', price: r.priceAtRegistration })),
+      totalCost: inserted.reduce((sum, r) => sum + r.priceAtRegistration, 0),
     }).catch((err) => console.error('[notification] NOT-003 failed:', err));
   }
 
   return inserted;
 }
 
+async function subjectNames(ids: string[]) {
+  if (!ids.length) return new Map<string, string>();
+  const rows = await db.select({ id: subject.id, name: subject.name }).from(subject).where(inArray(subject.id, [...new Set(ids)]));
+  return new Map(rows.map((r) => [r.id, r.name]));
+}
+
 /**
- * Parent directly registers subjects for one of their linked children.
+ * Parent reserves lines directly for one of their linked children (§4.4).
  *
  * - Parent must have an approved link to the student.
- * - Session must be active.
- * - No duplicate registrations.
- * - Core subject validation applies for Grade 10 June.
- * - Created with status 'pending_payment' (auto-approved by parent).
+ * - The session is open for the student; each line's own deadline when it is made.
+ * - The lines are created in 'pending_payment' (approved by the parent), with both consents
+ *   on the app channel.
  */
 export async function createDirectRegistration(
   parentId: string,
@@ -616,88 +227,30 @@ export async function createDirectRegistration(
   });
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
-  // as open for this student — never past the board's entry deadline (MO-10)
-  await assertWindowOpen(data.studentId, sess.id, null);
-
-  const subjects = await db.query.subject.findMany({
-    where: (s, { eq, and, inArray }) =>
-      and(eq(s.isActive, true), inArray(s.id, data.subjectIds)),
-  });
-  if (subjects.length !== data.subjectIds.length) {
-    throw new Error('One or more subjects are invalid or inactive');
-  }
-
-  const alreadyRegistered = await getExistingRegistrationSubjectIds(
-    data.studentId,
-    data.sessionId
-  );
-  const duplicates = data.subjectIds.filter((id) => alreadyRegistered.includes(id));
-  if (duplicates.length > 0) {
-    throw new Error('Some subjects are already registered for this session');
-  }
-  // F0b: each subject's board series is open (asked again in the transaction).
-  await routeAndCheck(db, data.sessionId, subjects);
-
-  const coreCheck = await validateCoreSubjectRequirements(
-    data.studentId,
-    data.sessionId,
-    data.subjectIds
-  );
-  if (!coreCheck.valid) {
-    const names = coreCheck.missingCoreSubjects.map((s) => s.name).join(', ');
-    throw new Error(
-      `Grade 10 June session requires all core subjects. Missing: ${names}`
-    );
-  }
-
-  const prepared = await prepareRegistrationInputs(
-    data.studentId,
-    sess,
-    subjects,
-    data.subjectOptions,
-    eligibility
-  );
+  // as open for this student — never past a line's own deadline (MO-10)
+  await assertWindowOpen(data.studentId, sess.id, null, data.lines);
+  await assertSchoolFeeGate(data.studentId, eligibility);
 
   const now = new Date();
-  const records = subjects.map((sub) => {
-    const p = prepared.get(sub.id)!;
-    return {
-      id: randomUUID(),
-      studentId: data.studentId,
-      sessionId: data.sessionId,
-      subjectId: sub.id,
-      priceAtRegistration: p.pricing.total,
-      courseFeeAtRegistration: p.pricing.courseFee,
-      registrationFeeAtRegistration: p.pricing.registrationFee,
-      isRetake: p.isRetake,
-      takenOutsideSchool: p.pricing.isOutsideSchool,
-      teacherId: p.teacherId,
-      wasCoreAtRegistration: sub.isCore,
-      status: 'pending_payment' as const,
-      requestedBy: parentId,
-      approvedBy: parentId,
-      approvedAt: now,
-    };
-  });
-
   // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
   const created = await db.transaction(async (tx) => {
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    return insertRoutedRegistrations(tx, data.sessionId, subjects, records);
+    return reserveLines(tx, {
+      studentId: data.studentId, sessionId: data.sessionId, lines: data.lines, status: 'pending_payment',
+      requestedBy: parentId, approvedBy: parentId, approvedAt: now, eligibility, declaredBy: 'family', channel: 'app',
+    });
   });
 
   // REG-003: Notify student via in-app + email that their parent registered
   // subjects for them. Fire-and-forget so registration creation never fails
   // because of a notification/email hiccup.
+  const names = await subjectNames(created.map((r) => r.subjectId));
   notifyDirectRegistrationCreated({
     studentId: data.studentId,
     parentId,
     sessionName: sess.name,
-    subjects: subjects.map((sub) => ({
-      name: sub.name,
-      price: prepared.get(sub.id)!.pricing.total,
-    })),
-    totalCost: records.reduce((sum, r) => sum + r.priceAtRegistration, 0),
+    subjects: created.map((r) => ({ name: names.get(r.subjectId) ?? 'Subject', price: r.priceAtRegistration })),
+    totalCost: created.reduce((sum, r) => sum + r.priceAtRegistration, 0),
   }).catch((err) => console.error('[notification] REG-003 direct student notify failed:', err));
 
   return created;
@@ -746,7 +299,7 @@ export async function approveRegistrationRequest(
   // passed (a deadline extension counts). Checked against the session's
   // status alone, a request made under an extension after the close could
   // never be approved (state audit ST-07, MO-20).
-  for (const r of regs) await assertWindowOpen(r.studentId, r.sessionId, r.boardSeriesId);
+  for (const r of regs) await assertWindowOpen(r.studentId, r.sessionId, r);
 
   const studentIds = [...new Set(regs.map((r) => r.studentId))];
   for (const studentId of studentIds) {
@@ -876,6 +429,13 @@ export async function revertApprovedRegistrationRequest(
     if (paymentLinksInTx.length > 0) {
       throw new Error('One or more registrations already have a payment in progress and cannot be reverted');
     }
+    // The reservations rework (§3.6): a line under a live instalment plan is not reverted — the guard
+    // reads the plan itself (the plan locks the line before it is granted), so a plan with nothing
+    // paid yet is covered too.
+    const [plan] = await tx.select({ id: exception.id }).from(exception)
+      .where(and(eq(exception.policyKey, 'plan.instalments'), eq(exception.status, 'active'), inArray(exception.registrationId, data.registrationIds)))
+      .limit(1);
+    if (plan) throw new Error('A subject under an instalment plan cannot be sent back for approval — ask the finance office to end the plan first');
 
     const rows = await tx
       .update(registration)
@@ -1003,9 +563,10 @@ export async function rejectRegistrationRequest(
  * Admin overrides the parent approval requirement (REG-007).
  *
  * Used for exceptional cases: orphaned students, legal guardianship, etc.
- * Registrations are created directly in 'pending_payment' status.
- * The admin's reason is stored in approvalComments with an [ADMIN OVERRIDE] prefix,
- * providing a clear audit trail without requiring a separate audit table.
+ * Lines are created directly in 'pending_payment' status, their consent on the desk channel
+ * (the family's paper, read and signed, §3.5). The admin's reason is stored in approvalComments
+ * with an [ADMIN OVERRIDE] prefix. A sitting the admin names that the system does not know is
+ * declared by the school (`declared_by_desk`) and listed to verify.
  */
 export async function adminOverrideApproval(
   data: AdminOverrideApprovalType,
@@ -1026,82 +587,22 @@ export async function adminOverrideApproval(
   });
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
-  // as open for this student — never past the board's entry deadline (MO-10)
-  await assertWindowOpen(data.studentId, sess.id, null);
-
-  const subjects = await db.query.subject.findMany({
-    where: (s, { eq, and, inArray }) =>
-      and(eq(s.isActive, true), inArray(s.id, data.subjectIds)),
-  });
-  if (subjects.length !== data.subjectIds.length) {
-    throw new Error('One or more subjects are invalid or inactive');
-  }
-
-  const alreadyRegistered = await getExistingRegistrationSubjectIds(
-    data.studentId,
-    data.sessionId
-  );
-  const duplicates = data.subjectIds.filter((id) => alreadyRegistered.includes(id));
-  if (duplicates.length > 0) {
-    throw new Error('Some subjects are already registered for this session');
-  }
-  // F0b: each subject's board series is open (asked again in the transaction).
-  await routeAndCheck(db, data.sessionId, subjects);
-
-  // CORE-003: Admin override bypasses parent approval (REG-007), NOT the
-  // Grade 10 June core-subject curriculum rule. Core requirements must
-  // still be satisfied — the admin provides the subject list that will
-  // be registered, which for Grade 10 June must include the subject IDs
-  // of every active core subject not already registered for this session.
-  const coreCheck = await validateCoreSubjectRequirements(
-    data.studentId,
-    data.sessionId,
-    [...data.subjectIds, ...alreadyRegistered]
-  );
-  if (!coreCheck.valid) {
-    const names = coreCheck.missingCoreSubjects.map((s) => s.name).join(', ');
-    throw new Error(
-      `Grade 10 June session requires all core subjects. Missing: ${names}`
-    );
-  }
-
-  // V3: same pricing/level/teacher pipeline as normal registrations.
-  // (The school-fee gate applies to admin overrides too — an admin can
-  // grant a fee_waiver exception when that's the intent.)
-  const prepared = await prepareRegistrationInputs(
-    data.studentId,
-    sess,
-    subjects,
-    undefined,
-    eligibility
-  );
+  // as open for this student — never past a line's own deadline (MO-10)
+  await assertWindowOpen(data.studentId, sess.id, null, data.lines);
+  // CORE-003: the override bypasses parent approval (REG-007), not the grade-10 core rule:
+  // assertLineRules counts the student's live lines with these (gate.grade10Core). The
+  // school-fee gate applies too (a fee waiver is the sanctioned way past it).
+  await assertSchoolFeeGate(data.studentId, eligibility);
 
   const now = new Date();
-  const records = subjects.map((sub) => {
-    const p = prepared.get(sub.id)!;
-    return {
-      id: randomUUID(),
-      studentId: data.studentId,
-      sessionId: data.sessionId,
-      subjectId: sub.id,
-      priceAtRegistration: p.pricing.total,
-      courseFeeAtRegistration: p.pricing.courseFee,
-      registrationFeeAtRegistration: p.pricing.registrationFee,
-      isRetake: p.isRetake,
-      takenOutsideSchool: p.pricing.isOutsideSchool,
-      wasCoreAtRegistration: sub.isCore,
-      status: 'pending_payment' as const,
-      requestedBy: adminId,
-      approvedBy: adminId,
-      approvedAt: now,
-      approvalComments: `[ADMIN OVERRIDE] ${data.reason}`,
-    };
-  });
-
   // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
   return db.transaction(async (tx) => {
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    return insertRoutedRegistrations(tx, data.sessionId, subjects, records);
+    return reserveLines(tx, {
+      studentId: data.studentId, sessionId: data.sessionId, lines: data.lines, status: 'pending_payment',
+      requestedBy: adminId, approvedBy: adminId, approvedAt: now, approvalComments: `[ADMIN OVERRIDE] ${data.reason}`, eligibility,
+      declaredBy: 'desk', channel: 'desk',
+    });
   });
 }
 

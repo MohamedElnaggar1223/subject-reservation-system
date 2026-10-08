@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, waitFor, notificationsFor, money,
-  openWindow, futureWindow, type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, waitFor, notificationsFor, money, openWindow, futureWindow, type Client, reservationOf } from './helpers';
 
 /**
  * The original approval workflow and the V3 flows that had never run before
@@ -47,7 +44,7 @@ describe('V3 flows', () => {
   });
 
   it('student requests, parent sees it pending and approves (REG-001/002)', async () => {
-    const created = await apiResponse(student.api.v1.registrations.request.$post({ json: { sessionId: juneA, subjectIds: [business] } }));
+    const created = await apiResponse(student.api.v1.registrations.request.$post({ json: { sessionId: juneA, ...(await reservationOf(juneA, [business])) } }));
     const requested = created[0]!;
     expect(requested.status).toBe('pending_approval');
     await waitFor(async () => (await notificationsFor(parent.email, 'REGISTRATION_REQUEST_RECEIVED')).length === 1 || null);
@@ -74,7 +71,7 @@ describe('V3 flows', () => {
     );
     expect(twice).toEqual({ status: 409, error: 'A schedule for that academic year and grade already exists' });
 
-    const blocked = await refused(student.api.v1.registrations.request.$post({ json: { sessionId: juneA, subjectIds: [economics] } }));
+    const blocked = await refused(student.api.v1.registrations.request.$post({ json: { sessionId: juneA, ...(await reservationOf(juneA, [economics])) } }));
     expect(blocked).toEqual({ status: 400, error: `The ${academicYear} school fee (5000.00 EGP) must be paid before registering subjects` });
 
     const due = { required: true, waived: false, paid: false, amount: 5000 };
@@ -92,7 +89,7 @@ describe('V3 flows', () => {
     expect(collect.error).toBe(`The ${academicYear} school fee is waived for this student — nothing to collect`);
     expect(await sql(`select 1 from payment where student_id = $1 and purpose = 'school_fee'`, [studentId])).toEqual([]);
 
-    await apiResponse(student.api.v1.registrations.request.$post({ json: { sessionId: juneA, subjectIds: [economics] } }));
+    await apiResponse(student.api.v1.registrations.request.$post({ json: { sessionId: juneA, ...(await reservationOf(juneA, [economics])) } }));
 
     // The schedule gates every family in the shared test database for this
     // academic year; remove it so the other suites are not affected by order.
@@ -102,13 +99,22 @@ describe('V3 flows', () => {
 
   it('held wallet: preregister for a draft session, pay at the desk into held, capture on activation', async () => {
     const draft = futureWindow();
-    const wrongLevel = await refused(
-      adm.api.v1.sessions.$post({ json: { name: 'January IGCSE?', sessionType: 'january', seriesYear: 2027, qualificationLevel: 'igcse', ...draft } })
-    );
-    expect(wrongLevel.status).toBe(400);
+    // The reservations rework (RESERVATIONS_REWORK.md §3.1, §3.3): a winter session is valid;
+    // "IGCSE sits neither October nor January" is checked per item, so an IGCSE item entered in a
+    // January series is refused (it was a January IGCSE window that was refused before).
+    const igcse = await subject(adm, 'T4MA1', 'Mathematics (IGCSE, v3 flows)', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
+    const winter = await session(adm, 'Winter (IGCSE, v3 flows)', 'november', 'igcse', draft);
+    const offer = (await apiResponse(adm.api.v1.sessions[':id'].offers.$get({ param: { id: winter } }))).offers.find((o) => o.subjectId === igcse)!;
+    const year = (await one<{ y: number }>(`select series_year as y from registration_session where id = $1`, [winter])).y;
+    const january = await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month: 'january', year: year + 1, label: 'v3 flows' } }));
+    const wrongLevel = await refused(adm.api.v1.sessions[':id'].offers[':offerId'].items.$post({
+      param: { id: winter, offerId: offer.id },
+      json: { label: 'Whole subject (January)', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: january.id, availability: 'open', requiredInSeries: false },
+    }));
+    expect(wrongLevel).toEqual({ status: 400, error: 'IGCSE sits neither October nor January: an IGCSE item is entered in a June or November series' });
 
     januaryA = await session(adm, 'January (A-Level)', 'january', 'a_level', draft);
-    const pre = await apiResponse(parent.api.v1.registrations.preregister.$post({ json: { sessionId: januaryA, subjectIds: [physicsA], studentId } }));
+    const pre = await apiResponse(parent.api.v1.registrations.preregister.$post({ json: { sessionId: januaryA, ...(await reservationOf(januaryA, [physicsA])), studentId } }));
     preregId = pre[0]!.id;
     expect(pre[0]).toMatchObject({ status: 'preregistered', priceAtRegistration: 1500 });
 

@@ -11,6 +11,9 @@ import {
 import { foundationArabic } from './i18n-foundation';
 import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
 import { importArabic, translateImportText } from './i18n-import';
+import { sessionsArabic, translateSessionsText } from './i18n-sessions';
+import { moneyArabic, translateMoneyText } from './i18n-money';
+import { reservationsArabic, translateReservationsText } from './i18n-reservations';
 
 export type Language = 'en' | 'ar';
 
@@ -56,7 +59,8 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.notifications': 'Notifications',
     'nav.home': 'Home',
     'nav.registration': 'Registration',
-    'nav.registerSubjects': 'Register Subjects',
+    'nav.registerSubjects': 'Reserve Subjects',
+    'nav.statement': 'Statement',
     'nav.myRegistrations': 'My Registrations',
     'nav.history': 'History',
     'nav.approvals': 'Approvals',
@@ -86,6 +90,9 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.catalogue': 'Exam Catalogue',
     'nav.boardSeries': 'Board Series',
     'nav.import': 'Day-one Import',
+    'nav.boardServices': 'Board Services',
+    'nav.charges': 'Charges',
+    'nav.chargesDue': 'Charges & Instalments',
     'reports.title': 'Reports',
     'reports.description': 'Generate and export data reports. All reports support CSV download.',
     'reports.pendingApprovals': 'Pending Approvals',
@@ -186,6 +193,9 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.catalogue': 'دليل الامتحانات',
     'nav.boardSeries': 'دورات المجالس',
     'nav.import': 'استيراد بدء التشغيل',
+    'nav.boardServices': 'خدمات المجالس',
+    'nav.charges': 'الرسوم الأخرى',
+    'nav.chargesDue': 'الرسوم والأقساط',
     'app.subjectReservation': 'حجز المواد',
     'common.user': 'مستخدم',
     'common.signOut': 'تسجيل الخروج',
@@ -224,7 +234,8 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.notifications': 'الإشعارات',
     'nav.home': 'الرئيسية',
     'nav.registration': 'التسجيل',
-    'nav.registerSubjects': 'تسجيل المواد',
+    'nav.registerSubjects': 'حجز المواد',
+    'nav.statement': 'كشف الحساب',
     'nav.myRegistrations': 'تسجيلاتي',
     'nav.history': 'السجل',
     'nav.approvals': 'الموافقات',
@@ -1498,6 +1509,12 @@ Object.assign(autoArabicText, foundationArabic);
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // F7 screens (lib/i18n-import.ts), the same way.
 for (const [en, ar] of Object.entries(importArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// The reservations rework's screens (lib/i18n-sessions.ts): the same rule.
+for (const [en, ar] of Object.entries(sessionsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// Step C's money screens (lib/i18n-money.ts): the same rule.
+for (const [en, ar] of Object.entries(moneyArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// Step B's screens (lib/i18n-reservations.ts): Reserve, the statement, To verify, the slip.
+for (const [en, ar] of Object.entries(reservationsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
 const textNodeOriginals = new WeakMap<Text, string>();
 
@@ -1579,6 +1596,15 @@ function translateDynamicText(text: string): string | null {
   // F7: the import's sentences with a name, a number or a year in them.
   const f7Text = translateImportText(text);
   if (f7Text) return f7Text;
+  // The reservations rework: session names, refund sentences, the refusals of its screens.
+  const reworkText = translateSessionsText(text);
+  if (reworkText) return reworkText;
+  // Step C: the registry's sentences, the exceptions' dialogs and refusals.
+  const moneyText = translateMoneyText(text, translateExactText);
+  if (moneyText) return moneyText;
+  // Step B: the Reserve page's results, the pricing basis, the consent and the refusals.
+  const reservationText = translateReservationsText(text);
+  if (reservationText) return reservationText;
 
   // Accessible names that carry a person's name (the Team grid).
   const roleOfMatch = /^Role of (.+)$/.exec(text);

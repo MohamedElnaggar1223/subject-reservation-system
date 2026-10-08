@@ -1,0 +1,27 @@
+[
+ {
+  "label": "from scratch: deadline of 1 series (academic year chosen on the page)",
+  "inputs": 4,
+  "clicks": 2
+ },
+ {
+  "label": "copy-from: new session copying the last June (the default in \"Copy from\")",
+  "inputs": 5,
+  "clicks": 2
+ },
+ {
+  "label": "copy-from: fees confirmed when the board publishes (one per series)",
+  "inputs": 0,
+  "clicks": 2
+ },
+ {
+  "label": "copy-from: deadline of 1 series",
+  "inputs": 6,
+  "clicks": 2
+ },
+ {
+  "label": "copy-from: 17 subjects came across, 17 with their teacher, 17 open",
+  "inputs": 0,
+  "clicks": 0
+ }
+]

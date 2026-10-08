@@ -90,6 +90,8 @@ type EscrowMutationParams = {
   initiatedBy: string;
   relatedRegistrationId?: string;
   relatedPaymentId?: string;
+  /** The reservations rework (§3.10 item 3): the charge a charge_refund credit is for. */
+  relatedChargeId?: string;
 };
 
 type DbConn = Pick<typeof db, 'update' | 'insert' | 'query'>;
@@ -130,6 +132,7 @@ export async function creditEscrow(params: EscrowMutationParams, tx?: DbConn): P
     // valid IDs are never the empty string.
     relatedRegistrationId: params.relatedRegistrationId || null,
     relatedPaymentId: params.relatedPaymentId || null,
+    relatedChargeId: params.relatedChargeId || null,
   });
 
   return updated.balance;
@@ -179,6 +182,7 @@ export async function debitEscrow(params: EscrowMutationParams, tx?: DbConn): Pr
     // Same defensive coercion as creditEscrow (see comment above).
     relatedRegistrationId: params.relatedRegistrationId || null,
     relatedPaymentId: params.relatedPaymentId || null,
+    relatedChargeId: params.relatedChargeId || null,
   });
 
   return updated.balance;
@@ -216,14 +220,67 @@ export async function creditHeld(params: EscrowMutationParams, tx?: DbConn): Pro
     initiatedBy: params.initiatedBy,
     relatedRegistrationId: params.relatedRegistrationId || null,
     relatedPaymentId: params.relatedPaymentId || null,
+    relatedChargeId: params.relatedChargeId || null,
   });
 
   return updated.heldBalance;
 }
 
-export async function debitHeld(params: EscrowMutationParams, tx?: DbConn): Promise<number> {
+/**
+ * The reservations rework (§3.6, §3.10 item 6): held money is also the deposits of instalment
+ * plans, earmarked per line — credited with reason `instalment` and the line as
+ * related_registration_id, debited by an instalment's reversal, the plan's capture, its forfeit
+ * or its release. A line's deposits are spent only by that line, and never by anything else.
+ */
+export const PLAN_HELD_DEBIT_REASONS = ['instalment_reversed', 'plan_capture', 'plan_forfeit', 'plan_release'] as const;
+
+/** A line's deposits still held (net of every plan debit), or every line's of the wallet. */
+/**
+ * The SQL of a line's deposits held under its instalment plan (alias of the registration row): the
+ * instalments credited to the held wallet for it, less what was reversed, captured, kept or
+ * released — the same ledger rows earmarkedHeld sums. Zero once the plan is captured or settled.
+ * The statement, the Money tab and the desk's "Owes now" read a plan line's paid part from it.
+ */
+export const lineDepositsSql = (alias = 'r') => sql.raw(`(select coalesce(sum(case when t.type = 'credit' then t.amount else -t.amount end), 0)
+  from escrow_transaction t
+  where t.related_registration_id = ${alias}.id and t.balance_type = 'held'
+    and ((t.type = 'credit' and t.reason = 'instalment')
+      or (t.type = 'debit' and t.reason in ('instalment_reversed', 'plan_capture', 'plan_forfeit', 'plan_release'))))`);
+
+export async function earmarkedHeld(conn: Pick<typeof db, 'execute'>, escrowId: string, registrationId?: string): Promise<number> {
+  const r = await conn.execute(sql`
+    select coalesce(sum(case when t.type = 'credit' then t.amount else -t.amount end), 0)::numeric as held
+    from escrow_transaction t
+    where t.escrow_id = ${escrowId} and t.balance_type = 'held'
+      and ((t.type = 'credit' and t.reason = 'instalment')
+        or (t.type = 'debit' and t.reason in ('instalment_reversed', 'plan_capture', 'plan_forfeit', 'plan_release')))
+      ${registrationId ? sql`and t.related_registration_id = ${registrationId}` : sql``}`);
+  return Math.round(Number((r.rows[0] as { held: string } | undefined)?.held ?? 0) * 100) / 100;
+}
+
+export async function debitHeld(params: EscrowMutationParams, tx?: DbConn & Pick<typeof db, 'execute' | 'select'>): Promise<number> {
   const conn = tx ?? db;
   const account = await getOrCreateEscrow(params.studentId, conn);
+
+  // Read-then-write on the wallet (MA-06): the row is locked before the sums are read, so a
+  // debit of a line's deposits and any other held movement on the wallet run one after the other.
+  await conn.select({ id: escrow.id }).from(escrow).where(eq(escrow.id, account.id)).for('update');
+  const planDebit = (PLAN_HELD_DEBIT_REASONS as readonly string[]).includes(params.reason);
+  if (planDebit) {
+    // A plan's money: only that line's own deposits (never another line's, never a preregistration's).
+    if (!params.relatedRegistrationId) throw new Error('A plan debit names its line');
+    const line = await earmarkedHeld(conn, account.id, params.relatedRegistrationId);
+    if (line + 0.001 < params.amount) {
+      throw new Error(`Insufficient held deposits for this line. Held: ${line.toFixed(2)} EGP, requested: ${params.amount.toFixed(2)} EGP`);
+    }
+  } else {
+    // A preregistration's money: never the deposits earmarked for a plan's line.
+    const earmarked = await earmarkedHeld(conn, account.id);
+    const [w] = await conn.select({ held: escrow.heldBalance }).from(escrow).where(eq(escrow.id, account.id));
+    if ((w?.held ?? 0) - earmarked + 0.001 < params.amount) {
+      throw new Error(`Insufficient held balance. Requested: ${params.amount.toFixed(2)} EGP`);
+    }
+  }
 
   const [updated] = await conn
     .update(escrow)
@@ -255,6 +312,7 @@ export async function debitHeld(params: EscrowMutationParams, tx?: DbConn): Prom
     initiatedBy: params.initiatedBy,
     relatedRegistrationId: params.relatedRegistrationId || null,
     relatedPaymentId: params.relatedPaymentId || null,
+    relatedChargeId: params.relatedChargeId || null,
   });
 
   return updated.heldBalance;

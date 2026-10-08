@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, type Client,
+  admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, sessionName, subjectFeeIn, type Client,
+  reservationOf,
 } from './helpers';
 
 /**
@@ -9,14 +10,14 @@ import {
  * review of 682907a, flags 1 and 2).
  *
  * The coordinator's answer to "which board is it entered with?" moves the
- * subject's live registrations to each window's default series of the new
- * board. MO-10 holds across it: nothing moves into a series past its entry
- * deadline, or into one with another deadline than the entry's own. A
- * window's route for the subject (to a series of the old board) moves with
- * it, so a family is offered the subject and can register it.
+ * subject's items, with their live lines, to the new board's series of the
+ * same month and label (the reservations rework: a session's series are its
+ * items'; catalogue.services.ts boardChangeTarget). MO-10 holds across it,
+ * per line: nothing moves into a series past the line's deadline, or into one
+ * with another deadline than the line's own. The item moves with the subject,
+ * so a family is still offered it and can reserve it.
  *
- * Every window here is a draft (families preregister): no (type, level) pair
- * is held open.
+ * Every session here is a draft (families preregister).
  */
 
 const days = (n: number) => n * 24 * 60 * 60 * 1000;
@@ -29,20 +30,31 @@ describe('F0b: a board change and the entry deadline', () => {
   const subj: Record<string, string> = {};
   let fam: { parent: Client; student: Client; studentId: string };
 
-  /** A draft November IGCSE window feeding the given series; returns its id and series year. */
+  /** A draft winter IGCSE session; returns its id, series year, end and (derived) name. */
   const window = async (tag: string) => {
     const id = await session(adm, `November (IGCSE, board change ${tag})`, 'november', 'igcse', futureWindow());
     const w = await one<{ year: number; end: string }>(`select series_year as year, end_date as "end" from registration_session where id = $1`, [id]);
-    return { id, year: w.year, end: new Date(w.end) };
+    return { id, year: w.year, end: new Date(w.end), name: await sessionName(id) };
   };
+  const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  /** A November series of a board (exams in a year's time, so it takes reservations before any deadline is set). */
   const series = async (board: 'cambridge' | 'pearson_edexcel', year: number, label: string) =>
-    (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: board, month: 'november', year, label } }))).id;
-  const feed = (sessionId: string, series: { boardSeriesId: string; isDefault: boolean }[], routes: { subjectId: string; boardSeriesId: string }[] = []) =>
-    apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({ param: { id: sessionId }, json: { series, routes } }));
+    (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: board, month: 'november', year, label, examsStart: `${year + 1}-12-31` } }))).id;
+  /** The subject's item in the session placed in a series (the Session screen's series column). */
+  const place = async (sessionId: string, subjectId: string, boardSeriesId: string) => {
+    await subjectFeeIn(adm, boardSeriesId, subjectId);
+    const it = await one<{ id: string; offer_id: string }>(
+      `select i.id, i.offer_id from session_offer_item i join session_offer o on o.id = i.offer_id where i.session_id = $1 and o.subject_id = $2`, [sessionId, subjectId]);
+    await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
+      param: { id: sessionId, offerId: it.offer_id, itemId: it.id }, json: { boardSeriesId, reason: 'board change: the series it is entered in' },
+    }));
+    return it.id;
+  };
+  const itemSeries = async (itemId: string) => (await one<{ s: string }>(`select board_series_id as s from session_offer_item where id = $1`, [itemId])).s;
   const deadline = (id: string, entryDeadline: Date) =>
     apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id }, json: { entryDeadline, reason: 'board key dates published' } }));
   const prereg = async (sessionId: string, subjectId: string) =>
-    (await apiResponse(fam.parent.api.v1.registrations.preregister.$post({ json: { sessionId, subjectIds: [subjectId], studentId: fam.studentId } })))[0]!.id;
+    (await apiResponse(fam.parent.api.v1.registrations.preregister.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subjectId])), studentId: fam.studentId } })))[0]!.id;
   const toPearson = (subjectId: string) =>
     adm.api.v1.subjects[':id'].$put({ param: { id: subjectId }, json: { council: 'pearson_edexcel' } });
 
@@ -60,7 +72,7 @@ describe('F0b: a board change and the entry deadline', () => {
     const w = await window('passed');
     const cam = await series('cambridge', w.year, 'BC passed');
     const pea = await series('pearson_edexcel', w.year, 'BC passed');
-    await feed(w.id, [{ boardSeriesId: cam, isDefault: true }, { boardSeriesId: pea, isDefault: true }]);
+    await place(w.id, subj.PAS!, cam);
     const reg = await prereg(w.id, subj.PAS!);
     expect(await seriesOf(reg)).toBe(cam);
     // The window closed long ago; Cambridge's deadline is ahead, Pearson's has passed.
@@ -69,7 +81,7 @@ describe('F0b: a board change and the entry deadline', () => {
     await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [pea]);
     const r = await refused(toPearson(subj.PAS!));
     expect(r.status).toBe(400);
-    expect(r.error).toMatch(/^Pearson Edexcel November \d{4} \(BC passed\) is past its entry deadline \(.+\): Board change PAS cannot be moved into it in November \(IGCSE, board change passed\)$/);
+    expect(r.error).toMatch(new RegExp(`^Pearson Edexcel November \\d{4} \\(BC passed\\) is past its entry deadline \\(.+\\): Board change PAS cannot be moved into it in ${esc(w.name)}$`));
     expect(await councilOf(subj.PAS!)).toBe('cambridge');
     expect(await seriesOf(reg)).toBe(cam);
   });
@@ -78,13 +90,13 @@ describe('F0b: a board change and the entry deadline', () => {
     const w = await window('differs');
     const cam = await series('cambridge', w.year, 'BC differs');
     const pea = await series('pearson_edexcel', w.year, 'BC differs');
-    await feed(w.id, [{ boardSeriesId: cam, isDefault: true }, { boardSeriesId: pea, isDefault: true }]);
+    await place(w.id, subj.DIF!, cam);
     await deadline(cam, new Date(w.end.getTime() + days(10)));
     await deadline(pea, new Date(w.end.getTime() + days(20)));
     const reg = await prereg(w.id, subj.DIF!);
     const r = await refused(toPearson(subj.DIF!));
     expect(r.status).toBe(400);
-    expect(r.error).toMatch(/^In November \(IGCSE, board change differs\), Board change DIF is entered in Cambridge International November \d{4} \(BC differs\) \(entry deadline .+\) and would move to Pearson Edexcel November \d{4} \(BC differs\) \(entry deadline .+\): a board change keeps the entry deadline — give the two series the same deadline first$/);
+    expect(r.error).toMatch(new RegExp(`^In ${esc(w.name)}, Board change DIF is entered in Cambridge International November \\d{4} \\(BC differs\\) \\(entry deadline .+\\) and would move to Pearson Edexcel November \\d{4} \\(BC differs\\) \\(entry deadline .+\\): a board change keeps the entry deadline — give the two series the same deadline first$`));
     expect(await councilOf(subj.DIF!)).toBe('cambridge');
     expect(await seriesOf(reg)).toBe(cam);
   });
@@ -93,7 +105,7 @@ describe('F0b: a board change and the entry deadline', () => {
     const w = await window('same');
     const cam = await series('cambridge', w.year, 'BC same');
     const pea = await series('pearson_edexcel', w.year, 'BC same');
-    await feed(w.id, [{ boardSeriesId: cam, isDefault: true }, { boardSeriesId: pea, isDefault: true }]);
+    const item = await place(w.id, subj.SAM!, cam);
     const at = new Date(w.end.getTime() + days(10));
     await deadline(cam, at);
     await deadline(pea, at);
@@ -102,6 +114,9 @@ describe('F0b: a board change and the entry deadline', () => {
     expect(await councilOf(subj.SAM!)).toBe('pearson_edexcel');
     expect(await seriesOf(reg)).toBe(pea);
     await audited([reg], ['REGISTRATION_SERIES_MOVED']);
+    // Its item went with it (the line is always where its item is).
+    expect(await itemSeries(item)).toBe(pea);
+    await audited([item], ['OFFER_ITEM_SERIES_CHANGED']);
   });
 
   it("what the migration inferred is listed for staff to check, until they mark it checked (flag 5)", async () => {
@@ -112,8 +127,8 @@ describe('F0b: a board change and the entry deadline', () => {
     // offered, and a registered subject kept on its board and not offered.
     const w = await window('inferred');
     const pea = await series('pearson_edexcel', w.year, 'BC inferred');
-    await feed(w.id, [{ boardSeriesId: pea, isDefault: true }]);
     const sub = await subject(adm, 'BC-INF', 'Board change inferred', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
+    await place(w.id, sub, pea);
     const offered = await subject(adm, 'BC-OFF', 'Board change offered only', { course: 1000, registration: 400 }, { council: 'pearson_edexcel' });
     const kept = await subject(adm, 'BC-KEPT', 'Board change kept', { course: 1000, registration: 400 }, { council: 'oxford' });
     const reg = await prereg(w.id, sub);
@@ -168,44 +183,49 @@ describe('F0b: a board change and the entry deadline', () => {
     expect(after).toContain(other);
   });
 
-  describe("a window's route for the subject moves with it (flag 2)", () => {
-    it("the route to the old board's series is re-pointed to the new board's default: the subject is offered and registered there", async () => {
+  // Changed by the reservations rework (trail row "assertion"; not money): F0b's per-window routes
+  // are items placed in a series (§3.3). The flag-2 outcome stands — after a board change the
+  // subject is still offered, and reserved in a series of its new board — but an item with no
+  // lines moves freely (no checkout or refund was judged against its date), and a session never
+  // "feeds no series" of the new board: the series is created when the item lands in it.
+  describe("a subject's item moves with it (flag 2)", () => {
+    it("an item in a labelled series moves to the new board's series of that label: the subject is offered and reserved there", async () => {
       const w = await window('route');
-      const cam = await series('cambridge', w.year, 'BC route');
       const camRouted = await series('cambridge', w.year, 'BC route (routed)');
-      const pea = await series('pearson_edexcel', w.year, 'BC route');
-      await feed(w.id, [{ boardSeriesId: cam, isDefault: true }, { boardSeriesId: camRouted, isDefault: false }, { boardSeriesId: pea, isDefault: true }],
-        [{ subjectId: subj.RTE!, boardSeriesId: camRouted }]);
+      const peaRouted = await series('pearson_edexcel', w.year, 'BC route (routed)');
+      const item = await place(w.id, subj.RTE!, camRouted);
       await apiResponse(toPearson(subj.RTE!));
-      expect(await sql(`select board_series_id from session_subject_series where session_id = $1 and subject_id = $2`, [w.id, subj.RTE!])).toEqual([]);
-      await audited([w.id], ['SUBJECT_ROUTE_MOVED']);
-      const panel = await apiResponse(adm.api.v1.sessions[':id']['board-series'].$get({ param: { id: w.id } }));
-      expect(panel.subjects.find((x) => x.id === subj.RTE)).toMatchObject({ council: 'pearson_edexcel', entersIn: pea, routedTo: null });
-      // The family registers it: entered in Pearson's series, no board mismatch.
+      expect(await itemSeries(item)).toBe(peaRouted);
+      await audited([item], ['OFFER_ITEM_SERIES_CHANGED']);
+      const offers = await apiResponse(adm.api.v1.sessions[':id'].offers.$get({ param: { id: w.id } }));
+      const offered = offers.offers.find((o) => o.subjectId === subj.RTE);
+      expect(offered?.items.map((i) => i.boardSeriesId)).toEqual([peaRouted]);
+      // The family reserves it: entered in Pearson's series, no board mismatch.
       const reg = await prereg(w.id, subj.RTE!);
-      expect(await seriesOf(reg)).toBe(pea);
+      expect(await seriesOf(reg)).toBe(peaRouted);
     });
 
-    it('refused when the route would move to another deadline, or the window feeds no series of the new board', async () => {
+    it("refused when a line would move to another deadline; an item with no lines moves to a series made for the new board", async () => {
       const w = await window('route rules');
-      const cam = await series('cambridge', w.year, 'BC rules');
       const camRouted = await series('cambridge', w.year, 'BC rules (routed)');
-      const pea = await series('pearson_edexcel', w.year, 'BC rules');
-      await feed(w.id, [{ boardSeriesId: cam, isDefault: true }, { boardSeriesId: camRouted, isDefault: false }, { boardSeriesId: pea, isDefault: true }],
-        [{ subjectId: subj.RTD!, boardSeriesId: camRouted }]);
+      const peaRouted = await series('pearson_edexcel', w.year, 'BC rules (routed)');
+      const item = await place(w.id, subj.RTD!, camRouted);
       await deadline(camRouted, new Date(w.end.getTime() + days(10)));
-      await deadline(pea, new Date(w.end.getTime() + days(30)));
+      await deadline(peaRouted, new Date(w.end.getTime() + days(30)));
+      await prereg(w.id, subj.RTD!);
       const differs = await refused(toPearson(subj.RTD!));
-      expect(differs.error).toMatch(/^In November \(IGCSE, board change route rules\), Board change RTD is entered in Cambridge International November \d{4} \(BC rules \(routed\)\) \(entry deadline .+\) and would move to Pearson Edexcel November \d{4} \(BC rules\) \(entry deadline .+\): a board change keeps the entry deadline — give the two series the same deadline first$/);
-      expect((await one<{ s: string }>(`select board_series_id as s from session_subject_series where session_id = $1 and subject_id = $2`, [w.id, subj.RTD!])).s).toBe(camRouted);
+      expect(differs.error).toMatch(new RegExp(`^In ${esc(w.name)}, Board change RTD is entered in Cambridge International November \\d{4} \\(BC rules \\(routed\\)\\) \\(entry deadline .+\\) and would move to Pearson Edexcel November \\d{4} \\(BC rules \\(routed\\)\\) \\(entry deadline .+\\): a board change keeps the entry deadline — give the two series the same deadline first$`));
+      expect(await itemSeries(item)).toBe(camRouted);
+      expect(await councilOf(subj.RTD!)).toBe('cambridge');
 
       const v = await window('route none');
-      const cam2 = await series('cambridge', v.year, 'BC none');
       const cam2Routed = await series('cambridge', v.year, 'BC none (routed)');
-      await feed(v.id, [{ boardSeriesId: cam2, isDefault: true }, { boardSeriesId: cam2Routed, isDefault: false }], [{ subjectId: subj.RTN!, boardSeriesId: cam2Routed }]);
-      const none = await refused(toPearson(subj.RTN!));
-      expect(none.error).toMatch(/^November \(IGCSE, board change route none\) enters Board change RTN in Cambridge International November \d{4} \(BC none \(routed\)\) and feeds no Pearson Edexcel series — add one to the window first$/);
-      expect(await councilOf(subj.RTN!)).toBe('cambridge');
+      const item2 = await place(v.id, subj.RTN!, cam2Routed);
+      await apiResponse(toPearson(subj.RTN!));
+      expect(await councilOf(subj.RTN!)).toBe('pearson_edexcel');
+      // No Pearson series of that label: the board's own November series (made when not on record).
+      expect(await one(`select bs.board_code, bs.month, bs.year, bs.label from session_offer_item i join board_series bs on bs.id = i.board_series_id where i.id = $1`, [item2]))
+        .toEqual({ board_code: 'pearson_edexcel', month: 'november', year: v.year, label: '' });
     });
   });
 });

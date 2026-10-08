@@ -1,0 +1,147 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -1.1 ms (measured within 1 ms)
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [2e07cdaf-f153-432e-9f16-32e2782a9e2b] POST /api/auth/sign-up/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[email:stub] To: admin.t08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c734037f-9ba3-48ec-96be-b631d1dd6c04] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [efa7f796-8723-4f96-af62-f5426a97084f] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [95b5822e-ec64-4c0d-a1a7-d2e8d56c00bd] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [eb65da4a-885b-4757-be54-69bd29f47afd] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [d76135df-6f57-4a63-a871-dcf4b62e62d9] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [8c57c545-6a24-4f4c-8a04-88f6a70de468] POST /v1/teachers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [1a34a53b-fac9-4f7d-940c-f81522a996aa] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [ffb62fd4-a694-4578-aedc-6c277647b58c] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [672fcaae-c740-4064-ae83-d2bae6223a3e] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [73c0f658-b056-477c-ac11-c6e4cdaa1014] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [496f6a6a-f3f5-4894-95b1-8e16d787a51d] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [2d6d513e-e374-4ec6-b3bf-59aea6dc4507] POST /v1/sessions/484a41af-c253-42bb-a528-d25017640a59/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [ddcfec6b-b457-4bca-a881-5974cb01d7e5] POST /v1/sessions/d8ac583c-f08a-4dc5-b2d2-b9344463fbc2/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [ab2f637b-89e2-4c02-9d96-6dc381c2476a] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [f0452ee4-9c38-4d9c-93e7-4fc71dec4e03] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [73c2fcb1-a24e-4280-aee7-6e1965c95646] POST /v1/sessions/484a41af-c253-42bb-a528-d25017640a59/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[INFO] [e171c4c2-640b-4fa1-9d9f-1e62e2679d70] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[INFO] [d92da345-8d1d-418a-8bef-b1981560b4ac] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[INFO] [86981ccc-f6b5-497b-8c74-d45b159d58ee] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[INFO] [f63432e1-e75f-4956-89e8-1fa9099f113f] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[INFO] [a996c548-dc6a-4fce-806a-13a95fdf6f79] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[INFO] [1a45108f-ef67-4931-9e30-3d30e16395a4] POST /v1/sessions/484a41af-c253-42bb-a528-d25017640a59/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[INFO] [8e21f01e-c3bc-422f-bd6e-d6be8c262d9d] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[email:stub] To: parent.t08-ma-fr3s@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[email:stub] To: student.t08-ma-fr3s@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[INFO] [fdf38442-6e04-42fe-8575-6af349679268] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[INFO] [4bb3b8e6-92fb-4d7b-9f35-224ace0a5462] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[INFO] [f4c56ff2-5eca-4424-862f-b1bb2b8b28ee] POST /v1/sessions/484a41af-c253-42bb-a528-d25017640a59/board-series/move
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+[INFO] [bb0eb56e-7b4f-42fc-8973-686d7238d980] POST /v1/board-fees/e0ce9a30-fc3f-4acc-9d01-79bd87e4f434/confirm
+
+ ❯ test/08t-rework-races.test.ts (14 tests | 1 failed | 13 skipped) 2092ms
+   ↓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+   ↓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+   ↓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused
+   ↓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+   ↓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+   ↓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+   ↓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+   ↓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+   ↓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+   ↓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+   ↓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > an item's series change
+   × 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move 472ms
+     → expected +0 to be 1 // Object.is equality
+   ↓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > a board change
+   ↓ 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the session's series correction
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line > the admin's move
+AssertionError: expected +0 to be 1 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 0[39m
+
+ ❯ test/08t-rework-races.test.ts:425:23
+    423|         param: { id: s1 }, json: { registrationIds: [line!.id], boardS…
+    424|       }), to, await feeIdOf(to, sub));
+    425|       expect(cleared).toBe(1);
+       |                       ^
+    426|       expect(await lineState(line!.id)).toEqual({ s: to, p: false, pri…
+    427|       expect((await one<{ item: string }>(`select offer_item_id as ite…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 skipped (14)
+   Start at  04:48:44
+   Duration  3.86s (transform 518ms, setup 3ms, collect 254ms, tests 2.09s, environment 0ms, prepare 37ms)
+

@@ -3,9 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { apiResponse } from '@repo/validations';
-import {
-  admin, staff, onboard, signUp, signIn, subject, session, one, sql, openWindow, type Client,
-} from './helpers';
+import { admin, staff, onboard, signUp, signIn, subject, session, one, sql, openWindow, type Client, reservationOf } from './helpers';
 
 /**
  * Audit-trail completeness (security audit, RF-14 and RF-15).
@@ -62,7 +60,7 @@ describe('audit trail', () => {
 
   it('a desk registration with cash is audited before the desk gets its answer', async () => {
     const r = await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId, sessionId, subjectIds: [chem], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId, sessionId, ...(await reservationOf(sessionId, [chem])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }));
     const actions = (await rowsFor(studentId)).map((x) => x.action);
     expect(actions).toContain('DESK_REGISTRATION');

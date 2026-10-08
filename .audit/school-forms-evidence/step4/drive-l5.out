@@ -1,0 +1,103 @@
+admin@igcse.local → http://localhost:3000/admin/dashboard
+TEAM url: http://localhost:3000/admin/team
+TEAM:
+Team & Accounts
+
+Create accounts and assign roles. Anyone on the staff can also teach: link their account to a teacher record and they get the teaching screens for their own lessons.
+
+Name
+Email
+Temp. password
+Role
+Admin
+Finance Admin
+Finance Officer
+Coordinator
+Teacher
+Gate
+Parent
+Student
+Teaches as
+Does not teach
+New teacher record (this name)
+
+Runs the desk: payments, receipts and registrations on a family’s behalf.
+
+Create Account
+Staff
+Students
+Parents
+Name	Email	Role	Teaches as
+Finance Admin Rana	finadmin.rana@igcse.local	
+Admin
+Finance Admin
+Finance Officer
+Coordinator
+Teacher
+Gate
+Parent
+Student
+	
+No unlinked record
+
+Officer Mona	officer.mona@igcse.local	
+Admin
+Finance Admin
+Finance Officer
+Coordinator
+Teacher
+Gate
+Parent
+Student
+	
+No unlinked record
+
+School Admin	admin@igcse.local	
+Admin
+Finance Admin
+Finance Officer
+Coordinator
+Teacher
+Gate
+Parent
+Student
+	
+No unlinked record
+team buttons: Create Account | Staff | Students | Parents
+year options: 2025/26/2026/27/2027/28
+SERIES 2027/28:
+Every sitting of every board this academic year, with the dates the boards set. The entry deadline is the school's hard stop: past it, nothing more is entered, paid or confirmed for that series. Late-fee dates are shown for information.
+June 2028
+Series	Entry deadline	Late fee from	High late fee from	Windows feeding it	Registrations	Actions
+Cambridge International June 2028
+No entry deadline yet
+June 2028
+	0 confirmed	
+Dates
+DATES text: Board series |  | Every sitting of every board this academic year, with the dates the boards set. The entry deadline is the school's hard stop: past it, nothing more is entered, paid or confirmed for that series. Late-fee dates are shown for information. |  | Academic year | 2025/26 | 2026/27 | 2027/28 | 2028/29 |  | Add a series |  | Pearson Edexcel | Cambridge International | OxfordAQA | Month | Choose… | October 2027 | November 2027 | January 2028 | June 2028 | Label (only if the board runs two calendars that month) | Add the series | Series	Entry deadline	Late fee from	High late fee from	Windows feeding it	Registrations	Actions | Cambridge International June 2028 |  | Academic year 2027/28 |  | 	 | No entry deadline yet | 	—	—	 | June 2028 | 	0 confirmed	 | Close |  |  | Entry deadline — the school's hard stop | Deadline (your clock) | Retakes until (your clock) |  | Past it, every payment still unconfirmed for this series closes on its own (wallet money returne
+DATES inputs:
+0: select Academic year = 2025/26/2026/27/2027/28/2028/29
+1: select Month = Choose…/October 2027/November 2027/January 2028/June 2028
+2: input Label (only if the board runs two calendars that month) = 
+3: input[datetime-local] Deadline (your clock) = 
+4: input[datetime-local] Retakes until (your clock) = 
+5: input[date] Estimated entries due = 
+6: input[date] Late entry fee from = 
+7: input[date] High late fee from = 
+8: input[date] Late entries close = 
+9: input[date] Forecast grades due = 
+10: input[date] Coursework (NEA) marks due = 
+11: input[date] Access arrangements due = 
+12: input[date] Exams start = 
+13: input[date] Exams end = 
+14: input[date] Results released = 
+15: input[date] Certificates available = 
+16: input Notes = 
+DATES buttons: Pearson Edexcel | Cambridge International | OxfordAQA | Add the series | Close | Cancel | Save the dates
+shot 02-dates-dialog
+datetime inputs 2, date inputs 11
+save button: Save the dates
+ROW AFTER: Cambridge International June 2028 |  | Academic year 2027/28 |  | 	 | No entry deadline yet | 	—	—	 | June 2028 | 	0 confirmed	 | Close
+shot 03-series-after
+TOTAL: inputs 14 clicks 2
+ERRORS: none

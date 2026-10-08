@@ -1,0 +1,181 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: 0.2 ms (measured within 2 ms)
+stderr | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [8dcc2ab3-9d68-4118-b262-57697d51d111] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[email:stub] To: admin.n08v@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [6909dd1c-7060-46ba-bfb9-102e42e39d61] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [58059b7f-ede0-4561-9b78-f73b2572159e] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [c6c130a6-a3cd-48e2-b7f5-f3044462c6c9] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [263ddb63-fba5-4538-aa86-00d156b34289] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [a8854df8-f1e3-4768-95b6-94f9bffdf92f] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [691f5791-7b02-46c7-8dbd-09823ffeb8cf] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [7e9dfeba-9f9d-4ac1-879c-856c9e82cdb5] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [ff628bf7-b7b9-4fba-aea8-7d4e07794477] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [8649d227-80ad-45b2-992f-09b4d7288cc8] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [544e2018-a85e-4667-9126-22df2af3048a] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [ee6b5135-0e66-4961-b707-67c8b0865417] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [94231cfa-bdca-4e60-b7fb-9da77316f4e4] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [860277db-720c-4ec4-bab4-56d981c91610] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [200fb2a7-a8c8-465a-aa9c-63f3ece91ffe] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [b78aa781-021a-4d4b-bce2-2787fb49a350] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [8788bb3f-d447-4a8a-8ba8-a36092839c74] POST /v1/catalogue/units
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [e690f4e1-18b4-44e0-98d8-ac4893111498] POST /v1/catalogue/units
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [276e17a7-7a0a-4213-abfa-79b2ecdd4bfb] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [20aad3fa-eb4b-41d1-a676-4c1c941289e4] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [74c0b357-51e9-488a-973a-76002b0b2474] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [0d589c90-917e-473b-8a62-c4845445f38e] POST /v1/sessions/7d8e1ac5-90b5-4a24-a4c3-cbe2c6174726/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [302d0499-fb49-47b8-bef8-0461eb783e99] POST /v1/sessions/337ea9c1-5b1f-4ee9-a78b-4faaf4e0278a/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [a063df39-bafd-4f35-9a54-6a0c14120ab1] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[email:stub] To: parent.n08v-rtu-7gej@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[email:stub] To: student.n08v-rtu-7gej@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [4d3a20de-619f-4123-81de-fd1403f58155] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [51977daf-494c-4ffb-a1ea-689ce57360f2] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [375278c5-8ba1-458f-ba87-94a755cad873] GET /v1/academic/years
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [263dd54d-96c0-4d41-ab00-4b21f383c806] POST /v1/academic/years
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [557ab817-d5de-4499-845c-a55dda0ee943] POST /v1/enrolments/bulk
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+[INFO] [d329379b-ad7f-4a7a-9f72-d7f99a0b26aa] POST /v1/sessions/337ea9c1-5b1f-4ee9-a78b-4faaf4e0278a/offers/7e6922fe-1dfe-498f-817e-e1c51ac28509/replace-teacher
+
+ ❯ test/08n-session-offers.test.ts (37 tests | 1 failed | 36 skipped) 2077ms
+   ↓ 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+   ↓ 08n: sessions and offers > the next June copied from it: offers, teachers and items in the next year's series; board fees provisional; audited
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > an IGCSE item is refused in October and January; Cambridge AS defaults to November, Pearson AS to October
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a Cambridge retake of the previous June is reservable until the retake deadline after the entry deadline passed; a first entry is not; a retake of an older sitting is cut off at the entry deadline; the retake is due by the retake deadline
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a retake whose declared sitting the school rejected is a first entry for the board: its deadline is the entry deadline, not the retake deadline (§3.5)
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > the admin's move takes a retake into a series past its entry deadline while the retake deadline is ahead; a first entry not
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > the sweep at the retake deadline closes the waiting retakes of the previous sitting (MO-10 per line)
+   ↓ 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+   ↓ 08n: the line rules (§3.5) > AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can
+   ↓ 08n: the line rules (§3.5) > the same entry twice in one series across two sessions is refused: the board takes one entry
+   ↓ 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted
+   ↓ 08n: the line rules (§3.5) > a carried sitting outside the board's carry-forward period is refused (Cambridge: 13 months); inside it, accepted
+   ↓ 08n: the line rules (§3.5) > self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting
+   ↓ 08n: past a line's own deadline (flags 59, 60) > a family's drop of a paid line whose deadline passed is refused and sent to the desk; a series with no entry deadline is cut off at the start of its exams' day
+   ↓ 08n: the enrolment per unit (§3.2, §10: F1 reads it) > a line of an item entering units is enrolled per unit with its item's teacher; the teaching demand groups per unit
+   ↓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+   ↓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+   ↓ 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+   ↓ 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+   ↓ 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+   ↓ 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+   ↓ 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+   ↓ 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+   ↓ 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+   ↓ 08n: the reviews of 977848d and 40c1447 > an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)
+   ↓ 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+   ↓ 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+   ↓ 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+   ↓ 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+   ↓ 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+   ↓ 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+   × 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit) 441ms
+     → expected { lines: 1, items: +0, enrolments: 2 } to match object { lines: 1, enrolments: 1 }
+(1 matching property omitted from actual)
+   ↓ 08n: the reviews of 977848d and 40c1447 > the family's read lists as known earlier sittings the confirmed lines only: a dropped line was never sat
+   ↓ 08n: the reviews of 977848d and 40c1447 > Q-20: a late board entry (deadline.boardEntry) is that student's entry deadline while the setting is on — reservable, kept by the sweep, due by it; off, the board's deadline stands and the sweep closes the line
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher moves the enrolment of the units its lines enter, not the student's other units of the subject taught through another session (§2.11: per unit)
+AssertionError: expected { lines: 1, items: +0, enrolments: 2 } to match object { lines: 1, enrolments: 1 }
+(1 matching property omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "enrolments": 1,[39m
+[31m+   "enrolments": 2,[39m
+[2m    "lines": 1,[22m
+[2m  }[22m
+
+ ❯ test/08n-session-offers.test.ts:1253:15
+    1251|       param: { id: june, offerId: oj.id }, json: { fromTeacherId: both…
+    1252|     }));
+    1253|     expect(r).toMatchObject({ lines: 1, enrolments: 1 });
+       |               ^
+    1254|     expect(await enrolments()).toEqual([{ unit_id: u1, teacher_id: bot…
+    1255|     expect(await sql(`select id, teacher_id from registration where id…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 36 skipped (37)
+   Start at  05:32:30
+   Duration  3.61s (transform 478ms, setup 2ms, collect 196ms, tests 2.08s, environment 0ms, prepare 31ms)
+

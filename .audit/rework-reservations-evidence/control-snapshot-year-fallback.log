@@ -1,0 +1,61 @@
+# Trimmed under CLAUDE.md (Git): the vitest summary and, for a red run, the failing tests and their
+# messages; the request log of the run removed. Original: 129813 bytes, 1371 lines.
+
+ ❯ test/08o-reservation-lines.test.ts (19 tests | 1 failed) 14093ms
+   ✓ 08o: reservation lines (step B) > a family reserves in the app: one line per item with the entry chosen, both consents required and recorded, the refund steps frozen  669ms
+   × 08o: reservation lines (step B) > a converted session with no refund policy freezes its refund windows as dates: the session's own, else its academic year's 711ms
+   ✓ 08o: reservation lines (step B) > the price the page showed is the price charged: a line priced otherwise in between is refused, nothing made  417ms
+   ✓ 08o: reservation lines (step B) > a family declares a retake with its sitting: created when not on record, priced as a retake, listed to verify; a first entry names none  1058ms
+   ✓ 08o: reservation lines (step B) > a sitting the system knows is filled in and not listed to verify; its retake runs to the retake deadline  373ms
+   ✓ 08o: reservation lines (step B) > a dropped line is not a known sitting (it was never sat): a retake naming nothing is refused, naming it declares it and lists it to verify  446ms
+   ✓ 08o: reservation lines (step B) > the coordinator verifies: the line stands; a carry-forward from another centre records the previous centre and candidate number; answered once  680ms
+   ✓ 08o: reservation lines (step B) > rejected on an unpaid line: refused while a checkout is open; then it expires (declaration_rejected), the family is told, and may reserve a first entry  386ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line before the first-entry deadline: the line stands as paid with declaration_rejected (a first entry for F4), the family is told  335ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line after the first-entry deadline: dropped through the receipt-gated drop with today's refund  366ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line after its own deadline: the board fee the school has paid is kept, the rest refunded by the window  382ms
+   ✓ 08o: reservation lines (step B) > unverified at the deadline: entered as declared by default; under hold the sweep expires a waiting line and drops a paid one, once  1380ms
+   ✓ 08o: reservation lines (step B) > the school's grade-10 lines carry the school's consent; the family gives its own at checkout; a line without consent is never paid or confirmed  727ms
+   ✓ 08o: reservation lines (step B) > a swap's new line inherits the dropped line's consent and refund steps  1177ms
+   ✓ 08o: reservation lines (step B) > the teacher on a line: "no preference" assigned later; changed on a paid line the enrolment follows and the price does not; self-study is not re-priced  1093ms
+   ✓ 08o: reservation lines (step B) > the desk: reserve only; reserve and collect takes one payment per entry deadline, a provisional line reserved and collected once its fee is confirmed  815ms
+   ✓ 08o: reservation lines (step B) > the family's flow: a student asks, a parent approves and pays by series; the statement's numbers are the ledger's, one payment per entry deadline  408ms
+   ✓ 08o: reservation lines (step B) > the statement's outstanding is the Money tab's unpaid: a line awaiting the parent is not owed, an unfunded preregistration is  371ms
+   ✓ 08o: reservation lines (step B) > GET /registrations/available is gone: the Reserve pages read /registrations/offers 279ms
+ ❯ test/08o-reservation-lines.test.ts:215:40
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08o-reservation-lines.test.ts > 08o: reservation lines (step B) > a converted session with no refund policy freezes its refund windows as dates: the session's own, else its academic year's
+AssertionError: expected { kind: 'dates', windows: [] } to deeply equal { Object (kind, windows) }
+
+- Expected
++ Received
+
+  {
+    "kind": "dates",
+-   "windows": [
+-     {
+-       "endsAt": "2026-10-28T02:59:26.519Z",
+-       "percent": 30,
+-       "startsAt": "2026-10-07T02:59:26.519Z",
+-     },
+-   ],
++   "windows": [],
+  }
+
+ ❯ test/08o-reservation-lines.test.ts:215:40
+    213|       const yearly = await windowsOf('academic_year', year);
+    214|       expect(yearly.some((w) => w.percent === 30)).toBe(true);
+    215|       expect(await snapshotOf(lb!.id)).toEqual({ kind: 'dates', window…
+       |                                        ^
+    216|       expect((await apiResponse(fb.student.api.v1.sessions[':id']['ref…
+    217|     } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 passed (19)
+   Start at  05:59:21
+   Duration  15.79s (transform 524ms, setup 2ms, collect 198ms, tests 14.09s, environment 0ms, prepare 34ms)

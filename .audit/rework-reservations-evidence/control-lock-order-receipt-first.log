@@ -1,0 +1,52 @@
+# Trimmed under CLAUDE.md (Git): the vitest summary and, for a red run, the failing tests and their
+# messages; the request log of the run removed. Original: 72184 bytes, 774 lines.
+
+ ❯ test/08t-rework-races.test.ts (16 tests | 1 failed) 12450ms
+   ✓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line  599ms
+   ✓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused  470ms
+   ✓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused  458ms
+   ✓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it  1140ms
+   ✓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused  581ms
+   ✓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional  477ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it  605ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged  581ms
+   ✓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused  626ms
+   ✓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once  612ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the checkout first: it opens its payment, and the rejection is refused while it is open  580ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the rejection first: the line expires, and the checkout that waited is refused, no payment made  580ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > verified while its payment is confirmed: both land, the line paid and verified  608ms
+   × 08t: the rework races > a declared sitting answered while its line is being paid > a parent's approval of a drop against the coordinator's rejection of the same paid line > the approval first: the line is dropped, and the rejection that waited finds nothing to answer 1632ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > a parent's approval of a drop against the coordinator's rejection of the same paid line > the rejection first: the paid line stands as a first entry, then the approval drops it  628ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the hold step run by two schedulers at once drops a paid unverified line once  549ms
+ ❯ test/08t-rework-races.test.ts:506:26
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a declared sitting answered while its line is being paid > a parent's approval of a drop against the coordinator's rejection of the same paid line > the approval first: the line is dropped, and the rejection that waited finds nothing to answer
+AssertionError: expected 400 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 400
+
+ ❯ test/08t-rework-races.test.ts:506:26
+    504|         const [a, r] = await Promise.all([apr!, rej!]);
+    505|         expect(a.status).toBe(200);
+    506|         expect(r.status).toBe(409);
+       |                          ^
+    507|         expect(((await r.json()) as { error: string }).error).toBe('Th…
+    508|         expect(await after(id)).toEqual({ status: 'dropped', outcome: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+
+# The API's log lines naming the cause:
+params: 0b039a16-b58c-411f-ae7b-4596f4618266 | cause: deadlock detected
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 15 passed (16)
+   Start at  05:01:10
+   Duration  14.02s (transform 500ms, setup 2ms, collect 179ms, tests 12.45s, environment 0ms, prepare 32ms)

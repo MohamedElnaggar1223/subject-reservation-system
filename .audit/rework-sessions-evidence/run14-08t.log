@@ -1,0 +1,429 @@
+
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+> vitest run "test/08t"
+
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -0.2 ms (measured within 2 ms)
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [a3a4ab99-79a8-46f6-a02d-9b985ae5c8e1] POST /api/auth/sign-up/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[email:stub] To: admin.t08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [bb47497c-5568-4617-8737-024fb5a4438b] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [9db53542-7df2-4f10-9539-0e6f9f00b4cb] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [cf3311fd-92c4-4792-9956-12c7a124384c] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c2185115-744c-4cab-9eae-f42b1bb33eee] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [2dc45091-f4b1-4777-a1c1-36025a32de20] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [a9747a03-ff42-4b84-a695-fd6d3883159c] POST /v1/teachers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c5e00cba-d257-44cd-95ee-3b415ee86023] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [69974c93-0357-498d-be58-d4af1314825f] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [bfb58c9b-948d-4918-a577-486ffcf52534] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [b98ed57d-507f-4bd5-8dd9-ea32b0930547] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [a6c479d2-3fab-4136-b74a-70e6f5d55f09] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [0c76c45a-5661-44d5-96ae-b7d6f7ffc68a] POST /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [cb7d73b3-5393-4a62-8560-ad0f0b7c4881] POST /v1/sessions/c83975fd-63bd-4906-8dcb-643c7b32b8cd/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [60a1ac2a-37d3-47bc-8925-81ce49c67672] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [3e083452-b33e-4401-8139-f638170f7dd6] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [c5331b78-876c-4dfd-867c-4b671887d1bc] POST /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+[INFO] [685170e2-f960-4d23-a8a0-49bba0291264] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+[email:stub] To: parent.t08-desks-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+[email:stub] To: student.t08-desks-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+[INFO] [bc64ff90-6aaa-4e5a-8f8a-6201dde71d42] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+[INFO] [8d173380-6275-4e10-b439-ece9eca923e1] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+[INFO] [2cc94d9e-750d-4d5e-a80b-d24b64397e34] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+[INFO] [07e1b5fa-916b-4541-9ddb-d165032cadc9] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+[INFO] [d0120f4f-e8a7-40e3-a257-c50a183721fe] POST /v1/registrations/desk
+[INFO] [7442e9a5-e4a9-42b1-afda-bee701a730d1] POST /v1/registrations/desk
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+[INFO] [7d4e560c-3364-44d3-b081-1ffc86078e9d] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+[email:stub] To: parent.t08-once-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+[email:stub] To: student.t08-once-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+[INFO] [328e4660-aa63-4f89-aee9-780ca5dbd471] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+[INFO] [b4a6ffde-a0df-469d-8a0d-04399472fec9] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two items of one exclusive group at once: one line, the other refused
+[INFO] [973fe2f6-ea6f-4a52-a470-7219529eb172] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two items of one exclusive group at once: one line, the other refused
+[email:stub] To: parent.t08-group-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two items of one exclusive group at once: one line, the other refused
+[email:stub] To: student.t08-group-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two items of one exclusive group at once: one line, the other refused
+[INFO] [48e5b805-60e0-442e-ac20-27c36b65511b] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > two items of one exclusive group at once: one line, the other refused
+[INFO] [e9892848-1761-4ec0-a6ef-a6e45506057d] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[INFO] [21ea357e-5a30-4cc3-ab02-ff0f049561bf] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[INFO] [7dea1db3-b5e8-49be-9b1c-6d042d5fbda5] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[INFO] [ddfd29ab-6cc8-4cdf-a971-a6836f658fe9] POST /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[INFO] [60b2ae2a-921f-45d8-8e4d-30157c86642d] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[email:stub] To: parent.t08-close-a-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[email:stub] To: student.t08-close-a-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[INFO] [ef0c0ece-4713-41b0-9f87-a531bf6d44a8] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[INFO] [cd6afc05-7c42-422c-b08c-1ec22929cd8c] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[INFO] [c4306595-61c8-437f-b889-a8513a2ab274] PUT /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers/8ead8793-e775-48e8-b300-04f4231670d6/items/ee76bc44-33f2-4269-8af9-343093c40d63
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[INFO] [42db5e58-bab0-49f7-90d0-52d0b73f533a] PUT /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers/8ead8793-e775-48e8-b300-04f4231670d6/items/ee76bc44-33f2-4269-8af9-343093c40d63
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[INFO] [d713989b-8586-41b4-97d4-b71c40711f0a] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[email:stub] To: parent.t08-close-b-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[email:stub] To: student.t08-close-b-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[INFO] [95efa012-66bb-4d76-943a-a6dc9ee9e37f] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[INFO] [806ddf70-f761-4603-962a-6cdd549cb159] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+[INFO] [91a1470a-f955-4be7-8c22-9bb3e14e7370] PUT /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers/8ead8793-e775-48e8-b300-04f4231670d6/items/ee76bc44-33f2-4269-8af9-343093c40d63
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+[INFO] [6f4f6f63-6990-4363-a529-dc7711ce27db] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+[INFO] [b0929c70-c87b-4c40-ba53-128b6f7d9d58] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+[INFO] [30d80918-c00b-4ec2-afdf-fccd0462cb23] POST /v1/teachers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+[INFO] [977995de-91b4-49d7-9abf-accefb21ea6a] POST /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+[INFO] [0f054490-7259-4f58-a3b2-7a454e49f1dc] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+[email:stub] To: parent.t08-teacher-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+[email:stub] To: student.t08-teacher-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+[INFO] [38f01020-22f1-4510-8ea2-5cc6185a4b5f] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+[INFO] [a7daeaa7-245a-4621-9feb-3610192ce970] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+[INFO] [4c63b723-e82b-4de6-969a-e29bd7865a73] PUT /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers/c4d351eb-4947-4fc9-8335-3e2ba995144e
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [fd7a5bf5-a820-422d-8301-0b3c97cb9fea] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [4c44a7d8-9523-42f3-a2bd-18a18cf419a2] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [f7059881-1696-4066-8ead-0cdad9bc578a] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [5a5c238f-30d6-4110-b4c8-2a8e38e9b09e] POST /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [720eeddc-b3cb-473f-b34f-02cae5636c07] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[email:stub] To: parent.t08-fee-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[email:stub] To: student.t08-fee-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [613c50c2-f91d-4974-bdab-46cb17f24774] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [60d1d4ae-b1bc-4d3c-8c3f-d201d4ede2ce] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [e0f589d7-4bd5-4b9b-9127-da66d4475cc3] POST /v1/board-fees/57642ed6-1793-4e88-bbb8-5cb97e646a80/confirm
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+[INFO] [376038a6-1e19-455e-a1bc-b114564d1e82] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+[INFO] [e81980e7-dbcd-4331-ba24-23afac7a9ad6] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+[INFO] [c809878e-ca90-415e-a2ac-67a1cdfce80b] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+[INFO] [c27b3116-8fd9-46c6-a33e-9048be5bbd40] POST /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+[INFO] [d57b4cb1-0d8b-49a7-91c3-3ba788cf0040] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+[email:stub] To: parent.t08-rpa-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+[email:stub] To: student.t08-rpa-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+[INFO] [86176e44-b46d-4253-b8b6-4f140714808b] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+[INFO] [7f389790-c96d-4cc0-8149-75f51d92057c] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+[INFO] [9b216f72-496d-4c04-aacb-9fde8ce11400] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [566f64f8-2f71-47ed-8ee2-23d035ac8275] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [cfe8fa2e-02ff-4933-a96e-529ebf933494] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [b9377fcb-f1e6-494f-9daa-aa378045666f] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [a4139bd3-2ee7-48ea-a437-f6a6d83c2d94] POST /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [0a41c5c7-c6b0-4466-a655-97c39fee8351] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[email:stub] To: parent.t08-rpb-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[email:stub] To: student.t08-rpb-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [61358f6d-8c5f-4f78-8ade-bcbf2a60f606] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [00c469c7-7f8a-4bdc-94d1-088eb37d64dc] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+[INFO] [48a8faf6-8627-41a9-b1db-ecb8e7d16f18] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [8ed75592-284d-4cfc-95f0-98b0f7476d3c] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [34924075-f13c-4799-8102-945d1a6db354] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [88c03941-f59f-4613-968a-a6db81c9c0dc] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [cd26a5d5-5a5b-492d-ae20-464ef8210f5d] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [0668f4dd-a1a3-44db-8037-f37421505feb] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [4009bbf1-311f-49b8-8a1e-7ad4dae68115] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [f6d724a1-55db-445c-b6fd-75115df893db] POST /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [7199d41d-3ee2-483d-9a81-aefa72e6039e] POST /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [aebf370a-95e5-4121-b235-c2a4719be5f8] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[email:stub] To: parent.t08-series-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[email:stub] To: student.t08-series-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [a63de80a-dfdc-4018-8fa1-e1eba5d20534] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [d325b94b-a6b6-44a0-ae97-b1fe9548a1a9] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [c38ab70b-923a-4f22-b7ce-7670b065f823] POST /v1/payments/initiate
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+[INFO] [ffe381cc-ebbc-4b2f-9fc7-505f54dcdc28] PUT /v1/sessions/ad1c8ace-bac7-4d82-a554-13dbfd361782/offers/e685bdcc-432c-40da-8e1e-917d669db160/items/64ab9560-f456-423d-83d3-cfe8c55a3ca9
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[INFO] [b6745eea-220d-4368-a517-ac03c6812bf5] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[INFO] [1d403c6a-0d04-4828-8b20-343a1b88125d] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[INFO] [6ee4d164-f3eb-4a3c-bf41-fe5cdc21a1b9] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[INFO] [7fc8d834-1e4c-4930-bd0c-8c1b6cae60a7] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[INFO] [11f59228-846e-493d-b19a-9cd804084d3a] POST /v1/sessions/c8b9c52f-9a97-4196-8798-60901bb537f5/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[INFO] [eb06676f-dc37-465c-8656-7920b6e4f157] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[email:stub] To: parent.t08-cap-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[email:stub] To: student.t08-cap-gqtf@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[INFO] [28d050a3-e0a9-4ced-a668-cfe36aa7707b] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[INFO] [30348e35-4206-4bc5-8b0b-8feac0c04c79] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[INFO] [2e4a71f6-0b81-4fcc-bdb3-f9519111ad2f] POST /v1/registrations/preregister
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[INFO] [ad02c55c-1036-4be2-ae69-d831b4a9162b] POST /v1/payments/initiate
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[INFO] [94fcbd2e-1781-4630-af46-bc87187d0b74] POST /v1/payments/da12c39f-9a39-4b2f-8f0d-462bb010b7b7/confirm
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+[email:stub] To: parent.t08-cap-gqtf@test.local | Subject: Payment confirmed — June 2027 — t08c-gqtf | Attachments: receipt-da12c39f-9a39-4b2f-8f0d-462bb010b7b7.pdf
+
+ ❯ test/08t-rework-races.test.ts (10 tests | 2 failed) 7177ms
+   ✓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line  571ms
+   ✓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused  440ms
+   ✓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused  446ms
+   ✓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it  1029ms
+   ✓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused  635ms
+   ✓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional  495ms
+   × 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it 338ms
+     → A confirmed fee changes only by "Confirm" at the new amount (the lines priced from it are then re-priced or listed)
+   × 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged 320ms
+     → A confirmed fee changes only by "Confirm" at the new amount (the lines priced from it are then re-priced or listed)
+   ✓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused  599ms
+   ✓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once  686ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+Error: A confirmed fee changes only by "Confirm" at the new amount (the lines priced from it are then re-priced or listed)
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ setUp test/08t-rework-races.test.ts:238:7
+    236|       const [line] = await reserve(f.studentId, s1, [{ offerItemId: o.…
+    237|       // The board's fee changes (typed again, confirmed): the line re…
+    238|       await feeFor(s, sub, 650, false);
+       |       ^
+    239|       const feeId = (await one<{ id: string }>(`select id from board_f…
+    240|       const checkout = () => f.parent.api.v1.payments.initiate.$post({…
+ ❯ test/08t-rework-races.test.ts:246:43
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+Error: A confirmed fee changes only by "Confirm" at the new amount (the lines priced from it are then re-priced or listed)
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ setUp test/08t-rework-races.test.ts:238:7
+    236|       const [line] = await reserve(f.studentId, s1, [{ offerItemId: o.…
+    237|       // The board's fee changes (typed again, confirmed): the line re…
+    238|       await feeFor(s, sub, 650, false);
+       |       ^
+    239|       const feeId = (await one<{ id: string }>(`select id from board_f…
+    240|       const checkout = () => f.parent.api.v1.payments.initiate.$post({…
+ ❯ test/08t-rework-races.test.ts:270:43
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 8 passed (10)
+   Start at  01:02:37
+   Duration  8.81s (transform 484ms, setup 2ms, collect 179ms, tests 7.18s, environment 0ms, prepare 33ms)
+
+ ELIFECYCLE  Test failed. See above for more details.

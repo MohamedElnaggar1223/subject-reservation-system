@@ -1,0 +1,72 @@
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+> vitest run "test/08q-charges.test.ts"
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+
+[clock] database minus host: 0.5 ms (measured within 3 ms)
+ ❯ test/08q-charges.test.ts (42 tests | 1 failed) 22942ms
+   ✓ 08q: charges > the boards' services, as seeded: Cambridge 1, 1S, 2, 2S; Pearson's review, re-check, scripts, priority, cash-in and late cash-in; refunds in full until Q-21 is answered 15ms
+   ✓ 08q: charges > a cash-in charge, end to end > asked for by the family: requested, at the series' fee, not payable until the school accepts it 32ms
+   ✓ 08q: charges > a cash-in charge, end to end > paid in its own payment beside a line's, in one desk action: two payments, two receipts, both in the takings 73ms
+   ✓ 08q: charges > a cash-in charge, end to end > reversed as the registration payment is (MO-11): the charge payable again, its receipt void; paid again, the receipt reissued under a new number 46ms
+   ✓ 08q: charges > a cash-in charge, end to end > refunded to escrow by finance: at most what it cost, the paper back first, audited; never voided while paid 48ms
+   ✓ 08q: charges > a cash-in charge, end to end > two charges of different service deadlines are refused in one payment; the desk takes each in its own 73ms
+   ✓ 08q: charges > a cash-in charge, end to end > closed unpaid at its service deadline: its open payment failed, escrow back, the charge cancelled, the family told — once, however many sweeps run 69ms
+   ✓ 08q: charges > a Cambridge remark is priced per component at the AS rate from the series' grid; a changed grade refunds it by the service's rule (seeded full; a fixed deduction when set)  447ms
+   ✓ 08q: charges > the school fee pushed to families (point 8) > pushed to a list: a paid, a waived and an A-13 graduate skipped and listed; the others owe it by the date; a second push skips an open one 49ms
+   ✓ 08q: charges > the school fee pushed to families (point 8) > paid through the school-fee path: settled by that payment in its transaction; the payment reversed reopens it; the desk's collection settles it too; a waiver after the push cancels it 54ms
+   ✓ 08q: charges > the school fee pushed to families (point 8) > pushed to a grade: every student of that grade next year who owes it 294ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > week 3 of June: 50% of the course fee and the board fee (1,000); a later course start of the offer moves the anchor; refund.courseStart moves one student's 126ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > week 7 of a winter session: 0% of the course fee, and the board fee (500) 225ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a custom-priced line refunds its total by the course rule, never a board fee (1,200 at 50%: 600)  337ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a converted line refunds as V3 did: its session's windows, on the whole price (50%: 750)  359ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > past its line's deadline: the family is sent to the desk; the desk drops it, the board fee kept (sent), the paper back first  537ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a series with no entry deadline is cut off at its exams' start, and its board fee counts as sent from then  483ms
+   ✓ 08q: charges > payment.expireOverdueAfterDays: off by default; on, a line unpaid that long after its due date expires ("overdue") once, however many ticks run  334ms
+   ✓ 08q: instalment plans > refused: a provisional board fee, a checkout in progress, instalments that do not add up, a last date past the session's end; granted by finance only  425ms
+   ✓ 08q: instalment plans > three instalments into the held wallet, earmarked for the line, each with a deposit slip and in the day's takings; the line captured at the last in one payment from its deposits  537ms
+   ✓ 08q: instalment plans > a plan line is not sent back for approval by the parent, even with nothing paid yet  355ms
+   ✓ 08q: instalment plans > stopped in week 3 (50%): the school keeps min(deposits, price − the refund) and releases the rest — 1,000 paid: 500 kept; 500 paid: 500 kept; 300 paid: 300 kept; a paid drop that day gives 1,000 back  516ms
+   ✓ 08q: instalment plans > released in full by finance: every deposit back in escrow, the line still payable and paid normally  378ms
+   ✓ 08q: instalment plans > ended by an overdue expiry, by the student leaving, and by an instalment payment failing on a line no longer payable — each settled as a drop that day  724ms
+   ✓ 08q: instalment plans > the close spares a line whose last instalment is being checked; that instalment rejected after the close ends the plan (plan_ended); a line under a plan not spared is settled at the close  443ms
+   ✓ 08q: instalment plans > at the deadline: confirming the last instalment is refused, the sweep ends the plans and fails their open instalment payments; a plan that lapses is settled and its transfer refused at confirmation  495ms
+   ✓ 08q: instalment plans > an instalment payment that fails on a line still payable leaves the plan standing: the instalment is paid again  355ms
+   ✓ 08q: instalment plans > a line under a live plan keeps its price: a price exception on it is refused naming the plan; one granted before the plan and revoked after leaves it, and the capture pays it; a paid charge against a line keeps its price too  431ms
+   × 08q: instalment plans > only what paid toward the line keeps its price: a paid certificate split alone leaves it re-priceable, and so do the paid instalments of a plan released in full 359ms
+     → This line has been paid for or has a payment: its price stays — add a price adjustment or refund the difference instead
+   ✓ 08q: instalment plans > one plan per line: a second plan on a line whose plan was released in full is refused  351ms
+   ✓ 08q: instalment plans > the eligibility clean-up spares a line whose last instalment is being checked; the transfer rejected after it ends the plan (plan_ended)  378ms
+   ✓ 08q: instalment plans > the last instalment falls by the line's own deadline when it comes before the session's end  674ms
+   ✓ 08q: instalment plans > a late board entry (Q-20, the setting on) keeps a plan line's instalments payable after the board's date, and the last captures it  748ms
+   ✓ 08q: instalment plans > another line's preregistration capture leaves the plan's deposits alone; held money is never transferred to a sibling  825ms
+   ✓ 08q: instalment plans > a plan line is listed, not re-priced, when its board fee is confirmed at a new amount and re-priced — and its last instalment captures it  504ms
+   ✓ 08q: instalment plans > a plan line moved to another series with its item keeps its price there — and its last instalment captures it  516ms
+   ✓ 08q: the desk collects lines, charges and the year's school fee in one action > reserve and collect: the year's fee first (the gate asks for it), the lines, then the student's charges — each its own payment  378ms
+   ✓ 08q: the desk collects lines, charges and the year's school fee in one action > on the Student 360: a waiting line, a charge and the pushed fee in one action — the push settled by the fee's payment 55ms
+   ✓ 08q: the desk collects lines, charges and the year's school fee in one action > the fee alone; and when the rest cannot be taken, the fee stays collected and the rest is listed as not collected  619ms
+   ✓ 08q: the desk collects lines, charges and the year's school fee in one action > a session's charges: its lines' (an adjustment) and none of another's; each with the family it belongs to 22ms
+   ✓ 08q: a board service's provisional fee > a cash-in at a provisional fee is asked for and accepted but not paid; confirmed at another amount, the open charge follows it and is paid 64ms
+   ✓ 08q: a board service's provisional fee > with pricing.payOnProvisionalFee on, the school lets a provisional fee be paid 43ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08q-charges.test.ts > 08q: instalment plans > only what paid toward the line keeps its price: a paid certificate split alone leaves it re-priceable, and so do the paid instalments of a plan released in full
+Error: This line has been paid for or has a payment: its price stays — add a price adjustment or refund the difference instead
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08q-charges.test.ts:787:13
+    785|     await payAtDesk(f, [split.id]);
+    786|     expect(await statusOf('charge', split.id)).toBe('paid');
+    787|     expect((await apiResponse(discount(c!))).repriced).toEqual({ from:…
+       |             ^
+    788|     // A plan released in full: its paid instalment's money went back …
+    789|     const p = await plan(f, d!, [750, 750]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 41 passed (42)
+   Start at  07:36:39
+   Duration  24.69s (transform 553ms, setup 2ms, collect 212ms, tests 22.94s, environment 0ms, prepare 35ms)
+
+ ELIFECYCLE  Test failed. See above for more details.

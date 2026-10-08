@@ -1,0 +1,3 @@
+lines 16; wallets 1; sessions 9; waiting lines with an eligibility answer 9; live lines with a refund preview 13
+statuses: {'confirmed': 4, 'dropped': 1, 'expired': 2, 'pending_payment': 5, 'preregistered': 4}
+DIFFERENCES: 0

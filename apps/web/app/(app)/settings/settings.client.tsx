@@ -13,7 +13,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, ROLE_LABELS, WEEKDAY_LABELS, type Role } from '@repo/validations';
+import { apiResponse, ROLE_LABELS, WEEKDAY_LABELS, refundPolicySentence, RefundPolicySchema, type RefundPolicy, type Role } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { useI18n } from '~/lib/i18n';
@@ -28,6 +28,12 @@ const GROUPS: { id: string; title: string; hint: string }[] = [
   { id: 'calendar', title: 'Calendar', hint: 'The school week the calendar and the day’s lists build on.' },
   { id: 'catalogue', title: 'Exam catalogue', hint: 'How the school’s level codes are read from the units each entry covers.' },
   { id: 'import', title: 'Day-one import', hint: 'The coordinator’s answers every import’s review starts from.' },
+  { id: 'verification', title: 'Declared sittings', hint: 'What happens to a retake a family declared when the school has not verified it by the board’s deadline.' },
+  { id: 'pricing', title: 'Prices', hint: 'How a line’s price is made from the course fee and the board’s fee.' },
+  { id: 'payment', title: 'Payment', hint: 'When a line’s money is due.' },
+  { id: 'refund', title: 'Refunds', hint: 'What a new session’s refund policy is.' },
+  // Step C (RESERVATIONS_REWORK.md §3.7): what an exception may lift beyond the registry's own rules.
+  { id: 'exceptions', title: 'Exceptions', hint: 'What the school allows an exception to lift.' },
 ];
 
 /** The value as a person reads it. */
@@ -36,6 +42,11 @@ function describeValue(s: Setting, value: unknown): string {
   if (s.input === 'choice') return s.choices.find((c) => c.value === value)?.label ?? String(value);
   if (s.input === 'weekdays' && Array.isArray(value)) {
     return [...(value as number[])].sort((a, b) => a - b).map((d) => WEEKDAY_LABELS[d] ?? String(d)).join(', ');
+  }
+  if (s.input === 'number' && typeof value === 'number') return s.unit === 'percent' ? `${value}%` : s.unit === 'days' ? `${value} ${value === 1 ? 'day' : 'days'}` : String(value);
+  if (s.input === 'refundPolicy') {
+    const p = RefundPolicySchema.safeParse(value);
+    return p.success ? refundPolicySentence(p.data) : JSON.stringify(value);
   }
   return JSON.stringify(value);
 }
@@ -206,6 +217,21 @@ function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (save
                 })}
               </div>
             )}
+            {s.input === 'number' && (
+              <label className="inline-flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="number"
+                  aria-label={s.label}
+                  min={s.min ?? undefined}
+                  max={s.max ?? undefined}
+                  value={typeof draft === 'number' ? draft : ''}
+                  onChange={(e) => setDraft(e.target.value === '' ? null : Number(e.target.value))}
+                  className="w-28 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                {s.unit && <span>{s.unit === 'percent' ? '%' : 'days'}</span>}
+              </label>
+            )}
+            {s.input === 'refundPolicy' && <RefundPolicyEditor value={draft as RefundPolicy} onChange={setDraft} />}
           </fieldset>
 
           {s.key === 'eligibility.graduateRetakes' && s.value === true && draft === false && (
@@ -241,6 +267,62 @@ function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (save
           </div>
         </form>
       )}
+    </div>
+  );
+}
+
+/**
+ * A refund policy in weeks from the first lesson (the forms' "100% within 2 weeks, 50% in week 3,
+ * nothing after"): each step's last week and its share of the course fee; the last step runs on.
+ */
+function RefundPolicyEditor({ value, onChange }: { value: RefundPolicy; onChange: (v: RefundPolicy) => void }): React.JSX.Element {
+  const steps = value?.steps ?? [{ throughWeek: null, percent: 0 }];
+  const set = (next: RefundPolicy['steps']) => onChange({ steps: next });
+  const parsed = RefundPolicySchema.safeParse({ steps });
+  return (
+    <div className="space-y-2">
+      {steps.map((step, i) => {
+        const last = i === steps.length - 1;
+        return (
+          <div key={i} className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+            <input
+              type="number"
+              aria-label="Share of the course fee"
+              min={0}
+              max={100}
+              value={step.percent}
+              onChange={(e) => set(steps.map((x, j) => (j === i ? { ...x, percent: Number(e.target.value) } : x)))}
+              className="w-20 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+            />
+            <span>%</span>
+            {last ? <span>after that</span> : (
+              <>
+                <span>through week</span>
+                <input
+                  type="number"
+                  aria-label="Through week"
+                  min={1}
+                  max={104}
+                  value={step.throughWeek ?? ''}
+                  onChange={(e) => set(steps.map((x, j) => (j === i ? { ...x, throughWeek: Number(e.target.value) } : x)))}
+                  className="w-20 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+                />
+              </>
+            )}
+            {steps.length > 1 && (
+              <button type="button" className="text-xs text-muted-foreground underline hover:no-underline" onClick={() => {
+                const next = steps.filter((_, j) => j !== i);
+                set(next.map((x, j) => (j === next.length - 1 ? { ...x, throughWeek: null } : x)));
+              }}>Remove</button>
+            )}
+          </div>
+        );
+      })}
+      <button type="button" className="text-xs text-primary hover:underline" onClick={() => {
+        const prevWeek = steps.slice(0, -1).reduce((a, x) => Math.max(a, x.throughWeek ?? 0), 0);
+        set([...steps.slice(0, -1), { throughWeek: prevWeek + 1, percent: steps[steps.length - 1]!.percent }, { throughWeek: null, percent: 0 }]);
+      }}>Add a step</button>
+      <p className="text-xs text-muted-foreground">{parsed.success ? refundPolicySentence(parsed.data) : parsed.error.issues[0]?.message}</p>
     </div>
   );
 }

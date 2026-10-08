@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, money, audited, openWindow, futureWindow, academicYearOf, loneStudent, schoolToday,
-  runSessionRecovery, runSessionScheduler, holdRowLock, lockWaiters, notified, expireByHand, type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, money, audited, openWindow, futureWindow, academicYearOf, loneStudent, schoolToday, runSessionRecovery, runSessionScheduler, holdRowLock, lockWaiters, notified, expireByHand, type Client, reservationOf, swapTo } from './helpers';
 
 /**
  * State and time (state-and-time audit, STATE_AUDIT.md, finding ids ST-nn).
@@ -34,7 +31,7 @@ describe('state and time', () => {
   const family = (tag: string, grade: 10 | 11 | 12 = 11): Promise<Family> => onboard(officer, `st-${tag}`, grade);
   const deskCash = async (f: Family, subjectIds: string[]) =>
     apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f.studentId, sessionId, subjectIds, collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: f.studentId, sessionId, ...(await reservationOf(sessionId, subjectIds)), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }));
 
   beforeAll(async () => {
@@ -187,7 +184,7 @@ describe('state and time', () => {
   describe('a parent reverting an approval while checking out (ST-03)', () => {
     it('a revert arriving while the checkout holds the lock sees the checkout, and is refused', async () => {
       const f = await family('rv0');
-      const [id] = (await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId, subjectIds: [subj.S14!] } }))).map((r) => r.id) as [string];
+      const [id] = (await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subj.S14!])) } }))).map((r) => r.id) as [string];
       await apiResponse(f.parent.api.v1.registrations.approve.$put({ json: { registrationIds: [id] } }));
       // The checkout queues on the registration's lock; the revert arrives while it waits.
       const release = await holdRowLock('registration', id);
@@ -209,7 +206,7 @@ describe('state and time', () => {
       const f = await family('rv');
       // Sixteen races: the interleaving that breaks it is narrow, and one clean run proves little.
       const subjects = [3, 4, 5, 6, 7, 8, 9, 10, 15, 16, 17, 18, 19, 20, 21, 22].map((n) => subj[`S${n}`]!);
-      const requested = await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId, subjectIds: subjects } }));
+      const requested = await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId, ...(await reservationOf(sessionId, subjects)) } }));
       const ids = requested.map((r) => r.id);
       await apiResponse(f.parent.api.v1.registrations.approve.$put({ json: { registrationIds: ids } }));
       // Each registration races a checkout against a revert, the revert
@@ -242,7 +239,7 @@ describe('state and time', () => {
       const desk = await deskCash(f, [subj.S11!]);
       await apiResponse(f.parent.api.v1.registrations[':id'].drop.$post({ param: { id: desk.registrations[0]!.id }, json: { reason: 'setup for escrow' } }));
       expect(await escrowOf(f.studentId)).toBe(1500);
-      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [subj.S12!], studentId: f.studentId } })))[0]!.id;
+      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subj.S12!])), studentId: f.studentId } })))[0]!.id;
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 300 } }))).id!;
       expect(await escrowOf(f.studentId)).toBe(1200);
 
@@ -262,7 +259,7 @@ describe('state and time', () => {
 
     it('a checkout whose transfer is being checked keeps its registration through a withdrawal, as at a close', async () => {
       const f = await family('gr2', 12);
-      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [subj.S13!], studentId: f.studentId } })))[0]!.id;
+      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subj.S13!])), studentId: f.studentId } })))[0]!.id;
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
       await apiResponse(f.parent.api.v1.payments[':id']['instapay-reference'].$post({ param: { id: pay }, json: { reference: 'FT-ST-GR-2' } }));
       await apiResponse(adm.api.v1.students[':id'].leave.$post({ param: { id: f.studentId }, json: { kind: 'transferred', leftOn: schoolToday(), reason: 'left after the November entries' } }));
@@ -344,7 +341,7 @@ describe('state and time', () => {
     });
 
     it('can have a request approved, and another rejected, by the parent', async () => {
-      const requested = await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId, subjectIds: [subj.S1!, subj.S2!] } }));
+      const requested = await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subj.S1!, subj.S2!])) } }));
       const [keep, drop] = requested.map((r) => r.id) as [string, string];
       const approved = await apiResponse(f.parent.api.v1.registrations.approve.$put({ json: { registrationIds: [keep] } }));
       expect(approved.map((r) => r.status)).toEqual(['pending_payment']);
@@ -353,7 +350,7 @@ describe('state and time', () => {
     });
 
     it('a request left behind when the extension runs out can still be rejected, though no longer approved', async () => {
-      const [left] = (await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId, subjectIds: [subj.S5!] } }))).map((r) => r.id) as [string];
+      const [left] = (await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subj.S5!])) } }))).map((r) => r.id) as [string];
       await sql(`update exception set valid_until = now() - interval '1 minute' where student_id = $1 and type = 'deadline_extension'`, [f.studentId]);
       const approve = await refused(f.parent.api.v1.registrations.approve.$put({ json: { registrationIds: [left] } }));
       expect(approve.status).toBe(400);
@@ -383,7 +380,7 @@ describe('state and time', () => {
     it('a close interrupted before its finalisation is finished on the next tick, and only once', async () => {
       const s = await session(adm, 'January (AS, state and time, recovery)', 'january', 'as_level', { ...openWindow(), activate: true });
       const f = await family('rc1');
-      const waiting = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, subjectIds: [subj.S3!], studentId: f.studentId } })))[0]!.id;
+      const waiting = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, ...(await reservationOf(s, [subj.S3!])), studentId: f.studentId } })))[0]!.id;
       // The window closes, but the process stops before it is finalised.
       await sql(`update registration_session set status = 'closed', closed_at = now() where id = $1`, [s]);
       expect(await statusOf('registration', waiting)).toBe('pending_payment');
@@ -391,7 +388,7 @@ describe('state and time', () => {
       // Before the late finalisation, a student with a deadline extension registers and checks out.
       const late = await family('rc2');
       await extend(late.studentId, s);
-      const lateReg = (await apiResponse(late.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, subjectIds: [subj.S4!], studentId: late.studentId } })))[0]!.id;
+      const lateReg = (await apiResponse(late.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, ...(await reservationOf(s, [subj.S4!])), studentId: late.studentId } })))[0]!.id;
       const latePay = (await apiResponse(late.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [lateReg], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
 
       expect((await runSessionRecovery()).finalized).toBeGreaterThanOrEqual(1);
@@ -406,7 +403,7 @@ describe('state and time', () => {
     it('preregistrations an opening did not capture are captured on the next tick', async () => {
       const s = await session(adm, 'January (AS, state and time, capture)', 'january', 'as_level', futureWindow());
       const f = await family('rc3');
-      const pre = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: s, subjectIds: [subj.S5!], studentId: f.studentId } })))[0]!.id;
+      const pre = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: s, ...(await reservationOf(s, [subj.S5!])), studentId: f.studentId } })))[0]!.id;
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [pre], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
       await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay }, json: { instrumentUsed: 'cash' } }));
       const held = async () => money((await one<{ held: string }>(`select held_balance as held from escrow where student_id = $1`, [f.studentId])).held);
@@ -425,10 +422,10 @@ describe('state and time', () => {
       const s = await session(adm, 'January (AS, state and time, stranded)', 'january', 'as_level', { ...openWindow(), activate: true });
       const f = await family('rc4');
       const funded = await apiResponse(officer.api.v1.registrations.desk.$post({
-        json: { studentId: f.studentId, sessionId: s, subjectIds: [subj.S6!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+        json: { studentId: f.studentId, sessionId: s, ...(await reservationOf(s, [subj.S6!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
       }));
       await apiResponse(f.parent.api.v1.registrations[':id'].drop.$post({ param: { id: funded.registrations[0]!.id }, json: { reason: 'setup for escrow' } }));
-      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, subjectIds: [subj.S7!], studentId: f.studentId } })))[0]!.id;
+      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, ...(await reservationOf(s, [subj.S7!])), studentId: f.studentId } })))[0]!.id;
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 300 } }))).id!;
       expect(await escrowOf(f.studentId)).toBe(1200);
       // Its registration expired, but closing the payment failed.
@@ -446,7 +443,7 @@ describe('state and time', () => {
     it("a checkout made just before the close is kept for its reference even when the API's clock runs behind the database's", async () => {
       const s = await session(adm, 'January (AS, state and time, clock)', 'january', 'as_level', { ...openWindow(), activate: true });
       const f = await family('clock');
-      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, subjectIds: [subj.S8!], studentId: f.studentId } })))[0]!.id;
+      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, ...(await reservationOf(s, [subj.S8!])), studentId: f.studentId } })))[0]!.id;
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
       // The payment's time comes from Postgres; put the API's clock five seconds
       // behind it, as a drifting host or container clock can, for the close.
@@ -467,7 +464,7 @@ describe('state and time', () => {
     it("the scheduler's close stamps the same clock: a checkout made just before it is kept for its reference", async () => {
       const s = await session(adm, 'January (AS, state and time, clock scheduler)', 'january', 'as_level', { ...openWindow(), activate: true });
       const f = await family('clock-sched');
-      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, subjectIds: [subj.S9!], studentId: f.studentId } })))[0]!.id;
+      const reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: s, ...(await reservationOf(s, [subj.S9!])), studentId: f.studentId } })))[0]!.id;
       const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
       // The window's end passes (by the database's clock); the scheduler closes
       // it on its next tick while the API's clock runs five seconds behind.
@@ -490,7 +487,7 @@ describe('state and time', () => {
       const s = await session(adm, 'January (AS, state and time, clock swap)', 'january', 'as_level', { ...openWindow(), activate: true });
       const f = await family('clock-swap');
       const paid = (await apiResponse(officer.api.v1.registrations.desk.$post({
-        json: { studentId: f.studentId, sessionId: s, subjectIds: [subj.S10!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+        json: { studentId: f.studentId, sessionId: s, ...(await reservationOf(s, [subj.S10!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
       }))).registrations[0]!.id;
       // The swap runs while the API's clock is five seconds ahead: the new,
       // unpaid registration must still count as made before the close.
@@ -499,7 +496,7 @@ describe('state and time', () => {
       let swappedIn: string;
       try {
         swappedIn = (await apiResponse(f.parent.api.v1.registrations[':id'].swap.$post({
-          param: { id: paid }, json: { newSubjectId: subj.S11!, reason: 'clock check swap' },
+          param: { id: paid }, json: { line: await swapTo(paid, subj.S11!), reason: 'clock check swap' },
         }))).newRegistrationId;
       } finally {
         vi.useRealTimers();

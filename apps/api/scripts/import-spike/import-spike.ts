@@ -346,12 +346,16 @@ try {
     if (!r.series || !r.level) continue;
     const key = `${r.series.type}|${r.level}`;
     if (sessions.has(key)) continue;
+    // The reservations rework: a session is June or winter (its year: June's, or November's for a
+    // January series); the tab's series and level become its label, its name derived.
+    const labelYear = Number(r.series.label.slice(-4));
+    const winter = r.series.type !== 'june';
     const s = await attempt<{ id: string; status: string }>(adm.v1.sessions.$post({
       json: {
-        name: `${r.series.label} ${LEVEL_NAME[r.level]} (spike)`, sessionType: r.series.type, qualificationLevel: r.level,
-        // F0a: the series year is the one in the label ("November 2026").
-        seriesYear: Number(r.series.label.slice(-4)),
+        type: winter ? 'winter' : 'june', year: r.series.type === 'january' ? labelYear - 1 : labelYear,
+        label: `${r.series.type} ${LEVEL_NAME[r.level]} spike`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         startDate: new Date(Date.now() - day).toISOString(), endDate: new Date(Date.now() + 30 * day).toISOString(),
+        courseStartsOn: new Date(Date.now()).toISOString().slice(0, 10), paymentDueAt: new Date(Date.now() + 30 * day).toISOString(),
       },
     }));
     if (!s.ok) { note('session-refused', 'Session refused', `${r.series.label} ${LEVEL_NAME[r.level]}: ${s.error}`, r.row); sessions.set(key, ''); continue; }
@@ -396,24 +400,36 @@ try {
       bySession.set(sessionId, [...(bySession.get(sessionId) ?? []), r]);
     }
     for (const [sessionId, list] of bySession) {
+      // Since the reservations rework (step B) the desk takes lines — each subject's whole item,
+      // a self-study row as a retake (its sitting is not on the sheet, so the desk refuses it
+      // until one is named: counted below) — and the parent's consent, read and signed.
       const subjectIds: string[] = [];
-      const subjectOptions: Record<string, { teacherId?: string; takeOutsideSchool?: boolean }> = {};
+      type SpikeLine = { offerItemId: string; attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study'; teacherId?: string };
+      const lineOf = new Map<string, SpikeLine>();
       for (const r of list) {
         const sid = catalogue.get(`${r.level}|${r.subject}`);
         if (!sid) continue;
         if (subjectIds.includes(sid)) { note('duplicate-row', 'The same subject twice for one student and series', 'Registered once.', r.row); continue; }
+        const item = (await db.execute(sql`select i.id from session_offer_item i join session_offer o on o.id = i.offer_id
+          where o.session_id = ${sessionId} and o.subject_id = ${sid} and i.kind = 'whole' order by (i.availability = 'closed'), i.id limit 1`)).rows[0] as { id: string } | undefined;
+        if (!item) { note('not-offered', 'The subject is not offered in the session', 'Not registered.', r.row); continue; }
         subjectIds.push(sid);
         const tid = r.teacher ? teacherIds.get(r.teacher.toLowerCase()) : undefined;
-        subjectOptions[sid] = r.selfStudy ? { takeOutsideSchool: true } : tid ? { teacherId: tid } : {};
+        lineOf.set(sid, r.selfStudy
+          ? { offerItemId: item.id, attempt: 'retake', mode: 'self_study' }
+          : { offerItemId: item.id, attempt: 'first', mode: 'in_school', ...(tid ? { teacherId: tid } : {}) });
       }
       if (subjectIds.length === 0) continue;
-      const res = await attempt<{ registrations: { id: string }[] }>(officer.v1.registrations.desk.$post({ json: { studentId, sessionId, subjectIds, subjectOptions } }));
+      const consent = { refundPolicy: true, declaration: true } as const;
+      const res = await attempt<{ registrations: { id: string }[] }>(officer.v1.registrations.desk.$post({ json: { studentId, sessionId, lines: subjectIds.map((sid) => lineOf.get(sid)!), consent } }));
       if (res.ok) { registered += res.data.registrations.length; continue; }
       // Refused as a batch: try each subject alone, so every refusal is counted against its row.
       for (const r of list) {
         const sid = catalogue.get(`${r.level}|${r.subject}`);
         if (!sid) continue;
-        const one = await attempt<{ registrations: { id: string }[] }>(officer.v1.registrations.desk.$post({ json: { studentId, sessionId, subjectIds: [sid], subjectOptions: { [sid]: subjectOptions[sid] ?? {} } } }));
+        const line = lineOf.get(sid);
+        if (!line) continue;
+        const one = await attempt<{ registrations: { id: string }[] }>(officer.v1.registrations.desk.$post({ json: { studentId, sessionId, lines: [line], consent } }));
         if (one.ok) registered += one.data.registrations.length;
         else { refusedRegistrations.push({ row: r.row, error: one.error }); note(`registration-refused:${one.error}`, 'The desk refused a registration', one.error, r.row); }
       }
