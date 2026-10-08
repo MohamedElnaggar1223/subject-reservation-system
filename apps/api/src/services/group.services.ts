@@ -1040,12 +1040,14 @@ export async function followEnrolments(tx: Tx, changes: EnrolmentChange[], actor
         // How the new teacher teaches it (the offer's word, as forming reads it): online takes no room.
         const year = years.get(g.academicYearId)!;
         const delivery = to && g.subjectId ? (await offerDeliveries(year.startYear, [g.subjectId], sp))(g.subjectId, g.unitId, to) : g.delivery as 'in_school' | 'online';
+        const goesOnline = delivery !== g.delivery && delivery === 'online';
+        let draftLessonRoomsCleared = 0;
         if (delivery !== g.delivery) {
-          const online = delivery === 'online';
-          await sp.update(teachingGroup).set({ delivery, ...(online ? { roomId: null, roomType: null, roomFeatures: [] } : {}), updatedAt: new Date() }).where(eq(teachingGroup.id, g.id));
-          if (online) {
-            await sp.execute(sql`update ${timetableLesson} l set room_id = null, updated_at = now() from ${timetable} t
-              where l.timetable_id = t.id and t.status = 'draft' and l.group_id = ${g.id}`);
+          await sp.update(teachingGroup).set({ delivery, ...(goesOnline ? { roomId: null, roomType: null, roomFeatures: [] } : {}), updatedAt: new Date() }).where(eq(teachingGroup.id, g.id));
+          if (goesOnline) {
+            const cleared = await sp.execute(sql`update ${timetableLesson} l set room_id = null, updated_at = now() from ${timetable} t
+              where l.timetable_id = t.id and t.status = 'draft' and l.group_id = ${g.id} and l.room_id is not null returning l.id`);
+            draftLessonRoomsCleared = cleared.rows.length;
           }
         }
         // A group formed while it had no teacher takes its teacher's name.
@@ -1057,8 +1059,15 @@ export async function followEnrolments(tx: Tx, changes: EnrolmentChange[], actor
           await sp.update(teachingGroup).set({ name, updatedAt: new Date() }).where(eq(teachingGroup.id, g.id));
         }
         await syncDraftCards(sp, [g.id]);
-        await logAction(actorId, 'TEACHING_GROUP_UPDATED', 'teaching_group', g.id, { teacherId: nowTeacher, name: g.name, delivery: g.delivery },
-          { teacherId: to, teacherFrom: from, name, delivery, followed: 'enrolment', enrolmentIds: mine.map((c) => c.enrolmentId), coversLost: r.coversLost }, ctx, sp);
+        // The audit row says what the handover changed: the delivery, and (gone online) the room needs
+        // given up and how many draft lessons gave up their rooms.
+        await logAction(actorId, 'TEACHING_GROUP_UPDATED', 'teaching_group', g.id,
+          { teacherId: nowTeacher, name: g.name, delivery: g.delivery, roomId: g.roomId, roomType: g.roomType, roomFeatures: g.roomFeatures },
+          {
+            teacherId: to, teacherFrom: from, name, delivery,
+            ...(goesOnline ? { roomId: null, roomType: null, roomFeatures: [], draftLessonRoomsCleared } : {}),
+            followed: 'enrolment', enrolmentIds: mine.map((c) => c.enrolmentId), coversLost: r.coversLost,
+          }, ctx, sp);
         return { ...r, name };
       });
       if (done.ok) {

@@ -969,6 +969,11 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
       .toEqual({ delivery: 'online', room_type: null, room_id: null, room_features: [] });
     expect(await one(`select room_id from timetable_lesson where timetable_id = $1 and group_id = $2`, [v, gid['Bio solo']])).toEqual({ room_id: null });
     expect((await load(v)).engine.groups.find((x) => x.id === gid['Bio solo'])).toMatchObject({ noRoom: true });
+    // The handover's audit row says what it gave up: the room needs before, and the draft lesson whose room went.
+    expect(await one(`select previous_data->'delivery' as before, previous_data->'roomType' as room_type, previous_data->'roomId' as room_id, previous_data->'roomFeatures' as features,
+        new_data->'delivery' as after, new_data->'roomType' as new_room_type, new_data->'draftLessonRoomsCleared' as cleared
+      from audit_log where action = 'TEACHING_GROUP_UPDATED' and entity_id = $1 and new_data->>'followed' = 'enrolment'`, [gid['Bio solo']]))
+      .toEqual({ before: 'in_school', room_type: 'classroom', room_id: null, features: [], after: 'online', new_room_type: null, cleared: 1 });
   });
 
   it('a teacher who takes a group later in the term has their own rules judged for it from that day — unavailable then, over their periods a day — by the grid, a move, publishing and the generator alike', async () => {

@@ -870,7 +870,9 @@ schema. Each item, what was done, and its proof (08s6 unless named; controls in 
    offers with such an item (the subject's, from items entering no unit), so a later session's offer
    of the other unit, in school, no longer overrides a unit's online item (scenario; control RV5a). A
    whole group handed to its new teacher takes that teacher's delivery — online: its room needs and
-   its draft lessons' rooms go (scenario; control RV5b).
+   its draft lessons' rooms go (scenario; control RV5b). The reviewer's confirmation (b4ed39c) asked,
+   not blocking, that the handover's audit row say so: its previous data has the room id, type and
+   features, its new data the count of draft lessons whose rooms were cleared (scenario; RV5c).
 6. **A teacher who takes a group later in the term** has their unavailability and limits judged for
    it from that day: the model loads every such teacher's rules and gives the engine
    `teacherSpans`; the grid, a server move, publishing and the generator judge alike (scenario in
