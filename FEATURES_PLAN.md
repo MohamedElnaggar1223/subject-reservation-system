@@ -463,6 +463,16 @@ error states that say what to do; sentences, not codes; tables with sorting, fil
 and export; print layouts; performance (no screen waits on an unnecessary request). Before-and-
 after screenshots of every screen changed; a written checklist per screen.
 
+**Queued from the rework's step 4 check (8 Oct 2026, `.audit/school-forms-evidence/step4/measure-counts.json`):**
+a new session lists every active subject closed and shows the catalogue's self-study-only
+subjects to families at once (say which subjects families can see); the subject drawer has two
+forms with two Save buttons; "Dates not set" on a session is not a link to the Board Series page
+(where the next year's filter hides the series); the dates form's required reason is labelled
+"Why it changes" while a Notes field sits below; the family's Reserve page should preselect the
+only child and the only open session; the desk's parent-consent tick shows for lines the family
+reserved itself; the Arabic hydration warning from the language provider (pre-existing). Also
+from C: three hand-cast API responses in `desk.client.tsx` that predate the rework.
+
 ### F8 — The demo school and the walkthrough (last, after F6)
 
 The owner's request of 30 Sep 2026: once every feature and the UI audit are finished, an artifact

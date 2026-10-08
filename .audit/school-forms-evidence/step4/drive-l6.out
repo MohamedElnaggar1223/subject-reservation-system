@@ -1,0 +1,11 @@
+admin@igcse.local → http://localhost:3000/admin/dashboard
+teaches-as options: New teacher record (this name)
+TEAM after: Account created for teacher.a@lead.local. Share the temporary password with them directly. | Teacher A	teacher.a@lead.local	 | Teacher A
+shot 01-teacher-created
+date labels: Estimated entries due | Late entry fee from | High late fee from | Late entries close | Forecast grades due | Coursework (NEA) marks due | Access arrangements due | Exams start | Exams end | Results released | Certificates available
+shot 02-dates-filled
+after save (messages): Every sitting of every board this academic year, with the dates the boards set. The entry deadline is the school's hard stop: past it, nothing more is entered, paid or confirmed for that series. Late-fee dates are shown for information. | Series	Entry deadline	Late fee from	High late fee from	Windows feeding it	Registrations	Actions | No entry deadline yet | Entry deadline — the school's hard stop | Deadline (your clock) | Past it, every payment still unconfirmed for this series closes on its own (wallet money returned, families told) and every registration still waiting expires. It may fall while a session is still open: what is entered in this series stops at it, and the rest of the session goes on. A retake of the board's previous sitting runs to the retake date where the board gives one (Cambridge). Leave the deadline empty and the exams' start is the cut-off. | Say why the deadline changes (at least 5 characters) — it is recorded.
+ROW AFTER: Cambridge International June 2028 |  | Academic year 2027/28 |  | 	 | No entry deadline yet | 	—	—	 | June 2028 | 	0 confirmed	 | Close
+shot 03-after-save
+TOTAL: inputs 10 clicks 3
+ERRORS: none

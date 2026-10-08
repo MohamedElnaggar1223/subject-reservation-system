@@ -1,0 +1,35 @@
+parent.f1@lead.local → http://localhost:3000/approvals
+session options: Choose… / June 2028
+offer rows: 11
+ROWS: O.L. | Accounting Cambridge International | 	Whole subject | Environmental Management Cambridge International Self-study only (not taught this cycle) | 	Whole subject Self-study only (not taught this cycle) | French Cambridge International Self-study only (not taught this cycle) | 	Whole subject Self-study only (not taught this cycle) | Mathematics Cambridge International grade-10 core Self-study only (not taught this cycle) | 	Whole subject | Physics Cambridge International | 	Whole subject
+STEP register FAILED: TimeoutError: locator.check: Timeout 30000ms exceeded.
+STATEMENT:
+Statement
+
+Every line with its price and why, what is paid and what is still owed, and the payments — one per exam board deadline.
+
+Show ended lines (expired, rejected)
+Student F1
+
+Grade 11 · STU-20261008-A9B64
+
+Price
+
+EGP 0
+
+Paid
+
+EGP 0
+
+Outstanding
+
+EGP 0
+
+Escrow
+
+EGP 0
+
+Nothing reserved yet.
+shot 03-statement
+TOTAL: inputs 2 clicks 0
+ERRORS: none
