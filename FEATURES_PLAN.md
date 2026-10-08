@@ -125,7 +125,11 @@ next, then D. **Step 2 complete (8 Oct 2026, 06:36Z):** C's branch landed at b76
 Opus 5.5 passes; migrations 0041–0049 are on main's journal in stamp order. C finishes two
 follow-ups on its branch (the statement's charges with the no-double-count rule for instalments;
 the desk reservation taking the year's fee and the charges in one action). **Step 3 (D, messages
-and reminders) launched 8 Oct 06:40Z** on `feature/rework-messages`; then step 4 (the lead).
+and reminders) launched 8 Oct 06:40Z** on `feature/rework-messages`; then step 4 (the lead). **Step 4's end-to-end
+check done (8 Oct 08:04Z, main 9edefbb):** every flow driven from a bare template with no errors; the
+counts measured against RESERVATIONS_REWORK.md §11 (`.audit/school-forms-evidence/step4/`); seven
+observations queued under F6. **F4 and F7 resumed (08:20Z)** on the new model; F1 next, F2 after it,
+F8 last.
 
 ## 1. The features and their full scope
 
@@ -655,11 +659,11 @@ API and web ports):
 | F0a Core foundation | yes — docs/features/FOUNDATION.md | Opus 5.5, three rounds; lead review | 29 Sep 2026, `b747d47`, main CI 36613182503 green | owner questions in FOUNDATION §12; A-12/13/14 as settings |
 | F0b Catalogue, series, enrolment | yes — docs/features/CATALOGUE.md | Opus 5.5, three rounds (eleven flags, then six, then two); lead review | 30 Sep 2026, see the trail | owner questions in CATALOGUE §12; F1's 0040 collides with F0b's 0040 |
 | F1 Scheduling | **frozen 7 Oct** at 2c2a910 on `feature/scheduling` (the round-two fixes uncommitted on the agent's disk); resumes on the rework's session model (RESERVATIONS_REWORK.md §9) | Opus 5.5, round one applied (SCHEDULING.md §16); round two (30 Sep, session log) left three flags to fix on resumption: dated teacher clashes checked across intervals, carried covers re-checked after a change, lock and race tests for memberships and covers | | |
-| F4 Exam entries | | | | |
+| F4 Exam entries | frozen 7 Oct at ec7689b (CI green on 53fd152; the lead drove every screen 30 Sep); **resumed 8 Oct 2026 08:20Z** on the rework's model (RESERVATIONS_REWORK.md §9's F4 list) in worktree `agent-ae3ddd804d82aff1d` | Opus 5.5 implementer; reviewer after its push | | |
 | F2 Campus leave | | | | |
 | F5 Pathway advisor | | | | |
 | F3 Attendance | | | | |
-| F7 Day-one import | | | | |
+| F7 Day-one import | frozen 7 Oct at e58324b (gates green on 0036d64; fixing its review's flags, last flag 6); **resumed 8 Oct 2026 08:20Z** on the rework's model (§9's F7 list) in worktree `agent-acf43230a4e06e8b4` | Opus 5.5 implementer; reviewer after its push | | |
 | F6 UI audit | | | | |
 | F8 Demo school and walkthrough | | | | owner's request, 30 Sep 2026; after F6 |
 
