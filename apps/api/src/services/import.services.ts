@@ -98,39 +98,85 @@ export async function stageImport(data: CreateImportType, actor: Actor, ctx?: Au
   const fileHash = createHash('sha256').update(content.body).digest('hex');
   const id = randomUUID();
   await db.transaction(async (tx) => {
-    // The same file staged before: its review is carried over (the mapping, the fixes, the merges
-    // and skips), so running it again asks nothing new and makes nothing new.
-    const [earlier] = await tx.select().from(importBatch)
-      .where(and(eq(importBatch.fileHash, fileHash), eq(importBatch.kind, data.kind), sql`${importBatch.status} <> 'discarded'`))
-      .orderBy(desc(importBatch.createdAt)).limit(1);
-    const before = earlier ? await tx.select().from(importRow).where(eq(importRow.batchId, earlier.id)) : [];
-    const beforeAt = new Map(before.map((r) => [`${r.tab}|${r.rowNumber}`, r]));
+    // What staff decided on earlier files of this kind is carried over (review flag 3), so a file staged
+    // again — the same bytes, or the sheet re-exported with lines added — asks nothing new and makes
+    // nothing twice:
+    // - a line's fixes and decision go with what the line says (its cells, and which of several identical
+    //   lines it is), not where it sits, from the newest earlier file that has that line;
+    // - a person's decisions (name and phone chosen, merge, "different people", "one child", skip) go
+    //   with their email, from the newest earlier file that decided them;
+    // - the mapping comes from the same bytes staged before, or else — for the school's sheet — from the
+    //   newest earlier file with the same session tabs (the same names and titles: the same sheet
+    //   exported again). Another sheet, or another SCL or money file, starts from the defaults.
+    const earlier = await tx.select().from(importBatch)
+      .where(and(eq(importBatch.kind, data.kind), sql`${importBatch.status} <> 'discarded'`))
+      .orderBy(desc(importBatch.createdAt));
+    const sameBytes = earlier.find((b) => b.fileHash === fileHash) ?? null;
+    const sessionTabs = (tabs: { name: string; kind: string; title: string }[]) =>
+      JSON.stringify(tabs.filter((t) => t.kind === 'session').map((t) => [t.name, t.title]).sort());
+    const mine = sessionTabs(source.tabs);
+    const sameSheet = data.kind === 'school_sheet'
+      ? earlier.find((b) => sessionTabs(((b.source as { tabs?: { name: string; kind: string; title: string }[] } | null)?.tabs ?? [])) === mine) ?? null
+      : null;
+    const multiTab = (tabs: { kind: string }[]) => data.kind === 'school_sheet' && tabs.filter((t) => t.kind === 'session').length > 1;
+    const lineKeys = <T extends { tab: string; raw: [string, string][] }>(lines: T[], tabs: { kind: string }[]) => {
+      const seen = new Map<string, number>();
+      const byTab = multiTab(tabs);
+      return lines.map((l) => {
+        const base = `${byTab ? l.tab : '*'}|${JSON.stringify(l.raw.map(([, v]) => v))}`;
+        const n = (seen.get(base) ?? 0) + 1;
+        seen.set(base, n);
+        return { line: l, key: `${base}|${n}` };
+      });
+    };
+    const carriedRows = new Map<string, typeof importRow.$inferSelect>();
+    if (earlier.length) {
+      const all = await tx.select().from(importRow).where(inArray(importRow.batchId, earlier.map((b) => b.id)))
+        .orderBy(importRow.tab, importRow.rowNumber);
+      for (const b of earlier) {
+        const tabs = ((b.source as { tabs?: { kind: string }[] } | null)?.tabs ?? []);
+        for (const { line, key } of lineKeys(all.filter((r) => r.batchId === b.id), tabs)) {
+          const decided = Object.keys(line.edits ?? {}).length > 0 || line.decision !== null;
+          if (decided && !carriedRows.has(key)) carriedRows.set(key, line);
+        }
+      }
+    }
+    const settings = (sameBytes ?? sameSheet)?.settings ?? {};
     await tx.insert(importBatch).values({
       id, kind: data.kind, fileId: data.fileId, fileName: content.name, fileHash, status: 'staged',
-      source: { tabs: source.tabs } as Record<string, unknown>, settings: earlier?.settings ?? {}, createdBy: actor.id,
+      source: { tabs: source.tabs } as Record<string, unknown>, settings: settings as Record<string, unknown>, createdBy: actor.id,
     });
-    for (let i = 0; i < source.lines.length; i += 500) {
-      await tx.insert(importRow).values(source.lines.slice(i, i + 500).map((l) => {
-        const was = beforeAt.get(`${l.tab}|${l.rowNumber}`);
+    const keyed = lineKeys(source.lines, source.tabs);
+    for (let i = 0; i < keyed.length; i += 500) {
+      await tx.insert(importRow).values(keyed.slice(i, i + 500).map(({ line: l, key }) => {
+        const was = carriedRows.get(key);
         return {
           id: randomUUID(), batchId: id, tab: l.tab, rowNumber: l.rowNumber, raw: l.raw,
           edits: was?.edits ?? {}, decision: was?.decision ?? null, decisionNote: was?.decisionNote ?? null, decidedBy: was?.decidedBy ?? null,
         };
       }));
     }
-    if (earlier) {
-      const people = await tx.select().from(importPerson).where(eq(importPerson.batchId, earlier.id));
-      const decided = people.filter((p) => Object.keys(p.edits ?? {}).length || p.mergedInto || p.distinct || p.oneChild || p.decision === 'skip');
-      if (decided.length) {
-        await tx.insert(importPerson).values(decided.map((p) => ({
+    let carriedPeople = 0;
+    if (earlier.length) {
+      const people = await tx.select().from(importPerson).where(inArray(importPerson.batchId, earlier.map((b) => b.id)));
+      const order = new Map(earlier.map((b, i) => [b.id, i]));
+      const newest = new Map<string, typeof importPerson.$inferSelect>();
+      for (const p of people.sort((a, b) => order.get(a.batchId)! - order.get(b.batchId)!)) {
+        const decided = Object.keys(p.edits ?? {}).length || p.mergedInto || p.distinct || p.oneChild || p.decision === 'skip';
+        if (decided && !newest.has(`${p.role}|${p.key}`)) newest.set(`${p.role}|${p.key}`, p);
+      }
+      if (newest.size) {
+        await tx.insert(importPerson).values([...newest.values()].map((p) => ({
           id: randomUUID(), batchId: id, role: p.role, key: p.key, edits: p.edits, mergedInto: p.mergedInto, distinct: p.distinct,
           oneChild: p.oneChild, decision: p.decision, updatedBy: actor.id,
         })));
       }
+      carriedPeople = newest.size;
     }
     await logAction(actor.id, 'IMPORT_STAGED', 'import', id, null, {
       kind: data.kind, fileId: data.fileId, fileName: content.name, lines: source.lines.length,
-      tabs: source.tabs.map((t) => ({ name: t.name, kind: t.kind, lines: t.lines })), reviewCarriedFrom: earlier?.id ?? null,
+      tabs: source.tabs.map((t) => ({ name: t.name, kind: t.kind, lines: t.lines })), reviewCarriedFrom: (sameBytes ?? sameSheet)?.id ?? null,
+      carried: { lines: keyed.filter(({ key }) => carriedRows.has(key)).length, people: carriedPeople, mappingFrom: sameBytes ? 'the same file' : sameSheet ? 'the same sheet exported again' : null },
     }, ctx, tx);
   });
   await refreshSummary(id);
@@ -230,8 +276,12 @@ export async function updateImportPerson(batchId: string, data: UpdateImportPers
   if (data.mergedInto) {
     if (data.mergedInto === data.key) throw new ImportError('A person cannot be merged into themself');
     const into = view.people.find((p) => p.role === data.role && p.key === data.mergedInto);
+    // Or into an account already in the system, of the same role (a child imported before under another email).
+    const account = !into && data.mergedInto.includes('@')
+      ? (await db.select({ id: user.id }).from(user).where(and(sql`lower(${user.email}) = ${data.mergedInto.toLowerCase()}`, eq(user.role, data.role))))[0]
+      : undefined;
     // Only into someone who is not merged themself: no chain turns back on itself.
-    if (!into || into.mergedInto) throw new ImportError('Merge into a person of this import who is not merged into someone else', 404);
+    if ((!into && !account) || into?.mergedInto) throw new ImportError('Merge into a person of this import who is not merged into someone else, or into an account of the same kind', 404);
   }
   await db.transaction(async (tx) => {
     const [batch] = await tx.select().from(importBatch).where(eq(importBatch.id, batchId)).for('update');

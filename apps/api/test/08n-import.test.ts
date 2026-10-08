@@ -3,7 +3,7 @@ import { apiResponse, academicYearStartOf, academicYearShortLabel, seriesYearInA
 import {
   app, admin, staff, onboard, subject, session, feedSeries, refused, one, sql, audited, openWindow, holdRowLock, lockWaiters, waitFor, type Client,
 } from './helpers';
-import { schoolSheet, sclRoster, moneyRecord, workbook, zip, serial, years, D, type Cell } from './import-fixtures';
+import { schoolSheet, sclRoster, moneyRecord, workbook, zip, serial, years, liveTabRows, historyTabRows, rosterTabRows, D, type Cell } from './import-fixtures';
 
 /**
  * F7 — the day-one import (FEATURES_PLAN.md F7; IMPORT_SPIKE.md).
@@ -473,6 +473,55 @@ describe('F7: the day-one import', () => {
       expect(out.result.sectionsCreated).toEqual([]);
       expect(await snapshot()).toEqual(before);
     });
+
+    it('the same sheet re-exported with one extra line keeps every decision and duplicates nothing', async () => {
+      const before = await snapshot();
+      // Another file (another hash): the November tab has one more line at its end, a subject Bassem had not taken.
+      const live = liveTabRows();
+      live.push(['Bassem Nour', '11G', 'O.L.', 'Computer Science', 'Mr Karim', serial(years().november, 11), '010 3333 3333', `bassem${D}`, 'Rania Nour', `rania${D}`, 1044444444, 'I confirm my registration', 'No', '']);
+      const file = workbook([{ name: '2024', rows: live }, { name: 'Sheet1', rows: historyTabRows() }, { name: 'S1', rows: rosterTabRows() }]);
+      const id = await stage(coordinator, file, 'Nov registration (re-exported).xlsx', 'school_sheet');
+      const v = await fetchView(coordinator, id);
+      expect(v.batch.sameFileBefore).toEqual([]);
+      // The earlier files' decisions, found by what each line says: the typed email, the split, the parent's own
+      // email, the class, the confirmed link, the skip; the merge by email; the mapping.
+      expect(rowAt(v, '2024', 13).data).toMatchObject({ studentEmail: `farid${D}` });
+      expect(rowAt(v, '2024', 15).data).toMatchObject({ studentEmail: `omar.mostafa${D}` });
+      expect(rowAt(v, '2024', 18).data).toMatchObject({ parentEmail: `said${D}` });
+      expect(rowAt(v, '2024', 20).edits).toMatchObject({ classGrade: '11F', parentEmail: `ezz.nader${D}` });
+      expect(rowAt(v, '2024', 7).edits).toMatchObject({ confirmLink: true });
+      expect(rowAt(v, '2024', 19)).toMatchObject({ decision: 'skip', decisionSource: 'staff' });
+      expect(person(v, 'student', `karim.l${D}`).mergedInto).toBe(`karim.lotfy${D}`);
+      expect(v.settings.carryForward).toBe('result');
+      expect(v.summary).toMatchObject({ heldFamilies: 0 });
+      expect(rowAt(v, '2024', 22).plan).toMatchObject({ student: 'match', links: ['exists'], enrolment: 'create', registration: 'history' });
+      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }));
+      expect(out.result.created).toEqual({ students: 0, parents: 0, links: 0, sectionPlaces: 0, enrolments: 1, history: 1, registrations: 0, money: 0 });
+      expect(await snapshot()).toEqual({ ...before, enrolments: before.enrolments + 1, history: before.history + 1 });
+    });
+
+    it('a child under a new email who is already an account in the system holds the family until staff say which', async () => {
+      const before = await snapshot();
+      const file = workbook([{ name: 'Again', rows: [
+        [`Nov. ${Y} Session`],
+        ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', '', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''],
+        ['Karim Lotfy', '11J', 'O.L.', 'Combined Science', 'Ms Salma', serial(Y, 11), 1017171717, `karim.lotfy2${D}`, 'Lotfy Hassan', `lotfy${D}`, 1018181818, 'I confirm my registration', 'No'],
+      ] }]);
+      const id = await stage(coordinator, file, 'karim-again.xlsx', 'school_sheet');
+      let v = await fetchView(coordinator, id);
+      const k = person(v, 'student', `karim.lotfy2${D}`);
+      expect(k.problems.find((p) => p.code === 'duplicate_account')).toMatchObject({ severity: 'error', detail: `Karim Lotfy (karim.lotfy${D}): the same name and parent` });
+      expect(k.possibleAccounts.map((a) => a.email)).toEqual([`karim.lotfy${D}`]);
+      expect(v.families.find((f) => f.students.includes(`karim.lotfy2${D}`))!.status).toBe('held');
+      // Staff say it is him: his line joins the account already in the system.
+      await putPerson(coordinator, id, { role: 'student', key: `karim.lotfy2${D}`, mergedInto: `karim.lotfy${D}` });
+      v = await fetchView(coordinator, id);
+      expect(rowAt(v, 'Again', 3).plan).toMatchObject({ student: 'match', links: ['exists'] });
+      expect(v.summary.heldFamilies).toBe(0);
+      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }));
+      expect(out.result.created).toMatchObject({ students: 0, parents: 0, links: 0 });
+      expect(await snapshot()).toEqual({ ...before, history: before.history + 1, enrolments: before.enrolments + 1 });
+    });
   });
 
   describe('registrations in an open window, routed to their board series (the admin\'s)', () => {
@@ -629,19 +678,20 @@ describe('F7: the day-one import', () => {
   });
 
   describe('the interim retake rule: imported history is a sitting only if its series had ended when it was committed', () => {
-    let juneWindow: string, subjectN: string, level: 'igcse' | 'as_level' | 'a_level';
+    let juneWindow: string, subjectN: string, level: 'igcse' | 'as_level' | 'a_level', wtype: 'june' | 'january';
     const code = () => (level === 'igcse' ? 'O.L.' : level === 'as_level' ? 'A.S.' : 'A.2.');
     const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
     const row = (self: 'Yes' | 'No'): Cell[] => ['Nov Hist', '11K', code(), 'Interim Subject N', self === 'Yes' ? '' : 'Mr Live', '01048484848', `nov.hist${D}`, 'Nov Hist Parent', `nov.hist.parent${D}`, '01049494949', 'I confirm my registration', self];
 
     beforeAll(async () => {
-      // A June window of the academic year Y (the June Y+1 series), at a level no earlier suite holds open.
-      const taken = new Set((await sql<{ k: string }>(`select qualification_level as k from registration_session where status = 'active' and session_type = 'june'`)).map((r) => r.k));
-      const free = (['igcse', 'as_level', 'a_level'] as const).find((l) => !taken.has(l));
-      if (!free) throw new Error('08n needs one level with no open June window');
-      level = free;
+      // A window after November Y in the academic year Y — June Y+1, or January Y+1 when every June level is
+      // held open by an earlier suite — at a type and level no earlier suite holds open.
+      const taken = new Set((await sql<{ k: string }>(`select session_type || '/' || qualification_level as k from registration_session where status = 'active'`)).map((r) => r.k));
+      const free = ([['june', 'igcse'], ['june', 'as_level'], ['june', 'a_level'], ['january', 'as_level'], ['january', 'a_level']] as const).find(([t, l]) => !taken.has(`${t}/${l}`));
+      if (!free) throw new Error('08n needs a June or January window type and level with none open');
+      [wtype, level] = free;
       subjectN = await subject(adm, 'IMP-INT-N', 'Interim Subject N', { course: 1000, registration: 500 }, { qualificationLevel: level });
-      juneWindow = await session(adm, 'June window (interim rule)', 'june', level, { ...openWindow(), activate: true, seriesYear: Y + 1 });
+      juneWindow = await session(adm, 'Window after November (interim rule)', wtype, level, { ...openWindow(), activate: true, seriesYear: Y + 1 });
       // November Y, imported as history by the coordinator.
       const id = await stage(coordinator, workbook([{ name: 'Nov', rows: [[`Nov. ${Y} Session`], header, row('No')] }]), 'nov-history.xlsx', 'school_sheet');
       expect((await putSettings(coordinator, id, { enrol: false, createSections: false })).status).toBe(200);
@@ -658,20 +708,21 @@ describe('F7: the day-one import', () => {
       return officer.api.v1.registrations.desk.$post({ json: { studentId: st.id, sessionId: juneWindow, subjectIds: [subjectN], subjectOptions: { [subjectN]: { takeOutsideSchool: true } } } });
     };
     const reviewSays = async () => {
-      const id = await stage(adm, workbook([{ name: 'June', rows: [[`June ${Y + 1} Session`], header, row('Yes')] }]), 'june-self.xlsx', 'school_sheet');
-      expect((await putSettings(adm, id, { series: { [`june-${Y + 1}-${level}`]: { mode: 'window', sessionId: juneWindow } }, enrol: false, createSections: false })).status).toBe(200);
-      const code = rowAt(await fetchView(adm, id), 'June', 3).problems.find((p) => p.code.startsWith('self_study'))!.code;
+      const month = wtype === 'june' ? 'June' : 'January';
+      const id = await stage(adm, workbook([{ name: 'Later', rows: [[`${month} ${Y + 1} Session`], header, row('Yes')] }]), 'after-november-self.xlsx', 'school_sheet');
+      expect((await putSettings(adm, id, { series: { [`${wtype}-${Y + 1}-${level}`]: { mode: 'window', sessionId: juneWindow } }, enrol: false, createSections: false })).status).toBe(200);
+      const code = rowAt(await fetchView(adm, id), 'Later', 3).problems.find((p) => p.code.startsWith('self_study'))!.code;
       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
       return code;
     };
 
-    it('committed while November was still running: not a sitting before June, at the desk or in the review', async () => {
+    it('committed while November was still running: not a sitting before the later window, at the desk or in the review', async () => {
       await committedOn(`${Y}-11-15T10:00:00Z`);
       expect(await refused(deskOutside())).toEqual({ status: 400, error: 'Subjects can only be taken outside school when retaking or when the school does not offer them' });
       expect(await reviewSays()).toBe('self_study_on_taught');
     });
 
-    it('committed after November had ended: a past sitting, so June is a retake outside school at the outside rate', async () => {
+    it('committed after November had ended: a past sitting, so the later window takes it as a retake outside school at the outside rate', async () => {
       await committedOn(`${Y}-12-01T10:00:00Z`);
       expect(await reviewSays()).toBe('self_study_retake');
       const made = await apiResponse(deskOutside());
@@ -739,6 +790,20 @@ describe('F7: the day-one import', () => {
       expect(v.rows.filter((r) => r.decision === 'import').every((r) => codes(r).includes('already_imported'))).toBe(true);
       await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: again } }));
       expect(await snapshot()).toEqual({ ...before, money: before.money + 2 });
+    });
+
+    it('the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out', async () => {
+      const before = await snapshot();
+      const [header, ...lines] = moneyRecord().trimEnd().split('\n');
+      const file = [header, `amir${D},${Y}-10-01,250,in,payment,,cash,R-0000,November ${Y},Computer Science,`, ...lines].join('\n') + '\n';
+      const id = await stage(coordinator, file, 'money-record (2).csv', 'money_record');
+      const v = await fetchView(coordinator, id);
+      // Every later line moved down one: what staff decided goes with what the line says, not where it sits.
+      expect(v.rows.find((r) => r.rowNumber === 5)).toMatchObject({ decision: 'skip', decisionSource: 'staff' });
+      expect(v.rows.filter((r) => r.decision === 'import').map((r) => [r.rowNumber, r.plan.money])).toEqual([[2, 'create'], [3, 'exists'], [4, 'exists']]);
+      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }));
+      expect(out.result.created).toMatchObject({ money: 1 });
+      expect(await snapshot()).toEqual({ ...before, money: before.money + 1 });
     });
 
     it('the import cannot make a payment: the code that commits it touches no payment, escrow or receipt table', async () => {
@@ -866,18 +931,19 @@ describe('F7: the day-one import', () => {
   });
 
   describe('a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder', () => {
-    const sheet = (tag: string, teacher: string) => workbook([{
+    // Each file's families have their own phones: a parent with another's phone is a possible duplicate.
+    const sheet = (tag: string, teacher: string, n: number) => workbook([{
       name: 'Stale', rows: [
         [`Nov. ${Y} Session`],
         ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', '', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''],
-        ...[1, 2].map((i): Cell[] => [`${tag} Child ${i}`, '11G', 'O.L.', 'Computer Science', teacher, serial(Y, 11), `010000001${i}0`, `${tag}${i}${D}`, `${tag} Parent ${i}`, `${tag}.parent${i}${D}`, `011000001${i}0`, 'I confirm my registration', 'No']),
+        ...[1, 2].map((i): Cell[] => [`${tag} Child ${i}`, '11G', 'O.L.', 'Computer Science', teacher, serial(Y, 11), `01000000${n}${i}0`, `${tag}${i}${D}`, `${tag} Parent ${i}`, `${tag}.parent${i}${D}`, `01100000${n}${i}0`, 'I confirm my registration', 'No']),
       ],
     }]);
     const batch = (id: string) => one<{ status: string; by: string | null; committed_by: string | null }>(
       `select status, commit_started_by as by, committed_by from import_batch where id = $1`, [id]);
 
     it('a claim under 15 minutes old is refused, naming who holds it; an older one is taken over and the commit runs', async () => {
-      const id = await stage(adm, sheet('stale', 'Mr Karim'), 'stale.xlsx', 'school_sheet');
+      const id = await stage(adm, sheet('stale', 'Mr Karim', 1), 'stale.xlsx', 'school_sheet');
       // A commit that stopped part-way (its process gone): the batch still says it is being committed.
       await sql(`update import_batch set status = 'committing', commit_started_by = $1, commit_started_at = now() - interval '14 minutes' where id = $2`, [coordinator.id, id]);
       expect(await refused(adm.api.v1.imports[':id'].commit.$post({ param: { id } }))).toEqual({
@@ -891,7 +957,7 @@ describe('F7: the day-one import', () => {
     });
 
     it('a commit still running when its claim is taken over stops without resetting the new holder\'s claim', async () => {
-      const id = await stage(adm, sheet('overtaken', 'Ms Overtaken'), 'overtaken.xlsx', 'school_sheet');
+      const id = await stage(adm, sheet('overtaken', 'Ms Overtaken', 2), 'overtaken.xlsx', 'school_sheet');
       // Hold the lock the commit takes to make reference data (a new teacher), so each commit waits there.
       const { default: pg } = await import('pg');
       const holder = new pg.Client({ connectionString: process.env.DATABASE_URL });
@@ -926,7 +992,7 @@ describe('F7: the day-one import', () => {
     });
 
     it('a commit taken over that runs on to the end leaves the batch to the new holder: its families once, one IMPORT_COMMITTED', async () => {
-      const id = await stage(adm, sheet('runon', 'Ms Runon'), 'runon.xlsx', 'school_sheet');
+      const id = await stage(adm, sheet('runon', 'Ms Runon', 3), 'runon.xlsx', 'school_sheet');
       const { default: pg } = await import('pg');
       const holder = new pg.Client({ connectionString: process.env.DATABASE_URL });
       await holder.connect();

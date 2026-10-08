@@ -32,7 +32,7 @@ import { assertMayRegisterForInTx } from '../eligibility.services';
 import { sessionWindow, entryDeadlineMessage } from '../window.services';
 import { prepareRegistrationInputs, insertRoutedRegistrations } from '../registration.services';
 import {
-  computeView, historyFingerprint, feeFingerprint, carryFingerprint, moneyFingerprint, historyOutcome, lower,
+  computeView, historyFingerprint, feeFingerprint, carryFingerprint, moneyFingerprints, historyOutcome, lower,
   type ImportView, type ImportRowView,
 } from './view';
 import { seriesText, type SheetLine, type MoneyLine } from './normalise';
@@ -267,13 +267,14 @@ async function commitFamily(
   const sourceRef = (r: ImportRowView) => `${batch.fileName} — ${r.tab} row ${r.rowNumber}`;
 
   if (view.kind === 'money_record') {
+    const keys = moneyFingerprints(view.rows.filter((x) => x.data.kind === 'money').map((x) => ({ id: x.id, studentId: x.studentId, d: x.data as MoneyData })));
     for (const r of rows) {
       const d = r.data as MoneyData;
       if (!r.studentId) throw new ImportError(`${r.tab} row ${r.rowNumber}: no student`);
       const made = await tx.insert(moneyHistory).values({
         id: randomUUID(), studentId: r.studentId, kind: d.moneyKind, direction: d.direction, amount: d.amount, percent: d.percent,
         happenedOn: d.happenedOn, method: d.method, receiptNumber: d.receiptNumber, seriesLabel: d.seriesLabel, subjectLabel: d.subject, note: d.note,
-        fingerprint: moneyFingerprint(d, r), importBatchId: batch.id, importRowId: r.id, sourceRef: sourceRef(r), createdBy: actor.id,
+        fingerprint: keys.get(r.id)!, importBatchId: batch.id, importRowId: r.id, sourceRef: sourceRef(r), createdBy: actor.id,
       }).onConflictDoNothing().returning({ id: moneyHistory.id });
       if (made[0]) { created.money++; createdIds.money!.push(made[0].id); note(r.id, 'money', 'created'); } else note(r.id, 'money', 'exists');
       note(r.id, 'studentId', r.studentId);

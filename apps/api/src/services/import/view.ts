@@ -132,9 +132,23 @@ export const historyFingerprint = (d: Pick<SheetLine, 'series' | 'subject' | 'le
 export const feeFingerprint = (d: Pick<SheetLine, 'series' | 'subject' | 'levelCode' | 'feeKind' | 'feePercent'>) => `fee|${d.series?.type}|${d.series?.year}|${lower(d.subject)}|${d.levelCode ?? ''}|${d.feeKind}|${d.feePercent ?? ''}`;
 export const carryFingerprint = (d: Pick<SheetLine, 'series' | 'subject' | 'levelCode'>) => `carry|${d.series?.type}|${d.series?.year}|${lower(d.subject)}|${d.levelCode ?? ''}`;
 
-/** A money-record line: its content, and where it is (so the same file again finds it). */
-export function moneyFingerprint(d: Omit<MoneyLine, 'local'>, where: { tab: string; rowNumber: number }) {
-  return `money|${d.happenedOn ?? ''}|${d.amount ?? ''}|${d.direction ?? ''}|${d.moneyKind}|${d.percent ?? ''}|${(d.receiptNumber ?? '').toLowerCase()}|${lower(d.seriesLabel ?? '')}|${lower(d.subject ?? '')}|${where.tab}!${where.rowNumber}`;
+/**
+ * The money-record lines' fingerprints: what each says, and which of several identical lines it is
+ * (the first, the second…), never where it sits — a line inserted above does not make the lines below
+ * new (review flag 3). `lines` are the file's lines in order.
+ */
+export function moneyFingerprints(lines: { id: string; studentId: string | null; d: Omit<MoneyLine, 'local'> }[]): Map<string, string> {
+  const seen = new Map<string, number>();
+  const out = new Map<string, string>();
+  for (const { id, studentId, d } of lines) {
+    const base = `money|${d.happenedOn ?? ''}|${d.amount ?? ''}|${d.direction ?? ''}|${d.moneyKind}|${d.percent ?? ''}|${(d.receiptNumber ?? '').toLowerCase()}|${lower(d.seriesLabel ?? '')}|${lower(d.subject ?? '')}|${lower(d.note ?? '')}`;
+    // Counted per student (the row is unique per student and fingerprint).
+    const k = `${studentId ?? d.studentRef.toLowerCase()}|${base}`;
+    const n = (seen.get(k) ?? 0) + 1;
+    seen.set(k, n);
+    out.set(id, `${base}|${n}`);
+  }
+  return out;
 }
 
 /** A student id that is never an account: the school-fee gate of a student the import will create. */
@@ -186,6 +200,8 @@ type PersonView = {
   problems: ViewProblem[]; familyKey: string | null; decision: 'import' | 'skip'; mergedInto: string | null;
   mergedFrom: string[]; distinct: boolean; oneChild: boolean; edits: Record<string, unknown>; status: string; userId: string | null; error: string | null;
   sclIds: string[];
+  /** Accounts already in the system this person may be (review flag 3): the same name and a parent, child or phone. */
+  possibleAccounts: { id: string; name: string; email: string; why: string }[];
 };
 
 export type ImportViewInput = { batch: BatchRow; rows: RowRecord[]; people: PersonRecord[] };
@@ -349,9 +365,11 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     if (w.seriesKey && settings.series[w.seriesKey]?.mode === 'skip') skipByDefault(w, 'Its series is left out');
   }
 
-  // 4. Existing accounts by email (and, for the money record, by school ID).
+  // 4. Existing accounts by email (and, for the money record, by school ID). A merge may point at an account
+  // already in the system (a child imported before under another email).
   const emails = new Set<string>();
   const refs = new Set<string>();
+  for (const p of people) if (p.mergedInto?.includes('@')) emails.add(p.mergedInto.toLowerCase());
   for (const w of work) {
     const d = w.d;
     if (d.kind === 'sheet') { if (d.studentEmailOk) emails.add(d.studentEmail); if (d.parentEmailOk) emails.add(d.parentEmail); }
@@ -411,7 +429,9 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       p = { role, key, rowIds: [], names: new Map(), phones: new Map(), classes: new Map(), sections: new Map(), cohorts: new Map(), parentKeys: new Set(), childKeys: new Set(), email, sclIds: new Set() };
       agg.set(id, p);
     }
-    if (!p.email && email) p.email = email;
+    // A person's email is their key when the key is one: after a merge, the email they were merged into.
+    if (key.includes('@')) p.email = key;
+    else if (!p.email && email) p.email = email;
     return p;
   };
   const bump = <K,>(m: Map<K, number>, k: K | null | undefined) => { if (k !== null && k !== undefined && k !== '') m.set(k, (m.get(k) ?? 0) + 1); };
@@ -471,7 +491,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       problems: [], familyKey: null, decision: dec?.decision === 'skip' ? 'skip' : 'import', mergedInto: null,
       mergedFrom: people.filter((x) => x.role === p.role && x.mergedInto && x.key !== p.key && canonical(p.role, x.key) === p.key).map((x) => x.key),
       distinct: dec?.distinct ?? false, oneChild: dec?.oneChild ?? false, edits, status: dec?.status ?? 'pending', userId: dec?.userId ?? null, error: dec?.error ?? null,
-      sclIds: [...p.sclIds],
+      sclIds: [...p.sclIds], possibleAccounts: [],
     });
   }
   for (const dec of people) {
@@ -481,7 +501,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       role: dec.role as Role, key: dec.key, email: dec.key.includes('@') ? dec.key : null, name: dec.key, names: [], phone: null, phones: [], classes: [],
       section: null, cohortYear: null, gradeToday: null, rowIds: [], parentKeys: [], childKeys: [], matched: null, problems: [], familyKey: null,
       decision: dec.decision === 'skip' ? 'skip' : 'import', mergedInto: canonical(dec.role as Role, dec.key), mergedFrom: [], distinct: dec.distinct,
-      oneChild: dec.oneChild, edits: dec.edits, status: dec.status, userId: dec.userId, error: dec.error, sclIds: [],
+      oneChild: dec.oneChild, edits: dec.edits, status: dec.status, userId: dec.userId, error: dec.error, sclIds: [], possibleAccounts: [],
     });
   }
 
@@ -534,6 +554,54 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
       if (p.distinct) continue;
       const others = group.filter((o) => o !== p);
       p.problems.push({ code: 'duplicate_parent', severity: 'warning', detail: `also ${others.map((o) => o.key).join(', ')} (same phone)` });
+    }
+  }
+
+  // Already in the system under another email (review flag 3): a student with the same name as a student
+  // account that has one of this student's parents (or the same phone), a parent with the same phone as a
+  // parent account (or the same name, parent of one of this parent's children). An error: the family waits
+  // until staff merge the person into that account or say they are different people.
+  const unmatched = active.filter((p) => !p.matched && !p.distinct && p.email);
+  if (unmatched.length) {
+    const names = [...new Set(unmatched.map((p) => lower(p.name)).filter(Boolean))];
+    const phones = [...new Set(unmatched.map((p) => p.phone).filter((x): x is string => !!x))];
+    const candidates = await db.select({ id: user.id, name: user.name, email: user.email, role: user.role, phone: user.phone }).from(user)
+      .where(and(inArray(user.role, ['student', 'parent']), or(
+        names.length ? inArray(sql`lower(${user.name})`, names) : undefined,
+        phones.length ? inArray(user.phone, phones) : undefined,
+      )));
+    const candidateIds = candidates.map((c) => c.id);
+    const links = candidateIds.length
+      ? await db.select({ parentId: parentStudentLink.parentId, studentId: parentStudentLink.studentId }).from(parentStudentLink)
+        .where(and(or(inArray(parentStudentLink.parentId, candidateIds), inArray(parentStudentLink.studentId, candidateIds)), inArray(parentStudentLink.status, ['pending', 'approved'])))
+      : [];
+    const linkedIds = new Set(links.flatMap((l) => [l.parentId, l.studentId]));
+    const others = linkedIds.size
+      ? await db.select({ id: user.id, email: user.email, phone: user.phone }).from(user).where(inArray(user.id, [...linkedIds]))
+      : [];
+    const emailOf = new Map(others.map((o) => [o.id, o.email.toLowerCase()]));
+    const phoneOf = new Map(others.map((o) => [o.id, o.phone]));
+    const parentsOf = (studentId: string) => links.filter((l) => l.studentId === studentId).map((l) => l.parentId);
+    const childrenOf = (parentId: string) => links.filter((l) => l.parentId === parentId).map((l) => l.studentId);
+    for (const p of unmatched) {
+      const mine = p.role === 'student' ? p.parentKeys : p.childKeys;
+      const myPhones = new Set(p.role === 'student'
+        ? p.parentKeys.map((k) => personViews.get(`parent|${k}`)?.phone).filter((x): x is string => !!x) : []);
+      for (const c of candidates) {
+        if (c.role !== p.role || c.email.toLowerCase() === p.key) continue;
+        const sameName = lower(c.name) === lower(p.name);
+        const related = (p.role === 'student' ? parentsOf(c.id) : childrenOf(c.id));
+        const sharesFamily = related.some((id) => mine.includes(emailOf.get(id) ?? ''));
+        const sharesParentPhone = p.role === 'student' && related.some((id) => { const ph = phoneOf.get(id); return !!ph && myPhones.has(ph); });
+        const samePhone = !!p.phone && c.phone === p.phone;
+        const why = p.role === 'student'
+          ? (sameName && sharesFamily ? 'the same name and parent' : sameName && (sharesParentPhone || samePhone) ? 'the same name and phone' : null)
+          : (samePhone ? 'the same phone' : sameName && sharesFamily ? 'the same name and child' : null);
+        if (why) p.possibleAccounts.push({ id: c.id, name: c.name, email: c.email.toLowerCase(), why });
+      }
+      if (p.possibleAccounts.length) {
+        p.problems.push({ code: 'duplicate_account', severity: 'error', detail: p.possibleAccounts.map((a) => `${a.name} (${a.email}): ${a.why}`).join('; ') });
+      }
     }
   }
 
@@ -610,6 +678,8 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     || priorRegs.some((r) => r.studentId === studentId && r.subjectId === subjectId && r.sessionId !== windowId);
   const sectionByName = new Map(sections.map((s) => [`${s.yearId}|${s.name.toLowerCase()}`, s]));
 
+  const moneyLineKeys = moneyFingerprints(work.filter((w) => w.d.kind === 'money').map((w) => ({ id: w.r.id, studentId: w.studentId, d: w.d as MoneyLine })));
+
   // 8. Row by row: the mapping's problems and what a commit would do.
   const isHistory = (w: Working) => {
     const d = w.d as SheetLine;
@@ -646,7 +716,7 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
     const plan = noPlan();
     w.plan = plan;
     if (d.kind === 'money') {
-      if (w.studentId) plan.money = moneySet.has(`${w.studentId}|${moneyFingerprint(d, w.r)}`) ? 'exists' : 'create';
+      if (w.studentId) plan.money = moneySet.has(`${w.studentId}|${moneyLineKeys.get(w.r.id)}`) ? 'exists' : 'create';
       continue;
     }
     const s = w.studentKey ? personViews.get(`student|${w.studentKey}`) : undefined;
