@@ -17,6 +17,7 @@ import { cardsFor, type PutTeacherConstraintsType, type PutRoomConstraintsType, 
 import { logAction, type AuditContext } from './audit.services';
 import { gridOfYear } from './timetable.services';
 import { SchedulingError, isUniqueViolation } from './scheduling-shared.services';
+import { todayAtSchool } from '../lib/clock';
 
 async function yearOrThrow(id: string) {
   const [y] = await db.select().from(academicYear).where(eq(academicYear.id, id));
@@ -74,7 +75,8 @@ function dedupe<T extends { weekday: number; period: number | null }>(rows: T[])
 
 export async function putTeacherRules(teacherId: string, data: PutTeacherConstraintsType, actorId: string, ctx?: AuditContext) {
   await yearOrThrow(data.academicYearId);
-  return db.transaction(async (tx) => {
+  const cover = await import('./cover.services');
+  const result = await db.transaction(async (tx) => {
     const [t] = await tx.select().from(teacher).where(eq(teacher.id, teacherId)).for('update');
     if (!t) throw new SchedulingError('Teacher not found', 404);
     const beforeOff = await tx.select().from(scheduleUnavailability).where(and(eq(scheduleUnavailability.academicYearId, data.academicYearId), eq(scheduleUnavailability.teacherId, teacherId)));
@@ -95,8 +97,13 @@ export async function putTeacherRules(teacherId: string, data: PutTeacherConstra
     await logAction(actorId, 'SCHEDULE_RULES_SET', 'teacher', teacherId,
       { maxPerDay: beforeLim?.maxPerDay ?? null, maxPerWeek: beforeLim?.maxPerWeek ?? null, unavailable: beforeOff.length },
       { academicYearId: data.academicYearId, maxPerDay: data.maxPerDay, maxPerWeek: data.maxPerWeek, unavailable: rows.length }, ctx, tx);
-    return { teacherId, unavailable: rows.length, maxPerDay: data.maxPerDay, maxPerWeek: data.maxPerWeek };
+    // The cover this teacher gives from today is judged again by the new rules (round two, flag 2: a
+    // period they can no longer teach, or a day's limit now passed, and it is theirs no longer).
+    const coversLost = await cover.recheckCovers(tx, await cover.liveCoversFrom(tx, { teacherIds: [teacherId], from: todayAtSchool() }), actorId, `${t.name}'s timetable rules changed`, ctx);
+    return { teacherId, unavailable: rows.length, maxPerDay: data.maxPerDay, maxPerWeek: data.maxPerWeek, coversLost };
   });
+  await cover.coverChangeNotices(result.coversLost, 'no_longer_holds').catch((err) => console.error('[rules] cover notices failed:', err));
+  return { ...result, coversLost: await cover.describeCovers(result.coversLost) };
 }
 
 export async function putRoomRules(roomId: string, data: PutRoomConstraintsType, actorId: string, ctx?: AuditContext) {
