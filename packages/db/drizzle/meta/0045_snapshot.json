@@ -1,5 +1,5 @@
 {
-  "id": "8e239316-2d42-43eb-b87c-1009d89f4662",
+  "id": "b30c92a6-2a37-45e4-9394-138f3b0217f4",
   "prevId": "97a60ff1-81cd-4aa4-bb0c-91ee4d17d6ba",
   "version": "7",
   "dialect": "postgresql",
@@ -1158,490 +1158,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.board_service": {
-      "name": "board_service",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "board_code": {
-          "name": "board_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "code": {
-          "name": "code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "per_component": {
-          "name": "per_component",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "level_rates": {
-          "name": "level_rates",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "refund_rule": {
-          "name": "refund_rule",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'full'"
-        },
-        "refund_deduction": {
-          "name": "refund_deduction",
-          "type": "numeric(12, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requestable_by_family": {
-          "name": "requestable_by_family",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "legacy_service_type": {
-          "name": "legacy_service_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "sort_order": {
-          "name": "sort_order",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "boardService_board_code_idx": {
-          "name": "boardService_board_code_idx",
-          "columns": [
-            {
-              "expression": "board_code",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "code",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "boardService_board_legacy_idx": {
-          "name": "boardService_board_legacy_idx",
-          "columns": [
-            {
-              "expression": "board_code",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "legacy_service_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "legacy_service_type IS NOT NULL",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "board_service_board_code_exam_board_code_fk": {
-          "name": "board_service_board_code_exam_board_code_fk",
-          "tableFrom": "board_service",
-          "tableTo": "exam_board",
-          "columnsFrom": [
-            "board_code"
-          ],
-          "columnsTo": [
-            "code"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "board_service_kind_valid": {
-          "name": "board_service_kind_valid",
-          "value": "\"board_service\".\"kind\" IN ('remark', 'cash_in', 'late_cash_in', 'certificate_split')"
-        },
-        "board_service_refund_rule_valid": {
-          "name": "board_service_refund_rule_valid",
-          "value": "\"board_service\".\"refund_rule\" IN ('none', 'full', 'less_fixed')"
-        },
-        "board_service_deduction_whole": {
-          "name": "board_service_deduction_whole",
-          "value": "(\"board_service\".\"refund_rule\" = 'less_fixed') = (\"board_service\".\"refund_deduction\" IS NOT NULL AND \"board_service\".\"refund_deduction\" > 0)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.board_service_deadline": {
-      "name": "board_service_deadline",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "board_series_id": {
-          "name": "board_series_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "board_service_id": {
-          "name": "board_service_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "deadline": {
-          "name": "deadline",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "set_by": {
-          "name": "set_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "boardServiceDeadline_series_service_idx": {
-          "name": "boardServiceDeadline_series_service_idx",
-          "columns": [
-            {
-              "expression": "board_series_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "board_service_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "board_service_deadline_board_series_id_board_series_id_fk": {
-          "name": "board_service_deadline_board_series_id_board_series_id_fk",
-          "tableFrom": "board_service_deadline",
-          "tableTo": "board_series",
-          "columnsFrom": [
-            "board_series_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "board_service_deadline_board_service_id_board_service_id_fk": {
-          "name": "board_service_deadline_board_service_id_board_service_id_fk",
-          "tableFrom": "board_service_deadline",
-          "tableTo": "board_service",
-          "columnsFrom": [
-            "board_service_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "board_service_deadline_set_by_user_id_fk": {
-          "name": "board_service_deadline_set_by_user_id_fk",
-          "tableFrom": "board_service_deadline",
-          "tableTo": "user",
-          "columnsFrom": [
-            "set_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.board_service_fee": {
-      "name": "board_service_fee",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "board_series_id": {
-          "name": "board_series_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "board_service_id": {
-          "name": "board_service_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "level": {
-          "name": "level",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount": {
-          "name": "amount",
-          "type": "numeric(12, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provisional": {
-          "name": "provisional",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "confirmed_at": {
-          "name": "confirmed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "confirmed_by": {
-          "name": "confirmed_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "copied_from_default": {
-          "name": "copied_from_default",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "boardServiceFee_series_service_level_idx": {
-          "name": "boardServiceFee_series_service_level_idx",
-          "columns": [
-            {
-              "expression": "board_series_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "board_service_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "level",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "board_service_fee_board_series_id_board_series_id_fk": {
-          "name": "board_service_fee_board_series_id_board_series_id_fk",
-          "tableFrom": "board_service_fee",
-          "tableTo": "board_series",
-          "columnsFrom": [
-            "board_series_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "board_service_fee_board_service_id_board_service_id_fk": {
-          "name": "board_service_fee_board_service_id_board_service_id_fk",
-          "tableFrom": "board_service_fee",
-          "tableTo": "board_service",
-          "columnsFrom": [
-            "board_service_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "board_service_fee_confirmed_by_user_id_fk": {
-          "name": "board_service_fee_confirmed_by_user_id_fk",
-          "tableFrom": "board_service_fee",
-          "tableTo": "user",
-          "columnsFrom": [
-            "confirmed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "board_service_fee_created_by_user_id_fk": {
-          "name": "board_service_fee_created_by_user_id_fk",
-          "tableFrom": "board_service_fee",
-          "tableTo": "user",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "board_service_fee_level_valid": {
-          "name": "board_service_fee_level_valid",
-          "value": "\"board_service_fee\".\"level\" IN ('igcse', 'as_a_level')"
-        },
-        "board_service_fee_amount_nonneg": {
-          "name": "board_service_fee_amount_nonneg",
-          "value": "\"board_service_fee\".\"amount\" >= 0"
-        },
-        "board_service_fee_confirmed_whole": {
-          "name": "board_service_fee_confirmed_whole",
-          "value": "(\"board_service_fee\".\"provisional\" AND \"board_service_fee\".\"confirmed_at\" IS NULL) OR (NOT \"board_service_fee\".\"provisional\" AND \"board_service_fee\".\"confirmed_at\" IS NOT NULL)"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.calendar_entry": {
       "name": "calendar_entry",
       "schema": "",
@@ -1848,6 +1364,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "new_line": {
+          "name": "new_line",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "price_at_request": {
           "name": "price_at_request",
           "type": "numeric(12, 2)",
@@ -2037,528 +1559,6 @@
         "change_request_price_at_request_nonneg": {
           "name": "change_request_price_at_request_nonneg",
           "value": "\"change_request\".\"price_at_request\" >= 0"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.charge": {
-      "name": "charge",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "student_id": {
-          "name": "student_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "registration_id": {
-          "name": "registration_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "board_series_id": {
-          "name": "board_series_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "board_service_id": {
-          "name": "board_service_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "level": {
-          "name": "level",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "academic_year": {
-          "name": "academic_year",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount": {
-          "name": "amount",
-          "type": "numeric(12, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "due_at": {
-          "name": "due_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending_payment'"
-        },
-        "plan_exception_id": {
-          "name": "plan_exception_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "instalment_no": {
-          "name": "instalment_no",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refund_amount": {
-          "name": "refund_amount",
-          "type": "numeric(12, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refunded_at": {
-          "name": "refunded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refunded_by": {
-          "name": "refunded_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refund_reason": {
-          "name": "refund_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "settled_by_payment_id": {
-          "name": "settled_by_payment_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requested_by": {
-          "name": "requested_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "accepted_by": {
-          "name": "accepted_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "accepted_at": {
-          "name": "accepted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cancelled_by": {
-          "name": "cancelled_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cancelled_at": {
-          "name": "cancelled_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "cancel_reason": {
-          "name": "cancel_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "pricing_basis": {
-          "name": "pricing_basis",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "reason": {
-          "name": "reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "charge_studentId_idx": {
-          "name": "charge_studentId_idx",
-          "columns": [
-            {
-              "expression": "student_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "charge_registrationId_idx": {
-          "name": "charge_registrationId_idx",
-          "columns": [
-            {
-              "expression": "registration_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "charge_status_idx": {
-          "name": "charge_status_idx",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "charge_kind_idx": {
-          "name": "charge_kind_idx",
-          "columns": [
-            {
-              "expression": "kind",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "charge_planExceptionId_idx": {
-          "name": "charge_planExceptionId_idx",
-          "columns": [
-            {
-              "expression": "plan_exception_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "charge_series_service_idx": {
-          "name": "charge_series_service_idx",
-          "columns": [
-            {
-              "expression": "board_series_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "board_service_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "charge_one_push_per_year_idx": {
-          "name": "charge_one_push_per_year_idx",
-          "columns": [
-            {
-              "expression": "student_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "academic_year",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "kind = 'school_fee_push' AND status IN ('pending_payment', 'paid')",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "charge_one_instalment_idx": {
-          "name": "charge_one_instalment_idx",
-          "columns": [
-            {
-              "expression": "plan_exception_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "instalment_no",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "kind = 'instalment'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "charge_student_id_user_id_fk": {
-          "name": "charge_student_id_user_id_fk",
-          "tableFrom": "charge",
-          "tableTo": "user",
-          "columnsFrom": [
-            "student_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "charge_registration_id_registration_id_fk": {
-          "name": "charge_registration_id_registration_id_fk",
-          "tableFrom": "charge",
-          "tableTo": "registration",
-          "columnsFrom": [
-            "registration_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "charge_board_series_id_board_series_id_fk": {
-          "name": "charge_board_series_id_board_series_id_fk",
-          "tableFrom": "charge",
-          "tableTo": "board_series",
-          "columnsFrom": [
-            "board_series_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "charge_board_service_id_board_service_id_fk": {
-          "name": "charge_board_service_id_board_service_id_fk",
-          "tableFrom": "charge",
-          "tableTo": "board_service",
-          "columnsFrom": [
-            "board_service_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "charge_plan_exception_id_exception_id_fk": {
-          "name": "charge_plan_exception_id_exception_id_fk",
-          "tableFrom": "charge",
-          "tableTo": "exception",
-          "columnsFrom": [
-            "plan_exception_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "charge_refunded_by_user_id_fk": {
-          "name": "charge_refunded_by_user_id_fk",
-          "tableFrom": "charge",
-          "tableTo": "user",
-          "columnsFrom": [
-            "refunded_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "charge_settled_by_payment_id_payment_id_fk": {
-          "name": "charge_settled_by_payment_id_payment_id_fk",
-          "tableFrom": "charge",
-          "tableTo": "payment",
-          "columnsFrom": [
-            "settled_by_payment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "charge_requested_by_user_id_fk": {
-          "name": "charge_requested_by_user_id_fk",
-          "tableFrom": "charge",
-          "tableTo": "user",
-          "columnsFrom": [
-            "requested_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "charge_accepted_by_user_id_fk": {
-          "name": "charge_accepted_by_user_id_fk",
-          "tableFrom": "charge",
-          "tableTo": "user",
-          "columnsFrom": [
-            "accepted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "charge_cancelled_by_user_id_fk": {
-          "name": "charge_cancelled_by_user_id_fk",
-          "tableFrom": "charge",
-          "tableTo": "user",
-          "columnsFrom": [
-            "cancelled_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "charge_created_by_user_id_fk": {
-          "name": "charge_created_by_user_id_fk",
-          "tableFrom": "charge",
-          "tableTo": "user",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "charge_kind_valid": {
-          "name": "charge_kind_valid",
-          "value": "\"charge\".\"kind\" IN ('cash_in', 'late_cash_in', 'certificate_split', 'late_entry_fee', 'school_fee_push', 'instalment', 'price_adjustment', 'custom')"
-        },
-        "charge_status_valid": {
-          "name": "charge_status_valid",
-          "value": "\"charge\".\"status\" IN ('requested', 'pending_payment', 'paid', 'cancelled', 'refunded')"
-        },
-        "charge_amount_nonneg": {
-          "name": "charge_amount_nonneg",
-          "value": "\"charge\".\"amount\" >= 0"
-        },
-        "charge_level_valid": {
-          "name": "charge_level_valid",
-          "value": "\"charge\".\"level\" IS NULL OR \"charge\".\"level\" IN ('igcse', 'as_a_level')"
-        },
-        "charge_refund_within": {
-          "name": "charge_refund_within",
-          "value": "\"charge\".\"refund_amount\" IS NULL OR (\"charge\".\"refund_amount\" > 0 AND \"charge\".\"refund_amount\" <= \"charge\".\"amount\")"
-        },
-        "charge_refunded_whole": {
-          "name": "charge_refunded_whole",
-          "value": "(\"charge\".\"status\" = 'refunded') = (\"charge\".\"refund_amount\" IS NOT NULL)"
-        },
-        "charge_push_shape": {
-          "name": "charge_push_shape",
-          "value": "(\"charge\".\"kind\" = 'school_fee_push') = (\"charge\".\"academic_year\" IS NOT NULL)"
-        },
-        "charge_settled_push_only": {
-          "name": "charge_settled_push_only",
-          "value": "\"charge\".\"settled_by_payment_id\" IS NULL OR \"charge\".\"kind\" = 'school_fee_push'"
-        },
-        "charge_instalment_shape": {
-          "name": "charge_instalment_shape",
-          "value": "(\"charge\".\"kind\" = 'instalment') = (\"charge\".\"plan_exception_id\" IS NOT NULL AND \"charge\".\"instalment_no\" IS NOT NULL AND \"charge\".\"registration_id\" IS NOT NULL)"
-        },
-        "charge_service_shape": {
-          "name": "charge_service_shape",
-          "value": "\"charge\".\"kind\" NOT IN ('cash_in', 'late_cash_in', 'certificate_split') OR (\"charge\".\"board_service_id\" IS NOT NULL AND \"charge\".\"board_series_id\" IS NOT NULL)"
         }
       },
       "isRLSEnabled": false
@@ -3069,12 +2069,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "related_charge_id": {
-          "name": "related_charge_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "initiated_by": {
           "name": "initiated_by",
           "type": "text",
@@ -3169,19 +2163,6 @@
           "tableTo": "payment",
           "columnsFrom": [
             "related_payment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "escrow_transaction_related_charge_id_charge_id_fk": {
-          "name": "escrow_transaction_related_charge_id_charge_id_fk",
-          "tableFrom": "escrow_transaction",
-          "tableTo": "charge",
-          "columnsFrom": [
-            "related_charge_id"
           ],
           "columnsTo": [
             "id"
@@ -3447,25 +2428,13 @@
           "name": "type",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
-        },
-        "policy_key": {
-          "name": "policy_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "student_id": {
           "name": "student_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
-        },
-        "family_id": {
-          "name": "family_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "session_id": {
           "name": "session_id",
@@ -3479,63 +2448,9 @@
           "primaryKey": false,
           "notNull": false
         },
-        "offer_id": {
-          "name": "offer_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "offer_item_id": {
-          "name": "offer_item_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "registration_id": {
-          "name": "registration_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "charge_id": {
-          "name": "charge_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "board_series_id": {
-          "name": "board_series_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "academic_year": {
-          "name": "academic_year",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "value": {
           "name": "value",
           "type": "numeric(12, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "value_number": {
-          "name": "value_number",
-          "type": "numeric(12, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "value_date": {
-          "name": "value_date",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "value_json": {
-          "name": "value_json",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -3576,42 +2491,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "revoke_reason": {
-          "name": "revoke_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "used_at": {
-          "name": "used_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "used_for": {
-          "name": "used_for",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "check_reason": {
-          "name": "check_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "confirmed_at": {
-          "name": "confirmed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "confirmed_by": {
-          "name": "confirmed_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3643,41 +2522,11 @@
           "method": "btree",
           "with": {}
         },
-        "exception_familyId_idx": {
-          "name": "exception_familyId_idx",
-          "columns": [
-            {
-              "expression": "family_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "exception_type_idx": {
           "name": "exception_type_idx",
           "columns": [
             {
               "expression": "type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "exception_policyKey_idx": {
-          "name": "exception_policyKey_idx",
-          "columns": [
-            {
-              "expression": "policy_key",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -3702,36 +2551,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "exception_registrationId_idx": {
-          "name": "exception_registrationId_idx",
-          "columns": [
-            {
-              "expression": "registration_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "exception_chargeId_idx": {
-          "name": "exception_chargeId_idx",
-          "columns": [
-            {
-              "expression": "charge_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -3741,19 +2560,6 @@
           "tableTo": "user",
           "columnsFrom": [
             "student_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "exception_family_id_user_id_fk": {
-          "name": "exception_family_id_user_id_fk",
-          "tableFrom": "exception",
-          "tableTo": "user",
-          "columnsFrom": [
-            "family_id"
           ],
           "columnsTo": [
             "id"
@@ -3787,71 +2593,6 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "exception_offer_id_session_offer_id_fk": {
-          "name": "exception_offer_id_session_offer_id_fk",
-          "tableFrom": "exception",
-          "tableTo": "session_offer",
-          "columnsFrom": [
-            "offer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "exception_offer_item_id_session_offer_item_id_fk": {
-          "name": "exception_offer_item_id_session_offer_item_id_fk",
-          "tableFrom": "exception",
-          "tableTo": "session_offer_item",
-          "columnsFrom": [
-            "offer_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "exception_registration_id_registration_id_fk": {
-          "name": "exception_registration_id_registration_id_fk",
-          "tableFrom": "exception",
-          "tableTo": "registration",
-          "columnsFrom": [
-            "registration_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "exception_charge_id_charge_id_fk": {
-          "name": "exception_charge_id_charge_id_fk",
-          "tableFrom": "exception",
-          "tableTo": "charge",
-          "columnsFrom": [
-            "charge_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "exception_board_series_id_board_series_id_fk": {
-          "name": "exception_board_series_id_board_series_id_fk",
-          "tableFrom": "exception",
-          "tableTo": "board_series",
-          "columnsFrom": [
-            "board_series_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
         "exception_granted_by_user_id_fk": {
           "name": "exception_granted_by_user_id_fk",
           "tableFrom": "exception",
@@ -3877,19 +2618,6 @@
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
-        },
-        "exception_confirmed_by_user_id_fk": {
-          "name": "exception_confirmed_by_user_id_fk",
-          "tableFrom": "exception",
-          "tableTo": "user",
-          "columnsFrom": [
-            "confirmed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3899,14 +2627,6 @@
         "exception_value_nonneg": {
           "name": "exception_value_nonneg",
           "value": "\"exception\".\"value\" IS NULL OR \"exception\".\"value\" >= 0"
-        },
-        "exception_value_number_nonneg": {
-          "name": "exception_value_number_nonneg",
-          "value": "\"exception\".\"value_number\" IS NULL OR \"exception\".\"value_number\" >= 0"
-        },
-        "exception_status_valid": {
-          "name": "exception_status_valid",
-          "value": "\"exception\".\"status\" IN ('active', 'revoked', 'lapsed', 'used')"
         }
       },
       "isRLSEnabled": false
@@ -4871,123 +3591,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.payment_charge": {
-      "name": "payment_charge",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "payment_id": {
-          "name": "payment_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "charge_id": {
-          "name": "charge_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "paymentCharge_paymentId_idx": {
-          "name": "paymentCharge_paymentId_idx",
-          "columns": [
-            {
-              "expression": "payment_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "paymentCharge_chargeId_idx": {
-          "name": "paymentCharge_chargeId_idx",
-          "columns": [
-            {
-              "expression": "charge_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "paymentCharge_unique_idx": {
-          "name": "paymentCharge_unique_idx",
-          "columns": [
-            {
-              "expression": "payment_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "charge_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "payment_charge_payment_id_payment_id_fk": {
-          "name": "payment_charge_payment_id_payment_id_fk",
-          "tableFrom": "payment_charge",
-          "tableTo": "payment",
-          "columnsFrom": [
-            "payment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "payment_charge_charge_id_charge_id_fk": {
-          "name": "payment_charge_charge_id_charge_id_fk",
-          "tableFrom": "payment_charge",
-          "tableTo": "charge",
-          "columnsFrom": [
-            "charge_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.payment_registration": {
       "name": "payment_registration",
       "schema": "",
@@ -5562,13 +4165,7 @@
           "name": "registration_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
-        },
-        "charge_id": {
-          "name": "charge_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "receipt_number": {
           "name": "receipt_number",
@@ -5692,19 +4289,6 @@
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
-        "receipt_charge_id_charge_id_fk": {
-          "name": "receipt_charge_id_charge_id_fk",
-          "tableFrom": "receipt",
-          "tableTo": "charge",
-          "columnsFrom": [
-            "charge_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
         "receipt_issued_by_user_id_fk": {
           "name": "receipt_issued_by_user_id_fk",
           "tableFrom": "receipt",
@@ -5754,13 +4338,6 @@
             "registration_id"
           ]
         },
-        "receipt_charge_id_unique": {
-          "name": "receipt_charge_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "charge_id"
-          ]
-        },
         "receipt_receipt_number_unique": {
           "name": "receipt_receipt_number_unique",
           "nullsNotDistinct": false,
@@ -5774,10 +4351,6 @@
         "receipt_refund_nonneg": {
           "name": "receipt_refund_nonneg",
           "value": "\"receipt\".\"refund_amount_on_return\" IS NULL OR \"receipt\".\"refund_amount_on_return\" >= 0"
-        },
-        "receipt_one_subject": {
-          "name": "receipt_one_subject",
-          "value": "num_nonnulls(\"receipt\".\"registration_id\", \"receipt\".\"charge_id\") = 1"
         }
       },
       "isRLSEnabled": false
@@ -6030,6 +4603,31 @@
           "primaryKey": false,
           "notNull": false
         },
+        "prior_sitting_verified_by": {
+          "name": "prior_sitting_verified_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prior_sitting_verified_at": {
+          "name": "prior_sitting_verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prior_sitting_verified_outcome": {
+          "name": "prior_sitting_verified_outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "declaration_rejected": {
+          "name": "declaration_rejected",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "due_at": {
           "name": "due_at",
           "type": "timestamp with time zone",
@@ -6237,6 +4835,22 @@
           "method": "btree",
           "with": {}
         },
+        "registration_to_verify_idx": {
+          "name": "registration_to_verify_idx",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "prior_sitting_source IN ('declared_by_family', 'declared_by_desk') AND prior_sitting_verified_outcome IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "registration_unique_live_item_idx": {
           "name": "registration_unique_live_item_idx",
           "columns": [
@@ -6360,6 +4974,19 @@
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
+        "registration_prior_sitting_verified_by_user_id_fk": {
+          "name": "registration_prior_sitting_verified_by_user_id_fk",
+          "tableFrom": "registration",
+          "tableTo": "user",
+          "columnsFrom": [
+            "prior_sitting_verified_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
         "registration_requested_by_user_id_fk": {
           "name": "registration_requested_by_user_id_fk",
           "tableFrom": "registration",
@@ -6430,6 +5057,14 @@
         "registration_prior_sitting_source_valid": {
           "name": "registration_prior_sitting_source_valid",
           "value": "\"registration\".\"prior_sitting_source\" IS NULL OR \"registration\".\"prior_sitting_source\" IN ('known', 'declared_by_desk', 'declared_by_family', 'legacy')"
+        },
+        "registration_prior_sitting_outcome_valid": {
+          "name": "registration_prior_sitting_outcome_valid",
+          "value": "\"registration\".\"prior_sitting_verified_outcome\" IS NULL OR (\"registration\".\"prior_sitting_verified_outcome\" IN ('verified', 'rejected') AND \"registration\".\"prior_sitting_verified_at\" IS NOT NULL AND \"registration\".\"prior_sitting_series_id\" IS NOT NULL)"
+        },
+        "registration_declaration_rejected_outcome": {
+          "name": "registration_declaration_rejected_outcome",
+          "value": "NOT \"registration\".\"declaration_rejected\" OR \"registration\".\"prior_sitting_verified_outcome\" = 'rejected'"
         },
         "registration_retake_is_attempt": {
           "name": "registration_retake_is_attempt",
@@ -6509,9 +5144,30 @@
               "isExpression": false,
               "asc": true,
               "nulls": "last"
+            },
+            {
+              "expression": "channel",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "registrationConsent_registrationId_idx": {
+          "name": "registrationConsent_registrationId_idx",
+          "columns": [
+            {
+              "expression": "registration_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -6999,18 +5655,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "board_service_id": {
-          "name": "board_service_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "service_level": {
-          "name": "service_level",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "status": {
           "name": "status",
           "type": "text",
@@ -7162,19 +5806,6 @@
           "tableTo": "registration",
           "columnsFrom": [
             "registration_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "remark_request_board_service_id_board_service_id_fk": {
-          "name": "remark_request_board_service_id_board_service_id_fk",
-          "tableFrom": "remark_request",
-          "tableTo": "board_service",
-          "columnsFrom": [
-            "board_service_id"
           ],
           "columnsTo": [
             "id"

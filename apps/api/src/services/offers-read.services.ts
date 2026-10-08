@@ -98,7 +98,7 @@ export async function offersForStudent(studentId: string, sessionId: string) {
       // Open per attempt (the review of 977848d): a first entry until the entry deadline (or the
       // exams' start with none); a retake of the board's previous sitting until the retake deadline
       // where the board gives one. A retake of an older sitting is a first entry's date.
-      const firstDeadline = seriesId ? await effectiveDeadlineFor(db, { boardSeriesId: seriesId, attempt: 'first', priorSittingSeriesId: null, studentId }) : { at: null, kind: null };
+      const firstDeadline = seriesId ? await effectiveDeadlineFor(db, { boardSeriesId: seriesId, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false, studentId }) : { at: null, kind: null };
       // The later of the retake deadline and a first entry's (a late board entry, Q-20, can be later).
       const retakeDeadline = i.retakeDeadline ? new Date(i.retakeDeadline as string) : null;
       const retakeUntil = retakeDeadline && (!firstDeadline.at || retakeDeadline > firstDeadline.at) ? retakeDeadline : firstDeadline.at;

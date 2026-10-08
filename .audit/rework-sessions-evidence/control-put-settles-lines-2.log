@@ -1,0 +1,209 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: 0.1 ms (measured within 2 ms)
+stderr | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [622d6013-bbde-4cc6-b9ba-684e4ef6391e] POST /api/auth/sign-up/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[email:stub] To: admin.p08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [2bb011db-6e3f-4572-b789-6ddcbc4af1e5] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [0431ac49-bb6c-47d4-9a36-3f1b40cd6628] POST /v1/users
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [f51a95a2-3619-49ff-97ef-71071de77305] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [ccb0655b-ac06-4755-b8c4-a83d73ce4f0a] POST /v1/users
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [08f93f44-c98a-490c-abf3-b69b1616337b] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [5a8129f7-17a0-43e9-9ea2-4b5d5ade5b09] POST /v1/teachers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [41b73b71-3637-4e90-9f46-b85e6cc8f430] POST /v1/sessions
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [f550f1cf-28cc-4593-bb26-e29ec7c947a0] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [a0959dd3-3326-443b-95f1-e2e923033c12] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [d4b424e8-2034-438e-bb25-d1b42a44f03a] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [f99e4154-b190-4c2b-b3f1-73049f46b7df] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [71a3a8e6-adb8-48a3-af70-02fb4e8da07c] POST /v1/catalogue/qualifications
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [dff488e4-3610-4286-8bdf-0ff2b6f587bc] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [f12f612f-40f5-47b5-84b0-6b05816b8860] POST /v1/sessions/0b8d61db-a6c0-4499-b105-13f2850502e7/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [0d32ae4f-c653-49d4-af7e-bc6365e3d70a] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [4f9bf600-6071-4b30-be4e-89115d2a024f] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [392adee4-5809-47f6-9660-b8c0b1a56b04] POST /v1/sessions/0b8d61db-a6c0-4499-b105-13f2850502e7/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [cec6fb84-17a1-4278-a6fb-a48df580ff01] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [58f75fb9-d3d2-4845-aecd-ded782ed0407] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [6ddd2039-12d0-4a13-9f1d-8880dd15bcad] POST /v1/sessions/0b8d61db-a6c0-4499-b105-13f2850502e7/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [3d186c54-d85a-4223-bb5e-ff14790ab280] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [ecf59358-fd6d-43a0-bd71-cebef1d7d0a3] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [73b4e53d-6c23-42ef-b921-e08aced1f327] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [7e35726c-311e-42e6-981e-f5e8f9a27e22] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [082c28ff-8386-4baa-a975-62af7938857d] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[email:stub] To: parent.p08-put-jhu7@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[email:stub] To: student.p08-put-jhu7@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [56177c2e-150e-41ca-b018-e9eba7767544] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [242c0bfd-283f-48c0-aed0-9bca4ce84002] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [ecd1e81e-5591-4ed9-a77c-be60b3054e62] POST /v1/sessions/0b8d61db-a6c0-4499-b105-13f2850502e7/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [287da970-01e8-41b7-ab10-ef056d816b31] POST /v1/sessions/0b8d61db-a6c0-4499-b105-13f2850502e7/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+[INFO] [87d699ef-3df1-4817-b06d-7d92b6e89e3b] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+[INFO] [5d312361-4b2b-4a10-b09f-a872d38dab22] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+[INFO] [813eb23d-6d54-4804-bf87-38b7b1fba391] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+[INFO] [b5a1b364-cca2-45b2-aded-f0b0f6c8bdef] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+[INFO] [18c634af-e98e-426b-a142-1f5ea0dcf52f] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+[INFO] [f5b52e2f-2a7b-4f05-bbca-f55f060774be] POST /v1/board-fees/bdad6dae-d36f-4a24-9570-276dac97301e/copy
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+[INFO] [710c9aa1-1d3f-46be-9941-ac9d5a360c68] POST /v1/sessions/0b8d61db-a6c0-4499-b105-13f2850502e7/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+[INFO] [aa5e9807-49f1-4c9e-9d9d-603f2d024bb8] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+[email:stub] To: parent.p08-cp-jhu7@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+[email:stub] To: student.p08-cp-jhu7@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+[INFO] [de84d7bb-4316-4f05-b959-886f26821e3b] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+[INFO] [6d313c60-f827-430c-b280-c831da7e4ce3] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+[INFO] [81f7c9bd-7194-4ac5-bba7-6eb51101372f] PUT /v1/board-fees
+
+ ❯ test/08p-pricing-policies.test.ts (10 tests | 2 failed | 8 skipped) 2399ms
+   ↓ 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+   ↓ 08p: pricing policies > a one-paper retake costs its own course fee and the qualification's board fee; it is refused with the whole subject, and as a first entry
+   ↓ 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+   ↓ 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+   ↓ 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+   ↓ 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace
+   × 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price 399ms
+     → expected { changed: 2, …(1) } to match object { changed: 2, …(1) }
+   × 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1) 359ms
+     → expected { changed: 1, …(1) } to match object { changed: 1, …(1) }
+   ↓ 08p: pricing policies > the Fees tab lists a waiting line still provisional on confirmed fees, and confirming its fees again makes it payable (09's rule, on the screen)
+   ↓ 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08p-pricing-policies.test.ts > 08p: pricing policies > a provisional fee saved as the board's published one (the grid's save, a pasted list) is confirmed as Confirm confirms it: its lines become payable; at another amount they wait for the Re-price
+AssertionError: expected { changed: 2, …(1) } to match object { changed: 2, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "changed": 2,[22m
+[32m-   "linesNoLongerProvisional": 1,[39m
+[31m+   "linesNoLongerProvisional": 0,[39m
+[2m  }[22m
+
+ ❯ test/08p-pricing-policies.test.ts:257:17
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08p-pricing-policies.test.ts > 08p: pricing policies > a copied grid, a line reserved on it, then the board's published list pasted at the same amount: the line becomes payable (the review of 40c1447..af33662, item 1)
+AssertionError: expected { changed: 1, …(1) } to match object { changed: 1, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "changed": 1,[22m
+[32m-   "linesNoLongerProvisional": 1,[39m
+[31m+   "linesNoLongerProvisional": 0,[39m
+[2m  }[22m
+
+ ❯ test/08p-pricing-policies.test.ts:282:17
+    280|     // The paste dialog sends every matched row as published (its box …
+    281|     const put = await apiResponse(finadmin.api.v1['board-fees'].$put({…
+    282|     expect(put).toMatchObject({ changed: 1, linesNoLongerProvisional: …
+       |                 ^
+    283|     expect(await priceOf(line!.id)).toMatchObject({ price: 1800, provi…
+    284|     expect((await apiResponse(finadmin.api.v1['board-fees'].$get({ que…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 8 skipped (10)
+   Start at  06:38:04
+   Duration  4.11s (transform 519ms, setup 2ms, collect 188ms, tests 2.40s, environment 0ms, prepare 34ms)
+

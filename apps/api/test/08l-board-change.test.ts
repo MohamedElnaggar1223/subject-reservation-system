@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, audited, futureWindow, sessionName, subjectFeeIn, type Client,
+  reservationOf,
 } from './helpers';
 
 /**
@@ -53,7 +54,7 @@ describe('F0b: a board change and the entry deadline', () => {
   const deadline = (id: string, entryDeadline: Date) =>
     apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id }, json: { entryDeadline, reason: 'board key dates published' } }));
   const prereg = async (sessionId: string, subjectId: string) =>
-    (await apiResponse(fam.parent.api.v1.registrations.preregister.$post({ json: { sessionId, subjectIds: [subjectId], studentId: fam.studentId } })))[0]!.id;
+    (await apiResponse(fam.parent.api.v1.registrations.preregister.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subjectId])), studentId: fam.studentId } })))[0]!.id;
   const toPearson = (subjectId: string) =>
     adm.api.v1.subjects[':id'].$put({ param: { id: subjectId }, json: { council: 'pearson_edexcel' } });
 

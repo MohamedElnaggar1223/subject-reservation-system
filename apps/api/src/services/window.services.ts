@@ -10,7 +10,7 @@
  * fails or is cancelled (whether its lines stay payable) and desk collection ask here.
  */
 
-import { db, registrationSession, eq } from '@repo/db';
+import { db, registrationSession, sessionOfferItem, sessionOffer, eq, inArray } from '@repo/db';
 import { hasDeadlineExtension } from './exception.services';
 import { effectiveDeadlineFor, deadlinePassedSentence, type LineDeadlineKey, type DeadlineKind } from './deadline.services';
 
@@ -67,6 +67,18 @@ export async function sessionWindow(
     }
   }
   return { open, entryDeadlinePassed: false, entryDeadline: d.at, deadlineKind: d.kind, status: sess.status };
+}
+
+/**
+ * The subjects of a new reservation's items (step B's lines name items, not subjects), for the
+ * window's subject-scoped extensions. An id not on offer is left out: the reservation refuses it.
+ */
+export async function subjectsOfItems(executor: typeof db | Tx, itemIds: readonly string[]): Promise<string[]> {
+  if (!itemIds.length) return [];
+  const rows = await executor.selectDistinct({ subjectId: sessionOffer.subjectId }).from(sessionOfferItem)
+    .innerJoin(sessionOffer, eq(sessionOffer.id, sessionOfferItem.offerId))
+    .where(inArray(sessionOfferItem.id, [...itemIds]));
+  return rows.map((r) => r.subjectId);
 }
 
 export async function sessionOpenFor(

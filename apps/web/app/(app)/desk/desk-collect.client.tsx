@@ -5,7 +5,12 @@
  * subjects waiting for payment, charges (board services, instalments, adjustments) and the year's
  * school fee, pushed or not — ticked and taken in one action, each part its own payment (lines per
  * entry deadline, charges per deadline or plan line, the school fee on its own path, first).
- * `AlsoCollect` offers the same charges and fee beside a reservation at the desk.
+ * `AlsoCollect` offers the same charges and fee beside a reservation (not rendered since step B's
+ * Reserve took the desk's reservation card; the API still takes them in `collectNow`).
+ *
+ * Step B's rules for the lines, kept here: a line on a provisional board fee is collected once the
+ * fee is confirmed (`payableNow`, §3.4), and a line the school reserved (grade 10) takes the
+ * family's own consent with its collection, "read and signed by the parent" (§3.5).
  *
  * In the sheet the officer adds the columns by hand and writes one receipt per column; here the
  * ticked total is the money in hand, and each part gets its own receipt.
@@ -32,12 +37,14 @@ function useOwed(studentId: string, summary: Summary | undefined) {
     const rows = charges.data ?? [];
     // A line under a live plan is paid by its instalments (they are charges).
     const planLines = new Set(rows.filter((c) => c.kind === 'instalment' && (c.status === 'pending_payment' || c.status === 'paid')).map((c) => c.registrationId));
-    const lines = (summary?.registrations ?? []).filter((r) => r.status === 'pending_payment' && !planLines.has(r.id));
+    const waiting = (summary?.registrations ?? []).filter((r) => r.status === 'pending_payment' && !planLines.has(r.id));
+    const lines = waiting.filter((r) => r.payableNow);
+    const provisional = waiting.filter((r) => !r.payableNow);
     const payable = rows.filter((c) => c.status === 'pending_payment' && c.kind !== 'school_fee_push' && !c.openPaymentId);
     const requested = rows.filter((c) => c.status === 'requested');
     const pushes = rows.filter((c) => c.kind === 'school_fee_push' && c.status === 'pending_payment');
     const fees = (summary?.schoolFeesDue ?? []).map((f) => ({ ...f, push: pushes.find((p) => p.academicYear === f.academicYear) ?? null }));
-    return { lines, payable, requested, fees, loading: charges.isLoading };
+    return { lines, provisional, payable, requested, fees, loading: charges.isLoading };
   }, [charges.data, charges.isLoading, summary]);
 }
 
@@ -47,6 +54,9 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
   const [unticked, setUnticked] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<Collected | null>(null);
   const [error, setError] = useState('');
+  // A subject the school reserved (grade 10) carries the school's consent only: the parent's own,
+  // read and signed, goes with its collection (step B, RESERVATIONS_REWORK.md §3.5).
+  const [consent, setConsent] = useState(false);
   const isOn = (key: string) => !unticked.has(key);
   const flip = (key: string) => setUnticked((u) => {
     const next = new Set(u);
@@ -64,12 +74,13 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
     mutationFn: (instrumentUsed: Parameters<typeof collectAtDesk>[0]['instrumentUsed']) => collectAtDesk({
       studentId, registrationIds: lineIds, chargeIds, instrumentUsed, escrowAmountToApply: 0,
       ...(fee ? { schoolFeeYear: fee.academicYear } : {}),
+      ...(consent && lineIds.length ? { consent: { refundPolicy: true as const, declaration: true as const } } : {}),
     }),
-    onSuccess: (r) => { setResult(r); setError(''); setUnticked(new Set()); queryClient.invalidateQueries({ queryKey: CHARGES_KEY }); onDone(); },
+    onSuccess: (r) => { setResult(r); setError(''); setUnticked(new Set()); setConsent(false); queryClient.invalidateQueries({ queryKey: CHARGES_KEY }); onDone(); },
     onError: (err: Error) => setError(err.message),
   });
 
-  if (!owed.lines.length && !owed.payable.length && !owed.fees.length && !owed.requested.length) {
+  if (!owed.lines.length && !owed.provisional.length && !owed.payable.length && !owed.fees.length && !owed.requested.length) {
     return result ? <Notice tone="success" title="Collected at the desk"><CollectedNotice r={result} /></Notice> : null;
   }
   return (
@@ -93,6 +104,11 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
           <Row key={`c:${c.id}`} checked={isOn(`c:${c.id}`)} onChange={() => flip(`c:${c.id}`)}
             title={<bdi>{c.description}</bdi>} detail={<><span>{kindLabel(c.kind)}</span> · <span>due</span> <Day iso={c.dueAt} /></>} amount={c.amount} />
         ))}
+        {owed.provisional.length > 0 && (
+          <li className="px-5 py-2.5 text-xs text-muted-foreground">
+            <span>On a provisional board fee, collected once the fee is confirmed:</span> <bdi data-i18n-skip="true">{owed.provisional.map((r) => r.subject.name).join(' · ')}</bdi>
+          </li>
+        )}
         {owed.requested.map((c: ChargeRow) => (
           <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-2.5 text-muted-foreground">
             <span><bdi>{c.description}</bdi> · <span>asked for by the family — accept it on the</span> <Link href="/charges" className="text-primary underline">Charges</Link> <span>page first</span></span>
@@ -100,6 +116,12 @@ export function DeskCollectPanel({ studentId, summary, onDone }: { studentId: st
           </li>
         ))}
       </ul>
+      {owed.lines.length > 0 && (
+        <label className="flex items-center gap-2 border-t border-border px-5 py-2.5 text-xs text-foreground">
+          <input type="checkbox" className="h-3.5 w-3.5" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+          <span>Refund policy and declaration read and signed by the parent (asked for subjects the school reserved)</span>
+        </label>
+      )}
       {error && <div className="px-5 pb-4"><Notice tone="danger">{error}</Notice></div>}
       {result && <div className="px-5 pb-4"><Notice tone={result.notCollected.length ? 'warning' : 'success'} title="Collected at the desk"><CollectedNotice r={result} /></Notice></div>}
     </section>

@@ -1,0 +1,121 @@
+
+ RUN  v3.2.7 /tmp/rwa/main-src/apps/api
+
+stderr | test/09-money-invariants.test.ts > money invariants over the whole database > F0a: nothing waits for, and nothing was captured into, a series its student may not sit
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+ × test/09-money-invariants.test.ts > money invariants over the whole database > there is money to check: every kind of movement happened in the suites above 266ms
+   → held_moves: expected 0 to be greater than 0
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > every escrow balance equals the sum of its ledger, free and held, and none is negative 2ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > escrow applied to a payment is debited once, and given back once exactly when the payment failed or was reversed 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > a registration payment charges exactly the price of what it covers 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > every registration price is its course fee plus its registration fee 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > no registration is paid for twice, and every confirmed one is paid for once 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > a completed payment never covers a registration that is waiting, expired or rejected 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > every paid registration has its paper receipt, and a parked drop has a receipt out waiting to come back 2ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > a drop never refunds more than the registration cost 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > cash handed over against a refund request adds up to what the request says was released 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > every reversal records its day and whether the money went back, so the takings know where it belongs (MO-11) 0ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > a transfer found after its payment closed is credited to escrow once, for exactly the amount found, and an undo takes back exactly that (MO-10, MO-24) 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > an open payment never covers a request awaiting approval, nor only registrations that have expired (ST-03, ST-04, ST-06) 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > a confirmed remark fee has moved its request on: never left awaiting payment, and never on a cancelled request (ST-01) 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > the held wallet holds exactly the price of paid preregistrations still waiting for their session (MA-15) 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > an approved refund request has no hand-over after its approval (MA-17) 1ms
+ × test/09-money-invariants.test.ts > money invariants over the whole database > every payment has exactly one audit row for its creation, whichever path made it (SO-1) 3ms
+   → expected [ { …(4) }, { …(4) }, { …(4) }, …(1) ] to deeply equal []
+ × test/09-money-invariants.test.ts > money invariants over the whole database > every expired registration has exactly one audit row saying why (SO-1) 1ms
+   → expected [ { …(2) } ] to deeply equal []
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > every capture of held money, escrow transfer and refund request has its audit row, for the same amount (SO-1) 4ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > every paper receipt handed over, brought back or written off as lost has exactly one audit row for it (SO-1) 1ms
+ × test/09-money-invariants.test.ts > money invariants over the whole database > there are board series to check: windows feeding several, entries in them, entries closed at a deadline 2ms
+   → windows_feeding_several_series: expected 0 to be greater than 0
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > every live registration in a window that feeds board series is entered in one of them, of its subject's board (F0b) 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > a registration expired at an entry deadline was in a series whose deadline had passed (MO-10 per series) 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > every open payment's registrations share one entry deadline (F0b: the sweep closes a payment at its series' deadline) 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > every window closes before the entry deadline of every series it feeds, and every series is in its academic year and kind (F0b) 1ms
+ ✓ test/09-money-invariants.test.ts > money invariants over the whole database > every money transition left exactly one audit row (O-7) 1ms
+ × test/09-money-invariants.test.ts > money invariants over the whole database > F0a: nothing waits for, and nothing was captured into, a series its student may not sit 41ms
+   → expected 0 to be greater than 0
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > there is money to check: every kind of movement happened in the suites above
+AssertionError: held_moves: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:50:78
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > every payment has exactly one audit row for its creation, whichever path made it (SO-1)
+AssertionError: expected [ { …(4) }, { …(4) }, { …(4) }, …(1) ] to deeply equal []
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [][39m
+[31m+ [[39m
+[31m+   {[39m
+[31m+     "desk": "true",[39m
+[31m+     "id": "304b11cb-f880-469d-9437-3b1465049571",[39m
+[31m+     "purpose": "registration",[39m
+[31m+     "rows": "0",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "desk": "true",[39m
+[31m+     "id": "6ca374c0-e92c-4bc9-9777-d10566f44b1b",[39m
+[31m+     "purpose": "registration",[39m
+[31m+     "rows": "0",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "desk": "true",[39m
+[31m+     "id": "c82630f1-f7ed-42c9-bbdb-9d1880b0e620",[39m
+[31m+     "purpose": "registration",[39m
+[31m+     "rows": "0",[39m
+[31m+   },[39m
+[31m+   {[39m
+[31m+     "desk": "true",[39m
+[31m+     "id": "1890f93a-8bdc-4c76-bff3-ad31ef1ff41e",[39m
+[31m+     "purpose": "registration",[39m
+[31m+     "rows": "0",[39m
+[31m+   },[39m
+[31m+ ][39m
+
+ ❯ test/09-money-invariants.test.ts:290:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > every expired registration has exactly one audit row saying why (SO-1)
+AssertionError: expected [ { …(2) } ] to deeply equal []
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [][39m
+[31m+ [[39m
+[31m+   {[39m
+[31m+     "id": "e458557b-d5cb-40ae-871c-a9f56f0a3014",[39m
+[31m+     "rows": "0",[39m
+[31m+   },[39m
+[31m+ ][39m
+
+ ❯ test/09-money-invariants.test.ts:301:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > there are board series to check: windows feeding several, entries in them, entries closed at a deadline
+AssertionError: windows_feeding_several_series: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:382:78
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F0a: nothing waits for, and nothing was captured into, a series its student may not sit
+AssertionError: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:512:133
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 22 passed (27)
+   Start at  01:58:14
+   Duration  668ms (transform 152ms, setup 12ms, collect 193ms, tests 338ms, environment 0ms, prepare 38ms)
+

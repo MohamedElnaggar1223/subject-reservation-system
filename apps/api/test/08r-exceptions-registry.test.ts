@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import { admin, staff, onboard, subject, session, refused, one, sql, money, openWindow, audited, runPaymentDeadlines, type Client } from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, money, openWindow, audited, runPaymentDeadlines, reservationOf, type Client } from './helpers';
 
 /**
  * 08r — the exceptions registry (RESERVATIONS_REWORK.md §3.7, §4.7; docs/features/RESERVATIONS_MONEY.md §3).
@@ -26,10 +26,10 @@ describe('08r: the exceptions registry', () => {
 
   const priceOf = async (id: string) => money((await one<{ p: string }>(`select price_at_registration as p from registration where id = $1`, [id])).p);
   const deskUnpaid = async (studentId: string, subjectIds: string[]) =>
-    (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: june, subjectIds } }))).registrations.map((r) => r.id);
+    (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: june, ...(await reservationOf(june, subjectIds)) } }))).registrations.map((r) => r.id);
   const deskPaid = async (studentId: string, subjectIds: string[]) =>
     (await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId, sessionId: june, subjectIds, collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId, sessionId: june, ...(await reservationOf(june, subjectIds)), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }))).registrations.map((r) => r.id);
 
   beforeAll(async () => {
@@ -124,9 +124,13 @@ describe('08r: the exceptions registry', () => {
 
   it('a one-shot gate lets one reservation through and is used by it; the next is refused', async () => {
     const f = await onboard(officer, 'xr-oneshot', 12);
-    const selfStudy = (subjectId: string) => f.parent.api.v1.registrations.direct.$post({
-      json: { sessionId: june, subjectIds: [subjectId], studentId: f.studentId, subjectOptions: { [subjectId]: { takeOutsideSchool: true } } },
-    });
+    // A self-study line (step B: the line's mode).
+    const selfStudy = async (subjectId: string) => {
+      const r = await reservationOf(june, [subjectId]);
+      return f.parent.api.v1.registrations.direct.$post({
+        json: { sessionId: june, studentId: f.studentId, lines: r.lines.map((l) => ({ ...l, mode: 'self_study' as const })), consent: r.consent },
+      });
+    };
     expect((await refused(selfStudy(subj.S2!))).error).toContain('only be taken outside school');
     const gate = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'gate.selfStudyFirstEntry', studentId: f.studentId, reason: 'studies abroad this term' } }));
     const [line] = await apiResponse(selfStudy(subj.S2!));
@@ -274,7 +278,7 @@ describe('08r: the exceptions registry', () => {
   it("the pricing policies through the registry: a student's self-study course share, a family's board share — each in the line's price and its basis", async () => {
     const ss = await subject(adm, 'XR-SS', 'Self-study only (AS, registry)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel', isOfferedAtSchool: false });
     const reserve = async (studentId: string) =>
-      (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: june, subjectIds: [ss] } }))).registrations[0]!.id;
+      (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: june, ...(await reservationOf(june, [ss])) } }))).registrations[0]!.id;
     const lineOf = (id: string) => one<{ p: number; course: number; board: number; ids: string[]; cp: number; bp: number }>(
       `select price_at_registration::float as p, course_fee_at_registration::float as course, registration_fee_at_registration::float as board,
               pricing_basis->'exceptionIds' as ids, (pricing_basis->>'coursePercent')::float as cp, (pricing_basis->>'boardPercent')::float as bp
@@ -314,7 +318,7 @@ describe('08r: the exceptions registry', () => {
        values (gen_random_uuid()::text, 'deadline_extension', $1, $2, 'V3: late joiner, one subject', now() + interval '20 days', 'active', $3) returning id`,
       [w.studentId, subj.S9!, finadmin.id])).id;
     await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'the window ended' } }));
-    const reserve = (subjectId: string) => officer.api.v1.registrations.desk.$post({ json: { studentId: w.studentId, sessionId: s, subjectIds: [subjectId] } });
+    const reserve = async (subjectId: string) => officer.api.v1.registrations.desk.$post({ json: { studentId: w.studentId, sessionId: s, ...(await reservationOf(s, [subjectId])) } });
     // Under "Check these", it applies to nothing: the closed window's own refusal.
     const closed = 'Registration window is not open — a finance admin can grant this student a deadline extension';
     expect(await refused(reserve(subj.S9!))).toEqual({ status: 422, error: closed });
@@ -334,8 +338,8 @@ describe('08r: the exceptions registry', () => {
     const h = await onboard(officer, 'xr-late', 12);
     const k = await onboard(officer, 'xr-late-other', 12);
     await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [series]);
-    const reserve = (studentId: string, subjectId: string, collect = false) => officer.api.v1.registrations.desk.$post({
-      json: { studentId, sessionId: s, subjectIds: [subjectId], ...(collect ? { collectNow: { instrumentUsed: 'cash' as const, escrowAmountToApply: 0 } } : {}) },
+    const reserve = async (studentId: string, subjectId: string, collect = false) => officer.api.v1.registrations.desk.$post({
+      json: { studentId, sessionId: s, ...(await reservationOf(s, [subjectId])), ...(collect ? { collectNow: { instrumentUsed: 'cash' as const, escrowAmountToApply: 0 } } : {}) },
     });
     const setting = (value: boolean) => apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'exceptions.boardEntryDeadline' }, json: { value, reason: value ? 'a late entry this series' : 'back to the hard stop' } }));
     await setting(true);

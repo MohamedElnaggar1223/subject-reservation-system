@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, money, openWindow, futureWindow, academicYearOf,
-  refuseAudit, runSessionRecovery, type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, money, openWindow, futureWindow, academicYearOf, refuseAudit, runSessionRecovery, type Client, reservationOf, swapTo } from './helpers';
 
 /**
  * A money movement and its audit row commit together, or neither does
@@ -49,7 +46,7 @@ describe('an audit row commits with its movement, or neither does (SO-1)', () =>
   const family = (tag: string): Promise<Family> => onboard(officer, `ax-${tag}`);
   const deskCash = async (f: Family, subjectIds: string[]) =>
     apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f.studentId, sessionId, subjectIds, collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: f.studentId, sessionId, ...(await reservationOf(sessionId, subjectIds)), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }));
   /** A family with free escrow: a subject paid at the desk, then dropped. */
   const withCredit = async (f: Family, subjectId: string) => {
@@ -80,7 +77,7 @@ describe('an audit row commits with its movement, or neither does (SO-1)', () =>
     it('that applies escrow: refused audit, no payment and no debit', async () => {
       f = await family('checkout');
       const credit = await withCredit(f, subj.S1!);
-      reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [subj.S2!], studentId: f.studentId } })))[0]!.id;
+      reg = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subj.S2!])), studentId: f.studentId } })))[0]!.id;
       const checkout = () => f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 300 } });
 
       expect((await withAuditRefused('PAYMENT_INITIATED', checkout)).status).toBeGreaterThanOrEqual(400);
@@ -109,8 +106,8 @@ describe('an audit row commits with its movement, or neither does (SO-1)', () =>
 
   it('a desk registration that takes the money: refused audit, no registration and no payment', async () => {
     const f = await family('desk');
-    const register = () => officer.api.v1.registrations.desk.$post({
-      json: { studentId: f.studentId, sessionId, subjectIds: [subj.S3!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+    const register = async () => officer.api.v1.registrations.desk.$post({
+      json: { studentId: f.studentId, sessionId, ...(await reservationOf(sessionId, [subj.S3!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     });
     expect((await withAuditRefused('DESK_REGISTRATION', register)).status).toBeGreaterThanOrEqual(400);
     expect(await sql(`select 1 from registration where student_id = $1`, [f.studentId])).toEqual([]);
@@ -145,7 +142,7 @@ describe('an audit row commits with its movement, or neither does (SO-1)', () =>
     it('a direct swap: refused audit, the old subject stays and no new one appears', async () => {
       const reg = (await deskCash(f, [subj.S5!])).registrations[0]!.id;
       const before = (await escrowOf(f.studentId)).free;
-      const swap = () => f.parent.api.v1.registrations[':id'].swap.$post({ param: { id: reg }, json: { newSubjectId: subj.S6!, reason: 'timetable clash' } });
+      const swap = async () => f.parent.api.v1.registrations[':id'].swap.$post({ param: { id: reg }, json: { line: await swapTo(reg, subj.S6!), reason: 'timetable clash' } });
 
       expect((await withAuditRefused('DIRECT_SWAP_EXECUTED', swap)).status).toBeGreaterThanOrEqual(400);
       expect(await statusOf('registration', reg)).toBe('confirmed');
@@ -372,7 +369,7 @@ describe('an audit row commits with its movement, or neither does (SO-1)', () =>
     beforeAll(async () => {
       f = await family('prereg');
       [cancelled, captured] = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({
-        json: { sessionId: draftId, subjectIds: [subj.S14!, subj.S15!], studentId: f.studentId },
+        json: { sessionId: draftId, ...(await reservationOf(draftId, [subj.S14!, subj.S15!])), studentId: f.studentId },
       }))).map((r) => r.id) as [string, string];
       await fund(cancelled);
       await fund(captured);
@@ -392,7 +389,7 @@ describe('an audit row commits with its movement, or neither does (SO-1)', () =>
     });
 
     it('a close that cannot write its expiry rows expires nothing; the recovery sweep finishes it, with the rows', async () => {
-      unpaid = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, subjectIds: [subj.S16!], studentId: f.studentId } })))[0]!.id;
+      unpaid = (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId, ...(await reservationOf(sessionId, [subj.S16!])), studentId: f.studentId } })))[0]!.id;
       const kept = (await deskCash(f, [subj.S17!])).registrations[0]!.id;
       request = (await apiResponse(f.student.api.v1.registrations[':id']['request-drop'].$post({ param: { id: kept }, json: { reason: 'not this one' } }))).id;
 

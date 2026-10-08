@@ -1,0 +1,133 @@
+
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+> vitest run "test/08t" "-t" "a fee confirmed while a line is being priced"
+
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -0.2 ms (measured within 1 ms)
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [39f06a4b-8911-4d73-aaa9-8a7d87fcbc32] POST /api/auth/sign-up/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[email:stub] To: admin.t08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [8c6c9217-6b5d-45cf-b511-936f74089928] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [ee1493d1-983a-4524-b9eb-ef696f5c292f] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [25c7417a-e6e3-43b7-ae9a-524ad6215453] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [16b302d7-bede-4b9d-8699-03f934a7dc75] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [e70706f1-2efa-48d2-938b-89dbdb210289] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [32186fad-a71d-4b86-ad30-66eefa36b1b9] POST /v1/teachers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [dc4387b6-526f-463c-a4ae-e7d496319913] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [94246086-d102-4735-be91-9e7965e7a57d] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [b412fba9-1b92-40b2-9146-a3369067be1f] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [81ad33e9-7f61-4787-8c33-5f6e276d39a5] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [fd87122d-c472-470b-8a30-d119c15252a5] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [2372055e-c5b4-4b4a-9e24-3b64f78bef8d] POST /v1/sessions/b796744f-0abd-455d-a4b8-4e54836e4b1a/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [ac06975c-6ea7-4010-ab33-950087927b57] POST /v1/sessions/8333365c-276c-4a01-adc4-dec0b03622c2/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [83e0b80f-19c2-47d1-ab03-7422f5ceb23e] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [41ce14c0-a26b-4946-ab87-1f76e0f30542] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [88bd942f-1b1e-4e97-ad20-597d065ace12] POST /v1/sessions/b796744f-0abd-455d-a4b8-4e54836e4b1a/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [d1052a4a-03d6-4412-ac21-3921f78c58c3] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [574ef3c3-ce87-4bba-9d40-324c52b022a1] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [69c308f2-a8ef-482c-bf9e-3c3268749df2] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [b36ba578-d386-4542-9bbc-20b909ffb4f3] POST /v1/sessions/b796744f-0abd-455d-a4b8-4e54836e4b1a/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [90bde571-b934-47c7-b7a0-5b3b02746b7d] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[email:stub] To: parent.t08-fee-gv3h@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[email:stub] To: student.t08-fee-gv3h@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [ae03b5ad-7ab4-41cc-bbda-889e3b754320] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [7458ada7-a242-4365-8f5c-317bcd4af053] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+[INFO] [41c8f283-a88b-4eb4-a177-3c1ddb794c21] POST /v1/board-fees/936870c7-d20a-4d68-b607-e742b919d8c9/confirm
+
+ ❯ test/08t-rework-races.test.ts (10 tests | 1 failed | 9 skipped) 6807ms
+   ↓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line
+   ↓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused
+   ↓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused
+   ↓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it
+   ↓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused
+   × 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional 5370ms
+     → waitFor: timed out
+   ↓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it
+   ↓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged
+   ↓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused
+   ↓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 skipped (10)
+   Start at  01:04:31
+   Duration  8.19s (transform 443ms, setup 2ms, collect 164ms, tests 6.81s, environment 0ms, prepare 31ms)
+
+ ELIFECYCLE  Test failed. See above for more details.
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional
+Error: waitFor: timed out
+ ❯ waitFor test/helpers.ts:437:38
+    435|     const v = await probe();
+    436|     if (v) return v;
+    437|     if (Date.now() > deadline) throw new Error('waitFor: timed out');
+       |                                      ^
+    438|     await new Promise((r) => setTimeout(r, 100));
+    439|   }
+ ❯ test/08t-rework-races.test.ts:218:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

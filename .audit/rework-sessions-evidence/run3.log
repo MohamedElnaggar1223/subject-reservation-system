@@ -1,0 +1,71 @@
+# run3.log: the proof of this run, as vitest reported it (the full log, 22183 lines, 1962497 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ✓ test/00-harness.test.ts (4 tests) 1511ms
+ ✓ test/01-desk.test.ts (8 tests) 1510ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 1869ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 5618ms
+ ✓ test/08-money-rules.test.ts (51 tests) 10284ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 10633ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 5768ms
+ ❯ test/08d-foundation-grade.test.ts (28 tests | 6 skipped) 7466ms
+ ❯ test/08e-foundation-eligibility-changes.test.ts (10 tests | 1 failed) 5219ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5123ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 8906ms
+
+## Failed tests
+   × F0a: when eligibility changes after a registration exists > a draft session's header never changes its series: the audited series correction is the way 354ms
+
+## Failures
+ FAIL  test/08d-foundation-grade.test.ts > F0a: grade and eligibility > every registration path asks mayRegisterFor
+Error: Failed query: insert into registration (id, student_id, session_id, subject_id, price_at_registration, course_fee_at_registration, registration_fee_at_registration, status, requested_by, offer_item_id, due_at)
+                 values ($1, $2, $3, $4, 1200, 1000, 200, $5, $6, (select i.id from session_offer_item i join session_offer o on o.id = i.offer_id where o.session_id =  and o.subject_id =  and i.kind = 'whole' order by (i.availability = 'closed'), (i.board_series_id is null), i.id limit 1), now() + interval '30 days')
+params: ae05d527-0a59-4101-8134-c8dfc099005d,kvLvdrjKkPD5P5rF7I5Z9O6ECuaLP8V6,b05c89cf-9be7-42df-985c-209b34eec0ed,82110bab-2f14-4748-b68d-a22fa271fc54,pending_approval,kvLvdrjKkPD5P5rF7I5Z9O6ECuaLP8V6
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:73:11
+ ❯ sql test/helpers.ts:63:18
+     61|     q = s`${q}${params[i - 1]}${s.raw(parts[i] ?? '')}`;
+     62|   }
+     63|   const result = await db.execute(q);
+       |                  ^
+     64|   return result.rows as T[];
+     65| }
+ ❯ seed test/08d-foundation-grade.test.ts:229:7
+ ❯ test/08d-foundation-grade.test.ts:272:26
+Caused by: error: syntax error at or near "and"
+ ❯ ../../node_modules/.pnpm/pg-pool@3.10.1_pg@8.16.3/node_modules/pg-pool/index.js:45:11
+ ❯ ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:71:12
+ ❯ sql test/helpers.ts:63:18
+ ❯ seed test/08d-foundation-grade.test.ts:229:7
+ ❯ test/08d-foundation-grade.test.ts:272:26
+
+ FAIL  test/08d-foundation-grade.test.ts > F0a: grade and eligibility > every registration path asks mayRegisterFor
+TypeError: Cannot read properties of undefined (reading 'g10')
+ ❯ test/08d-foundation-grade.test.ts:282:125
+    280|       // (09 checks that nothing waits for a series its student may no…
+    281|       for (const s of [seeded.approval!, seeded.payment!]) {
+    282|         await sql(`delete from registration where id in ($1, $2) and s…
+       |                                                                                                                             ^
+    283|       }
+    284|     });
+
+ FAIL  test/08e-foundation-eligibility-changes.test.ts > F0a: when eligibility changes after a registration exists > a draft session's header never changes its series: the audited series correction is the way
+Error: Cambridge International November 2026 (t3-g3zo) is not a series of this session (June 2028)
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ offerInSession test/helpers.ts:250:3
+    248|   const seriesId = await suiteSeries(adm, s, sub.council, sub.level);
+    249|   const teacherId = await teacherOfTheSuite(adm);
+    250|   await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+       |   ^
+    251|     param: { id: s.id },
+    252|     json: {
+ ❯ subject test/helpers.ts:209:34
+ ❯ test/08e-foundation-eligibility-changes.test.ts:291:19
+
+## Summary
+[clock] database minus host: -1.1 ms (measured within 1 ms)
+ Test Files  2 failed | 9 passed (11)
+      Tests  1 failed | 174 passed | 6 skipped | 1 todo (182)
+   Start at  00:01:02
+   Duration  67.31s (transform 518ms, setup 15ms, collect 955ms, tests 63.91s, environment 1ms, prepare 321ms)

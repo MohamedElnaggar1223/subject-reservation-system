@@ -1,0 +1,157 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -0.4 ms (measured within 1 ms)
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08t-rework-races.test.ts > 08t: the rework races
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [b9a05fb8-fadf-463e-9042-32a24339f9a5] POST /api/auth/sign-up/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[email:stub] To: admin.t08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [fdf8c296-7a25-43c6-90a6-a52aca298bc7] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [b260d533-e2d0-4bde-8784-d377347a952e] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [44fa4d6b-276f-4d80-b78b-42fe54e5a0a8] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [1b233c69-df5c-402e-ad0e-b2891f0941f4] POST /v1/users
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [4277efb4-5a08-4b1b-9100-58ed5341c104] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [39a35ce0-0d64-4406-9e35-50ab27e76ce8] POST /v1/teachers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [4b76b41a-5b68-4ca8-8e37-1ed1297c4959] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [61bed563-df69-429d-8e26-b38a1fef2c3d] POST /v1/sessions
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [9decde02-4a1b-46a4-8adb-f1507d3b2f72] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [bc5f22f5-5dc4-4624-b2d5-1b1f18aec2c5] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [07d16f7b-fb2f-4685-9902-8366bccdbfbd] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [63a16576-e436-4087-b8dd-3ede9bd5a0a8] POST /v1/sessions/de4146f0-a240-4c84-9c75-fbab468c7763/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [f27b5842-9983-4bf6-885b-8d8516f44d81] POST /v1/sessions/a198b933-273d-4cca-b624-b4b875e74db7/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [1dfdc922-7665-42e1-8904-13d047b44751] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [8b388716-e9e9-4373-9c0a-c15c59d50cae] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races
+[INFO] [4f5b0df7-325e-4a35-8f9e-ec978c261820] POST /v1/sessions/de4146f0-a240-4c84-9c75-fbab468c7763/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[INFO] [d9935ad3-3746-4f0a-8651-13e0b5ba262b] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[INFO] [a235f35f-34d0-470a-a141-46fcd0f81408] POST /v1/catalogue/qualifications
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[INFO] [768f6cd7-bfdc-4afa-b55d-71e21fb1fa4f] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[INFO] [9f38126e-5c54-4126-a0f0-e02ae7f9a8c3] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[INFO] [5b61575d-72b5-4df8-a080-d40e7a564e62] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[INFO] [19010c72-a6cd-4f98-8958-905d8001c236] POST /v1/sessions/de4146f0-a240-4c84-9c75-fbab468c7763/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[INFO] [10d05556-3b1f-42fd-a10f-ccc78e69654b] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[email:stub] To: parent.t08-ga-806y@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[email:stub] To: student.t08-ga-806y@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[INFO] [43dc0c4b-b78c-41a9-a0a4-c3b685828cbb] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[INFO] [d0629672-7206-4c9c-a445-c78c0d979043] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[INFO] [3671ace3-1783-4c5c-b233-92aad43eea7e] POST /v1/sessions/de4146f0-a240-4c84-9c75-fbab468c7763/board-series/move
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[INFO] [b691e4c8-a1a9-4dca-9415-ef09be2cdc03] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+[INFO] [fa3df1f7-fa0f-43be-af00-a6cfcb26c352] POST /v1/board-fees/7a3ae07f-0599-4a88-92f8-c999953307b4/confirm
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[INFO] [ede2d467-7cb0-4410-89c5-5a12f7b3784d] POST /v1/subjects
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[INFO] [d0faf8c9-d977-4ae2-8a44-c2979205f2cf] POST /v1/catalogue/qualifications
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[INFO] [3f3b2944-94ce-44ba-a9d7-bee80a1625fe] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[INFO] [dc80d3ca-32a7-4339-9611-1a54d1e1be4d] POST /v1/board-series
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[INFO] [8cd17753-8312-4fc4-8761-1051c5617dad] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[INFO] [51ea766b-024d-4460-8ffa-4f7b5d798e2c] POST /v1/sessions/de4146f0-a240-4c84-9c75-fbab468c7763/offers
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[INFO] [867f3c32-9066-4398-9284-2539d4e1d3ff] POST /v1/links/desk-onboard
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[email:stub] To: parent.t08-gb-806y@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[email:stub] To: student.t08-gb-806y@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[INFO] [9bf951ef-b550-4e8a-b4e2-4f52ddaf2c0e] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[INFO] [bb0db9b8-e19d-4df1-908c-73596b18f19c] POST /api/auth/sign-in/email
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[INFO] [ac39740a-38c5-44a2-92c2-9f505628d0ac] PUT /v1/board-fees
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[INFO] [b57863f0-7215-4c14-8a72-f93a4422ff3a] POST /v1/sessions/de4146f0-a240-4c84-9c75-fbab468c7763/board-series/move
+
+stdout | test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+[INFO] [7ee48d9f-dd8d-4064-acfb-f28d36b9cd21] POST /v1/board-fees/5c9e6f78-7f6b-4c56-bbba-1dc2a0b85956/confirm
+
+ ✓ test/08t-rework-races.test.ts (18 tests | 16 skipped) 2992ms
+   ✓ 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after  669ms
+   ✓ 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line  846ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed | 16 skipped (18)
+   Start at  06:11:32
+   Duration  4.45s (transform 469ms, setup 2ms, collect 189ms, tests 2.99s, environment 0ms, prepare 34ms)
+

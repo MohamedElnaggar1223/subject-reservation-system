@@ -13,11 +13,12 @@
  * each family whose price changed, or whose price became one to be confirmed, is told after the
  * move commits (`tellPriceChanged`).
  *
- * A move takes the rows its lines will read in Confirm's order — the fee rows (FOR SHARE), then
- * the lines (`lockMoveFeeRows` before the lines' FOR UPDATE): a Confirm of one of those rows
- * either commits first (the move reads it confirmed) or waits for the move and then finds the
- * moved lines by their basis, so no moved line is left provisional on a confirmed row (the review
- * of 40c1447; docs/features/RESERVATIONS.md §2.12).
+ * A move takes what its lines will read in Confirm's order — the target series' fee grid (shared:
+ * lib/fee-grid-lock.ts), the fee rows (FOR SHARE), then the lines (`lockMoveFeeRows` before the
+ * lines' FOR UPDATE): a Confirm or a fee row's creation in that series either commits first (the
+ * move reads it) or waits for the move, and a Confirm then finds the moved lines by their basis, so
+ * no moved line is left provisional on a confirmed row (the review of 40c1447;
+ * docs/features/RESERVATIONS.md §2.1, §2.12).
  */
 
 import { db, registration, boardFee, sessionOfferItemFeeKey, subject, sql, and, eq, inArray } from '@repo/db';
@@ -26,6 +27,7 @@ import { randomUUID } from 'crypto';
 import { logAction, logActions } from './audit.services';
 import { repriceBoardPart } from './pricing.services';
 import { createNotification } from './notification.services';
+import { lockFeeGrids } from '../lib/fee-grid-lock';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -47,13 +49,15 @@ export async function lockFeeRows(tx: Tx, wanted: { seriesId: string; keyKind: s
 }
 
 /**
- * Before a move locks its lines: the fee rows each item will read in the series it goes to, FOR
- * SHARE — after carrying the old series' rows across where the new one has none, so the rows the
- * lines are priced from are all held (a Confirm of one waits for the move; see the header).
+ * Before a move locks its lines: the fee grids of the series it goes to, shared (no fee row is
+ * created or confirmed there until the move commits: lib/fee-grid-lock.ts), then the fee rows each
+ * item will read there, FOR SHARE — after carrying the old series' rows across where the new one
+ * has none, so the rows the lines are priced from are all held (see the header).
  */
 export async function lockMoveFeeRows(
   tx: Tx, moves: { itemId: string; fromSeriesId: string | null; toSeriesId: string | null }[], actorId: string | null, why: string,
 ) {
+  await lockFeeGrids(tx, moves.map((m) => m.toSeriesId), 'move');
   for (const m of moves) await carryFeeRows(tx, m.itemId, m.fromSeriesId, m.toSeriesId, actorId, why);
   const itemIds = [...new Set(moves.filter((m) => m.toSeriesId).map((m) => m.itemId))];
   if (!itemIds.length) return [];

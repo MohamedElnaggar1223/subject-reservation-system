@@ -1,0 +1,4 @@
+
+> @repo/api@ check-types /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-reservations/apps/api
+> tsc -p tsconfig.test.json --noEmit
+

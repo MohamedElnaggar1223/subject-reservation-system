@@ -238,6 +238,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
       {
         titleKey: 'nav.financial',
         items: [
+          { labelKey: 'nav.statement', href: '/statement', icon: 'documents' },
           { labelKey: 'nav.schoolFee', href: '/school-fee', icon: 'payments' },
           // The reservations rework, step C (§3.6, §3.10): instalments and charges, paid here.
           { labelKey: 'nav.chargesDue', href: '/charges-due', icon: 'checkout' },
@@ -267,6 +268,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
       items: [
         { labelKey: 'nav.registerSubjects', href: '/register', icon: 'register' },
         { labelKey: 'nav.myRegistrations', href: '/registrations', icon: 'registrations' },
+        { labelKey: 'nav.statement', href: '/statement', icon: 'documents' },
         { labelKey: 'nav.history', href: '/registrations/history', icon: 'history' },
         { labelKey: 'nav.browseSubjects', href: '/subjects', icon: 'subjects' },
         { labelKey: 'nav.remarks', href: '/remarks', icon: 'audit' },

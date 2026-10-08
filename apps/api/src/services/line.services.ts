@@ -9,10 +9,10 @@
  * sets its due date, checks its teacher and inserts it; the routing trigger enters it in its
  * item's series. It writes no consent rows: the caller does (step B).
  *
- * The paths that still name subjects (request, direct, desk, override, preregistration, swap)
- * build their lines with `legacyLinesFor`: the subject's whole item (`resolveItem`), a retake
- * when the student sat or dropped the subject in another session, self-study when asked or when
- * the item is self-study only — until step B gives them `lines` and `consent`.
+ * Since step B every reservation path (request, direct, desk, override, preregistration, swap)
+ * takes `lines` and `consent` and reaches here through reservation.services `reserveLines`, which
+ * resolves the sitting a retake follows and writes the consent rows (the bridge
+ * `legacyLinesFor`, which built a subject's whole item from `subjectIds`, is gone).
  */
 
 import {
@@ -21,7 +21,7 @@ import {
   and, eq, or, inArray, sql,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
-import type { Eligibility, LineInputType, SubjectRegistrationOptionsType } from '@repo/validations';
+import type { Eligibility, LineInputType } from '@repo/validations';
 import { assertLineRules } from './line-rules.services';
 import { priceLine } from './pricing.services';
 import { computeDueAt, effectiveDeadlineFor, deadlinePassedSentence } from './deadline.services';
@@ -116,7 +116,8 @@ export async function insertLines(tx: Tx, input: InsertLinesInput) {
     const it = byId.get(l.offerItemId);
     if (!it || it.item.sessionId !== input.sessionId) throw new LineError('That item is not on offer in this session', 404);
     if (!it.item.boardSeriesId) throw new LineError(`${it.subjectName} is entered in no board series: it cannot be reserved`);
-    const d = await effectiveDeadlineFor(tx, { boardSeriesId: it.item.boardSeriesId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId ?? null, studentId: input.studentId });
+    // A line being made has no answer to a declaration yet (declarationRejected false).
+    const d = await effectiveDeadlineFor(tx, { boardSeriesId: it.item.boardSeriesId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId ?? null, declarationRejected: false, studentId: input.studentId });
     if (!d.at) {
       throw new LineError(`${it.subjectName} is entered in a board series with no entry deadline and no exam dates yet: it opens for reservations once they are set`);
     }
@@ -179,44 +180,4 @@ export async function insertLines(tx: Tx, input: InsertLinesInput) {
   const inserted = await tx.insert(registration).values(records).returning();
   if (usedExceptionIds.length) await lineExceptions.markUsed(tx, usedExceptionIds, { registrationIds: inserted.map((r) => r.id), actorId: input.requestedBy });
   return inserted;
-}
-
-/**
- * The subjects a path names, as lines (until step B gives the paths `lines`): each subject's whole
- * item; a retake when the student sat (confirmed) or dropped the subject in another session —
- * its prior sitting the latest such line's series ('known'), or unknown ('legacy') when that line
- * had none; self-study when asked, or when the item is self-study only; the teacher asked for.
- */
-export async function legacyLinesFor(
-  executor: Executor, studentId: string, sessionId: string, subjectIds: string[],
-  options: Record<string, SubjectRegistrationOptionsType> | undefined,
-): Promise<LineInputType[]> {
-  const out: LineInputType[] = [];
-  for (const subjectId of subjectIds) {
-    let resolved;
-    try {
-      resolved = await resolveItem(executor, sessionId, subjectId);
-    } catch (err) {
-      if (err instanceof OfferError) throw new LineError(err.message, err.status === 404 ? 404 : 400);
-      throw err;
-    }
-    const prior = await executor.select({ boardSeriesId: registration.boardSeriesId }).from(registration)
-      .where(and(eq(registration.studentId, studentId), eq(registration.subjectId, subjectId), sql`${registration.sessionId} <> ${sessionId}`,
-        inArray(registration.status, ['confirmed', 'dropped'])))
-      .orderBy(sql`${registration.createdAt} desc`, sql`${registration.id} desc`);
-    const isRetake = prior.length > 0;
-    const known = prior.find((p) => p.boardSeriesId)?.boardSeriesId ?? null;
-    const c = availabilityConstraints(resolved.offer.availability, resolved.item.availability);
-    const opts = options?.[subjectId] ?? {};
-    const mode = c.selfStudyOnly || opts.takeOutsideSchool ? 'self_study' : 'in_school';
-    out.push({
-      offerItemId: resolved.item.id,
-      attempt: isRetake ? 'retake' : 'first',
-      mode,
-      teacherId: mode === 'in_school' ? opts.teacherId ?? null : null,
-      priorSittingSeriesId: isRetake ? known : null,
-      priorSittingSource: isRetake ? (known ? 'known' : 'legacy') : null,
-    });
-  }
-  return out;
 }

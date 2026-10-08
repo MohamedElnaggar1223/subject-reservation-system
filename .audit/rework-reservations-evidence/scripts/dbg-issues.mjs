@@ -1,0 +1,13 @@
+import { browser, signedIn, shot, WEB } from './lib.mjs';
+const b = await browser();
+const page = await signedIn(b, 'officer.mona@igcse.local');
+const logs = [];
+page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') logs.push(`${m.type()}: ${m.text().slice(0, 400)}`); });
+await page.goto(`${WEB}/desk`);
+await page.fill('input[type="search"]', 'Demo B');
+await page.getByRole('button', { name: /student\.demob@igcse\.local/ }).first().click();
+await page.waitForTimeout(1500);
+await page.getByRole('button', { name: '+ Reserve' }).click();
+await page.waitForTimeout(2000);
+console.log(logs.join('\n'));
+await b.close();

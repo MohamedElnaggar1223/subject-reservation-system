@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearLabel, academicYearStartOf } from '@repo/validations';
 import {
   admin, staff, onboard, subject, session, refused, one, sql, money, takings, takingsDelta, openWindow, futureWindow,
-  runPaymentDeadlines, seriesOfSession, audited, notificationsFor, type Client,
+  runPaymentDeadlines, seriesOfSession, audited, notificationsFor, reservationOf, type Client,
 } from './helpers';
 
 /**
@@ -37,10 +37,10 @@ describe('08q: charges', () => {
 
   const deskPaid = async (f: Family, subjectIds: string[], sessionId = june) =>
     (await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f.studentId, sessionId, subjectIds, collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: f.studentId, sessionId, ...(await reservationOf(sessionId, subjectIds)), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }))).registrations.map((r) => r.id);
   const deskUnpaid = async (f: Family, subjectIds: string[], sessionId = june) =>
-    (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId, subjectIds } }))).registrations.map((r) => r.id);
+    (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId, ...(await reservationOf(sessionId, subjectIds)) } }))).registrations.map((r) => r.id);
   const paymentOfCharge = async (chargeId: string, status = 'completed') =>
     (await one<{ id: string }>(`select p.id from payment p join payment_charge pc on pc.payment_id = p.id where pc.charge_id = $1 and p.status = $2`, [chargeId, status])).id;
 
@@ -472,10 +472,10 @@ describe('08q: instalment plans', () => {
 
   const deskPaid = async (f: Family, subjectIds: string[], sessionId: string) =>
     (await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f.studentId, sessionId, subjectIds, collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: f.studentId, sessionId, ...(await reservationOf(sessionId, subjectIds)), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }))).registrations.map((r) => r.id);
   const unpaid = async (f: Family, subjectIds: string[], sessionId: string) =>
-    (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId, subjectIds } }))).registrations.map((r) => r.id);
+    (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId, ...(await reservationOf(sessionId, subjectIds)) } }))).registrations.map((r) => r.id);
   const grant = (f: Family, line: string, amounts: number[], extra: { validUntil?: Date; firstInDays?: number } = {}) =>
     finadmin.api.v1.exceptions.$post({
       json: {
@@ -602,7 +602,7 @@ describe('08q: instalment plans', () => {
 
   it('a plan line is not sent back for approval by the parent, even with nothing paid yet', async () => {
     const f = await onboard(officer, 'cqp-revert', 12);
-    const [req] = await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId: s1, subjectIds: [subj.P5!] } }));
+    const [req] = await apiResponse(f.student.api.v1.registrations.request.$post({ json: { sessionId: s1, ...(await reservationOf(s1, [subj.P5!])) } }));
     await apiResponse(f.parent.api.v1.registrations.approve.$put({ json: { registrationIds: [req!.id] } }));
     const p = await plan(f, req!.id, [750, 750]);
     expect((await refused(f.parent.api.v1.registrations['revert-approval'].$put({ json: { registrationIds: [req!.id] } }))).error).toContain('instalment plan');
@@ -858,7 +858,7 @@ describe('08q: instalment plans', () => {
     expect((await refused(f.parent.api.v1.escrow.transfer.$post({ json: { fromStudentId: f.studentId, toStudentId: sibling.student.id, amount: 100 } }))).status).toBeGreaterThanOrEqual(400);
     // A preregistration in a session not open yet, paid: its money is held for it beside the plan's.
     const draft = await session(adm, 'June (AS, plans prereg)', 'june', 'as_level', futureWindow());
-    const [pre] = await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, subjectIds: [subj.P8!], studentId: f.studentId } }));
+    const [pre] = await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, ...(await reservationOf(draft, [subj.P8!])), studentId: f.studentId } }));
     const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [pre!.id], paymentMethod: 'in_school' } }));
     await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay.id! }, json: { instrumentUsed: 'cash' } }));
     expect(await wallet(f.studentId)).toEqual({ free: 0, held: 2250 });
@@ -935,7 +935,7 @@ describe("08q: the desk collects lines, charges and the year's school fee in one
     june = await session(adm, 'June (AS, desk collect)', 'june', 'as_level', { ...openWindow(), activate: true });
     // A line waiting for payment, reserved before the year's school fee opened.
     g = await onboard(officer, 'cqd-g', 12);
-    gLine = (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId: g.studentId, sessionId: june, subjectIds: [subj.D1!] } }))).registrations[0]!.id;
+    gLine = (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId: g.studentId, sessionId: june, ...(await reservationOf(june, [subj.D1!])) } }))).registrations[0]!.id;
     // This year's school fee: it gates every registration of this year while this block runs.
     scheduleId = (await apiResponse(finadmin.api.v1['school-fees'].schedules.$post({ json: { academicYear: year, amount: 3000, opensAt: inDays(-1).toISOString() } }))).id;
   });
@@ -946,8 +946,8 @@ describe("08q: the desk collects lines, charges and the year's school fee in one
   it("reserve and collect: the year's fee first (the gate asks for it), the lines, then the student's charges — each its own payment", async () => {
     const f = await onboard(officer, 'cqd-f', 12);
     const card = await custom(f, 250);
-    const reserve = (collectNow: Record<string, unknown>) =>
-      officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId: june, subjectIds: [subj.D2!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0, ...collectNow } } });
+    const reserve = async (collectNow: Record<string, unknown>) =>
+      officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId: june, ...(await reservationOf(june, [subj.D2!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0, ...collectNow } } });
     // Without the fee the gate refuses, and nothing is taken.
     expect((await refused(reserve({}))).error).toContain('school fee');
     expect(await paymentsOf(f.studentId)).toEqual([]);

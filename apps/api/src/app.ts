@@ -40,6 +40,7 @@ import { catalogueRoutes } from './routes/catalogue.routes';
 import { boardSeriesRoutes } from './routes/board-series.routes';
 import { enrolmentRoutes } from './routes/enrolment.routes';
 import { boardFeeRoutes } from './routes/board-fee.routes';
+import { lineRoutes, sessionVerifyRoutes, statementRoutes } from './routes/reservation.routes';
 import { isGrantedRole, isGranted } from './lib/role-grants';
 import { reports } from './routes/report.routes';
 import { teachers } from './routes/teacher.routes';
@@ -388,8 +389,11 @@ const v1 = new Hono<HonoEnv>()
   .route('/users', users)
   .route('/subjects', subjects)
   .route('/sessions', sessions)
+  .route('/sessions', sessionVerifyRoutes)
   .route('/registrations', registrations)
   .route('/registrations', registrationSwapRoutes)
+  .route('/registrations', lineRoutes)
+  .route('/statement', statementRoutes)
   .route('/payments', payments)
   .route('/escrow', escrowRoutes)
   .route('/change-requests', changeRequestRoutes)

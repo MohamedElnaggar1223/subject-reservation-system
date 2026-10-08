@@ -1202,6 +1202,14 @@ export const registration = pgTable(
     // On a verified carry-forward from another centre (asked at verification, never listed).
     priorCentre: text("prior_centre"),
     priorCandidateNumber: text("prior_candidate_number"),
+    // Step B (§3.5): the coordinator's answer to a declared sitting — who, when and what. A
+    // paid line whose declaration was rejected before the first-entry deadline stands with
+    // declaration_rejected (F4 reads its attempt as 'first').
+    priorSittingVerifiedBy: text("prior_sitting_verified_by").references(() => user.id, { onDelete: "set null" }),
+    priorSittingVerifiedAt: timestamp("prior_sitting_verified_at", { withTimezone: true }),
+    // 'verified' | 'rejected'; null while a declared sitting waits (or there is none to verify).
+    priorSittingVerifiedOutcome: text("prior_sitting_verified_outcome"),
+    declarationRejected: boolean("declaration_rejected").notNull().default(false),
     // When the line is due (dueDateFor). Not null after 0043.
     dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
     // A board fee read was provisional: "confirmed before payment".
@@ -1248,6 +1256,11 @@ export const registration = pgTable(
     check("registration_attempt_valid", sql`${table.attempt} IN ('first', 'retake')`),
     check("registration_mode_valid", sql`${table.mode} IN ('in_school', 'self_study')`),
     check("registration_prior_sitting_source_valid", sql`${table.priorSittingSource} IS NULL OR ${table.priorSittingSource} IN ('known', 'declared_by_desk', 'declared_by_family', 'legacy')`),
+    // Step B: an outcome is recorded with who and when, and only on a sitting there is to verify;
+    // a line stands with its declaration rejected only after a rejection.
+    check("registration_prior_sitting_outcome_valid", sql`${table.priorSittingVerifiedOutcome} IS NULL OR (${table.priorSittingVerifiedOutcome} IN ('verified', 'rejected') AND ${table.priorSittingVerifiedAt} IS NOT NULL AND ${table.priorSittingSeriesId} IS NOT NULL)`),
+    check("registration_declaration_rejected_outcome", sql`NOT ${table.declarationRejected} OR ${table.priorSittingVerifiedOutcome} = 'rejected'`),
+    index("registration_to_verify_idx").on(table.sessionId).where(sql`prior_sitting_source IN ('declared_by_family', 'declared_by_desk') AND prior_sitting_verified_outcome IS NULL`),
     // One live line per (student, session, item) — P1 and P2 under one
     // subject are two lines (RESERVATIONS_REWORK.md §3.5; migration 0043).
     // The exclusive groups and "the same unit or award once in a series" are
@@ -1385,7 +1398,10 @@ export const registrationConsent = pgTable(
     at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("registrationConsent_unique_idx").on(table.registrationId, table.kind),
+    // One row per line, kind and channel (step B): a line the school reserved (grade 10, channel
+    // 'school') gets the family's own pair at checkout beside it.
+    uniqueIndex("registrationConsent_unique_idx").on(table.registrationId, table.kind, table.channel),
+    index("registrationConsent_registrationId_idx").on(table.registrationId),
     check("registration_consent_kind_valid", sql`${table.kind} IN ('refund_policy', 'declaration')`),
     check("registration_consent_channel_valid", sql`${table.channel} IN ('app', 'desk', 'school', 'imported')`),
   ]
@@ -2279,6 +2295,9 @@ export const changeRequest = pgTable(
     // Reservations rework (§3.5, §7): the item a swap goes to. The backfill
     // maps a pending swap to its new subject's whole item; null on history.
     newOfferItemId: text("new_offer_item_id").references(() => sessionOfferItem.id, { onDelete: "restrict" }),
+    // Step B: the swap's new line as the student asked for it (attempt, mode, teacher, the
+    // sitting it follows). Null on a request made before step B: approval reserves a first entry.
+    newLine: jsonb("new_line").$type<Record<string, unknown>>(),
     // Snapshot of the new subject's price at time of request (for swaps)
     // For drops: stores the priceAtRegistration to be credited back
     priceAtRequest: numeric("price_at_request", { precision: 12, scale: 2, mode: "number" }).notNull(),

@@ -67,6 +67,8 @@ import { sessionOpenFor, sessionWindow, windowRefusal, entryDeadlineMessage, sch
 import { effectiveDeadlinesOf, lineDeadlineSql, linesKeptByLateEntry } from './deadline.services';
 import { getSetting } from './settings.services';
 import { PROVISIONAL_REFUSAL, PRICE_CHANGED_REFUSAL } from './pricing.services';
+import { consentStanding, writeConsents, refundTermsFor, CONSENT_MISSING_REFUSAL, FAMILY_CONSENT_NEEDED } from './reservation.services';
+import { holdUnverifiedAtDeadline } from './verification.services';
 import { seriesPastDeadline, seriesDisplayName, windowsOfSeries, seriesDeadlineGroups, mixedDeadlinesSentence } from './series.services';
 import {
   notifyPaymentConfirmed,
@@ -254,6 +256,12 @@ export async function initiatePayment(
     throw new Error(PROVISIONAL_REFUSAL);
   }
 
+  // Consent (RESERVATIONS_REWORK.md §3.5): a line nobody consented to is never paid; a line the
+  // school reserved (grade 10, channel 'school') takes the family's own pair here, at checkout.
+  const consent = await consentStanding(db, data.registrationIds);
+  if (consent.missing.length) throw new Error(CONSENT_MISSING_REFUSAL);
+  if (consent.schoolOnly.length && !data.consent) throw new Error(FAMILY_CONSENT_NEEDED);
+
   // Held-wallet funding is provider money only — no escrow application
   if (isPrereg && (data.escrowAmountToApply ?? 0) > 0) {
     throw new Error('Escrow cannot be applied to preregistration payments');
@@ -387,6 +395,8 @@ export async function initiatePayment(
     // deadline change at the same moment waits for this checkout).
     const groupsInTx = await seriesDeadlineGroups(tx, data.registrationIds, true);
     if (groupsInTx.length > 1) throw new Error(mixedDeadlinesSentence(groupsInTx));
+    // The family's own consent on the lines the school reserved, with the checkout it came with.
+    if (consent.schoolOnly.length) await writeConsents(tx, consent.schoolOnly, { channel: 'app', confirmedBy: parentId });
 
     // 1. Create payment record FIRST so the escrow_transaction FK can resolve.
     const [paymentRecord] = await tx
@@ -535,6 +545,7 @@ export async function confirmPayment(
             boardSeriesId: registration.boardSeriesId,
             attempt: registration.attempt,
             priorSittingSeriesId: registration.priorSittingSeriesId,
+            declarationRejected: registration.declarationRejected,
             price: registration.priceAtRegistration,
           })
           .from(registration)
@@ -568,6 +579,9 @@ export async function confirmPayment(
         'Payment cannot be confirmed — at least one registration is no longer payable (session closed or already expired).'
       );
     }
+    // A line nobody consented to is never confirmed (§3.5); the database refuses it too (0045).
+    const toConfirm = regs.filter((r) => r.status === 'pending_payment').map((r) => r.id);
+    if ((await consentStanding(tx, toConfirm)).missing.length) throw new Error(CONSENT_MISSING_REFUSAL);
 
     // V3 §6.10: a remark fee moves its request on in this transaction, and
     // only a request still awaiting payment. The move used to run after the
@@ -795,7 +809,7 @@ async function failOpenPayment(
     const expired: { id: string; studentId: string; subjectId: string; sessionId: string }[] = [];
     if (opts.expireIfClosed) {
       const regs = await tx
-        .select({ id: registration.id, sessionId: registration.sessionId, subjectId: registration.subjectId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId })
+        .select({ id: registration.id, sessionId: registration.sessionId, subjectId: registration.subjectId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId, declarationRejected: registration.declarationRejected })
         .from(paymentRegistration)
         .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
         .where(and(eq(paymentRegistration.paymentId, paymentId), eq(registration.status, 'pending_payment')));
@@ -1242,6 +1256,14 @@ export async function undoLateTransfer(paymentId: string, financeAdminId: string
  *    (MO-21).
  */
 export async function enforcePaymentDeadlines(now: Date = new Date()) {
+  // Under `verification.unverifiedAtDeadline = hold`, a declared sitting still unverified at its
+  // line's deadline ends the line first (RESERVATIONS_REWORK.md §3.5): a waiting one expires
+  // (hold_unverified), a paid one is dropped through the receipt-gated drop. Off (the default,
+  // enter_as_declared): nothing. Its own failures never stop the sweep below.
+  const held = await holdUnverifiedAtDeadline(now).catch((err) => {
+    console.error('[deadlines] Could not hold the unverified declared sittings:', err);
+    return { expired: 0, dropped: 0 };
+  });
   let referencesLapsed = 0;
   let paymentsClosedAtDeadline = 0;
   let registrationsExpiredAtDeadline = 0;
@@ -1321,7 +1343,7 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
     try {
       const expired = await db.transaction((tx) =>
         expireWaitingRegistrations(tx, and(eq(registration.boardSeriesId, s.id),
-          sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}) <= ${now}`,
+          sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}, ${registration.declarationRejected}) <= ${now}`,
           kept.length ? notInArray(registration.id, kept) : undefined), 'entry_deadline', now));
       registrationsExpiredAtDeadline += expired.length;
       for (const sessionId of new Set(expired.map((r) => r.sessionId))) {
@@ -1361,6 +1383,7 @@ export async function enforcePaymentDeadlines(now: Date = new Date()) {
 
   return {
     referencesLapsed, paymentsClosedAtDeadline, registrationsExpiredAtDeadline, preregistrationsRefundedAtDeadline, preregistrationsExpiredUnopened,
+    unverifiedExpired: held.expired, unverifiedDropped: held.dropped,
     chargesClosedAtDeadline: charges.closed, chargePaymentsClosedAtDeadline: charges.paymentsClosed, instalmentPaymentsOfEndedPlans: deadPlanPayments,
   };
 }
@@ -2202,6 +2225,17 @@ export async function getCheckoutSummary(
     student: regs[0]!.student,
     openPayment,
     deadlineGroups,
+    // Lines the school reserved (grade 10) whose family has not given its own consent yet: the
+    // checkout asks for it (step B, RESERVATIONS_REWORK.md §3.5), showing the refund terms each
+    // line's session freezes when the family ticks.
+    ...(await (async () => {
+      const familyConsentNeeded = (await consentStanding(db, registrationIds)).schoolOnly;
+      const sessions = [...new Set(regs.filter((r) => familyConsentNeeded.includes(r.id)).map((r) => r.sessionId))];
+      return {
+        familyConsentNeeded,
+        familyConsentTerms: await Promise.all(sessions.map(async (sessionId) => ({ sessionId, terms: await refundTermsFor(db, sessionId) }))),
+      };
+    })()),
   };
 }
 
@@ -2459,7 +2493,7 @@ async function expireDeadPlanLineInTx(tx: Tx, paymentId: string, studentId: stri
   const [inst] = await tx.select({ registrationId: charge.registrationId }).from(paymentCharge).innerJoin(charge, eq(charge.id, paymentCharge.chargeId))
     .where(and(eq(paymentCharge.paymentId, paymentId), eq(charge.kind, 'instalment'))).limit(1);
   if (!inst?.registrationId) return [];
-  const [line] = await tx.select({ id: registration.id, status: registration.status, sessionId: registration.sessionId, subjectId: registration.subjectId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId })
+  const [line] = await tx.select({ id: registration.id, status: registration.status, sessionId: registration.sessionId, subjectId: registration.subjectId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId, declarationRejected: registration.declarationRejected })
     .from(registration).where(eq(registration.id, inst.registrationId)).for('update');
   if (!line || line.status !== 'pending_payment') return [];
   if (await sessionOpenFor(studentId, line.sessionId, line, tx) && (await mayRegisterFor(studentId, line.sessionId, tx)).allowed) return [];

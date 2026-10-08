@@ -139,6 +139,7 @@ export async function refundFor(
       courseFee: registration.courseFeeAtRegistration, boardFee: registration.registrationFeeAtRegistration,
       snapshot: registration.refundPolicySnapshot, legacy: registration.legacy,
       boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId,
+      declarationRejected: registration.declarationRejected,
       sessionStart: registrationSession.startDate, sessionCourseStart: registrationSession.courseStartsOn, sessionPolicy: registrationSession.refundPolicy,
       offerId: sessionOffer.id, offerCourseStart: sessionOffer.courseStartsOn,
     })

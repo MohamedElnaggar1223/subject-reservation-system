@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, audited, notified, notificationsFor, waitFor, money, sessionName,
-  openWindow, runPaymentDeadlines, type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, audited, notified, notificationsFor, waitFor, money, sessionName, openWindow, runPaymentDeadlines, type Client, reservationOf } from './helpers';
 
 /**
  * F0b — board series (FEATURES_PLAN.md F0b; DISCOVERY_RESEARCH.md §5 note 1; IMPORT_SPIKE.md
@@ -42,7 +39,7 @@ describe('F0b: board series', () => {
   type Family = { parent: Client; student: Client; studentId: string };
   const family = (tag: string): Promise<Family> => onboard(officer, `bs-${tag}`, 12);
   const direct = async (f: Family, subjectIds: string[]) =>
-    apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, subjectIds, studentId: f.studentId } }));
+    apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, ...(await reservationOf(windowId, subjectIds)), studentId: f.studentId } }));
   const checkout = (f: Family, ids: string[], method: 'instapay' | 'in_school', escrow = 0) =>
     apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: ids, paymentMethod: method, escrowAmountToApply: escrow } }));
   // A series with neither an entry deadline nor an exam start takes no line (§3.3): the exams' start is on record.
@@ -127,13 +124,15 @@ describe('F0b: board series', () => {
       expect(await seriesOfRegistration(bySubject[subj.MA3!]!)).toBe(oct);
       expect(await seriesOfRegistration(bySubject[subj.BI4!]!)).toBe(jan);
 
-      const available = (await apiResponse(a.parent.api.v1.registrations.available.$get({ query: { sessionId: windowId, studentId: a.studentId } })))
-        .filter((s) => s.code.startsWith('BS-'));
+      // Step B: the offers read (GET /registrations/available is gone) — the items not yet held.
+      const read = await apiResponse(a.parent.api.v1.registrations.offers.$get({ query: { sessionId: windowId, studentId: a.studentId } }));
+      const available = read.offers.filter((o) => o.subject.code.startsWith('BS-')).flatMap((o) => o.items.filter((i) => !i.held).map((i) => ({ code: o.subject.code, series: i.series })));
       // Not the two already registered, not Geography (not offered here).
       expect(available.map((s) => s.code).sort()).toEqual(['BS-BI5', 'BS-MA4']);
-      expect(available.find((s) => s.code === 'BS-BI5')!.boardSeries).toMatchObject({ id: jan, name: `Pearson Edexcel January ${Y + 1} (series)` });
-      expect(await refused(a.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, subjectIds: [subj.GEO!], studentId: a.studentId } }))).toEqual({
-        status: 400, error: 'Geography (series) is not offered in this session',
+      expect(available.find((s) => s.code === 'BS-BI5')!.series).toMatchObject({ id: jan, month: 'january', year: Y + 1, label: 'series' });
+      // A subject the session does not offer has no item to reserve: the line names one not on offer.
+      expect(await refused(a.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, ...(await reservationOf(windowId, [subj.GEO!])), studentId: a.studentId } }))).toEqual({
+        status: 404, error: 'That item is not on offer in this session',
       });
       // The database enters a line in its item's series and refuses another.
       const ma4 = await itemOf(subj.MA4!);
@@ -210,7 +209,7 @@ describe('F0b: board series', () => {
       b = await family('b'); d = await family('d'); e = await family('e'); f = await family('f'); x = await family('x');
       // B pays for Mathematics (October) by InstaPay, with 200 from escrow, and sends the reference.
       const fundB = await apiResponse(officer.api.v1.registrations.desk.$post({
-        json: { studentId: b.studentId, sessionId: windowId, subjectIds: [subj.MA4!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+        json: { studentId: b.studentId, sessionId: windowId, ...(await reservationOf(windowId, [subj.MA4!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
       }));
       await apiResponse(b.parent.api.v1.registrations[':id'].drop.$post({ param: { id: fundB.registrations[0]!.id }, json: { reason: 'setup for escrow' } }));
       expect(await escrowOf(b.studentId)).toBe(1400);
@@ -288,7 +287,7 @@ describe('F0b: board series', () => {
       await apiResponse(finadmin.api.v1.exceptions.$post({
         json: { type: 'deadline_extension', studentId: x.studentId, sessionId: windowId, validUntil: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), reason: 'late family, approved by the head' },
       }));
-      const lateOct = await refused(x.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, subjectIds: [subj.MA4!], studentId: x.studentId } }));
+      const lateOct = await refused(x.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, ...(await reservationOf(windowId, [subj.MA4!])), studentId: x.studentId } }));
       expect(lateOct.status).toBe(422);
       expect(lateOct.error).toMatch(deadlineSentence);
       const xJan = (await direct(x, [subj.BI5!]))[0]!.id;

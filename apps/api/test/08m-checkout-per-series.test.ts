@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, audited, money, takings, takingsDelta,
-  futureWindow, runPaymentDeadlines, subjectFeeIn, type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, audited, money, takings, takingsDelta, futureWindow, runPaymentDeadlines, subjectFeeIn, type Client, reservationOf } from './helpers';
 
 /**
  * F0b — money is taken per entry deadline (the review of 682907a, flags 3 and
@@ -54,7 +51,7 @@ describe('F0b: one checkout per entry deadline', () => {
 
   type Family = { parent: Client; student: Client; studentId: string };
   const direct = async (f: Family, subjectIds: string[]) =>
-    (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, subjectIds, studentId: f.studentId } }))).map((r) => r.id);
+    (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, ...(await reservationOf(windowId, subjectIds)), studentId: f.studentId } }))).map((r) => r.id);
   const checkout = (f: Family, ids: string[]) =>
     f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: ids, paymentMethod: 'instapay', escrowAmountToApply: 0 } });
   const mkSeries = async (month: 'january' | 'october' | 'november', label: string) =>
@@ -128,7 +125,7 @@ describe('F0b: one checkout per entry deadline', () => {
     const f2 = await onboard(officer, 'ckd-2', 12);
     const before = await takings(officer);
     const r = await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f2.studentId, sessionId: windowId, subjectIds: [subj.D!, subj.E!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: f2.studentId, sessionId: windowId, ...(await reservationOf(windowId, [subj.D!, subj.E!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }));
     expect(r.collected).toBe(3000);
     expect(r.notCollected).toEqual([]);
@@ -177,7 +174,7 @@ describe('F0b: one checkout per entry deadline', () => {
     const f5 = await onboard(officer, 'ckd-5', 12);
     // 3000 in the wallet: two subjects paid at the desk, then dropped (no refund window: all back).
     const funded = await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f5.studentId, sessionId: windowId, subjectIds: [subj.PO!, subj.PJ!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: f5.studentId, sessionId: windowId, ...(await reservationOf(windowId, [subj.PO!, subj.PJ!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }));
     for (const reg of funded.registrations) {
       await apiResponse(f5.parent.api.v1.registrations[':id'].drop.$post({ param: { id: reg.id }, json: { reason: 'fund the wallet for the split' } }));
@@ -187,7 +184,7 @@ describe('F0b: one checkout per entry deadline', () => {
     const before = await takings(officer);
     // A (earlier deadline) and B (later): 2000 from the wallet covers A in full and 500 of B.
     const r = await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f5.studentId, sessionId: windowId, subjectIds: [subj.A!, subj.B!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 2000 } },
+      json: { studentId: f5.studentId, sessionId: windowId, ...(await reservationOf(windowId, [subj.A!, subj.B!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 2000 } },
     }));
     expect(r.collected).toBe(1000);
     const byFirst = r.payments.map((p) => [p.escrowApplied, p.collected]);
@@ -289,7 +286,7 @@ describe("F0b: an item's series change may not split an open checkout across dea
     const end = new Date((await one<{ end: string }>(`select end_date as "end" from registration_session where id = $1`, [w])).end);
     const f = await onboard(officer, 'ckw-1', 12);
     // Both items are in the session's one series so far: the two preregistrations share one checkout.
-    const ids = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, subjectIds: [one1, two], studentId: f.studentId } }))).map((r) => r.id);
+    const ids = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, ...(await reservationOf(w, [one1, two])), studentId: f.studentId } }))).map((r) => r.id);
     const first = (await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [ids[0]!])).s;
     const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: ids, paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
     const mk = async (month: 'october' | 'january', days: number) => {
@@ -333,7 +330,7 @@ describe('F0b: MO-21 per series — a draft session whose items sit October and 
     await apiResponse(place(adm, w, pj, jan));
     const f = await onboard(officer, 'ckp-1', 12);
     const prereg = async (subjectId: string) =>
-      (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, subjectIds: [subjectId], studentId: f.studentId } })))[0]!.id;
+      (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, ...(await reservationOf(w, [subjectId])), studentId: f.studentId } })))[0]!.id;
     const pay = async (id: string) => {
       const p = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [id], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
       await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: p }, json: { instrumentUsed: 'cash' } }));

@@ -26,6 +26,8 @@ import { invalidateFinancialState } from '~/lib/financial-cache';
 import {
   ACTIVE_PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
+  DECLARATION_TEXT,
+  refundConsentText,
   type ActivePaymentMethod,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
@@ -58,6 +60,10 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
   const [instapayRef, setInstapayRef] = useState('');
   const [refSubmitted, setRefSubmitted] = useState(false);
   const [refError, setRefError] = useState('');
+  // A subject the school reserved for the family (grade 10) carries the school's consent only: the
+  // family gives its own here (RESERVATIONS_REWORK.md §3.5).
+  const [refundTick, setRefundTick] = useState(false);
+  const [declTick, setDeclTick] = useState(false);
 
   const summaryKey = registrationIds.join(',');
 
@@ -74,6 +80,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
         registrationIds,
         paymentMethod: selectedMethod,
         escrowAmountToApply: escrowToApply,
+        ...(summary?.familyConsentNeeded.length ? { consent: { refundPolicy: true as const, declaration: true as const } } : {}),
       });
     },
     onSuccess: (payment) => {
@@ -629,6 +636,20 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
             </div>
           </div>
 
+          {summary.familyConsentNeeded.length > 0 && (
+            <div className="bg-card rounded-xl border border-border shadow-sm p-5 space-y-2 text-sm">
+              <p className="font-semibold text-foreground">The school reserved these subjects for you: confirm before paying</p>
+              <label className="flex items-start gap-2">
+                <input type="checkbox" className="mt-0.5 h-4 w-4" checked={refundTick} onChange={(e) => setRefundTick(e.target.checked)} />
+                <span>{summary.familyConsentTerms.map((t) => refundConsentText(t.terms)).join(' ')}</span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input type="checkbox" className="mt-0.5 h-4 w-4" checked={declTick} onChange={(e) => setDeclTick(e.target.checked)} />
+                <span>{DECLARATION_TEXT}</span>
+              </label>
+            </div>
+          )}
+
           {submitError && (
             <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-sm text-destructive">
               {submitError}
@@ -637,7 +658,7 @@ export default function CheckoutClient({ registrationIds }: CheckoutClientProps)
 
           <Button
             onClick={() => initiateMutation.mutate()}
-            disabled={initiateMutation.isPending}
+            disabled={initiateMutation.isPending || (summary.familyConsentNeeded.length > 0 && !(refundTick && declTick))}
             className="w-full"
             size="lg"
           >

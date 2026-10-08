@@ -1,0 +1,91 @@
+# Trimmed under CLAUDE.md (Git): the vitest summary and, for a red run, the failing tests and their
+# messages; the request log of the run removed. Original: 252743 bytes, 2780 lines.
+
+ ❯ test/08o-reservation-lines.test.ts (19 tests | 1 failed) 15335ms
+   ✓ 08o: reservation lines (step B) > a family reserves in the app: one line per item with the entry chosen, both consents required and recorded, the refund steps frozen  842ms
+   ✓ 08o: reservation lines (step B) > a converted session with no refund policy freezes its refund windows as dates: the session's own, else its academic year's  716ms
+   ✓ 08o: reservation lines (step B) > the price the page showed is the price charged: a line priced otherwise in between is refused, nothing made  407ms
+   ✓ 08o: reservation lines (step B) > a family declares a retake with its sitting: created when not on record, priced as a retake, listed to verify; a first entry names none  992ms
+   ✓ 08o: reservation lines (step B) > a sitting the system knows is filled in and not listed to verify; its retake runs to the retake deadline  360ms
+   ✓ 08o: reservation lines (step B) > a dropped line is not a known sitting (it was never sat): a retake naming nothing is refused, naming it declares it and lists it to verify  392ms
+   ✓ 08o: reservation lines (step B) > the coordinator verifies: the line stands; a carry-forward from another centre records the previous centre and candidate number; answered once  722ms
+   ✓ 08o: reservation lines (step B) > rejected on an unpaid line: refused while a checkout is open; then it expires (declaration_rejected), the family is told, and may reserve a first entry  391ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line before the first-entry deadline: the line stands as paid with declaration_rejected (a first entry for F4), the family is told  548ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line after the first-entry deadline: dropped through the receipt-gated drop with today's refund  461ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line after its own deadline: the board fee the school has paid is kept, the rest refunded by the window  392ms
+   × 08o: reservation lines (step B) > unverified at the deadline: entered as declared by default; under hold the sweep expires a waiting line and drops a paid one, once 1627ms
+   ✓ 08o: reservation lines (step B) > the school's grade-10 lines carry the school's consent; the family gives its own at checkout; a line without consent is never paid or confirmed  1055ms
+   ✓ 08o: reservation lines (step B) > a swap's new line inherits the dropped line's consent and refund steps  1178ms
+   ✓ 08o: reservation lines (step B) > the teacher on a line: "no preference" assigned later; changed on a paid line the enrolment follows and the price does not; self-study is not re-priced  1130ms
+   ✓ 08o: reservation lines (step B) > the desk: reserve only; reserve and collect takes one payment per entry deadline, a provisional line reserved and collected once its fee is confirmed  815ms
+   ✓ 08o: reservation lines (step B) > the family's flow: a student asks, a parent approves and pays by series; the statement's numbers are the ledger's, one payment per entry deadline  435ms
+   ✓ 08o: reservation lines (step B) > the statement's outstanding is the Money tab's unpaid: a line awaiting the parent is not owed, an unfunded preregistration is  387ms
+   ✓ 08o: reservation lines (step B) > GET /registrations/available is gone: the Reserve pages read /registrations/offers 281ms
+ ❯ test/08t-rework-races.test.ts (18 tests | 1 failed) 17567ms
+   ✓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line  736ms
+   ✓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused  510ms
+   ✓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused  427ms
+   ✓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it  1083ms
+   ✓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused  592ms
+   ✓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional  460ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it  597ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged  654ms
+   ✓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused  638ms
+   ✓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once  674ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the checkout first: it opens its payment, and the rejection is refused while it is open  580ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the rejection first: the line expires, and the checkout that waited is refused, no payment made  592ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > verified while its payment is confirmed: both land, the line paid and verified  611ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > a parent's approval of a drop against the coordinator's rejection of the same paid line > the approval first: the line is dropped, and the rejection that waited finds nothing to answer  619ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > a parent's approval of a drop against the coordinator's rejection of the same paid line > the rejection first: the paid line stands as a first entry, then the approval drops it  623ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > a payment reversal against the coordinator's rejection of the same paid line > the rejection first: it holds the receipt and the line; the reversal waits, then reverts the payment  612ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > a payment reversal against the coordinator's rejection of the same paid line > the reversal first: the line waits for payment again, and the rejection that waited ends it  605ms
+   × 08t: the rework races > a declared sitting answered while its line is being paid > the hold step run by two schedulers at once drops a paid unverified line once 5505ms
+ ❯ test/08o-reservation-lines.test.ts:457:17
+ ❯ waitFor test/helpers.ts:482:38
+ ❯ test/08t-rework-races.test.ts:608:9
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08o-reservation-lines.test.ts > 08o: reservation lines (step B) > unverified at the deadline: entered as declared by default; under hold the sweep expires a waiting line and drops a paid one, once
+AssertionError: expected { referencesLapsed: +0, …(6) } to match object { unverifiedExpired: 1, …(1) }
+(5 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "unverifiedDropped": 1,
+-   "unverifiedExpired": 1,
++   "unverifiedDropped": 0,
++   "unverifiedExpired": 0,
+  }
+
+ ❯ test/08o-reservation-lines.test.ts:457:17
+    455|     await sql(`update school_setting set updated_at = now() where key …
+    456|     const run = await runPaymentDeadlines();
+    457|     expect(run).toMatchObject({ unverifiedExpired: 1, unverifiedDroppe…
+       |                 ^
+    458|     // The waiting declared line: hold_unverified; the paid one: dropp…
+    459|     expect(await lineOf(w!.id)).toMatchObject({ status: 'expired', out…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a declared sitting answered while its line is being paid > the hold step run by two schedulers at once drops a paid unverified line once
+Error: waitFor: timed out
+ ❯ waitFor test/helpers.ts:482:38
+    480|     const v = await probe();
+    481|     if (v) return v;
+    482|     if (Date.now() > deadline) throw new Error('waitFor: timed out');
+       |                                      ^
+    483|     await new Promise((r) => setTimeout(r, 100));
+    484|   }
+ ❯ test/08t-rework-races.test.ts:608:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 35 passed (37)
+   Start at  06:00:58
+   Duration  34.90s (transform 594ms, setup 4ms, collect 376ms, tests 32.90s, environment 0ms, prepare 73ms)

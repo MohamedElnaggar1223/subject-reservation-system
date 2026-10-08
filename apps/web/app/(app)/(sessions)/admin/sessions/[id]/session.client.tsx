@@ -30,9 +30,10 @@ import SubjectsTab from './subjects-tab.client';
 import FeesTab from './fees-tab.client';
 import MoneyTab from './money-tab.client';
 import Grade10Tab from './grade10-tab.client';
+import ToVerifyTab from './to-verify-tab.client';
 
-type Tab = 'subjects' | 'fees' | 'money' | 'grade10';
-const TAB_LABEL: Record<Tab, string> = { subjects: 'Subjects', fees: 'Fees', money: 'Money', grade10: 'Grade 10' };
+type Tab = 'subjects' | 'fees' | 'money' | 'grade10' | 'verify';
+const TAB_LABEL: Record<Tab, string> = { subjects: 'Subjects', fees: 'Fees', money: 'Money', grade10: 'Grade 10', verify: 'To verify' };
 
 /** Which tabs a role reads (each endpoint still checks its own role). */
 function tabsFor(role: string, isJune: boolean): Tab[] {
@@ -41,6 +42,8 @@ function tabsFor(role: string, isJune: boolean): Tab[] {
   if (role === ROLES.ADMIN || role === ROLES.FINANCE_ADMIN || role === ROLES.COORDINATOR) tabs.push('fees');
   if (role === ROLES.ADMIN || role === ROLES.FINANCE_ADMIN || role === ROLES.FINANCE_OFFICER) tabs.push('money');
   if (isJune && (role === ROLES.ADMIN || role === ROLES.COORDINATOR)) tabs.push('grade10');
+  // Step B (§3.5): the declared sittings — the coordinator's; the admin's and the finance desk's too.
+  if (role === ROLES.ADMIN || role === ROLES.COORDINATOR || role === ROLES.FINANCE_ADMIN || role === ROLES.FINANCE_OFFICER) tabs.push('verify');
   return tabs;
 }
 
@@ -81,6 +84,7 @@ export default function SessionClient({ id, viewerRole }: { id: string; viewerRo
         {current === 'fees' && <FeesTab session={s} viewerRole={viewerRole} />}
         {current === 'money' && <MoneyTab session={s} />}
         {current === 'grade10' && <Grade10Tab session={s} />}
+        {current === 'verify' && <ToVerifyTab session={s} viewerRole={viewerRole} />}
         {!current && <Notice tone="neutral">Nothing on this session is yours to see.</Notice>}
       </div>
     </div>

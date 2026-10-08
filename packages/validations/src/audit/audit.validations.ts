@@ -309,6 +309,11 @@ export const AUDIT_ACTIONS = [
   'DESK_DROP_EXECUTED',
   'REWORK_BACKFILL_EXCEPTION',
   'REWORK_BACKFILL_SERVICE',
+  // Reservations rework, step B (declared sittings, the teacher on a line)
+  'PRIOR_SITTING_VERIFIED',
+  'PRIOR_SITTING_REJECTED',
+  'LINE_DROPPED_UNVERIFIED',
+  'LINE_TEACHER_CHANGED',
   // Parent-student links (security audit RF-14: access to a child's money
   // and records hangs on these, so every change is recorded)
   'LINK_REQUESTED',
@@ -515,6 +520,10 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   DESK_DROP_EXECUTED: 'Dropped at the Desk after the Deadline',
   REWORK_BACKFILL_EXCEPTION: 'Exception Moved onto the Policy Registry',
   REWORK_BACKFILL_SERVICE: 'Remark Fees and Deadlines Moved onto Board Services',
+  PRIOR_SITTING_VERIFIED:     'Declared Sitting Verified',
+  PRIOR_SITTING_REJECTED:     'Declared Sitting Rejected',
+  LINE_DROPPED_UNVERIFIED:    'Line Dropped: Sitting Unverified at the Deadline',
+  LINE_TEACHER_CHANGED:       'Line Teacher Changed',
 };
 
 // ─── Query Filters ────────────────────────────────────────────────────────────

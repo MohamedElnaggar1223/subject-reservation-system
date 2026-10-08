@@ -31,7 +31,7 @@ export type LineDeadlineKey = {
    * Step B's `registration.declaration_rejected`: a retake whose declared sitting the school
    * rejected is a first entry for the board — its deadline is the entry deadline (§3.5).
    */
-  declarationRejected?: boolean | null;
+  declarationRejected: boolean | null;
   /** The line's student: a late board entry granted to them (Q-20) is read when given. */
   studentId?: string | null;
 };
@@ -45,7 +45,7 @@ const asDate = (v: unknown): Date | null => (v === null || v === undefined ? nul
  * With step B merged it passes the row's `declaration_rejected` as the fourth argument (0044).
  */
 export function lineDeadlineSql(alias = 'r') {
-  return sql.raw(`line_effective_deadline(${alias}.attempt, ${alias}.prior_sitting_series_id, ${alias}.board_series_id)`);
+  return sql.raw(`line_effective_deadline(${alias}.attempt, ${alias}.prior_sitting_series_id, ${alias}.board_series_id, ${alias}.declaration_rejected)`);
 }
 
 /**
@@ -99,17 +99,30 @@ export async function linesKeptByLateEntry(executor: Executor, boardSeriesId: st
   return kept;
 }
 
-/** The effective deadlines of stored lines, by id. */
+/**
+ * The effective deadlines of stored lines, by id — each line's student's late board entry (Q-20)
+ * read as effectiveDeadlineFor reads it, while the setting is on (the review of 40c1447..af33662:
+ * the InstaPay reference check and the moves read deadlines here).
+ */
 export async function effectiveDeadlinesOf(executor: Executor, registrationIds: string[]): Promise<Map<string, EffectiveDeadline>> {
   const out = new Map<string, EffectiveDeadline>();
   if (!registrationIds.length) return out;
   const r = await executor.execute(sql`
-    select r.id,
-      line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id) as at,
-      line_effective_deadline_kind(r.attempt, r.prior_sitting_series_id, r.board_series_id) as kind
+    select r.id, r.student_id as "studentId", r.board_series_id as "seriesId",
+      line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as at,
+      line_effective_deadline_kind(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as kind
     from registration r where r.id in (${sql.join(registrationIds.map((id) => sql`${id}`), sql`, `)})`);
-  for (const row of r.rows as { id: string; at: unknown; kind: DeadlineKind | null }[]) {
-    out.set(row.id, { at: asDate(row.at), kind: row.kind });
+  const lateOn = await getSetting('exceptions.boardEntryDeadline', executor);
+  const late = new Map<string, Date | null>();
+  for (const row of r.rows as { id: string; studentId: string; seriesId: string | null; at: unknown; kind: DeadlineKind | null }[]) {
+    let d: EffectiveDeadline = { at: asDate(row.at), kind: row.kind };
+    if (lateOn && d.at && d.kind !== 'exams_start' && row.seriesId) {
+      const key = `${row.studentId}|${row.seriesId}`;
+      if (!late.has(key)) late.set(key, await lateEntryUntil(executor, row.studentId, row.seriesId));
+      const until = late.get(key);
+      if (until && until > d.at) d = { at: until, kind: 'entry' };
+    }
+    out.set(row.id, d);
   }
   return out;
 }
@@ -169,7 +182,7 @@ export async function dueDateFor(executor: Executor, input: DueDateInput): Promi
     .select({
       id: registration.id, studentId: registration.studentId, sessionId: registration.sessionId, subjectId: registration.subjectId,
       offerItemId: registration.offerItemId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt,
-      priorSittingSeriesId: registration.priorSittingSeriesId, createdAt: registration.createdAt,
+      priorSittingSeriesId: registration.priorSittingSeriesId, declarationRejected: registration.declarationRejected, createdAt: registration.createdAt,
       priceProvisional: registration.priceProvisional, pricingBasis: registration.pricingBasis, paymentDueAt: registrationSession.paymentDueAt,
     })
     .from(registration)

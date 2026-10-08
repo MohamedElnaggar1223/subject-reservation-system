@@ -421,6 +421,51 @@ export async function seriesOfSession(sessionId: string, board: 'cambridge' | 'p
     where i.session_id = $1 and bs.board_code = $2 and i.availability <> 'closed'`, [sessionId, board])).id;
 }
 
+/** Both consents ticked: every reservation path takes them since step B (RESERVATIONS_REWORK.md §3.5). */
+export const CONSENT = { refundPolicy: true, declaration: true } as const;
+
+/** A subject's whole item in a session — what resolveItem picks: an open one first, then one with a series. */
+async function wholeItemOf(sessionId: string, subjectId: string) {
+  const [it] = await sql<{ id: string; offer_availability: string; availability: string }>(
+    `select i.id, o.availability as offer_availability, i.availability from session_offer_item i join session_offer o on o.id = i.offer_id
+     where o.session_id = $1 and o.subject_id = $2 and i.kind = 'whole' order by (i.availability = 'closed'), (i.board_series_id is null), i.id limit 1`,
+    [sessionId, subjectId]);
+  return it ?? null;
+}
+
+/**
+ * A file's subjects as one reservation's `lines` and `consent` (step B: every reservation path
+ * takes lines — one per item — and both consents, not `subjectIds`): each subject's whole item in
+ * the session, a first entry, in school unless the item is self-study only; `teachers` names a
+ * line's teacher (else the server's default: the item's or offer's only teacher, or none).
+ * A subject the session does not offer becomes an item id the server refuses as not on offer.
+ */
+export async function reservationOf(
+  sessionId: string,
+  subjectIds: string[],
+  opts: { teachers?: Record<string, string> } = {},
+) {
+  const lines: { offerItemId: string; attempt: 'first'; mode: 'in_school' | 'self_study'; teacherId?: string }[] = [];
+  for (const subjectId of subjectIds) {
+    const it = await wholeItemOf(sessionId, subjectId);
+    const selfStudyOnly = it ? it.offer_availability === 'self_study_only' || it.availability === 'self_study_only' : false;
+    lines.push({
+      offerItemId: it?.id ?? `not-offered:${subjectId}`,
+      attempt: 'first',
+      mode: selfStudyOnly ? 'self_study' : 'in_school',
+      ...(opts.teachers?.[subjectId] ? { teacherId: opts.teachers[subjectId] } : {}),
+    });
+  }
+  return { lines, consent: CONSENT };
+}
+
+/** A swap's new line (step B): the subject's whole item in the session of the line being swapped, a first entry. */
+export async function swapTo(registrationId: string, subjectId: string) {
+  const [r] = await sql<{ session_id: string }>(`select session_id from registration where id = $1`, [registrationId]);
+  const { lines } = await reservationOf(r?.session_id ?? '', [subjectId]);
+  return lines[0]!;
+}
+
 /** A session's name (derived from its type, year and label since the reservations rework). */
 export async function sessionName(sessionId: string) {
   return (await one<{ name: string }>(`select name from registration_session where id = $1`, [sessionId])).name;
@@ -687,26 +732,51 @@ export async function refuseAudit(action: string): Promise<() => Promise<void>> 
  * the trigger is dropped on release (test files run one at a time, so no other suite sees it).
  */
 export async function pauseAtAudit(action: string): Promise<() => Promise<void>> {
-  if (!/^[A-Z_]+$/.test(action)) throw new Error(`not an audit action: ${action}`);
+  const p = await pauseAtAudits([action]);
+  return p.releaseAll;
+}
+
+/**
+ * pauseAtAudit for several actions, each released on its own: `paused(action)` waits until a
+ * transaction is held at that action's write, `release(action)` lets it go, `releaseAll()` lets
+ * every one go and drops the trigger.
+ */
+export async function pauseAtAudits(actions: string[]) {
+  for (const a of actions) if (!/^[A-Z_]+$/.test(a)) throw new Error(`not an audit action: ${a}`);
+  const keys = new Map(actions.map((a, i) => [a, 40400 + i]));
   const { default: pg } = await import('pg');
   const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
-  await client.query('select pg_advisory_lock(40400)');
+  for (const k of keys.values()) await client.query(`select pg_advisory_lock(${k})`);
   await sql(`create or replace function test_pause_audit() returns trigger language plpgsql as $$
     begin
-      if new.action = '${action}' then perform pg_advisory_xact_lock(40400); end if;
+      ${[...keys].map(([a, k]) => `if new.action = '${a}' then perform pg_advisory_xact_lock(${k}); end if;`).join('\n      ')}
       return new;
     end $$`);
   await sql(`drop trigger if exists test_pause_audit on audit_log`);
   await sql(`create trigger test_pause_audit before insert on audit_log for each row execute function test_pause_audit()`);
-  let released = false;
-  return async () => {
-    if (released) return;
-    released = true;
-    await client.query('select pg_advisory_unlock(40400)');
-    await client.end();
-    await sql(`drop trigger if exists test_pause_audit on audit_log`);
-    await sql(`drop function if exists test_pause_audit()`);
+  const held = new Set(keys.values());
+  const release = async (action: string) => {
+    const k = keys.get(action)!;
+    if (!held.delete(k)) return;
+    await client.query(`select pg_advisory_unlock(${k})`);
+  };
+  let done = false;
+  return {
+    /** Until a transaction waits at this action's write (an advisory wait on its key). */
+    paused: (action: string, ms = 5000) => waitFor(async () => {
+      const [r] = await sql<{ n: string }>(`select count(*) as n from pg_locks where locktype = 'advisory' and not granted and classid = 0 and objid = $1 and objsubid = 1`, [keys.get(action)!]);
+      return Number(r?.n ?? 0) > 0 || null;
+    }, ms),
+    release,
+    releaseAll: async () => {
+      if (done) return;
+      done = true;
+      for (const a of keys.keys()) await release(a);
+      await client.end();
+      await sql(`drop trigger if exists test_pause_audit on audit_log`);
+      await sql(`drop function if exists test_pause_audit()`);
+    },
   };
 }
 

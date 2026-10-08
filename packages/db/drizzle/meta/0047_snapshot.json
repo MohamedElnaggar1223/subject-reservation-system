@@ -1,6 +1,6 @@
 {
-  "id": "d47fce68-2cd5-42b5-b41a-0537b2d34005",
-  "prevId": "e62ac58c-3274-41de-9083-d04e862791e3",
+  "id": "8e239316-2d42-43eb-b87c-1009d89f4662",
+  "prevId": "450b4615-7445-4613-bf8b-697139663654",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1848,6 +1848,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "new_line": {
+          "name": "new_line",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "price_at_request": {
           "name": "price_at_request",
           "type": "numeric(12, 2)",
@@ -1912,9 +1918,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "changeReq_requestedBy_idx": {
           "name": "changeReq_requestedBy_idx",
@@ -1927,9 +1933,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "changeReq_status_idx": {
           "name": "changeReq_status_idx",
@@ -1942,9 +1948,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "changeReq_one_pending_per_registration_idx": {
           "name": "changeReq_one_pending_per_registration_idx",
@@ -1957,77 +1963,77 @@
             }
           ],
           "isUnique": true,
-          "where": "status = 'pending_approval'",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "status = 'pending_approval'",
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "change_request_registration_id_registration_id_fk": {
           "name": "change_request_registration_id_registration_id_fk",
           "tableFrom": "change_request",
-          "tableTo": "registration",
           "columnsFrom": [
             "registration_id"
           ],
+          "tableTo": "registration",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "restrict"
         },
         "change_request_requested_by_user_id_fk": {
           "name": "change_request_requested_by_user_id_fk",
           "tableFrom": "change_request",
-          "tableTo": "user",
           "columnsFrom": [
             "requested_by"
           ],
+          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "restrict"
         },
         "change_request_new_subject_id_subject_id_fk": {
           "name": "change_request_new_subject_id_subject_id_fk",
           "tableFrom": "change_request",
-          "tableTo": "subject",
           "columnsFrom": [
             "new_subject_id"
           ],
+          "tableTo": "subject",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "restrict"
         },
         "change_request_new_offer_item_id_session_offer_item_id_fk": {
           "name": "change_request_new_offer_item_id_session_offer_item_id_fk",
           "tableFrom": "change_request",
-          "tableTo": "session_offer_item",
           "columnsFrom": [
             "new_offer_item_id"
           ],
+          "tableTo": "session_offer_item",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "restrict"
         },
         "change_request_approved_by_user_id_fk": {
           "name": "change_request_approved_by_user_id_fk",
           "tableFrom": "change_request",
-          "tableTo": "user",
           "columnsFrom": [
             "approved_by"
           ],
+          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         }
       },
       "compositePrimaryKeys": {},
@@ -3453,7 +3459,7 @@
           "name": "policy_key",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "student_id": {
           "name": "student_id",
@@ -3907,10 +3913,6 @@
         "exception_status_valid": {
           "name": "exception_status_valid",
           "value": "\"exception\".\"status\" IN ('active', 'revoked', 'lapsed', 'used')"
-        },
-        "exception_one_holder": {
-          "name": "exception_one_holder",
-          "value": "num_nonnulls(\"exception\".\"student_id\", \"exception\".\"family_id\") = 1"
         }
       },
       "isRLSEnabled": false
@@ -6034,6 +6036,31 @@
           "primaryKey": false,
           "notNull": false
         },
+        "prior_sitting_verified_by": {
+          "name": "prior_sitting_verified_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prior_sitting_verified_at": {
+          "name": "prior_sitting_verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prior_sitting_verified_outcome": {
+          "name": "prior_sitting_verified_outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "declaration_rejected": {
+          "name": "declaration_rejected",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "due_at": {
           "name": "due_at",
           "type": "timestamp with time zone",
@@ -6147,9 +6174,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "registration_sessionId_idx": {
           "name": "registration_sessionId_idx",
@@ -6162,9 +6189,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "registration_subjectId_idx": {
           "name": "registration_subjectId_idx",
@@ -6177,9 +6204,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "registration_status_idx": {
           "name": "registration_status_idx",
@@ -6192,9 +6219,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "registration_requestedBy_idx": {
           "name": "registration_requestedBy_idx",
@@ -6207,9 +6234,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "registration_offerItemId_idx": {
           "name": "registration_offerItemId_idx",
@@ -6222,9 +6249,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "registration_priorSittingSeriesId_idx": {
           "name": "registration_priorSittingSeriesId_idx",
@@ -6237,9 +6264,25 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
+        },
+        "registration_to_verify_idx": {
+          "name": "registration_to_verify_idx",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "where": "prior_sitting_source IN ('declared_by_family', 'declared_by_desk') AND prior_sitting_verified_outcome IS NULL",
+          "concurrently": false
         },
         "registration_unique_live_item_idx": {
           "name": "registration_unique_live_item_idx",
@@ -6264,10 +6307,10 @@
             }
           ],
           "isUnique": true,
-          "where": "status NOT IN ('dropped', 'rejected', 'expired')",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "status NOT IN ('dropped', 'rejected', 'expired')",
+          "concurrently": false
         },
         "registration_boardSeriesId_idx": {
           "name": "registration_boardSeriesId_idx",
@@ -6280,143 +6323,156 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "registration_student_id_user_id_fk": {
           "name": "registration_student_id_user_id_fk",
           "tableFrom": "registration",
-          "tableTo": "user",
           "columnsFrom": [
             "student_id"
           ],
+          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "restrict"
         },
         "registration_session_id_registration_session_id_fk": {
           "name": "registration_session_id_registration_session_id_fk",
           "tableFrom": "registration",
-          "tableTo": "registration_session",
           "columnsFrom": [
             "session_id"
           ],
+          "tableTo": "registration_session",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "restrict"
         },
         "registration_subject_id_subject_id_fk": {
           "name": "registration_subject_id_subject_id_fk",
           "tableFrom": "registration",
-          "tableTo": "subject",
           "columnsFrom": [
             "subject_id"
           ],
+          "tableTo": "subject",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "restrict"
         },
         "registration_teacher_id_teacher_id_fk": {
           "name": "registration_teacher_id_teacher_id_fk",
           "tableFrom": "registration",
-          "tableTo": "teacher",
           "columnsFrom": [
             "teacher_id"
           ],
+          "tableTo": "teacher",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         },
         "registration_offer_item_id_session_offer_item_id_fk": {
           "name": "registration_offer_item_id_session_offer_item_id_fk",
           "tableFrom": "registration",
-          "tableTo": "session_offer_item",
           "columnsFrom": [
             "offer_item_id"
           ],
+          "tableTo": "session_offer_item",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "restrict"
         },
         "registration_prior_sitting_series_id_board_series_id_fk": {
           "name": "registration_prior_sitting_series_id_board_series_id_fk",
           "tableFrom": "registration",
-          "tableTo": "board_series",
           "columnsFrom": [
             "prior_sitting_series_id"
           ],
+          "tableTo": "board_series",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "restrict"
+        },
+        "registration_prior_sitting_verified_by_user_id_fk": {
+          "name": "registration_prior_sitting_verified_by_user_id_fk",
+          "tableFrom": "registration",
+          "columnsFrom": [
+            "prior_sitting_verified_by"
+          ],
+          "tableTo": "user",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "set null"
         },
         "registration_requested_by_user_id_fk": {
           "name": "registration_requested_by_user_id_fk",
           "tableFrom": "registration",
-          "tableTo": "user",
           "columnsFrom": [
             "requested_by"
           ],
+          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "restrict"
         },
         "registration_approved_by_user_id_fk": {
           "name": "registration_approved_by_user_id_fk",
           "tableFrom": "registration",
-          "tableTo": "user",
           "columnsFrom": [
             "approved_by"
           ],
+          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         },
         "registration_result_recorded_by_user_id_fk": {
           "name": "registration_result_recorded_by_user_id_fk",
           "tableFrom": "registration",
-          "tableTo": "user",
           "columnsFrom": [
             "result_recorded_by"
           ],
+          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         },
         "registration_board_series_link_fk": {
           "name": "registration_board_series_link_fk",
           "tableFrom": "registration",
-          "tableTo": "session_board_series",
           "columnsFrom": [
             "session_id",
             "board_series_id"
           ],
+          "tableTo": "session_board_series",
           "columnsTo": [
             "session_id",
             "board_series_id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "restrict"
         }
       },
       "compositePrimaryKeys": {},
@@ -6434,6 +6490,14 @@
         "registration_prior_sitting_source_valid": {
           "name": "registration_prior_sitting_source_valid",
           "value": "\"registration\".\"prior_sitting_source\" IS NULL OR \"registration\".\"prior_sitting_source\" IN ('known', 'declared_by_desk', 'declared_by_family', 'legacy')"
+        },
+        "registration_prior_sitting_outcome_valid": {
+          "name": "registration_prior_sitting_outcome_valid",
+          "value": "\"registration\".\"prior_sitting_verified_outcome\" IS NULL OR (\"registration\".\"prior_sitting_verified_outcome\" IN ('verified', 'rejected') AND \"registration\".\"prior_sitting_verified_at\" IS NOT NULL AND \"registration\".\"prior_sitting_series_id\" IS NOT NULL)"
+        },
+        "registration_declaration_rejected_outcome": {
+          "name": "registration_declaration_rejected_outcome",
+          "value": "NOT \"registration\".\"declaration_rejected\" OR \"registration\".\"prior_sitting_verified_outcome\" = 'rejected'"
         },
         "registration_retake_is_attempt": {
           "name": "registration_retake_is_attempt",
@@ -6513,40 +6577,61 @@
               "isExpression": false,
               "asc": true,
               "nulls": "last"
+            },
+            {
+              "expression": "channel",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
             }
           ],
           "isUnique": true,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
+        },
+        "registrationConsent_registrationId_idx": {
+          "name": "registrationConsent_registrationId_idx",
+          "columns": [
+            {
+              "expression": "registration_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "registration_consent_registration_id_registration_id_fk": {
           "name": "registration_consent_registration_id_registration_id_fk",
           "tableFrom": "registration_consent",
-          "tableTo": "registration",
           "columnsFrom": [
             "registration_id"
           ],
+          "tableTo": "registration",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "restrict"
         },
         "registration_consent_confirmed_by_user_id_fk": {
           "name": "registration_consent_confirmed_by_user_id_fk",
           "tableFrom": "registration_consent",
-          "tableTo": "user",
           "columnsFrom": [
             "confirmed_by"
           ],
+          "tableTo": "user",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         }
       },
       "compositePrimaryKeys": {},

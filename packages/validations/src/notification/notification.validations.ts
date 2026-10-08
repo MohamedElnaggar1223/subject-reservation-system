@@ -57,6 +57,8 @@ export const NOTIFICATION_TYPES = [
   'CHARGE_ADDED',
   'CHARGE_UPDATED',
   'PLAN_UPDATED',
+  // Step B: the school's answer to a declared sitting (a retake or a carry-forward)
+  'DECLARATION_REVIEWED',
   // Reservations rework: a moved line whose price stayed but is now to be confirmed
   'PRICE_TO_BE_CONFIRMED',
 ] as const;
@@ -90,6 +92,7 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   CHARGE_ADDED:                     'New Charge',
   CHARGE_UPDATED:                   'Charge Updated',
   PLAN_UPDATED:                     'Instalment Plan',
+  DECLARATION_REVIEWED:             'Declared Sitting Reviewed',
   PRICE_TO_BE_CONFIRMED:            'Price To Be Confirmed',
 };
 
@@ -120,6 +123,7 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   CHARGE_ADDED:                     '🧾',
   CHARGE_UPDATED:                   '🧾',
   PLAN_UPDATED:                     '🗓️',
+  DECLARATION_REVIEWED:             '🔎',
   PRICE_TO_BE_CONFIRMED:            '💱',
 };
 

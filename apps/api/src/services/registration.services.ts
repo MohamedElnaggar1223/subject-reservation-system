@@ -6,8 +6,8 @@
  * - Parent approves or rejects pending requests
  * - Parent directly registers for a linked child (auto-approved)
  * - Admin overrides parent approval with mandatory audit reason
- * - Core subject validation for Grade 10 June sessions
- * - Available subject filtering (excludes already-registered subjects)
+ * - Core subject validation for Grade 10 June sessions (gate.grade10Core, line-rules)
+ * - Lines and consent since the reservations rework (reservation.services reserveLines)
  *
  * Status flow:
  * Student-initiated:  pending_approval → (parent approves) → pending_payment → (payment) → confirmed
@@ -22,13 +22,8 @@
 import {
   db,
   registration,
-  sessionOffer,
-  sessionOfferTeacher,
-  sessionOfferItemTeacher,
-  teacher,
   subject,
   exception,
-  sql,
   eq,
   and,
   inArray,
@@ -48,14 +43,10 @@ import {
   notifyRegistrationDecision,
   notifyDirectRegistrationCreated,
 } from './notification.services';
-import { assertMayRegisterFor, assertMayRegisterForInTx, mayRegisterFor, type Eligibility } from './eligibility.services';
-import { priceLine } from './pricing.services';
+import { assertMayRegisterFor, assertMayRegisterForInTx, type Eligibility } from './eligibility.services';
 import { schoolFeeGateReason } from './school-fee.services';
-import { sessionWindow, windowRefusal } from './window.services';
-import { insertLines, legacyLinesFor } from './line.services';
-import { availabilityConstraints, resolveItem } from './offer.services';
-import { effectiveDeadlineFor } from './deadline.services';
-import type { SubjectRegistrationOptionsType, LineInputType } from '@repo/validations';
+import { sessionWindow, windowRefusal, subjectsOfItems } from './window.services';
+import { reserveLines } from './reservation.services';
 
 // ─── Internal Helpers ────────────────────────────────────────────────────────
 
@@ -66,31 +57,23 @@ import type { SubjectRegistrationOptionsType, LineInputType } from '@repo/valida
  */
 async function assertWindowOpen(
   studentId: string, sessionId: string,
-  line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null; subjectId?: string | null } | null,
-  subjectIds?: readonly string[],
+  line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null; declarationRejected: boolean | null; subjectId?: string | null } | null,
+  /** A new reservation's lines: with the session closed, a subject-scoped extension opens its subject alone (step C). */
+  newLines?: readonly { offerItemId: string }[],
 ) {
+  const subjectIds = newLines ? await subjectsOfItems(db, newLines.map((l) => l.offerItemId)) : undefined;
   const w = await sessionWindow(studentId, sessionId, line, db, new Date(), subjectIds);
   if (w.open) return;
   throw new Error(windowRefusal(w));
 }
 
 /**
- * The paths that still name subjects (request, direct, override, desk, preregistration): the
- * school-fee gate (D-H: the fee of the series' academic year at the student's grade in it,
- * F0a), then the subjects as lines — each subject's whole item, its attempt from history, its
- * mode from the option or the item (line.services.ts legacyLinesFor). Until step B gives these
- * paths `lines` and `consent`.
+ * The school-fee gate every reservation path asks before its lines (D-H: the fee of the series'
+ * academic year at the student's grade in it, F0a; a waiver lifts it).
  */
-export async function prepareLegacyLines(
-  studentId: string,
-  sessionId: string,
-  subjectIds: string[],
-  subjectOptions: Record<string, SubjectRegistrationOptionsType> | undefined,
-  eligibility: Eligibility,
-): Promise<LineInputType[]> {
+export async function assertSchoolFeeGate(studentId: string, eligibility: Eligibility) {
   const gate = await schoolFeeGateReason(studentId, eligibility);
   if (gate) throw new Error(gate);
-  return legacyLinesFor(db, studentId, sessionId, subjectIds, subjectOptions);
 }
 
 /**
@@ -140,138 +123,20 @@ async function studentHasApprovedParent(studentId: string): Promise<boolean> {
   return !!link;
 }
 
-/**
- * Return the subject IDs for which a student already has a non-dropped,
- * non-rejected registration in the given session.
- * Used to prevent duplicate registrations.
- */
-export async function getExistingRegistrationSubjectIds(
-  studentId: string,
-  sessionId: string
-): Promise<string[]> {
-  const existing = await db.query.registration.findMany({
-    where: (r, { eq, and, notInArray }) =>
-      and(
-        eq(r.studentId, studentId),
-        eq(r.sessionId, sessionId),
-        notInArray(r.status, ['dropped', 'rejected', 'expired'])
-      ),
-    columns: { subjectId: true },
-  });
-  return existing.map((r) => r.subjectId);
-}
-
 // ─── Public Service Functions ────────────────────────────────────────────────
 
 // The grade-10 core rule (A-05) is a rule on the lines now: gate.grade10Core in
 // assertLineRules (line-rules.services.ts) reads the session's core offers.
 
 /**
- * The subjects a student can still reserve in a session, for the pages that still name
- * subjects (the family's Register page and the desk) until step B's Reserve pages replace them:
- * each open offer with a whole item whose series is reservable now, priced with priceLine.
- * Subjects with a live line are left out; the page pre-selects and locks a grade-10 student's
- * core offers (isCore).
- */
-export type AvailableSubjectRow = {
-  id: string;
-  name: string;
-  code: string;
-  council: string;
-  qualificationLevel: string;
-  courseFee: number;
-  registrationFee: number;
-  priceInSchool: number;
-  isOfferedAtSchool: boolean;
-  customPrice: number | null;
-  isActive: boolean;
-  isCore: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  teachers: { id: string; name: string }[];
-  isRetake: boolean;
-  pricing: { courseFee: number; registrationFee: number; total: number; isOutsideSchool: boolean };
-  outsidePricing: { courseFee: number; registrationFee: number; total: number; isOutsideSchool: boolean } | null;
-  /** F0b: the board series the subject would be entered in (null: the window feeds none). */
-  boardSeries: { id: string; name: string; entryDeadline: Date | null } | null;
-};
-
-// Explicit return type: the drizzle relational inference chained through
-// Hono RPC + JSONParsed exceeds TS instantiation depth in the web compile
-// and silently degrades the client type — a concrete type short-circuits it.
-export async function getAvailableSubjects(
-  studentId: string,
-  sessionId: string
-): Promise<AvailableSubjectRow[]> {
-  // F0a: nothing is available in a series the student may not register for
-  if (!(await mayRegisterFor(studentId, sessionId)).allowed) return [];
-
-  const alreadyRegistered = new Set(await getExistingRegistrationSubjectIds(studentId, sessionId));
-  const offers = await db.select({ offer: sessionOffer, subject }).from(sessionOffer)
-    .innerJoin(subject, eq(subject.id, sessionOffer.subjectId))
-    .where(and(eq(sessionOffer.sessionId, sessionId), eq(subject.isActive, true)))
-    .orderBy(subject.name);
-  const now = new Date();
-  const out: AvailableSubjectRow[] = [];
-  for (const { offer, subject: sub } of offers) {
-    if (alreadyRegistered.has(sub.id) || offer.availability === 'closed') continue;
-    let resolved;
-    try {
-      resolved = await resolveItem(db, sessionId, sub.id);
-    } catch {
-      continue; // offered by unit or route only: B's Reserve page
-    }
-    const c = availabilityConstraints(offer.availability, resolved.item.availability);
-    if (c.closed || !resolved.item.boardSeriesId) continue;
-    const [line] = await legacyLinesFor(db, studentId, sessionId, [sub.id], undefined);
-    const isRetake = line!.attempt === 'retake';
-    if (c.retakeOnly && !isRetake) continue;
-    const d = await effectiveDeadlineFor(db, { boardSeriesId: resolved.item.boardSeriesId, attempt: line!.attempt, priorSittingSeriesId: line!.priorSittingSeriesId ?? null, studentId });
-    if (!d.at || d.at <= now) continue;
-    let pricing;
-    let outside = null;
-    try {
-      const p = await priceLine(db, { item: { id: resolved.item.id }, attempt: line!.attempt, mode: c.selfStudyOnly ? 'self_study' : 'in_school', studentId, sessionId });
-      pricing = { courseFee: p.courseFee, registrationFee: p.registrationFee, total: p.total, isOutsideSchool: c.selfStudyOnly };
-      if (c.selfStudyOnly || isRetake) {
-        const o = await priceLine(db, { item: { id: resolved.item.id }, attempt: line!.attempt, mode: 'self_study', studentId, sessionId });
-        outside = { courseFee: o.courseFee, registrationFee: o.registrationFee, total: o.total, isOutsideSchool: true };
-      }
-    } catch {
-      continue; // no board fee yet: not reservable until one is set
-    }
-    const own = await db.select({ id: teacher.id, name: teacher.name, isActive: teacher.isActive }).from(sessionOfferItemTeacher)
-      .innerJoin(teacher, eq(teacher.id, sessionOfferItemTeacher.teacherId)).where(eq(sessionOfferItemTeacher.itemId, resolved.item.id));
-    const pool = own.length ? own : await db.select({ id: teacher.id, name: teacher.name, isActive: teacher.isActive }).from(sessionOfferTeacher)
-      .innerJoin(teacher, eq(teacher.id, sessionOfferTeacher.teacherId)).where(eq(sessionOfferTeacher.offerId, offer.id)).orderBy(sessionOfferTeacher.sortOrder);
-    const teachers = pool.filter((t) => t.isActive).map((t) => ({ id: t.id, name: t.name }));
-    const [series] = await db.execute(sql`
-      select bs.id, b.name || ' ' || initcap(bs.month) || ' ' || bs.year || case when bs.label <> '' then ' (' || bs.label || ')' else '' end as name, bs.entry_deadline as "entryDeadline"
-      from board_series bs join exam_board b on b.code = bs.board_code where bs.id = ${resolved.item.boardSeriesId}`).then((r) => r.rows as { id: string; name: string; entryDeadline: string | Date | null }[]);
-    out.push({
-      ...sub,
-      courseFee: offer.courseFee,
-      registrationFee: pricing.registrationFee,
-      isOfferedAtSchool: !c.selfStudyOnly,
-      isCore: offer.grade10Core,
-      teachers,
-      isRetake,
-      pricing,
-      outsidePricing: outside,
-      boardSeries: series ? { id: series.id, name: series.name, entryDeadline: series.entryDeadline ? new Date(series.entryDeadline) : null } : null,
-    });
-  }
-  return out;
-}
-
-/**
- * Student submits a registration request for a set of subjects.
+ * Student submits a reservation request: one line per item ticked (RESERVATIONS_REWORK.md
+ * §3.5, §4.4), with both consents. The lines wait for a parent's approval.
  *
- * - Session must be active.
- * - All subjects must be active.
- * - No duplicate registrations in the same session.
- * - Grade 10 June sessions must include all core subjects.
- * - Created with status 'pending_approval'; parent must approve before payment.
+ * - The student may register for the session's series (F0a), and has a parent to approve.
+ * - The session is open for the student (or an extension); each line's own deadline is checked
+ *   when it is made.
+ * - The school-fee gate, then the lines (reservation.services reserveLines: the sitting a retake
+ *   follows, the rules, the price, the series, the consent rows on the app channel).
  */
 export async function createRegistrationRequest(
   studentId: string,
@@ -298,16 +163,18 @@ export async function createRegistrationRequest(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past a line's own deadline (MO-10)
-  await assertWindowOpen(studentId, sess.id, null, data.subjectIds);
-  await assertSubjectsNew(studentId, data.sessionId, data.subjectIds);
-  const lines = await prepareLegacyLines(studentId, data.sessionId, data.subjectIds, data.subjectOptions, eligibility);
+  await assertWindowOpen(studentId, sess.id, null, data.lines);
+  await assertSchoolFeeGate(studentId, eligibility);
 
   // Asked again with the student and window held, so a withdrawal or a
   // correction racing this request either lands first or expires it (F0a);
   // each line is checked, priced and entered in its item's series (insertLines).
   const inserted = await db.transaction(async (tx) => {
     await assertMayRegisterForInTx(tx, studentId, data.sessionId);
-    return insertLines(tx, { studentId, sessionId: data.sessionId, lines, status: 'pending_approval', requestedBy, eligibility });
+    return reserveLines(tx, {
+      studentId, sessionId: data.sessionId, lines: data.lines, status: 'pending_approval', requestedBy, eligibility,
+      declaredBy: 'family', channel: 'app',
+    });
   });
 
   // NOT-003: Notify all linked parents of the new request (fire-and-forget)
@@ -329,21 +196,6 @@ export async function createRegistrationRequest(
   return inserted;
 }
 
-/** Subjects must be active, and none already live for the student in the session. */
-async function assertSubjectsNew(studentId: string, sessionId: string, subjectIds: string[]) {
-  const subjects = await db.query.subject.findMany({
-    where: (s, { eq, and, inArray }) => and(eq(s.isActive, true), inArray(s.id, subjectIds)),
-    columns: { id: true },
-  });
-  if (subjects.length !== new Set(subjectIds).size) {
-    throw new Error('One or more subjects are invalid or inactive');
-  }
-  const alreadyRegistered = await getExistingRegistrationSubjectIds(studentId, sessionId);
-  if (subjectIds.some((id) => alreadyRegistered.includes(id))) {
-    throw new Error('Some subjects are already registered for this session');
-  }
-}
-
 async function subjectNames(ids: string[]) {
   if (!ids.length) return new Map<string, string>();
   const rows = await db.select({ id: subject.id, name: subject.name }).from(subject).where(inArray(subject.id, [...new Set(ids)]));
@@ -351,13 +203,12 @@ async function subjectNames(ids: string[]) {
 }
 
 /**
- * Parent directly registers subjects for one of their linked children.
+ * Parent reserves lines directly for one of their linked children (§4.4).
  *
  * - Parent must have an approved link to the student.
- * - Session must be active.
- * - No duplicate registrations.
- * - Core subject validation applies for Grade 10 June.
- * - Created with status 'pending_payment' (auto-approved by parent).
+ * - The session is open for the student; each line's own deadline when it is made.
+ * - The lines are created in 'pending_payment' (approved by the parent), with both consents
+ *   on the app channel.
  */
 export async function createDirectRegistration(
   parentId: string,
@@ -375,17 +226,16 @@ export async function createDirectRegistration(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past a line's own deadline (MO-10)
-  await assertWindowOpen(data.studentId, sess.id, null, data.subjectIds);
-  await assertSubjectsNew(data.studentId, data.sessionId, data.subjectIds);
-  const lines = await prepareLegacyLines(data.studentId, data.sessionId, data.subjectIds, data.subjectOptions, eligibility);
+  await assertWindowOpen(data.studentId, sess.id, null, data.lines);
+  await assertSchoolFeeGate(data.studentId, eligibility);
 
   const now = new Date();
   // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
   const created = await db.transaction(async (tx) => {
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    return insertLines(tx, {
-      studentId: data.studentId, sessionId: data.sessionId, lines, status: 'pending_payment',
-      requestedBy: parentId, approvedBy: parentId, approvedAt: now, eligibility,
+    return reserveLines(tx, {
+      studentId: data.studentId, sessionId: data.sessionId, lines: data.lines, status: 'pending_payment',
+      requestedBy: parentId, approvedBy: parentId, approvedAt: now, eligibility, declaredBy: 'family', channel: 'app',
     });
   });
 
@@ -711,9 +561,10 @@ export async function rejectRegistrationRequest(
  * Admin overrides the parent approval requirement (REG-007).
  *
  * Used for exceptional cases: orphaned students, legal guardianship, etc.
- * Registrations are created directly in 'pending_payment' status.
- * The admin's reason is stored in approvalComments with an [ADMIN OVERRIDE] prefix,
- * providing a clear audit trail without requiring a separate audit table.
+ * Lines are created directly in 'pending_payment' status, their consent on the desk channel
+ * (the family's paper, read and signed, §3.5). The admin's reason is stored in approvalComments
+ * with an [ADMIN OVERRIDE] prefix. A sitting the admin names that the system does not know is
+ * declared by the school (`declared_by_desk`) and listed to verify.
  */
 export async function adminOverrideApproval(
   data: AdminOverrideApprovalType,
@@ -735,20 +586,20 @@ export async function adminOverrideApproval(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past a line's own deadline (MO-10)
-  await assertWindowOpen(data.studentId, sess.id, null, data.subjectIds);
-  await assertSubjectsNew(data.studentId, data.sessionId, data.subjectIds);
+  await assertWindowOpen(data.studentId, sess.id, null, data.lines);
   // CORE-003: the override bypasses parent approval (REG-007), not the grade-10 core rule:
   // assertLineRules counts the student's live lines with these (gate.grade10Core). The
   // school-fee gate applies too (a fee waiver is the sanctioned way past it).
-  const lines = await prepareLegacyLines(data.studentId, data.sessionId, data.subjectIds, undefined, eligibility);
+  await assertSchoolFeeGate(data.studentId, eligibility);
 
   const now = new Date();
   // Asked again with the student and window held (F0a; see assertMayRegisterForInTx).
   return db.transaction(async (tx) => {
     await assertMayRegisterForInTx(tx, data.studentId, data.sessionId);
-    return insertLines(tx, {
-      studentId: data.studentId, sessionId: data.sessionId, lines, status: 'pending_payment',
+    return reserveLines(tx, {
+      studentId: data.studentId, sessionId: data.sessionId, lines: data.lines, status: 'pending_payment',
       requestedBy: adminId, approvedBy: adminId, approvedAt: now, approvalComments: `[ADMIN OVERRIDE] ${data.reason}`, eligibility,
+      declaredBy: 'desk', channel: 'desk',
     });
   });
 }
