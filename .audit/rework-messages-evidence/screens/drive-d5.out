@@ -1,0 +1,67 @@
+drive-d5.mjs on 3130/3131 (igcse_rwd_dev), 8 Oct 2026: Student D9's line set due an hour before the drive (due_at = now() - 1 hour) and set back to 2026-10-22 08:14:01+00 after it; nothing sent.
+
+en TAB overdue: Student D7
+en DIALOG overdue:
+Remind these families
+The payment reminder, now, to the parents and the student of each family ticked: what they owe in this session and by when. What is past its due date gets the overdue text.
+Student D7
+overdue EGP 14,500 · since 4 Oct 2026
+Preview — the copy for Student D7
+Payment overdue — June 2027 · دفعة متأخرة — June 2027
+Dear Parent D7, EGP 14,500 for Student D7 is overdue and still unpaid: Biology (overdue since 4 October 2026). Please pay in the app or at the school's finance desk.
+عزيزي ولي الأمر Parent D7، مبلغ 14,500 جنيه الخاص بـ Student D7 متأخر ولم يُسدَّد بعد: Biology (متأخر منذ 4 أكتوبر 2026). يرجى الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.
+Also by email
+Cancel
+Remind 1 family
+en TAB all: Student D10 | Student D10 | Student D5 | Student D5 | Student D6 | Student D7 | Student D8 | Student D9
+en DIALOG all:
+Remind these families
+The payment reminder, now, to the parents and the student of each family ticked: what they owe in this session and by when. What is past its due date gets the overdue text.
+Student D10
+EGP 29,000 · due 22 Oct 2026
+Student D5
+EGP 28,700 · due 22 Oct 2026
+Student D7
+overdue EGP 14,500 · since 4 Oct 2026
+Student D9
+overdue EGP 14,200 · since 8 Oct 2026
+Preview — the copy for Student D7
+Payment overdue — June 2027 · دفعة متأخرة — June 2027
+Dear Parent D7, EGP 14,500 for Student D7 is overdue and still unpaid: Biology (overdue since 4 October 2026). Please pay in the app or at the school's finance desk.
+عزيزي ولي الأمر Parent D7، مبلغ 14,500 جنيه الخاص بـ Student D7 متأخر ولم يُسدَّد بعد: Biology (متأخر منذ 4 أكتوبر 2026). يرجى الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.
+Also by email
+Cancel
+Remind 4 families
+ar TAB overdue: Student D7
+ar DIALOG overdue:
+تذكير هذه الأسر
+تذكير الدفع الآن إلى أولياء الأمور والطالب في كل أسرة محددة: ما عليهم في هذه الجلسة وموعده. وما فات موعده يصله نص التأخير.
+Student D7
+متأخرة 14,500 جنيه · منذ 4 أكتوبر 2026
+معاينة — النسخة الخاصة بـ Student D7
+Payment overdue — June 2027 · دفعة متأخرة — June 2027
+Dear Parent D7, EGP 14,500 for Student D7 is overdue and still unpaid: Biology (overdue since 4 October 2026). Please pay in the app or at the school's finance desk.
+عزيزي ولي الأمر Parent D7، مبلغ 14,500 جنيه الخاص بـ Student D7 متأخر ولم يُسدَّد بعد: Biology (متأخر منذ 4 أكتوبر 2026). يرجى الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.
+وبالبريد الإلكتروني أيضًا
+إلغاء
+تذكير أسرة واحدة
+ar TAB all: Student D10 | Student D10 | Student D5 | Student D5 | Student D6 | Student D7 | Student D8 | Student D9
+ar DIALOG all:
+تذكير هذه الأسر
+تذكير الدفع الآن إلى أولياء الأمور والطالب في كل أسرة محددة: ما عليهم في هذه الجلسة وموعده. وما فات موعده يصله نص التأخير.
+Student D10
+29,000 جنيه · مستحق 22 أكتوبر 2026
+Student D5
+28,700 جنيه · مستحق 22 أكتوبر 2026
+Student D7
+متأخرة 14,500 جنيه · منذ 4 أكتوبر 2026
+Student D9
+متأخرة 14,200 جنيه · منذ 8 أكتوبر 2026
+معاينة — النسخة الخاصة بـ Student D7
+Payment overdue — June 2027 · دفعة متأخرة — June 2027
+Dear Parent D7, EGP 14,500 for Student D7 is overdue and still unpaid: Biology (overdue since 4 October 2026). Please pay in the app or at the school's finance desk.
+عزيزي ولي الأمر Parent D7، مبلغ 14,500 جنيه الخاص بـ Student D7 متأخر ولم يُسدَّد بعد: Biology (متأخر منذ 4 أكتوبر 2026). يرجى الدفع من التطبيق أو في مكتب الشؤون المالية بالمدرسة.
+وبالبريد الإلكتروني أيضًا
+إلغاء
+تذكير 4 أسر
+ERRORS: none

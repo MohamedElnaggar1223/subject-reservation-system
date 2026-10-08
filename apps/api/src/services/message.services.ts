@@ -18,7 +18,7 @@ import {
   eq, and, lte, inArray, desc, asc,
 } from '@repo/db';
 import {
-  AudienceDefinition, isPaymentList, ROLES, CHARGE_KINDS, CHARGE_KIND_LABELS, variablesIn, renderMessage, messageDate, messageAmount, messageList,
+  AudienceDefinition, isPaymentList, ROLES, CHARGE_KINDS, CHARGE_KIND_LABELS, variablesIn, renderMessage, messageDate, messageAmount, messageList, messageOverdueItem,
   MESSAGE_VARIABLE_LABELS, REMINDER_KIND_LABELS, academicYearStartOf, NOTHING_TO_SEND,
   type AudienceDefinitionType, type CreateMessageType, type MessageTexts, type MessageVars, type MessageVariable, type MessageLanguage,
   type MessageLanguageChoice, type NotificationType, type SaveTemplateType, type ReminderKind,
@@ -64,7 +64,10 @@ export function varsFor(m: AudienceMember, resolved: Pick<ResolvedAudience, 'ses
   if (m.owed) {
     v.amount = messageAmount(m.owed.amount, lang);
     v.due = messageDate(m.owed.dueAt, lang);
-    v.items = messageList(m.owed.items, lang);
+    // What is overdue is named item by item with its own date (follow-up 2); otherwise the names.
+    v.items = m.owed.overdue?.length
+      ? messageList([...new Set(m.owed.overdue.map((o) => messageOverdueItem(o.item, o.since, lang)))], lang)
+      : messageList(m.owed.items, lang);
   }
   return v;
 }

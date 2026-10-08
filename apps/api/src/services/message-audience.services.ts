@@ -27,7 +27,11 @@ type Executor = typeof db | Tx;
 export type Viewer = { id: string; role: string | null | undefined };
 
 /** What one student owes in a money list: the total, the earliest due date, what it is for. */
-export type Owed = { amount: number; dueAt: Date; items: string[]; sessionId: string | null; sessionName: string | null; lineIds: string[]; chargeIds: string[] };
+export type Owed = {
+  amount: number; dueAt: Date; items: string[]; sessionId: string | null; sessionName: string | null; lineIds: string[]; chargeIds: string[];
+  /** Overdue items, each with its own due date: {items} then names each "… (overdue since …)". */
+  overdue?: { item: string; since: Date }[];
+};
 
 export type AudienceMember = {
   recipientId: string;
@@ -223,6 +227,33 @@ function firstDayOwed(parts: Map<string, OwedPart[]>): Map<string, Owed | null> 
   return owed;
 }
 
+/**
+ * What one student owes that is overdue, as the overdue text says it: **everything** already past
+ * its date (all of it is owed now), its sum as {amount}, each item with its own date in {items}
+ * ("Biology (overdue since 4 October 2026) and A lab coat (overdue since 6 October 2026)"), the
+ * earliest as {due} — so a family behind on two dates hears of both, with or without the step (the
+ * review of 9e7a4d6..9037be2, follow-up 2). What is not yet due keeps the first day's rule.
+ */
+function allOverdue(parts: Map<string, OwedPart[]>): Map<string, Owed | null> {
+  const owed = new Map<string, Owed | null>();
+  for (const [studentId, list] of parts) {
+    if (!list.length) continue;
+    const sorted = [...list].sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
+    const o: Owed = {
+      amount: 0, dueAt: sorted[0]!.dueAt, items: [], sessionId: sorted[0]!.sessionId, sessionName: sorted[0]!.sessionName, lineIds: [], chargeIds: [], overdue: [],
+    };
+    for (const p of sorted) {
+      o.amount = round2(o.amount + p.amount);
+      if (!o.items.includes(p.item)) o.items.push(p.item);
+      o.overdue!.push({ item: p.item, since: p.dueAt });
+      if (p.lineId) o.lineIds.push(p.lineId);
+      if (p.chargeId) o.chargeIds.push(p.chargeId);
+    }
+    owed.set(studentId, o);
+  }
+  return owed;
+}
+
 function addOwed(parts: Map<string, OwedPart[]>, studentId: string, add: OwedPart) {
   parts.set(studentId, [...(parts.get(studentId) ?? []), add]);
 }
@@ -233,6 +264,12 @@ function addOwed(parts: Map<string, OwedPart[]>, studentId: string, add: OwedPar
  * send "is due on" with a date already gone during the first 24 hours.
  */
 const isOverdue = (due: Date, now: Date) => due.getTime() < now.getTime();
+/**
+ * Whole days past a due date, as the Money tab counts them (session-money.services.ts, and the
+ * statement): its Overdue filter is this above 0. "Remind" under that filter uses it, so the dialog
+ * lists exactly the families the tab lists (follow-up 1); a line carries the tab's own number.
+ */
+const daysOverdue = (due: Date, now: Date) => (due.getTime() < now.getTime() ? Math.floor((now.getTime() - due.getTime()) / 86_400_000) : 0);
 
 /**
  * A session's unpaid families, as the Money tab shows them (A's getSessionMoney with its subject
@@ -241,20 +278,28 @@ const isOverdue = (due: Date, now: Date) => due.getTime() < now.getTime();
  * now — not a line on a provisional board fee (unless the school takes payment on one), one paid by
  * its instalment plan, one with a payment open or past its effective deadline, nor a charge being
  * paid or that C's rules refuse. `filter`: everything owed, only what is overdue (its due instant
- * passed), or only what is not yet (the Money tab's "Remind" sends the overdue text to the first,
- * the due text to the second). Per student, the items of the first day they owe anything
- * (firstDayOwed).
+ * passed; or, under the tab's own Overdue filter, a whole day or more), or only what is not yet (the
+ * Money tab's "Remind" sends the overdue text to the first, the due text to the second). Per
+ * student: what is overdue, all of it (allOverdue); otherwise the items of the first day they owe
+ * anything (firstDayOwed).
  */
 async function sessionUnpaid(executor: Executor, def: Extract<AudienceDefinitionType, { list: 'session_unpaid' }>, now: Date) {
   const owed = new Map<string, OwedPart[]>();
   const [session] = await executor.select({ id: registrationSession.id, name: registrationSession.name }).from(registrationSession).where(eq(registrationSession.id, def.sessionId));
   if (!session) throw new AudienceError('Session not found', 404);
   const only = def.studentIds?.length ? new Set(def.studentIds) : null;
-  const wanted = (due: Date) => def.filter === 'unpaid' || (def.filter === 'overdue') === isOverdue(due, now);
+  const wanted = (due: Date, tabDays?: number) => {
+    switch (def.filter) {
+      case 'unpaid': return true;
+      case 'overdue': return isOverdue(due, now);
+      case 'overdue_days': return (tabDays ?? daysOverdue(due, now)) > 0;
+      case 'due': return !isOverdue(due, now);
+    }
+  };
   if (def.include !== 'charges') {
     const money = await getSessionMoney(def.sessionId, { filter: 'unpaid', ...(def.offerId ? { offerId: def.offerId } : {}), ...(def.sectionId ? { sectionId: def.sectionId } : {}) });
     const payOnProvisional = await getSetting('pricing.payOnProvisionalFee', executor);
-    const lines = (money?.lines ?? []).filter((l) => l.unpaid && (!only || only.has(l.student.id)) && wanted(new Date(l.dueAt)));
+    const lines = (money?.lines ?? []).filter((l) => l.unpaid && (!only || only.has(l.student.id)) && wanted(new Date(l.dueAt), l.overdueDays));
     const payable = await payableLines(executor, lines.map((l) => l.id), now, payOnProvisional);
     for (const l of lines) {
       if (!payable.has(l.id)) continue;
@@ -273,7 +318,7 @@ async function sessionUnpaid(executor: Executor, def: Extract<AudienceDefinition
       addOwed(owed, c.studentId, { amount: c.amount, dueAt: new Date(c.dueAt), item: c.description, sessionId: session.id, sessionName: session.name, chargeId: c.id });
     }
   }
-  return firstDayOwed(owed);
+  return def.filter === 'overdue' || def.filter === 'overdue_days' ? allOverdue(owed) : firstDayOwed(owed);
 }
 
 /**

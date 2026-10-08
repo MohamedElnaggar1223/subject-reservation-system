@@ -9,9 +9,11 @@
  * lists the families with what each owes, all ticked; untick any; one click sends. It goes through
  * POST /v1/messages, the payment-list path the finance officer may use. A line that cannot be paid
  * now (a provisional board fee, a payment already in progress, a plan line, past its deadline) is
- * not in it; a plan's instalments are. Per family, each part names what falls due on its first day
- * (the review of 9e7a4d6, item 1); "overdue" is past the due instant, while the tab's badge counts
- * whole days (item 5).
+ * not in it; a plan's instalments are. Per family, the overdue part names everything overdue, each
+ * item with its date, and the due part what falls due on its first day (the review of 9e7a4d6, item
+ * 1, and its follow-up 2). "Overdue" is past the due instant (item 5) — except under the tab's own
+ * Overdue filter, where it is the tab's whole-day rule, so the dialog lists exactly the families the
+ * tab lists (follow-up 1).
  *
  * The two parts are two messages (two POSTs). The dialog records which went: when the second fails,
  * the list and the email choice are frozen, the button reads "Send the rest", and a retry sends only
@@ -46,7 +48,9 @@ function RemindDialog({ sessionId, filter, offerId, sectionId, onClose }: { sess
   const queryClient = useQueryClient();
   const definition = (part: Part) => ({
     kind: 'batch' as const, list: 'session_unpaid' as const, sessionId,
-    include: offerId ? 'lines' as const : 'both' as const, filter: part,
+    include: offerId ? 'lines' as const : 'both' as const,
+    // Under the tab's Overdue filter, the tab's own rule (a whole day or more); elsewhere the due instant.
+    filter: part === 'due' ? 'due' as const : filter === 'overdue' ? 'overdue_days' as const : 'overdue' as const,
     ...(offerId ? { offerId } : {}), ...(sectionId ? { sectionId } : {}), who: 'families' as const,
   });
   // Under the tab's "Overdue" filter only what is past due; otherwise both parts.
@@ -131,7 +135,7 @@ function RemindDialog({ sessionId, filter, offerId, sectionId, onClose }: { sess
                       <bdi data-i18n-skip="true">{f.name}</bdi>
                     </span>
                     <span className="flex flex-col items-end gap-0.5 text-xs text-muted-foreground">
-                      {f.overdue > 0 && <span><Badge tone="danger">overdue</Badge> <Money amount={f.overdue} />{f.overdueAt && <> · <span>was due</span> <Day iso={f.overdueAt} /></>}</span>}
+                      {f.overdue > 0 && <span><Badge tone="danger">overdue</Badge> <Money amount={f.overdue} />{f.overdueAt && <> · <span>since</span> <Day iso={f.overdueAt} /></>}</span>}
                       {f.due > 0 && <span><Money amount={f.due} />{f.dueAt && <> · <span>due</span> <Day iso={f.dueAt} /></>}</span>}
                     </span>
                   </label>

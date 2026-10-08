@@ -219,6 +219,7 @@ export const messagesArabic: Record<string, string> = {
   'Remind': 'تذكير',
   'Remind these families': 'تذكير هذه الأسر',
   'Send the rest': 'إرسال الباقي',
+  'since': 'منذ',
   'Nobody was left to remind: the families paid meanwhile.': 'لم يبقَ أحد للتذكير: سددت الأسر في الأثناء.',
   'Sending again sends only the rest.': 'الإرسال من جديد يرسل الباقي فقط.',
   'The payment reminder, now, to the parents and the student of each family ticked: what they owe in this session and by when.':

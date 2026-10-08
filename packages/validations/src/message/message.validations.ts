@@ -65,8 +65,13 @@ export const SessionUnpaidList = z.object({
   sessionId: id,
   /** What is owed: the session's lines, its charges, or both (the Money tab's two tables). */
   include: z.enum(['lines', 'charges', 'both']).default('both'),
-  /** Everything owed, only what is past its due date, or only what is not yet (the overdue and the due texts of "Remind"). */
-  filter: z.enum(['unpaid', 'overdue', 'due']).default('unpaid'),
+  /**
+   * Everything owed; only what is past its due instant (`overdue`: the overdue text of "Remind");
+   * only what is a whole day or more past its due date (`overdue_days`: the Money tab's own Overdue
+   * filter, its "N days overdue" above 0 — "Remind" under that filter); or only what is not yet past
+   * its due instant (`due`: the due text).
+   */
+  filter: z.enum(['unpaid', 'overdue', 'overdue_days', 'due']).default('unpaid'),
   offerId: id.nullable().optional(),
   sectionId: id.nullable().optional(),
   /** The families ticked (by their students); none: every family the list finds. */
@@ -240,6 +245,10 @@ export function messageDate(d: Date | string, lang: MessageLanguage): string {
 /** An amount as a message says it. */
 export function messageAmount(n: number, lang: MessageLanguage): string {
   return lang === 'ar' ? `${amountFmt.format(n)} جنيه` : `EGP ${amountFmt.format(n)}`;
+}
+/** One overdue item as a message names it: "Biology (overdue since 4 October 2026)" / "Biology (متأخر منذ 4 أكتوبر 2026)". */
+export function messageOverdueItem(item: string, since: Date, lang: MessageLanguage): string {
+  return lang === 'ar' ? `${item} (متأخر منذ ${messageDate(since, 'ar')})` : `${item} (overdue since ${messageDate(since, 'en')})`;
 }
 /** Names as a message lists them: "A, B and C" / "A، B وC". */
 export function messageList(names: string[], lang: MessageLanguage): string {
