@@ -110,6 +110,14 @@ checks (its §16), the last verdict "ready for the owner"; the owner's questions
 Q-22 (its §17, DISCOVERY.md §3) stand open with the defaults the design builds. Phase 3 (its
 §9: agents A, B, C, D) waits for the owner's review of the design and the prototype.
 
+**Phase 3 started (7 Oct 2026, 19:33Z).** The owner's "let's do it": the five defaults stand
+(DISCOVERY.md Q-15, Q-19 to Q-22). Agent A launched on `feature/rework-sessions` (§7 below);
+B and C start when A's contract (`docs/features/RESERVATIONS.md` §Contracts) is on its branch;
+D after B and C. **Step 1 merged (8 Oct 2026, 03:08Z):** A's branch landed on main at b438976
+after its Opus 5.5 review ("ready to merge") and the follow-ups it asked for; A keeps its branch
+for post-merge items (the open fee-row race). B and C were each reviewed "merge after fixes 1, 2"
+(8 Oct 02:20Z and 02:35Z), are fixing, and merge in that order after main has A; D after them.
+
 ## 1. The features and their full scope
 
 Each feature lists its scope, then **named scenarios** (tests in `apps/api/test`, driven
@@ -618,6 +626,10 @@ API and web ports):
 | F3 Attendance | `feature/attendance` | `attendance` | 3031 / 3030 |
 | F7 Day-one import | `feature/import` | `import` | 3091 / 3090 |
 | F6 UI audit | `feature/ui-audit` | `ui` | 3071 / 3070 |
+| Rework A — sessions, offers, fees (RESERVATIONS_REWORK.md §9 step 1); merged to main 8 Oct 2026 (b438976) | `feature/rework-sessions` | `rwa` | 3121 / 3120 |
+| Rework B — reservations (step 2) | `feature/rework-reservations` | `rwb` | 3111 / 3110 |
+| Rework C — money changes, charges, exceptions (step 2) | `feature/rework-money` | `rwc` | 3141 / 3140 (A's servers took 3121/3120 because 3101/3100 were held by an older worktree's dev servers) |
+| Rework D — messages and reminders (step 3) | `feature/rework-messages` | `rwd` | 3131 / 3130 |
 
 | Feature | Implemented | Reviewed | Merged | Notes |
 |---|---|---|---|---|
