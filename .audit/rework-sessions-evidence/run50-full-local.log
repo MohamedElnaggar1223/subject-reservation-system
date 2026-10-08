@@ -1,0 +1,83 @@
+# run50-full-local.log: the proof of this run, as vitest reported it (the full log, 181282 lines, 18752685 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ✓ test/00-harness.test.ts (4 tests) 1727ms
+ ✓ test/01-desk.test.ts (8 tests) 1858ms
+ ✓ test/02-money.test.ts (4 tests) 1866ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 2214ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 5627ms
+ ✓ test/05-object-access.test.ts (16 tests) 4259ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3611ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1851ms
+ ✓ test/08-money-rules.test.ts (51 tests) 13716ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 12930ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 6606ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 8773ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 6447ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5854ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 8824ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2650ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4363ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 4058ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4575ms
+ ✓ test/08l-board-change.test.ts (7 tests) 4066ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 6030ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 24729ms
+ ✓ test/08o-reservation-lines.test.ts (23 tests) 17223ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 8212ms
+ ✓ test/08q-charges.test.ts (46 tests) 28912ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 8916ms
+ ✓ test/08s-messages-reminders.test.ts (36 tests) 54466ms
+ ❯ test/08t-rework-races.test.ts (44 tests | 4 failed) 40773ms
+ ✓ test/09-money-invariants.test.ts (51 tests) 976ms
+
+## Failed tests
+   × 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change 879ms
+   × 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction 1025ms
+   × 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form 867ms
+   × 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue 847ms
+
+## Failures
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+TypeError: Body is unusable: Body has already been read
+ ❯ refusal test/08t-rework-races.test.ts:1040:59
+    1038|       [studentId, sessionId, subjectId, studentId, itemId, seriesId],
+    1039|     ];
+    1040|     const refusal = async (r: Res) => [r.status, (await r.json() as { …
+       |                                                           ^
+    1041|     const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel'…
+    1042|       (await apiResponse(adm.api.v1['board-series'].$post({ json: { bo…
+ ❯ test/08t-rework-races.test.ts:1069:20
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+TypeError: Body is unusable: Body has already been read
+ ❯ refusal test/08t-rework-races.test.ts:1040:59
+    1038|       [studentId, sessionId, subjectId, studentId, itemId, seriesId],
+    1039|     ];
+    1040|     const refusal = async (r: Res) => [r.status, (await r.json() as { …
+       |                                                           ^
+    1041|     const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel'…
+    1042|       (await apiResponse(adm.api.v1['board-series'].$post({ json: { bo…
+ ❯ test/08t-rework-races.test.ts:1089:20
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+TypeError: Body is unusable: Body has already been read
+ ❯ refusal test/08t-rework-races.test.ts:1040:59
+    1038|       [studentId, sessionId, subjectId, studentId, itemId, seriesId],
+    1039|     ];
+    1040|     const refusal = async (r: Res) => [r.status, (await r.json() as { …
+       |                                                           ^
+    1041|     const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel'…
+    1042|       (await apiResponse(adm.api.v1['board-series'].$post({ json: { bo…
+ ❯ test/08t-rework-races.test.ts:1115:22
+
+## Summary
+[clock] database minus host: -0.0 ms (measured within 2 ms)
+ Test Files  1 failed | 28 passed (29)
+      Tests  4 failed | 542 passed | 1 todo (547)
+   Start at  02:11:44
+   Duration  305.84s (transform 1.08s, setup 48ms, collect 3.83s, tests 296.11s, environment 2ms, prepare 951ms)
+local exit 1

@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
-import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLock, pauseAtAudit, pauseAtAudits, session, openWindow, runPaymentDeadlines, type Client, reservationOf, CONSENT } from './helpers';
+import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLock, pauseAtAudit, pauseAtAudits, session, openWindow, runPaymentDeadlines, waitFor, type Client, reservationOf, CONSENT } from './helpers';
 import { examWorld, type ExamWorld } from './exam-helpers';
+import { STUDENTS_KEPT_CHANGING } from '../src/lib/student-locks';
 
 /**
  * The reservations rework, step 1 — races (RESERVATIONS_REWORK.md §6, §8; FEATURES_PLAN.md §5:
@@ -984,6 +985,138 @@ describe('08t: the rework races', () => {
       expect((await cf.json() as { data: { linesNoLongerProvisional: number } }).data.linesNoLongerProvisional).toBe(1);
       expect(await lineState(s.line)).toEqual({ s: s.to, p: false, price: 1600 });
     });
+  });
+
+  describe('a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed', () => {
+    /**
+     * Four reservations landing one after another while a change that locks its students first
+     * runs (lib/student-locks.ts). The change's first run waits for its first student (held by the
+     * test). Each round: the next newcomer's own row is held (so the change's next run, which locks
+     * it, waits there), the newcomer's line is committed, then the student the change is waiting
+     * for is let go: that run reads the lines, meets the newcomer, and runs again — until the
+     * fourth newcomer, which is the refusal. Each wait is checked with pg_blocking_pids.
+     */
+    const fourNewcomers = async (o: { first: string; newcomers: string[]; line: (studentId: string) => [string, unknown[]]; fire: () => Promise<Res> }) => {
+      const { default: pg } = await import('pg');
+      const open: InstanceType<typeof pg.Client>[] = [];
+      const holdStudent = async (id: string) => {
+        const c = new pg.Client({ connectionString: process.env.DATABASE_URL });
+        await c.connect();
+        open.push(c);
+        await c.query('BEGIN');
+        await c.query(`select id from "user" where id = $1 for no key update`, [id]);
+        return c;
+      };
+      const blockedBy = (c: InstanceType<typeof pg.Client>) => waitFor(async () =>
+        Number((await sql<{ n: string }>(`select count(*) as n from pg_stat_activity a where $1 = any(pg_blocking_pids(a.pid))`,
+          [(c as unknown as { processID: number }).processID]))[0]?.n) > 0 || null);
+      const made: string[] = [];
+      try {
+        let held = await holdStudent(o.first);
+        const firing = o.fire();
+        for (let k = 0; k < 4; k++) {
+          // The change waits for the held student — unless it answered first (then say what it answered).
+          const early = await Promise.race([blockedBy(held).then(() => null), firing.then((r) => `answered ${r.status}`)]);
+          if (early) throw new Error(`the change did not wait for its student (round ${k}): ${early}`);
+          const next = k < 3 ? await holdStudent(o.newcomers[k]!) : undefined;
+          const [text, params] = o.line(o.newcomers[k]!);
+          made.push((await one<{ id: string }>(`${text} returning id`, params)).id);
+          await held.query('COMMIT');
+          if (next) held = next;
+        }
+        return { res: await firing, made };
+      } finally {
+        for (const c of open) {
+          await c.query('ROLLBACK').catch(() => undefined);
+          await c.end().catch(() => undefined);
+        }
+      }
+    };
+    /** A waiting line of a student on an item, as a reservation that landed would leave it. */
+    const lineOn = (sessionId: string, subjectId: string, itemId: string, seriesId: string) => (studentId: string): [string, unknown[]] => [
+      `insert into registration (id, student_id, session_id, subject_id, price_at_registration, status, requested_by, offer_item_id, board_series_id, due_at)
+       values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment', $4, $5, $6, now() + interval '30 days')`,
+      [studentId, sessionId, subjectId, studentId, itemId, seriesId],
+    ];
+    const refusal = async (r: Res) => [r.status, (await r.json() as { error?: string }).error ?? null];
+    const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel', year: number, label: string, entryDeadline: Date) =>
+      (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode, month: 'june', year, label, entryDeadline } })))!.id;
+    let newcomers: string[];
+    const made: string[] = [];
+
+    beforeAll(async () => {
+      newcomers = [];
+      for (let i = 1; i <= 4; i++) newcomers.push((await onboard(officer, `t08-nc${i}-${RUN}`, 11)).studentId);
+    });
+    afterAll(async () => {
+      // The newcomers' lines stood for reservations that landed; nothing else reads them.
+      if (made.length) await sql(`delete from registration where id in $1`, [made]);
+    });
+
+    it("an item's series change", async () => {
+      const sub = await subject(adm, `RWT-NI-${RUN}`, `Newcomers item (08t ${RUN})`, { course: 1000, registration: 500 });
+      const from = await mkSeries('cambridge', Y + 1, `t08-ni-a-${RUN}`, new Date(Date.now() + days(50)));
+      const to = await mkSeries('cambridge', Y + 1, `t08-ni-b-${RUN}`, new Date(Date.now() + days(50)));
+      await feeFor(from, sub);
+      await feeFor(to, sub);
+      const o = await offerOf(s1, sub, [whole(from)]);
+      const f = await onboard(officer, `t08-ni-${RUN}`, 11);
+      const [line] = await reserveAtDesk(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
+      const r = await fourNewcomers({
+        first: f.studentId, newcomers, line: lineOn(s1, sub, o.items[0]!, from),
+        fire: () => adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: s1, offerId: o.id, itemId: o.items[0]! }, json: { boardSeriesId: to, reason: 'race: sat later' } }),
+      });
+      made.push(...r.made);
+      expect(await refusal(r.res)).toEqual([409, STUDENTS_KEPT_CHANGING]);
+      expect(await one(`select board_series_id as s from session_offer_item where id = $1`, [o.items[0]])).toEqual({ s: from });
+      expect(await one(`select board_series_id as s from registration where id = $1`, [line!.id])).toEqual({ s: from });
+    });
+
+    it("the session's series correction", async () => {
+      const sc = await mkSession(`t08-nc-${RUN}`);
+      const sub = await subject(adm, `RWT-NC-${RUN}`, `Newcomers correction (08t ${RUN})`, { course: 1000, registration: 500 });
+      const from = await mkSeries('cambridge', Y + 1, `t08-nc-${RUN}`, new Date(Date.now() + days(50)));
+      const to = await mkSeries('cambridge', Y + 2, `t08-nc-${RUN}`, new Date(Date.now() + days(50)));
+      await feeFor(from, sub);
+      await feeFor(to, sub);
+      const o = await offerOf(sc, sub, [whole(from)]);
+      const f = await onboard(officer, `t08-ncs-${RUN}`, 11);
+      await reserveAtDesk(f.studentId, sc, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
+      const r = await fourNewcomers({
+        first: f.studentId, newcomers, line: lineOn(sc, sub, o.items[0]!, from),
+        fire: () => adm.api.v1.sessions[':id'].series.$put({ param: { id: sc }, json: { sessionType: 'june', seriesYear: Y + 2, reason: 'race: the next June' } }),
+      });
+      made.push(...r.made);
+      expect(await refusal(r.res)).toEqual([409, STUDENTS_KEPT_CHANGING]);
+      expect(await one(`select series_year as y from registration_session where id = $1`, [sc])).toEqual({ y: Y + 1 });
+    });
+
+    for (const via of ['the Subjects form', 'the Catalogue'] as const) {
+      it(`a board change from ${via}`, async () => {
+        const tag = via === 'the Subjects form' ? 'S' : 'C';
+        const sub = await subject(adm, `RWT-NB${tag}-${RUN}`, `Newcomers board ${tag} (08t ${RUN})`, { course: 1000, registration: 500 }, { council: 'cambridge' });
+        const deadline = new Date(Date.now() + days(50));
+        const cam = await mkSeries('cambridge', Y + 1, `t08-nb${tag}-${RUN}`, deadline);
+        await mkSeries('pearson_edexcel', Y + 1, `t08-nb${tag}-${RUN}`, deadline);
+        await feeFor(cam, sub);
+        const o = await offerOf(s1, sub, [whole(cam)]);
+        const f = await onboard(officer, `t08-nb${tag}-${RUN}`, 11);
+        await reserveAtDesk(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
+        // The Catalogue maps a subject to an award (or units) of its new board.
+        const award = (await apiResponse(adm.api.v1.catalogue.qualifications.$post({
+          json: { boardCode: 'pearson_edexcel', code: `T08NB${tag}-${RUN}`, title: `Newcomers award ${tag} (08t ${RUN})`, level: 'igcse', suite: 'Pearson Edexcel International GCSE', subjectArea: 'Test', entryMethod: 'qualification' },
+        })))!.id;
+        const r = await fourNewcomers({
+          first: f.studentId, newcomers, line: lineOn(s1, sub, o.items[0]!, cam),
+          fire: () => via === 'the Subjects form'
+            ? adm.api.v1.subjects[':id'].$put({ param: { id: sub }, json: { council: 'pearson_edexcel' } })
+            : adm.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: sub }, json: { boardCode: 'pearson_edexcel', qualificationId: award, unitIds: [], reason: 'race: the board moved' } }),
+        });
+        made.push(...r.made);
+        expect(await refusal(r.res)).toEqual([409, STUDENTS_KEPT_CHANGING]);
+        expect(await one(`select council from subject where id = $1`, [sub])).toEqual({ council: 'cambridge' });
+      });
+    }
   });
 
   describe("a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line", () => {

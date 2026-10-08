@@ -29,6 +29,7 @@ import type { HonoEnv } from '../lib/types';
 import * as subjectService from '../services/subject.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 import { teacherForViewer } from '../lib/teacher-view';
+import { StudentsKeptChanging } from '../lib/student-locks';
 
 export const subjects = new Hono<HonoEnv>()
   .use('*', requireAuth())
@@ -148,9 +149,10 @@ export const subjects = new Hono<HonoEnv>()
       try {
         updated = await subjectService.updateSubject(id, data, user.id, extractAuditContext(c));
       } catch (err) {
-        // Post-merge validation errors (e.g. removing customPrice from a non-school subject)
+        // Post-merge validation errors (e.g. removing customPrice from a non-school subject); a
+        // board change refused because its students kept changing (lib/student-locks.ts) is a 409.
         if (err instanceof Error) {
-          return error(c, clientMessage(err, 'Failed to update subject'), 400);
+          return error(c, clientMessage(err, 'Failed to update subject'), err instanceof StudentsKeptChanging ? err.status : 400);
         }
         throw err;
       }
