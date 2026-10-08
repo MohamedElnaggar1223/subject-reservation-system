@@ -26,6 +26,8 @@ import { Button } from '~/components/ui/button';
 import { ReasonModal } from '~/components/ui/reason-modal';
 import { Badge, StandingBadge } from '~/components/ui/tone';
 import { StudentAcademicPanel } from '~/components/student-academic-panel';
+import { Reserve, SlipLink, type ReserveDone } from '~/components/reservations/reserve';
+import { StatementView } from '~/components/reservations/statement';
 
 // ─── Types, derived from their fetchers (CLAUDE.md: Hono RPC everywhere) ──────
 
@@ -34,13 +36,6 @@ const fetchHits = (search: string) =>
 const fetchSummary = (id: string) => apiResponse(api.v1.users[':id'].summary.$get({ param: { id } }));
 type Summary = Awaited<ReturnType<typeof fetchSummary>>;
 
-type SessionRow = { id: string; name: string; status: string; qualificationLevel: string };
-type AvailableSubject = {
-  id: string; name: string; code: string; isCore: boolean; isRetake: boolean;
-  teachers: { id: string; name: string }[];
-  pricing: { total: number; isOutsideSchool: boolean };
-  outsidePricing: { total: number } | null;
-};
 
 /** True when `a` falls in a calendar month before `b`'s (the takings' month rule, MO-11). */
 function isEarlierMonth(a: Date, b: Date): boolean {
@@ -92,6 +87,8 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
     enabled: !!studentId,
   });
   const [showAcademic, setShowAcademic] = useState(false);
+  // The Student 360's statement (§4.5): every line, its price and why, what is paid and owed.
+  const [showStatement, setShowStatement] = useState(false);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['desk'] });
@@ -277,6 +274,9 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                   <button type="button" className="text-xs text-primary underline hover:no-underline" onClick={() => setShowAcademic((v) => !v)}>
                     {showAcademic ? 'Hide academic record' : 'Academic record'}
                   </button>
+                  <button type="button" className="text-xs text-primary underline hover:no-underline" onClick={() => setShowStatement((v) => !v)}>
+                    {showStatement ? 'Hide statement' : 'Statement'}
+                  </button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Parents:{' '}
@@ -340,7 +340,7 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                 </span>
               ) : null}
               <Button size="sm" onClick={() => setShowRegister((v) => !v)}>
-                {showRegister ? 'Close Registration' : '+ Register Subjects'}
+                {showRegister ? 'Close' : '+ Reserve'}
               </Button>
             </div>
 
@@ -355,11 +355,14 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
           </div>
 
           {showRegister && (
-            <DeskRegisterCard
-              studentId={summary.student.id}
-              onDone={(msg) => { setShowRegister(false); done(msg); }}
-              onError={fail}
-            />
+            <DeskReserveCard key={summary.student.id} studentId={summary.student.id} onDone={(msg) => done(msg)} />
+          )}
+
+          {showStatement && (
+            <div className="bg-card rounded-xl border border-border shadow-sm p-5">
+              <h3 className="mb-3 text-sm font-semibold text-foreground font-display">Statement</h3>
+              <StatementView query={{ studentId: summary.student.id }} teacherChange />
+            </div>
           )}
 
           {/* Subjects registered and waiting for payment (MA-18): after a
@@ -714,239 +717,46 @@ function OnboardCard({ onDone, onError }: { onDone: (msg: string) => void; onErr
   );
 }
 
-// ─── Desk registration + take money (G1) ─────────────────────────────────────
+// ─── Reserve at the desk (§4.3) ──────────────────────────────────────────────
 
-function DeskRegisterCard({
-  studentId,
-  onDone,
-  onError,
-}: {
-  studentId: string;
-  onDone: (msg: string) => void;
-  onError: (e: Error) => void;
-}) {
+const fetchActiveSessions = () => apiResponse(api.v1.sessions.active.$get());
+
+/**
+ * The desk's Reserve page for the student in front of it (RESERVATIONS_REWORK.md §4.3): the
+ * session, then every subject with what can be entered; "Reserve only" or "Reserve and collect"
+ * (one payment per entry deadline; a provisional line reserved now, collected once confirmed);
+ * the slip to print with the consent texts.
+ */
+function DeskReserveCard({ studentId, onDone }: { studentId: string; onDone: (msg: string) => void }) {
+  const { data: sessions = [] } = useQuery({ queryKey: ['sessions', 'active'], queryFn: fetchActiveSessions });
   const [sessionId, setSessionId] = useState('');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  // Per-subject options — without these the desk charged FULL price for
-  // outside-school retakes (the 50% rule lives behind subjectOptions)
-  // and never recorded a teacher, making it strictly weaker than the
-  // parent's own self-serve flow.
-  const [choices, setChoices] = useState<Record<string, { teacherId?: string; takeOutsideSchool?: boolean }>>({});
-  const [collect, setCollect] = useState(true);
-  const [instrument, setInstrument] = useState<'cash' | 'card' | 'instapay' | 'other'>('cash');
-  const [escrowApply, setEscrowApply] = useState('');
-  const [localError, setLocalError] = useState('');
-
-  const { data: sessions = [] } = useQuery<SessionRow[]>({
-    queryKey: ['sessions', 'active'],
-    queryFn: async () => (await apiResponse(api.v1.sessions.active.$get())) as SessionRow[],
-  });
-
-  const { data: available = [], isFetching } = useQuery<AvailableSubject[]>({
-    queryKey: ['registrations', 'available', sessionId, studentId, 'desk'],
-    queryFn: async () =>
-      (await apiResponse(
-        api.v1.registrations.available.$get({ query: { sessionId, studentId } })
-      )) as AvailableSubject[],
-    enabled: !!sessionId,
-    retry: false,
-  });
-
-  const priceFor = (sub: AvailableSubject) =>
-    choices[sub.id]?.takeOutsideSchool && sub.outsidePricing
-      ? sub.outsidePricing.total
-      : sub.pricing.total;
-
-  const total = available
-    .filter((s) => selected.has(s.id))
-    .reduce((sum, s) => sum + priceFor(s), 0);
-
-  const mutation = useMutation({
-    mutationFn: () =>
-      apiResponse(
-        api.v1.registrations.desk.$post({
-          json: {
-            studentId,
-            sessionId,
-            subjectIds: Array.from(selected),
-            subjectOptions: Array.from(selected).reduce<
-              Record<string, { teacherId?: string; takeOutsideSchool?: boolean }>
-            >((acc, id) => {
-              const choice = choices[id];
-              if (choice && (choice.teacherId || choice.takeOutsideSchool)) acc[id] = choice;
-              return acc;
-            }, {}),
-            collectNow: collect
-              ? {
-                  instrumentUsed: instrument,
-                  escrowAmountToApply: parseFloat(escrowApply) > 0 ? parseFloat(escrowApply) : 0,
-                }
-              : undefined,
-          },
-        })
-      ),
-    onSuccess: (d) => {
-      onDone(
-        collect
-          ? `Registered and collected ${formatPrice(d.collected)}. Receipts ready to hand over${d.receipts.length ? `: ${d.receipts.map((r) => r.receiptNumber).join(', ')}` : ''}.${paymentsLine(d)}`
-          : 'Registered — the family can pay later (app or desk).'
-      );
-    },
-    onError: (err: Error) => { setLocalError(err.message); onError(err); },
-  });
-
+  const [last, setLast] = useState<ReserveDone | null>(null);
+  const chosen = sessionId || (sessions.length === 1 ? sessions[0]!.id : '');
   return (
-    <div className="bg-card rounded-xl border border-primary/40 shadow-sm p-5">
-      <h3 className="text-sm font-semibold text-foreground font-display mb-3">Register subjects at the desk</h3>
-
-      <div className="flex gap-3 flex-wrap mb-3">
-        <select
-          value={sessionId}
-          onChange={(e) => { setSessionId(e.target.value); setSelected(new Set()); setChoices({}); }}
-          className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-        >
-          <option value="">Pick an open session…</option>
-          {sessions.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-      </div>
-
-      {sessionId && (isFetching ? (
-        <div className="py-4 text-sm text-muted-foreground">Loading subjects…</div>
-      ) : available.length === 0 ? (
-        <p className="py-2 text-sm text-muted-foreground">Nothing available (already registered, or level mismatch).</p>
-      ) : (
-        <div className="space-y-1 max-h-64 overflow-y-auto mb-3">
-          {available.map((s) => (
-            <div key={s.id} className="py-1">
-              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selected.has(s.id)}
-                  onChange={(e) =>
-                    setSelected((prev) => {
-                      const next = new Set(prev);
-                      if (e.target.checked) next.add(s.id);
-                      else next.delete(s.id);
-                      return next;
-                    })
-                  }
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                />
-                <span className="flex-1">
-                  {s.name} <span className="text-xs text-muted-foreground font-mono">{s.code}</span>
-                  {s.isCore && <span className="text-xs text-amber-700 dark:text-amber-400 ml-1">core</span>}
-                  {s.isRetake && <span className="text-xs text-violet-700 dark:text-violet-400 ml-1">retake</span>}
-                </span>
-                <span className="font-medium">{formatPrice(priceFor(s))}</span>
-              </label>
-
-              {selected.has(s.id) && (s.outsidePricing || s.teachers.length > 0) && (
-                <div className="ml-6 mt-1 flex flex-wrap items-center gap-3">
-                  {s.outsidePricing && (
-                    <label className="flex items-center gap-1.5 text-xs text-foreground cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={choices[s.id]?.takeOutsideSchool ?? false}
-                        onChange={(e) =>
-                          setChoices((prev) => ({
-                            ...prev,
-                            [s.id]: {
-                              ...prev[s.id],
-                              takeOutsideSchool: e.target.checked,
-                              teacherId: e.target.checked ? undefined : prev[s.id]?.teacherId,
-                            },
-                          }))
-                        }
-                        className="h-3.5 w-3.5 rounded border-border text-primary focus:ring-primary"
-                      />
-                      Outside school ({formatPrice(s.outsidePricing.total)})
-                    </label>
-                  )}
-                  {s.teachers.length > 0 && !choices[s.id]?.takeOutsideSchool && (
-                    <select
-                      value={choices[s.id]?.teacherId ?? ''}
-                      onChange={(e) =>
-                        setChoices((prev) => ({
-                          ...prev,
-                          [s.id]: { ...prev[s.id], teacherId: e.target.value || undefined },
-                        }))
-                      }
-                      className="rounded-lg border border-border bg-card px-2 py-1 text-xs text-foreground"
-                    >
-                      <option value="">Teacher: no preference</option>
-                      {s.teachers.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+    <div className="bg-card rounded-xl border border-primary/40 shadow-sm p-5 space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h3 className="text-sm font-semibold text-foreground font-display">Reserve at the desk</h3>
+        <div>
+          <label htmlFor="desk-session" className="mb-1 block text-xs font-medium text-foreground">Session</label>
+          <select id="desk-session" value={chosen} onChange={(e) => { setSessionId(e.target.value); setLast(null); }}
+            className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground">
+            <option value="">Pick an open session…</option>
+            {sessions.map((s) => <option key={s.id} value={s.id} data-i18n-skip="true">{s.name}</option>)}
+          </select>
         </div>
-      ))}
-
-      {selected.size > 0 && (
-        <>
-          <div className="flex items-center justify-between text-sm font-semibold text-foreground border-t border-border pt-3 mb-3">
-            <span>Total</span>
-            <span>{formatPrice(total)}</span>
-          </div>
-
-          <label className="flex items-center gap-2 text-sm text-foreground mb-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={collect}
-              onChange={(e) => setCollect(e.target.checked)}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-            />
-            Money received now (confirms immediately and creates the receipts)
-          </label>
-
-          {collect && (
-            <div className="flex gap-3 flex-wrap items-end mb-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-foreground">Paid with</label>
-                <select
-                  value={instrument}
-                  onChange={(e) => setInstrument(e.target.value as typeof instrument)}
-                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                >
-                  {IN_SCHOOL_INSTRUMENTS.map((i) => (
-                    <option key={i} value={i}>{IN_SCHOOL_INSTRUMENT_LABELS[i]}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-foreground">Apply escrow (EGP, optional)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={escrowApply}
-                  onChange={(e) => setEscrowApply(e.target.value)}
-                  className="w-36 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                />
-              </div>
-            </div>
+      </div>
+      {last && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+          <p>{last.message}</p>
+          {last.desk && last.desk.receipts.length > 0 && (
+            <p className="mt-1 text-xs"><span>Receipts to hand over:</span> <span className="font-mono" data-i18n-skip="true">{last.desk.receipts.map((r) => r.receiptNumber).join(', ')}</span></p>
           )}
-
-          {localError && <p className="mb-3 text-sm text-destructive">{localError}</p>}
-
-          <Button
-            className="w-full"
-            disabled={mutation.isPending}
-            onClick={() => { setLocalError(''); mutation.mutate(); }}
-          >
-            {mutation.isPending
-              ? 'Processing…'
-              : collect
-                ? `Register & Collect ${formatPrice(Math.max(0, total - (parseFloat(escrowApply) > 0 ? parseFloat(escrowApply) : 0)))}`
-                : `Register ${selected.size} Subject${selected.size === 1 ? '' : 's'} (pay later)`}
-          </Button>
-        </>
+          <div className="mt-2"><SlipLink studentId={studentId} registrationIds={last.registrationIds} /></div>
+        </div>
+      )}
+      {chosen && (
+        <Reserve key={`${chosen}|${studentId}`} viewer="desk" studentId={studentId} sessionId={chosen}
+          onDone={(d) => { setLast(d); onDone(d.message); }} />
       )}
     </div>
   );

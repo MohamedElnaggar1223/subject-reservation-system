@@ -9,6 +9,7 @@
  */
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '~/components/ui/button';
 import { Badge } from '~/components/ui/tone';
@@ -25,13 +26,16 @@ const FILTER_LABEL: Record<Filter, string> = { all: 'All', unpaid: 'Unpaid', ove
 export default function MoneyTab({ session }: { session: SessionDetail }): React.JSX.Element {
   const [filter, setFilter] = useState<Filter>('all');
   const [offerId, setOfferId] = useState('');
+  // Step B: by section too (§4.6).
+  const [sectionId, setSectionId] = useState('');
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: [...moneyKey(session.id), filter, offerId],
-    queryFn: () => fetchMoney(session.id, { filter, ...(offerId ? { offerId } : {}) }),
+    queryKey: [...moneyKey(session.id), filter, offerId, sectionId],
+    queryFn: () => fetchMoney(session.id, { filter, ...(offerId ? { offerId } : {}), ...(sectionId ? { sectionId } : {}) }),
   });
-  // The subject filter: the subjects this session's lines are of (finance reads no offer list).
-  const { data: all } = useQuery({ queryKey: [...moneyKey(session.id), 'all', ''], queryFn: () => fetchMoney(session.id, { filter: 'all' }) });
+  // The subject and section filters: the subjects and sections this session's lines are of (finance reads no offer list).
+  const { data: all } = useQuery({ queryKey: [...moneyKey(session.id), 'all', '', ''], queryFn: () => fetchMoney(session.id, { filter: 'all' }) });
   const subjects = [...new Map((all?.lines ?? []).map((l) => [l.item.offerId, l.subject.name])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  const sections = [...new Map((all?.lines ?? []).filter((l) => l.student.sectionId).map((l) => [l.student.sectionId!, l.student.section ?? ''])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   if (isLoading) return <LoadingState />;
   if (isError || !data) return <ErrorState onRetry={() => refetch()} />;
   const t = data.totals;
@@ -63,8 +67,19 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
               {subjects.map(([id, name]) => <option key={id} value={id} data-i18n-skip="true">{name}</option>)}
             </select>
           )}
+          {sections.length > 0 && (
+            <select aria-label="Section" className={INPUT_CLASS.replace('w-full', 'w-40')} value={sectionId} onChange={(e) => setSectionId(e.target.value)}>
+              <option value="">Every section</option>
+              {sections.map(([id, name]) => <option key={id} value={id} data-i18n-skip="true">{name}</option>)}
+            </select>
+          )}
         </div>
-        <Button variant="outline" size="sm" onClick={exportCsv} disabled={!data.lines.length}>Export</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* "Remind" sends the payment reminder to these families now (a batch audience): step D's
+              messages and reminders (RESERVATIONS_REWORK.md §3.8). Until it lands it does nothing. */}
+          <Button variant="outline" size="sm" disabled title="Reminders arrive with the messages step">Remind</Button>
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={!data.lines.length}>Export</Button>
+        </div>
       </div>
       {data.lines.length === 0 ? <EmptyState title="No lines here" /> : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
@@ -83,7 +98,7 @@ export default function MoneyTab({ session }: { session: SessionDetail }): React
               {data.lines.map((l) => (
                 <tr key={l.id} className="border-b border-border last:border-0">
                   <td className="px-4 py-2 align-top">
-                    <div className="font-medium text-foreground"><bdi data-i18n-skip="true">{l.student.name}</bdi></div>
+                    <div className="font-medium text-foreground"><Link href={`/statement?studentId=${l.student.id}`} className="hover:underline"><bdi data-i18n-skip="true">{l.student.name}</bdi></Link></div>
                     <div className="text-xs text-muted-foreground"><bdi data-i18n-skip="true">{l.student.number ?? ''}</bdi>{l.student.section && <> · <bdi data-i18n-skip="true">{l.student.section}</bdi></>}</div>
                   </td>
                   <td className="px-4 py-2 align-top">
