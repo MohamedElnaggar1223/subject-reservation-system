@@ -1149,6 +1149,11 @@ describe('F7: the day-one import', () => {
         ['Retake (Self Study ONLY)', one(true, false)],
         ['(Second entry ONLY)', one(true, false)],
         ['Dropped 20% School fees', one(false, false)],
+        // Two papers named together, not in the forms (the review of 7fb133a): "and" and "&" join two papers
+        // (the line splits); "/" reads as one paper, as the forms' "41/42" does.
+        ['Paper 1 and 2 only', one(false, false)],
+        ['Paper 1 & 2 only', one(false, false)],
+        ['Paper 1/2 only', one(false, true)],
       ];
       for (const [w, want] of wordings) expect([w, readEntryNote(w)]).toEqual([w, want]);
       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));

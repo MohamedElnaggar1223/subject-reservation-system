@@ -237,7 +237,9 @@ For a line whose series and level the admin mapped to its session (`lineOf` in v
      of its items is one paper — choose the item (…)". A note says one paper with "one paper" or
      "paper", a paper's name or code, "only" — the ICT form's "(Theory Paper ONLY)" (the review of
      a326890, item 1) and the June forms' "(Paper 41/42 ONLY)" (the review of d2fa2cd); 08n reads
-     every retake and self-study wording of SCHOOL_FORMS.md §2 so a new one cannot slip through.
+     every retake and self-study wording of SCHOOL_FORMS.md §2 so a new one cannot slip through. Two
+     papers joined by "and" or "&" ("Paper 1 and 2 only") are not one paper, so the line splits;
+     "Paper 1/2 only" reads as one, as "41/42" does (the review of 7fb133a).
 2. **Attempt, mode and the sitting** (the lead's rules of 8 Oct, MO-25's interim rule):
    - mode: self-study from the answer or the note, or when the item or offer is self-study only;
    - a **retake with source `legacy`** when the student's history has the subject **sat** (not
@@ -522,6 +524,7 @@ gives for each):
 | C71 | a326890 item 2: a drifted fee note carries a fee marker | red |
 | C72 | a326890 item 3: a copy records a self-study-only offer's reason at 0 | red |
 | C73 | d2fa2cd: "(Paper 41/42 ONLY)" a one-paper retake | red |
+| C74 | 7fb133a: two papers joined by "and" not one paper | red |
 
 The earlier controls whose code main removed (C3, C13, C14, C19–C22: `getRetakeSubjectIds`,
 `prepareRegistrationInputs`, inactive import subjects) are superseded by C32, C36–C41.
@@ -748,6 +751,8 @@ records it.
 - 19:28–19:47Z — on 4d5c3d5: types green; the suites side by side green (569 passed, 1 todo each);
   every control with its own row: 53 red, C44 green as since 7003e74 (C60 covers it).
 - 19:56Z — pushed e79cb88 (one push from a89674c); CI 37834602612 green (569 passed, 1 todo).
+- 20:02–20:04Z — the review of 7fb133a (confirmed: merge after F4): "and" left out of the one-paper
+  gap; C74 red; the real sheet's counts unchanged; held for the final-merge push.
 - Next: the reviewer confirms items 1 and 2 on the diff; the final merge waits for F4 on main (main
   has D at c2d7a78, its migrations to 0054): origin/main merged as its own commit, 0050_import
   regenerated after main's last migration with a later stamp and its snapshot chained, the order
