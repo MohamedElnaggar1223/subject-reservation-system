@@ -1,12 +1,12 @@
 # C65: 2ca07a4 item 3: the family's students held before any row that names a subject
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 13141ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds a family's students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3) 436ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13855ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds a family's students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3) 466ms
  Test Files  1 failed (1)
-      Tests  1 failed | 66 passed (67)
-   Duration  14.72s (transform 618ms, setup 2ms, collect 252ms, tests 13.14s, environment 0ms, prepare 31ms)
- ❯ test/08n-import.test.ts:1227:22
+      Tests  1 failed | 67 passed (68)
+   Duration  15.95s (transform 664ms, setup 2ms, collect 280ms, tests 13.86s, environment 0ms, prepare 33ms)
+ ❯ test/08n-import.test.ts:1255:22
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -20,13 +20,13 @@ AssertionError: expected false to be true // Object.is equality
 - true
 + false
 
- ❯ test/08n-import.test.ts:1227:22
-    1225|         catch (err) { if ((err as { code?: string }).code === '55P03')…
-    1226|         finally { await c.query('rollback').catch(() => {}); await c.e…
-    1227|         expect(held).toBe(true);
+ ❯ test/08n-import.test.ts:1255:22
+    1253|         catch (err) { if ((err as { code?: string }).code === '55P03')…
+    1254|         finally { await c.query('rollback').catch(() => {}); await c.e…
+    1255|         expect(held).toBe(true);
        |                      ^
-    1228|         await release();
-    1229|         expect((await apiResponse(commit)).result.created).toMatchObje…
+    1256|         await release();
+    1257|         expect((await apiResponse(commit)).result.created).toMatchObje…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

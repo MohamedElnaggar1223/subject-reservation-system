@@ -1,14 +1,14 @@
 # C56: item 6: an open offer with no course fee is refused at creation, naming the subject (MO-9)
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 2 failed) 13169ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 126ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 58ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13768ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 176ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 108ms
  Test Files  1 failed (1)
-      Tests  2 failed | 65 passed (67)
-   Duration  14.69s (transform 645ms, setup 2ms, collect 255ms, tests 13.17s, environment 0ms, prepare 32ms)
- ❯ test/08n-import.test.ts:1530:125
- ❯ test/08n-import.test.ts:1577:73
+      Tests  2 failed | 66 passed (68)
+   Duration  15.77s (transform 667ms, setup 2ms, collect 286ms, tests 13.77s, environment 0ms, prepare 32ms)
+ ❯ test/08n-import.test.ts:1558:125
+ ❯ test/08n-import.test.ts:1605:73
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
@@ -26,13 +26,13 @@ AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 
 +   "status": 201,
   }
 
- ❯ test/08n-import.test.ts:1530:125
-    1528|       });
-    1529|       const noFee = 'Astronomy has no course fee: set the school\'s co…
-    1530|       expect(await refused(adm.api.v1.sessions[':id'].offers.$post({ p…
+ ❯ test/08n-import.test.ts:1558:125
+    1556|       });
+    1557|       const noFee = 'Astronomy has no course fee: set the school\'s co…
+    1558|       expect(await refused(adm.api.v1.sessions[':id'].offers.$post({ p…
        |                                                                                                                             ^
-    1531|       const offer = await apiResponse(adm.api.v1.sessions[':id'].offer…
-    1532|       const putOffer = (json: { availability?: 'open' | 'closed'; cour…
+    1559|       const offer = await apiResponse(adm.api.v1.sessions[':id'].offer…
+    1560|       const putOffer = (json: { availability?: 'open' | 'closed'; cour…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -49,13 +49,13 @@ AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 
 +   "status": 201,
   }
 
- ❯ test/08n-import.test.ts:1577:73
-    1575|       // Open and retakes-only: refused at 0, naming the subject.
-    1576|       const noFee = 'Fee Rule Taught (imp) has no course fee: set the …
-    1577|       expect(await refused(post(winter, offerJson(taught, 'open', 0)))…
+ ❯ test/08n-import.test.ts:1605:73
+    1603|       // Open and retakes-only: refused at 0, naming the subject.
+    1604|       const noFee = 'Fee Rule Taught (imp) has no course fee: set the …
+    1605|       expect(await refused(post(winter, offerJson(taught, 'open', 0)))…
        |                                                                         ^
-    1578|       expect(await refused(post(winter, offerJson(taught, 'retake_only…
-    1579|       // Self-study only: 0 needs a reason, as a board fee of 0 does; …
+    1606|       expect(await refused(post(winter, offerJson(taught, 'retake_only…
+    1607|       // Self-study only: 0 needs a reason, as a board fee of 0 does; …
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

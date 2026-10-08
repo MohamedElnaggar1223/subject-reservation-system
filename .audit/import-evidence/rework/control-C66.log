@@ -1,12 +1,12 @@
 # C66: 2ca07a4 item 4: "The item for …" translated only as the import's own aria-label
 # undone in apps/api/../web/lib/i18n-import.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 12960ms
-   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > the import's own sentences read in Arabic, with A's line refusals it shows on a line 8ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13675ms
+   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > the import's own sentences read in Arabic, with A's line refusals it shows on a line 6ms
  Test Files  1 failed (1)
-      Tests  1 failed | 66 passed (67)
-   Duration  14.54s (transform 650ms, setup 2ms, collect 252ms, tests 12.96s, environment 0ms, prepare 30ms)
- ❯ test/08n-import.test.ts:1350:86
+      Tests  1 failed | 67 passed (68)
+   Duration  15.39s (transform 662ms, setup 2ms, collect 267ms, tests 13.68s, environment 0ms, prepare 32ms)
+ ❯ test/08n-import.test.ts:1378:86
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -20,13 +20,13 @@ AssertionError: expected null to be 'بند الجلسة لرمز الجدول p
 + Received: 
 null
 
- ❯ test/08n-import.test.ts:1350:86
-    1348|       expect(translateImportText('the sheet names Mr Teacher, who does…
-    1349|       expect(translateImportText('Mathematics A.S./A.L.: choose the it…
-    1350|       expect(translateImportText('The session’s item for the sheet’s c…
+ ❯ test/08n-import.test.ts:1378:86
+    1376|       expect(translateImportText('the sheet names Mr Teacher, who does…
+    1377|       expect(translateImportText('Mathematics A.S./A.L.: choose the it…
+    1378|       expect(translateImportText('The session’s item for the sheet’s c…
        |                                                                                      ^
-    1351|       // Only the import's own sentence: another screen's "The item fo…
-    1352|       expect(translateImportText('The item for paper 2')).toBeNull();
+    1379|       // Only the import's own sentence: another screen's "The item fo…
+    1380|       expect(translateImportText('The item for paper 2')).toBeNull();
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

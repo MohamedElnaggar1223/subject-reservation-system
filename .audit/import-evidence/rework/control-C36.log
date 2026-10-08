@@ -1,22 +1,22 @@
 # C36: the lead's Q2: a sitting from the student's history is the legacy source
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 6 failed) 12763ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 182ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 340ms
+ ❯ test/08n-import.test.ts (68 tests | 6 failed) 13638ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 185ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 362ms
    × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the declared sittings are on the session's To verify tab; the legacy one is not; the desk's offers read does not take sheet history as a known sitting 6ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 10ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed after November had ended: a past sitting, so June takes it as a legacy retake in self-study, at the self-study share 65ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 116ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 11ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed after November had ended: a past sitting, so June takes it as a legacy retake in self-study, at the self-study share 54ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 101ms
  Test Files  1 failed (1)
-      Tests  6 failed | 61 passed (67)
-   Duration  14.32s (transform 612ms, setup 3ms, collect 247ms, tests 12.76s, environment 0ms, prepare 41ms)
+      Tests  6 failed | 62 passed (68)
+   Duration  15.72s (transform 741ms, setup 3ms, collect 330ms, tests 13.64s, environment 0ms, prepare 42ms)
  ❯ test/08n-import.test.ts:637:44
  ❯ test/08n-import.test.ts:705:56
  ❯ test/08n-import.test.ts:729:111
  ❯ test/08n-import.test.ts:745:68
  ❯ test/08n-import.test.ts:841:71
- ❯ test/08n-import.test.ts:1136:51
+ ❯ test/08n-import.test.ts:1164:51
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
@@ -174,13 +174,13 @@ AssertionError: expected [ Array(1) ] to match object [ { …(5) } ]
     },
   ]
 
- ❯ test/08n-import.test.ts:1136:51
-    1134|       const legacy = { month: 'june', year: Y, source: 'legacy', from:…
-    1135|       // In school: a first entry carrying the AS sitting, at the full…
-    1136|       expect(rowAt(v, 'Nov carry', 3).plan.lines).toMatchObject([{ off…
+ ❯ test/08n-import.test.ts:1164:51
+    1162|       const legacy = { month: 'june', year: Y, source: 'legacy', from:…
+    1163|       // In school: a first entry carrying the AS sitting, at the full…
+    1164|       expect(rowAt(v, 'Nov carry', 3).plan.lines).toMatchObject([{ off…
        |                                                   ^
-    1137|       expect(rowAt(v, 'Nov carry', 3).problems.filter((p) => p.severit…
-    1138|       // Self-study: still a first entry — it needs the exception, nev…
+    1165|       expect(rowAt(v, 'Nov carry', 3).problems.filter((p) => p.severit…
+    1166|       // Self-study: still a first entry — it needs the exception, nev…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
 

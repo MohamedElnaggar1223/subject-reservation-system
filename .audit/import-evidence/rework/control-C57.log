@@ -1,14 +1,14 @@
 # C57: item 6: opening an offer with no course fee, or setting it to 0 while open, is refused (MO-9)
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 2 failed) 13119ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 128ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 76ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 14018ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 159ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 96ms
  Test Files  1 failed (1)
-      Tests  2 failed | 65 passed (67)
-   Duration  14.81s (transform 603ms, setup 2ms, collect 253ms, tests 13.12s, environment 0ms, prepare 30ms)
- ❯ test/08n-import.test.ts:1533:65
- ❯ test/08n-import.test.ts:1590:89
+      Tests  2 failed | 66 passed (68)
+   Duration  16.36s (transform 694ms, setup 2ms, collect 288ms, tests 14.02s, environment 0ms, prepare 33ms)
+ ❯ test/08n-import.test.ts:1561:65
+ ❯ test/08n-import.test.ts:1618:89
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
@@ -26,13 +26,13 @@ AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 
 +   "status": 200,
   }
 
- ❯ test/08n-import.test.ts:1533:65
-    1531|       const offer = await apiResponse(adm.api.v1.sessions[':id'].offer…
-    1532|       const putOffer = (json: { availability?: 'open' | 'closed'; cour…
-    1533|       expect(await refused(putOffer({ availability: 'open' }))).toEqua…
+ ❯ test/08n-import.test.ts:1561:65
+    1559|       const offer = await apiResponse(adm.api.v1.sessions[':id'].offer…
+    1560|       const putOffer = (json: { availability?: 'open' | 'closed'; cour…
+    1561|       expect(await refused(putOffer({ availability: 'open' }))).toEqua…
        |                                                                 ^
-    1534|       expect(await refused(putOffer({ courseFee: 0, availability: 'ope…
-    1535|       expect(await one(`select availability, course_fee::float as fee …
+    1562|       expect(await refused(putOffer({ courseFee: 0, availability: 'ope…
+    1563|       expect(await one(`select availability, course_fee::float as fee …
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -42,7 +42,7 @@ AssertionError: expected '""' to be 'Fee Rule Untaught (imp) has no course…' /
 Expected: "Fee Rule Untaught (imp) has no course fee: set the school's course fee before it is open in this session (a line is never priced without one)"
 Received: """"
 
- ❯ test/08n-import.test.ts:1590:89
+ ❯ test/08n-import.test.ts:1618:89
 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯

@@ -1,12 +1,12 @@
 # C64: 2ca07a4 item 2: a copy brings an offer it would open at 0 (not self-study only) across closed, named
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 12959ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 144ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13773ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 171ms
  Test Files  1 failed (1)
-      Tests  1 failed | 66 passed (67)
-   Duration  14.62s (transform 622ms, setup 2ms, collect 257ms, tests 12.96s, environment 0ms, prepare 30ms)
- ❯ test/08n-import.test.ts:1597:34
+      Tests  1 failed | 67 passed (68)
+   Duration  15.70s (transform 708ms, setup 3ms, collect 282ms, tests 13.77s, environment 0ms, prepare 33ms)
+ ❯ test/08n-import.test.ts:1625:34
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -22,13 +22,13 @@ AssertionError: expected [] to deeply equal [ 'Fee Rule Taught (imp)' ]
 - ]
 + []
 
- ❯ test/08n-import.test.ts:1597:34
-    1595|       const next = await session(adm, 'Winter session (import, course …
-    1596|       const copied = await apiResponse(adm.api.v1.sessions[':id']['cop…
-    1597|       expect(copied.closedNoFee).toEqual(['Fee Rule Taught (imp)']);
+ ❯ test/08n-import.test.ts:1625:34
+    1623|       const next = await session(adm, 'Winter session (import, course …
+    1624|       const copied = await apiResponse(adm.api.v1.sessions[':id']['cop…
+    1625|       expect(copied.closedNoFee).toEqual(['Fee Rule Taught (imp)']);
        |                                  ^
-    1598|       expect(await sql(`select s.name, o.availability, o.course_fee::f…
-    1599|         where o.session_id = $1 and s.code in ('IMP-FEE-T', 'IMP-FEE-U…
+    1626|       expect(await sql(`select s.name, o.availability, o.course_fee::f…
+    1627|         where o.session_id = $1 and s.code in ('IMP-FEE-T', 'IMP-FEE-U…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

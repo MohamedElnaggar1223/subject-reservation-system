@@ -1,14 +1,14 @@
 # C43: the review asks the rules on lines as the commit will (assertLineRules, rolled back)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 2 failed) 12252ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 87ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction 356ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 12848ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 100ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction 339ms
  Test Files  1 failed (1)
-      Tests  2 failed | 65 passed (67)
-   Duration  13.78s (transform 608ms, setup 2ms, collect 246ms, tests 12.25s, environment 0ms, prepare 32ms)
- ❯ test/08n-import.test.ts:966:92
- ❯ test/08n-import.test.ts:1242:122
+      Tests  2 failed | 66 passed (68)
+   Duration  14.56s (transform 666ms, setup 2ms, collect 281ms, tests 12.85s, environment 0ms, prepare 31ms)
+ ❯ test/08n-import.test.ts:986:92
+ ❯ test/08n-import.test.ts:1270:122
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
@@ -26,13 +26,13 @@ AssertionError: expected undefined to deeply equal { code: 'registration_refused
 + Received: 
 undefined
 
- ❯ test/08n-import.test.ts:966:92
-    964|       expect(codes(rowAt(v, 'Units', 3))).toEqual(['unit_row']);
-    965|       expect(rowAt(v, 'Units', 4).plan.lines[0]).toMatchObject({ itemL…
-    966|       expect(rowAt(v, 'Units', 4).problems.find((p) => p.code === 'reg…
+ ❯ test/08n-import.test.ts:986:92
+    984|       expect(codes(rowAt(v, 'Units', 3))).toEqual(['unit_row']);
+    985|       expect(rowAt(v, 'Units', 4).plan.lines[0]).toMatchObject({ itemL…
+    986|       expect(rowAt(v, 'Units', 4).problems.find((p) => p.code === 'reg…
        |                                                                                            ^
-    967|         code: 'registration_refused', severity: 'error', detail: 'Math…
-    968|       });
+    987|         code: 'registration_refused', severity: 'error', detail: 'Math…
+    988|       });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -45,7 +45,7 @@ AssertionError: expected undefined to be 'Mathematics A.S./A.L. (imp) — P2 tak
 + Received: 
 undefined
 
- ❯ test/08n-import.test.ts:1242:122
+ ❯ test/08n-import.test.ts:1270:122
 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯

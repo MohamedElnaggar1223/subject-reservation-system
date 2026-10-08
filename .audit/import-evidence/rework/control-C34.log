@@ -1,12 +1,12 @@
 # C34: s9: the sheet's confirmation is the line's consent on the imported channel
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 2 failed) 13235ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 346ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 9ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13553ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 381ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 25ms
  Test Files  1 failed (1)
-      Tests  2 failed | 65 passed (67)
-   Duration  14.87s (transform 619ms, setup 2ms, collect 263ms, tests 13.24s, environment 0ms, prepare 31ms)
+      Tests  2 failed | 66 passed (68)
+   Duration  15.44s (transform 663ms, setup 2ms, collect 271ms, tests 13.55s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:719:28
  ❯ test/08n-import.test.ts:745:68
 

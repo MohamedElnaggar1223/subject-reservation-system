@@ -1,12 +1,12 @@
 # C52: item 4: the September pattern "… is not open" deleted (it read A's "Registration window is not open")
 # undone in apps/api/../web/lib/i18n-import.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 13032ms
-   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > A's and B's sentences are not the import's: the two the September patterns half-translated have their own words; the rest reach their own translators 8ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 14451ms
+   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > A's and B's sentences are not the import's: the two the September patterns half-translated have their own words; the rest reach their own translators 7ms
  Test Files  1 failed (1)
-      Tests  1 failed | 66 passed (67)
-   Duration  14.60s (transform 599ms, setup 2ms, collect 252ms, tests 13.03s, environment 0ms, prepare 30ms)
- ❯ test/08n-import.test.ts:1320:70
+      Tests  1 failed | 67 passed (68)
+   Duration  16.36s (transform 640ms, setup 2ms, collect 275ms, tests 14.45s, environment 0ms, prepare 32ms)
+ ❯ test/08n-import.test.ts:1348:70
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -20,13 +20,13 @@ null
 + Received: 
 "Registration window غير مفتوحة"
 
- ❯ test/08n-import.test.ts:1320:70
-    1318|     it('A\'s and B\'s sentences are not the import\'s: the two the Sep…
-    1319|       // The September patterns read these as "Registration window غير…
-    1320|       expect(translateImportText('Registration window is not open')).t…
+ ❯ test/08n-import.test.ts:1348:70
+    1346|     it('A\'s and B\'s sentences are not the import\'s: the two the Sep…
+    1347|       // The September patterns read these as "Registration window غير…
+    1348|       expect(translateImportText('Registration window is not open')).t…
        |                                                                      ^
-    1321|       expect(importArabic['Registration window is not open']).toBe('نا…
-    1322|       expect(translateImportText('Registration window is not open — a …
+    1349|       expect(importArabic['Registration window is not open']).toBe('نا…
+    1350|       expect(translateImportText('Registration window is not open — a …
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

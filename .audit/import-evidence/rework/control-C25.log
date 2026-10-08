@@ -1,12 +1,12 @@
 # C25: a new link to an existing account waits for staff (re-run on the new base)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 2 failed) 13625ms
-   × F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > IS-06 identity: a missing email, two children under one email, a duplicate family, one email for student and parent, a child with two parents, a staff email 6ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13653ms
+   × F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > IS-06 identity: a missing email, two children under one email, a duplicate family, one email for student and parent, a child with two parents, a staff email 8ms
    × F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > the mapping suggests the catalogue rows and teachers; what a commit would do is counted 1ms
  Test Files  1 failed (1)
-      Tests  2 failed | 65 passed (67)
-   Duration  15.29s (transform 615ms, setup 2ms, collect 261ms, tests 13.62s, environment 0ms, prepare 31ms)
+      Tests  2 failed | 66 passed (68)
+   Duration  15.32s (transform 637ms, setup 2ms, collect 267ms, tests 13.65s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:212:95
  ❯ test/08n-import.test.ts:259:25
 

@@ -1,12 +1,12 @@
 # C62: 2ca07a4 item 2: a self-study-only offer at a course fee of 0 says why
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (67 tests | 1 failed) 26151ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 153ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13249ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 139ms
  Test Files  1 failed (1)
-      Tests  1 failed | 66 passed (67)
-   Duration  30.73s (transform 1.84s, setup 5ms, collect 1.02s, tests 26.15s, environment 0ms, prepare 66ms)
- ❯ test/08n-import.test.ts:1580:86
+      Tests  1 failed | 67 passed (68)
+   Duration  15.14s (transform 671ms, setup 2ms, collect 274ms, tests 13.25s, environment 0ms, prepare 30ms)
+ ❯ test/08n-import.test.ts:1608:86
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -24,13 +24,13 @@ AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 
 +   "status": 201,
   }
 
- ❯ test/08n-import.test.ts:1580:86
-    1578|       expect(await refused(post(winter, offerJson(taught, 'retake_only…
-    1579|       // Self-study only: 0 needs a reason, as a board fee of 0 does; …
-    1580|       expect(await refused(post(winter, offerJson(untaught, 'self_stud…
+ ❯ test/08n-import.test.ts:1608:86
+    1606|       expect(await refused(post(winter, offerJson(taught, 'retake_only…
+    1607|       // Self-study only: 0 needs a reason, as a board fee of 0 does; …
+    1608|       expect(await refused(post(winter, offerJson(untaught, 'self_stud…
        |                                                                                      ^
-    1581|         status: 400, error: 'Fee Rule Untaught (imp) is self-study onl…
-    1582|       });
+    1609|         status: 400, error: 'Fee Rule Untaught (imp) is self-study onl…
+    1610|       });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
