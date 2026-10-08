@@ -4,8 +4,9 @@
  * Mapping: what the file's words become in the system, one screen of
  * choices, each defaulting to today's assumption.
  * - Tabs: which to take, and the year their classes are in.
- * - Series and levels: history (default), or registrations awaiting payment
- *   in an open window of the same series (the admin's), or leave out.
+ * - Series and levels: history (default), or lines awaiting payment in the
+ *   session of the same series (the admin's: each line on the subject and
+ *   item the sheet names, priced from the session's fee grids), or leave out.
  * - Subjects: the catalogue row each of the sheet's subjects is (found by
  *   name, code or unit), or added in one step by the admin.
  * - Teachers, sections, and the coordinator's pending answers (decision 3):
@@ -81,7 +82,7 @@ export function MappingTab({ id, v, editable, isAdmin }: { id: string; v: Import
       )}
 
       {v.kind === 'school_sheet' && v.mapping.series.length > 0 && (
-        <Section title="Series and levels" hint="History records what each student registered for before the system; nothing is owed. An open window of the same series takes the rows as registrations awaiting payment — the family then pays through the app or the desk. That choice is the admin's.">
+        <Section title="Series and levels" hint="History records what each student registered for before the system; nothing is owed. The session of the same series takes the lines as reservations awaiting payment — each on the subject and item the sheet names, priced from the session's fee grids — and the family then pays through the app or the desk. That choice is the admin's.">
           <ul className="divide-y divide-border">
             {v.mapping.series.map((g) => (
               <li key={g.key} className="flex flex-wrap items-center gap-3 py-2 text-sm">
@@ -102,13 +103,13 @@ export function MappingTab({ id, v, editable, isAdmin }: { id: string; v: Import
                   <option value="history">History only</option>
                   {g.windows.map((w) => (
                     <option key={w.id} value={`window:${w.id}`} disabled={!isAdmin || w.status !== 'active'}>
-                      {`Registrations awaiting payment in ${w.name}${w.status !== 'active' ? ` (${w.status})` : ''}`}
+                      {w.status === 'active' ? `Lines awaiting payment in ${w.name}` : `Lines awaiting payment in ${w.name} (${w.status})`}
                     </option>
                   ))}
                   <option value="skip">Leave these rows out</option>
                 </select>
-                {g.suggestedWindowId && g.mode !== 'window' && <Badge tone="info">An open window matches{isAdmin ? '' : ' — the admin can register these'}</Badge>}
-                {g.windows.length === 0 && <span className="text-xs text-muted-foreground">No window of this series and level.</span>}
+                {g.suggestedWindowId && g.mode !== 'window' && <Badge tone="info">{isAdmin ? 'A session of this series is open' : 'A session of this series is open — the admin can reserve these lines'}</Badge>}
+                {g.windows.length === 0 && <span className="text-xs text-muted-foreground">No session of this series.</span>}
                 {g.boards.length > 0 && <span className="text-xs text-muted-foreground"><span>Boards:</span> <bdi data-i18n-skip="true">{g.boards.map(councilName).join(', ')}</bdi></span>}
                 {g.problems.map((p) => <Badge key={p.code} tone="info">{problemTitle(p.code)}</Badge>)}
               </li>
@@ -254,7 +255,7 @@ function SubjectsSection({ id, v, disabled, isAdmin, onMap }: { id: string; v: I
   const missing = v.mapping.subjects.filter((x) => !x.subjectId);
   const byId = new Map(v.options.subjects.map((x) => [x.id, x]));
   return (
-    <Section title="Subjects" hint="Each subject as the sheet writes it, with its level code, is a registrable row of the catalogue — a whole subject, a unit (P1) or a paper set. Found by name, code or unit; check each. A subject left unmapped is kept in history in the sheet's words, with no enrolment or registration.">
+    <Section title="Subjects" hint="Each subject as the sheet writes it, with its level code, is a registrable row of the catalogue — a whole subject, a unit (P1) or a paper set. Found by name, code or unit; check each. A subject left unmapped is kept in history in the sheet's words, with no enrolment or line. A line in a session is found on the session's subjects and their items.">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="border-b border-border text-xs text-muted-foreground">
@@ -301,7 +302,7 @@ function SubjectsSection({ id, v, disabled, isAdmin, onMap }: { id: string; v: I
             </Button>
           )
         ) : (
-          <p className="mt-3 text-sm text-muted-foreground">Subjects carry their prices: the admin adds the missing ones from this screen, or on the Subjects page.</p>
+          <p className="mt-3 text-sm text-muted-foreground">The admin adds the missing ones to the catalogue from this screen, or on the Subjects page.</p>
         )
       )}
     </Section>
@@ -316,18 +317,17 @@ const codeFor = (subject: string, levelCode: string | null) =>
 function AddSubjects({ id, v, rows, onDone }: { id: string; v: ImportView; rows: ImportView['mapping']['subjects']; onDone: () => void }) {
   const [items, setItems] = useState(() => rows.map((x) => ({
     key: x.key, name: x.subject, code: codeFor(x.subject, x.levelCode), qualificationLevel: (x.levelSuggested ?? 'igcse') as 'igcse' | 'as_level' | 'a_level',
-    council: boardFor(x) as Council, isOfferedAtSchool: x.taughtInSchool, courseFee: 0, registrationFee: 0, include: true,
+    council: boardFor(x) as Council, isOfferedAtSchool: x.taughtInSchool, include: true,
   })));
   const add = useReviewMutation(id, () => apiResponse(api.v1.imports[':id'].subjects.$post({
     param: { id }, json: { subjects: items.filter((x) => x.include).map(({ include: _i, ...x }) => x) },
   })));
   const upd = (i: number, patch: Partial<(typeof items)[number]>) => setItems(items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  const noPrice = items.filter((x) => x.include && x.courseFee + x.registrationFee === 0).length;
   void v;
   return (
     <div className="mt-3 rounded-lg border border-border p-3">
       <p className="mb-2 text-sm text-muted-foreground">
-        Each becomes a registrable row of the catalogue. The board is today's assumption (units and paper sets: Pearson Edexcel IAL; the rest: Cambridge) — change it here or later on the Catalogue. A subject with no price is added inactive: the rows keep it as history, and no one can enrol in it or register for it until the admin sets its fees and turns it on, on Subjects.
+        Each becomes a registrable row of the catalogue. The board is today's assumption (units and paper sets: Pearson Edexcel IAL; the rest: Cambridge) — change it here or later on the Catalogue. A subject carries no price: a line is priced from its session's course fee and the board fee in the series' grid, and nothing is reserved until both are set.
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -338,9 +338,7 @@ function AddSubjects({ id, v, rows, onDone }: { id: string; v: ImportView; rows:
               <th className="pe-2 text-start font-semibold">Code</th>
               <th className="pe-2 text-start font-semibold">Level</th>
               <th className="pe-2 text-start font-semibold">Board</th>
-              <th className="pe-2 text-start font-semibold">Taught</th>
-              <th className="pe-2 text-start font-semibold">Course fee</th>
-              <th className="text-start font-semibold">Board fee</th>
+              <th className="text-start font-semibold">Taught</th>
             </tr>
           </thead>
           <tbody>
@@ -359,15 +357,12 @@ function AddSubjects({ id, v, rows, onDone }: { id: string; v: ImportView; rows:
                     {Object.entries(COUNCIL_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                   </select>
                 </td>
-                <td className="py-1 pe-2"><input type="checkbox" aria-label={`${x.name} is taught at school`} checked={x.isOfferedAtSchool} onChange={(e) => upd(i, { isOfferedAtSchool: e.target.checked })} /></td>
-                <td className="py-1 pe-2"><input inputMode="decimal" className={cn(INPUT, 'w-24')} value={x.courseFee} onChange={(e) => upd(i, { courseFee: Number(e.target.value) || 0 })} /></td>
-                <td className="py-1"><input inputMode="decimal" className={cn(INPUT, 'w-24')} value={x.registrationFee} onChange={(e) => upd(i, { registrationFee: Number(e.target.value) || 0 })} /></td>
+                <td className="py-1"><input type="checkbox" aria-label={`${x.name} is taught at school`} checked={x.isOfferedAtSchool} onChange={(e) => upd(i, { isOfferedAtSchool: e.target.checked })} /></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {noPrice > 0 && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400"><span className="tabular-nums">{noPrice}</span> <span>of them have no price yet: they are added inactive.</span></p>}
       {add.error && <Notice tone="danger" className="mt-2">{add.error}</Notice>}
       <div className="mt-3 flex gap-2">
         <Button disabled={add.isPending || !items.some((x) => x.include)} onClick={() => add.mutate(undefined, { onSuccess: onDone })}>

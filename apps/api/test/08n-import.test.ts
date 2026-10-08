@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, academicYearShortLabel, seriesYearInAcademicYear, seriesOrder } from '@repo/validations';
 import {
-  app, admin, staff, onboard, subject, session, feedSeries, refused, one, sql, audited, openWindow, holdRowLock, lockWaiters, waitFor, type Client,
+  app, admin, staff, onboard, subject, session, seriesOfSession, teachOffer, refused, one, sql, audited, openWindow, holdRowLock, lockWaiters, waitFor, type Client,
 } from './helpers';
 import { schoolSheet, sclRoster, moneyRecord, workbook, zip, serial, years, liveTabRows, historyTabRows, rosterTabRows, D, type Cell } from './import-fixtures';
 
@@ -524,63 +524,114 @@ describe('F7: the day-one import', () => {
     });
   });
 
-  describe('registrations in an open window, routed to their board series (the admin\'s)', () => {
-    let windowId: string, seriesId: string, liveBatch: string, finadmin: Client;
-    let type: 'june' | 'november' | 'january' | 'october', level: 'igcse' | 'as_level' | 'a_level', seriesYear: number;
+  describe('lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin\'s)', () => {
+    let windowId: string, seriesId: string, seriesName: string, liveBatch: string, finadmin: Client, mrLive: string;
+    const level = 'as_level' as const;
+    const seriesYear = seriesYearInAcademicYear('november', Y);
     const L: Record<string, string> = {};
-    const code = () => (level === 'igcse' ? 'O.L.' : level === 'as_level' ? 'A.S.' : 'A.2.');
-    const liveSheet = () => {
-      const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
-      const C = 'I confirm my registration';
-      const one = (subject: string, teacher: string, self: 'Yes' | 'No'): Cell[] => ['Live One', '11K', code(), subject, teacher, '01040404040', `live.one${D}`, 'Live Parent One', `live.parent.one${D}`, '01041414141', C, self];
-      const two = (cls: string, subject: string, self: 'Yes' | 'No', spec = code()): Cell[] => ['Live Two', cls, spec, subject, self === 'Yes' ? '' : 'Mr Live', '01042424242', `live.two${D}`, 'Live Parent Two', `live.parent.two${D}`, '01043434343', C, self];
-      const month = type[0]!.toUpperCase() + type.slice(1);
-      return workbook([
-        { name: 'Live', rows: [[`${month} ${seriesYear} Session`], header, one('Live Subject A', 'Mr Live', 'No'), one('Live Subject B', '', 'Yes'), one('Live Subject Self', '', 'Yes'), one('Live Subject Free', 'Mr Live', 'No'), two('11K', 'Live Subject B', 'Yes')] },
-        // What Live Two sat before the system: last June, in grade 10.
-        { name: 'Past', rows: [[`June ${Y} Session`], header, two('10A', 'Live Subject B', 'No'), two('10A', 'Live Subject C', 'No')] },
-      ]);
+    const C = 'I confirm my registration';
+    const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', '', ''];
+    const liveOne = (subject: string, teacher: string, self: 'Yes' | 'No', note = ''): Cell[] =>
+      ['Live One', '11K', 'A.S.', subject, teacher, '01040404040', `live.one${D}`, 'Live Parent One', `live.parent.one${D}`, '01041414141', C, self, note];
+    const liveTwo = (cls: string, subject: string, self: 'Yes' | 'No', note = ''): Cell[] =>
+      ['Live Two', cls, 'A.S.', subject, self === 'Yes' ? '' : 'Mr Live', '01042424242', `live.two${D}`, 'Live Parent Two', `live.parent.two${D}`, '01043434343', C, self, note];
+    const liveSheet = () => workbook([
+      { name: 'Live', rows: [[`November ${seriesYear} Session`], header,
+        liveOne('Live Subject A', 'Mr Live', 'No'),                                   // 3: a first entry in school
+        liveOne('Live Subject B', '', 'Yes'),                                         // 4: self-study on a first entry of a taught subject
+        liveOne('Live Subject Self', '', 'Yes'),                                      // 5: self-study, not taught this cycle
+        liveOne('Live Subject Gridless', 'Mr Live', 'No'),                            // 6: no fee row in the series' grid
+        liveTwo('11K', 'Live Subject B', 'Yes'),                                      // 7: a retake of the student's history (legacy)
+        liveTwo('11K', 'Live Subject A', 'Yes', `Retake Self Study 50% fees (All Papers) From November ${Y - 1}`), // 8: the sitting named on the sheet
+        liveOne('Live Subject C', 'Mr Live', 'No', 'Retake in School 100% fees (All Papers)'), // 9: a retake naming no sitting
+        liveOne('Live Subject Provisional', 'Mr Live', 'No'),                         // 10: a provisional fee row
+      ] },
+      // What Live Two sat before the system: last June, in grade 10.
+      { name: 'Past', rows: [[`June ${Y} Session`], header, liveTwo('10A', 'Live Subject B', 'No'), liveTwo('10A', 'Live Subject C', 'No')] },
+    ]);
+    /** A subject the school offers in the session with a course fee, whose board fee row finance has (or has not) set. */
+    const offerOwn = async (k: string, name: string, fee: { amount: number; provisional: boolean } | null) => {
+      const s = await apiResponse(adm.api.v1.subjects.$post({ json: {
+        name, code: `IMP-LIVE-${k}`, council: 'pearson_edexcel', qualificationLevel: level, courseFee: 0, registrationFee: 0, isOfferedAtSchool: true, isCore: false,
+      } }));
+      await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+        param: { id: windowId },
+        json: {
+          subjectId: s.id, availability: 'open', courseFee: 1000, grade10Core: false, teachers: [{ teacherId: mrLive, mode: 'in_school' }],
+          items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false }],
+        },
+      }));
+      if (fee) await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind: 'subject', keyId: s.id, amount: fee.amount, provisional: fee.provisional }] } }));
+      return s.id;
     };
+    const lineOf = (r: RowView) => r.plan.line!;
 
     beforeAll(async () => {
       finadmin = await staff(adm, 'finance_admin', 'imp');
-      // A type and level no earlier suite holds open (one active window per type and level).
-      const combos = [['june', 'igcse'], ['november', 'igcse'], ['june', 'as_level'], ['november', 'as_level'], ['january', 'as_level'], ['october', 'as_level'],
-        ['june', 'a_level'], ['november', 'a_level'], ['january', 'a_level'], ['october', 'a_level']] as const;
-      const taken = new Set((await sql<{ k: string }>(`select session_type || '/' || qualification_level as k from registration_session where status = 'active'`)).map((r) => r.k));
-      const free = combos.find(([t, l]) => !taken.has(`${t}/${l}`));
-      if (!free) throw new Error('08n needs one type and level with no open window');
-      [type, level] = free;
-      seriesYear = seriesYearInAcademicYear(type, Y);
-      for (const [k, name, offered, fee] of [['A', 'Live Subject A', true, 1000], ['B', 'Live Subject B', true, 1000], ['C', 'Live Subject C', true, 1000], ['S', 'Live Subject Self', false, 1000], ['F', 'Live Subject Free', true, 0]] as const) {
-        L[k] = await subject(adm, `IMP-LIVE-${k}`, name, { course: fee, registration: fee / 2 }, { qualificationLevel: level, council: 'pearson_edexcel', isOfferedAtSchool: offered });
+      mrLive = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: 'Mr Live' } })))!.id;
+      for (const [k, name, offered] of [['A', 'Live Subject A', true], ['B', 'Live Subject B', true], ['C', 'Live Subject C', true], ['S', 'Live Subject Self', false]] as const) {
+        L[k] = await subject(adm, `IMP-LIVE-${k}`, name, { course: 1000, registration: 500 }, { qualificationLevel: level, council: 'pearson_edexcel', isOfferedAtSchool: offered });
       }
-      windowId = await session(adm, `Live window (import)`, type, level, { ...openWindow(), activate: true, seriesYear });
-      seriesId = await feedSeries(adm, windowId, { boardCode: 'pearson_edexcel', label: 'import live', entryDeadline: new Date(Date.now() + 330 * 86_400_000) });
+      // The winter session of November Y (the reservations rework: one session per cycle, levels per subject).
+      windowId = await session(adm, 'Live session (import)', 'november', level, { ...openWindow(), activate: true, seriesYear });
+      seriesId = await seriesOfSession(windowId, 'pearson_edexcel');
+      const s = await one<{ month: string; year: number; label: string }>(`select month, year, label from board_series where id = $1`, [seriesId]);
+      seriesName = `Pearson Edexcel November ${s.year} (${s.label})`;
+      // Mr Live teaches A, B and C this cycle (the session's links sheet).
+      for (const k of ['A', 'B', 'C'] as const) await teachOffer(adm, windowId, L[k]!, [mrLive]);
+      L.G = await offerOwn('G', 'Live Subject Gridless', null);
+      L.P = await offerOwn('P', 'Live Subject Provisional', { amount: 600, provisional: true });
       liveBatch = await stage(adm, liveSheet(), 'live.xlsx', 'school_sheet');
     });
     afterAll(async () => {
-      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: windowId }, json: { reason: 'import scenario done: free the pair' } }));
+      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: windowId }, json: { reason: 'import scenario done' } }));
     });
 
-    it('the series is offered its open window; mapped there by the admin, each row is checked as the desk would check it', async () => {
+    it('the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is', async () => {
       let v = await fetchView(adm, liveBatch);
-      const g = v.mapping.series.find((s) => s.key === `${type}-${seriesYear}-${level}`)!;
-      expect(g).toMatchObject({ mode: 'history', suggestedWindowId: windowId, rows: 5 });
+      const g = v.mapping.series.find((x) => x.key === `november-${seriesYear}-${level}`)!;
+      expect(g).toMatchObject({ mode: 'history', rows: 8 });
+      expect(g.windows.map((x) => x.id)).toContain(windowId);
       expect((await putSettings(adm, liveBatch, { series: { [g.key]: { mode: 'window', sessionId: windowId } }, enrol: false, createSections: false })).status).toBe(200);
       v = await fetchView(adm, liveBatch);
-      expect(rowAt(v, 'Live', 3).plan.registration).toBe('live');
+      // 3: the offer and item the sheet names, a first entry in school, Mr Live, priced from the grid.
       expect(codes(rowAt(v, 'Live', 3))).toEqual([]);
-      // A first attempt at self-study on a taught subject: today's rule refuses it (IS-03).
-      expect(rowAt(v, 'Live', 4).problems.find((p) => p.code === 'self_study_on_taught')).toMatchObject({ severity: 'error', detail: 'a first attempt' });
+      expect(lineOf(rowAt(v, 'Live', 3))).toMatchObject({
+        sessionId: windowId, subjectName: 'Live Subject A', itemLabel: 'Whole subject', found: 'only', series: seriesName,
+        attempt: 'first', mode: 'in_school', priorSitting: null, teacherId: mrLive,
+        price: { total: 1500, courseFee: 1000, boardFee: 500, provisional: false, coursePercent: 100, boardPercent: 100 },
+      });
+      // 4: self-study on a first entry is refused without the student's exception (gate.selfStudyFirstEntry), never priced at the share silently.
+      expect(rowAt(v, 'Live', 4).problems.find((p) => p.code === 'self_study_on_taught')).toEqual({
+        code: 'self_study_on_taught', severity: 'error',
+        detail: 'Self-study on a first entry needs the exception: grant it on the Exceptions page or make it a retake with its sitting',
+      });
+      // 5: not taught this cycle: a first entry in self-study, at the self-study share of the course fee and the whole board fee.
       expect(codes(rowAt(v, 'Live', 5))).toEqual(['self_study_not_taught']);
-      expect(rowAt(v, 'Live', 6).problems.find((p) => p.code === 'registration_refused')!.detail).toBe('Live Subject Free has no price yet — set its fees on Subjects first');
-      // Live Two sat Subject B last June (the Past tab): a retake, so self-study is allowed.
-      expect(codes(rowAt(v, 'Live', 7))).toEqual(['self_study_retake']);
-      expect(rowAt(v, 'Past', 3).plan.registration).toBe('history');
+      expect(lineOf(rowAt(v, 'Live', 5))).toMatchObject({ attempt: 'first', mode: 'self_study', teacherId: null, price: { total: 1000, courseFee: 500, boardFee: 500, coursePercent: 50, boardPercent: 100 } });
+      // 6: no fee row in the series' grid: refused, naming the grid (never priced at 0).
+      expect(rowAt(v, 'Live', 6).problems).toEqual([{ code: 'fee_missing', severity: 'error', detail: `Whole subject has no board fee in ${seriesName} yet — set one on the session's Fees tab` }]);
+      expect(lineOf(rowAt(v, 'Live', 6)).price).toBeNull();
+      // 7: Live Two sat B last June (the Past tab, over by now): a retake of the student's legacy history.
+      expect(rowAt(v, 'Live', 7).problems).toEqual([{ code: 'self_study_retake', severity: 'info', detail: `a retake of June ${Y} (the student’s history)` }]);
+      expect(lineOf(rowAt(v, 'Live', 7))).toMatchObject({
+        attempt: 'retake', mode: 'self_study', priorSitting: { month: 'june', year: Y, source: 'legacy', from: 'history' },
+        price: { total: 1000, courseFee: 500, boardFee: 500, coursePercent: 50, boardPercent: 100 },
+      });
+      // 8: the sheet names the sitting: the desk's declaration, verified on To verify.
+      expect(codes(rowAt(v, 'Live', 8))).toEqual(['fee_note', 'self_study_retake']);
+      expect(lineOf(rowAt(v, 'Live', 8))).toMatchObject({ attempt: 'retake', mode: 'self_study', priorSitting: { month: 'november', year: Y - 1, source: 'declared_by_desk', from: 'note' }, price: { total: 1000 } });
+      // 9: a retake that names no sitting, with none in the student's history: an error until staff name it.
+      expect(rowAt(v, 'Live', 9).problems.find((p) => p.code === 'retake_sitting_missing')).toEqual({
+        code: 'retake_sitting_missing', severity: 'error', detail: '"Retake in School 100% fees (All Papers)": name the sitting it follows on the line, or make it a first entry',
+      });
+      // 10: a provisional fee row prices the line provisional, at its amount — never 0.
+      expect(rowAt(v, 'Live', 10).problems).toEqual([{ code: 'price_provisional', severity: 'info', detail: `board fee 600 in ${seriesName}` }]);
+      expect(lineOf(rowAt(v, 'Live', 10)).price).toEqual({ total: 1600, courseFee: 1000, boardFee: 600, provisional: true, coursePercent: 100, boardPercent: 100 });
+      expect(rowAt(v, 'Past', 3).plan).toMatchObject({ registration: 'history', line: null });
     });
 
-    it('the school-fee gate is the window\'s own: a new family owes the year\'s fee first', async () => {
+    it('the school-fee gate is the session\'s own: a new family owes the year\'s fee first', async () => {
       const schedule = await apiResponse(finadmin.api.v1['school-fees'].schedules.$post({
         json: { academicYear: `${Y}-${Y + 1}`, amount: 2500, opensAt: new Date(Date.now() - 86_400_000).toISOString() },
       }));
@@ -594,139 +645,186 @@ describe('F7: the day-one import', () => {
       expect(codes(rowAt(await fetchView(adm, liveBatch), 'Live', 3))).toEqual([]);
     });
 
-    it('the row-level answer to self-study; a row left out; the coordinator may not commit registrations', async () => {
+    it('staff settle each line: the self-study answer, the fee row set on the Fees tab, the sitting named; the coordinator may not commit lines', async () => {
       let v = await fetchView(adm, liveBatch);
       await putRows(adm, liveBatch, { rowIds: [rowAt(v, 'Live', 4).id], edits: { selfStudyChoice: 'in_school' } });
-      await putRows(adm, liveBatch, { rowIds: [rowAt(v, 'Live', 6).id], decision: 'skip', note: 'no price yet' });
+      await putRows(adm, liveBatch, { rowIds: [rowAt(v, 'Live', 9).id], edits: { priorSitting: { month: 'june', year: Y } } });
+      // The gridless subject is refused until finance sets its row in the series' grid.
+      await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind: 'subject', keyId: L.G!, amount: 450, provisional: false }] } }));
       v = await fetchView(adm, liveBatch);
-      expect(rowAt(v, 'Live', 4)).toMatchObject({ mode: 'in_school', plan: { registration: 'live' } });
-      expect(v.summary).toMatchObject({ heldFamilies: 0, plan: { registrations: 4, history: 2 } });
+      expect(rowAt(v, 'Live', 4)).toMatchObject({ mode: 'in_school', plan: { registration: 'live', line: { attempt: 'first', mode: 'in_school', teacherId: mrLive, price: { total: 1500 } } } });
+      expect(rowAt(v, 'Live', 4).problems.find((p) => p.code === 'self_study_on_taught')).toMatchObject({ severity: 'info', detail: 'taken as taught in school' });
+      expect(codes(rowAt(v, 'Live', 6))).toEqual([]);
+      expect(lineOf(rowAt(v, 'Live', 6)).price).toMatchObject({ total: 1450, boardFee: 450 });
+      expect(lineOf(rowAt(v, 'Live', 9))).toMatchObject({ attempt: 'retake', mode: 'in_school', priorSitting: { month: 'june', year: Y, source: 'declared_by_desk', from: 'line' }, price: { total: 1500, coursePercent: 100 } });
+      expect(v.summary).toMatchObject({ heldFamilies: 0, plan: { registrations: 8, history: 2 } });
       expect(await refused(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: liveBatch } }))).toEqual({
-        status: 403, error: 'Registering families in an open window is the admin’s: ask the admin to commit this import, or set those series to "History only"',
+        status: 403, error: 'Reserving lines for families in a session is the admin’s: ask the admin to commit this import, or set those series to "History only"',
       });
       expect((await one<{ status: string }>(`select status from import_batch where id = $1`, [liveBatch])).status).toBe('staged');
     });
 
-    it('the admin commits: registrations await payment in the window, each entered in its board series, never paid', async () => {
+    it('the admin commits: lines through insertLines, priced from the grids, with the sheet\'s consent on the imported channel and the sitting\'s source; never paid', async () => {
       const payments = Number((await one<{ n: string }>(`select count(*) as n from payment`)).n);
       const out = await apiResponse(adm.api.v1.imports[':id'].commit.$post({ param: { id: liveBatch } }));
-      expect(out.result.created).toMatchObject({ students: 2, parents: 2, registrations: 4, history: 2 });
-      const regs = await sql<{ email: string; subject: string; status: string; price: string; outside: boolean; retake: boolean; series: string | null; teacher: string | null; comments: string }>(
-        `select u.email, s.name as subject, r.status, r.price_at_registration as price, r.taken_outside_school as outside, r.is_retake as retake,
-                r.board_series_id as series, t.name as teacher, r.approval_comments as comments
-         from registration r join "user" u on u.id = r.student_id join subject s on s.id = r.subject_id left join teacher t on t.id = r.teacher_id
-         where r.session_id = $1 order by u.email, s.name`, [windowId]);
-      expect(regs.map((r) => [r.email.replace(D, ''), r.subject, r.status, Number(r.price), r.outside, r.retake, r.series === seriesId, r.teacher])).toEqual([
-        ['live.one', 'Live Subject A', 'pending_payment', 1500, false, false, true, 'Mr Live'],
-        ['live.one', 'Live Subject B', 'pending_payment', 1500, false, false, true, null],
-        ['live.one', 'Live Subject Self', 'pending_payment', 750, true, false, true, null],
-        // A retake of what the student sat before the system, outside school at the outside rate (V3 §6.9).
-        ['live.two', 'Live Subject B', 'pending_payment', 750, true, true, true, null],
+      expect(out.result.created).toMatchObject({ students: 2, parents: 2, registrations: 8, history: 2 });
+      const lines = await sql<{
+        email: string; subject: string; item: string; status: string; attempt: string; mode: string; price: string; course: string; board: string; provisional: boolean;
+        retake: boolean; outside: boolean; source: string | null; prior: string | null; teacher: string | null; series_ok: boolean; comments: string; basis: { coursePercent: number; boardPercent: number };
+        consents: string[]; snapshot: boolean;
+      }>(`select u.email, s.name as subject, i.label as item, r.status, r.attempt, r.mode, r.price_at_registration as price, r.course_fee_at_registration as course,
+                r.registration_fee_at_registration as board, r.price_provisional as provisional, r.is_retake as retake, r.taken_outside_school as outside,
+                r.prior_sitting_source as source, (select ps.board_code || ' ' || ps.month || ' ' || ps.year from board_series ps where ps.id = r.prior_sitting_series_id) as prior,
+                t.name as teacher, r.board_series_id = i.board_series_id as series_ok, r.approval_comments as comments, r.pricing_basis as basis,
+                (select array_agg(c.kind || '/' || c.channel order by c.kind) from registration_consent c where c.registration_id = r.id) as consents,
+                r.refund_policy_snapshot is not null as snapshot
+         from registration r join "user" u on u.id = r.student_id join subject s on s.id = r.subject_id join session_offer_item i on i.id = r.offer_item_id
+         left join teacher t on t.id = r.teacher_id where r.session_id = $1 order by u.email, s.name`, [windowId]);
+      expect(lines.map((r) => [r.email.replace(D, ''), r.subject, r.attempt, r.mode, Number(r.price), Number(r.course), Number(r.board), r.provisional, r.source, r.prior, r.teacher,
+        r.basis.coursePercent, r.basis.boardPercent])).toEqual([
+        ['live.one', 'Live Subject A', 'first', 'in_school', 1500, 1000, 500, false, null, null, 'Mr Live', 100, 100],
+        ['live.one', 'Live Subject B', 'first', 'in_school', 1500, 1000, 500, false, null, null, 'Mr Live', 100, 100],
+        ['live.one', 'Live Subject C', 'retake', 'in_school', 1500, 1000, 500, false, 'declared_by_desk', `pearson_edexcel june ${Y}`, 'Mr Live', 100, 100],
+        ['live.one', 'Live Subject Gridless', 'first', 'in_school', 1450, 1000, 450, false, null, null, 'Mr Live', 100, 100],
+        ['live.one', 'Live Subject Provisional', 'first', 'in_school', 1600, 1000, 600, true, null, null, 'Mr Live', 100, 100],
+        ['live.one', 'Live Subject Self', 'first', 'self_study', 1000, 500, 500, false, null, null, null, 50, 100],
+        ['live.two', 'Live Subject A', 'retake', 'self_study', 1000, 500, 500, false, 'declared_by_desk', `pearson_edexcel november ${Y - 1}`, null, 50, 100],
+        // A retake of what the student sat before the system (the legacy history), at the self-study share.
+        ['live.two', 'Live Subject B', 'retake', 'self_study', 1000, 500, 500, false, 'legacy', `pearson_edexcel june ${Y}`, null, 50, 100],
       ]);
-      expect(regs.every((r) => r.comments.startsWith('[IMPORT] live.xlsx — Live row '))).toBe(true);
+      for (const r of lines) {
+        expect([r.status, r.item, r.series_ok, r.retake === (r.attempt === 'retake'), r.outside === (r.mode === 'self_study'), r.snapshot]).toEqual(['pending_payment', 'Whole subject', true, true, true, true]);
+        // The sheet's "I confirm my registration": both consents, on the imported channel.
+        expect(r.consents).toEqual(['declaration/imported', 'refund_policy/imported']);
+        expect(r.comments).toMatch(/^\[IMPORT\] live\.xlsx — Live row \d+/);
+      }
       expect(Number((await one<{ n: string }>(`select count(*) as n from payment`)).n)).toBe(payments);
       expect(await sql(`select 1 from audit_log where action = 'IMPORT_REGISTRATION' and new_data->>'batchId' = $1`, [liveBatch])).toHaveLength(2);
     });
 
-    it('history before the system counts as a sitting everywhere: the desk registers a retake of it outside school', async () => {
+    it('the declared sittings are on the session\'s To verify tab; the legacy one is not; the desk\'s offers read does not take sheet history as a known sitting', async () => {
+      const list = await apiResponse(coordinator.api.v1.sessions[':id']['to-verify'].$get({ param: { id: windowId }, query: {} }));
+      const mine = list.lines.filter((l) => l.student.name.startsWith('Live '));
+      expect(mine.map((l) => [l.student.name, l.line.subject, l.sitting?.name, l.declaredBy.channel]).sort()).toEqual([
+        ['Live One', 'Live Subject C', `Pearson Edexcel June ${Y}`, 'desk'],
+        ['Live Two', 'Live Subject A', `Pearson Edexcel November ${Y - 1}`, 'desk'],
+      ]);
+      // B's known sittings are the system's own lines (the lead's answer, 8 Oct): Live Two's sheet history of C is not one.
       const two = await one<{ id: string }>(`select id from "user" where email = $1`, [`live.two${D}`]);
-      const one1 = await one<{ id: string }>(`select id from "user" where email = $1`, [`live.one${D}`]);
-      const desk = (studentId: string) => officer.api.v1.registrations.desk.$post({
-        json: { studentId, sessionId: windowId, subjectIds: [L.C!], subjectOptions: { [L.C!]: { takeOutsideSchool: true } } },
-      });
-      // Live One never sat Subject C: outside school is refused, as before.
-      expect(await refused(desk(one1.id))).toEqual({ status: 400, error: 'Subjects can only be taken outside school when retaking or when the school does not offer them' });
-      const made = await apiResponse(desk(two.id));
-      expect(made.registrations.map((r) => [Number(r.priceAtRegistration), r.isRetake, r.takenOutsideSchool])).toEqual([[750, true, true]]);
+      const offers = await apiResponse(officer.api.v1.registrations.offers.$get({ query: { studentId: two.id, sessionId: windowId } }));
+      const c = offers.offers.find((o) => o.subject.id === L.C)!.items[0]!;
+      expect(c.knownSittings).toEqual([]);
     });
 
-    it('history of the window\'s own series, or of a later one, is not a sitting before it: no retake at the desk or in the review', async () => {
-      const month = type[0]!.toUpperCase() + type.slice(1);
-      const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
+    it('the statement and the session\'s Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent', async () => {
+      const two = await one<{ id: string }>(`select id from "user" where email = $1`, [`live.two${D}`]);
+      const st = await apiResponse(adm.api.v1.statement.$get({ query: { studentId: two.id } }));
+      const lines = st.students[0]!.sessions.find((s) => s.id === windowId)!.lines;
+      expect(lines.map((l) => [l.subject, l.attempt, l.mode, l.price, l.paid, l.outstanding, l.provisional, l.basisText, l.priorSitting?.source, l.consents.map((c) => c.channel)])
+        .sort((a, b) => String(a[0]).localeCompare(String(b[0])))).toEqual([
+        ['Live Subject A', 'retake', 'self_study', 1000, 0, 1000, false, 'course 1,000 × 50% + board 500 × 100%', 'declared_by_desk', ['imported', 'imported']],
+        ['Live Subject B', 'retake', 'self_study', 1000, 0, 1000, false, 'course 1,000 × 50% + board 500 × 100%', 'legacy', ['imported', 'imported']],
+      ]);
+      const money = await apiResponse(adm.api.v1.sessions[':id'].money.$get({ param: { id: windowId }, query: {} }));
+      const imported = money.lines.filter((l) => l.student.name.startsWith('Live '));
+      expect(imported).toHaveLength(8);
+      expect(imported.every((l) => l.unpaid && !l.paid && l.status === 'pending_payment')).toBe(true);
+      expect(imported.reduce((a, l) => a + l.outstanding, 0)).toBe(1500 + 1500 + 1500 + 1450 + 1600 + 1000 + 1000 + 1000);
+      expect(imported.filter((l) => l.provisional).map((l) => [l.subject.name, l.price])).toEqual([['Live Subject Provisional', 1600]]);
+    });
+
+    it('a first entry in self-study is a line once the student has the exception: the line uses it once', async () => {
+      // Bassem, already in the system (the desk onboarded him), self-study on a subject the school teaches.
+      const bassem = await one<{ id: string }>(`select id from "user" where email = $1`, [`bassem${D}`]);
+      const id = await stage(adm, workbook([{ name: 'Self', rows: [[`November ${seriesYear} Session`], header,
+        ['Bassem Nour', '11G', 'A.S.', 'Live Subject C', '', '01033333333', `bassem${D}`, 'Rania Nour', `rania${D}`, '01044444444', C, 'Yes', ''],
+      ] }]), 'bassem-self.xlsx', 'school_sheet');
+      expect((await putSettings(adm, id, { series: { [`november-${seriesYear}-${level}`]: { mode: 'window', sessionId: windowId } }, enrol: false, createSections: false })).status).toBe(200);
+      expect(rowAt(await fetchView(adm, id), 'Self', 3).problems.find((p) => p.code === 'self_study_on_taught')).toMatchObject({ severity: 'error' });
+      const offerId = (await one<{ id: string }>(`select id from session_offer where session_id = $1 and subject_id = $2`, [windowId, L.C])).id;
+      const exc = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'gate.selfStudyFirstEntry', studentId: bassem.id, scope: { offerId }, reason: 'the school does not teach him this cycle' } }));
+      const v = await fetchView(adm, id);
+      expect(rowAt(v, 'Self', 3).problems.find((p) => p.code === 'self_study_on_taught')).toEqual({ code: 'self_study_on_taught', severity: 'info', detail: 'a first entry in self-study, by the student’s exception' });
+      expect(lineOf(rowAt(v, 'Self', 3))).toMatchObject({ attempt: 'first', mode: 'self_study', price: { total: 1000, coursePercent: 50 } });
+      expect((await apiResponse(adm.api.v1.imports[':id'].commit.$post({ param: { id } }))).result.created).toMatchObject({ registrations: 1 });
+      expect(await one(`select r.attempt, r.mode, r.price_at_registration::float as price from registration r where r.student_id = $1 and r.session_id = $2`, [bassem.id, windowId]))
+        .toEqual({ attempt: 'first', mode: 'self_study', price: 1000 });
+      expect((await one<{ status: string }>(`select status from exception where id = $1`, [exc.id])).status).toBe('used');
+    });
+
+    it('history of the session\'s own series, or of a later one, is not a sitting before it: a first entry, in the review as at the commit', async () => {
       const three = (cls: string, subject: string, self: 'Yes' | 'No'): Cell[] =>
-        ['Live Three', cls, code(), subject, self === 'Yes' ? '' : 'Mr Live', '01046464646', `live.three${D}`, 'Live Parent Three', `live.parent.three${D}`, '01047474747', 'I confirm my registration', self];
-      // Recorded before the system, as history (the coordinator's default): Subject C in this window's own
-      // series, Subject A in the same month a year later.
+        ['Live Three', cls, 'A.S.', subject, self === 'Yes' ? '' : 'Mr Live', '01046464646', `live.three${D}`, 'Live Parent Three', `live.parent.three${D}`, '01047474747', C, self, ''];
+      // Recorded before the system, as history (the coordinator's default): Subject C in this session's own series, Subject A a year later.
       const past = await stage(coordinator, workbook([
-        { name: 'Same', rows: [[`${month} ${seriesYear} Session`], header, three('11K', 'Live Subject C', 'No')] },
-        { name: 'Later', rows: [[`${month} ${seriesYear + 1} Session`], header, three('12K', 'Live Subject A', 'No')] },
+        { name: 'Same', rows: [[`November ${seriesYear} Session`], header, three('11K', 'Live Subject C', 'No')] },
+        { name: 'Later', rows: [[`November ${seriesYear + 1} Session`], header, three('12K', 'Live Subject A', 'No')] },
       ]), 'three.xlsx', 'school_sheet');
       expect((await putSettings(coordinator, past, { enrol: false, createSections: false })).status).toBe(200);
-      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: past } }));
-      expect(out.result.created).toMatchObject({ students: 1, parents: 1, history: 2, registrations: 0 });
-      // The desk: neither subject was sat before this window's series, so outside school is refused.
-      const st = await one<{ id: string }>(`select id from "user" where email = $1`, [`live.three${D}`]);
-      for (const s of [L.C!, L.A!]) {
-        expect(await refused(officer.api.v1.registrations.desk.$post({
-          json: { studentId: st.id, sessionId: windowId, subjectIds: [s], subjectOptions: { [s]: { takeOutsideSchool: true } } },
-        }))).toEqual({ status: 400, error: 'Subjects can only be taken outside school when retaking or when the school does not offer them' });
-      }
-      // The review agrees, so the commit is not refused where the review said yes: self-study in this window
-      // on C or A (their history is this series or later) and on B (the file's only other row of it is a
-      // later series) is a first attempt.
+      expect((await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id: past } }))).result.created).toMatchObject({ students: 1, parents: 1, history: 2, registrations: 0 });
+      // Self-study in this session on C or A (their history is this series or later) and on B (the file's only other
+      // line of it is a later series) is a first entry: refused without the exception.
       const again = await stage(adm, workbook([
-        { name: 'Again', rows: [[`${month} ${seriesYear} Session`], header, three('11K', 'Live Subject C', 'Yes'), three('11K', 'Live Subject A', 'Yes'), three('11K', 'Live Subject B', 'Yes')] },
-        { name: 'Later', rows: [[`${month} ${seriesYear + 1} Session`], header, three('12K', 'Live Subject B', 'No')] },
+        { name: 'Again', rows: [[`November ${seriesYear} Session`], header, three('11K', 'Live Subject C', 'Yes'), three('11K', 'Live Subject A', 'Yes'), three('11K', 'Live Subject B', 'Yes')] },
+        { name: 'Later', rows: [[`November ${seriesYear + 1} Session`], header, three('12K', 'Live Subject B', 'No')] },
       ]), 'three-again.xlsx', 'school_sheet');
-      expect((await putSettings(adm, again, { series: { [`${type}-${seriesYear}-${level}`]: { mode: 'window', sessionId: windowId } } })).status).toBe(200);
+      expect((await putSettings(adm, again, { series: { [`november-${seriesYear}-${level}`]: { mode: 'window', sessionId: windowId } } })).status).toBe(200);
       const v = await fetchView(adm, again);
       for (const n of [3, 4, 5]) {
-        expect(rowAt(v, 'Again', n).problems.find((p) => p.code.startsWith('self_study'))).toMatchObject({ code: 'self_study_on_taught', severity: 'error', detail: 'a first attempt' });
+        expect(rowAt(v, 'Again', n).problems.find((p) => p.code.startsWith('self_study'))).toMatchObject({ code: 'self_study_on_taught', severity: 'error' });
+        expect(lineOf(rowAt(v, 'Again', n))).toMatchObject({ attempt: 'first', priorSitting: null });
       }
       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id: again } }));
     });
   });
 
   describe('the interim retake rule: imported history is a sitting only if its series had ended when it was committed', () => {
-    let juneWindow: string, subjectN: string, level: 'igcse' | 'as_level' | 'a_level', wtype: 'june' | 'january';
-    const code = () => (level === 'igcse' ? 'O.L.' : level === 'as_level' ? 'A.S.' : 'A.2.');
+    let juneSession: string, subjectN: string;
     const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
-    const row = (self: 'Yes' | 'No'): Cell[] => ['Nov Hist', '11K', code(), 'Interim Subject N', self === 'Yes' ? '' : 'Mr Live', '01048484848', `nov.hist${D}`, 'Nov Hist Parent', `nov.hist.parent${D}`, '01049494949', 'I confirm my registration', self];
+    const row = (self: 'Yes' | 'No'): Cell[] => ['Nov Hist', '11K', 'A.S.', 'Interim Subject N', self === 'Yes' ? '' : 'Mr Live', '01048484848', `nov.hist${D}`, 'Nov Hist Parent', `nov.hist.parent${D}`, '01049494949', 'I confirm my registration', self];
 
     beforeAll(async () => {
-      // A window after November Y in the academic year Y — June Y+1, or January Y+1 when every June level is
-      // held open by an earlier suite — at a type and level no earlier suite holds open.
-      const taken = new Set((await sql<{ k: string }>(`select session_type || '/' || qualification_level as k from registration_session where status = 'active'`)).map((r) => r.k));
-      const free = ([['june', 'igcse'], ['june', 'as_level'], ['june', 'a_level'], ['january', 'as_level'], ['january', 'a_level']] as const).find(([t, l]) => !taken.has(`${t}/${l}`));
-      if (!free) throw new Error('08n needs a June or January window type and level with none open');
-      [wtype, level] = free;
-      subjectN = await subject(adm, 'IMP-INT-N', 'Interim Subject N', { course: 1000, registration: 500 }, { qualificationLevel: level });
-      juneWindow = await session(adm, 'Window after November (interim rule)', wtype, level, { ...openWindow(), activate: true, seriesYear: Y + 1 });
+      subjectN = await subject(adm, 'IMP-INT-N', 'Interim Subject N', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level' });
+      // The June session of Y+1 (Cambridge's June series), after November Y.
+      juneSession = await session(adm, 'June session (interim rule)', 'june', 'as_level', { ...openWindow(), activate: true, seriesYear: Y + 1 });
       // November Y, imported as history by the coordinator.
       const id = await stage(coordinator, workbook([{ name: 'Nov', rows: [[`Nov. ${Y} Session`], header, row('No')] }]), 'nov-history.xlsx', 'school_sheet');
       expect((await putSettings(coordinator, id, { enrol: false, createSections: false })).status).toBe(200);
       expect((await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }))).result.created).toMatchObject({ students: 1, history: 1 });
     });
     afterAll(async () => {
-      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: juneWindow }, json: { reason: 'interim rule scenario done: free the pair' } }));
+      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: juneSession }, json: { reason: 'interim rule scenario done' } }));
     });
 
     /** When the file was committed: the history row's own time. */
     const committedOn = (at: string) => sql(`update registration_history set created_at = $1 where student_id = (select id from "user" where email = $2)`, [at, `nov.hist${D}`]);
-    const deskOutside = async () => {
-      const st = await one<{ id: string }>(`select id from "user" where email = $1`, [`nov.hist${D}`]);
-      return officer.api.v1.registrations.desk.$post({ json: { studentId: st.id, sessionId: juneWindow, subjectIds: [subjectN], subjectOptions: { [subjectN]: { takeOutsideSchool: true } } } });
-    };
-    const reviewSays = async () => {
-      const month = wtype === 'june' ? 'June' : 'January';
-      const id = await stage(adm, workbook([{ name: 'Later', rows: [[`${month} ${Y + 1} Session`], header, row('Yes')] }]), 'after-november-self.xlsx', 'school_sheet');
-      expect((await putSettings(adm, id, { series: { [`${wtype}-${Y + 1}-${level}`]: { mode: 'window', sessionId: juneWindow } }, enrol: false, createSections: false })).status).toBe(200);
-      const code = rowAt(await fetchView(adm, id), 'Later', 3).problems.find((p) => p.code.startsWith('self_study'))!.code;
-      await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
-      return code;
+    const laterSheet = () => workbook([{ name: 'Later', rows: [[`June ${Y + 1} Session`], header, row('Yes')] }]);
+    const mapped = async (id: string) => {
+      expect((await putSettings(adm, id, { series: { [`june-${Y + 1}-as_level`]: { mode: 'window', sessionId: juneSession } }, enrol: false, createSections: false })).status).toBe(200);
+      return rowAt(await fetchView(adm, id), 'Later', 3);
     };
 
-    it('committed while November was still running: not a sitting before the later window, at the desk or in the review', async () => {
+    it('committed while November was still running: not a sitting before June, so self-study is a first entry, refused without the exception', async () => {
       await committedOn(`${Y}-11-15T10:00:00Z`);
-      expect(await refused(deskOutside())).toEqual({ status: 400, error: 'Subjects can only be taken outside school when retaking or when the school does not offer them' });
-      expect(await reviewSays()).toBe('self_study_on_taught');
+      const id = await stage(adm, laterSheet(), 'after-november-self.xlsx', 'school_sheet');
+      const r = await mapped(id);
+      expect(r.problems.find((p) => p.code.startsWith('self_study'))).toMatchObject({ code: 'self_study_on_taught', severity: 'error' });
+      expect(r.plan.line).toMatchObject({ attempt: 'first', priorSitting: null });
+      await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
     });
 
-    it('committed after November had ended: a past sitting, so the later window takes it as a retake outside school at the outside rate', async () => {
+    it('committed after November had ended: a past sitting, so June takes it as a legacy retake in self-study, at the self-study share', async () => {
       await committedOn(`${Y}-12-01T10:00:00Z`);
-      expect(await reviewSays()).toBe('self_study_retake');
-      const made = await apiResponse(deskOutside());
-      expect(made.registrations.map((r) => [Number(r.priceAtRegistration), r.isRetake, r.takenOutsideSchool])).toEqual([[750, true, true]]);
+      const id = await stage(adm, laterSheet(), 'after-november-self-2.xlsx', 'school_sheet');
+      const r = await mapped(id);
+      expect(r.problems.find((p) => p.code.startsWith('self_study'))).toEqual({ code: 'self_study_retake', severity: 'info', detail: `a retake of November ${Y} (the student’s history)` });
+      expect(r.plan.line).toMatchObject({ attempt: 'retake', mode: 'self_study', priorSitting: { month: 'november', year: Y, source: 'legacy', from: 'history' }, price: { total: 1000, coursePercent: 50, boardPercent: 100 } });
+      expect((await apiResponse(adm.api.v1.imports[':id'].commit.$post({ param: { id } }))).result.created).toMatchObject({ registrations: 1 });
+      const st = await one<{ id: string }>(`select id from "user" where email = $1`, [`nov.hist${D}`]);
+      expect(await one(`select r.attempt, r.mode, r.prior_sitting_source as source, ps.board_code as board, ps.month, ps.year, r.price_at_registration::float as price,
+        (r.pricing_basis->>'coursePercent')::int as course_pct from registration r join board_series ps on ps.id = r.prior_sitting_series_id where r.student_id = $1 and r.session_id = $2`, [st.id, juneSession]))
+        .toEqual({ attempt: 'retake', mode: 'self_study', source: 'legacy', board: 'cambridge', month: 'november', year: Y, price: 1000, course_pct: 50 });
+      expect(subjectN).toBeTruthy();
     });
   });
 
@@ -850,12 +948,12 @@ describe('F7: the day-one import', () => {
   });
 
   describe('the catalogue from the review, and a file put aside', () => {
-    it('the admin adds the sheet\'s missing subjects in one step (they carry prices; one with no price is added inactive); the coordinator may not', async () => {
+    it('the admin adds the sheet\'s missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not', async () => {
       const sheet = workbook([{ name: 'Extra', rows: [
         [`Nov. ${Y} Session`],
-        ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Student Email', '', 'Parent Email'],
-        ['Extra Child', '11G', 'O.L.', 'Astronomy', `extra${D}`, 'Extra Parent', `extra.parent${D}`],
-        ['Extra Child', '11G', 'O.L.', 'Cosmology', `extra${D}`, 'Extra Parent', `extra.parent${D}`],
+        ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Student Email', '', 'Parent Email', '', ''],
+        ['Extra Child', '11G', 'O.L.', 'Astronomy', `extra${D}`, 'Extra Parent', `extra.parent${D}`, 'I confirm my registration', 'No'],
+        ['Extra Child', '11G', 'O.L.', 'Cosmology', `extra${D}`, 'Extra Parent', `extra.parent${D}`, 'I confirm my registration', 'No'],
       ] }]);
       const id = await stage(adm, sheet, 'extra.xlsx', 'school_sheet');
       let v = await fetchView(adm, id);
@@ -863,27 +961,51 @@ describe('F7: the day-one import', () => {
       const c = v.mapping.subjects.find((x) => x.subject === 'Cosmology')!;
       expect(s).toMatchObject({ subject: 'Astronomy', levelCode: 'O.L.', subjectId: null, levelSuggested: 'igcse', taughtInSchool: true });
       const body = { subjects: [
-        { key: s.key, name: 'Astronomy', code: 'imp-ast', qualificationLevel: 'igcse' as const, council: 'cambridge' as const, isOfferedAtSchool: true, courseFee: 900, registrationFee: 300 },
-        { key: c.key, name: 'Cosmology', code: 'imp-cos', qualificationLevel: 'igcse' as const, council: 'cambridge' as const, isOfferedAtSchool: true, courseFee: 0, registrationFee: 0 },
+        { key: s.key, name: 'Astronomy', code: 'imp-ast', qualificationLevel: 'igcse' as const, council: 'cambridge' as const, isOfferedAtSchool: true },
+        { key: c.key, name: 'Cosmology', code: 'imp-cos', qualificationLevel: 'igcse' as const, council: 'cambridge' as const, isOfferedAtSchool: true },
       ] };
       expect((await refused(coordinator.api.v1.imports[':id'].subjects.$post({ param: { id }, json: body }))).status).toBe(403);
       await apiResponse(adm.api.v1.imports[':id'].subjects.$post({ param: { id }, json: body }));
       v = await fetchView(adm, id);
       const made = await one<{ id: string; code: string; price: string; active: boolean }>(`select id, code, price_in_school as price, is_active as active from subject where code = 'IMP-AST'`);
-      const unpriced = await one<{ id: string; price: string; active: boolean }>(`select id, price_in_school as price, is_active as active from subject where code = 'IMP-COS'`);
+      const other = await one<{ id: string; price: string; active: boolean }>(`select id, price_in_school as price, is_active as active from subject where code = 'IMP-COS'`);
       expect(v.mapping.subjects.find((x) => x.subject === 'Astronomy')!.subjectId).toBe(made.id);
-      expect(v.mapping.subjects.find((x) => x.subject === 'Cosmology')!.subjectId).toBe(unpriced.id);
-      expect([Number(made.price), made.active]).toEqual([1200, true]);
-      // No price: added inactive. Its row keeps it as history; no enrolment is made for it, and the review says why.
-      expect([Number(unpriced.price), unpriced.active]).toEqual([0, false]);
+      expect(v.mapping.subjects.find((x) => x.subject === 'Cosmology')!.subjectId).toBe(other.id);
+      // Active, with no price of their own (the lead's answer to review flag 1 on the new model): the row's history keeps them, and enrolment follows.
+      expect([Number(made.price), made.active, Number(other.price), other.active]).toEqual([0, true, 0, true]);
       expect(rowAt(v, 'Extra', 3).plan.enrolment).toBe('create');
-      expect(rowAt(v, 'Extra', 4).plan.enrolment).toBe('none');
-      expect(rowAt(v, 'Extra', 4).problems.find((p) => p.code === 'subject_inactive')).toMatchObject({ severity: 'warning', detail: 'Cosmology: no enrolment until its fees are set and it is turned on' });
+      expect(rowAt(v, 'Extra', 4).plan.enrolment).toBe('create');
       await audited([made.id], ['SUBJECT_CREATED']);
-      await audited([unpriced.id], ['SUBJECT_CREATED']);
+      await audited([other.id], ['SUBJECT_CREATED']);
       expect(await refused(adm.api.v1.imports[':id'].subjects.$post({ param: { id }, json: body }))).toEqual({
         status: 409, error: 'A subject with the code IMP-AST exists already — map "Astronomy" to it, or choose another code',
       });
+
+      // Nothing is reserved for such a subject for free (MO-9): the session offers it with a course fee, and a line
+      // of it is refused, naming the series' grid, until finance sets its board fee there.
+      const winter = await session(adm, 'Winter session (import, added subjects)', 'november', 'igcse', { ...openWindow(), activate: true, seriesYear: seriesYearInAcademicYear('november', Y) });
+      const cambridge = await seriesOfSession(winter, 'cambridge');
+      const teacher = await apiResponse(adm.api.v1.teachers.$post({ json: { name: 'Teacher of the added subject (imp)' } }));
+      await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+        param: { id: winter },
+        json: {
+          subjectId: made.id, availability: 'open', courseFee: 900, grade10Core: false, teachers: [{ teacherId: teacher!.id, mode: 'in_school' }],
+          items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: cambridge, availability: 'open', requiredInSeries: false }],
+        },
+      }));
+      const grid = await one<{ board: string; year: number; label: string }>(`select b.name as board, bs.year, bs.label from board_series bs join exam_board b on b.code = bs.board_code where bs.id = $1`, [cambridge]);
+      expect((await putSettings(adm, id, { series: { [`november-${Y}-igcse`]: { mode: 'window', sessionId: winter } } })).status).toBe(200);
+      v = await fetchView(adm, id);
+      expect(rowAt(v, 'Extra', 3).problems.find((p) => p.code === 'fee_missing')).toEqual({
+        code: 'fee_missing', severity: 'error', detail: `Whole subject has no board fee in ${grid.board} November ${grid.year} (${grid.label}) yet — set one on the session's Fees tab`,
+      });
+      // Cosmology is not offered in the session at all.
+      expect(rowAt(v, 'Extra', 4).problems.find((p) => p.code === 'not_offered')).toMatchObject({ severity: 'error' });
+      await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: cambridge }, json: { rows: [{ keyKind: 'subject', keyId: made.id, amount: 300, provisional: false }] } }));
+      v = await fetchView(adm, id);
+      expect(rowAt(v, 'Extra', 3).problems.filter((p) => p.code === 'fee_missing')).toEqual([]);
+      expect(rowAt(v, 'Extra', 3).plan.line).toMatchObject({ subjectName: 'Astronomy', attempt: 'first', mode: 'in_school', price: { total: 1200, courseFee: 900, boardFee: 300 } });
+      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: winter }, json: { reason: 'import scenario done' } }));
 
       // Put aside: nothing it would make is made, and it takes no more changes.
       expect(await apiResponse(coordinator.api.v1.imports[':id'].discard.$post({ param: { id } }))).toEqual({ id, status: 'discarded' });

@@ -39,20 +39,22 @@ export type ImportStatus = (typeof IMPORT_STATUSES)[number];
 /**
  * Self-study on a subject the school teaches (IMPORT_SPIKE.md IS-03, the
  * coordinator's pending answer, DISCOVERY.md A-02):
- * - `retake_only` (today's rule, V3 §6.9): outside school only on a retake —
- *   the student sat the subject before (their history) — at the outside rate;
- *   otherwise the row waits for staff.
+ * - `retake_only` (the forms' rule, "Self Study … ONLY 2nd entry";
+ *   RESERVATIONS_REWORK.md §3.5 gate.selfStudyFirstEntry): self-study only on
+ *   a retake — a sitting before (the student's history, or one named on the
+ *   line) — at the self-study share; a first entry in self-study waits for
+ *   staff (the student's exception, or a retake with its sitting).
  * - `in_school`: taken as taught in school.
- * - `enrol_only`: enrolled as self-study, no exam registration made.
+ * - `enrol_only`: enrolled as self-study, no exam line made.
  */
 export const SELF_STUDY_RULES = ['retake_only', 'in_school', 'enrol_only'] as const;
 export const SelfStudyRuleSchema = z.enum(SELF_STUDY_RULES);
 export type SelfStudyRule = z.infer<typeof SelfStudyRuleSchema>;
 
 export const SELF_STUDY_RULE_LABELS: Record<SelfStudyRule, string> = {
-  retake_only: 'Only as a retake (today’s rule): a first attempt waits for staff',
+  retake_only: 'Only as a retake (the forms’ rule): a first entry waits for staff',
   in_school: 'Taken as taught in school',
-  enrol_only: 'Enrolled as self-study, no exam registration made',
+  enrol_only: 'Enrolled as self-study, no exam line made',
 };
 
 /**
@@ -74,14 +76,19 @@ export const CARRY_FORWARD_LABELS: Record<CarryForwardReading, string> = {
   payment: 'A payment carried forward (money history)',
 };
 
-/** What a series and level in the file becomes. */
+/**
+ * What a series and level in the file becomes: history, or lines awaiting payment in the
+ * session of that series (the reservations rework: one session per cycle — June, or the
+ * winter of November, October and January — each line on the offer and item the sheet's words
+ * name). The stored value of the second is still 'window'.
+ */
 export const SERIES_MODES = ['history', 'window', 'skip'] as const;
 export const SeriesModeSchema = z.enum(SERIES_MODES);
 export type SeriesMode = z.infer<typeof SeriesModeSchema>;
 
 export const SERIES_MODE_LABELS: Record<SeriesMode, string> = {
   history: 'History only (what the student sat before the system)',
-  window: 'Registrations awaiting payment in an open window',
+  window: 'Lines awaiting payment in the session',
   skip: 'Leave out',
 };
 
@@ -91,7 +98,7 @@ const KeySchema = z.string().min(1).max(300);
 export const ImportSettings = z.object({
   /** Per tab: take it or not, and the academic year (start) its classes and grades are in. */
   tabs: z.record(KeySchema, z.object({ include: z.boolean(), classYear: z.number().int().min(2000).max(2100) })).optional(),
-  /** Per series and level ("november-2026-igcse"): history, a window, or leave out. */
+  /** Per series and level ("november-2026-igcse"): history, the session's lines, or leave out. */
   series: z.record(KeySchema, z.object({ mode: SeriesModeSchema, sessionId: z.string().min(1).nullable().optional() })).optional(),
   /** Per subject as the sheet writes it with its level code: the catalogue row, or none (history keeps the sheet's words). */
   subjects: z.record(KeySchema, z.object({ subjectId: z.string().min(1).nullable() })).optional(),
@@ -138,12 +145,14 @@ export const IMPORT_PROBLEMS = {
   // Carry forward (IS-02)
   carry_forward: { severity: 'warning', finding: 'IS-02', title: '"Carry forward" noted by staff', meaning: 'A result or a payment carried from an earlier series (Q-02). How it is recorded is the Carry forward setting.' },
   // Self-study (IS-03)
-  self_study_on_taught: { severity: 'error', finding: 'IS-03', title: 'Self-study on a subject the school teaches, first attempt', meaning: 'Today’s rule allows studying outside school only on a retake or a subject the school does not teach. Choose on the row: register in school, or enrol only; or change the Self-study setting when the coordinator answers.' },
-  self_study_retake: { severity: 'info', finding: 'IS-03', title: 'Self-study on a retake', meaning: 'The student sat this subject before (their history): outside school at the outside rate, as today’s rule allows.' },
-  self_study_not_taught: { severity: 'info', finding: 'IS-03', title: 'Self-study: the school does not teach it', meaning: 'Enrolled as self-study, registered outside school.' },
+  self_study_on_taught: { severity: 'error', finding: 'IS-03', title: 'Self-study on a first entry of a subject the school teaches', meaning: 'Self-study on a first entry needs the exception: grant it on the Exceptions page or make it a retake with its sitting. Or choose on the line: in school, or enrol only; or change the Self-study setting when the coordinator answers.' },
+  self_study_retake: { severity: 'info', finding: 'IS-03', title: 'Self-study on a retake', meaning: 'A sitting before is known (the student’s history) or named on the line: a retake in self-study, at the self-study share.' },
+  self_study_not_taught: { severity: 'info', finding: 'IS-03', title: 'Self-study: the school does not teach it', meaning: 'Enrolled as self-study; its line is in self-study.' },
+  self_study_contradiction: { severity: 'warning', finding: 'IS-03', title: 'The fee note says self-study, the self-study answer says No', meaning: 'The line is read as self-study (the note is the school’s own); check it with the family and set Self-study on the line if the answer is right.' },
+  retake_sitting_missing: { severity: 'error', title: 'A retake that names no earlier sitting', meaning: 'The sheet says a retake (or a second entry), and neither the student’s history nor the line names the sitting it follows. Name the sitting on the line (it is then the desk’s declaration, verified on the session’s To verify tab), or make it a first entry.' },
   // Series (IS-05, IS-14)
   series_other_than_tab: { severity: 'warning', finding: 'IS-05', title: 'A row for another series than its tab', meaning: 'The tab holds more than one exam series (January rows in a November tab): the row goes to its own series’ mapping.' },
-  boards_in_series: { severity: 'info', finding: 'IS-14', title: 'Several boards in one series and level', meaning: 'The subjects of this series and level are entered with more than one board; each registration is routed to its board’s series (F0b).' },
+  boards_in_series: { severity: 'info', finding: 'IS-14', title: 'Several boards in one series and level', meaning: 'The subjects of this series and level are entered with more than one board; each line goes to its item’s board series.' },
   series_missing: { severity: 'error', title: 'No exam series', meaning: 'Neither the row nor its tab says which series it is for. Set it on the row.' },
   // Identity (IS-06)
   email_student_missing: { severity: 'error', finding: 'IS-06', title: 'Student email missing or not an email', meaning: 'Every account needs its own email. Type the student’s email on the row, or skip it.' },
@@ -173,11 +182,17 @@ export const IMPORT_PROBLEMS = {
   class_unreadable: { severity: 'error', finding: 'IS-04', title: 'Class & Grade not in the form "11A"', meaning: 'The grade and section cannot be read. Fix it on the row.' },
   grade_out_of_range: { severity: 'error', title: 'Grade outside 9–12', meaning: 'The school’s grades are 10–12 (9: starts grade 10 next year). Fix it on the row.' },
   // Mapping
-  subject_inactive: { severity: 'warning', title: 'The subject is not active', meaning: 'A subject added with no price stays inactive until the admin sets its fees and turns it on, on Subjects: history keeps it, but no enrolment or registration is made for it until then.' },
+  subject_inactive: { severity: 'warning', title: 'The subject is not active', meaning: 'The catalogue row is turned off on Subjects: history keeps it, but no enrolment or line is made for it until it is turned on again.' },
   subject_unmapped: { severity: 'warning', title: 'Subject not in the catalogue', meaning: 'Map it to a catalogue row (or add it): until then history keeps the sheet’s words, and no enrolment or registration is made for it.' },
   teacher_missing: { severity: 'info', title: 'No teacher named', meaning: 'Enrolled with no teacher yet.' },
   teacher_on_self_study: { severity: 'info', title: 'A teacher named on a self-study row', meaning: 'Self-study is not taught: the teacher is not recorded on it.' },
-  registration_refused: { severity: 'error', title: 'The registration would be refused', meaning: 'The window would refuse this registration (the reason is given). Import the series as history, skip the row, or fix what is refused.' },
+  teacher_not_on_offer: { severity: 'warning', title: 'The teacher named does not teach it in the session', meaning: 'The line takes the subject’s only teacher in the session, or none yet (the coordinator assigns one later). Add the teacher to the subject on the session’s Subjects tab if the sheet is right.' },
+  registration_refused: { severity: 'error', title: 'The line would be refused', meaning: 'The session would refuse this line (the reason is given): eligibility, the school fee, the session or the series closed, or a rule on lines. Import the series as history, skip the row, or fix what is refused.' },
+  not_offered: { severity: 'error', title: 'The session does not offer this subject', meaning: 'No subject of the session fits the line’s words. Add it on the session’s Subjects tab (its teachers, items and course fee), map the line to the right catalogue row, or import its series as history.' },
+  item_unclear: { severity: 'error', title: 'Which item of the subject?', meaning: 'The line’s words fit none, or more than one, of the subject’s items (the whole subject, a unit, a route, a one-paper retake). Choose the item on the line.' },
+  fee_missing: { severity: 'error', title: 'No board fee in the series’ grid', meaning: 'The item has no fee row in its board series yet (the grid is named). Set it on the session’s Fees tab — provisional until the board publishes is fine — and the line is priced from it; nothing is ever priced at 0 for want of a fee.' },
+  price_provisional: { severity: 'info', title: 'The board fee is provisional', meaning: 'The series’ grid holds a provisional fee: the line is reserved at that price, marked provisional, and is paid once the school confirms the board’s fee.' },
+  consent_missing: { severity: 'error', title: 'No confirmation from the family on the line', meaning: 'A line made in a session records the sheet’s “I confirm my registration” as the family’s consent (the imported channel); this line has none. Import its series as history, or skip the line; the desk can reserve it with the parent’s signature.' },
   // Existing accounts
   cohort_differs: { severity: 'warning', title: 'The sheet’s grade differs from the student’s record', meaning: 'The system’s record is kept; correct it on the student’s page if the sheet is right.' },
   section_differs: { severity: 'warning', title: 'Already in another section this year', meaning: 'The student’s current section is kept; move them on the Sections screen if the sheet is right.' },
@@ -195,7 +210,7 @@ export const IMPORT_PROBLEM_CODES = Object.keys(IMPORT_PROBLEMS) as ImportProble
 
 /** File-wide notes, shown once (not per row). */
 export const IMPORT_NOTES = {
-  no_money: { finding: 'IS-07', title: 'No money in this file', meaning: 'No prices, payments or receipts: nothing is paid by this import. Registrations it makes wait for payment; money before the system comes from the money record, as history only.' },
+  no_money: { finding: 'IS-07', title: 'No money in this file', meaning: 'No prices, payments or receipts: nothing is paid by this import. Lines it makes are priced from the session’s fee grids and wait for payment; money before the system comes from the money record, as history only.' },
   two_series_one_tab: { finding: 'IS-05', title: 'One tab holds several exam series', meaning: 'Each series and level is mapped on its own.' },
   roster_tab_ignored: { finding: 'A-04', title: 'Per-unit roster tabs are not imported', meaning: 'Tabs that list students by unit without emails (the hand-made rosters) are class lists, not registrations.' },
   year_not_set_up: { title: 'Academic year not set up', meaning: 'The year the classes are in is not on the Academic year screen: sections and course enrolments are not made for it (cohorts and history are).' },
@@ -225,8 +240,14 @@ export const ImportRowEdits = z.object({
   selfStudy: z.boolean().optional(),
   /** Staff checked that this line's family is the account already in the system: make the new link (review flag 6). */
   confirmLink: z.boolean().optional(),
-  /** Self-study on a taught subject, first attempt: what this row does (IS-03). */
+  /** Self-study on a taught subject, first entry: what this row does (IS-03). */
   selfStudyChoice: z.enum(['in_school', 'enrol_only']).nullable().optional(),
+  /** A line in a session: the item of the subject staff choose when the sheet's words cannot tell (an item of the session). */
+  offerItemId: z.string().min(1).nullable().optional(),
+  /** A first entry, or a retake, whatever the note says (a retake names its sitting). */
+  attempt: z.enum(['first', 'retake']).optional(),
+  /** The sitting a retake (or a carried-forward route) follows, named by staff: the desk's declaration, verified on To verify. */
+  priorSitting: z.object({ month: z.enum(['january', 'june', 'october', 'november']), year: z.number().int().min(2000).max(2100) }).nullable().optional(),
   // Money record rows
   studentRef: Text(254).optional(),
   amount: Text(40).optional(),
@@ -268,7 +289,12 @@ export const CreateImport = z.object({
 });
 export type CreateImportType = z.infer<typeof CreateImport>;
 
-/** Catalogue rows made from the sheet's subjects (the admin's: they carry prices). */
+/**
+ * Catalogue rows made from the sheet's subjects (the admin's). Since the reservations rework a
+ * subject carries no price: a line is priced from its session offer's course fee and its series'
+ * fee grid, and nothing is reserved without both (priceLine refuses a missing fee row, naming the
+ * grid; MO-9). The rows are made active, with no fees (their fee columns are history only).
+ */
 export const CreateImportSubjects = z.object({
   subjects: z.array(z.object({
     key: KeySchema,
@@ -277,8 +303,6 @@ export const CreateImportSubjects = z.object({
     qualificationLevel: z.enum(['igcse', 'as_level', 'a_level']),
     council: z.enum(['pearson_edexcel', 'cambridge', 'oxford']),
     isOfferedAtSchool: z.boolean(),
-    courseFee: z.number().min(0).max(1_000_000),
-    registrationFee: z.number().min(0).max(1_000_000),
   })).min(1).max(200),
 });
 export type CreateImportSubjectsType = z.infer<typeof CreateImportSubjects>;

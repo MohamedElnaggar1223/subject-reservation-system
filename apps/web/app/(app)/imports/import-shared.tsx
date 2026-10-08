@@ -71,6 +71,8 @@ export const FAMILY_STATUS: Record<string, { tone: Tone; label: string }> = {
 
 export const LEVEL_LABEL: Record<string, string> = { igcse: 'IGCSE', as_level: 'AS Level', a_level: 'A Level' };
 export const MONTH: Record<string, string> = { january: 'January', june: 'June', october: 'October', november: 'November' };
+/** An amount in EGP as the school writes it. */
+export const egp = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
 /** What a row will make, in a few words. */
 export function planWords(r: ImportRow): { label: string; tone: Tone }[] {
@@ -78,8 +80,8 @@ export function planWords(r: ImportRow): { label: string; tone: Tone }[] {
   const out: { label: string; tone: Tone }[] = [];
   if (r.status === 'committed') return [{ label: 'Committed', tone: 'success' }];
   if (r.decision === 'skip') return [{ label: 'Left out', tone: 'neutral' }];
-  if (p.registration === 'live') out.push({ label: 'Registration awaiting payment', tone: 'warning' });
-  if (p.registration === 'live_exists') out.push({ label: 'Registered already', tone: 'neutral' });
+  if (p.registration === 'live') out.push({ label: 'Line awaiting payment', tone: 'warning' });
+  if (p.registration === 'live_exists') out.push({ label: 'Reserved already', tone: 'neutral' });
   if (p.registration === 'history') out.push({ label: 'History', tone: 'info' });
   if (p.registration === 'history_exists') out.push({ label: 'History already', tone: 'neutral' });
   if (p.enrolment === 'create') out.push({ label: 'Enrolment', tone: 'info' });

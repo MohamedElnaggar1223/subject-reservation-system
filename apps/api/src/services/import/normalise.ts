@@ -92,7 +92,9 @@ export function readSeries(raw: string): Series | null {
 export const seriesText = (s: Series) => `${s.type[0]!.toUpperCase()}${s.type.slice(1)} ${s.year}`;
 
 const CONFIRM_RE = /confirm my registration|drop the course/i;
-const FEE_RE = /school fees|refund\s*\d|self\s*study|external/i;
+// The staff's note and the forms' own options (SCHOOL_FORMS.md §2.5): "Self Study 50% School fees",
+// "Retake in School 100% fees (All Papers)", "… (One paper ONLY) From June 2026", "Dropped 20% School fees".
+const FEE_RE = /school fees|refund\s*\d|self\s*study|external|retake|2nd entry|second entry|one paper/i;
 const YESNO_RE = /^(yes|no)$/i;
 
 /** A fee note (IS-08): its kind and percentage. */
@@ -107,6 +109,21 @@ export function readFeeNote(note: string, dropIntent: boolean): { kind: MoneyHis
     : dropIntent ? 'drop'
     : 'other';
   return { kind, percent };
+}
+
+/**
+ * What a note says about the entry (RESERVATIONS_REWORK.md §9's F7 list: the fee note gives the
+ * attempt and the mode): a retake or a second entry, a one-paper retake, and the sitting it
+ * names ("From June 2026"). Self-study is read with the yes/no answer (readSheetLine).
+ */
+export function readEntryNote(note: string | null): { retake: boolean; onePaper: boolean; sitting: Series | null } {
+  if (!note) return { retake: false, onePaper: false, sitting: null };
+  const from = /\bfrom\s+((?:jan|june?|may|oct|nov)[a-z]*\.?\s*\d{4})/i.exec(note);
+  return {
+    retake: /retake|2nd entry|second entry/i.test(note),
+    onePaper: /one\s*paper/i.test(note),
+    sitting: from ? readSeries(from[1]!) : null,
+  };
 }
 
 // ─── The school's sheet ──────────────────────────────────────────────────────
@@ -146,7 +163,8 @@ export function tabRoles(tab: SourceTab, lines: SourceLine[]): Roles {
   const afterEmail = emailCol >= 0 ? tab.columns[emailCol + 1] : undefined;
   return {
     byName,
-    series: dominant((v) => readSeries(v) !== null && /^\d{5}$|\d{4}/.test(v)),
+    // A note that names a sitting ("… From June 2026") is the fee note, not the series column.
+    series: dominant((v) => readSeries(v) !== null && /^\d{5}$|\d{4}/.test(v) && !FEE_RE.test(v)),
     parentName: byName.get('parent name') ?? (afterEmail && isUnlabeled(afterEmail) ? afterEmail : null),
     confirm: dominant((v) => CONFIRM_RE.test(v)),
     fee: dominant((v) => FEE_RE.test(v)),
@@ -231,10 +249,14 @@ export function readSheetLine(line: SourceLine, roles: Roles, edits: ImportRowEd
   }
   if (!series) local.push({ code: 'series_missing' });
 
-  // Self-study: the yes/no answer or a fee note that says so (IS-03, IS-08).
+  // Self-study: the yes/no answer or a fee note that says so (IS-03, IS-08). A note that says
+  // self-study against an explicit "No" is read as self-study and flagged (review flag 7).
   const answeredYes = /^yes$/i.test(cleanText(yesnoCell?.[1]));
+  const answeredNo = /^no$/i.test(cleanText(yesnoCell?.[1]));
   const noteSaysSelf = !!feeNote && /self\s*study|external/i.test(feeNote);
   const selfStudy = edits.selfStudy ?? (answeredYes || noteSaysSelf);
+  if (edits.selfStudy === undefined && answeredNo && noteSaysSelf) local.push({ code: 'self_study_contradiction', detail: feeNote ?? undefined });
+  const entryNote = readEntryNote(feeNote);
 
   const teacherText = edits.teacher ?? cleanText(named('teacher'));
   const teacher = teacherText || null;
@@ -272,6 +294,8 @@ export function readSheetLine(line: SourceLine, roles: Roles, edits: ImportRowEd
     subject, isUnit, teacher,
     series, seriesSource,
     confirm, selfStudy, selfStudyChoice: edits.selfStudyChoice ?? null,
+    selfStudyAnswer: answeredYes ? 'yes' : answeredNo ? 'no' : null,
+    noteRetake: entryNote.retake, noteOnePaper: entryNote.onePaper, noteSitting: entryNote.sitting,
     feeNote, feeKind: fee?.kind ?? null, feePercent: fee?.percent ?? null,
     carryForwardFrom, carryForwardNote,
     local,

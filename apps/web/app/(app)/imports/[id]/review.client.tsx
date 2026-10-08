@@ -260,7 +260,7 @@ export function PlanList({ v, compact = false }: { v: ImportView; compact?: bool
     [p.newTeachers, 'new teacher records'],
     [p.enrolments, 'course enrolments'],
     [p.history, 'registrations kept as history'],
-    [p.registrations, 'registrations awaiting payment'],
+    [p.registrations, 'lines awaiting payment'],
     [p.money, 'money history notes'],
   ];
   const shown = items.filter(([n]) => n > 0);

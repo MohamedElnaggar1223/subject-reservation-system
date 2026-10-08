@@ -141,7 +141,7 @@ export default function ImportsClient({ isAdmin }: { isAdmin: boolean }): React.
         {error && <Notice tone="danger" className="mt-3">{error}</Notice>}
         {!isAdmin && (
           <p className="mt-3 text-xs text-muted-foreground">
-            Registering families in an open window and adding subjects to the catalogue are the admin’s steps; everything else here is yours.
+            Reserving lines for families in a session and adding subjects to the catalogue are the admin’s steps; everything else here is yours.
           </p>
         )}
       </section>

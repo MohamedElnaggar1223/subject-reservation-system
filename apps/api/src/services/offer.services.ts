@@ -850,6 +850,103 @@ export async function resolveItem(executor: Executor, sessionId: string, subject
   return { item, offer: o.offer, subjectName: o.subjectName };
 }
 
+// ─── Finding what a sheet's words name (F7's contract, RESERVATIONS_REWORK.md §10) ───
+
+const words = (t: string) => t.replace(/\s+/g, ' ').trim().toLowerCase();
+/** The codes a sheet's words name: in brackets ("Pure Mathematics 1 (P1)") or on their own ("P1", "WMA11", "Paper 4", "1H"). */
+function namedCodes(term: string): string[] {
+  const t = words(term);
+  const out = new Set<string>();
+  for (const m of t.matchAll(/\(([^)]+)\)/g)) for (const part of m[1]!.split(/\s*(?:&|and|,|\/)\s*/)) if (part) out.add(part.trim());
+  for (const m of t.matchAll(/\b((?:p|m|s|d|fp)\d|w[a-z]{2}\d{2}|\d[a-z]{1,3}\d[a-z]?)\b/g)) out.add(m[1]!);
+  for (const m of t.matchAll(/\bpaper\s*(\d+[a-z]?)\b/g)) out.add(`paper ${m[1]}`);
+  return [...out];
+}
+
+/**
+ * The session's offer a sheet's words name (F7, the day-one import): the offer of the catalogue
+ * row the import's mapping chose; else the offer whose subject is named exactly (name or code),
+ * or by its name without a bracket ("Biology (Paper 3 & Paper 4)" → Biology); else the one offer
+ * with an item entering a unit the words name ("Pure Mathematics 1 (P1)" → the IAL Mathematics
+ * offer whose P1 item enters it). Null when nothing, or more than one offer, fits.
+ */
+export async function findOffer(executor: Executor, sessionId: string, term: string, opts: { subjectId?: string | null } = {}) {
+  const offers = await executor.select({ id: sessionOffer.id, subjectId: sessionOffer.subjectId, availability: sessionOffer.availability, name: subject.name, code: subject.code })
+    .from(sessionOffer).innerJoin(subject, eq(subject.id, sessionOffer.subjectId)).where(eq(sessionOffer.sessionId, sessionId));
+  const pick = (xs: typeof offers, how: 'subject' | 'name' | 'unit') => (xs.length === 1 ? { offer: xs[0]!, how } : null);
+  if (opts.subjectId) {
+    const hit = pick(offers.filter((o) => o.subjectId === opts.subjectId), 'subject');
+    if (hit) return hit;
+  }
+  const t = words(term);
+  const bare = words(term.replace(/\s*\([^)]*\)\s*$/, ''));
+  const byName = pick(offers.filter((o) => words(o.name) === t || words(o.code) === t), 'name')
+    ?? (bare !== t ? pick(offers.filter((o) => words(o.name) === bare), 'name') : null);
+  if (byName) return byName;
+  const codes = namedCodes(term).filter((c) => !c.startsWith('paper '));
+  if (!codes.length || !offers.length) return null;
+  const r = await executor.execute(sql`
+    select distinct i.offer_id as "offerId" from session_offer_item i
+    join session_offer_item_unit iu on iu.item_id = i.id join exam_unit u on u.id = iu.unit_id
+    where i.session_id = ${sessionId} and (lower(coalesce(u.short_code, '')) in (${sql.join(codes.map((c) => sql`${c}`), sql`, `)})
+      or lower(u.code) in (${sql.join(codes.map((c) => sql`${c}`), sql`, `)}))`);
+  const ids = new Set((r.rows as { offerId: string }[]).map((x) => x.offerId));
+  return pick(offers.filter((o) => ids.has(o.id)), 'unit');
+}
+
+/**
+ * The item of an offer a sheet's words name (F7): the item labelled so; else the one item entering
+ * the unit or paper the words name (P1, WMA11, "Paper 4" → "Paper 4 only (retake)"); else the
+ * whole subject, as resolveItem picks it; an offer of one item, that item. Among several that fit,
+ * the one in the series of the sheet's month and year. `candidates` lists them when none or more
+ * than one fit, for staff to choose on the line.
+ */
+export async function findItem(executor: Executor, offerId: string, label: string, opts: { month?: string | null; year?: number | null } = {}) {
+  const items = await executor.select({ item: sessionOfferItem, month: boardSeries.month, year: boardSeries.year })
+    .from(sessionOfferItem).leftJoin(boardSeries, eq(boardSeries.id, sessionOfferItem.boardSeriesId))
+    .where(eq(sessionOfferItem.offerId, offerId))
+    .orderBy(sql`${sessionOfferItem.availability} = 'closed'`, sql`${sessionOfferItem.boardSeriesId} is null`, sessionOfferItem.sortOrder, sessionOfferItem.id);
+  const units = items.length
+    ? await executor.select({ itemId: sessionOfferItemUnit.itemId, code: examUnit.code, shortCode: examUnit.shortCode })
+        .from(sessionOfferItemUnit).innerJoin(examUnit, eq(examUnit.id, sessionOfferItemUnit.unitId))
+        .where(inArray(sessionOfferItemUnit.itemId, items.map((i) => i.item.id)))
+    : [];
+  const candidates = items.map((i) => ({ id: i.item.id, label: i.item.label, kind: i.item.kind }));
+  const inSeries = (xs: typeof items) => {
+    const here = xs.filter((x) => opts.month && x.month === opts.month && x.year === opts.year);
+    return here.length ? here : xs;
+  };
+  const pick = (xs: typeof items, how: 'label' | 'unit' | 'paper' | 'whole' | 'only') => {
+    const narrowed = inSeries(xs);
+    // The same thing in two series (a converted window, or an item moved): the open one first, as ordered.
+    const distinct = new Set(narrowed.map((x) => `${x.item.kind}|${words(x.item.label)}`));
+    return narrowed.length && distinct.size === 1 ? { item: narrowed[0]!.item, how, candidates } : null;
+  };
+  if (items.length === 1) return { item: items[0]!.item, how: 'only' as const, candidates };
+  const t = words(label);
+  const byLabel = pick(items.filter((i) => words(i.item.label) === t), 'label');
+  if (byLabel) return byLabel;
+  const codes = namedCodes(label);
+  if (codes.length) {
+    // An item fits when the units it enters are exactly the ones named (by code or by what the school calls them).
+    const fits = items.filter((i) => {
+      const own = units.filter((u) => u.itemId === i.item.id).map((u) => [u.code.toLowerCase(), (u.shortCode ?? '').toLowerCase(), `paper ${u.code.toLowerCase().split('/').pop()}`]);
+      return own.length > 0 && own.every((u) => u.some((c) => codes.includes(c))) && codes.every((c) => own.some((u) => u.includes(c)));
+    });
+    const hit = pick(fits, 'unit');
+    if (hit) return hit;
+    // A paper named in the label of a one-paper retake ("Paper 4" → "Paper 4 only (retake)").
+    const papers = codes.filter((c) => c.startsWith('paper ')).map((c) => c.slice(6));
+    if (papers.length === 1) {
+      const byPaper = pick(items.filter((i) => i.item.kind === 'one_paper' && new RegExp(`\\b(?:paper\\s*)?${papers[0]}\\b`).test(words(i.item.label))), 'paper');
+      if (byPaper) return byPaper;
+    }
+    if (codes.length > 1 || fits.length) return { item: null, how: null, candidates };
+  }
+  const whole = pick(items.filter((i) => i.item.kind === 'whole'), 'whole');
+  return whole ?? { item: null, how: null, candidates };
+}
+
 /** The Subjects tab (§4.2): every offer with its board, teachers, items, their series, fees and lines. */
 export async function listOffers(sessionId: string) {
   const [session] = await db.select().from(registrationSession).where(eq(registrationSession.id, sessionId));

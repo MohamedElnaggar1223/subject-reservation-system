@@ -21,7 +21,7 @@ type Result = {
 
 const CREATED: [string, string][] = [
   ['students', 'student accounts'], ['parents', 'parent accounts'], ['links', 'parent–child links'], ['sectionPlaces', 'section places'],
-  ['enrolments', 'course enrolments'], ['history', 'history rows'], ['registrations', 'registrations awaiting payment'], ['money', 'money history notes'],
+  ['enrolments', 'course enrolments'], ['history', 'history rows'], ['registrations', 'lines awaiting payment'], ['money', 'money history notes'],
 ];
 
 export function ResultTab({ v, onOpenRows }: { v: ImportView; onOpenRows: (show: string) => void }) {

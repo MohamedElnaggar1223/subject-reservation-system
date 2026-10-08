@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import { admin, staff, onboard, subject, session, refused, one, sql, waitFor, notificationsFor, money, openWindow, futureWindow, type Client, reservationOf } from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, waitFor, notificationsFor, money, openWindow, futureWindow, type Client, reservationOf, seriesOfSession } from './helpers';
 
 /**
  * The original approval workflow and the V3 flows that had never run before
@@ -192,17 +192,33 @@ describe('V3 flows', () => {
     expect(money((await one<{ balance: string }>(`select balance from escrow where student_id = $1`, [studentId])).balance)).toBe(1600);
   });
 
-  it('a subject with no price cannot be registered on any path: the student\'s request, the parent\'s direct registration, the desk', async () => {
-    const unpriced = await subject(adm, 'T0000', 'Unpriced (AS)', { course: 0, registration: 0 }, { qualificationLevel: 'a_level' });
-    const sentence = 'Unpriced (AS) has no price yet: the admin sets the fees on Subjects before anyone can register';
-    const before = await sql(`select id from registration where subject_id = $1`, [unpriced]);
-    expect(await refused(student.api.v1.registrations.request.$post({ json: { sessionId: juneA, subjectIds: [unpriced] } }))).toEqual({ status: 400, error: sentence });
-    expect(await refused(parent.api.v1.registrations.direct.$post({ json: { sessionId: juneA, subjectIds: [unpriced], studentId } }))).toEqual({ status: 400, error: sentence });
-    expect(await refused(officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: juneA, subjectIds: [unpriced] } }))).toEqual({ status: 400, error: sentence });
-    expect(await sql(`select id from registration where subject_id = $1`, [unpriced])).toEqual(before);
-    // Once the admin sets its fees, the same request goes through at that price.
-    await apiResponse(adm.api.v1.subjects[':id'].$put({ param: { id: unpriced }, json: { courseFee: 500, registrationFee: 100 } }));
-    const made = await apiResponse(parent.api.v1.registrations.direct.$post({ json: { sessionId: juneA, subjectIds: [unpriced], studentId } }));
+  it('an item with no fee row in its series cannot be reserved on any path — the student\'s request, the parent\'s direct reservation, the desk — and the refusal names the grid (F7 review flag 1)', async () => {
+    // A catalogue row the day-one import adds carries no price: the session offers it with a course
+    // fee, and its board fee is a row of the series' grid finance has not set yet.
+    const unpriced = await apiResponse(adm.api.v1.subjects.$post({ json: {
+      name: 'Unpriced (AS)', code: 'T0000', council: 'cambridge', qualificationLevel: 'a_level', courseFee: 0, registrationFee: 0, isOfferedAtSchool: true, isCore: false,
+    } }));
+    const teacher = await apiResponse(adm.api.v1.teachers.$post({ json: { name: 'Teacher of the unpriced subject (v3)' } }));
+    const seriesId = await seriesOfSession(juneA, 'cambridge');
+    await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+      param: { id: juneA },
+      json: {
+        subjectId: unpriced.id, availability: 'open', courseFee: 500, grade10Core: false, teachers: [{ teacherId: teacher!.id, mode: 'in_school' }],
+        items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false }],
+      },
+    }));
+    const s = await one<{ board: string; month: string; year: number; label: string }>(
+      `select b.name as board, bs.month, bs.year, bs.label from board_series bs join exam_board b on b.code = bs.board_code where bs.id = $1`, [seriesId]);
+    const sentence = `Whole subject has no board fee in ${s.board} ${s.month.charAt(0).toUpperCase()}${s.month.slice(1)} ${s.year}${s.label ? ` (${s.label})` : ''} yet — set one on the session's Fees tab`;
+    const lines = await reservationOf(juneA, [unpriced.id]);
+    const before = await sql(`select id from registration where subject_id = $1`, [unpriced.id]);
+    expect(await refused(student.api.v1.registrations.request.$post({ json: { sessionId: juneA, ...lines } }))).toEqual({ status: 400, error: sentence });
+    expect(await refused(parent.api.v1.registrations.direct.$post({ json: { sessionId: juneA, studentId, ...lines } }))).toEqual({ status: 400, error: sentence });
+    expect(await refused(officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: juneA, ...lines } }))).toEqual({ status: 400, error: sentence });
+    expect(await sql(`select id from registration where subject_id = $1`, [unpriced.id])).toEqual(before);
+    // Once finance sets its row in the grid, the same reservation goes through at that price.
+    await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId }, json: { rows: [{ keyKind: 'subject', keyId: unpriced.id, amount: 100, provisional: false }] } }));
+    const made = await apiResponse(parent.api.v1.registrations.direct.$post({ json: { sessionId: juneA, studentId, ...lines } }));
     expect(made.map((r) => [r.status, Number(r.priceAtRegistration)])).toEqual([['pending_payment', 600]]);
   });
 

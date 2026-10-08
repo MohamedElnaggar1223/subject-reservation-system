@@ -6,8 +6,11 @@
  * sections the file needs are made in one transaction of their own, then each
  * family that is ready (nothing in it is an error) is committed in its own:
  * its accounts, links, section places, course enrolments, registration
- * history, registrations awaiting payment (when a series is mapped to an open
- * window: the admin's) and money history — every row it makes pointing back to
+ * history, lines awaiting payment (when a series is mapped to its session: the
+ * admin's — each on the offer and item the sheet's words name, its attempt and
+ * mode from the note, priced from the series' fee grid by insertLines, the
+ * sheet's confirmation recorded as its consent on the imported channel) and
+ * money history — every row it makes pointing back to
  * its line, every account and link audited, one IMPORT_FAMILY_COMMITTED row
  * listing what it made. A family that fails rolls back whole, and its rows say
  * why; the others stand. Running it again changes nothing: what exists is
@@ -18,19 +21,22 @@
  * written to `money_history` only (09-money-invariants checks it).
  */
 import {
-  db, user, teacher, section, parentStudentLink, registrationHistory, moneyHistory, importBatch, importRow, importPerson, subject,
-  registration, registrationSession, academicYear, subjectTeacher,
+  db, user, teacher, section, parentStudentLink, registrationHistory, moneyHistory, importBatch, importRow, importPerson,
+  registration, registrationSession, academicYear, sessionOffer, sessionOfferItem, boardSeries,
   eq, and, inArray, notInArray, sql,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
-import { academicYearStartOf, gradeInAcademicYear, seriesLabel, type ImportSettingsType } from '@repo/validations';
+import { academicYearStartOf, gradeInAcademicYear, type ImportSettingsType, type LineInputType } from '@repo/validations';
 import { logAction, type AuditContext } from '../audit.services';
 import { generateUniqueStudentId } from '../user.services';
 import { addSectionMembersInTx } from '../academic.services';
 import { upsertEnrolments, type EnrolmentRowInput } from '../enrolment.services';
 import { assertMayRegisterForInTx } from '../eligibility.services';
-import { sessionWindow, entryDeadlineMessage } from '../window.services';
-import { prepareRegistrationInputs, insertRoutedRegistrations } from '../registration.services';
+import { sessionWindow, windowRefusal } from '../window.services';
+import { assertSchoolFeeGate } from '../registration.services';
+import { insertLines } from '../line.services';
+import { writeConsents } from '../reservation.services';
+import { findOrCreateSeries } from '../offer.services';
 import {
   computeView, historyFingerprint, feeFingerprint, carryFingerprint, moneyFingerprints, historyOutcome, lower,
   type ImportView, type ImportRowView,
@@ -97,9 +103,9 @@ export async function commitImport(batchId: string, actor: Actor, ctx?: AuditCon
     let view = await computeView(input);
     const ready = view.families.filter((f) => f.status === 'ready' || f.status === 'failed' || f.status === 'partly_committed');
     const readyRows = new Set(ready.flatMap((f) => f.rowIds));
-    // Registering families in a window is the admin's (registrations wait for money).
+    // Reserving for families in a session is the admin's (lines wait for money).
     if (actor.role !== 'admin' && view.rows.some((r) => readyRows.has(r.id) && r.plan.registration === 'live')) {
-      throw new ImportError('Registering families in an open window is the admin’s: ask the admin to commit this import, or set those series to "History only"', 403);
+      throw new ImportError('Reserving lines for families in a session is the admin’s: ask the admin to commit this import, or set those series to "History only"', 403);
     }
     if (!ready.length) throw new ImportError(view.summary.heldFamilies ? 'Nothing is ready to commit: every family left has a problem to fix first' : 'Nothing is left to commit', 409);
 
@@ -430,18 +436,17 @@ async function commitFamily(
     res.rows.forEach((x, i) => note(list[i]!.rowId, 'enrolment', x.outcome === 'created' ? 'created' : 'exists'));
   }
 
-  // Registrations awaiting payment, in an open window (the admin's) — the desk's register-only path.
+  // Lines awaiting payment in the session (the admin's) — every reservation path's own checks.
   const live = rows.filter((r) => r.plan.registration === 'live');
-  const byWindow = new Map<string, ImportRowView[]>();
+  const bySession = new Map<string, ImportRowView[]>();
   for (const r of live) {
-    const sessionId = r.seriesKey ? settings.series[r.seriesKey]?.sessionId : null;
-    if (!sessionId || !studentIdOf(r)) throw new ImportError(`${r.tab} row ${r.rowNumber}: no window for its registration`);
-    const k = `${studentIdOf(r)}|${sessionId}`;
-    byWindow.set(k, [...(byWindow.get(k) ?? []), r]);
+    if (!r.plan.line || !studentIdOf(r)) throw new ImportError(`${r.tab} row ${r.rowNumber}: no line in a session for it`);
+    const k = `${studentIdOf(r)}|${r.plan.line.sessionId}`;
+    bySession.set(k, [...(bySession.get(k) ?? []), r]);
   }
-  for (const [k, list] of byWindow) {
+  for (const [k, list] of bySession) {
     const [studentId, sessionId] = k.split('|') as [string, string];
-    const made = await registerInWindow(tx, studentId, sessionId, list, teacherIdOf, actor, batch, ctx);
+    const made = await reserveImportLines(tx, studentId, sessionId, list, actor, batch, ctx);
     created.registrations += made.length;
     createdIds.registrations!.push(...made.map((m) => m.id));
     for (const m of made) note(m.rowId, 'registration', m.id);
@@ -469,60 +474,66 @@ async function commitFamily(
 }
 
 /**
- * The desk's register-only path, in the family's transaction: eligibility with
- * the student and window held, the window open, core subjects, the pricing
- * pipeline (retakes read the history just written), each subject routed to
- * its board series (F0b) — pending payment, never paid.
+ * A family's lines in one session, in the family's transaction, the way every reservation path makes
+ * them (RESERVATIONS_REWORK.md §6, §9's F7 list): the student held first (assertMayRegisterForInTx,
+ * FOR NO KEY UPDATE), the session open for each line (its series' effective deadline), the school-fee
+ * gate, then insertLines — the rework's locks in their order, assertLineRules, priceLine from the
+ * series' fee grid (a missing row refused, naming the grid; a provisional one priced provisional,
+ * never 0), the due date and the teacher — on the offer item the review found, with the attempt,
+ * mode and sitting the sheet gives: a sitting from the student's legacy history ('legacy') or named
+ * on the sheet or the line ('declared_by_desk', listed on To verify), made as a board series with no
+ * dates when not on record. The sheet's confirmation is the family's consent on the imported
+ * channel. Pending payment, never paid.
  */
-async function registerInWindow(
-  tx: Tx, studentId: string, sessionId: string, rows: ImportRowView[],
-  teacherIdOf: (r: ImportRowView) => string | null, actor: Actor, batch: typeof importBatch.$inferSelect, ctx?: AuditContext,
+async function reserveImportLines(
+  tx: Tx, studentId: string, sessionId: string, rows: ImportRowView[], actor: Actor, batch: typeof importBatch.$inferSelect, ctx?: AuditContext,
 ) {
   const eligibility = await assertMayRegisterForInTx(tx, studentId, sessionId);
-  const w = await sessionWindow(studentId, sessionId, null, tx);
-  if (!w.open) throw new ImportError(w.entryDeadlinePassed ? entryDeadlineMessage(w.entryDeadline!) : 'The registration window is not open');
-  const [sess] = await tx.select().from(registrationSession).where(eq(registrationSession.id, sessionId));
-  if (!sess) throw new ImportError('Window not found', 404);
-  const subjectIds = [...new Set(rows.map((r) => r.subjectId!))];
-  const subjects = await tx.select().from(subject).where(and(inArray(subject.id, subjectIds), eq(subject.isActive, true)));
-  if (subjects.length !== subjectIds.length) throw new ImportError('A subject is no longer offered');
-  const already = await tx.select({ subjectId: registration.subjectId }).from(registration)
-    .where(and(eq(registration.studentId, studentId), eq(registration.sessionId, sessionId), inArray(registration.subjectId, subjectIds), notInArray(registration.status, ['dropped', 'rejected', 'expired'])));
-  const todo = subjects.filter((s) => !already.some((a) => a.subjectId === s.id));
+  const [sess] = await tx.select({ name: registrationSession.name }).from(registrationSession).where(eq(registrationSession.id, sessionId));
+  if (!sess) throw new ImportError('Session not found', 404);
+  // A line the student holds already (the same file committed before) is not made again.
+  const held = await tx.select({ itemId: registration.offerItemId }).from(registration)
+    .where(and(eq(registration.studentId, studentId), eq(registration.sessionId, sessionId), inArray(registration.offerItemId, rows.map((r) => r.plan.line!.offerItemId)),
+      notInArray(registration.status, ['dropped', 'rejected', 'expired'])));
+  const todo = rows.filter((r) => !held.some((h) => h.itemId === r.plan.line!.offerItemId));
   if (!todo.length) return [];
-  if (eligibility.grade === 10 && eligibility.series.sessionType === 'june') {
-    const core = await tx.select({ id: subject.id, name: subject.name }).from(subject).where(and(eq(subject.isCore, true), eq(subject.isActive, true)));
-    const have = new Set([...subjectIds, ...already.map((a) => a.subjectId)]);
-    const missing = core.filter((c) => !have.has(c.id));
-    if (missing.length) throw new ImportError(`Grade 10 June session requires all core subjects. Missing: ${missing.map((m) => m.name).join(', ')}`);
-  }
-  const options: Record<string, { teacherId?: string; takeOutsideSchool?: boolean }> = {};
-  for (const s of todo) {
-    const r = rows.find((x) => x.subjectId === s.id)!;
-    const teacherId = r.mode === 'in_school' ? teacherIdOf(r) : null;
-    // A named teacher is linked to the subject (as enrolment and the Subjects page do).
-    if (teacherId) await tx.insert(subjectTeacher).values({ id: randomUUID(), subjectId: s.id, teacherId }).onConflictDoNothing();
-    options[s.id] = { ...(teacherId ? { teacherId } : {}), takeOutsideSchool: r.mode === 'self_study' };
-  }
-  const prepared = await prepareRegistrationInputs(studentId, sess, todo, options, eligibility, tx);
   const now = new Date();
-  const records = todo.map((s) => {
-    const p = prepared.get(s.id)!;
-    const r = rows.find((x) => x.subjectId === s.id)!;
-    return {
-      id: randomUUID(), studentId, sessionId, subjectId: s.id,
-      priceAtRegistration: p.pricing.total, courseFeeAtRegistration: p.pricing.courseFee, registrationFeeAtRegistration: p.pricing.registrationFee,
-      isRetake: p.isRetake, takenOutsideSchool: p.pricing.isOutsideSchool, teacherId: p.teacherId, wasCoreAtRegistration: s.isCore,
-      status: 'pending_payment' as const, requestedBy: actor.id, approvedBy: actor.id, approvedAt: now,
-      approvalComments: `[IMPORT] ${batch.fileName} — ${r.tab} row ${r.rowNumber}`,
-    };
+  const lines: LineInputType[] = [];
+  for (const r of todo) {
+    const l = r.plan.line!;
+    const [it] = await tx.select({ seriesId: sessionOfferItem.boardSeriesId, subjectId: sessionOffer.subjectId, boardCode: boardSeries.boardCode })
+      .from(sessionOfferItem).innerJoin(sessionOffer, eq(sessionOffer.id, sessionOfferItem.offerId))
+      .leftJoin(boardSeries, eq(boardSeries.id, sessionOfferItem.boardSeriesId)).where(eq(sessionOfferItem.id, l.offerItemId));
+    if (!it) throw new ImportError(`${r.tab} row ${r.rowNumber}: the item is no longer offered`);
+    let priorId: string | null = null;
+    if (l.priorSitting) {
+      if (!it.boardCode) throw new ImportError(`${r.tab} row ${r.rowNumber}: ${l.subjectName} has no board to name a sitting of`);
+      priorId = (await findOrCreateSeries(tx, it.boardCode, l.priorSitting.month, l.priorSitting.year, '', actor.id,
+        `Created when the day-one import named a sitting not on record (no dates yet): ${batch.fileName} — ${r.tab} row ${r.rowNumber}`)).id;
+    }
+    const w = await sessionWindow(studentId, sessionId, { boardSeriesId: it.seriesId, attempt: l.attempt, priorSittingSeriesId: priorId, declarationRejected: false, subjectId: it.subjectId }, tx, now);
+    if (!w.open) throw new ImportError(`${r.tab} row ${r.rowNumber}: ${windowRefusal(w, `${sess.name} is not open for reservations`)}`);
+    lines.push({
+      offerItemId: l.offerItemId, attempt: l.attempt, mode: l.mode, teacherId: l.mode === 'in_school' ? l.teacherId : null,
+      priorSittingSeriesId: priorId, priorSittingSource: priorId ? l.priorSitting!.source : null,
+    });
+  }
+  await assertSchoolFeeGate(studentId, eligibility);
+  const inserted = await insertLines(tx, {
+    studentId, sessionId, lines, status: 'pending_payment', requestedBy: actor.id, approvedBy: actor.id, approvedAt: now,
+    approvalComments: `[IMPORT] ${batch.fileName} — ${todo.map((r) => `${r.tab} row ${r.rowNumber}`).join(', ')}`, eligibility, now,
   });
-  const inserted = await insertRoutedRegistrations(tx, sessionId, todo, records);
+  // The sheet's "I confirm my registration": the family's consent to the refund policy and the declaration, as the sheet recorded it.
+  await writeConsents(tx, inserted.map((i) => i.id), { channel: 'imported', confirmedBy: actor.id, at: now });
+  const rowOf = (itemId: string) => todo.find((x) => x.plan.line!.offerItemId === itemId)!;
   await logAction(actor.id, 'IMPORT_REGISTRATION', 'registration', studentId, null, {
-    batchId: batch.id, sessionId, series: seriesLabel(sess.sessionType, sess.seriesYear), registrationIds: inserted.map((i) => i.id),
-    rows: inserted.map((i) => { const r = rows.find((x) => x.subjectId === i.subjectId)!; return `${r.tab} row ${r.rowNumber}`; }),
+    batchId: batch.id, sessionId, session: sess.name, registrationIds: inserted.map((i) => i.id),
+    lines: inserted.map((i) => {
+      const r = rowOf(i.offerItemId!);
+      return { row: `${r.tab} row ${r.rowNumber}`, registrationId: i.id, item: r.plan.line!.itemLabel, attempt: i.attempt, mode: i.mode, priorSittingSource: i.priorSittingSource, price: i.priceAtRegistration, provisional: i.priceProvisional };
+    }),
   }, ctx, tx);
-  return inserted.map((i) => ({ id: i.id, rowId: rows.find((x) => x.subjectId === i.subjectId)!.id }));
+  return inserted.map((i) => ({ id: i.id, rowId: rowOf(i.offerItemId!).id }));
 }
 
 /** The rows and people of a committed family, and its one audit row. */
