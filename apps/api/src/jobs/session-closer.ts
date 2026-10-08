@@ -13,10 +13,11 @@
  * when moving to a multi-instance deployment.
  */
 
-import { db, payment, registrationSession, eq, and, lte, gte, isNull } from '@repo/db';
+import { db, payment, eq, and } from '@repo/db';
 import { autoManageSessions, finalizePendingRecords, recoverSessionTransitions } from '../services/session.services';
 import { failPayment, enforcePaymentDeadlines } from '../services/payment.services';
-import { notifySessionOpened, notifySessionClosingSoon, notifySessionClosed, processScheduledAnnouncements, getStudentAndParentBroadcastIds } from '../services/notification.services';
+import { notifySessionOpened, notifySessionClosed, getStudentAndParentBroadcastIds } from '../services/notification.services';
+import { runMessagesStep } from '../services/messages-step.services';
 import { capturePreregistrationsForSession } from '../services/prereg.services';
 import { lapseGrade10Exceptions, lapsePlans } from '../services/exception-lapse.services';
 import { expireOverdueLines } from '../services/overdue.services';
@@ -32,8 +33,8 @@ const FAWRY_FALLBACK_LIFETIME_MS = 24 * 60 * 60 * 1000;
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 // Re-entry guard: if a tick takes longer than INTERVAL_MS (slow DB, many
 // emails, many stale Fawry rows) setInterval will queue up another tick
-// on top. That causes duplicate NOT-002 reminder sends, double work on
-// scheduled announcements, and races on reminderSentAt. This flag ensures
+// on top. Every step claims before it acts, so a second tick sends nothing
+// twice, but it would do the work twice over. This flag ensures
 // only one tick body runs at a time per process. Multi-instance deployments
 // still need an external distributed lock (e.g. Postgres advisory lock)
 // or a centralized scheduler (BullMQ, Render Cron).
@@ -103,41 +104,8 @@ export function startSessionScheduler(): void {
         }
       }
 
-      // NOT-002: 24-hour closing reminder for active sessions (DB-tracked via reminderSentAt)
-      try {
-        const now = new Date();
-        const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        const closingSoon = await db.select().from(registrationSession).where(
-          and(
-            eq(registrationSession.status, 'active'),
-            lte(registrationSession.endDate, in24h),
-            gte(registrationSession.endDate, now),
-            isNull(registrationSession.reminderSentAt),
-          )
-        );
-
-        for (const sess of closingSoon) {
-          const { studentIds, parentIds } = await getStudentAndParentBroadcastIds();
-
-          await notifySessionClosingSoon({
-            sessionId: sess.id,
-            sessionName: sess.name,
-            deadline: sess.endDate,
-            studentIds,
-            parentIds,
-          });
-
-          // Mark reminder as sent in DB so it persists across restarts
-          await db
-            .update(registrationSession)
-            .set({ reminderSentAt: new Date() })
-            .where(eq(registrationSession.id, sess.id));
-
-          logger.info(`[session-closer] NOT-002: 24h reminder sent for "${sess.name}".`);
-        }
-      } catch (err) {
-        logger.error('[session-closer] NOT-002 reminder check failed:', err);
-      }
+      // NOT-002's 24-hour closing reminder is the session_closing reminder rule's day −1 since step D
+      // (RESERVATIONS_REWORK.md §3.8): sent by the messages step below, claimed once.
 
       if (activated > 0) {
         logger.info(`[session-closer] Auto-activated ${activated} session(s).`);
@@ -231,15 +199,11 @@ export function startSessionScheduler(): void {
         logger.error('[session-closer] Overdue expiry failed:', err);
       }
 
-      // Process scheduled announcements whose time has arrived
-      try {
-        const dispatched = await processScheduledAnnouncements();
-        if (dispatched > 0) {
-          logger.info(`[session-closer] Dispatched ${dispatched} scheduled announcement(s).`);
-        }
-      } catch (err) {
-        logger.error('[session-closer] Scheduled announcement processing failed:', err);
-      }
+      // Step D (RESERVATIONS_REWORK.md §3.8): scheduled messages whose time has come, the reminder
+      // rules' reminders due now, the emails waiting to go out. Each claims before it acts (a
+      // message by its row lock, a reminder by its unique claim row, an email by a status-guarded
+      // update), so a second scheduler instance sends nothing twice (ST-06, ST-12).
+      await runMessagesStep(new Date());
 
       // Owner decision MO-10: InstaPay checkouts whose reference never came in
       // the grace period after a close lapse; at a series' exam-board entry

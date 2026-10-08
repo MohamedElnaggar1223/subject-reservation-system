@@ -1,0 +1,38 @@
+The full API suite on igcse_rwd_test in local time (Africa/Cairo), worktree rework-messages, the second review's fixes on 9e7a4d6 (uncommitted tree, committed next)
+
+Files:
+ ✓ test/00-harness.test.ts (4 tests) 1678ms
+ ✓ test/01-desk.test.ts (8 tests) 1831ms
+ ✓ test/02-money.test.ts (4 tests) 1988ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 2064ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 6316ms
+ ✓ test/05-object-access.test.ts (16 tests) 4179ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3714ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1704ms
+ ✓ test/08-money-rules.test.ts (51 tests) 11950ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 11619ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 6635ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 7883ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 5912ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5313ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 9188ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2611ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4323ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 4118ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4703ms
+ ✓ test/08l-board-change.test.ts (7 tests) 4015ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 6091ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 23127ms
+ ✓ test/08o-reservation-lines.test.ts (23 tests) 16493ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 8267ms
+ ✓ test/08q-charges.test.ts (46 tests) 27238ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 8906ms
+ ✓ test/08s-messages-reminders.test.ts (34 tests) 48470ms
+ ✓ test/08t-rework-races.test.ts (40 tests) 36840ms
+ ✓ test/09-money-invariants.test.ts (51 tests) 1057ms
+
+ Test Files  29 passed (29)
+      Tests  540 passed | 1 todo (541)
+   Start at  15:24:41
+   Duration  286.94s (transform 1.00s, setup 50ms, collect 3.50s, tests 278.23s, environment 2ms, prepare 985ms)
+

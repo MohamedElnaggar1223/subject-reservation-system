@@ -73,6 +73,10 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
         // The reservations rework, step B: whether an unverified declared sitting is held at its
         // deadline is the owner's question (Q-22): the admin's setting.
         'verification.unverifiedAtDeadline': false,
+        // The reservations rework, step D: the reminders' switch is the admin's; their send hour the
+        // admin's and finance admin's.
+        'reminders.enabled': false,
+        'reminders.sendAtHour': false,
       });
     });
 

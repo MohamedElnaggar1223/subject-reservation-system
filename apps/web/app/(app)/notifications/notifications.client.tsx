@@ -58,6 +58,10 @@ const TYPE_COLOUR: Partial<Record<NotificationType, string>> = {
   ESCROW_WITHDRAWAL_REJECTED:       'bg-destructive/5 border-destructive/20',
   GRADE_CHANGED:                    'bg-violet-50 border-violet-200 dark:bg-violet-900/20 dark:border-violet-700',
   BULK_ANNOUNCEMENT:                'bg-muted border-border',
+  // Step D: a message from the school, a payment reminder, a reminder to staff.
+  SCHOOL_MESSAGE:                   'bg-brand-50 border-brand-200 dark:bg-brand-900/20 dark:border-brand-700',
+  PAYMENT_REMINDER:                 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700',
+  STAFF_REMINDER:                   'bg-violet-50 border-violet-200 dark:bg-violet-900/20 dark:border-violet-700',
 };
 
 const DEFAULT_COLOUR = 'bg-muted border-border';
@@ -255,9 +259,10 @@ export default function NotificationsClient() {
                     <p className={`text-sm font-semibold mb-0.5 ${isUnread ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {n.title}
                     </p>
-                    <p className="text-sm text-muted-foreground leading-snug">
-                      {n.body}
-                    </p>
+                    {/* A message in English and Arabic comes as two paragraphs (step D): each in its own direction. */}
+                    <div className="text-sm text-muted-foreground leading-snug space-y-1">
+                      {n.body.split(/\n{2,}/).map((para, i) => <p key={i} dir="auto" className="whitespace-pre-line">{para}</p>)}
+                    </div>
                   </div>
                 </div>
               </button>

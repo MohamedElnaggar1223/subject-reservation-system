@@ -355,15 +355,50 @@
     {
       "idx": 50,
       "version": "7",
-      "when": 1791462448447,
-      "tag": "0050_scheduling",
+      "when": 1791444538626,
+      "tag": "0050_rework_messages_structure",
       "breakpoints": true
     },
     {
       "idx": 51,
       "version": "7",
-      "when": 1791462449131,
-      "tag": "0051_scheduling_leavings",
+      "when": 1791444609348,
+      "tag": "0051_rework_messages_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1791453573346,
+      "tag": "0052_rework_messages_claim_day",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1791453585318,
+      "tag": "0053_rework_messages_claim_day_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1791453628209,
+      "tag": "0054_rework_messages_claim_day_required",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1791464803689,
+      "tag": "0055_scheduling",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1791464804807,
+      "tag": "0056_scheduling_leavings",
       "breakpoints": true
     }
   ]

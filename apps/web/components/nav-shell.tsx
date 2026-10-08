@@ -181,7 +181,8 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
         items: [
           { labelKey: 'nav.reports', href: '/admin/reports', icon: 'reports' },
           { labelKey: 'nav.auditLog', href: '/admin/audit', icon: 'audit' },
-          { labelKey: 'nav.announcements', href: '/admin/notifications', icon: 'notifications' },
+          // Step D (RESERVATIONS_REWORK.md §4.8): messages and reminders replaced the announcement form.
+          { labelKey: 'nav.messages', href: '/admin/messages', icon: 'notifications' },
         ],
       },
       {
@@ -206,6 +207,8 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
           { labelKey: 'nav.charges', href: '/charges', icon: 'checkout' },
           // The reservations rework (§4.2, §4.6): the sessions' fees and money.
           { labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' },
+          // Step D (§3.8, §5): finance sends the payment reminders to a session's unpaid families.
+          { labelKey: 'nav.messages', href: '/admin/messages', icon: 'notifications' },
           { labelKey: 'nav.dailyTakings', href: '/takings', icon: 'escrow' },
           { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
           { labelKey: 'nav.resultsEntry', href: '/results-entry', icon: 'reports' },

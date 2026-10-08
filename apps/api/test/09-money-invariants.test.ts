@@ -996,4 +996,71 @@ describe('money invariants over the whole database', () => {
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action in ('PRIOR_SITTING_VERIFIED', 'PRIOR_SITTING_REJECTED')`))[0]?.n)).toBeGreaterThan(0);
     expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'LINE_DROPPED_UNVERIFIED' or (action = 'PRIOR_SITTING_REJECTED' and new_data->>'effect' = 'dropped')`))[0]?.n)).toBeGreaterThan(0);
   });
+  // ─── The reservations rework, step D: messages and reminders (RESERVATIONS_REWORK.md §3.8, §8) ───
+
+  it('there are messages and reminders to check: staff messages, reminders claimed, emails sent and failed, announcements moved', async () => {
+    const [c] = await sql<Record<string, string>>(`select
+      (select count(*) from message where source = 'staff' and status = 'sent') as staff,
+      (select count(*) from message where source = 'reminder') as reminders,
+      (select count(*) from reminder_sent) as claims,
+      (select count(*) from message_delivery where channel = 'email' and status = 'sent') as emails,
+      (select count(*) from message_delivery where channel = 'email' and status = 'failed') as failed,
+      (select count(*) from message where status = 'cancelled') as cancelled`);
+    for (const k of ['staff', 'reminders', 'claims', 'emails', 'failed', 'cancelled']) expect(Number(c![k]), k).toBeGreaterThan(0);
+  });
+
+  it('every reminder sent has its claim row: a reminder message has its claims, each claim its reminder message and rule, one claim per target, day and offset (§8, ST-06, ST-12)', async () => {
+    expect(await sql(`select m.id from message m where m.source = 'reminder' and not exists (select 1 from reminder_sent rs where rs.message_id = m.id)`)).toEqual([]);
+    expect(await sql(`select rs.id from reminder_sent rs join message m on m.id = rs.message_id join reminder_rule rr on rr.id = rs.rule_id
+      where m.source <> 'reminder' or m.reminder_rule_id <> rs.rule_id or rr.kind <> rs.kind`)).toEqual([]);
+    expect(await sql(`select kind, target_kind, target_id, anchor_on, offset_days from reminder_sent
+      group by kind, target_kind, target_id, anchor_on, offset_days having count(*) > 1`)).toEqual([]);
+    // At most one reminder a day per target and date, whatever rule changed during the day (the review of 5c2f2bf, item 5).
+    expect(await sql(`select kind, target_kind, target_id, anchor_on, sent_on from reminder_sent
+      group by kind, target_kind, target_id, anchor_on, sent_on having count(*) > 1`)).toEqual([]);
+    // A reminder about a student who had left the school by the day it went out (item 6).
+    expect(await sql(`select rs.id from reminder_sent rs join "user" u on u.id = rs.student_id
+      where u.left_on is not null and u.left_on <= rs.sent_on`)).toEqual([]);
+    // Nothing about a child's money went out without a claim on that child in the same message.
+    expect(await sql(`select d.id from message_delivery d join message m on m.id = d.message_id join reminder_rule rr on rr.id = m.reminder_rule_id
+      where m.source = 'reminder' and rr.kind in ('payment_due', 'school_fee_due')
+        and (d.student_id is null or not exists (select 1 from reminder_sent rs where rs.message_id = m.id and rs.student_id = d.student_id))`)).toEqual([]);
+  });
+
+  it('a payment reminder was never claimed for a line or a charge after it was paid (§3.8: until paid)', async () => {
+    expect(await sql(`select rs.id from reminder_sent rs
+      where rs.kind = 'payment_due' and rs.target_kind = 'line'
+        and exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id
+                    where pr.registration_id = rs.target_id and p.status = 'completed' and p.confirmed_at < rs.sent_at)`)).toEqual([]);
+    expect(await sql(`select rs.id from reminder_sent rs
+      where rs.kind in ('payment_due', 'school_fee_due') and rs.target_kind = 'charge'
+        and exists (select 1 from charge c where c.id = rs.target_id and c.status in ('paid', 'refunded')
+                    and coalesce((select max(p.confirmed_at) from payment_charge pc join payment p on p.id = pc.payment_id
+                                  where pc.charge_id = c.id and p.status = 'completed'),
+                                 (select p.confirmed_at from payment p where p.id = c.settled_by_payment_id)) < rs.sent_at)`)).toEqual([]);
+  });
+
+  it('every delivery belongs to a message; an in-app delivery is the notification it wrote, a notification a message wrote has its delivery; nothing scheduled or cancelled was delivered (§3.8)', async () => {
+    expect(await sql(`select d.id from message_delivery d left join message m on m.id = d.message_id where m.id is null`)).toEqual([]);
+    expect(await sql(`select d.id from message_delivery d left join notification n on n.id = d.notification_id
+      where d.channel = 'in_app' and d.status = 'sent' and (n.id is null or n.user_id <> d.recipient_id or n.title <> d.title or n.body <> d.body)`)).toEqual([]);
+    expect(await sql(`select n.id from notification n where n.data ? 'messageId'
+      and not exists (select 1 from message_delivery d where d.notification_id = n.id and d.message_id = n.data->>'messageId')`)).toEqual([]);
+    expect(await sql(`select m.id from message m where m.status in ('scheduled', 'cancelled') and exists (select 1 from message_delivery d where d.message_id = m.id)`)).toEqual([]);
+    // A sent email marked its in-app twin's notification as emailed, as the notification centre always recorded it.
+    expect(await sql(`select e.id from message_delivery e join message_delivery i on i.message_id = e.message_id and i.recipient_id = e.recipient_id
+        and coalesce(i.student_id, '') = coalesce(e.student_id, '') and i.channel = 'in_app'
+      join notification n on n.id = i.notification_id
+      join message m on m.id = e.message_id and m.source <> 'legacy_announcement'
+      where e.channel = 'email' and e.status = 'sent' and n.email_sent_at is null`)).toEqual([]);
+  });
+
+  it('every message sent has its audit row, and counts the people its deliveries reached (O-7)', async () => {
+    expect(await sql(`select m.id from message m where m.status = 'sent'
+      and not exists (select 1 from audit_log a where a.entity_id = m.id and a.action in ('MESSAGE_SENT', 'REMINDERS_SENT', 'REWORK_BACKFILL_MESSAGE'))`)).toEqual([]);
+    expect(await sql(`select m.id from message m where m.status = 'cancelled'
+      and m.source <> 'legacy_announcement' and not exists (select 1 from audit_log a where a.entity_id = m.id and a.action = 'MESSAGE_CANCELLED')`)).toEqual([]);
+    expect(await sql(`select m.id from message m where m.status = 'sent' and m.source <> 'legacy_announcement'
+      and m.recipient_count <> (select count(distinct d.recipient_id) from message_delivery d where d.message_id = m.id)`)).toEqual([]);
+  });
 });
