@@ -10,7 +10,8 @@ logs, control logs, screenshots, scratch scripts) is `.audit/scheduling-evidence
 **Resumed 8 Oct 2026 on the reservations rework's model** (RESERVATIONS_REWORK.md §9's F1 list and
 §10's F1 contract) and the second review round's flags: §17 says what changed, how each item was
 checked against main's code, the lock order, and the proof. Merged with main four times on the
-way (§14); F1's migrations are now `0056`/`0057`, after main's `0055`. The Opus 5.5 review of
+way (§14; a fifth, of trail rows only, after the review); F1's migrations are now `0056`/`0057`,
+after main's `0055`. The Opus 5.5 review of
 88898f6 (eight items, two material) is §17.5.
 
 F1 gives the school what its sheet cannot hold: **who is taught together** (teaching groups
@@ -597,6 +598,8 @@ with `git merge-tree` (nothing in lead-env touched), the rework's side winning o
    commit (a201282).
 4. `061468a` (the lead's trail rows and FEATURES_PLAN.md's line queuing the Arabic hydration error
    under F6) into `eb823b2` → `bc471b3`: no conflict, no code; CI green on it (run 37818174482).
+5. After the review's fixes (`759c066`): `5b911d2` (the lead's trail rows) → `681e98c`: no conflict
+   (`.audit/school-forms.tsv` only), no code; CI green on it (run 37834144754).
 
 ## 15. Progress log
 
@@ -670,6 +673,11 @@ with `git merge-tree` (nothing in lead-env touched), the rework's side winning o
   trail row (88898f6).
 - The Opus 5.5 review of 88898f6: "merge after fixes: 1, 2", eight items (§17.5); all done the same
   evening, each with a scenario and a control (times in the trail).
+- 18:52–19:00Z — the fixes (items 1, 2, 5, 6, 8); 19:11Z 08s6 (39) and 08s0 green; 19:16–19:23Z
+  controls RV1a–RV8 (RV1d green: redundant while the students come first), F3b, RW1–RW3 again;
+  19:26Z a race found timing out under load during a control (5 s), three clean runs, waits raised
+  to 20 s; 19:42Z the suite green in local time and UTC (637 passed, 1 todo); 759c066.
+- 19:43Z — merged `5b911d2` (681e98c), pushed; 19:52Z CI green on 681e98c (run 37834144754).
 
 ## 16. The review round (Opus 5.5 review of 9569dd9; the lead's decisions applied)
 
