@@ -1,0 +1,64 @@
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+> vitest run "test/08q-charges.test.ts"
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+
+[clock] database minus host: -1.4 ms (measured within 3 ms)
+ ❯ test/08q-charges.test.ts (18 tests | 2 failed) 7638ms
+   ✓ 08q: charges > the boards' services, as seeded: Cambridge 1, 1S, 2, 2S; Pearson's review, re-check, scripts, priority, cash-in and late cash-in; refunds in full until Q-21 is answered 14ms
+   ✓ 08q: charges > a cash-in charge, end to end > asked for by the family: requested, at the series' fee, not payable until the school accepts it 36ms
+   ✓ 08q: charges > a cash-in charge, end to end > paid in its own payment beside a line's, in one desk action: two payments, two receipts, both in the takings 72ms
+   ✓ 08q: charges > a cash-in charge, end to end > reversed as the registration payment is (MO-11): the charge payable again, its receipt void; paid again, the receipt reissued under a new number 47ms
+   ✓ 08q: charges > a cash-in charge, end to end > refunded to escrow by finance: at most what it cost, the paper back first, audited; never voided while paid 37ms
+   ✓ 08q: charges > a cash-in charge, end to end > two charges of different service deadlines are refused in one payment; the desk takes each in its own 69ms
+   ✓ 08q: charges > a cash-in charge, end to end > closed unpaid at its service deadline: its open payment failed, escrow back, the charge cancelled, the family told — once, however many sweeps run 50ms
+   ✓ 08q: charges > a Cambridge remark is priced per component at the AS rate from the series' grid; a changed grade refunds it by the service's rule (seeded full; a fixed deduction when set)  429ms
+   ✓ 08q: charges > the school fee pushed to families (point 8) > pushed to a list: a paid, a waived and an A-13 graduate skipped and listed; the others owe it by the date; a second push skips an open one 56ms
+   ✓ 08q: charges > the school fee pushed to families (point 8) > paid through the school-fee path: settled by that payment in its transaction; the payment reversed reopens it; the desk's collection settles it too; a waiver after the push cancels it 52ms
+   ✓ 08q: charges > the school fee pushed to families (point 8) > pushed to a grade: every student of that grade next year who owes it 270ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > week 3 of June: 50% of the course fee and the board fee (1,000); a later course start of the offer moves the anchor; refund.courseStart moves one student's 152ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > week 7 of a winter session: 0% of the course fee, and the board fee (500) 264ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a custom-priced line refunds its total by the course rule, never a board fee (1,200 at 50%: 600)  411ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a converted line refunds as V3 did: its session's windows, on the whole price (50%: 750)  336ms
+   × 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > past its line's deadline: the family is sent to the desk; the desk drops it, the board fee kept (sent), the paper back first 342ms
+     → Nothing to change
+   × 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a series with no entry deadline is cut off at its exams' start, and its board fee counts as sent from then 338ms
+     → Nothing to change
+   ✓ 08q: charges > payment.expireOverdueAfterDays: off by default; on, a line unpaid that long after its due date expires ("overdue") once, however many ticks run  351ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08q-charges.test.ts > 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > past its line's deadline: the family is sent to the desk; the desk drops it, the board fee kept (sent), the paper back first
+Error: Nothing to change
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08q-charges.test.ts:404:7
+    402|       const k = await onboard(officer, 'cq-deskdrop', 12);
+    403|       const [a, b] = await deskPaid(k, [subj.I!, subj.J!]);
+    404|       await setStart(june, -15);
+       |       ^
+    405|       // Before the deadline the desk-drop is refused: the family drop…
+    406|       expect((await refused(officer.api.v1.registrations[':id']['desk-…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08q-charges.test.ts > 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a series with no entry deadline is cut off at its exams' start, and its board fee counts as sent from then
+Error: Nothing to change
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08q-charges.test.ts:433:7
+    431|       const s = await one<{ s: string; e: string }>(
+    432|         `select r.board_series_id as s, bs.exams_start::text as e from…
+    433|       await setStart(june, -15);
+       |       ^
+    434|       await sql(`update board_series set exams_start = (now() at time …
+    435|       try {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 16 passed (18)
+   Start at  03:09:35
+   Duration  9.35s (transform 554ms, setup 2ms, collect 191ms, tests 7.64s, environment 0ms, prepare 33ms)
+
+/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @repo/api@ test: `vitest run "test/08q-charges.test.ts"`
+Exit status 1

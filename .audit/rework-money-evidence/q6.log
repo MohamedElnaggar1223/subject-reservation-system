@@ -1,0 +1,29 @@
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+> vitest run "test/08q-charges.test.ts"
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+
+[clock] database minus host: 0.2 ms (measured within 2 ms)
+ ✓ test/08q-charges.test.ts (31 tests) 17242ms
+   ✓ 08q: charges > a Cambridge remark is priced per component at the AS rate from the series' grid; a changed grade refunds it by the service's rule (seeded full; a fixed deduction when set)  439ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a custom-priced line refunds its total by the course rule, never a board fee (1,200 at 50%: 600)  357ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a converted line refunds as V3 did: its session's windows, on the whole price (50%: 750)  352ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > past its line's deadline: the family is sent to the desk; the desk drops it, the board fee kept (sent), the paper back first  532ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a series with no entry deadline is cut off at its exams' start, and its board fee counts as sent from then  497ms
+   ✓ 08q: charges > payment.expireOverdueAfterDays: off by default; on, a line unpaid that long after its due date expires ("overdue") once, however many ticks run  334ms
+   ✓ 08q: instalment plans > refused: a provisional board fee, a checkout in progress, instalments that do not add up, a last date past the session's end; granted by finance only  392ms
+   ✓ 08q: instalment plans > three instalments into the held wallet, earmarked for the line, each with a deposit slip and in the day's takings; the line captured at the last in one payment from its deposits  500ms
+   ✓ 08q: instalment plans > a plan line is not sent back for approval by the parent, even with nothing paid yet  359ms
+   ✓ 08q: instalment plans > stopped in week 3 (50%): the school keeps min(deposits, price − the refund) and releases the rest — 1,000 paid: 500 kept; 500 paid: 500 kept; 300 paid: 300 kept; a paid drop that day gives 1,000 back  544ms
+   ✓ 08q: instalment plans > released in full by finance: every deposit back in escrow, the line still payable and paid normally  366ms
+   ✓ 08q: instalment plans > ended by an overdue expiry, by the student leaving, and by an instalment payment failing on a line no longer payable — each settled as a drop that day  782ms
+   ✓ 08q: instalment plans > the close spares a line whose last instalment is being checked; that instalment rejected after the close ends the plan (plan_ended); a line under a plan not spared is settled at the close  474ms
+   ✓ 08q: instalment plans > at the deadline: confirming the last instalment is refused, the sweep ends the plans and fails their open instalment payments; a plan that lapses is settled and its transfer refused at confirmation  567ms
+   ✓ 08q: instalment plans > an instalment payment that fails on a line still payable leaves the plan standing: the instalment is paid again  363ms
+   ✓ 08q: the desk collects lines, charges and the year's school fee in one action > reserve and collect: the year's fee first (the gate asks for it), the lines, then the student's charges — each its own payment  377ms
+   ✓ 08q: the desk collects lines, charges and the year's school fee in one action > the fee alone; and when the rest cannot be taken, the fee stays collected and the rest is listed as not collected  606ms
+
+ Test Files  1 passed (1)
+      Tests  31 passed (31)
+   Start at  05:13:30
+   Duration  19.08s (transform 602ms, setup 2ms, collect 237ms, tests 17.24s, environment 0ms, prepare 34ms)

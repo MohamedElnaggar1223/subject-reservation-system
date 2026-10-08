@@ -1,0 +1,51 @@
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+> vitest run "test/08q-charges.test.ts" "test/08t-rework-races.test.ts" "test/08r-exceptions-registry.test.ts"
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/apps/api
+
+[clock] database minus host: 0.3 ms (measured within 2 ms)
+ ✓ test/08q-charges.test.ts (27 tests) 14324ms
+   ✓ 08q: charges > a Cambridge remark is priced per component at the AS rate from the series' grid; a changed grade refunds it by the service's rule (seeded full; a fixed deduction when set)  455ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a custom-priced line refunds its total by the course rule, never a board fee (1,200 at 50%: 600)  346ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a converted line refunds as V3 did: its session's windows, on the whole price (50%: 750)  351ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > past its line's deadline: the family is sent to the desk; the desk drops it, the board fee kept (sent), the paper back first  504ms
+   ✓ 08q: charges > drops refund the course fee by the policy and the board fee until the entry is sent (§3.9, Q-19) > a series with no entry deadline is cut off at its exams' start, and its board fee counts as sent from then  506ms
+   ✓ 08q: charges > payment.expireOverdueAfterDays: off by default; on, a line unpaid that long after its due date expires ("overdue") once, however many ticks run  327ms
+   ✓ 08q: instalment plans > refused: a provisional board fee, a checkout in progress, instalments that do not add up, a last date past the session's end; granted by finance only  411ms
+   ✓ 08q: instalment plans > three instalments into the held wallet, earmarked for the line, each with a deposit slip and in the day's takings; the line captured at the last in one payment from its deposits  490ms
+   ✓ 08q: instalment plans > a plan line is not sent back for approval by the parent, even with nothing paid yet  349ms
+   ✓ 08q: instalment plans > stopped in week 3 (50%): the school keeps min(deposits, price − the refund) and releases the rest — 1,000 paid: 500 kept; 500 paid: 500 kept; 300 paid: 300 kept; a paid drop that day gives 1,000 back  500ms
+   ✓ 08q: instalment plans > released in full by finance: every deposit back in escrow, the line still payable and paid normally  350ms
+   ✓ 08q: instalment plans > ended by an overdue expiry, by the student leaving, and by an instalment payment failing on a line no longer payable — each settled as a drop that day  709ms
+   ✓ 08q: instalment plans > the close spares a line whose last instalment is being checked; that instalment rejected after the close ends the plan (plan_ended); a line under a plan not spared is settled at the close  438ms
+   ✓ 08q: instalment plans > at the deadline: confirming the last instalment is refused, the sweep ends the plans and fails their open instalment payments; a plan that lapses is settled and its transfer refused at confirmation  502ms
+   ✓ 08q: instalment plans > an instalment payment that fails on a line still payable leaves the plan standing: the instalment is paid again  344ms
+ ✓ test/08r-exceptions-registry.test.ts (10 tests) 5034ms
+   ✓ 08r: the exceptions registry > a grant is checked against the registry: its grantors, its value, the scopes it accepts, a scope where one is required; a pending policy refused; late entries only while their setting is on  340ms
+   ✓ 08r: the exceptions registry > a family's exception covers every linked child, and no one else  755ms
+   ✓ 08r: the exceptions registry > a one-shot gate lets one reservation through and is used by it; the next is refused  367ms
+   ✓ 08r: the exceptions registry > a price exception on one unpaid line re-prices it (its basis records it), and back when it is revoked; on a line with a payment it is refused  398ms
+   ✓ 08r: the exceptions registry > a price exception on one charge prices it again at once, and back when it is revoked; a charge with a payment keeps its amount  335ms
+   ✓ 08r: the exceptions registry > deadline.payment moves one line's due date, and back when it is revoked  348ms
+   ✓ 08r: the exceptions registry > the eight V3 types, as the migration moves them onto the registry (a V3-shaped row is filled the same way), and V3's request shape mapped onto its key  334ms
+   ✓ 08r: the exceptions registry > Check these: a migrated subject-scoped refund percent applies to nothing until a finance admin confirms it; then to that subject's lines, on the course fee  362ms
+ ✓ test/08t-rework-races.test.ts (14 tests) 16154ms
+   ✓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line  618ms
+   ✓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused  316ms
+   ✓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused  457ms
+   ✓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it  1023ms
+   ✓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused  597ms
+   ✓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional  487ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it  600ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged  626ms
+   ✓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused  715ms
+   ✓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once  703ms
+   ✓ 08t: the rework races — money (step C) > an exception revoked while a line relies on it: the revocation waits for the reservation, then re-dates its line; one that lands first leaves the line without it  1412ms
+   ✓ 08t: the rework races — money (step C) > a family's one-shot gate wanted by two of its children at once: one reservation gets it, the other is refused  577ms
+   ✓ 08t: the rework races — money (step C) > the last instalment's confirmation racing the line's deadline > the confirmation first (begun before the deadline): the line is captured; the sweep after the deadline finds it confirmed and settles nothing  3227ms
+   ✓ 08t: the rework races — money (step C) > the last instalment's confirmation racing the line's deadline > the sweep first (after the deadline): the line expires and its deposits are settled once; the confirmation is refused and the payment failed  3252ms
+
+ Test Files  3 passed (3)
+      Tests  51 passed (51)
+   Start at  03:55:43
+   Duration  37.71s (transform 541ms, setup 4ms, collect 393ms, tests 35.51s, environment 0ms, prepare 93ms)
