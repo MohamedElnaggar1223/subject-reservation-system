@@ -832,6 +832,39 @@ describe('08q: instalment plans', () => {
     expect(await statusOf('registration', l!)).toBe('confirmed');
     expect(await wallet(f.studentId)).toEqual({ free: 0, held: 0 });
   });
+
+  it("a plan line is listed, not re-priced, when its board fee is confirmed at a new amount and re-priced — and its last instalment captures it", async () => {
+    const px = await subject(adm, 'CQP-RP', 'Re-price (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    const f = await onboard(officer, 'cqp-reprice', 12);
+    const [l] = await unpaid(f, [px], s1);
+    const p = await plan(f, l!, [750, 750]);
+    await payAtDesk(f, [p.i[0]!]);
+    const series = await seriesOfSession(s1, 'pearson_edexcel');
+    const feeId = (await one<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_kind = 'subject' and key_id = $2`, [series, px])).id;
+    await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: series }, json: { rows: [{ feeId, amount: 600 }], reason: 'the board raised its fee' } }));
+    const r = await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].reprice.$post({ param: { seriesId: series }, json: { feeIds: [feeId], reason: 'the board raised its fee' } }));
+    expect(r.repriced.map((x) => x.id)).not.toContain(l!);
+    expect(r.listed.filter((x) => x.id === l).map((x) => x.reason)).toEqual(['is paid by its instalment plan']);
+    expect(money((await one<{ p: string }>(`select price_at_registration as p from registration where id = $1`, [l!])).p)).toBe(1500);
+    await payAtDesk(f, [p.i[1]!]);
+    expect(await statusOf('registration', l!)).toBe('confirmed');
+  });
+
+  it("a plan line moved to another series with its item keeps its price there — and its last instalment captures it", async () => {
+    const py = await subject(adm, 'CQP-MV', 'Move (AS, plans)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    const f = await onboard(officer, 'cqp-move', 12);
+    const [l] = await unpaid(f, [py], s1);
+    const p = await plan(f, l!, [750, 750]);
+    await payAtDesk(f, [p.i[0]!]);
+    const Y = academicYearStartOf();
+    const later = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month: 'january', year: Y + 1, label: `cqp-mv-${Date.now() % 100000}`, examsStart: `${Y + 1}-01-10` } }))).id;
+    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: later }, json: { rows: [{ keyKind: 'subject', keyId: py, amount: 700, provisional: false }] } }));
+    const item = await one<{ id: string; offer: string }>(`select i.id, i.offer_id as offer from session_offer_item i join session_offer o on o.id = i.offer_id where o.session_id = $1 and o.subject_id = $2`, [s1, py]);
+    await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: s1, offerId: item.offer, itemId: item.id }, json: { boardSeriesId: later, reason: 'sat in January instead' } }));
+    expect(await one(`select board_series_id as s, price_at_registration::float as p from registration where id = $1`, [l!])).toEqual({ s: later, p: 1500 });
+    await payAtDesk(f, [p.i[1]!]);
+    expect(await statusOf('registration', l!)).toBe('confirmed');
+  });
 });
 
 // ─── The desk collects lines, charges and the year's fee in one action (§3.10 item 1) ───────────

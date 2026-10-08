@@ -169,7 +169,7 @@ export async function executeDeskRegistration(staffId: string, data: DeskRegistr
     where: (s, { eq }) => eq(s.id, data.sessionId),
   });
   if (!sess) throw new Error('Session not found');
-  const w = await sessionWindow(data.studentId, sess.id, null);
+  const w = await sessionWindow(data.studentId, sess.id, null, db, new Date(), data.subjectIds);
   if (!w.open) {
     throw new Error(windowRefusal(w, 'Registration window is not open — a finance admin can grant this student a deadline extension'));
   }
@@ -472,7 +472,7 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
   const lineIds = data.registrationIds;
   const regs = lineIds.length ? await db.query.registration.findMany({
     where: (r, { inArray }) => inArray(r.id, lineIds),
-    columns: { id: true, studentId: true, sessionId: true, status: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true, priceProvisional: true },
+    columns: { id: true, studentId: true, sessionId: true, subjectId: true, status: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true, priceProvisional: true },
   }) : [];
   if (regs.length !== lineIds.length || regs.some((r) => r.studentId !== data.studentId)) {
     throw new Error('One or more subjects do not belong to this student');

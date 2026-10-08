@@ -228,6 +228,13 @@ line under a live plan it answers the plan's last date first.
 22. **The family pays its charges on its own page** (Charges & Instalments): several
     instalments of one plan at once, or the charges of one deadline; a pushed school fee on the
     School fee page.
+23. **After A on main**: the four `pricing.*` policies are `live` (priceLine reads them); the
+    window hook carries the subject (`sessionWindow` reads a line's `subjectId` or a new
+    reservation's `subjectIds`; a subject-scoped `deadline.window` opens that subject alone, a
+    session-scoped one every subject); A's `repriceLines` and `repriceMovedLines` ask the one
+    `paymentHistoryOf` / `lineIdsWithPaymentHistory` (RESERVATIONS.md §2.12); a late board entry
+    is read by A's effective deadline while its setting is on (08r proves it end to end through
+    the registry).
 
 ---
 
@@ -309,6 +316,13 @@ Step C's own rules:
   charges; the fee alone; the fee kept when the rest is refused); a session's charges; a
   provisional service fee not paid, then confirmed at another amount and paid; with
   `pricing.payOnProvisionalFee` on, paid; the refund rule finance's (the coordinator refused).
+- After A on main: 08q — a plan line listed (not re-priced) by the board fee's re-price and kept
+  by its item's series move, and captured after; 08r — a student's and a family's pricing
+  policy in the line's price and basis; a migrated subject-scoped window extension, confirmed,
+  opens the closed session for that subject alone (reserved and paid; another subject refused);
+  a late board entry with the setting on (reserved and paid after the entry deadline, kept by
+  the sweep), off (refused, no longer read). Controls: the payment history without a live plan
+  (both plan re-price cases red), the plan line's price refusal undone (red).
 - `08r-exceptions-registry.test.ts` (11, with the same exception twice): the policies per caller; grant checks; a family's
   exception for every child and no one else; a one-shot gate used once; a line's price
   exception and its revocation; a charge's; `deadline.payment` re-dated and back; the eight V3
@@ -388,22 +402,23 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
 - **Charges on the Statement** (B's page): B renders `listChargesFor(studentId)` beside the
   lines, and each line's `exceptions` (the Student 360 returns them per line;
   `exceptionsOfLines` in `line-exceptions-read.services.ts` for B's own endpoint).
-- **After A is on main** (the lead's items 4, 5, 13, 14): the window hook carrying the subject
-  (a subject-scoped `deadline.window`), the late board entry end to end, RESERVATIONS.md §2.1 and
-  §2.10 notes, and A's re-price and move using `lineIdsWithPaymentHistory`.
+- **At my final merge, after B**: `charge_effective_deadline` passes B's
+  `registration.declaration_rejected` (A's §2.6 names the place); the migrations renumbered once
+  more after B's 0045 and proved on a database migrated at main first.
 - `exception.value`'s drop; reminders per instalment (step D, §3.8).
 
 ---
 
 ## 11. For the lead
 
-1. **`priceLine` reading the four `pricing.*` exceptions** is A's follow-up (the lead's message);
-   their status flips to `live` in `POLICIES` when it lands and 08r's 409 case changes.
+1. **The four `pricing.*` policies are live** (A's priceLine reads them since b438976); 08r's
+   former 409 case is now a student's and a family's grant in the line's price and basis.
 2. **Service fees are in `board_service_fee`**, not a service kind of `board_fee` (§2.10
    says the latter; `board_fee` is A's). If the lead prefers A's table, A adds the kind and the
    level and this table's rows move with a migration.
-3. **`deadline.boardEntry`**: A's follow-up makes the effective deadline honour it while the
-   setting is on; I add the end-to-end test after A is on main.
+3. **`deadline.boardEntry`**: A's effective deadline honours it while the setting is on; 08r's
+   end-to-end case through the real registry proves both settings. The Settings screen now has
+   an Exceptions group (the late entries) beside Payment (the overdue days).
 4. **Charges on the session's Money tab**: built as a component of mine
    (`[id]/session-charges.client.tsx`) rendered by one line in A's `money-tab.client.tsx`, reading
    `GET /v1/charges?sessionId=` — A's money service is untouched.
@@ -460,3 +475,9 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
   charges, remarks by board service; 08q's desk cases.
 - 02:45–03:08 — the review's NOW items (1, 2, 3, 6, 8, 9, 10, 12); the family's Charges &
   Instalments page; the workbench and print read charges; the suite green (420); the drives.
+- 03:12–03:40 — main (A's step 1, b438976) merged in (c6ab55f; conflicts resolved by hand;
+  migrations renumbered 0045–0047, `when`s after main's last); the suite green on the merge
+  (437); after main: A's re-price and move ask the one payment history; the window by subject;
+  the pricing policies live; the late entry end to end; the Settings screen's Exceptions group;
+  the dev copy recreated from the template, migrated at origin/main first and then at the
+  branch (`__drizzle_migrations` rows 46–48 are step C's three), re-seeded for the lead's drive.

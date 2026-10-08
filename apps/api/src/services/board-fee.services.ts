@@ -13,10 +13,11 @@
  */
 
 import {
-  db, boardSeries, boardFee, examBoard, examUnit, qualification, qualificationOption, subject, registration, paymentRegistration,
+  db, boardSeries, boardFee, examBoard, examUnit, qualification, qualificationOption, subject, registration,
   sessionOfferItem, sessionOfferItemFeeKey, sessionOffer, registrationSession,
   and, eq, inArray, sql, asc,
 } from '@repo/db';
+import { paymentHistoryOf, PAYMENT_HISTORY_REASON } from './line-history.services';
 import { randomUUID } from 'crypto';
 import type { PutBoardFeesType, ConfirmBoardFeesType, RepriceBoardFeesType, PricingBasis } from '@repo/validations';
 import { logAction, logActions, type AuditContext } from './audit.services';
@@ -287,10 +288,9 @@ export async function repriceLines(seriesId: string, data: RepriceBoardFeesType,
     if (prov) throw new BoardFeeError('Confirm a fee before re-pricing the lines read from it');
     // The lines first, locked; their payment history after (a checkout committing meanwhile is seen).
     const lines = await lockLinesOfFees(tx, seriesId, ids);
-    const histories = lines.length
-      ? await tx.select({ registrationId: paymentRegistration.registrationId }).from(paymentRegistration).where(inArray(paymentRegistration.registrationId, lines.map((l) => l.id)))
-      : [];
-    const withHistory = new Set(histories.map((h) => h.registrationId));
+    // A payment of the line, a live instalment plan on it, or a charge against it paid or being
+    // paid (line-history.services.ts; the review of step C, item 14): its price stays.
+    const withHistory = await paymentHistoryOf(tx, lines.map((l) => l.id));
     const repriced: { id: string; studentId: string; subjectId: string; from: number; to: number }[] = [];
     const listed: { id: string; studentId: string; status: string; price: number; reason: string }[] = [];
     const now = new Date();
@@ -301,7 +301,7 @@ export async function repriceLines(seriesId: string, data: RepriceBoardFeesType,
       const waiting = (WAITING as readonly string[]).includes(l.status);
       if (!basis || withHistory.has(l.id) || !waiting) {
         listed.push({ id: l.id, studentId: l.studentId, status: l.status, price: l.priceAtRegistration,
-          reason: !basis ? 'converted line (no pricing basis)' : withHistory.has(l.id) ? 'has a payment (open, failed or paid)' : `is ${l.status}` });
+          reason: !basis ? 'converted line (no pricing basis)' : withHistory.has(l.id) ? PAYMENT_HISTORY_REASON[withHistory.get(l.id)!] : `is ${l.status}` });
         if (l.priceProvisional) {
           await tx.update(registration).set({ priceProvisional: false, updatedAt: now }).where(eq(registration.id, l.id));
           // Its price stands (finance adjusts it); the mark it loses is recorded per line.

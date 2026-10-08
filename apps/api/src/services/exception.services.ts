@@ -624,9 +624,11 @@ export async function hasDeadlineExtension(
   sessionId: string,
   // A caller inside a transaction passes it, so the lookup does not take a
   // second pool connection while the transaction holds its locks.
-  executor: Tx | typeof db = db
+  executor: Tx | typeof db = db,
+  // The subject asked about: a subject-scoped extension opens the window for it alone.
+  subjectId?: string | null,
 ): Promise<boolean> {
-  return windowExtended(executor, studentId, sessionId);
+  return windowExtended(executor, studentId, sessionId, new Date(), subjectId);
 }
 
 /** Hook 3 — the school-fee gate's waiver (gate.schoolFee): for that academic year, or every year. */

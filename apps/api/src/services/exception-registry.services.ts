@@ -167,8 +167,10 @@ export async function markExceptionsUsed(tx: Tx, ids: readonly string[], ctx: { 
  * deadline.window (V3 deadline_extension / late_registration; MA-13): the session stays open for
  * this student until the exception's date. A null session scope is every session (MO-12).
  */
-export async function windowExtended(executor: Executor, studentId: string, sessionId: string, now: Date = new Date()): Promise<boolean> {
-  const rows = await activeExceptions(executor, studentId, ['deadline.window'], { sessionId }, { now });
+export async function windowExtended(executor: Executor, studentId: string, sessionId: string, now: Date = new Date(), subjectId?: string | null): Promise<boolean> {
+  // With a subject (a line's, or a new reservation's), a subject-scoped extension covers that
+  // subject only; a session-scoped one covers every subject (the review of step C, item 4).
+  const rows = await activeExceptions(executor, studentId, ['deadline.window'], { sessionId, ...(subjectId ? { subjectId } : {}) }, { now });
   return rows.some((r) => !r.valueDate || r.valueDate > now);
 }
 

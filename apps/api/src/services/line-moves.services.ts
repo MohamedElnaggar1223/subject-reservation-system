@@ -2,7 +2,8 @@
  * After lines move to another series (an item's series change, the admin's move, a board change,
  * the session's series correction): what they cost is read from the new series' fee grid.
  *
- * A moved line keeps the price it was given only while it has a payment (open, failed or paid) or
+ * A moved line keeps the price it was given only while it has a payment history (a payment of any
+ * status, a live instalment plan, a paid charge: lineIdsWithPaymentHistory) or
  * is no longer waiting; every other moved line is re-priced on its board part against the fee rows
  * its item reads in the new series (the course part and the exceptions its basis recorded stay),
  * so that series' Confirm and Re-price reach it — a provisional line would otherwise never become
@@ -19,7 +20,8 @@
  * of 40c1447; docs/features/RESERVATIONS.md §2.12).
  */
 
-import { db, registration, paymentRegistration, boardFee, sessionOfferItemFeeKey, subject, sql, and, eq, inArray } from '@repo/db';
+import { db, registration, boardFee, sessionOfferItemFeeKey, subject, sql, and, eq, inArray } from '@repo/db';
+import { lineIdsWithPaymentHistory } from './line-history.services';
 import { randomUUID } from 'crypto';
 import { logAction, logActions } from './audit.services';
 import { repriceBoardPart } from './pricing.services';
@@ -102,8 +104,8 @@ export async function carryFeeRows(tx: Tx, itemId: string, fromSeriesId: string 
 export async function repriceMovedLines(tx: Tx, lineIds: string[], actorId: string | null, why: string): Promise<RepricedLine[]> {
   if (!lineIds.length) return [];
   const lines = await tx.select().from(registration).where(inArray(registration.id, lineIds)).orderBy(registration.id);
-  const history = new Set((await tx.select({ id: paymentRegistration.registrationId }).from(paymentRegistration)
-    .where(inArray(paymentRegistration.registrationId, lineIds))).map((h) => h.id));
+  // A payment of the line, a live plan on it, or a charge against it paid or being paid (step C).
+  const history = await lineIdsWithPaymentHistory(tx, lineIds);
   const out: RepricedLine[] = [];
   const now = new Date();
   for (const l of lines) {

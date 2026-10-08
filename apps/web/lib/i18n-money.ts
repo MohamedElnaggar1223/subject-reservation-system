@@ -343,6 +343,14 @@ export const moneyArabic: Record<string, string> = {
   'Grant an exception for this student': 'منح استثناء لهذا الطالب',
   'Students': 'الطلاب',
   'Add the students.': 'أضف الطلاب.',
+  // ── The two settings step C adds (the Settings screen) ──
+  'What the school allows an exception to lift.': 'ما تسمح المدرسة للاستثناء برفعه.',
+  'Allow late board entries by exception': 'السماح بالقيد المتأخر لدى المجلس باستثناء',
+  'Off: the board\'s entry deadline is a hard stop (owner decision MO-10) and the "Late board entry" exception cannot be granted. On: the admin may grant one student a late entry in one series, with the board\'s late fee charged to the family (question Q-20 to the owner).':
+    'مُعطَّل: موعد قيد المجلس حدٌّ نهائي (قرار المالك MO-10) ولا يمكن منح استثناء «قيد متأخر لدى المجلس». مُفعَّل: يمكن للمدير منح طالب واحد قيدًا متأخرًا في دورة واحدة، مع تحميل الأسرة رسوم التأخير لدى المجلس (سؤال Q-20 للمالك).',
+  'Expire an unpaid line this many days after it was due': 'إنهاء السطر غير المدفوع بعد هذا العدد من الأيام من موعد استحقاقه',
+  'A line still unpaid this many days after its due date expires (reason "overdue"), and an instalment plan on it is settled as a drop that day. 0: never — a due date then drives reminders and the "overdue" list only, and the line waits for its board\'s deadline or the session\'s close.':
+    'ينتهي السطر الذي لم يُدفع بعد هذا العدد من الأيام من موعد استحقاقه (السبب «متأخر»)، وتُسوّى خطة الأقساط عليه كسحب في ذلك اليوم. 0: أبدًا — يقود موعد الاستحقاق حينها التذكيرات وقائمة «المتأخر» فقط، وينتظر السطر موعد مجلسه أو إغلاق الجلسة.',
   // ── The API's refusals on these screens ──
   'Percentage must be 0–100': 'النسبة بين 0 و100',
   'A family is a parent account': 'الأسرة حساب ولي أمر',

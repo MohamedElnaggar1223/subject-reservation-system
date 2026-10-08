@@ -29,6 +29,8 @@ const GROUPS: { id: string; title: string; hint: string }[] = [
   { id: 'pricing', title: 'Prices', hint: 'How a line’s price is made from the course fee and the board’s fee.' },
   { id: 'payment', title: 'Payment', hint: 'When a line’s money is due.' },
   { id: 'refund', title: 'Refunds', hint: 'What a new session’s refund policy is.' },
+  // Step C (RESERVATIONS_REWORK.md §3.7): what an exception may lift beyond the registry's own rules.
+  { id: 'exceptions', title: 'Exceptions', hint: 'What the school allows an exception to lift.' },
 ];
 
 /** The value as a person reads it. */

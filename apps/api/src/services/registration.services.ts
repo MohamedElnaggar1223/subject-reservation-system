@@ -64,8 +64,12 @@ import type { SubjectRegistrationOptionsType, LineInputType } from '@repo/valida
  * for a line, its own effective deadline decides; for a new reservation (`null`), each new
  * line's deadline is checked when it is made.
  */
-async function assertWindowOpen(studentId: string, sessionId: string, line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null } | null) {
-  const w = await sessionWindow(studentId, sessionId, line);
+async function assertWindowOpen(
+  studentId: string, sessionId: string,
+  line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null; subjectId?: string | null } | null,
+  subjectIds?: readonly string[],
+) {
+  const w = await sessionWindow(studentId, sessionId, line, db, new Date(), subjectIds);
   if (w.open) return;
   throw new Error(windowRefusal(w));
 }
@@ -294,7 +298,7 @@ export async function createRegistrationRequest(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past a line's own deadline (MO-10)
-  await assertWindowOpen(studentId, sess.id, null);
+  await assertWindowOpen(studentId, sess.id, null, data.subjectIds);
   await assertSubjectsNew(studentId, data.sessionId, data.subjectIds);
   const lines = await prepareLegacyLines(studentId, data.sessionId, data.subjectIds, data.subjectOptions, eligibility);
 
@@ -371,7 +375,7 @@ export async function createDirectRegistration(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past a line's own deadline (MO-10)
-  await assertWindowOpen(data.studentId, sess.id, null);
+  await assertWindowOpen(data.studentId, sess.id, null, data.subjectIds);
   await assertSubjectsNew(data.studentId, data.sessionId, data.subjectIds);
   const lines = await prepareLegacyLines(data.studentId, data.sessionId, data.subjectIds, data.subjectOptions, eligibility);
 
@@ -731,7 +735,7 @@ export async function adminOverrideApproval(
   if (!sess) throw new Error('Session not found');
   // Hook 2 (§6.3): a deadline-extension exception treats a closed window
   // as open for this student — never past a line's own deadline (MO-10)
-  await assertWindowOpen(data.studentId, sess.id, null);
+  await assertWindowOpen(data.studentId, sess.id, null, data.subjectIds);
   await assertSubjectsNew(data.studentId, data.sessionId, data.subjectIds);
   // CORE-003: the override bypasses parent approval (REG-007), not the grade-10 core rule:
   // assertLineRules counts the student's live lines with these (gate.grade10Core). The

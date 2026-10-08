@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse } from '@repo/validations';
-import { admin, staff, onboard, subject, session, refused, one, sql, money, openWindow, audited, type Client } from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, money, openWindow, audited, runPaymentDeadlines, type Client } from './helpers';
 
 /**
  * 08r — the exceptions registry (RESERVATIONS_REWORK.md §3.7, §4.7; docs/features/RESERVATIONS_MONEY.md §3).
@@ -55,7 +55,8 @@ describe('08r: the exceptions registry', () => {
     expect(byKey['price.discountPercent']).toMatchObject({ group: 'price', valueType: 'percent', min: 0, max: 100, grantable: true, oneShot: false, nullScope: 'every line reserved from now on' });
     expect(byKey['gate.selfStudyFirstEntry']).toMatchObject({ oneShot: true, grantable: true });
     expect(byKey['eligibility.grade10OtherSeries']).toMatchObject({ grantable: false, whyNot: 'not_your_role' });
-    expect(byKey['pricing.selfStudyCoursePercent']).toMatchObject({ grantable: false, whyNot: 'not_applied_yet' });
+    // priceLine reads the four pricing policies since A's step is on main: live, granted by finance.
+    expect(byKey['pricing.selfStudyCoursePercent']).toMatchObject({ grantable: true, whyNot: null, status: 'live' });
     expect(byKey['refund.courseStart']).toMatchObject({ nullScope: null, scopes: ['offer', 'line'] });
     const forAdmin = Object.fromEntries((await apiResponse(adm.api.v1.policies.$get())).policies.map((p) => [p.key, p]));
     expect(forAdmin['deadline.boardEntry']).toMatchObject({ grantable: false, whyNot: 'off_by_setting' });
@@ -64,7 +65,7 @@ describe('08r: the exceptions registry', () => {
     expect(forCoordinator['price.custom']!.grantable).toBe(false);
   });
 
-  it('a grant is checked against the registry: its grantors, its value, the scopes it accepts, a scope where one is required; a pending policy refused; late entries only while their setting is on', async () => {
+  it('a grant is checked against the registry: its grantors, its value, the scopes it accepts, a scope where one is required; late entries only while their setting is on', async () => {
     const f = await onboard(officer, 'xr-checks', 12);
     const grant = (who: Client, json: Parameters<typeof finadmin.api.v1.exceptions.$post>[0]['json']) => refused(who.api.v1.exceptions.$post({ json }));
     expect((await grant(coordinator, { policyKey: 'price.discountPercent', studentId: f.studentId, value: 10, reason: 'not the coordinator\'s' })).status).toBe(403);
@@ -72,7 +73,6 @@ describe('08r: the exceptions registry', () => {
     expect((await grant(finadmin, { policyKey: 'gate.schoolFee', studentId: f.studentId, value: 5, reason: 'no value here' })).error).toContain('takes no value');
     expect((await grant(finadmin, { policyKey: 'deadline.window', studentId: f.studentId, scope: { subjectId: subj.S1! }, value: day(10), reason: 'a subject cannot narrow it' })).error).toContain('cannot be narrowed by subject');
     expect((await grant(finadmin, { policyKey: 'refund.courseStart', studentId: f.studentId, value: day(-3), reason: 'no scope' })).error).toContain('choose what it is for');
-    expect((await grant(finadmin, { policyKey: 'pricing.selfStudyCoursePercent', studentId: f.studentId, value: 30, reason: 'pending' })).status).toBe(409);
     expect((await grant(finadmin, { policyKey: 'plan.instalments', familyId: f.parent.id, value: [{ dueAt: inDays(3), amount: 100 }], scope: {}, reason: 'family plan' })).status).toBe(400);
     const series = (await one<{ s: string }>(`select distinct i.board_series_id as s from session_offer_item i where i.session_id = $1`, [june])).s;
     const late = { policyKey: 'deadline.boardEntry' as const, studentId: f.studentId, scope: { boardSeriesId: series }, value: day(5), reason: 'late entry (Q-20)' };
@@ -267,5 +267,84 @@ describe('08r: the exceptions registry', () => {
     await apiResponse(finadmin.api.v1.exceptions[':id'].confirm.$post({ param: { id: ex.id }, json: { note: 'keep it on the old row' } }));
     expect((await apiResponse(finadmin.api.v1.exceptions['check-these'].$get())).some((e) => e.id === ex.id)).toBe(false);
     await sql(`delete from session_offer_item_unit where item_id = $1 and unit_id = $2`, [item, unit]);
+  });
+
+  // ─── With A's step on main: the pricing policies, the window by subject, the late entry ─────
+
+  it("the pricing policies through the registry: a student's self-study course share, a family's board share — each in the line's price and its basis", async () => {
+    const ss = await subject(adm, 'XR-SS', 'Self-study only (AS, registry)', { course: 1000, registration: 500 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel', isOfferedAtSchool: false });
+    const reserve = async (studentId: string) =>
+      (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: june, subjectIds: [ss] } }))).registrations[0]!.id;
+    const lineOf = (id: string) => one<{ p: number; course: number; board: number; ids: string[]; cp: number; bp: number }>(
+      `select price_at_registration::float as p, course_fee_at_registration::float as course, registration_fee_at_registration::float as board,
+              pricing_basis->'exceptionIds' as ids, (pricing_basis->>'coursePercent')::float as cp, (pricing_basis->>'boardPercent')::float as bp
+       from registration where id = $1`, [id]);
+    // The settings' shares: 50% of the course fee, the board fee in full (A-16).
+    const plain = await onboard(officer, 'xr-ss-plain', 12);
+    expect(await lineOf(await reserve(plain.studentId))).toMatchObject({ p: 1000, course: 500, board: 500, cp: 50, bp: 100, ids: [] });
+    // One student: 30% of the course fee.
+    const f = await onboard(officer, 'xr-ss-student', 12);
+    const mine = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'pricing.selfStudyCoursePercent', studentId: f.studentId, scope: { sessionId: june }, value: 30, reason: 'studies abroad, taught by the school online' } }));
+    expect(await lineOf(await reserve(f.studentId))).toMatchObject({ p: 800, course: 300, board: 500, cp: 30, bp: 100, ids: [mine.id] });
+    // A family: 60% of the board fee, for each child.
+    const g = await onboard(officer, 'xr-ss-family', 12);
+    const sib = await apiResponse(officer.api.v1.links['desk-onboard'].$post({
+      json: { parent: { email: g.parent.email }, student: { email: 'student.xr-ss-family-sib@test.local', name: 'Student xr-ss-family-sib', password: 'TestPass1', grade: 12 } },
+    }));
+    const fam = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'pricing.selfStudyBoardPercent', familyId: g.parent.id, value: 60, reason: 'two children sitting abroad' } }));
+    for (const s of [g.studentId, sib.student.id]) {
+      expect(await lineOf(await reserve(s))).toMatchObject({ p: 800, course: 500, board: 300, cp: 50, bp: 60, ids: [fam.id] });
+    }
+  });
+
+  it('a migrated subject-scoped window extension, once confirmed, opens the closed session for that subject alone', async () => {
+    const s = await session(adm, 'June (AS, registry window)', 'june', 'as_level', { ...openWindow(), activate: true });
+    const w = await onboard(officer, 'xr-window', 12);
+    const ext = (await one<{ id: string }>(
+      `insert into exception (id, type, student_id, subject_id, reason, valid_until, status, granted_by)
+       values (gen_random_uuid()::text, 'deadline_extension', $1, $2, 'V3: late joiner, one subject', now() + interval '20 days', 'active', $3) returning id`,
+      [w.studentId, subj.S9!, finadmin.id])).id;
+    await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'the window ended' } }));
+    const reserve = (subjectId: string) => officer.api.v1.registrations.desk.$post({ json: { studentId: w.studentId, sessionId: s, subjectIds: [subjectId] } });
+    // Under "Check these", it applies to nothing.
+    expect((await refused(reserve(subj.S9!))).status).toBeGreaterThanOrEqual(400);
+    await apiResponse(finadmin.api.v1.exceptions[':id'].confirm.$post({ param: { id: ext }, json: { note: 'confirmed with the family' } }));
+    // Confirmed: that subject, after the close; another subject still refused.
+    const line = (await apiResponse(reserve(subj.S9!))).registrations[0]!.id;
+    expect(await one(`select status, session_id as s from registration where id = $1`, [line])).toEqual({ status: 'pending_payment', s });
+    expect((await refused(reserve(subj.S10!))).status).toBeGreaterThanOrEqual(400);
+    // And paid at the desk, still under it.
+    const paid = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: w.studentId, registrationIds: [line], instrumentUsed: 'cash' } }));
+    expect(paid.collected).toBe(1500);
+  });
+
+  it('a late board entry (Q-20) end to end through the registry: with the setting on, reserved, kept by the sweep and paid after the entry deadline; off, refused and no longer read', async () => {
+    const s = await session(adm, 'June (AS, registry late entry)', 'june', 'as_level', { ...openWindow(), activate: true });
+    const series = (await one<{ s: string }>(`select distinct i.board_series_id as s from session_offer_item i where i.session_id = $1`, [s])).s;
+    const h = await onboard(officer, 'xr-late', 12);
+    const k = await onboard(officer, 'xr-late-other', 12);
+    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [series]);
+    const reserve = (studentId: string, subjectId: string, collect = false) => officer.api.v1.registrations.desk.$post({
+      json: { studentId, sessionId: s, subjectIds: [subjectId], ...(collect ? { collectNow: { instrumentUsed: 'cash' as const, escrowAmountToApply: 0 } } : {}) },
+    });
+    const setting = (value: boolean) => apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'exceptions.boardEntryDeadline' }, json: { value, reason: value ? 'a late entry this series' : 'back to the hard stop' } }));
+    await setting(true);
+    try {
+      await apiResponse(adm.api.v1.exceptions.$post({ json: { policyKey: 'deadline.boardEntry', studentId: h.studentId, scope: { boardSeriesId: series }, value: day(5), reason: 'the board accepted a late entry' } }));
+      // Reserved and paid after the series' deadline; another student is still refused.
+      const paid = await apiResponse(reserve(h.studentId, subj.S11!, true));
+      expect(await one(`select status from registration where id = $1`, [paid.registrations[0]!.id])).toEqual({ status: 'confirmed' });
+      expect((await refused(reserve(k.studentId, subj.S11!))).status).toBeGreaterThanOrEqual(400);
+      // An unpaid late line is kept by the deadline sweep until the late date.
+      const waiting = (await apiResponse(reserve(h.studentId, subj.S12!))).registrations[0]!.id;
+      await runPaymentDeadlines();
+      expect(await one(`select status from registration where id = $1`, [waiting])).toEqual({ status: 'pending_payment' });
+      await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: h.studentId, registrationIds: [waiting], instrumentUsed: 'cash' } }));
+    } finally {
+      await setting(false);
+    }
+    // Off: no new grant, and the one granted is no longer read.
+    expect((await refused(adm.api.v1.exceptions.$post({ json: { policyKey: 'deadline.boardEntry', studentId: k.studentId, scope: { boardSeriesId: series }, value: day(5), reason: 'late' } }))).status).toBe(409);
+    expect((await refused(reserve(h.studentId, subj.S10!))).status).toBeGreaterThanOrEqual(400);
   });
 });

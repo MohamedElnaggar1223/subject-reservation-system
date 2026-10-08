@@ -79,9 +79,9 @@ const ACADEMIC = [ROLES.ADMIN, ROLES.COORDINATOR] as const;
 const percentPolicy = (label: string, sentence: string): PolicyDefinition => ({
   group: 'price', label, sentence, valueType: 'percent', min: 0, max: 100,
   scopes: ['session', 'subject', 'offer', 'item', 'line'], nullScope: 'every session',
-  // priceLine (step A) reads these percents from the settings only; until it asks the registry,
-  // an exception of them would change nothing, so a grant is refused.
-  oneShot: false, grantRoles: FINANCE, hook: 'priceLine (not yet read: For the lead)', status: 'pending',
+  // priceLine (step A, on main since b438976) reads them through the adapter in place of the
+  // settings' percents and records the ones it applied in the line's pricing basis.
+  oneShot: false, grantRoles: FINANCE, hook: 'priceLine', status: 'live',
 });
 
 export const POLICIES = {

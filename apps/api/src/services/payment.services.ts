@@ -531,6 +531,7 @@ export async function confirmPayment(
             id: registration.id,
             status: registration.status,
             sessionId: registration.sessionId,
+            subjectId: registration.subjectId,
             boardSeriesId: registration.boardSeriesId,
             attempt: registration.attempt,
             priorSittingSeriesId: registration.priorSittingSeriesId,
@@ -794,7 +795,7 @@ async function failOpenPayment(
     const expired: { id: string; studentId: string; subjectId: string; sessionId: string }[] = [];
     if (opts.expireIfClosed) {
       const regs = await tx
-        .select({ id: registration.id, sessionId: registration.sessionId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId })
+        .select({ id: registration.id, sessionId: registration.sessionId, subjectId: registration.subjectId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId })
         .from(paymentRegistration)
         .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
         .where(and(eq(paymentRegistration.paymentId, paymentId), eq(registration.status, 'pending_payment')));
@@ -2451,7 +2452,7 @@ async function expireDeadPlanLineInTx(tx: Tx, paymentId: string, studentId: stri
   const [inst] = await tx.select({ registrationId: charge.registrationId }).from(paymentCharge).innerJoin(charge, eq(charge.id, paymentCharge.chargeId))
     .where(and(eq(paymentCharge.paymentId, paymentId), eq(charge.kind, 'instalment'))).limit(1);
   if (!inst?.registrationId) return [];
-  const [line] = await tx.select({ id: registration.id, status: registration.status, sessionId: registration.sessionId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId })
+  const [line] = await tx.select({ id: registration.id, status: registration.status, sessionId: registration.sessionId, subjectId: registration.subjectId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId })
     .from(registration).where(eq(registration.id, inst.registrationId)).for('update');
   if (!line || line.status !== 'pending_payment') return [];
   if (await sessionOpenFor(studentId, line.sessionId, line, tx) && (await mayRegisterFor(studentId, line.sessionId, tx)).allowed) return [];
