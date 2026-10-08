@@ -117,6 +117,11 @@ D after B and C. **Step 1 merged (8 Oct 2026, 03:08Z):** A's branch landed on ma
 after its Opus 5.5 review ("ready to merge") and the follow-ups it asked for; A keeps its branch
 for post-merge items (the open fee-row race). B and C were each reviewed "merge after fixes 1, 2"
 (8 Oct 02:20Z and 02:35Z), are fixing, and merge in that order after main has A; D after them.
+**Step 1's follow-ups and step 2's B merged (8 Oct 2026, 04:39Z and 05:26Z):** A's fee-row race
+closed by a per-series lock, its evidence trimmed under the new 300 KB rule (CLAUDE.md, CI gate 0),
+landed at ee7eb11; B's branch, reviewed "confirmed: merge" after two rounds, landed at 88c8d5a.
+C's final merge (its migrations renumbered after B's, B's expiries settling instalment plans) is
+next, then D.
 
 ## 1. The features and their full scope
 
@@ -627,7 +632,7 @@ API and web ports):
 | F7 Day-one import | `feature/import` | `import` | 3091 / 3090 |
 | F6 UI audit | `feature/ui-audit` | `ui` | 3071 / 3070 |
 | Rework A — sessions, offers, fees (RESERVATIONS_REWORK.md §9 step 1); merged to main 8 Oct 2026 (b438976) | `feature/rework-sessions` | `rwa` | 3121 / 3120 |
-| Rework B — reservations (step 2) | `feature/rework-reservations` | `rwb` | 3111 / 3110 |
+| Rework B — reservations (step 2); merged to main 8 Oct 2026 (88c8d5a) | `feature/rework-reservations` | `rwb` | 3111 / 3110 |
 | Rework C — money changes, charges, exceptions (step 2) | `feature/rework-money` | `rwc` | 3141 / 3140 (A's servers took 3121/3120 because 3101/3100 were held by an older worktree's dev servers) |
 | Rework D — messages and reminders (step 3) | `feature/rework-messages` | `rwd` | 3131 / 3130 |
 
