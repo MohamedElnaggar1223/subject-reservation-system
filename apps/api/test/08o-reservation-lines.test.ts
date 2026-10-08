@@ -322,6 +322,9 @@ describe('08o: reservation lines (step B)', () => {
     expect(r).toMatchObject({ outcome: 'rejected', effect: 'dropped', gated: true, refundAmount: 8100, refundPercentage: 50 });
     expect(await lineOf(id)).toMatchObject({ status: 'dropped_pending_receipt', outcome: 'rejected', declaration_rejected: false });
     expect(await one(`select status, refund_amount_on_return as amount from receipt where id = $1`, [rc.id])).toEqual({ status: 'return_required', amount: '8100.00' });
+    // Its own deadline (the retake deadline) has not passed: the board fee is not sent yet, which
+    // C's refundFor reads (today's computation takes the window's percentage of the whole price).
+    expect(await one(`select new_data->>'boardSent' as sent from audit_log where action = 'PRIOR_SITTING_REJECTED' and entity_id = $1`, [id])).toEqual({ sent: 'false' });
     expect(await escrowOf(f.studentId)).toEqual(before);
     await apiResponse(officer.api.v1.receipts[':id'].return.$post({ param: { id: rc.id }, json: {} }));
     expect(await lineOf(id)).toMatchObject({ status: 'dropped' });

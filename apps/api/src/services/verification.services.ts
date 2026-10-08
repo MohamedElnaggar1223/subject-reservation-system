@@ -248,14 +248,19 @@ export async function verifyPriorSitting(
         { outcome: 'rejected', effect: 'stands', declarationRejected: true, priorSittingSeriesId: line.priorSittingSeriesId, ...why }, ctx, tx);
       return { outcome: 'rejected', effect: 'stands' };
     }
-    const refund = await refundForSystemDrop(line, now, { boardSent: true });
+    // The board fee follows the per-line "sent" rule (§3.5, §3.9): sent once the line's own
+    // effective deadline has passed (F4's mark will say so too). A declared retake of the board's
+    // previous sitting runs to the retake deadline, so between the two deadlines it is not sent.
+    const own = await effectiveDeadlineFor(tx, line);
+    const boardSent = !!own.at && own.at <= now;
+    const refund = await refundForSystemDrop(line, now, { boardSent });
     const drop = await executeReceiptGatedDrop(tx, {
       registrationId, studentId: line.studentId, refundAmount: refund.amount, refundReason: 'drop', initiatedBy: actor.id,
     });
     await tx.update(registration).set(decided).where(eq(registration.id, registrationId));
     await logAction(actor.id, 'PRIOR_SITTING_REJECTED', 'registration', registrationId, { status: 'confirmed' },
       { outcome: 'rejected', effect: 'dropped', status: drop.gated ? 'dropped_pending_receipt' : 'dropped', refundAmount: drop.refundAmount,
-        refundPercentage: refund.percentage, gated: drop.gated, firstEntryDeadline: first.at!.toISOString(), priorSittingSeriesId: line.priorSittingSeriesId, ...why }, ctx, tx);
+        refundPercentage: refund.percentage, boardSent, gated: drop.gated, firstEntryDeadline: first.at!.toISOString(), priorSittingSeriesId: line.priorSittingSeriesId, ...why }, ctx, tx);
     return { outcome: 'rejected', effect: 'dropped', refundAmount: drop.refundAmount, refundPercentage: refund.percentage, gated: drop.gated };
   });
 
