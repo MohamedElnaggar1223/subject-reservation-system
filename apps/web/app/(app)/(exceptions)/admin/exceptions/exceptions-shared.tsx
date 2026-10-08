@@ -28,6 +28,7 @@ export type CheckRow = Awaited<ReturnType<typeof fetchCheckThese>>[number];
 
 export const fetchStudents = (search: string) => apiResponse(api.v1.students.$get({ query: search ? { search } : {} }));
 export const fetchSummary = (id: string) => apiResponse(api.v1.users[':id'].summary.$get({ param: { id } }));
+export const fetchStudent = (id: string) => apiResponse(api.v1.students[':id'].$get({ param: { id } }));
 export const fetchCharges = (studentId: string) => apiResponse(api.v1.charges.$get({ query: { studentId } }));
 export const fetchOffersFor = (studentId: string, sessionId: string) =>
   apiResponse(api.v1.registrations.offers.$get({ query: { studentId, sessionId } }));

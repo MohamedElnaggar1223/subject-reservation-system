@@ -11,7 +11,7 @@
  * reads it, and the sentence says what it will do before it is granted.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import { apiResponse, policySentence, type PolicyScope, type RegistryPolicyKey } from '@repo/validations';
@@ -19,7 +19,7 @@ import { Button } from '~/components/ui/button';
 import { Notice } from '~/components/ui/tone';
 import { Field, INPUT_CLASS, Money, fetchSessions, SESSIONS_KEY } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
 import {
-  fetchStudents, fetchSummary, fetchCharges, fetchOffersFor, fetchSubjects, fetchSeries,
+  fetchStudents, fetchStudent, fetchSummary, fetchCharges, fetchOffersFor, fetchSubjects, fetchSeries,
   EXCEPTIONS_KEY, WHY_NOT, type PoliciesData, type PolicyRow,
 } from './exceptions-shared';
 
@@ -33,18 +33,21 @@ type Row = { dueAt: string; amount: string };
 const grantException = (json: Parameters<typeof api.v1.exceptions.$post>[0]['json']) => apiResponse(api.v1.exceptions.$post({ json }));
 type Granted = Awaited<ReturnType<typeof grantException>>;
 
-export function GrantForm({ data, viewerRole }: { data: PoliciesData; viewerRole: string | null }): React.JSX.Element {
+export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesData; viewerRole: string | null; prefill?: { studentId?: string; registrationId?: string; policyKey?: string } }): React.JSX.Element {
   const queryClient = useQueryClient();
   // The finance desk and the admin read the Student 360 (the family, the lines); a coordinator
   // grants the academic gates, which are never narrowed to a line or a charge.
   const readsFamilies = viewerRole === 'admin' || viewerRole === 'finance_admin' || viewerRole === 'finance_officer';
-  const firstGrantable = data.policies.find((p) => p.grantable)?.key ?? '';
+  // Opened from a line: the first policy this role may grant on one line; else the first grantable.
+  const firstGrantable = (prefill.policyKey && data.policies.find((p) => p.key === prefill.policyKey && p.grantable)?.key)
+    ?? (prefill.registrationId && data.policies.find((p) => p.grantable && p.scopes.includes('line'))?.key)
+    ?? data.policies.find((p) => p.grantable)?.key ?? '';
   const [search, setSearch] = useState('');
-  const [studentId, setStudentId] = useState('');
+  const [studentId, setStudentId] = useState(prefill.studentId ?? '');
   const [holder, setHolder] = useState<'student' | 'family'>('student');
   const [familyId, setFamilyId] = useState('');
   const [policyKey, setPolicyKey] = useState<string>(firstGrantable);
-  const [scope, setScope] = useState<Partial<Record<ScopeField, string>>>({});
+  const [scope, setScope] = useState<Partial<Record<ScopeField, string>>>(prefill.registrationId ? { registrationId: prefill.registrationId } : {});
   const [browseSession, setBrowseSession] = useState('');
   const [value, setValue] = useState('');
   const [rows, setRows] = useState<Row[]>([{ dueAt: '', amount: '' }, { dueAt: '', amount: '' }]);
@@ -58,6 +61,9 @@ export function GrantForm({ data, viewerRole }: { data: PoliciesData; viewerRole
   const needsOffers = accepts.has('offer') || accepts.has('item');
 
   const students = useQuery({ queryKey: ['students', 'pick', search], queryFn: () => fetchStudents(search) });
+  // A student chosen before the form opened: find them in the picker by name.
+  const preset = useQuery({ queryKey: ['students', prefill.studentId], queryFn: () => fetchStudent(prefill.studentId!), enabled: !!prefill.studentId });
+  useEffect(() => { if (preset.data) setSearch(preset.data.student.name); }, [preset.data]);
   const summary = useQuery({ queryKey: ['users', studentId, 'summary'], queryFn: () => fetchSummary(studentId), enabled: !!studentId && readsFamilies });
   const sessions = useQuery({ queryKey: SESSIONS_KEY, queryFn: fetchSessions, enabled: accepts.has('session') || needsOffers });
   const subjects = useQuery({ queryKey: ['subjects', 'pick'], queryFn: fetchSubjects, enabled: accepts.has('subject') });
@@ -88,7 +94,8 @@ export function GrantForm({ data, viewerRole }: { data: PoliciesData; viewerRole
   });
   const pickPolicy = (key: string) => {
     setPolicyKey(key);
-    setScope({});
+    const accepts = data.policies.find((p) => p.key === key)?.scopes ?? [];
+    setScope(prefill.registrationId && accepts.includes('line') ? { registrationId: prefill.registrationId } : {});
     setValue('');
     setGranted(null);
     setFormError('');

@@ -7,7 +7,8 @@
  * its fee per level (IGCSE / AS–A Level), provisional until finance confirms it from the board's
  * list. A remark, a cash-in or a split is charged at the series' fee and refused past its date.
  *
- * The coordinator and the admin keep the catalogue and the dates; finance keeps the fees. The
+ * The coordinator and the admin keep the catalogue and the dates; the finance admin (and the admin)
+ * keeps the fees and the refund rule — both money. The
  * session's Fees tab keeps the subjects' board fees; these are the services' (one grid per
  * series here — RESERVATIONS_MONEY.md §8).
  */
@@ -38,6 +39,7 @@ export default function ServicesClient({ viewerRole }: { viewerRole: string | nu
   const [board, setBoard] = useState('');
   const current = board || boards[0]?.[0] || '';
   const [editing, setEditing] = useState<ServiceRow | null>(null);
+  const [ruleOf, setRuleOf] = useState<ServiceRow | null>(null);
   const [seriesId, setSeriesId] = useState('');
   const boardSeries = (series.data ?? []).filter((s) => s.boardCode === current);
   useEffect(() => { setSeriesId(''); }, [current]);
@@ -81,7 +83,12 @@ export default function ServicesClient({ viewerRole }: { viewerRole: string | nu
                   {s.refundRule === 'less_fixed' && s.refundDeduction != null && <> (<Money amount={s.refundDeduction} />)</>}
                 </td>
                 <td className="px-4 py-2 text-xs">{s.requestableByFamily ? 'the family or the desk' : 'the desk'}</td>
-                <td className="px-4 py-2 text-end">{keepsCatalogue && <Button size="sm" variant="ghost" onClick={() => setEditing(s)}>Edit</Button>}</td>
+                <td className="px-4 py-2 text-end">
+                  <div className="flex justify-end gap-1">
+                    {keepsFees && <Button size="sm" variant="ghost" onClick={() => setRuleOf(s)}>Refund rule</Button>}
+                    {keepsCatalogue && <Button size="sm" variant="ghost" onClick={() => setEditing(s)}>Edit</Button>}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -104,6 +111,7 @@ export default function ServicesClient({ viewerRole }: { viewerRole: string | nu
       </section>
 
       {editing && <EditService service={editing} onClose={() => setEditing(null)} />}
+      {ruleOf && <RefundRuleModal service={ruleOf} onClose={() => setRuleOf(null)} />}
     </Page>
   );
 }
@@ -242,16 +250,13 @@ function SeriesGrid({ seriesId, keepsDates, keepsFees, name }: {
 function EditService({ service, onClose }: { service: ServiceRow; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [label, setLabel] = useState(service.label);
-  const [rule, setRule] = useState<RefundRule>(service.refundRule as RefundRule);
-  const [deduction, setDeduction] = useState(service.refundDeduction != null ? String(service.refundDeduction) : '');
   const [requestable, setRequestable] = useState(service.requestableByFamily);
   const [active, setActive] = useState(service.isActive);
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const save = useMutation({
     mutationFn: () => apiResponse(api.v1['board-services'][':id'].$put({ param: { id: service.id }, json: {
-      label: label.trim(), refundRule: rule, refundDeduction: rule === 'less_fixed' ? Number(deduction) : null,
-      requestableByFamily: requestable, isActive: active, reason: reason.trim(),
+      label: label.trim(), requestableByFamily: requestable, isActive: active, reason: reason.trim(),
     } })),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: SERVICES_KEY }); onClose(); },
     onError: (err: Error) => setError(err.message),
@@ -260,6 +265,37 @@ function EditService({ service, onClose }: { service: ServiceRow; onClose: () =>
     <Modal title="Edit the service" onClose={onClose}>
       <div className="space-y-4">
         <Field label="Name" htmlFor="svc-label"><input id="svc-label" value={label} onChange={(e) => setLabel(e.target.value)} className={INPUT_CLASS} /></Field>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={requestable} onChange={(e) => setRequestable(e.target.checked)} /><span>A family may ask for it in the app</span></label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /><span>Offered</span></label>
+        <Field label="Reason" htmlFor="svc-edit-reason"><input id="svc-edit-reason" value={reason} onChange={(e) => setReason(e.target.value)} className={INPUT_CLASS} /></Field>
+        {error && <Notice tone="danger">{error}</Notice>}
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button disabled={save.isPending || reason.trim().length < 3} onClick={() => save.mutate()}>Save</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** The refund rule on a changed grade: a money rule, the finance admin's and the admin's (Q-21: full unless the school sets another). */
+function RefundRuleModal({ service, onClose }: { service: ServiceRow; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [rule, setRule] = useState<RefundRule>(service.refundRule as RefundRule);
+  const [deduction, setDeduction] = useState(service.refundDeduction != null ? String(service.refundDeduction) : '');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const save = useMutation({
+    mutationFn: () => apiResponse(api.v1['board-services'][':id']['refund-rule'].$put({ param: { id: service.id }, json: {
+      refundRule: rule, refundDeduction: rule === 'less_fixed' ? Number(deduction) : null, reason: reason.trim(),
+    } })),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: SERVICES_KEY }); onClose(); },
+    onError: (err: Error) => setError(err.message),
+  });
+  return (
+    <Modal title="The refund rule" onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground"><bdi>{service.label}</bdi></p>
         <Field label="On a changed grade" htmlFor="svc-rule">
           <select id="svc-rule" value={rule} onChange={(e) => setRule(e.target.value as RefundRule)} className={INPUT_CLASS}>
             {REFUND_RULES.map((r) => <option key={r} value={r}>{RULE_LABEL[r]}</option>)}
@@ -270,9 +306,7 @@ function EditService({ service, onClose }: { service: ServiceRow; onClose: () =>
             <input id="svc-deduction" type="number" inputMode="decimal" min="0" step="0.01" value={deduction} onChange={(e) => setDeduction(e.target.value)} className={INPUT_CLASS} />
           </Field>
         )}
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={requestable} onChange={(e) => setRequestable(e.target.checked)} /><span>A family may ask for it in the app</span></label>
-        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /><span>Offered</span></label>
-        <Field label="Reason" htmlFor="svc-edit-reason"><input id="svc-edit-reason" value={reason} onChange={(e) => setReason(e.target.value)} className={INPUT_CLASS} /></Field>
+        <Field label="Reason" htmlFor="svc-rule-reason"><input id="svc-rule-reason" value={reason} onChange={(e) => setReason(e.target.value)} className={INPUT_CLASS} /></Field>
         {error && <Notice tone="danger">{error}</Notice>}
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>Close</Button>

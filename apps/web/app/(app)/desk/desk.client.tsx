@@ -9,6 +9,7 @@
  * take back / print receipts.
  */
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
@@ -337,6 +338,11 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
               </Button>
             </div>
 
+            {isFinanceAdmin && (
+              <p className="mt-3 text-xs">
+                <Link href={`/admin/exceptions?studentId=${summary.student.id}`} className="text-primary underline">Grant an exception for this student</Link>
+              </p>
+            )}
             {summary.exceptions.length > 0 && (
               <p className="mt-3 text-xs text-violet-700 dark:text-violet-400">
                 Active exceptions:{' '}
@@ -385,6 +391,15 @@ export default function DeskClient({ userRole }: { userRole: string }): React.JS
                           {r.session.name}
                           {r.teacher && <> · {r.teacher.name}</>}
                         </div>
+                        {/* The exceptions that touched the line (§4.7), and one granted on it from here. */}
+                        {(r.exceptions.length > 0 || isFinanceAdmin) && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            {r.exceptions.map((e) => <Badge key={e.id} tone={e.status === 'active' || e.status === 'used' ? 'info' : 'neutral'}>{e.label}</Badge>)}
+                            {isFinanceAdmin && (
+                              <Link href={`/admin/exceptions?studentId=${summary.student.id}&registrationId=${r.id}`} className="text-xs text-primary underline">Exception on this line</Link>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 text-xs">
                         {REGISTRATION_STATUS_LABELS[r.status as keyof typeof REGISTRATION_STATUS_LABELS] ?? r.status}

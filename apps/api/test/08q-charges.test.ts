@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearLabel, academicYearStartOf } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, session, refused, one, sql, money, takings, takingsDelta, openWindow,
+  admin, staff, onboard, subject, session, refused, one, sql, money, takings, takingsDelta, openWindow, futureWindow,
   runPaymentDeadlines, seriesOfSession, audited, notificationsFor, type Client,
 } from './helpers';
 
@@ -245,12 +245,14 @@ describe('08q: charges', () => {
     expect(first.remark).toMatchObject({ feeCharged: 1800, boardServiceId: CAM2, serviceLevel: 'as_a_level' });
     expect(first.refunded).toBe(1800);
     // Q-21's answer is a field per service: "the fee less 100 per component" refunds 1,600 of 1,800.
-    await apiResponse(coordinator.api.v1['board-services'][':id'].$put({ param: { id: CAM2 }, json: { refundRule: 'less_fixed', refundDeduction: 100, reason: 'what Cambridge refunds the school' } }));
+    // The refund rule is a money rule: finance's (the coordinator keeps the catalogue and the dates).
+    expect((await refused(coordinator.api.v1['board-services'][':id']['refund-rule'].$put({ param: { id: CAM2 }, json: { refundRule: 'less_fixed', refundDeduction: 100, reason: 'not the coordinator\'s' } }))).status).toBe(403);
+    await apiResponse(finadmin.api.v1['board-services'][':id']['refund-rule'].$put({ param: { id: CAM2 }, json: { refundRule: 'less_fixed', refundDeduction: 100, reason: 'what Cambridge refunds the school' } }));
     try {
       const second = await run(chemistry!);
       expect(second.refunded).toBe(1600);
     } finally {
-      await apiResponse(coordinator.api.v1['board-services'][':id'].$put({ param: { id: CAM2 }, json: { refundRule: 'full', reason: 'back to the default until Q-21 is answered' } }));
+      await apiResponse(finadmin.api.v1['board-services'][':id']['refund-rule'].$put({ param: { id: CAM2 }, json: { refundRule: 'full', reason: 'back to the default until Q-21 is answered' } }));
     }
   });
 
@@ -746,6 +748,90 @@ describe('08q: instalment plans', () => {
     await payAtDesk(f, [p.i[0]!]);
     expect(await wallet(f.studentId)).toEqual({ free: 0, held: 700 });
   });
+
+  // ─── The review of be37650: what a plan line's price and ledger must keep (items 1, 8, 9) ───
+
+  it('a line under a live plan keeps its price: a price exception on it is refused naming the plan; one granted before the plan and revoked after leaves it, and the capture pays it; a paid charge against a line keeps its price too', async () => {
+    const f = await onboard(officer, 'cqp-keep', 12);
+    const [a, b, c] = await unpaid(f, [subj.P1!, subj.P2!, subj.P3!], s1);
+    await plan(f, a!, [750, 750]);
+    const onPlan = await refused(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'price.discountFixed', studentId: f.studentId, scope: { registrationId: a! }, value: 100, reason: 'a discount on a plan line' } }));
+    expect(onPlan.status).toBe(409);
+    expect(onPlan.error).toContain('instalment plan');
+    expect(money((await one<{ p: string }>(`select price_at_registration as p from registration where id = $1`, [a!])).p)).toBe(1500);
+    // Granted before the plan (the line re-priced to 1,400), revoked after: the price stays, the capture pays it.
+    const ex = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'price.discountFixed', studentId: f.studentId, scope: { registrationId: b! }, value: 100, reason: 'agreed at the desk' } }));
+    expect(ex.repriced).toEqual({ from: 1500, to: 1400 });
+    const pb = await plan(f, b!, [700, 700]);
+    const back = await apiResponse(finadmin.api.v1.exceptions[':id'].revocation.$post({ param: { id: ex.id }, json: { reason: 'granted in error' } }));
+    expect(back.repriced).toBeNull();
+    expect(money((await one<{ p: string }>(`select price_at_registration as p from registration where id = $1`, [b!])).p)).toBe(1400);
+    await payAtDesk(f, pb.i);
+    expect(await statusOf('registration', b!)).toBe('confirmed');
+    // A paid charge against a line (a price adjustment) is a payment history of the line.
+    const adj = await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: f.studentId, kind: 'price_adjustment', registrationId: c!, amount: 50, reason: 'the board raised its fee' } }));
+    await payAtDesk(f, [adj.id]);
+    expect((await refused(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'price.discountFixed', studentId: f.studentId, scope: { registrationId: c! }, value: 100, reason: 'after a paid adjustment' } }))).status).toBe(409);
+  });
+
+  it('one plan per line: a second plan on a line whose plan was released in full is refused', async () => {
+    const f = await onboard(officer, 'cqp-second', 12);
+    const [l] = await unpaid(f, [subj.P4!], s1);
+    const first = await plan(f, l!, [750, 750]);
+    await apiResponse(finadmin.api.v1.exceptions[':id'].release.$post({ param: { id: first.id }, json: { note: 'paying in full now' } }));
+    expect((await refused(grant(f, l!, [750, 750]))).error).toContain('one plan per line');
+  });
+
+  it('the eligibility clean-up spares a line whose last instalment is being checked; the transfer rejected after it ends the plan (plan_ended)', async () => {
+    const w = await onboard(officer, 'cqp-leaver-checked', 12);
+    const [l] = await unpaid(w, [subj.P5!], s1);
+    const p = await plan(w, l!, [750, 750]);
+    await payAtDesk(w, [p.i[0]!]);
+    const last = await payByTransfer(w, p.i[1]!, `CQP-LV-${w.studentId.slice(0, 6)}`);
+    await apiResponse(coordinator.api.v1.students[':id'].leave.$post({ param: { id: w.studentId }, json: { kind: 'withdrawn', leftOn: day(0), reason: 'moved abroad with the family' } }));
+    expect(await statusOf('registration', l!)).toBe('pending_payment');
+    await apiResponse(officer.api.v1.payments[':id'].reject.$post({ param: { id: last }, json: { reason: 'not on the bank statement' } }));
+    expect(await expiredFor(l!)).toBe('plan_ended');
+    expect(await settledOf(l!)).toMatchObject({ deposits: '750' });
+  });
+
+  it("the last instalment falls by the line's own deadline when it comes before the session's end", async () => {
+    const s = await session(adm, 'November (AS, plans cap)', 'november', 'as_level', { ...openWindow(), activate: true });
+    const f = await onboard(officer, 'cqp-cap', 12);
+    const [l] = await unpaid(f, [subj.P6!], s);
+    const series = (await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [l!])).s;
+    // The series' entry deadline in six days: the session ends months later.
+    await sql(`update board_series set entry_deadline = now() + interval '6 days' where id = $1`, [series]);
+    expect((await refused(grant(f, l!, [500, 500, 500]))).error).toContain('at the latest');
+    await apiResponse(grant(f, l!, [750, 750]));
+  });
+
+  it("another line's preregistration capture leaves the plan's deposits alone; held money is never transferred to a sibling", async () => {
+    const f = await onboard(officer, 'cqp-prereg', 12);
+    const sibling = await apiResponse(officer.api.v1.links['desk-onboard'].$post({
+      json: { parent: { email: f.parent.email }, student: { email: 'student.cqp-prereg-sib@test.local', name: 'Student cqp-prereg-sib', password: 'TestPass1', grade: 11 } },
+    }));
+    const [l] = await unpaid(f, [subj.P7!], s1);
+    const p = await plan(f, l!, [750, 750]);
+    await payAtDesk(f, [p.i[0]!]);
+    // Held money is not free: not transferred.
+    expect((await refused(f.parent.api.v1.escrow.transfer.$post({ json: { fromStudentId: f.studentId, toStudentId: sibling.student.id, amount: 100 } }))).status).toBeGreaterThanOrEqual(400);
+    // A preregistration in a session not open yet, paid: its money is held for it beside the plan's.
+    const draft = await session(adm, 'June (AS, plans prereg)', 'june', 'as_level', futureWindow());
+    const [pre] = await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, subjectIds: [subj.P8!], studentId: f.studentId } }));
+    const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [pre!.id], paymentMethod: 'in_school' } }));
+    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay.id! }, json: { instrumentUsed: 'cash' } }));
+    expect(await wallet(f.studentId)).toEqual({ free: 0, held: 2250 });
+    // The session opens: the preregistration is captured from its own held money, never the plan's.
+    const { capturePreregistrationsForSession } = await import('../src/services/prereg.services');
+    await sql(`update registration_session set status = 'active', start_date = now() - interval '1 day' where id = $1`, [draft]);
+    expect((await capturePreregistrationsForSession(draft)).captured).toBe(1);
+    expect(await wallet(f.studentId)).toEqual({ free: 0, held: 750 });
+    expect((await ledgerOf(l!)).instalment).toBe(750);
+    await payAtDesk(f, [p.i[1]!]);
+    expect(await statusOf('registration', l!)).toBe('confirmed');
+    expect(await wallet(f.studentId)).toEqual({ free: 0, held: 0 });
+  });
 });
 
 // ─── The desk collects lines, charges and the year's fee in one action (§3.10 item 1) ───────────
@@ -836,5 +922,56 @@ describe("08q: the desk collects lines, charges and the year's school fee in one
     const row = list.find((c) => c.id === adj.id)!;
     expect(row.family.map((p) => p.id)).toEqual([g.parent.id]);
     expect(row).toMatchObject({ outstanding: 120, registration: { subject: { name: 'Subject 1 (AS, desk)' } } });
+  });
+});
+
+// ─── A service's fee still provisional is reserved, not paid (§3.4 applied to services) ─────────
+
+describe("08q: a board service's provisional fee", () => {
+  let adm: Client, officer: Client, finadmin: Client;
+  let series: string;
+  type Family = Awaited<ReturnType<typeof onboard>>;
+  let f: Family;
+  const setFee = (serviceId: string, amount: number, provisional: boolean) =>
+    apiResponse(finadmin.api.v1['board-services'].fees.$put({ json: { boardSeriesId: series, rows: [{ boardServiceId: serviceId, level: 'igcse', amount, provisional }], reason: "the board's list" } }));
+  const ask = async (serviceId: string, kind: 'cash_in' | 'late_cash_in') =>
+    (await apiResponse(f.parent.api.v1.charges.$post({ json: { studentId: f.studentId, kind, boardServiceId: serviceId, boardSeriesId: series } }))).id;
+
+  beforeAll(async () => {
+    adm = await admin('cqv');
+    officer = await staff(adm, 'finance_officer', 'cqv');
+    finadmin = await staff(adm, 'finance_admin', 'cqv');
+    const Y = academicYearStartOf();
+    series = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month: 'june', year: Y + 2, label: `cqv-${Date.now() % 100000}`, examsStart: `${Y + 2}-05-10` } }))).id;
+    f = await onboard(officer, 'cqv-f', 12);
+  });
+
+  it('a cash-in at a provisional fee is asked for and accepted but not paid; confirmed at another amount, the open charge follows it and is paid', async () => {
+    await setFee(CI, 700, true);
+    const id = await ask(CI, 'cash_in');
+    expect(money((await one<{ a: string }>(`select amount as a from charge where id = $1`, [id])).a)).toBe(700);
+    await apiResponse(officer.api.v1.charges[':id'].accept.$post({ param: { id }, json: { reason: 'the family asked at the desk' } }));
+    expect((await refused(f.parent.api.v1.payments.initiate.$post({ json: { chargeIds: [id], paymentMethod: 'in_school' } }))).error).toContain('provisional');
+    expect((await refused(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, chargeIds: [id], instrumentUsed: 'cash' } }))).error).toContain('provisional');
+    // Finance confirms the board's published fee, at 750: the open charge follows it.
+    expect(await setFee(CI, 750, false)).toMatchObject({ changed: 1, chargesRepriced: 1 });
+    expect(money((await one<{ a: string }>(`select amount as a from charge where id = $1`, [id])).a)).toBe(750);
+    await audited([id], ['CHARGE_REQUESTED', 'CHARGE_ACCEPTED', 'CHARGE_REPRICED']);
+    const paid = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, chargeIds: [id], instrumentUsed: 'cash' } }));
+    expect(paid.collected).toBe(750);
+    expect(await statusOf('charge', id)).toBe('paid');
+  });
+
+  it('with pricing.payOnProvisionalFee on, the school lets a provisional fee be paid', async () => {
+    await setFee(LCI, 900, true);
+    const id = await ask(LCI, 'late_cash_in');
+    await apiResponse(officer.api.v1.charges[':id'].accept.$post({ param: { id }, json: { reason: 'the family asked at the desk' } }));
+    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'pricing.payOnProvisionalFee' }, json: { value: true, reason: 'the school takes provisional fees this year' } }));
+    try {
+      const paid = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, chargeIds: [id], instrumentUsed: 'cash' } }));
+      expect(paid.collected).toBe(900);
+    } finally {
+      await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'pricing.payOnProvisionalFee' }, json: { value: false, reason: 'back to the default' } }));
+    }
   });
 });

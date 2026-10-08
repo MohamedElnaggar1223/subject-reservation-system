@@ -15,8 +15,9 @@
 
 import { db, boardService, boardServiceFee, boardServiceDeadline, boardSeries, examBoard, and, eq, inArray, asc } from '@repo/db';
 import { randomUUID } from 'crypto';
-import type { BoardServicesQueryType, PutServiceDeadlinesType, PutServiceFeesType, UpdateBoardServiceType } from '@repo/validations';
+import type { BoardServicesQueryType, PutServiceDeadlinesType, PutServiceFeesType, UpdateBoardServiceType, ServiceRefundRuleType } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
+import { repriceChargesOfFee } from './charge.services';
 
 export class BoardServiceError extends Error {
   constructor(message: string, public readonly status: 400 | 403 | 404 | 409 = 400) {
@@ -51,20 +52,20 @@ export async function listBoardServices(q: BoardServicesQueryType = {}) {
   }));
 }
 
-export async function updateBoardService(id: string, data: UpdateBoardServiceType, actorId: string, ctx?: AuditContext) {
+export async function updateBoardService(id: string, data: UpdateBoardServiceType | ServiceRefundRuleType, actorId: string, ctx?: AuditContext) {
   return db.transaction(async (tx) => {
     const [cur] = await tx.select().from(boardService).where(eq(boardService.id, id)).for('update');
     if (!cur) throw new BoardServiceError('Board service not found', 404);
     const next: Partial<typeof boardService.$inferInsert> = {};
-    if (data.label !== undefined && data.label !== cur.label) next.label = data.label;
-    if (data.refundRule !== undefined && data.refundRule !== cur.refundRule) next.refundRule = data.refundRule;
-    if (data.refundRule !== undefined || data.refundDeduction !== undefined) {
-      const rule = data.refundRule ?? cur.refundRule;
-      next.refundDeduction = rule === 'less_fixed' ? (data.refundDeduction ?? cur.refundDeduction) : null;
-      if (rule === 'less_fixed' && !next.refundDeduction) throw new BoardServiceError('A fixed deduction needs its amount');
+    if ('label' in data && data.label !== undefined && data.label !== cur.label) next.label = data.label;
+    // The refund rule (a money rule) comes only through PUT /:id/refund-rule (finance admin, admin).
+    if ('refundRule' in data) {
+      if (data.refundRule !== cur.refundRule) next.refundRule = data.refundRule;
+      next.refundDeduction = data.refundRule === 'less_fixed' ? (data.refundDeduction ?? cur.refundDeduction) : null;
+      if (data.refundRule === 'less_fixed' && !next.refundDeduction) throw new BoardServiceError('A fixed deduction needs its amount');
     }
-    if (data.requestableByFamily !== undefined && data.requestableByFamily !== cur.requestableByFamily) next.requestableByFamily = data.requestableByFamily;
-    if (data.isActive !== undefined && data.isActive !== cur.isActive) next.isActive = data.isActive;
+    if ('requestableByFamily' in data && data.requestableByFamily !== undefined && data.requestableByFamily !== cur.requestableByFamily) next.requestableByFamily = data.requestableByFamily;
+    if ('isActive' in data && data.isActive !== undefined && data.isActive !== cur.isActive) next.isActive = data.isActive;
     if (!Object.keys(next).length || Object.entries(next).every(([k, v]) => (cur as Record<string, unknown>)[k] === v)) throw new BoardServiceError('Nothing to change', 409);
     const [updated] = await tx.update(boardService).set({ ...next, updatedAt: new Date() }).where(eq(boardService.id, id)).returning();
     await logAction(actorId, 'BOARD_SERVICE_UPDATED', 'board_service', id,
@@ -109,6 +110,7 @@ export async function putServiceDeadlines(data: PutServiceDeadlinesType, actorId
 /** A series' service fees, per service and level, as the board's list gives them. */
 export async function putServiceFees(data: PutServiceFeesType, actorId: string, ctx?: AuditContext) {
   return db.transaction(async (tx) => {
+    let chargesRepriced = 0;
     const [s] = await tx.select().from(boardSeries).where(eq(boardSeries.id, data.boardSeriesId)).for('share');
     if (!s) throw new BoardServiceError('Board series not found', 404);
     const services = await tx.select().from(boardService).where(inArray(boardService.id, data.rows.map((r) => r.boardServiceId)));
@@ -126,6 +128,8 @@ export async function putServiceFees(data: PutServiceFeesType, actorId: string, 
         await tx.update(boardServiceFee).set({
           amount: r.amount, provisional: r.provisional, confirmedAt: confirm ? now : null, confirmedBy: confirm ? actorId : null, copiedFromDefault: false, updatedAt: now,
         }).where(eq(boardServiceFee.id, cur.id));
+        // The open charges priced from this fee follow it.
+        chargesRepriced += await repriceChargesOfFee(tx, { feeId: cur.id, amount: r.amount, provisional: r.provisional, actorId, ctx });
       } else {
         await tx.insert(boardServiceFee).values({
           id: randomUUID(), boardSeriesId: s.id, boardServiceId: svc.id, level: r.level, amount: r.amount, provisional: r.provisional,
@@ -135,7 +139,7 @@ export async function putServiceFees(data: PutServiceFeesType, actorId: string, 
       changed.push({ boardServiceId: svc.id, level: r.level, from: cur?.amount ?? null, to: r.amount, provisional: r.provisional });
     }
     if (!changed.length) throw new BoardServiceError('Nothing to change', 409);
-    await logAction(actorId, 'SERVICE_FEES_SET', 'board_series', s.id, null, { rows: changed, reason: data.reason ?? null }, ctx, tx);
-    return { changed: changed.length };
+    await logAction(actorId, 'SERVICE_FEES_SET', 'board_series', s.id, null, { rows: changed, reason: data.reason ?? null, chargesRepriced }, ctx, tx);
+    return { changed: changed.length, chargesRepriced };
   });
 }

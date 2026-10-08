@@ -21,7 +21,7 @@
 import {
   db, exception, user, registration, registrationSession, subject, sessionOffer, sessionOfferItem, charge, boardSeries, parentStudentLink,
   paymentRegistration, paymentCharge, payment,
-  eq, and, inArray, sql, gradeTodayExtras,
+  eq, and, inArray, sql, isNull, gradeTodayExtras,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
 import {
@@ -40,6 +40,7 @@ import { priceLine } from './pricing.services';
 import { cairoDayStart } from './refund.services';
 import { dueDateFor, redateLines } from './deadline.services';
 import { redateChargeInTx, repriceChargeInTx, ChargeError } from './charge.services';
+import { lineIdsWithPaymentHistory, livePlanOf } from './line-history.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -222,6 +223,32 @@ async function holderStudentsOf(executor: Tx | typeof db, n: { studentId: string
   return kids.map((k) => k.id).sort();
 }
 
+const schoolDay = (d: string | Date) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(d));
+
+/**
+ * The same exception granted twice (same policy, holder, scope and value) would apply twice — a
+ * discount stacking on itself — or say nothing new: refused, naming the one already active.
+ */
+async function refuseIdenticalGrant(tx: Tx, n: Normalised, typed: ReturnType<typeof typedValue>) {
+  const same = (col: Parameters<typeof eq>[0], v: string | null | undefined) => (v ? eq(col, v) : isNull(col));
+  const [twin] = await tx.select({ id: exception.id, createdAt: exception.createdAt, by: user.name }).from(exception)
+    .innerJoin(user, eq(user.id, exception.grantedBy))
+    .where(and(
+      eq(exception.policyKey, n.policyKey), eq(exception.status, 'active'),
+      same(exception.studentId, n.studentId), same(exception.familyId, n.familyId),
+      same(exception.sessionId, n.scope.sessionId), same(exception.subjectId, n.scope.subjectId), same(exception.offerId, n.scope.offerId),
+      same(exception.offerItemId, n.scope.offerItemId), same(exception.registrationId, n.scope.registrationId), same(exception.chargeId, n.scope.chargeId),
+      same(exception.boardSeriesId, n.scope.boardSeriesId), same(exception.academicYear, n.scope.academicYear),
+      typed.valueNumber === null ? isNull(exception.valueNumber) : sql`${exception.valueNumber} = ${typed.valueNumber}`,
+      typed.valueDate === null ? isNull(exception.valueDate) : eq(exception.valueDate, typed.valueDate),
+      typed.valueJson === null ? isNull(exception.valueJson) : sql`${exception.valueJson} = ${JSON.stringify(typed.valueJson)}::jsonb`,
+    ))
+    .limit(1);
+  if (twin) {
+    throw new ExceptionError(`The same exception is already active (granted ${schoolDay(twin.createdAt)} by ${twin.by}): revoke it, or change its scope or value`, 409);
+  }
+}
+
 // ─── Management ──────────────────────────────────────────────────────────────
 
 /**
@@ -254,6 +281,7 @@ export async function grantException(data: GrantExceptionType, actor: { id: stri
       if (n.scope.registrationId) await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, n.scope.registrationId)).for('update');
       if (n.scope.chargeId) await tx.select({ id: charge.id }).from(charge).where(eq(charge.id, n.scope.chargeId)).for('update');
       await checkScope(tx, n, holderStudents);
+      await refuseIdenticalGrant(tx, n, typed);
       const id = randomUUID();
       const [created] = await tx.insert(exception).values({
         id,
@@ -314,8 +342,13 @@ export async function grantException(data: GrantExceptionType, actor: { id: stri
 async function repriceLineForException(tx: Tx, lineId: string, exceptionId: string, actorId: string, ctx?: AuditContext) {
   const [l] = await tx.select().from(registration).where(eq(registration.id, lineId));
   if (!l) throw new ExceptionError('That line was not found', 404);
-  const history = await tx.select({ id: paymentRegistration.id }).from(paymentRegistration).where(eq(paymentRegistration.registrationId, lineId)).limit(1);
-  if (!['pending_approval', 'pending_payment', 'preregistered'].includes(l.status) || history.length) {
+  // A line under a live plan is paid from its deposits at exactly its price: never re-priced.
+  const plan = await livePlanOf(tx, lineId);
+  if (plan) {
+    throw new ExceptionError(`This line is paid by its instalment plan (granted ${schoolDay(plan.created_at)}, ${plan.instalments} instalments): its price stays — release the plan in full first, or add a price adjustment`, 409);
+  }
+  const history = await lineIdsWithPaymentHistory(tx, [lineId]);
+  if (!['pending_approval', 'pending_payment', 'preregistered'].includes(l.status) || history.has(lineId)) {
     throw new ExceptionError('This line has been paid for or has a payment: its price stays — add a price adjustment or refund the difference instead', 409);
   }
   const basis = l.pricingBasis as { exceptionIds?: string[] } | null;
@@ -343,8 +376,8 @@ async function repriceLineWithout(tx: Tx, lineId: string, exceptionId: string, a
   const basis = l?.pricingBasis as { exceptionIds?: string[] } | null | undefined;
   if (!l || !basis?.exceptionIds?.includes(exceptionId)) return null;
   if (!['pending_approval', 'pending_payment', 'preregistered'].includes(l.status)) return null;
-  const history = await tx.select({ id: paymentRegistration.id }).from(paymentRegistration).where(eq(paymentRegistration.registrationId, lineId)).limit(1);
-  if (history.length) return null;
+  // A payment, a live plan or a paid charge against the line: its price stays.
+  if ((await lineIdsWithPaymentHistory(tx, [lineId])).has(lineId)) return null;
   const price = await priceLine(tx, { item: { id: l.offerItemId }, attempt: l.attempt as 'first' | 'retake', mode: l.mode as 'in_school' | 'self_study', studentId: l.studentId, sessionId: l.sessionId },
     { exceptionIds: basis.exceptionIds.filter((x) => x !== exceptionId) });
   await tx.update(registration).set({

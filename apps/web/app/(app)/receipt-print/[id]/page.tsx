@@ -27,7 +27,9 @@ type ReceiptDetail = {
     student: { name: string; studentId: string | null; grade: number | null };
     subject: { name: string; code: string; council: string };
     session: { name: string };
-  };
+  } | null;
+  // The reservations rework (§3.10 item 2): a charge's receipt (a board service, an adjustment).
+  charge: { description: string; amount: number; kind: string; student: { name: string; studentId: string | null; grade: number | null } } | null;
 };
 
 const COUNCILS: Record<string, string> = {
@@ -59,6 +61,20 @@ export default async function ReceiptPrintPage({
   }
 
   const reg = receipt.registration;
+  const ch = receipt.charge;
+  const student = reg?.student ?? ch?.student ?? null;
+  const rows: [string, string][] = reg
+    ? [
+        ['Subject', `${reg.subject.name} (${reg.subject.code})`],
+        ['Council', COUNCILS[reg.subject.council] ?? reg.subject.council],
+        ['Session', reg.session.name],
+        ['Course fee', `EGP ${reg.courseFeeAtRegistration.toFixed(2)}`],
+        ['Registration fee', `EGP ${reg.registrationFeeAtRegistration.toFixed(2)}`],
+        ['Total paid', `EGP ${reg.priceAtRegistration.toFixed(2)}`],
+      ]
+    : ch
+      ? [['Charge', ch.description], ['Total paid', `EGP ${ch.amount.toFixed(2)}`]]
+      : [];
 
   return (
     <div className="mx-auto max-w-md p-8 print:p-0 print:max-w-none">
@@ -67,7 +83,7 @@ export default async function ReceiptPrintPage({
           <h1 className="text-xl font-bold text-foreground print:text-black font-display">
             IGCSE Subject Reservation System
           </h1>
-          <p className="text-sm text-muted-foreground print:text-black mt-1">Subject Registration Receipt</p>
+          <p className="text-sm text-muted-foreground print:text-black mt-1">{reg ? 'Subject Registration Receipt' : 'Receipt'}</p>
         </div>
 
         <p className="text-center text-2xl font-bold tracking-widest font-mono text-foreground print:text-black mb-6">
@@ -76,14 +92,9 @@ export default async function ReceiptPrintPage({
 
         <dl className="space-y-2 text-sm text-foreground print:text-black">
           {[
-            ['Student', `${reg.student.name}${reg.student.grade != null ? ` (${gradeLabel(reg.student.grade)})` : ''}`],
-            ['Student ID', reg.student.studentId ?? '—'],
-            ['Subject', `${reg.subject.name} (${reg.subject.code})`],
-            ['Council', COUNCILS[reg.subject.council] ?? reg.subject.council],
-            ['Session', reg.session.name],
-            ['Course fee', `EGP ${reg.courseFeeAtRegistration.toFixed(2)}`],
-            ['Registration fee', `EGP ${reg.registrationFeeAtRegistration.toFixed(2)}`],
-            ['Total paid', `EGP ${reg.priceAtRegistration.toFixed(2)}`],
+            ['Student', student ? `${student.name}${student.grade != null ? ` (${gradeLabel(student.grade)})` : ''}` : '—'],
+            ['Student ID', student?.studentId ?? '—'],
+            ...rows,
             ['Issued', new Date(receipt.createdAt).toLocaleDateString('en-GB')],
           ].map(([label, value]) => (
             <div key={label} className="flex justify-between gap-4">
@@ -93,7 +104,7 @@ export default async function ReceiptPrintPage({
           ))}
         </dl>
 
-        {reg.takenOutsideSchool && (
+        {reg?.takenOutsideSchool && (
           <p className="mt-3 text-xs text-muted-foreground print:text-black">
             Taken outside school (50% fee applies).
           </p>

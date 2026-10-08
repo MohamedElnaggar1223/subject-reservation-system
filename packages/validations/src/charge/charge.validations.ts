@@ -63,16 +63,22 @@ export function serviceLevelOf(qualificationLevel: string | null | undefined): S
 
 export const BoardServiceId = z.object({ id: z.string().min(1) });
 
-/** Change a board service: its label, its refund rule (Q-21), whether a family may ask for it. */
+/** Change a board service in the catalogue: its label, whether a family may ask for it, whether it is offered (admin, coordinator). */
 export const UpdateBoardService = z.object({
   label: z.string().trim().min(2).max(120).optional(),
-  refundRule: z.enum(REFUND_RULES).optional(),
-  refundDeduction: z.number().min(0).max(100_000).refine(isWholePiastres, PIASTRES_MESSAGE).optional().nullable(),
   requestableByFamily: z.boolean().optional(),
   isActive: z.boolean().optional(),
   reason: z.string().trim().min(3, 'A reason is required').max(500),
-}).refine((d) => d.refundRule !== 'less_fixed' || (d.refundDeduction ?? 0) > 0, { message: 'A fixed deduction needs its amount', path: ['refundDeduction'] });
+});
 export type UpdateBoardServiceType = z.infer<typeof UpdateBoardService>;
+
+/** A board service's refund rule on a changed grade (Q-21; a money rule: finance admin, admin). */
+export const ServiceRefundRule = z.object({
+  refundRule: z.enum(REFUND_RULES),
+  refundDeduction: z.number().min(0).max(100_000).refine(isWholePiastres, PIASTRES_MESSAGE).optional().nullable(),
+  reason: z.string().trim().min(3, 'A reason is required').max(500),
+}).refine((d) => d.refundRule !== 'less_fixed' || (d.refundDeduction ?? 0) > 0, { message: 'A fixed deduction needs its amount', path: ['refundDeduction'] });
+export type ServiceRefundRuleType = z.infer<typeof ServiceRefundRule>;
 
 /** A series' service deadlines (one instant per service; null clears it). */
 export const PutServiceDeadlines = z.object({

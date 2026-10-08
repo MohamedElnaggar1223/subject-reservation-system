@@ -10,7 +10,10 @@ export const metadata = {
   title: 'Exceptions — IGCSE Admin',
 };
 
-export default async function ExceptionsAdminPage(): Promise<React.JSX.Element> {
+export default async function ExceptionsAdminPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }): Promise<React.JSX.Element> {
   const session = await requireAuth();
-  return <ExceptionsAdminClient viewerRole={session.user.role ?? null} />;
+  // Opened from the Student 360 or a line: the student (and the line) already chosen.
+  const q = await searchParams;
+  const one = (v: string | string[] | undefined) => (typeof v === 'string' && v ? v : undefined);
+  return <ExceptionsAdminClient viewerRole={session.user.role ?? null} prefill={{ studentId: one(q.studentId), registrationId: one(q.registrationId), policyKey: one(q.policyKey) }} />;
 }

@@ -2254,7 +2254,7 @@ async function lockChargesForPayment(tx: Tx, studentId: string, chargeIds: strin
   }
   // chargeRules (§6): the deadline, and the price exceptions scoped to each charge.
   const priced: ChargeRow[] = [];
-  for (const c of rows) priced.push(await repriceChargeInTx(tx, c, null));
+  for (const c of rows) priced.push(await repriceChargeInTx(tx, c, null, undefined, { forPayment: true }));
   if (expected && priced.some((c) => Math.abs(c.amount - (expected.get(c.id) ?? c.amount)) > 0.001)) throw new Error(PRICE_CHANGED_REFUSAL);
 
   const groups = new Map<string, ChargeGroup>();

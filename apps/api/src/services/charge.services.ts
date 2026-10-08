@@ -145,7 +145,7 @@ export async function redateChargeInTx(tx: Tx, chargeId: string, actorId: string
  * a pushed school fee (its amount is the schedule's; the waiver is the exception) nor an
  * instalment (its amounts are the plan's). Returns the amount the charge costs now.
  */
-export async function chargeRules(tx: Tx, c: ChargeRow, now: Date = new Date()) {
+export async function chargeRules(tx: Tx, c: ChargeRow, now: Date = new Date(), opts: { forPayment?: boolean } = {}) {
   const deadline = await chargeDeadline(tx, c);
   if (deadline && deadline <= now) {
     throw new ChargeError(c.kind === 'instalment'
@@ -154,6 +154,14 @@ export async function chargeRules(tx: Tx, c: ChargeRow, now: Date = new Date()) 
   }
   if (c.kind === 'school_fee_push' || c.kind === 'instalment') return { amount: c.amount, deadline, exceptionIds: [] as string[] };
   const basis = (c.pricingBasis as ChargeBasis | null) ?? { base: c.amount, exceptionIds: [] };
+  // §3.4's rule for a service's fee: reserved while provisional, paid once finance confirms it
+  // (unless the school lets provisional fees be paid, pricing.payOnProvisionalFee).
+  if (opts.forPayment && basis.feeId) {
+    const [fee] = await tx.select({ provisional: boardServiceFee.provisional }).from(boardServiceFee).where(eq(boardServiceFee.id, basis.feeId));
+    if (fee?.provisional && !(await getSetting('pricing.payOnProvisionalFee', tx))) {
+      throw new ChargeError(`${c.description}: the board's fee for it is provisional until finance confirms it on the Board services page — it can be paid once confirmed`, 409);
+    }
+  }
   const exc = (await activeExceptions(tx, c.studentId, ['price.custom', 'price.discountPercent', 'price.discountFixed'], { chargeId: c.id }))
     .filter((e) => e.scope.chargeId === c.id && e.value != null);
   let amount = round2(basis.base);
@@ -165,13 +173,41 @@ export async function chargeRules(tx: Tx, c: ChargeRow, now: Date = new Date()) 
 }
 
 /** Apply chargeRules' amount to an open charge (locked by the caller), audited when it changed. */
-export async function repriceChargeInTx(tx: Tx, c: ChargeRow, actorId: string | null, ctx?: AuditContext) {
-  const r = await chargeRules(tx, c);
+export async function repriceChargeInTx(tx: Tx, c: ChargeRow, actorId: string | null, ctx?: AuditContext, opts: { forPayment?: boolean } = {}) {
+  const r = await chargeRules(tx, c, new Date(), opts);
   if (Math.abs(r.amount - c.amount) < 0.001) return c;
   const basis = { ...((c.pricingBasis as ChargeBasis | null) ?? { base: c.amount }), exceptionIds: r.exceptionIds };
   const [next] = await tx.update(charge).set({ amount: r.amount, pricingBasis: basis, updatedAt: new Date() }).where(eq(charge.id, c.id)).returning();
   await logAction(actorId, 'CHARGE_REPRICED', 'charge', c.id, { amount: c.amount }, { amount: r.amount, exceptionIds: r.exceptionIds }, ctx, tx);
   return next!;
+}
+
+/**
+ * A service fee set or confirmed at another amount (Board services): the open charges priced from
+ * that fee row follow it — requested or awaiting payment, with no payment open or made — in the
+ * fee writer's transaction (the fee rows locked, then these charges), as a confirmed board fee
+ * re-prices its waiting lines. A charge with a payment keeps its amount.
+ */
+export async function repriceChargesOfFee(tx: Tx, a: { feeId: string; amount: number; provisional: boolean; actorId: string; ctx?: AuditContext }) {
+  const rows = await tx.select().from(charge)
+    .where(and(sql`${charge.pricingBasis}->>'feeId' = ${a.feeId}`, inArray(charge.status, ['requested', 'pending_payment'])))
+    .orderBy(charge.id).for('update');
+  let repriced = 0;
+  for (const c of rows) {
+    const paying = await tx.select({ id: paymentCharge.id }).from(paymentCharge).innerJoin(payment, eq(payment.id, paymentCharge.paymentId))
+      .where(and(eq(paymentCharge.chargeId, c.id), inArray(payment.status, ['pending', 'pending_verification', 'completed']))).limit(1);
+    if (paying.length) continue;
+    const basis = { ...((c.pricingBasis as ChargeBasis | null) ?? { base: c.amount, exceptionIds: [] }), base: a.amount, provisional: a.provisional };
+    const [withBase] = await tx.update(charge).set({ pricingBasis: basis, updatedAt: new Date() }).where(eq(charge.id, c.id)).returning();
+    try {
+      const next = await repriceChargeInTx(tx, withBase!, a.actorId, a.ctx);
+      if (Math.abs(next.amount - c.amount) > 0.001) repriced++;
+    } catch (err) {
+      // Past its deadline it can no longer be paid: its amount does not matter any more.
+      if (!(err instanceof ChargeError)) throw err;
+    }
+  }
+  return repriced;
 }
 
 // ─── Who may act ─────────────────────────────────────────────────────────────

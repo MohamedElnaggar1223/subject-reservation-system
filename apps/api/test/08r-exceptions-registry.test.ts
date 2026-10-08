@@ -91,6 +91,20 @@ describe('08r: the exceptions registry', () => {
     expect((await grant(finadmin, { policyKey: 'gate.schoolFee', familyId: f.studentId, reason: 'a student is not a family' })).error).toContain('parent account');
   });
 
+  it('the same exception twice is refused, naming the one that is active; another scope or value is a grant of its own', async () => {
+    const f = await onboard(officer, 'xr-twice', 12);
+    const waiver = { policyKey: 'gate.schoolFee' as const, studentId: f.studentId, scope: { academicYear: '2026-2027' }, reason: 'scholarship' };
+    await apiResponse(finadmin.api.v1.exceptions.$post({ json: waiver }));
+    const again = await refused(finadmin.api.v1.exceptions.$post({ json: { ...waiver, reason: 'asked twice' } }));
+    expect(again.status).toBe(409);
+    expect(again.error).toContain('already active');
+    await apiResponse(finadmin.api.v1.exceptions.$post({ json: { ...waiver, scope: { academicYear: '2027-2028' }, reason: 'the next year too' } }));
+    const discount = { policyKey: 'price.discountPercent' as const, studentId: f.studentId, scope: { sessionId: june }, value: 10, reason: 'siblings' };
+    await apiResponse(finadmin.api.v1.exceptions.$post({ json: discount }));
+    expect((await refused(finadmin.api.v1.exceptions.$post({ json: discount }))).status).toBe(409);
+    await apiResponse(finadmin.api.v1.exceptions.$post({ json: { ...discount, value: 5, reason: 'a second, smaller one' } }));
+  });
+
   it("a family's exception covers every linked child, and no one else", async () => {
     const f = await onboard(officer, 'xr-family', 12);
     const sibling = await apiResponse(officer.api.v1.links['desk-onboard'].$post({

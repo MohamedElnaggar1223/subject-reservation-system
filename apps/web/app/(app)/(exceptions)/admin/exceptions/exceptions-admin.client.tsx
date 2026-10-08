@@ -24,14 +24,16 @@ import {
 
 type Pending = { kind: 'revoke' | 'release' | 'confirm'; id: string; label: string } | null;
 
-export default function ExceptionsAdminClient({ viewerRole }: { viewerRole: string | null }): React.JSX.Element {
+export type Prefill = { studentId?: string; registrationId?: string; policyKey?: string };
+
+export default function ExceptionsAdminClient({ viewerRole, prefill = {} }: { viewerRole: string | null; prefill?: Prefill }): React.JSX.Element {
   const policies = useQuery({ queryKey: POLICIES_KEY, queryFn: fetchPolicies });
   if (policies.isLoading) return <Page><LoadingState /></Page>;
   if (policies.isError || !policies.data) return <Page><ErrorState onRetry={() => policies.refetch()} /></Page>;
   return (
     <Page>
       <CheckThese data={policies.data} />
-      <GrantForm data={policies.data} viewerRole={viewerRole} />
+      <GrantForm data={policies.data} viewerRole={viewerRole} prefill={prefill} />
       <Granted data={policies.data} />
     </Page>
   );

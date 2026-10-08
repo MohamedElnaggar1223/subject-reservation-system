@@ -53,7 +53,7 @@ export function AddChargeModal({ viewerRole, onClose, onAdded }: { viewerRole: s
       ...(isService ? { boardServiceId: serviceId, boardSeriesId: seriesId, ...(service?.levelRates ? { level } : {}) } : {}),
       ...(kind === 'late_entry_fee' && seriesId ? { boardSeriesId: seriesId } : {}),
       ...(lineId ? { registrationId: lineId } : {}),
-      ...(amount ? { amount: Number(amount) } : {}),
+      ...(amount && !isService ? { amount: Number(amount) } : {}),
       ...(description.trim() ? { description: description.trim() } : {}),
       ...(dueAt ? { dueAt: new Date(`${dueAt}T20:59:59Z`) } : {}),
       reason: reason.trim(),
@@ -128,9 +128,15 @@ export function AddChargeModal({ viewerRole, onClose, onAdded }: { viewerRole: s
               </select>
             </Field>
           )}
-          <Field label={isService ? 'Amount (EGP, empty for the grid\'s fee)' : 'Amount (EGP)'} htmlFor="charge-amount">
-            <input id="charge-amount" type="number" inputMode="decimal" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className={INPUT_CLASS} />
-          </Field>
+          {isService ? (
+            <Field label="Amount">
+              <p className="py-2 text-sm text-muted-foreground">The series&apos; fee for the service (Board services).</p>
+            </Field>
+          ) : (
+            <Field label="Amount (EGP)" htmlFor="charge-amount">
+              <input id="charge-amount" type="number" inputMode="decimal" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className={INPUT_CLASS} />
+            </Field>
+          )}
           <Field label="Due by (optional)" htmlFor="charge-due">
             <input id="charge-due" type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className={INPUT_CLASS} />
           </Field>

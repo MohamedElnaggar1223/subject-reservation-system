@@ -23,6 +23,7 @@ import { logAction, type AuditContext } from './audit.services';
 import { auth } from '../lib/auth';
 import { prepareLegacyLines, getExistingRegistrationSubjectIds } from './registration.services';
 import { insertLines } from './line.services';
+import { exceptionsOfLines } from './line-exceptions-read.services';
 import { sessionWindow, windowRefusal } from './window.services';
 import { seriesDeadlineGroups, type DeadlineGroup } from './series.services';
 import { getSetting } from './settings.services';
@@ -760,6 +761,7 @@ export async function getStudentSummary(studentId: string) {
       }),
     ]);
 
+  const lineExceptions = await exceptionsOfLines(db, registrations);
   const receipts = await db.query.receipt.findMany({
     where: (r, { inArray }) =>
       inArray(r.registrationId, registrations.map((reg) => reg.id).concat('__none__')),
@@ -833,6 +835,8 @@ export async function getStudentSummary(studentId: string) {
     registrations: registrations.map((r) => ({
       ...r,
       receipt: receiptByReg.get(r.id) ?? null,
+      // The exceptions that touched the line: priced it, are scoped to it, or let it through (§4.7).
+      exceptions: lineExceptions.get(r.id) ?? [],
     })),
     payments,
     exceptions,

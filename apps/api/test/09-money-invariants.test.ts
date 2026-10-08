@@ -818,8 +818,9 @@ describe('money invariants over the whole database', () => {
     expect(settlements).toEqual([]);
   });
 
-  it('a plan line that ended was settled, keeping at most what a paid drop that day would have kept (§3.6)', async () => {
-    // kept ≤ deposits, and kept ≤ price (the school never keeps more than the line cost).
+  it('a plan settled keeps at most its deposits and at most the line\'s price (§3.6)', async () => {
+    // What a paid drop that day would keep is computed by refundFor at the settlement (08q's worked example proves it);
+    // this rule checks the two bounds every settlement must hold over every row.
     const broken = await sql(`
       select a.entity_id, a.new_data from audit_log a
       where a.action = 'PLAN_SETTLED'

@@ -18,6 +18,7 @@ import { apiResponse } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Notice } from '~/components/ui/tone';
 import { Field, INPUT_CLASS, Money } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
+import { fetchStudents } from '~/app/(app)/(exceptions)/admin/exceptions/exceptions-shared';
 
 const fetchSchedules = () => apiResponse(api.v1['school-fees'].schedules.$get());
 const fetchSections = () => apiResponse(api.v1.academic.sections.$get({ query: {} }));
@@ -30,7 +31,10 @@ export default function SchoolFeePush(): React.JSX.Element {
   const sections = useQuery({ queryKey: ['academic', 'sections', 'push'], queryFn: fetchSections });
   const years = [...new Set((schedules.data ?? []).map((s) => s.academicYear))].sort().reverse();
   const [year, setYear] = useState('');
-  const [target, setTarget] = useState<'grade' | 'section'>('grade');
+  const [target, setTarget] = useState<'grade' | 'section' | 'students'>('grade');
+  const [search, setSearch] = useState('');
+  const [picked, setPicked] = useState<{ id: string; name: string }[]>([]);
+  const found = useQuery({ queryKey: ['students', 'pick', 'push', search], queryFn: () => fetchStudents(search), enabled: target === 'students' && search.trim().length >= 2 });
   const [grade, setGrade] = useState('12');
   const [sectionId, setSectionId] = useState('');
   const [dueAt, setDueAt] = useState('');
@@ -41,7 +45,7 @@ export default function SchoolFeePush(): React.JSX.Element {
   const push = useMutation({
     mutationFn: () => pushFees({
       academicYear: chosenYear,
-      ...(target === 'grade' ? { grade: Number(grade) } : { sectionId }),
+      ...(target === 'grade' ? { grade: Number(grade) } : target === 'section' ? { sectionId } : { studentIds: picked.map((p) => p.id) }),
       // The end of that day at the school.
       dueAt: new Date(`${dueAt}T20:59:59Z`),
     }),
@@ -54,6 +58,7 @@ export default function SchoolFeePush(): React.JSX.Element {
     setResult(null);
     if (!chosenYear) return setFormError('Set the year\'s school fee first.');
     if (target === 'section' && !sectionId) return setFormError('Pick a section.');
+    if (target === 'students' && !picked.length) return setFormError('Add the students.');
     if (!dueAt) return setFormError('Pick the date it is due by.');
     push.mutate();
   }
@@ -65,15 +70,15 @@ export default function SchoolFeePush(): React.JSX.Element {
         <p className="mt-1 text-sm text-muted-foreground">
           The year&apos;s fee goes on each student&apos;s statement, due by the date, and the family is told. Paid, waived and graduate students are skipped and listed.
         </p>
-        <div className="mt-4 grid gap-4 md:grid-cols-4">
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
           <Field label="Academic year" htmlFor="push-year">
             <select id="push-year" value={chosenYear} onChange={(e) => setYear(e.target.value)} className={INPUT_CLASS}>
               {!years.length && <option value="">No school fee set</option>}
               {years.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
           </Field>
-          <Field label="To">
-            <div className="flex gap-2" role="radiogroup" aria-label="To">
+          <div className="md:col-span-2"><Field label="To">
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="To">
               <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
                 <input type="radio" name="push-target" checked={target === 'grade'} onChange={() => setTarget('grade')} />
                 <span>A grade</span>
@@ -82,13 +87,33 @@ export default function SchoolFeePush(): React.JSX.Element {
                 <input type="radio" name="push-target" checked={target === 'section'} onChange={() => setTarget('section')} />
                 <span>A section</span>
               </label>
+              <label className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+                <input type="radio" name="push-target" checked={target === 'students'} onChange={() => setTarget('students')} />
+                <span>Students</span>
+              </label>
             </div>
-          </Field>
+          </Field></div>
           {target === 'grade' ? (
             <Field label="Grade (that year)" htmlFor="push-grade">
               <select id="push-grade" value={grade} onChange={(e) => setGrade(e.target.value)} className={INPUT_CLASS}>
                 {['9', '10', '11', '12', '13'].map((g) => <option key={g} value={g}>{`Grade ${g}`}</option>)}
               </select>
+            </Field>
+          ) : target === 'students' ? (
+            <Field label="Students" htmlFor="push-student-search">
+              <input id="push-student-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, email or number…" className={INPUT_CLASS} />
+              {(found.data?.students ?? []).filter((s) => !picked.some((p) => p.id === s.id)).slice(0, 6).map((s) => (
+                <button key={s.id} type="button" onClick={() => setPicked([...picked, { id: s.id, name: s.name }])} className="mt-1 block w-full rounded-md px-2 py-1 text-start text-sm hover:bg-muted">
+                  <bdi>{s.name}</bdi> <span className="text-xs text-muted-foreground">{s.gradeLabel}</span>
+                </button>
+              ))}
+              <div className="mt-2 flex flex-wrap gap-1">
+                {picked.map((p) => (
+                  <button key={p.id} type="button" onClick={() => setPicked(picked.filter((x) => x.id !== p.id))} className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-foreground" aria-label={`Remove ${p.name}`}>
+                    <bdi>{p.name}</bdi> ✕
+                  </button>
+                ))}
+              </div>
             </Field>
           ) : (
             <Field label="Section" htmlFor="push-section">

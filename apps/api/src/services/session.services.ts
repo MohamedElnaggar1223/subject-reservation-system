@@ -669,7 +669,7 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
           and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
       )`,
       // A plan line whose last instalment's transfer is being checked is spared too (§3.6).
-      sql`not ${lastInstalmentBeingCheckedSql(registration.id)}`,
+      sql`not ${lastInstalmentBeingCheckedSql(registration.id, now)}`,
     ),
     'session_closed', now));
 

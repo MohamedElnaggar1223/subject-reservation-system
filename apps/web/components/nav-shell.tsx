@@ -239,6 +239,8 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
         titleKey: 'nav.financial',
         items: [
           { labelKey: 'nav.schoolFee', href: '/school-fee', icon: 'payments' },
+          // The reservations rework, step C (§3.6, §3.10): instalments and charges, paid here.
+          { labelKey: 'nav.chargesDue', href: '/charges-due', icon: 'checkout' },
           { labelKey: 'nav.escrowBalance', href: '/escrow', icon: 'escrow' },
         ],
       },

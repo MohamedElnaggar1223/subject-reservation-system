@@ -73,11 +73,13 @@ export async function planOfLine(executor: Executor, lineId: string, lock?: 'sha
  * unpaid. The session's close and the eligibility clean-up spare such a line, as they spare a line
  * whose checkout's transfer is being checked (§3.6): the family may already have paid in full.
  */
-export const lastInstalmentBeingCheckedSql = (line: unknown) => sql`exists (
+export const lastInstalmentBeingCheckedSql = (line: unknown, now: Date) => sql`exists (
   select 1 from payment p
   join payment_charge pc on pc.payment_id = p.id
   join charge c on c.id = pc.charge_id
-  where c.registration_id = ${line} and c.kind = 'instalment' and p.status = 'pending_verification'
+  where c.registration_id = ${line} and c.kind = 'instalment'
+    -- As a line's own checkout is spared: a transfer being checked, or one whose reference is still due.
+    and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
     and not exists (
       select 1 from charge c2
       where c2.plan_exception_id = c.plan_exception_id and c2.status in ('requested', 'pending_payment')
@@ -121,9 +123,14 @@ export async function grantPlanInTx(tx: Tx, a: { planId: string; lineId: string;
   const open = await tx.select({ id: payment.id }).from(paymentRegistration).innerJoin(payment, eq(payment.id, paymentRegistration.paymentId))
     .where(and(eq(paymentRegistration.registrationId, a.lineId), inArray(payment.status, [...OPEN])));
   if (open.length) throw new PlanError('This line has a checkout in progress: confirm or cancel it before a plan', 409);
-  const live = await tx.select({ id: exception.id }).from(exception)
-    .where(and(eq(exception.policyKey, 'plan.instalments'), eq(exception.registrationId, a.lineId), eq(exception.status, 'active'), sql`${exception.id} <> ${a.planId}`));
-  if (live.length) throw new PlanError('This line already has a plan', 409);
+  // One plan per line, ever: the line's held ledger ends as one capture or one settlement (09).
+  const [earlier] = await tx.select({ id: exception.id, status: exception.status }).from(exception)
+    .where(and(eq(exception.policyKey, 'plan.instalments'), eq(exception.registrationId, a.lineId), sql`${exception.id} <> ${a.planId}`)).limit(1);
+  if (earlier) {
+    throw new PlanError(earlier.status === 'active'
+      ? 'This line already has a plan'
+      : `This line already had an instalment plan (${earlier.status}): one plan per line — the line is paid in full now`, 409);
+  }
 
   const rows = [...a.schedule].map((r) => ({ dueAt: new Date(r.dueAt), amount: round2(r.amount) }));
   const total = round2(rows.reduce((s, r) => s + r.amount, 0));
