@@ -404,11 +404,12 @@ receipted, reversed and refunded is §3.10.
   marking, clerical re-check, access to scripts, cash-in and late cash-in; Oxford's equivalents;
   certificate split for Cambridge and Pearson (Q-17). **Deadlines per series**
   (`board_service_deadline`: series, service, instant) replace `remark_deadline`; a service's
-  fee is a `board_fee` of the series.
+  fee is a `board_service_fee` of the series (its own table beside `board_fee`, carrying the
+  level rates and per-paper pricing; built so by step C and accepted at its review, 8 Oct).
 - **Remarks keep their own path.** A remark request stays what it is (`remark_request`, its
   states, consent, outcome, its payment with purpose `remark` and the hook that moves it on,
   ST-01); what changes: it picks a `board_service` of the line's board, its fee is read from the
-  series' `board_fee` (today's `remark_fee_schedule` by council and service becomes the default
+  series' `board_service_fee` (today's `remark_fee_schedule` by council and service becomes the default
   a new series copies; today's service types map: `clerical_check` → Cambridge 1 / Pearson
   clerical; `review_of_marking` → 2 / review of marking; `script_copy` → 1S for Cambridge (a
   copy comes only with a re-check there) / access to scripts for Pearson; `priority_review` →
@@ -573,7 +574,7 @@ Defaults seeded as settings.
 | `refund_window` (absolute dates) | kept **for converted sessions and academic years only** (their lines have no snapshot and read the windows as today); **no window is materialised from a policy** — one source for the percentage: a new line's `refund_policy_snapshot`; the overlap check and the one-scope check stay as they are; `offer_id` is not added |
 | `refund.services.ts` | **changed, not unchanged**: `refundPercentage(date, sessionId, studentId)` becomes `refundFor(line, at)` — the percent from the line's `refund_policy_snapshot` (its anchor by §3.1's precedence) or, for a converted line, from its window's absolute windows as today; then `refund.percent` and `refund.courseStart` exceptions (student, family, offer, line scope; today's `customRefundPercent` reader goes); **the amount = `course_fee_at_registration` × percent + the board fee by its rule** (Q-19's default: the board fee in full while the entry has **not been sent** — "sent" is **per line**: a line never confirmed was never sent, whatever the date; a confirmed line is sent by F4's "mark as sent" when F4 is live, else when its effective deadline has passed, else, for a series with no deadline, when its `exams_start` has passed; 0 after) in the five places that compute `priceAtRegistration × pct` today (`previewRefund`, the three swap legs, the preregistration cancel); **MO-21 keeps 100% of the whole price** (a series that never opened sent nothing and taught nothing); a line under an instalment plan refunds nothing itself (nothing was paid to the line; its deposits are settled by §3.6's rule). A custom-priced line (board fee folded in, course = total, board = 0 as `exception.services.ts` sets them) refunds its total by the course rule and never gets a board fee back, as today it refunds the whole by the window |
 | `exception` types and `value` | reshaped onto the registry with typed value columns and a nullable `student_id` plus `family_id` (§3.7) |
-| `remark_fee_schedule`, `remark_deadline` | `board_service`, `board_fee` (kind service) per series, `board_service_deadline` per series; the old tables kept one release as the defaults a new series copies; the remark request's states and payment unchanged |
+| `remark_fee_schedule`, `remark_deadline` | `board_service`, `board_service_fee` per series, `board_service_deadline` per series; the old tables kept one release as the defaults a new series copies; the remark request's states and payment unchanged |
 | `scheduled_announcement`, broadcast groups | `message` with audiences; the old rows migrate as broadcasts |
 | `computeRegistrationPricing` | `priceLine` |
 | `registration.subject_id` | kept; `offer_item_id` added |
@@ -923,7 +924,7 @@ Generated migrations on top of main's journal (0041 is free on main; the frozen 
    - **Refund windows.** Kept as they are (session or year scope).
    - **Remark fees and deadlines.** `remark_fee_schedule` rows become `board_service` defaults
      at **both** levels (the old row had none; both rows provisional); for every series that is
-     open or future at migration time, a `board_fee` (kind service) per (board, service, level)
+     open or future at migration time, a `board_service_fee` per (board, service, level)
      from the schedule; `remark_deadline` rows (per council and window) become
      `board_service_deadline` rows on each series the window feeds of that board. Existing
      remark requests are untouched (their path is kept).

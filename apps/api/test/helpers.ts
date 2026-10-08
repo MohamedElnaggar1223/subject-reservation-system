@@ -680,6 +680,37 @@ export async function refuseAudit(action: string): Promise<() => Promise<void>> 
 }
 
 /**
+ * Pause every transaction that writes one audit action, at that write, until release() is
+ * called: the trigger waits on an advisory lock the test's own connection holds, so a second
+ * request can be landed inside the first one's transaction on purpose — the race forced, not
+ * hoped for (lockWaiters counts the paused transaction). `action` is a test-supplied constant;
+ * the trigger is dropped on release (test files run one at a time, so no other suite sees it).
+ */
+export async function pauseAtAudit(action: string): Promise<() => Promise<void>> {
+  if (!/^[A-Z_]+$/.test(action)) throw new Error(`not an audit action: ${action}`);
+  const { default: pg } = await import('pg');
+  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  await client.connect();
+  await client.query('select pg_advisory_lock(40400)');
+  await sql(`create or replace function test_pause_audit() returns trigger language plpgsql as $$
+    begin
+      if new.action = '${action}' then perform pg_advisory_xact_lock(40400); end if;
+      return new;
+    end $$`);
+  await sql(`drop trigger if exists test_pause_audit on audit_log`);
+  await sql(`create trigger test_pause_audit before insert on audit_log for each row execute function test_pause_audit()`);
+  let released = false;
+  return async () => {
+    if (released) return;
+    released = true;
+    await client.query('select pg_advisory_unlock(40400)');
+    await client.end();
+    await sql(`drop trigger if exists test_pause_audit on audit_log`);
+    await sql(`drop function if exists test_pause_audit()`);
+  };
+}
+
+/**
  * The state a system expiry that committed leaves: the registration expired
  * and its REGISTRATION_EXPIRED row, written together as the app does (SO-1).
  * For tests that build a crash's aftermath by hand.

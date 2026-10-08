@@ -222,7 +222,7 @@ export async function getAvailableSubjects(
     const [line] = await legacyLinesFor(db, studentId, sessionId, [sub.id], undefined);
     const isRetake = line!.attempt === 'retake';
     if (c.retakeOnly && !isRetake) continue;
-    const d = await effectiveDeadlineFor(db, { boardSeriesId: resolved.item.boardSeriesId, attempt: line!.attempt, priorSittingSeriesId: line!.priorSittingSeriesId ?? null });
+    const d = await effectiveDeadlineFor(db, { boardSeriesId: resolved.item.boardSeriesId, attempt: line!.attempt, priorSittingSeriesId: line!.priorSittingSeriesId ?? null, studentId });
     if (!d.at || d.at <= now) continue;
     let pricing;
     let outside = null;

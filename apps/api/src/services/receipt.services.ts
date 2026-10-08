@@ -129,6 +129,15 @@ function chargeReceiptNumberFor(chargeId: string): string {
  * The registration row must already be status-guarded by the caller
  * (confirmed → target status update is done HERE with the guard).
  */
+/**
+ * A line's receipt, when it has one, locked FOR UPDATE — taken **before the line** wherever both are
+ * (MONEY_AUDIT.md MA-16: the order of a reversal, a void, a return and the receipt-gated drop; the
+ * opposite order deadlocks a drop against a reversal). docs/features/RESERVATIONS.md §2.1.
+ */
+export async function lockReceiptOf(tx: Tx, registrationId: string) {
+  await tx.select({ id: receipt.id }).from(receipt).where(eq(receipt.registrationId, registrationId)).for('update');
+}
+
 export async function executeReceiptGatedDrop(
   tx: Tx,
   args: {

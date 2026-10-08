@@ -290,6 +290,10 @@ export const sessionsArabic: Record<string, string> = {
   'Retakes until (your clock)': 'الإعادات حتى (بتوقيتك)',
   'Past it, every payment still unconfirmed for this series closes on its own (wallet money returned, families told) and every registration still waiting expires. It may fall while a session is still open: what is entered in this series stops at it, and the rest of the session goes on. A retake of the board\'s previous sitting runs to the retake date where the board gives one (Cambridge). Leave the deadline empty and the exams\' start is the cut-off.':
     'بعده تُغلق تلقائيًا كل دفعة غير مؤكدة لهذه الدورة (ويعود مال المحفظة وتُبلَّغ الأسر) وينتهي كل تسجيل ما زال منتظرًا. ويمكن أن يقع والجلسة مفتوحة: ما يُقيَّد في هذه الدورة يتوقف عنده ويستمر باقي الجلسة. وإعادة الدورة السابقة للمجلس تمتد حتى موعد الإعادات حين يحدده المجلس (كامبريدج). وإن تُرك الموعد فارغًا فبداية الامتحانات هي الحد.',
+
+  // ── Notifications (a line's price) ──
+  'Price Changed': 'تغيّر السعر',
+  'Price To Be Confirmed': 'السعر في انتظار التأكيد',
 };
 
 const MONTHS_AR: Record<string, string> = { January: 'يناير', June: 'يونيو', October: 'أكتوبر', November: 'نوفمبر' };

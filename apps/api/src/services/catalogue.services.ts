@@ -41,7 +41,7 @@ import { attachSeries, detachUnusedSeries, defaultSeriesFor, findOrCreateSeries 
 import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
 import { effectiveDeadlinesOf, effectiveDeadlineFor, redateLines } from './deadline.services';
 import { itemBoardFees, PricingError } from './pricing.services';
-import { repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
+import { lockFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
 import { recheckLines, LineRuleError } from './line-rules.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -467,7 +467,9 @@ function levelWord(level: string): string {
  * deadlines). The subject screen's board field and the Catalogue's mapping both come here.
  *
  * Locks, in order: the subject (caller), the affected students (FOR NO KEY UPDATE, as a
- * reservation takes them), the items, the lines (id order), the series involved.
+ * reservation takes them), the items, the subject's fee rows in the series they go to (FOR SHARE,
+ * after the old board's fee is carried there: Confirm's order, fee rows then lines — the review of
+ * 40c1447), the lines (id order), the series involved.
  */
 export async function applyBoardChange(
   tx: Tx, s: typeof subject.$inferSelect, newBoard: string, actorId: string | null, locked: Set<string>, names?: Map<string, string>,
@@ -475,8 +477,6 @@ export async function applyBoardChange(
   const boardNamesNow = names ?? (await boardNames(tx));
   await boardOrThrow(newBoard, tx);
   const plan = await followBoardChange(tx, s, newBoard, boardNamesNow, actorId, locked);
-  // What each item's board part was in the old board's series (read before its keys change).
-  const oldFees = await itemBoardFees(tx, plan.items.map((i) => i.id));
   await tx.update(subject).set({ council: newBoard, qualificationId: null, updatedAt: new Date() }).where(eq(subject.id, s.id));
   await tx.delete(subjectUnit).where(eq(subjectUnit.subjectId, s.id));
   const why = `The subject's board changed to ${boardName(boardNamesNow, newBoard)}`;
@@ -488,20 +488,6 @@ export async function applyBoardChange(
     await tx.insert(sessionOfferItemFeeKey).values({ id: randomUUID(), itemId: it.id, keyKind: 'subject', subjectId: s.id });
     await tx.update(sessionOfferItem).set({ boardSeriesId: it.to, entersKind: 'subject', qualificationId: null, qualificationOptionId: null, updatedAt: now })
       .where(eq(sessionOfferItem.id, it.id));
-    // The subject stays reservable in the new board's series: its fee there, when finance has not
-    // set one, is the old board's amount, **provisional** — priced, not payable until finance
-    // confirms the new board's fee on the Fees tab (RESERVATIONS_REWORK.md §3.4).
-    const was = oldFees.get(it.id)?.amount;
-    if (was !== null && was !== undefined) {
-      const [carried] = await tx.insert(boardFee).values({
-        id: randomUUID(), boardSeriesId: it.to, keyKind: 'subject', subjectId: s.id, amount: was, provisional: true,
-        zeroReason: was === 0 ? 'Carried by a board change' : null, createdBy: actorId,
-      }).onConflictDoNothing().returning({ id: boardFee.id });
-      if (carried) {
-        await logAction(actorId, 'BOARD_FEES_SET', 'board_fee', carried.id, null,
-          { boardSeriesId: it.to, keyKind: 'subject', keyId: s.id, amount: was, provisional: true, reason: `${why}: the old board's fee, provisional until confirmed` }, undefined, tx);
-      }
-    }
   }
   for (const m of plan.moved) {
     await tx.update(registration).set({ boardSeriesId: m.to, updatedAt: now }).where(eq(registration.id, m.id));
@@ -602,6 +588,38 @@ async function followBoardChange(tx: Tx, s: typeof subject.$inferSelect, newBoar
   // while the change waited for the subject sends it round again with that student first.
   assertStudentsLocked(locked, live.map((l) => l.studentId));
   await tx.select({ id: sessionOfferItem.id }).from(sessionOfferItem).where(inArray(sessionOfferItem.id, items.map((i) => i.id))).orderBy(sessionOfferItem.id).for('update');
+  // Where each item goes, and the fee it will read there, before the lines (Confirm's order).
+  const level = s.qualificationLevel === 'igcse' ? 'igcse' : s.qualificationLevel === 'as_level' ? 'as' : 'a_level';
+  const targets = new Map<string, string>();
+  for (const it of items) {
+    const [fromRow] = await tx.select().from(boardSeries).where(eq(boardSeries.id, it.seriesId));
+    try {
+      targets.set(it.id, await boardChangeTarget(tx, it, fromRow!, newBoard, level, actorId));
+    } catch (err) {
+      throw new CatalogueError(`${it.sessionName}: ${err instanceof Error ? err.message : 'no series of the new board fits'}`);
+    }
+  }
+  // The subject stays reservable in the new board's series: its fee there, when finance has not
+  // set one, is the old board's amount, **provisional** — priced, not payable until finance
+  // confirms the new board's fee on the Fees tab (RESERVATIONS_REWORK.md §3.4). Then the
+  // subject's row in each of those series is held FOR SHARE: a Confirm of it waits for the change
+  // and reaches the moved lines, or lands first and is read confirmed (the review of 40c1447).
+  const why = `The subject's board changed to ${boardName(names, newBoard)}`;
+  const oldFees = await itemBoardFees(tx, items.map((i) => i.id));
+  for (const it of items) {
+    const to = targets.get(it.id)!;
+    const was = oldFees.get(it.id)?.amount;
+    if (was === null || was === undefined) continue;
+    const [carried] = await tx.insert(boardFee).values({
+      id: randomUUID(), boardSeriesId: to, keyKind: 'subject', subjectId: s.id, amount: was, provisional: true,
+      zeroReason: was === 0 ? 'Carried by a board change' : null, createdBy: actorId,
+    }).onConflictDoNothing().returning({ id: boardFee.id });
+    if (carried) {
+      await logAction(actorId, 'BOARD_FEES_SET', 'board_fee', carried.id, null,
+        { boardSeriesId: to, keyKind: 'subject', keyId: s.id, amount: was, provisional: true, reason: `${why}: the old board's fee, provisional until confirmed` }, undefined, tx);
+    }
+  }
+  await lockFeeRows(tx, [...new Set(targets.values())].map((seriesId) => ({ seriesId, keyKind: 'subject', keyId: s.id })));
   const lines = live.length ? await tx.select().from(registration).where(inArray(registration.id, live.map((l) => l.id))).orderBy(registration.id).for('update') : [];
   const now = new Date();
   const current = await effectiveDeadlinesOf(tx, lines.map((l) => l.id));
@@ -616,14 +634,7 @@ async function followBoardChange(tx: Tx, s: typeof subject.$inferSelect, newBoar
   const plan: { id: string; sessionId: string; from: string; to: string }[] = [];
   const moved: { id: string; from: string | null; to: string }[] = [];
   for (const it of items) {
-    const level = s.qualificationLevel === 'igcse' ? 'igcse' : s.qualificationLevel === 'as_level' ? 'as' : 'a_level';
-    const [fromRow] = await tx.select().from(boardSeries).where(eq(boardSeries.id, it.seriesId));
-    let to: string;
-    try {
-      to = await boardChangeTarget(tx, it, fromRow!, newBoard, level, actorId);
-    } catch (err) {
-      throw new CatalogueError(`${it.sessionName}: ${err instanceof Error ? err.message : 'no series of the new board fits'}`);
-    }
+    const to = targets.get(it.id)!;
     const mine = lines.filter((l) => l.offerItemId === it.id);
     if (mine.length) {
       const [from, target] = await Promise.all([

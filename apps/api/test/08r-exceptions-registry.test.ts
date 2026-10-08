@@ -8,7 +8,7 @@ import { admin, staff, onboard, subject, session, refused, one, sql, money, open
  * Every policy an exception can lift is one entry of the registry: who may grant it, the value it
  * takes, the scopes it accepts and what none means, one-shot or not. Grants are checked against it;
  * every hook reads exceptions through it (the student's own, or the family's: every linked child);
- * the eight V3 types were moved onto it by migration 0045 — the same mapping its trigger applies to
+ * the eight V3 types were moved onto it by migration 0046 — the same mapping its trigger applies to
  * a V3-shaped row — and the two whose meaning changed wait under "Check these".
  *
  * Course fee 1,000 and board fee 500 (a line of 1,500).

@@ -13,16 +13,18 @@ progress log is the last section.
 
 ## 1. The data model
 
-Everything is in `packages/db/src/schema.ts`. Migrations after A's 0043:
-`0044_rework_money_structure` (generated, additive), `0045_rework_money_backfill` (custom,
+Everything is in `packages/db/src/schema.ts`. Migrations after main's 0044 (A's follow-ups):
+`0045_rework_money_structure` (generated, additive), `0046_rework_money_backfill` (custom,
 idempotent: run twice on the dev copy, the second run inserts nothing), and
-`0046_rework_money_constraints` (what the backfill makes true).
+`0047_rework_money_constraints` (what the backfill makes true). Renumbered from 0044–0046 when
+main took A's 0044; each journal `when` is later than main's last, so the migrator applies them
+after it on a database that already has main's (drizzle applies only newer entries).
 
 ### 1.1 `exception` (reshaped, §3.7)
 
 One row lifts one policy of the registry for one holder, optionally narrowed.
 
-- **The policy**: `policy_key` (not null after 0046), a key of `POLICIES`
+- **The policy**: `policy_key` (not null after 0047), a key of `POLICIES`
   (`packages/validations/src/exception/policies.ts`). `type` stays for V3's eight types (null on
   a new-shape row).
 - **The holder**: `student_id` **or** `family_id` (a parent account: every child linked to it,
@@ -32,12 +34,12 @@ One row lifts one policy of the registry for one holder, optionally narrowed.
   `board_series_id`, `academic_year`. What no scope means is the policy's `nullScope`.
 - **The value**, in its type's column: `value_number` (a percent or an amount), `value_date`,
   `value_json` (a plan's schedule). `value` (V3's) is kept: a V3-shaped insert is filled by the
-  trigger `exception_legacy_fill` (0045) exactly as the backfill maps it.
+  trigger `exception_legacy_fill` (0046) exactly as the backfill maps it.
 - **The life**: `status` (`active`, `revoked`, `lapsed`, `used` — a one-shot gate used by the
   reservation it let through, `used_at`, `used_for.registrationIds`), `valid_until`,
   `revoke_reason`; `check_reason` / `confirmed_at` / `confirmed_by` for "Check these".
 
-The eight V3 types map in 0045 (`exception_policy_from_legacy`): `discount_percent` →
+The eight V3 types map in 0046 (`exception_policy_from_legacy`): `discount_percent` →
 `price.discountPercent`, `discount_fixed` → `price.discountFixed`, `custom_price` →
 `price.custom`, `fee_waiver` → `gate.schoolFee`, `deadline_extension` and `late_registration` →
 `deadline.window` with `value_date` = their `valid_until`, `custom_refund_percent` →
@@ -58,9 +60,9 @@ moved exception.
   until the owner answers Q-21.
 - `board_service_fee` — the fee per series × service × level (`igcse` or `as_a_level`),
   `provisional` until confirmed, `copied_from_default` when it came from V3's
-  `remark_fee_schedule` (0045 copies each V3 remark fee, provisional, into every open or
+  `remark_fee_schedule` (0046 copies each V3 remark fee, provisional, into every open or
   future series of that board at both levels, with `REWORK_BACKFILL_SERVICE` rows).
-- `board_service_deadline` — the board's last date for a service in a series. 0045 moves each
+- `board_service_deadline` — the board's last date for a service in a series. 0046 moves each
   V3 `remark_deadline` (board × window × service) onto the series the window's items sit in;
   two windows feeding one series keep the earlier date.
 - `remark_request` gains `board_service_id` and `service_level`.
@@ -83,7 +85,7 @@ fee, a preregistration, a remark). `payment_method` gains `held_deposits` (a pla
 
 ### 1.4 Receipts and the ledger
 
-- `receipt.registration_id` is nullable and `receipt.charge_id` added (unique); 0046's
+- `receipt.registration_id` is nullable and `receipt.charge_id` added (unique); 0047's
   `receipt_one_subject` checks a receipt is for exactly one line or one charge. A charge's
   receipt is `RCP-C…` (`-R` when reissued after a reversal).
 - `escrow_transaction.related_charge_id` (a charge's refund). New ledger reasons: `instalment`
@@ -412,9 +414,10 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
 6. **Arabic pages log a hydration mismatch** on every page (A's Sessions too): the
    `I18nProvider` reads the language from `localStorage` in its initial state on the client.
    Not this step's; worth one fix in the provider.
-7. **Migration numbers** 0044–0046 follow A's 0043; if B's land first on main, mine are
-   regenerated at merge (`drizzle-kit generate --name rework_money_structure`, the two custom
-   files renumbered) — their content does not depend on B's.
+7. **Migration numbers**: renumbered 0045–0047 after main's 0044 (A's follow-ups; the
+   snapshots re-chained, `drizzle-kit generate` reports no change). B's 0045 lands before mine,
+   so they are renumbered once more at my final merge (/tmp/rwc/renumber.py does it: files,
+   journal, snapshots, a `when` after main's last).
 8. **A plan whose `valid_until` passed but whose lapse has not run** is still live for a
    confirmation until the next tick claims it (the plan is live while its exception is
    `active`, §3.6). The tick runs every minute.

@@ -23,25 +23,80 @@ import { logActions } from './audit.services';
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
 
-export type LineDeadlineKey = { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null };
+export type LineDeadlineKey = {
+  boardSeriesId: string | null;
+  attempt: string;
+  priorSittingSeriesId: string | null;
+  /**
+   * Step B's `registration.declaration_rejected`: a retake whose declared sitting the school
+   * rejected is a first entry for the board — its deadline is the entry deadline (§3.5).
+   */
+  declarationRejected?: boolean | null;
+  /** The line's student: a late board entry granted to them (Q-20) is read when given. */
+  studentId?: string | null;
+};
 export type DeadlineKind = 'retake' | 'entry' | 'exams_start';
 export type EffectiveDeadline = { at: Date | null; kind: DeadlineKind | null };
 
 const asDate = (v: unknown): Date | null => (v === null || v === undefined ? null : v instanceof Date ? v : new Date(String(v)));
 
-/** The SQL expression of a registration row's effective deadline (`alias` is the row's table alias). */
+/**
+ * The SQL expression of a registration row's effective deadline (`alias` is the row's table alias).
+ * With step B merged it passes the row's `declaration_rejected` as the fourth argument (0044).
+ */
 export function lineDeadlineSql(alias = 'r') {
   return sql.raw(`line_effective_deadline(${alias}.attempt, ${alias}.prior_sitting_series_id, ${alias}.board_series_id)`);
 }
 
-/** One line's effective deadline and which date it is. */
+/**
+ * Q-20: a late board entry granted to one student in one series (`deadline.boardEntry`, step C's
+ * registry, its `value_date`) is that student's entry deadline there — read only while the setting
+ * `exceptions.boardEntryDeadline` is on; off, the board's deadline is a hard stop (MO-10) and a
+ * grant made while it was on changes nothing.
+ */
+export async function lateEntryUntil(executor: Executor, studentId: string, boardSeriesId: string): Promise<Date | null> {
+  if (!(await getSetting('exceptions.boardEntryDeadline', executor))) return null;
+  const granted = await lineExceptions.active(executor, studentId, ['deadline.boardEntry'], { boardSeriesId });
+  const dates = granted.filter((e) => e.valueDate && e.scope.boardSeriesId === boardSeriesId).map((e) => e.valueDate!.getTime());
+  return dates.length ? new Date(Math.max(...dates)) : null;
+}
+
+/**
+ * One line's effective deadline and which date it is: a rejected declaration reads as a first
+ * entry; with the student given, a late board entry (Q-20, while its setting is on) moves an
+ * entry or retake deadline later to its date.
+ */
 export async function effectiveDeadlineFor(executor: Executor, line: LineDeadlineKey): Promise<EffectiveDeadline> {
   if (!line.boardSeriesId) return { at: null, kind: null };
+  const rejected = !!line.declarationRejected;
   const r = await executor.execute(sql`
-    select line_effective_deadline(${line.attempt}, ${line.priorSittingSeriesId}, ${line.boardSeriesId}) as at,
-           line_effective_deadline_kind(${line.attempt}, ${line.priorSittingSeriesId}, ${line.boardSeriesId}) as kind`);
+    select line_effective_deadline(${line.attempt}, ${line.priorSittingSeriesId}, ${line.boardSeriesId}, ${rejected}) as at,
+           line_effective_deadline_kind(${line.attempt}, ${line.priorSittingSeriesId}, ${line.boardSeriesId}, ${rejected}) as kind`);
   const row = r.rows[0] as { at: unknown; kind: DeadlineKind | null } | undefined;
-  return { at: asDate(row?.at), kind: row?.kind ?? null };
+  const base = { at: asDate(row?.at), kind: row?.kind ?? null };
+  if (line.studentId && base.at && base.kind !== 'exams_start') {
+    const late = await lateEntryUntil(executor, line.studentId, line.boardSeriesId);
+    if (late && late > base.at) return { at: late, kind: 'entry' };
+  }
+  return base;
+}
+
+/**
+ * The deadline sweep's exemption (Q-20): of a series' live lines, those whose student holds a late
+ * entry there still ahead of `now` — none while the setting is off.
+ */
+export async function linesKeptByLateEntry(executor: Executor, boardSeriesId: string, now: Date): Promise<string[]> {
+  if (!(await getSetting('exceptions.boardEntryDeadline', executor))) return [];
+  const rows = await executor.select({ id: registration.id, studentId: registration.studentId }).from(registration)
+    .where(and(eq(registration.boardSeriesId, boardSeriesId), sql`${registration.status} not in ('rejected', 'expired', 'dropped')`));
+  const until = new Map<string, Date | null>();
+  const kept: string[] = [];
+  for (const r of rows) {
+    if (!until.has(r.studentId)) until.set(r.studentId, await lateEntryUntil(executor, r.studentId, boardSeriesId));
+    const d = until.get(r.studentId);
+    if (d && d > now) kept.push(r.id);
+  }
+  return kept;
 }
 
 /** The effective deadlines of stored lines, by id. */

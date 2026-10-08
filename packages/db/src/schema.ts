@@ -1893,7 +1893,7 @@ export const refundWindow = pgTable(
  * its validUntil, or its plan's line ended), used (a one-shot gate used by the reservation it let
  * through; a plan captured into its line).
  *
- * The eight V3 types were moved onto policy keys by migration (0045); `type` and `value` are kept
+ * The eight V3 types were moved onto policy keys by migration (0046); `type` and `value` are kept
  * one release and read by nothing. A migrated subject-scoped deadline or refund exception, and a
  * price exception scoped to an old unit row, carries `check_reason`: it applies only once a finance
  * admin confirms it ("Check these").
@@ -1958,7 +1958,7 @@ export const exception = pgTable(
     check("exception_value_nonneg", sql`${table.value} IS NULL OR ${table.value} >= 0`),
     check("exception_value_number_nonneg", sql`${table.valueNumber} IS NULL OR ${table.valueNumber} >= 0`),
     check("exception_status_valid", sql`${table.status} IN ('active', 'revoked', 'lapsed', 'used')`),
-    // A student or a family, never both, never neither (0046, after the backfill).
+    // A student or a family, never both, never neither (0047, after the backfill).
     check("exception_one_holder", sql`num_nonnulls(${table.studentId}, ${table.familyId}) = 1`),
   ]
 );

@@ -451,6 +451,26 @@ describe('money invariants over the whole database', () => {
     expect(Number((await sql<{ n: string }>(`select count(*) as n from registration where pricing_basis is not null`))[0]?.n)).toBeGreaterThan(0);
   });
 
+  it('no waiting line is still provisional when every fee row it was priced from is confirmed at the amount it recorded (a Confirm reaches every line read from its rows)', async () => {
+    // Confirm clears a line whose basis rows are all confirmed at the amounts it recorded; a row
+    // confirmed at another amount leaves the line to the Re-price, so it is not counted here. A
+    // move racing a Confirm left the moved line provisional on a confirmed row until a second
+    // Confirm (the review of 40c1447): the move now holds the new series' rows before its lines.
+    const stuck = await sql(`
+      select r.id, r.status, r.pricing_basis->'feeRows' as rows from registration r
+      where r.price_provisional and r.status in ('pending_approval', 'pending_payment', 'preregistered')
+        and jsonb_array_length(coalesce(r.pricing_basis->'feeRows', '[]'::jsonb)) > 0
+        and not exists (
+          select 1 from jsonb_array_elements(r.pricing_basis->'feeRows') fr
+          left join board_fee f on f.id = fr->>'id'
+          where f.id is null or f.provisional or ${cents('f.amount')} <> ${cents("(fr->>'amount')::numeric")})
+    `);
+    expect(stuck).toEqual([]);
+    // There is something to check: Confirms that made waiting lines payable, and lines still waiting on a provisional row.
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from audit_log where action = 'BOARD_FEES_CONFIRMED' and (new_data->>'linesNoLongerProvisional')::int > 0`))[0]?.n)).toBeGreaterThan(0);
+    expect(Number((await sql<{ n: string }>(`select count(*) as n from registration where price_provisional and status in ('pending_approval', 'pending_payment', 'preregistered')`))[0]?.n)).toBeGreaterThan(0);
+  });
+
   it('one live line per student, unit or award and series, across sessions (§3.5 gate.sameEntryOnce)', async () => {
     // A line's entry keys: its award (an award or option item), each of its units, or its subject
     // row (an item entering the subject as a whole). Two live lines of a student in one series

@@ -313,22 +313,29 @@
     {
       "idx": 44,
       "version": "7",
-      "when": 1791413621594,
-      "tag": "0044_rework_money_structure",
+      "when": 1791425757386,
+      "tag": "0044_rework_sessions_followups",
       "breakpoints": true
     },
     {
       "idx": 45,
       "version": "7",
-      "when": 1791413698839,
-      "tag": "0045_rework_money_backfill",
+      "when": 1791429221338,
+      "tag": "0045_rework_money_structure",
       "breakpoints": true
     },
     {
       "idx": 46,
       "version": "7",
-      "when": 1791413761670,
-      "tag": "0046_rework_money_constraints",
+      "when": 1791429222338,
+      "tag": "0046_rework_money_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1791429223338,
+      "tag": "0047_rework_money_constraints",
       "breakpoints": true
     }
   ]
