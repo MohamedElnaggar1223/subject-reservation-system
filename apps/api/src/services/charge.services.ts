@@ -54,10 +54,15 @@ const FINANCE_DECIDES = ['admin', 'finance_admin'] as const;
 
 // ─── Deadlines and fees ──────────────────────────────────────────────────────
 
-/** A charge's deadline (§3.10 items 1 and 4): an instalment's line's, a board service's series', else none. */
+/**
+ * A charge's deadline (§3.10 items 1 and 4): an instalment's line's, a board service's series', else none.
+ * An instalment's is its line's effective deadline as the line's own checks read it — with the
+ * student, so a late board entry the student holds (Q-20, while its setting is on) moves it too
+ * (the review of step C, item 7).
+ */
 export async function chargeDeadline(executor: Executor, c: Pick<ChargeRow, 'kind' | 'registrationId' | 'boardSeriesId' | 'boardServiceId'>): Promise<Date | null> {
   if (c.kind === 'instalment' && c.registrationId) {
-    const [l] = await executor.select({ boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId })
+    const [l] = await executor.select({ boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId, studentId: registration.studentId })
       .from(registration).where(eq(registration.id, c.registrationId));
     return l ? (await effectiveDeadlineFor(executor, l)).at : null;
   }

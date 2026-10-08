@@ -2,15 +2,21 @@
  * Which lines have a payment history, so their price no longer changes on its own (§3.4, §3.6;
  * docs/features/RESERVATIONS.md §2.12).
  *
- * A line's price is what its payment charges: once money has been taken or is being taken for it,
- * a re-price would leave a payment for a price the line no longer has. Money for a line comes on
- * three paths, and each counts:
+ * A line's price is what its payment charges: once money has been taken or is being taken toward
+ * it, a re-price would leave a payment for a price the line no longer has. Money toward a line's
+ * price comes on three paths, and each counts:
  * - a payment of the line itself (`payment_registration`, any status: open, failed or paid);
  * - a live instalment plan on the line: its deposits sit in the held wallet, earmarked for the
  *   line, and the capture pays exactly the line's price from them — a re-price would leave the
  *   deposits short of it and the capture refused for ever;
- * - a charge against the line (an instalment, a price adjustment, a service for the line) that is
- *   paid, refunded, or has a payment open.
+ * - a charge that pays toward the line's price, paid, refunded or with a payment open: an
+ *   instalment of a live or captured plan, or a price adjustment of the line.
+ *
+ * Not counted (the review of step C, item 9): a charge for a service the line is the subject of
+ * (a cash-in, a certificate split, a late-entry fee, a custom charge) — it pays for the service,
+ * not toward the line's price; and the instalments of a plan released in full or settled — their
+ * deposits went back to escrow or were kept by the settlement, so the line's price no longer
+ * rests on them (a line released in full is paid in full at whatever it costs then).
  *
  * Every path that re-prices a waiting line asks this first and lists the line instead of
  * re-pricing it: the board fee's re-price (`repriceLines`), a series move (`repriceMovedLines`),
@@ -28,7 +34,7 @@ export type PaymentHistory = 'payment' | 'plan' | 'charge';
 export const PAYMENT_HISTORY_REASON: Record<PaymentHistory, string> = {
   payment: 'has a payment (open, failed or paid)',
   plan: 'is paid by its instalment plan',
-  charge: 'has a charge against it paid or being paid',
+  charge: 'has a price adjustment or an instalment paid or being paid',
 };
 
 export async function paymentHistoryOf(executor: Executor, lineIds: readonly string[]): Promise<Map<string, PaymentHistory>> {
@@ -43,6 +49,8 @@ export async function paymentHistoryOf(executor: Executor, lineIds: readonly str
     union all
     select c.registration_id, 3, 'charge' from charge c
       where c.registration_id in (${ids})
+        and (c.kind = 'price_adjustment' or (c.kind = 'instalment' and exists (
+          select 1 from exception e where e.id = c.plan_exception_id and e.status in ('active', 'used'))))
         and (c.status in ('paid', 'refunded') or exists (
           select 1 from payment_charge pc join payment p on p.id = pc.payment_id
           where pc.charge_id = c.id and p.status in ('pending', 'pending_verification', 'completed')))

@@ -281,7 +281,16 @@ describe('08r: the exceptions registry', () => {
        from registration where id = $1`, [id]);
     // The settings' shares: 50% of the course fee, the board fee in full (A-16).
     const plain = await onboard(officer, 'xr-ss-plain', 12);
-    expect(await lineOf(await reserve(plain.studentId))).toMatchObject({ p: 1000, course: 500, board: 500, cp: 50, bp: 100, ids: [] });
+    const plainLine = await reserve(plain.studentId);
+    expect(await lineOf(plainLine)).toMatchObject({ p: 1000, course: 500, board: 500, cp: 50, bp: 100, ids: [] });
+    // Never one line (the review of step C, item 3): priceLine passes no line id and a grant
+    // re-prices a line only for price.* — a line-scoped share would be granted and applied nowhere.
+    for (const policyKey of ['pricing.selfStudyCoursePercent', 'pricing.selfStudyBoardPercent', 'pricing.retakeTaughtCoursePercent', 'pricing.onePaperCoursePercent'] as const) {
+      const lineOnly = await refused(finadmin.api.v1.exceptions.$post({ json: { policyKey, studentId: plain.studentId, scope: { registrationId: plainLine }, value: 30, reason: 'one line only' } }));
+      expect(lineOnly).toMatchObject({ status: 400, error: expect.stringMatching(/ cannot be narrowed by line$/) });
+    }
+    expect(await sql(`select id from exception where student_id = $1`, [plain.studentId])).toEqual([]);
+    expect(await lineOf(plainLine)).toMatchObject({ p: 1000, cp: 50, ids: [] });
     // One student: 30% of the course fee.
     const f = await onboard(officer, 'xr-ss-student', 12);
     const mine = await apiResponse(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'pricing.selfStudyCoursePercent', studentId: f.studentId, scope: { sessionId: june }, value: 30, reason: 'studies abroad, taught by the school online' } }));
@@ -306,13 +315,14 @@ describe('08r: the exceptions registry', () => {
       [w.studentId, subj.S9!, finadmin.id])).id;
     await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: s }, json: { reason: 'the window ended' } }));
     const reserve = (subjectId: string) => officer.api.v1.registrations.desk.$post({ json: { studentId: w.studentId, sessionId: s, subjectIds: [subjectId] } });
-    // Under "Check these", it applies to nothing.
-    expect((await refused(reserve(subj.S9!))).status).toBeGreaterThanOrEqual(400);
+    // Under "Check these", it applies to nothing: the closed window's own refusal.
+    const closed = 'Registration window is not open — a finance admin can grant this student a deadline extension';
+    expect(await refused(reserve(subj.S9!))).toEqual({ status: 422, error: closed });
     await apiResponse(finadmin.api.v1.exceptions[':id'].confirm.$post({ param: { id: ext }, json: { note: 'confirmed with the family' } }));
     // Confirmed: that subject, after the close; another subject still refused.
     const line = (await apiResponse(reserve(subj.S9!))).registrations[0]!.id;
     expect(await one(`select status, session_id as s from registration where id = $1`, [line])).toEqual({ status: 'pending_payment', s });
-    expect((await refused(reserve(subj.S10!))).status).toBeGreaterThanOrEqual(400);
+    expect(await refused(reserve(subj.S10!))).toEqual({ status: 422, error: closed });
     // And paid at the desk, still under it.
     const paid = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: w.studentId, registrationIds: [line], instrumentUsed: 'cash' } }));
     expect(paid.collected).toBe(1500);
@@ -334,7 +344,8 @@ describe('08r: the exceptions registry', () => {
       // Reserved and paid after the series' deadline; another student is still refused.
       const paid = await apiResponse(reserve(h.studentId, subj.S11!, true));
       expect(await one(`select status from registration where id = $1`, [paid.registrations[0]!.id])).toEqual({ status: 'confirmed' });
-      expect((await refused(reserve(k.studentId, subj.S11!))).status).toBeGreaterThanOrEqual(400);
+      const pastEntry = /^The registration window is not open: the exam board's entry deadline for this series \(.+\) has passed$/;
+      expect(await refused(reserve(k.studentId, subj.S11!))).toMatchObject({ status: 422, error: expect.stringMatching(pastEntry) });
       // An unpaid late line is kept by the deadline sweep until the late date.
       const waiting = (await apiResponse(reserve(h.studentId, subj.S12!))).registrations[0]!.id;
       await runPaymentDeadlines();
@@ -344,7 +355,8 @@ describe('08r: the exceptions registry', () => {
       await setting(false);
     }
     // Off: no new grant, and the one granted is no longer read.
-    expect((await refused(adm.api.v1.exceptions.$post({ json: { policyKey: 'deadline.boardEntry', studentId: k.studentId, scope: { boardSeriesId: series }, value: day(5), reason: 'late' } }))).status).toBe(409);
-    expect((await refused(reserve(h.studentId, subj.S10!))).status).toBeGreaterThanOrEqual(400);
+    expect(await refused(adm.api.v1.exceptions.$post({ json: { policyKey: 'deadline.boardEntry', studentId: k.studentId, scope: { boardSeriesId: series }, value: day(5), reason: 'late' } })))
+      .toMatchObject({ status: 409, error: expect.stringContaining('Late board entries are off') });
+    expect(await refused(reserve(h.studentId, subj.S10!))).toMatchObject({ status: 422, error: expect.stringMatching(/^The registration window is not open: the exam board's entry deadline for this series \(.+\) has passed$/) });
   });
 });

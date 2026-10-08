@@ -78,7 +78,10 @@ const ACADEMIC = [ROLES.ADMIN, ROLES.COORDINATOR] as const;
 
 const percentPolicy = (label: string, sentence: string): PolicyDefinition => ({
   group: 'price', label, sentence, valueType: 'percent', min: 0, max: 100,
-  scopes: ['session', 'subject', 'offer', 'item', 'line'], nullScope: 'every session',
+  // A student's or a family's share (the design's pricing.* keys), narrowed to a session, a
+  // subject, an offer or an item — never one line: priceLine reads them when a line is priced
+  // and passes no line id, and a grant re-prices a line only for price.* (the review of step C, item 3).
+  scopes: ['session', 'subject', 'offer', 'item'], nullScope: 'every session',
   // priceLine (step A, on main since b438976) reads them through the adapter in place of the
   // settings' percents and records the ones it applied in the line's pricing basis.
   oneShot: false, grantRoles: FINANCE, hook: 'priceLine', status: 'live',

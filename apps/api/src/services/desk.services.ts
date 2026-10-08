@@ -496,7 +496,7 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
   // The reservations rework (§3.10 item 1): the student's charges in the same action, each group
   // its own payment (lines per entry deadline, charges per service deadline or per plan line).
   const chargeRows = data.chargeIds.length
-    ? await db.select({ id: charge.id, studentId: charge.studentId, amount: charge.amount, kind: charge.kind }).from(charge).where(inArray(charge.id, data.chargeIds))
+    ? await db.select({ id: charge.id, studentId: charge.studentId, amount: charge.amount, kind: charge.kind, registrationId: charge.registrationId }).from(charge).where(inArray(charge.id, data.chargeIds))
     : [];
   if (chargeRows.length !== data.chargeIds.length || chargeRows.some((c) => c.studentId !== data.studentId)) {
     throw new Error('One or more charges do not belong to this student');
@@ -512,16 +512,25 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
   const payments = await db.transaction(async (tx) => {
     const made: DeskPayment[] = [];
     let escrowLeft = escrowToApply;
-    if (lineIds.length) {
-      // Same guard as an app checkout (MA-06): lock the subjects, then make sure
-      // nothing else is already paying for them.
-      const locked = await tx
+    // Every line the collection touches — the lines it pays and the plan lines of the instalments
+    // it takes — in one id-ordered pass (§2.1: the lines in id order), before the charges: a fee
+    // re-price or a series move takes the same lines in the same order, so neither waits on the
+    // other holding a line the other has (the review of step C, item 5; 08t).
+    const planLineIds = chargeRows.filter((c) => c.kind === 'instalment' && c.registrationId).map((c) => c.registrationId!);
+    const touched = [...new Set([...lineIds, ...planLineIds])].sort();
+    const held = touched.length
+      ? await tx
         .select({ id: registration.id, status: registration.status, price: registration.priceAtRegistration })
         .from(registration)
-        .where(inArray(registration.id, lineIds))
+        .where(inArray(registration.id, touched))
         .orderBy(registration.id)
-        .for('update');
-      if (locked.some((r) => r.status !== 'pending_payment')) {
+        .for('update')
+      : [];
+    if (lineIds.length) {
+      // Same guard as an app checkout (MA-06): the subjects locked (above), then make sure
+      // nothing else is already paying for them.
+      const locked = held.filter((r) => lineIds.includes(r.id));
+      if (locked.length !== lineIds.length || locked.some((r) => r.status !== 'pending_payment')) {
         throw new Error('One or more subjects are not waiting for payment');
       }
       // The prices read before the lock still hold (a re-price may have committed in between, §3.4).
@@ -553,6 +562,7 @@ async function collectLinesAndCharges(staffId: string, data: DeskCollectType, au
       const expected = new Map(chargeRows.map((c) => [c.id, c.amount]));
       const charges = await createChargePaymentsInTx(tx, {
         studentId: data.studentId, payerParentId, actorId: staffId, chargeIds: data.chargeIds, method: 'in_school', escrowToApply: escrowLeft, desk: true, expected, auditCtx,
+        linesHeld: true,
       });
       made.push(...charges.map((c) => ({ id: c.id, amount: c.amount, escrowApplied: c.escrowApplied, registrationIds: [] as string[], chargeIds: c.chargeIds, series: [c.description], entryDeadline: c.deadline })));
     }

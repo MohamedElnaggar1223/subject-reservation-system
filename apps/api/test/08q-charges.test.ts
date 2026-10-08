@@ -774,6 +774,27 @@ describe('08q: instalment plans', () => {
     expect((await refused(finadmin.api.v1.exceptions.$post({ json: { policyKey: 'price.discountFixed', studentId: f.studentId, scope: { registrationId: c! }, value: 100, reason: 'after a paid adjustment' } }))).status).toBe(409);
   });
 
+  it('only what paid toward the line keeps its price: a paid certificate split alone leaves it re-priceable, and so do the paid instalments of a plan released in full', async () => {
+    const f = await onboard(officer, 'cqp-toward', 12);
+    const [c, d] = await unpaid(f, [subj.P1!, subj.P2!], s1);
+    const discount = (line: string) => finadmin.api.v1.exceptions.$post({ json: { policyKey: 'price.discountFixed', studentId: f.studentId, scope: { registrationId: line }, value: 100, reason: 'agreed at the desk' } });
+    // A certificate split for the line's subject, paid: it pays for the service, not toward the line.
+    const series = await seriesOfSession(s1, 'pearson_edexcel');
+    await apiResponse(finadmin.api.v1['board-services'].fees.$put({ json: { boardSeriesId: series, rows: [{ boardServiceId: 'svc-pearson-cs', level: 'as_a_level', amount: 300, provisional: false }] } }));
+    const split = await apiResponse(officer.api.v1.charges.$post({ json: { studentId: f.studentId, kind: 'certificate_split', boardServiceId: 'svc-pearson-cs', registrationId: c! } }));
+    await payAtDesk(f, [split.id]);
+    expect(await statusOf('charge', split.id)).toBe('paid');
+    expect((await apiResponse(discount(c!))).repriced).toEqual({ from: 1500, to: 1400 });
+    // A plan released in full: its paid instalment's money went back to escrow, nothing of the price rests on it.
+    const p = await plan(f, d!, [750, 750]);
+    await payAtDesk(f, [p.i[0]!]);
+    await apiResponse(finadmin.api.v1.exceptions[':id'].release.$post({ param: { id: p.id }, json: { note: 'paying in full now' } }));
+    expect(await statusOf('charge', p.i[0]!)).toBe('paid');
+    expect((await apiResponse(discount(d!))).repriced).toEqual({ from: 1500, to: 1400 });
+    const col = await apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId: f.studentId, registrationIds: [c!, d!], instrumentUsed: 'cash', escrowAmountToApply: 750 } }));
+    expect(col.collected).toBe(2050);
+  });
+
   it('one plan per line: a second plan on a line whose plan was released in full is refused', async () => {
     const f = await onboard(officer, 'cqp-second', 12);
     const [l] = await unpaid(f, [subj.P4!], s1);
@@ -804,6 +825,25 @@ describe('08q: instalment plans', () => {
     await sql(`update board_series set entry_deadline = now() + interval '6 days' where id = $1`, [series]);
     expect((await refused(grant(f, l!, [500, 500, 500]))).error).toContain('at the latest');
     await apiResponse(grant(f, l!, [750, 750]));
+  });
+
+  it("a late board entry (Q-20, the setting on) keeps a plan line's instalments payable after the board's date, and the last captures it", async () => {
+    const s = await session(adm, 'November (AS, plans late entry)', 'november', 'as_level', { ...openWindow(), activate: true });
+    const f = await onboard(officer, 'cqp-late', 12);
+    const [l] = await unpaid(f, [subj.P3!], s);
+    const p = await plan(f, l!, [750, 750]);
+    const series = (await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [l!])).s;
+    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [series]);
+    const setting = (value: boolean) => apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'exceptions.boardEntryDeadline' }, json: { value, reason: value ? 'a late entry this series' : 'back to the hard stop' } }));
+    await setting(true);
+    try {
+      await apiResponse(adm.api.v1.exceptions.$post({ json: { policyKey: 'deadline.boardEntry', studentId: f.studentId, scope: { boardSeriesId: series }, value: day(10), reason: 'the board accepted a late entry' } }));
+      await payAtDesk(f, [p.i[0]!]);
+      await payAtDesk(f, [p.i[1]!]);
+      expect(await statusOf('registration', l!)).toBe('confirmed');
+    } finally {
+      await setting(false);
+    }
   });
 
   it("another line's preregistration capture leaves the plan's deposits alone; held money is never transferred to a sibling", async () => {
@@ -842,6 +882,9 @@ describe('08q: instalment plans', () => {
     const series = await seriesOfSession(s1, 'pearson_edexcel');
     const feeId = (await one<{ id: string }>(`select id from board_fee where board_series_id = $1 and key_kind = 'subject' and key_id = $2`, [series, px])).id;
     await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].confirm.$post({ param: { seriesId: series }, json: { rows: [{ feeId, amount: 600 }], reason: 'the board raised its fee' } }));
+    // The Fees tab says what the re-price will do (the review of step C, item 6): the plan line is listed, not re-priced.
+    const grid = await apiResponse(finadmin.api.v1['board-fees'].$get({ query: { seriesId: series } }));
+    expect(grid.rows.find((x) => x.id === feeId)).toMatchObject({ lines: 1, toReprice: 0, toList: 1 });
     const r = await apiResponse(finadmin.api.v1['board-fees'][':seriesId'].reprice.$post({ param: { seriesId: series }, json: { feeIds: [feeId], reason: 'the board raised its fee' } }));
     expect(r.repriced.map((x) => x.id)).not.toContain(l!);
     expect(r.listed.filter((x) => x.id === l).map((x) => x.reason)).toEqual(['is paid by its instalment plan']);

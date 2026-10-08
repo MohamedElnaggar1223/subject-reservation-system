@@ -192,6 +192,11 @@ deadline sweep's preregistration refund. In the order above it sits where the re
 takes it: after the student and the session, before the line. The opposite order deadlocks a
 drop's approval against a reversal (08t); B's verification is being changed to take it so (the lead, 8 Oct).
 
+**The desk's collection takes every line it touches in one pass** (step C, the review of
+1cb38de item 5): the lines it pays and the plan lines of the instalments it takes, `FOR UPDATE` in
+id order, before the charges — not its own lines first and the plan lines after, which deadlocked
+against a fee re-price or a series move taking both in id order (08t).
+
 **A payment, then the student, for a pushed school fee** (step C, RESERVATIONS_MONEY.md §2).
 `settlePushInTx` runs inside a school-fee payment's confirmation, which holds the payment
 `FOR UPDATE`, and then takes the student `FOR NO KEY UPDATE` to settle the open push of that year
@@ -570,10 +575,13 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
 - **One payment history for every re-price** *(changed, step C after main)*:
   `lineIdsWithPaymentHistory(executor, lineIds)` (and `paymentHistoryOf`, which says why) in
   `line-history.services.ts` — a payment of the line (`payment_registration`, any status), a live
-  instalment plan on it, or a charge against it paid, refunded or being paid. `repriceLines` (the
-  board fee's re-price; its listed reason names which), `repriceMovedLines` (every series move)
-  and step C's single-line price exception (granted or revoked) ask it and leave such a line's
-  price; a plan line re-priced would never be captured (its deposits short of the new price).
+  instalment plan on it, or what paid toward its price: a price adjustment, or an instalment of a
+  live or captured plan, paid, refunded or being paid (not a service charge for the line's
+  subject, nor the instalments of a plan released in full: the review of 1cb38de, item 9).
+  `repriceLines` (the board fee's re-price; its listed reason names which), the Fees tab's
+  count (`getFeeGrid`, item 6), `repriceMovedLines` (every series move) and step C's single-line
+  price exception (granted or revoked) ask it and leave such a line's price; a plan line
+  re-priced would never be captured (its deposits short of the new price).
   08q: a plan line is listed by the re-price and kept by a move, and its last instalment captures.
 - **The window by subject** *(changed, step C after main)*: `sessionWindow(…, line, …,
   subjectIds?)` reads a line's `subjectId` (and a new reservation's subjects) and asks

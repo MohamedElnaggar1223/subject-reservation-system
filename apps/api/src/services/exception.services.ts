@@ -174,7 +174,9 @@ async function checkScope(tx: Tx, n: Normalised, holderStudents: string[]) {
   const allowed = new Set(p.scopes.map((s) => SCOPE_FIELD[s]));
   const set = (Object.entries(n.scope) as [keyof PolicyScopeInputType, string | undefined][]).filter(([, v]) => !!v);
   for (const [field] of set) {
-    if (!allowed.has(field)) throw new ExceptionError(`${p.label} cannot be narrowed by ${field.replace(/Id$/, '').replace(/([A-Z])/g, ' $1').toLowerCase()}`);
+    // Named as the Exceptions screen names the scope (registrationId is "line").
+    const scope = (Object.keys(SCOPE_FIELD) as (keyof typeof SCOPE_FIELD)[]).find((k) => SCOPE_FIELD[k] === field) ?? field;
+    if (!allowed.has(field)) throw new ExceptionError(`${p.label} cannot be narrowed by ${scope.replace(/Id$/, '').replace(/([A-Z])/g, ' $1').toLowerCase()}`);
   }
   if (!set.length && p.nullScope === null) throw new ExceptionError(`${p.label} applies to something specific: choose what it is for`);
   const s = n.scope;
@@ -376,7 +378,7 @@ async function repriceLineWithout(tx: Tx, lineId: string, exceptionId: string, a
   const basis = l?.pricingBasis as { exceptionIds?: string[] } | null | undefined;
   if (!l || !basis?.exceptionIds?.includes(exceptionId)) return null;
   if (!['pending_approval', 'pending_payment', 'preregistered'].includes(l.status)) return null;
-  // A payment, a live plan or a paid charge against the line: its price stays.
+  // A payment, a live plan, or a price adjustment or an instalment paid toward the line: its price stays.
   if ((await lineIdsWithPaymentHistory(tx, [lineId])).has(lineId)) return null;
   const price = await priceLine(tx, { item: { id: l.offerItemId }, attempt: l.attempt as 'first' | 'retake', mode: l.mode as 'in_school' | 'self_study', studentId: l.studentId, sessionId: l.sessionId },
     { exceptionIds: basis.exceptionIds.filter((x) => x !== exceptionId) });

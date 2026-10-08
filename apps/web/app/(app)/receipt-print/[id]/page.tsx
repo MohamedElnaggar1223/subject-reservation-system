@@ -14,23 +14,11 @@ export const metadata = {
   title: 'Receipt — IGCSE',
 };
 
-type ReceiptDetail = {
-  id: string;
-  receiptNumber: string;
-  status: string;
-  createdAt: string;
-  registration: {
-    priceAtRegistration: number;
-    courseFeeAtRegistration: number;
-    registrationFeeAtRegistration: number;
-    takenOutsideSchool: boolean;
-    student: { name: string; studentId: string | null; grade: number | null };
-    subject: { name: string; code: string; council: string };
-    session: { name: string };
-  } | null;
-  // The reservations rework (§3.10 item 2): a charge's receipt (a board service, an adjustment).
-  charge: { description: string; amount: number; kind: string; student: { name: string; studentId: string | null; grade: number | null } } | null;
-};
+// The receipt, typed from the route (CLAUDE.md: Hono RPC everywhere): a line's receipt, or (the
+// reservations rework, §3.10 item 2) a charge's — a board service, an adjustment.
+const fetchReceipt = (api: Awaited<ReturnType<typeof getServerApi>>, id: string) =>
+  apiResponse(api.v1.receipts[':id'].$get({ param: { id } }));
+type ReceiptDetail = Awaited<ReturnType<typeof fetchReceipt>>;
 
 const COUNCILS: Record<string, string> = {
   pearson_edexcel: 'Pearson Edexcel',
@@ -51,9 +39,7 @@ export default async function ReceiptPrintPage({
 
   let receipt: ReceiptDetail;
   try {
-    receipt = (await apiResponse(
-      api.v1.receipts[':id'].$get({ param: { id } })
-    )) as ReceiptDetail;
+    receipt = await fetchReceipt(api, id);
   } catch {
     return (
       <div className="p-10 text-center text-muted-foreground">Receipt not found.</div>

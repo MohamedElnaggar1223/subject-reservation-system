@@ -35,24 +35,10 @@ type PendingPayment = Awaited<ReturnType<typeof fetchPendingManual>>[number];
 const fetchWithdrawals = () => apiResponse(api.v1.escrow.admin.withdrawals.$get());
 type WithdrawalRequest = Awaited<ReturnType<typeof fetchWithdrawals>>[number];
 
-// Explicit type — this endpoint's RPC inference degrades in the web
-// compile (same pre-existing quirk as checkout-summary)
-type ReceiptRow = {
-  id: string;
-  receiptNumber: string;
-  status: string;
-  refundAmountOnReturn: number | null;
-  // A line's receipt, or (the reservations rework, §3.10 item 2) a charge's.
-  registration: {
-    id: string;
-    status: string;
-    priceAtRegistration: number;
-    student: { id: string; name: string; email: string; grade: number | null };
-    subject: { id: string; name: string; code: string };
-    session: { id: string; name: string };
-  } | null;
-  charge: { id: string; description: string; amount: number; student: { id: string; name: string; email: string } } | null;
-};
+// The receipts queue, typed from the route (CLAUDE.md: Hono RPC everywhere): a line's receipt,
+// or (the reservations rework, §3.10 item 2) a charge's — `registration` or `charge` set.
+const fetchReceipts = () => apiResponse(api.v1.receipts.queue.$get());
+type ReceiptRow = Awaited<ReturnType<typeof fetchReceipts>>[number];
 
 /** Whose receipt, and for what: the line's student and subject, or the charge's student and description. */
 function receiptOwner(r: ReceiptRow) {
@@ -61,8 +47,6 @@ function receiptOwner(r: ReceiptRow) {
   }
   return { student: r.charge?.student ?? { id: '', name: '—', email: '' }, what: r.charge?.description ?? '—', where: null };
 }
-const fetchReceipts = async () =>
-  (await apiResponse(api.v1.receipts.queue.$get())) as ReceiptRow[];
 
 const METHOD_BADGE: Record<string, string> = {
   in_school: 'bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400',

@@ -1876,6 +1876,10 @@ export async function getPendingBankTransfers() {
           },
         },
       },
+      // A charge payment's charges (the reservations rework, §3.10 item 1), listed as its subjects are.
+      paymentCharges: {
+        with: { charge: { columns: { id: true, kind: true, description: true, amount: true } } },
+      },
       student: { columns: { id: true, name: true, email: true, cohortYear: true, studentId: true }, extras: gradeTodayExtras },
       parent: { columns: { id: true, name: true, email: true } },
     },
@@ -2232,17 +2236,18 @@ const groupKeyOf = (c: ChargeRow, deadline: Date | null) => (c.kind === 'instalm
  * live; and one whose price changed since it was read (an exception granted meanwhile:
  * PRICE_CHANGED_REFUSAL, as a re-priced line is refused).
  */
-async function lockChargesForPayment(tx: Tx, studentId: string, chargeIds: string[], expected?: Map<string, number>): Promise<ChargeGroup[]> {
+async function lockChargesForPayment(tx: Tx, studentId: string, chargeIds: string[], expected?: Map<string, number>, opts: { linesHeld?: boolean } = {}): Promise<ChargeGroup[]> {
   const ids = [...new Set(chargeIds)].sort();
   const peek = await tx.select({ id: charge.id, registrationId: charge.registrationId, kind: charge.kind, studentId: charge.studentId })
     .from(charge).where(inArray(charge.id, ids));
   if (peek.length !== ids.length) throw new Error('One or more charges were not found');
   if (peek.some((c) => c.studentId !== studentId)) throw new Error('All charges must belong to the same student');
-  // An instalment's line before its charges (the plan's lock order).
+  // An instalment's line before its charges (the plan's lock order). `linesHeld`: the caller
+  // already holds every line it touches, taken in one id-ordered pass (the desk's collection,
+  // which pays lines beside the instalments); a second pass here would take them out of order.
   const lineIds = [...new Set(peek.filter((c) => c.kind === 'instalment' && c.registrationId).map((c) => c.registrationId!))].sort();
-  const lines = lineIds.length
-    ? await tx.select({ id: registration.id, status: registration.status }).from(registration).where(inArray(registration.id, lineIds)).orderBy(registration.id).for('share')
-    : [];
+  const lineQuery = () => tx.select({ id: registration.id, status: registration.status }).from(registration).where(inArray(registration.id, lineIds)).orderBy(registration.id);
+  const lines = !lineIds.length ? [] : opts.linesHeld ? await lineQuery() : await lineQuery().for('share');
   const rows = await tx.select().from(charge).where(inArray(charge.id, ids)).orderBy(charge.id).for('update');
   for (const c of rows) {
     if (c.kind === 'school_fee_push') throw new Error('A pushed school fee is paid on the School fee page or with the desk\'s school-fee collection, not as a charge');
@@ -2288,9 +2293,11 @@ export async function createChargePaymentsInTx(
   a: {
     studentId: string; payerParentId: string; actorId: string; chargeIds: string[]; method: 'in_school' | 'instapay'; escrowToApply: number;
     desk: boolean; expected?: Map<string, number>; auditCtx?: AuditContext;
+    /** The caller holds the plan lines of these instalments already (taken with its own lines, in id order). */
+    linesHeld?: boolean;
   },
 ): Promise<CreatedChargePayment[]> {
-  const groups = await lockChargesForPayment(tx, a.studentId, a.chargeIds, a.expected);
+  const groups = await lockChargesForPayment(tx, a.studentId, a.chargeIds, a.expected, { linesHeld: a.linesHeld });
   if (!a.desk && groups.length > 1) {
     throw new Error(`These charges fall due at different deadlines (${groups.map((g) => g.charges.map((c) => c.description).join(', ')).join(' · ')}): pay each group on its own`);
   }

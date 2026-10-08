@@ -6,8 +6,9 @@ its §17 defaults); this step is its §3.6, §3.7, §3.9, §3.10 items 1–9, §
 push and the desk-drop of §3.3. A's contract is `docs/features/RESERVATIONS.md` §2 (§2.1 the
 lock order, §2.8 the adapter this step replaces, §2.10 what is not mine to touch, §2.11 what
 the contract gained). The trail is `.audit/rework-money.tsv`; evidence (suite logs, controls,
-the dev-copy migration, screenshots) is `.audit/rework-money-evidence/` (git-ignored). The
-progress log is the last section.
+the dev-copy migration, screenshots) is `.audit/rework-money-evidence/`, force-added like the
+trail and kept as its proof: a run's log is the vitest summary with, for a red run or a control,
+the failing tests and their messages (CLAUDE.md, Git). The progress log is the last section.
 
 ---
 
@@ -104,9 +105,13 @@ fee, a preregistration, a remark). `payment_method` gains `held_deposits` (a pla
   line that many days past its due date, with no payment in progress, expires `overdue` (a live
   plan on it is settled). **One setting for every session** (§3.1's overdue expiry; the owner's
   default stands: a school setting, off until the school sets it).
-- `pricing.payOnProvisionalFee` (A's) also decides a **service** charge: while its fee row in the
-  series is provisional, the charge is reserved (asked for, accepted) but not paid, unless the
-  setting is on (§3.4's rule applied to services).
+- `pricing.payOnProvisionalFee` (A's) also decides a **service charge** (a cash-in, a late
+  cash-in, a certificate split): while its fee row in the series is provisional, the charge is
+  reserved (asked for, accepted) but not paid, unless the setting is on (§3.4's rule applied to
+  services; `chargeRules` with `forPayment`). **A remark is not held back** (the lead, 8 Oct, the
+  review of step C item 4): it keeps today's behaviour, payable at the fee its series shows,
+  copied or confirmed; when finance later confirms another amount, the difference is finance's
+  price adjustment charge on the line.
 - `exceptions.boardEntryDeadline` — false by default; admin; owner question Q-20. Off, the
   board's entry deadline is a hard stop: `deadline.boardEntry` cannot be granted and a
   `late_entry_fee` charge cannot be created.
@@ -137,7 +142,7 @@ before any held sum is read.
 | The overdue expiry (`expireOverdueLines`) | waiting lines past due by the setting's days expire `overdue`, a live plan settled | `REGISTRATION_EXPIRED` (`overdue`), `PLAN_SETTLED` | the line (status-filtered `FOR UPDATE`, so two ticks expire it once) |
 | Plans lapsing (`lapsePlans`) | the plan `lapsed`, its line expired `plan_lapsed`, settled | `EXCEPTION_LAPSED`, `REGISTRATION_EXPIRED`, `PLAN_SETTLED` | the line, then the plan's status-guarded claim |
 | A service fee set or confirmed (`putServiceFees`) | the fee row; the open charges priced from it (no payment open or made) re-priced to it | `SERVICE_FEES_SET` (with `chargesRepriced`), `CHARGE_REPRICED` each | the series `FOR SHARE`, the fee rows, then those charges (a payment locks charges and only reads the fee row) |
-| The desk's one action (`collectAtDesk`, reserve-and-collect) | the year's school fee first (its own payment; the registration gate asks for it), then the lines per entry deadline, then the charges per deadline or plan line; what cannot be taken after the fee is listed "not collected" | the paths' own rows | each path's own |
+| The desk's one action (`collectAtDesk`, reserve-and-collect) | the year's school fee first (its own payment; the registration gate asks for it), then the lines per entry deadline, then the charges per deadline or plan line; what cannot be taken after the fee is listed "not collected" | the paths' own rows | the fee's path; then every line it touches — the lines it pays and the instalments' plan lines — `FOR UPDATE` in one id-ordered pass, then the charges in id order (decision 25) |
 | The desk-drop (`deskDrop`) | a confirmed line past its effective deadline dropped through the receipt-gated drop with `refundFor` (board fee kept when sent); F4's withdrawal is a seam | `DESK_DROP_EXECUTED` (and the drop's own rows) | the line, its receipt (the core drop's locks) |
 | A drop's refund (`refundFor` in every drop path) | course fee by the policy's week, board fee until the entry is sent | the drop's rows | the drop's |
 | Grant / revoke an exception | the row; a line-scoped price exception re-prices the unpaid line (and back on revoke); a charge-scoped one re-prices a charge awaiting payment; `deadline.payment` re-dates; a plan creates its instalments, re-dates the line; a waiver cancels open pushes; a plan revoked expires and settles its line | `EXCEPTION_GRANTED` / `EXCEPTION_REVOKED`, `LINE_REPRICED`, `CHARGE_REPRICED`, `LINE_DUE_MOVED`, `CHARGE_CREATED` | the students it covers, the line or charge it rests on, the exception |
@@ -190,9 +195,8 @@ line under a live plan it answers the plan's last date first.
 
 1. **Service fees in their own table** (`board_service_fee`), not a service kind of
    `board_fee`: `board_fee` is A's (§2.10) and a service fee needs level rates and per-paper
-   pricing. *For the lead.*
-2. **`pricing.*` registered as `pending`** (a grant is refused 409): `priceLine` reads those
-   percents from the settings only. *For the lead.*
+   pricing. *Accepted by the lead (8 Oct): the table stays.*
+2. ~~`pricing.*` registered as `pending`~~ — superseded by 23: live since A's priceLine reads them.
 3. **`refundFor`'s fallbacks**: no snapshot → the session's policy; a converted line → V3's
    windows on the whole price; the anchor order above.
 4. **"Sent"** = confirmed (or parked for its paper) and F4's `entrySentAt` or the line's
@@ -218,17 +222,24 @@ line under a live plan it answers the plan's last date first.
     the exception; a revoked line-scoped price exception re-prices its unpaid line back; a
     charge-scoped one re-prices a charge awaiting payment at once.
 16. **A line's payment history** (`lineIdsWithPaymentHistory`, `line-history.services.ts`): a
-    payment of the line, a **live plan** on it, or a **charge against it paid, refunded or being
-    paid** — such a line is listed, never re-priced (review item 1: a re-priced plan line could
-    never be captured). A single-line price exception on a plan line is refused naming the plan.
-    A's board-fee re-price and series move use the same function once A is on main (item 14).
+    payment of the line, a **live plan** on it, or a **price adjustment or an instalment of a live
+    or captured plan, paid, refunded or being paid** — what paid toward the line's price — such a
+    line is listed, never re-priced (review item 1: a re-priced plan line could never be
+    captured). A charge for a service the line is the subject of (a cash-in, a certificate split,
+    a late-entry fee, a custom charge) does not count, nor the instalments of a plan released in
+    full or settled (their money went back or was kept; the line is paid in full at what it costs
+    then) — the review of 1cb38de, item 9. A single-line price exception on a plan line is refused
+    naming the plan. A's board-fee re-price, its Fees tab's count and the series move use the
+    same function (items 6 and 14).
 17. **One plan per line, ever**: the line's held ledger ends as one capture or one settlement.
 18. **The same exception twice** (policy, holder, scope, value) is refused, naming the one active.
 19. **The refund rule is a money rule**: `PUT /v1/board-services/:id/refund-rule` (finance admin,
     admin). The coordinator keeps the catalogue (label, family request, offered) and the
     service dates; the fees and the refund rule are finance's.
-20. **A provisional service fee is reserved, not paid**, and a fee set at another amount
-    re-prices the open charges of that fee row in its transaction.
+20. **A provisional service fee is reserved, not paid** — for a service charge; a remark keeps
+    today's behaviour, payable at the copied fee, a later difference finance's price adjustment
+    (the lead, the review of 1cb38de item 4) — and a fee set at another amount re-prices the open
+    charges of that fee row in its transaction.
 21. **The desk takes everything owed in one action**, each part its own payment, the year's
     school fee first (the registration gate asks for it).
 22. **The family pays its charges on its own page** (Charges & Instalments): several
@@ -241,6 +252,26 @@ line under a live plan it answers the plan's last date first.
     `paymentHistoryOf` / `lineIdsWithPaymentHistory` (RESERVATIONS.md §2.12); a late board entry
     is read by A's effective deadline while its setting is on (08r proves it end to end through
     the registry).
+24. **The `pricing.*` shares are never one line's** (the review of 1cb38de, item 3): their scopes
+    are session, subject, offer and item (the design's keys are the student's and the family's);
+    `priceLine` passes no line id and a grant re-prices a line only for `price.*`, so a
+    line-scoped share would be granted and applied nowhere — refused ("… cannot be narrowed by
+    line"; the refusal now names the scope as the screen does).
+25. **The desk's collection takes every line it touches in one id-ordered pass** (item 5): the
+    lines it pays and the plan lines of the instalments it takes, `FOR UPDATE`, before the
+    charges (RESERVATIONS.md §2.1: the lines in id order); `lockChargesForPayment` is told the
+    lines are held (`linesHeld`) instead of taking the plan lines in a second pass, which
+    deadlocked against a fee re-price or a series move taking both in id order (08t).
+26. **The Fees tab counts what the re-price will do** (item 6): `getFeeGrid`'s "to re-price" and
+    "listed" read `paymentHistoryOf`, the re-price's own test.
+27. **An instalment's deadline is its line's as the line reads it** (item 7): `chargeDeadline`
+    passes the student, so a late board entry (Q-20, its setting on) keeps a plan line's
+    instalments payable after the board's date; B's `declarationRejected` joins it at my final
+    merge (§10).
+28. **The receipt screens are typed from their routes** (item 8): the Finance Workbench's queue
+    row and the receipt print derive their types from the fetcher (`Awaited<ReturnType<…>>`), as
+    CLAUDE.md's Hono RPC rule says — the hand-written types were how a charge's receipt crashed
+    them; the bank-transfer list (`/admin/payments`) lists a charge payment's charges.
 
 ---
 
@@ -329,14 +360,24 @@ Step C's own rules:
   a late board entry with the setting on (reserved and paid after the entry deadline, kept by
   the sweep), off (refused, no longer read). Controls: the payment history without a live plan
   (both plan re-price cases red), the plan line's price refusal undone (red).
-- `08r-exceptions-registry.test.ts` (11, with the same exception twice): the policies per caller; grant checks; a family's
+- After the review of 1cb38de: 08q — only what paid toward a line keeps its price (a paid
+  certificate split alone, and a plan released in full, leave it re-priceable); the Fees tab's
+  count lists a plan line (0 to re-price, 1 listed); a late board entry keeps a plan line's
+  instalments payable after the board's date and the last captures it. 08r — a line-scoped
+  `pricing.*` grant refused for each of the four; the window and late-entry refusals assert
+  their messages. 08t — the desk collecting a line and another line's instalment while both
+  lines' fees are re-priced: no deadlock. Controls (red, restored): the desk's second pass
+  (`deadlock detected`), the line scope back, the tab's old count, `chargeDeadline` without the
+  student, any charge as a payment history.
+- `08r-exceptions-registry.test.ts` (14, with the same exception twice): the policies per caller; grant checks; a family's
   exception for every child and no one else; a one-shot gate used once; a line's price
   exception and its revocation; a charge's; `deadline.payment` re-dated and back; the eight V3
   types as the trigger maps them; Check these (a subject-scoped refund percent applies only
   once confirmed: 100% then 30% of the course fee; a unit row a parent item now enters).
-- `08t-rework-races.test.ts`, step C's block (4): an exception revoked while a line relies on
+- `08t-rework-races.test.ts`, step C's block (5): an exception revoked while a line relies on
   it, both orders; a family's one-shot gate used by two children at once; the last
-  instalment's confirmation and the deadline sweep on one line, both orders.
+  instalment's confirmation and the deadline sweep on one line, both orders; the desk's
+  collection against a fee re-price on the same lines.
 - `05-object-access`: a family cannot read, ask for, pay, accept, cancel or refund another's
   charges, nor scope an exception to another's line or charge, nor desk-drop.
 - Assertions restated (pre-authorised, trail rows): 08's refund block (750 → 1,000; 1,350 →
@@ -384,7 +425,10 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
   its fee at the line's level and its last date; the remarks desk names the service and points
   to Board services for the fees per series.
 - **The Finance Workbench and the receipt print** read a charge's payment and receipt (both
-  crashed on one before; found by the drive).
+  crashed on one before; found by the drive). Their row types now come from the typed fetcher,
+  so the type check catches a field the route does not send; the bank-transfer list
+  (`/admin/payments`, legacy: bank transfers only, which no charge payment is today) lists a
+  charge payment's charges instead of "Subjects (0)".
 - Arabic for all of it in `apps/web/lib/i18n-money.ts`, merged in `lib/i18n.tsx` as A's file is.
 
 ---
@@ -408,9 +452,20 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
 - **Charges on the Statement** (B's page): B renders `listChargesFor(studentId)` beside the
   lines, and each line's `exceptions` (the Student 360 returns them per line;
   `exceptionsOfLines` in `line-exceptions-read.services.ts` for B's own endpoint).
-- **At my final merge, after B**: `charge_effective_deadline` passes B's
-  `registration.declaration_rejected` (A's §2.6 names the place); the migrations renumbered once
-  more after B's 0045 and proved on a database migrated at main first.
+- **At my final merge, after B** (the review of 1cb38de, items 1 and 2):
+  - B's two expiry paths (`verification.services.ts`: a declaration rejected, a hold left
+    unverified) expire a waiting line with a raw update: they go through
+    `expireWaitingRegistrations` (or `settlePlansOfExpiredLines`), so a plan line ended there is
+    settled — its deposits released or kept, its plan ended — not left with its deposits held;
+  - B's `paymentState` counts an instalment payment in progress, not only `payment_registration`;
+  - B's `refundForSystemDrop` (`reservation.services.ts`) is replaced by
+    `refundFor(…, { neverSent })`;
+  - an 08q case: a declared plan line rejected, then settled;
+  - `charge_effective_deadline` and `chargeDeadline` pass B's `registration.declaration_rejected`
+    (A's §2.6 names the place);
+  - the migrations renamed 0047–0049, after B's 0045 and 0046, each journal `when` later than B's
+    0046's (1791429312401) in order, the snapshots chained after B's 0046, and proved on a copy
+    migrated at main (with B) first and then at my branch (`__drizzle_migrations` rows).
 - `exception.value`'s drop; reminders per instalment (step D, §3.8).
 
 ---
@@ -420,28 +475,30 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
 1. **The four `pricing.*` policies are live** (A's priceLine reads them since b438976); 08r's
    former 409 case is now a student's and a family's grant in the line's price and basis.
 2. **Service fees are in `board_service_fee`**, not a service kind of `board_fee` (§2.10
-   says the latter; `board_fee` is A's). If the lead prefers A's table, A adds the kind and the
-   level and this table's rows move with a migration.
+   said the latter; `board_fee` is A's). Decided by the lead (8 Oct): this table stays.
 3. **`deadline.boardEntry`**: A's effective deadline honours it while the setting is on; 08r's
    end-to-end case through the real registry proves both settings. The Settings screen now has
    an Exceptions group (the late entries) beside Payment (the overdue days).
 4. **Charges on the session's Money tab**: built as a component of mine
    (`[id]/session-charges.client.tsx`) rendered by one line in A's `money-tab.client.tsx`, reading
    `GET /v1/charges?sessionId=` — A's money service is untouched.
-9. **For B**: render each line's `exceptions` and the student's charges on the Statement and the
-   Reserve pages (§10).
 5. **The five extended 09 rules** (§6): they were not pre-authorised; the trail row has OLD and
-   NEW.
+   NEW. Accepted by the lead (8 Oct).
 6. **Arabic pages log a hydration mismatch** on every page (A's Sessions too): the
    `I18nProvider` reads the language from `localStorage` in its initial state on the client.
    Not this step's; worth one fix in the provider.
 7. **Migration numbers**: renumbered 0045–0047 after main's 0044 (A's follow-ups; the
-   snapshots re-chained, `drizzle-kit generate` reports no change). B's 0045 lands before mine,
-   so they are renumbered once more at my final merge (/tmp/rwc/renumber.py does it: files,
-   journal, snapshots, a `when` after main's last).
+   snapshots re-chained, `drizzle-kit generate` reports no change). B's 0045 and 0046 land before
+   mine and their journal `when`s (1791429270826, 1791429312401) are **later** than mine
+   (1791429221338–1791429223338): renumbering alone would make every database already at B skip
+   all three of mine. At my final merge they become 0047–0049, each `when` later than B's 0046's
+   in order, the snapshots chained after B's 0046, proved on a copy migrated at main (with B)
+   first and then at my branch (§10).
 8. **A plan whose `valid_until` passed but whose lapse has not run** is still live for a
    confirmation until the next tick claims it (the plan is live while its exception is
    `active`, §3.6). The tick runs every minute.
+9. **For B**: render each line's `exceptions` and the student's charges on the Statement and the
+   Reserve pages (§10).
 
 ---
 
@@ -450,7 +507,10 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
 - **Each board service's refund rule** stays seeded `full` (today's behaviour, the owner's
   default for Q-21); a finance admin may set another per service on Board services.
 - **The service fees copied from V3's remark fees stay provisional** until finance confirms
-  them per series; a provisional fee is not paid unless `pricing.payOnProvisionalFee` is on.
+  them per series; a service charge (cash-in, certificate split) on a provisional fee is not
+  paid unless `pricing.payOnProvisionalFee` is on. **A remark is paid at the copied fee** as
+  today, and a later difference is finance's price adjustment charge (the review of 1cb38de,
+  item 4).
 - **The overdue days** are a school setting, one for every session, off until the school sets
   it.
 
@@ -487,3 +547,12 @@ Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
   the pricing policies live; the late entry end to end; the Settings screen's Exceptions group;
   the dev copy recreated from the template, migrated at origin/main first and then at the
   branch (`__drizzle_migrations` rows 46–48 are step C's three), re-seeded for the lead's drive.
+- 03:42–03:54 — the suite green at b82de92 (442, local and UTC); the richer copies' refund proof;
+  pushed; CI green on 2ae28d6 and 1cb38de.
+- 04:10–04:50 — the review of 1cb38de (the lead's NOW list): the `pricing.*` shares never one
+  line's; the desk's lines in one pass (an 08t race; its control deadlocks); the Fees tab's count
+  by the shared payment history; an instalment's deadline with the student (late entry); the
+  payment history narrowed to what paid toward the line; 08r's refusals by their messages; the
+  receipt screens typed from their routes and the bank-transfer list's charges; remarks paid at
+  the copied fee (documented); five controls red, restored. The web dev server restarted after a
+  control's rebuild of validations broke its compile (trail incident row).
