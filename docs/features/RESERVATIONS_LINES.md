@@ -334,7 +334,9 @@ right.
 5. **Pre-existing on `main`, not changed here**: an Arabic user gets a React hydration mismatch
    on every server-rendered page (`I18nProvider`'s `useState` initializer reads localStorage, so
    the server's English differs from the client's Arabic: the sign-in page's language button shows
-   it); the receipt status "Ready to Hand Over" has no Arabic.
+   it); the receipt status "Ready to Hand Over" has no Arabic, nor do My Registrations' "Pay All",
+   "Swap", "Drop" and its refund sentence; a swapped line's note shows the family the dropped line's
+   internal id ("Direct swap from registration …").
 6. **A's §2.12** had not landed when this was written: B's lines already pass
    `priorSittingSource` explicitly (null only with no prior sitting); merge and rerun when it lands.
 7. **C**: `consentStanding` / `writeConsents` for the checkout and the desk; `refundForSystemDrop`
@@ -385,3 +387,8 @@ Times UTC, from the trail (`.audit/rework-reservations.tsv`), which holds each e
   generics 25. The commit after it adds only this document and the trail.
 - 01:13Z — the dev API restarted (it ran without watch); the Arabic desk driven again: "owes
   now" 0 with a provisional line reserved.
+- 01:20Z — CI green on cbd2d5a (the pushed branch: three gates).
+- 01:16Z–01:28Z — the remaining screens driven: a student's reservation sent to the parent and
+  the parent's approval; the parent's swap from a paid line to a new one (the line made, the old
+  one dropped, consent inherited); the verification setting (its Arabic description and group hint
+  were missing: added).

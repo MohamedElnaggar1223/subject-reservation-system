@@ -198,7 +198,10 @@ export const reservationsArabic: Record<string, string> = {
   'Choose what to swap to': 'اختر ما تستبدل إليه',
   // ── Settings ──
   'Declared sittings': 'الدورات المُصرَّح بها',
-  "What happens to a retake a family declared when the school has not verified it by the board's deadline.": 'ما يحدث لإعادة صرّحت بها أسرة ولم تتحقق منها المدرسة قبل موعد المجلس.',
+  // The settings page's group hint uses a typographic apostrophe.
+  'What happens to a retake a family declared when the school has not verified it by the board’s deadline.': 'ما يحدث لإعادة صرّحت بها أسرة ولم تتحقق منها المدرسة قبل موعد المجلس.',
+  'A family (or the desk) may declare the sitting a retake follows; the coordinator verifies it on the session\'s To verify tab. "Enter as declared": the form trusts the family — the line is entered and the entry check lists it as declared, unverified. "Hold": at the line\'s deadline a line awaiting payment expires, and a paid one is dropped with that day\'s refund (the paper receipt comes back first).':
+    'قد تصرّح الأسرة (أو المكتب) بالدورة التي تتبعها الإعادة؛ ويتحقق منها المنسق في تبويب «للتحقق» في الجلسة. «القيد كما صُرّح»: الاستمارة تثق بالأسرة — يُقيَّد السطر وتُدرجه مراجعة القيد على أنه مُصرَّح به ولم يُتحقق منه. «الإيقاف»: عند موعد السطر ينتهي السطر الذي ينتظر الدفع، ويُسحب المدفوع مع استرداد ذلك اليوم (يُعاد الإيصال الورقي أولًا).',
   'A declared sitting still unverified at its deadline': 'دورة مُصرَّح بها لم يُتحقق منها عند موعدها',
   'Enter as declared': 'القيد كما صُرّح',
   'Hold: expire or drop at the deadline': 'الإيقاف: الإنهاء أو السحب عند الموعد',
