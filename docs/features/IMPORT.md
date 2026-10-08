@@ -715,6 +715,7 @@ records it.
   counts its own database's wait; 00-harness tests it with a wait in another database; C67 red.
 - 17:33–17:50Z — on ee83d29: types green; the suites side by side green (568 passed, 1 todo each);
   every control with its own row: 48 red, C44 green as since 7003e74 (C60 covers it).
+- 18:00Z — pushed 9d17f74 (one push from 2ca07a4); CI 37819862101 green (568 passed, 1 todo).
 - Next: the reviewer confirms items 1 and 2 on the diff; the final merge waits for F4 on main (main
   has D at c2d7a78, its migrations to 0054): origin/main merged as its own commit, 0050_import
   regenerated after main's last migration with a later stamp and its snapshot chained, the order
