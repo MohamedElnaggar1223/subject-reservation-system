@@ -93,7 +93,12 @@ fee, a preregistration, a remark). `payment_method` gains `held_deposits` (a pla
 ### 1.5 Settings (F0a's store)
 
 - `payment.expireOverdueAfterDays` — 0 (off) by default; admin or finance admin. On, a waiting
-  line that many days past its due date, with no payment in progress, expires `overdue`.
+  line that many days past its due date, with no payment in progress, expires `overdue` (a live
+  plan on it is settled). **One setting for every session** (§3.1's overdue expiry; the owner's
+  default stands: a school setting, off until the school sets it).
+- `pricing.payOnProvisionalFee` (A's) also decides a **service** charge: while its fee row in the
+  series is provisional, the charge is reserved (asked for, accepted) but not paid, unless the
+  setting is on (§3.4's rule applied to services).
 - `exceptions.boardEntryDeadline` — false by default; admin; owner question Q-20. Off, the
   board's entry deadline is a hard stop: `deadline.boardEntry` cannot be granted and a
   `late_entry_fee` charge cannot be created.
@@ -123,6 +128,8 @@ before any held sum is read.
 | Dead plans' payments (`failInstalmentPaymentsOfDeadPlans`) | an open instalment payment of a plan no longer live failed (`The instalment plan ended before this payment was confirmed`) | `PAYMENT_FAILED` | the payment (after the ending committed) |
 | The overdue expiry (`expireOverdueLines`) | waiting lines past due by the setting's days expire `overdue`, a live plan settled | `REGISTRATION_EXPIRED` (`overdue`), `PLAN_SETTLED` | the line (status-filtered `FOR UPDATE`, so two ticks expire it once) |
 | Plans lapsing (`lapsePlans`) | the plan `lapsed`, its line expired `plan_lapsed`, settled | `EXCEPTION_LAPSED`, `REGISTRATION_EXPIRED`, `PLAN_SETTLED` | the line, then the plan's status-guarded claim |
+| A service fee set or confirmed (`putServiceFees`) | the fee row; the open charges priced from it (no payment open or made) re-priced to it | `SERVICE_FEES_SET` (with `chargesRepriced`), `CHARGE_REPRICED` each | the series `FOR SHARE`, the fee rows, then those charges (a payment locks charges and only reads the fee row) |
+| The desk's one action (`collectAtDesk`, reserve-and-collect) | the year's school fee first (its own payment; the registration gate asks for it), then the lines per entry deadline, then the charges per deadline or plan line; what cannot be taken after the fee is listed "not collected" | the paths' own rows | each path's own |
 | The desk-drop (`deskDrop`) | a confirmed line past its effective deadline dropped through the receipt-gated drop with `refundFor` (board fee kept when sent); F4's withdrawal is a seam | `DESK_DROP_EXECUTED` (and the drop's own rows) | the line, its receipt (the core drop's locks) |
 | A drop's refund (`refundFor` in every drop path) | course fee by the policy's week, board fee until the entry is sent | the drop's rows | the drop's |
 | Grant / revoke an exception | the row; a line-scoped price exception re-prices the unpaid line (and back on revoke); a charge-scoped one re-prices a charge awaiting payment; `deadline.payment` re-dates; a plan creates its instalments, re-dates the line; a waiver cancels open pushes; a plan revoked expires and settles its line | `EXCEPTION_GRANTED` / `EXCEPTION_REVOKED`, `LINE_REPRICED`, `CHARGE_REPRICED`, `LINE_DUE_MOVED`, `CHARGE_CREATED` | the students it covers, the line or charge it rests on, the exception |
@@ -202,6 +209,23 @@ line under a live plan it answers the plan's last date first.
 15. **A revocation locks the students it covers first** (§2.1), then the line or charge, then
     the exception; a revoked line-scoped price exception re-prices its unpaid line back; a
     charge-scoped one re-prices a charge awaiting payment at once.
+16. **A line's payment history** (`lineIdsWithPaymentHistory`, `line-history.services.ts`): a
+    payment of the line, a **live plan** on it, or a **charge against it paid, refunded or being
+    paid** — such a line is listed, never re-priced (review item 1: a re-priced plan line could
+    never be captured). A single-line price exception on a plan line is refused naming the plan.
+    A's board-fee re-price and series move use the same function once A is on main (item 14).
+17. **One plan per line, ever**: the line's held ledger ends as one capture or one settlement.
+18. **The same exception twice** (policy, holder, scope, value) is refused, naming the one active.
+19. **The refund rule is a money rule**: `PUT /v1/board-services/:id/refund-rule` (finance admin,
+    admin). The coordinator keeps the catalogue (label, family request, offered) and the
+    service dates; the fees and the refund rule are finance's.
+20. **A provisional service fee is reserved, not paid**, and a fee set at another amount
+    re-prices the open charges of that fee row in its transaction.
+21. **The desk takes everything owed in one action**, each part its own payment, the year's
+    school fee first (the registration gate asks for it).
+22. **The family pays its charges on its own page** (Charges & Instalments): several
+    instalments of one plan at once, or the charges of one deadline; a pushed school fee on the
+    School fee page.
 
 ---
 
@@ -216,13 +240,15 @@ line under a live plan it answers the plan's last date first.
 | `POST /v1/exceptions/:id/revocation` `{ reason }` | the policy's grantors | the screen's |
 | `POST /v1/exceptions/:id/release` `{ note? }` | finance admin, admin | a plan released in full |
 | `GET /v1/exceptions/check-these`, `POST /:id/confirm` `{ note? }` | finance admin, admin, coordinator (theirs) | §3.7 |
-| `GET /v1/charges` `?studentId&status&kind` | staff; a family its own | the Statement reads `listChargesFor(studentId)` |
+| `GET /v1/charges` `?studentId&status&kind&sessionId` | staff; a family its own | with the family (approved parents) and the payment state; `sessionId`: the session's lines' charges and its series' services |
 | `POST /v1/charges` | staff; a family a requestable service | `price_adjustment`, `custom` finance only; `late_entry_fee` behind Q-20's setting |
 | `POST /v1/charges/:id/accept`, `/cancel` `{ reason }` | finance desk, admin | |
 | `POST /v1/charges/:id/refund` `{ amount, reason }` | finance admin, admin | to escrow, the paper first |
 | `POST /v1/payments/initiate` `{ chargeIds }` | the family | charges or lines, never both |
-| `POST /v1/registrations/desk/collect` `{ registrationIds?, chargeIds? }` | finance desk | |
-| `GET /v1/board-services`; `PUT /:id`; `PUT /deadlines` | staff read; admin, coordinator write | |
+| `POST /v1/registrations/desk/collect` `{ registrationIds?, chargeIds?, schoolFeeYear? }` | finance desk | the year's fee first, each part its own payment |
+| `POST /v1/registrations/desk` `collectNow: { …, chargeIds?, schoolFeeYear? }` | finance desk | the fee before the gate, the charges after the lines |
+| `GET /v1/board-services`; `PUT /:id` (label, family request, offered); `PUT /deadlines` | staff and families read; admin, coordinator write | |
+| `PUT /v1/board-services/:id/refund-rule` `{ refundRule, refundDeduction?, reason }` | finance admin, admin | the refund rule on a changed grade |
 | `PUT /v1/board-services/fees` | finance admin, admin | the fee grid |
 | `POST /v1/school-fees/push` `{ academicYear, grade? \| sectionId? \| studentIds?, dueAt }` | finance admin, admin | |
 | `POST /v1/registrations/:id/desk-drop` `{ reason }` | finance desk, admin | past the line's effective deadline only |
@@ -272,7 +298,16 @@ Step C's own rules:
   reversal, escrow refused, takings; not sent back for approval; Q-15's worked example; release
   in full; overdue, leaver and failed-payment endings; the close sparing the last instalment;
   the deadline sweep and the lapse).
-- `08r-exceptions-registry.test.ts` (10): the policies per caller; grant checks; a family's
+- `08q`, the review's cases: a plan line keeps its price (a price exception refused naming the
+  plan; one granted before the plan and revoked after leaves the price and the capture pays
+  it; a paid charge against a line keeps its price); one plan per line; the eligibility
+  clean-up spares a last instalment being checked; the last instalment capped by the line's
+  own deadline; another line's preregistration capture leaves the plan's deposits alone and
+  held money is never transferred; the desk's one action (the fee first, the lines, the
+  charges; the fee alone; the fee kept when the rest is refused); a session's charges; a
+  provisional service fee not paid, then confirmed at another amount and paid; with
+  `pricing.payOnProvisionalFee` on, paid; the refund rule finance's (the coordinator refused).
+- `08r-exceptions-registry.test.ts` (11, with the same exception twice): the policies per caller; grant checks; a family's
   exception for every child and no one else; a one-shot gate used once; a line's price
   exception and its revocation; a charge's; `deadline.payment` re-dated and back; the eight V3
   types as the trigger maps them; Check these (a subject-scoped refund percent applies only
@@ -293,21 +328,42 @@ Step C's own rules:
 
 ## 8. Screens
 
-- **Exceptions** (`/admin/exceptions`, its own route group: admin, finance admin,
-  coordinator; in the coordinator's nav): "Check these" with confirm and revoke; the grant
-  form — the student (or the whole family, from the Student 360's parents), the policy grouped
-  (what this role cannot grant shown disabled with why), the scope narrowed to what the policy
-  accepts (session, subject, the subject in a session and its item, one line, one charge, a
-  board series, an academic year), the value by type or a plan's instalments, the registry's
-  sentence, a reason, valid until; the list by status with revoke and, for a plan, release in
-  full. Coordinators are offered the seven academic gates only.
-- **School fees → Push to families**: year, a grade or a section, the due date; pushed and
+Each screen is driven headless on web 3140 / API 3141 against `igcse_rwc_dev`, in English and
+Arabic, with screenshots in the evidence folder (`web-01` … `web-30`).
+
+- **Exceptions** (`/admin/exceptions`, its own route group: admin, finance admin, coordinator;
+  in the coordinator's nav): "Check these" with confirm and revoke; the grant form — the student
+  (or the whole family), the policy grouped (what this role cannot grant shown disabled with
+  why), the scope narrowed to what the policy accepts, the value by type or a plan's
+  instalments, the registry's sentence, a reason, valid until; the list by status with revoke
+  (with its reason) and, for a plan, release in full. Opened from the Student 360 or from a line
+  with the student and the line already chosen (`?studentId=&registrationId=`).
+- **Charges** (`/charges`: finance desk, finance admin, admin): every charge by family and
+  status (to accept, unpaid, paid, refunded, cancelled); accept a family's request, cancel,
+  collect what is ticked with the instrument (a pushed fee on its own path), refund to escrow
+  (finance admin), add a board service, a price adjustment or another charge.
+- **The desk's Student 360**: "To collect now" — subjects waiting, charges and the year's fee,
+  ticked and taken in one action; beside a reservation, "Also collect now" (the fee, collected
+  first, and the charges). Each line shows the exceptions that touched it, and finance opens the
+  grant form on it.
+- **Board services** (`/exams/services`: admin and coordinator for the catalogue and dates,
+  finance admin for the fees and the refund rule; in the Exams nav and the finance admin's):
+  each board's services; per series each service's last date and its fee per level, marked
+  provisional, confirmed, or copied from the old list, confirmed by finance "as the board
+  published it". **The admin uses this screen for service fees**, beside the session's Fees tab
+  (A's, the subjects' board fees); the separate table is the reviewer's and the lead's to judge.
+- **The session's Money tab**: the session's charges below its lines (owed, paid, each charge).
+- **Charges & Instalments** (`/charges-due`: parents, students read): each child's plan with its
+  instalments paid and owed, the other charges; a parent ticks and pays at the desk or by
+  InstaPay (with the reference); a pushed fee links to the School fee page.
+- **School fees → Push to families**: to a grade, a section or a list of students; pushed and
   skipped listed with why.
-- **The desk** names a student's exceptions (their own and the family's) by policy.
-- Arabic for all of it in `apps/web/lib/i18n-money.ts` (words, the registry's sentences with
-  their parts, the dialogs and the API's refusals), merged in `lib/i18n.tsx` as A's file is.
-  The excel version of the grant is a note beside the family's row someone must remember at
-  the next payment; here every hook applies it and the sentence says what it will do first.
+- **Remarks** (the family's page): the service is the board's own for the line's series, with
+  its fee at the line's level and its last date; the remarks desk names the service and points
+  to Board services for the fees per series.
+- **The Finance Workbench and the receipt print** read a charge's payment and receipt (both
+  crashed on one before; found by the drive).
+- Arabic for all of it in `apps/web/lib/i18n-money.ts`, merged in `lib/i18n.tsx` as A's file is.
 
 ---
 
@@ -327,31 +383,30 @@ Step C's own rules:
 
 ## 10. Not in this step
 
-- A **Charges screen** for finance (list, accept a family's request, cancel, refund, add a
-  custom charge or price adjustment) and the **desk's collection of charges** in its UI: the
-  API does it; the screens do not yet.
-- The **board services admin UI** (catalogue, deadlines per series, the fee grid): API only.
-- **Charges on the Statement** (B's page) and in the session's **Money tab** (A's service).
-- The **remarks pages** choosing a board service: they still send V3's service type, which the
-  API maps.
-- **`deadline.boardEntry` is not read by any hook**: A's `effectiveDeadlineFor` and
-  `line_effective_deadline` do not ask the registry, so a late entry granted while the setting
-  is on would change nothing. Off by default (Q-20).
-- `exception.value`'s drop; reminders per instalment (step D, §3.8); a family's plan screens.
+- **Charges on the Statement** (B's page): B renders `listChargesFor(studentId)` beside the
+  lines, and each line's `exceptions` (the Student 360 returns them per line;
+  `exceptionsOfLines` in `line-exceptions-read.services.ts` for B's own endpoint).
+- **After A is on main** (the lead's items 4, 5, 13, 14): the window hook carrying the subject
+  (a subject-scoped `deadline.window`), the late board entry end to end, RESERVATIONS.md §2.1 and
+  §2.10 notes, and A's re-price and move using `lineIdsWithPaymentHistory`.
+- `exception.value`'s drop; reminders per instalment (step D, §3.8).
 
 ---
 
 ## 11. For the lead
 
-1. **`priceLine` should read the four `pricing.*` exceptions through the adapter**; then their
-   status flips to `live` in `POLICIES` (one line each) and 08r's 409 case changes.
+1. **`priceLine` reading the four `pricing.*` exceptions** is A's follow-up (the lead's message);
+   their status flips to `live` in `POLICIES` when it lands and 08r's 409 case changes.
 2. **Service fees are in `board_service_fee`**, not a service kind of `board_fee` (§2.10
    says the latter; `board_fee` is A's). If the lead prefers A's table, A adds the kind and the
    level and this table's rows move with a migration.
-3. **`deadline.boardEntry` needs A's effective deadline to ask the registry** before Q-20's
-   setting can be turned on usefully.
-4. **Charges in the session's Money tab** (A's service and screen; A's comment says "charges
-   join it in step C").
+3. **`deadline.boardEntry`**: A's follow-up makes the effective deadline honour it while the
+   setting is on; I add the end-to-end test after A is on main.
+4. **Charges on the session's Money tab**: built as a component of mine
+   (`[id]/session-charges.client.tsx`) rendered by one line in A's `money-tab.client.tsx`, reading
+   `GET /v1/charges?sessionId=` — A's money service is untouched.
+9. **For B**: render each line's `exceptions` and the student's charges on the Statement and the
+   Reserve pages (§10).
 5. **The five extended 09 rules** (§6): they were not pre-authorised; the trail row has OLD and
    NEW.
 6. **Arabic pages log a hydration mismatch** on every page (A's Sessions too): the
@@ -366,14 +421,14 @@ Step C's own rules:
 
 ---
 
-## 12. Questions for the owner
+## 12. Decided from the design (the lead, 8 Oct 2026)
 
-- **Q-21** (still open): each board service's refund rule — seeded `full` for all until
-  answered; a finance admin can set `less_fixed` with a deduction per service.
-- The **service fees copied from V3's remark fees are provisional**: the school confirms each
-  series' grid before families pay them.
-- **The overdue expiry** stays off until the school chooses how many days after the due date an
-  unpaid line is released.
+- **Each board service's refund rule** stays seeded `full` (today's behaviour, the owner's
+  default for Q-21); a finance admin may set another per service on Board services.
+- **The service fees copied from V3's remark fees stay provisional** until finance confirms
+  them per series; a provisional fee is not paid unless `pricing.payOnProvisionalFee` is on.
+- **The overdue days** are a school setting, one for every session, off until the school sets
+  it.
 
 ---
 
@@ -397,3 +452,8 @@ Step C's own rules:
   Push to families; Arabic; driven headless on 3140/3141 (§8); the suite green (398).
 - 01:46 — A's review fixes and §2.12 (40c1447) merged in, no conflicts (1243e70); 01:50 — the
   suite green on the merge (408, local time); api and web check-types clean.
+- 02:05 — the lead's decisions; the dev servers restarted for the lead and the review.
+- 02:20–02:45 — the screens: Charges, the desk's one action, Board services, the Money tab's
+  charges, remarks by board service; 08q's desk cases.
+- 02:45–03:08 — the review's NOW items (1, 2, 3, 6, 8, 9, 10, 12); the family's Charges &
+  Instalments page; the workbench and print read charges; the suite green (420); the drives.
