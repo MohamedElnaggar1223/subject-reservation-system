@@ -195,8 +195,9 @@ move into it is under way: a finance write either commits first (the move then h
 reads) or waits for the move (and a Confirm then finds the moved lines by their basis). Moves do
 not wait for each other. It is not a mode of the series row because the checkout and a change's
 approval take the series row `FOR SHARE` *after* their lines: any row mode that conflicts with a
-move's would deadlock a Confirm (series, then lines) against them. Neither a reservation nor a
-checkout takes it (a reservation reads its fee rows `FOR SHARE` at the moment it prices). This
+move's would deadlock a Confirm (series, then lines) against them. A path making lines takes it
+**shared** too (`insertLines`' locks, before the fee rows it prices from: so does every
+reservation since the review of B); the checkout does not (it reads no fee row). This
 closes the case the rows alone left open — a row that existed nowhere when the move began,
 created and confirmed by finance inside the move's transaction (08t, both orders; with the move's
 lock removed the line is left provisional on a confirmed row). The put's lock alone and Confirm's
@@ -212,7 +213,20 @@ reversal, a receipt's void and return, `executeReceiptGatedDrop`, a drop's or sw
 (before its deadline check under the line's lock), a preregistration's cancel, capture and the
 deadline sweep's preregistration refund. In the order above it sits where the receipt-gated drop
 takes it: after the student and the session, before the line. The opposite order deadlocks a
-drop's approval against a reversal (08t); B's verification is being changed to take it so (the lead, 8 Oct).
+drop's approval against a reversal (08t); B's verification takes it so.
+
+**A swap: the new line's locks before the old line** (the review of B, 8 Oct). A path that holds
+a line and then makes a new one — a swap's approval, the parent's own swap — takes what making the
+new line locks first, right after the student (`holdNewLines`, `line.services.ts`): the subjects,
+the session's series links, the series, the offers, the items, the fee grid (shared), the fee rows
+`FOR SHARE` and the student's price exceptions `FOR SHARE`; then the old line's receipt and the old
+line; then `insertLines` takes the same locks again, already held. Confirm and the grid save hold
+their fee rows (after the grid, exclusive) and then want every line priced from them, a paid one
+included; taken after the old line, the new line's rows closed a cycle with them whenever a row
+being confirmed was in the old line's basis (old and new items reading one key, or a line paid on
+a provisional fee). 08t forces it in both orders and for the parent's own swap: both sides land;
+with the early locks removed each run ends in "deadlock detected". Accepted as is: none — the order
+changes nothing elsewhere in this section (fee rows already came before lines).
 
 ### 2.2 Creating lines — `insertLines` (`apps/api/src/services/line.services.ts`)
 
@@ -576,6 +590,10 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
   the first entry's date later than the retake deadline. And the approval's deadline check (the
   line's student) and `getAvailableSubjects` (the student) pass the student, so a late entry is
   read there.
+- **A swap takes the new line's locks before the old line** *(changed, the review of B)*: §2.1.
+  `holdNewLines(tx, { studentId, sessionId, lines })` is exported for any path that holds a line
+  before it makes new ones; every reservation's `insertLines` now takes the series' fee grid
+  shared before its fee rows.
 - **A put that confirms settles the lines** *(changed)*: `PUT /board-fees` saving a provisional
   row as the board's published fee (the grid's "published" save, a pasted published list) used to
   confirm the row and leave the lines priced from it provisional and unpayable; it now settles them

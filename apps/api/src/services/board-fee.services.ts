@@ -168,7 +168,7 @@ export async function putFees(seriesId: string, data: PutBoardFeesType, actorId:
   return db.transaction(async (tx) => {
     const [s] = await tx.select().from(boardSeries).where(eq(boardSeries.id, seriesId)).for('share');
     if (!s) throw new BoardFeeError('Board series not found', 404);
-    await lockFeeGrids(tx, [seriesId], 'write');
+    await lockFeeGrids(tx, [seriesId], 'exclusive');
     await assertKeysOfBoard(tx, s.boardCode, data.rows);
     const now = new Date();
     const changed: Record<string, unknown>[] = [];
@@ -220,7 +220,7 @@ export async function copyFees(seriesId: string, fromSeriesId: string, actorId: 
     const [to] = await tx.select().from(boardSeries).where(eq(boardSeries.id, seriesId)).for('share');
     const [from] = await tx.select().from(boardSeries).where(eq(boardSeries.id, fromSeriesId));
     if (!to || !from) throw new BoardFeeError('Board series not found', 404);
-    await lockFeeGrids(tx, [seriesId], 'write');
+    await lockFeeGrids(tx, [seriesId], 'exclusive');
     if (to.boardCode !== from.boardCode) throw new BoardFeeError('Copy from a series of the same board');
     const rows = await tx.select().from(boardFee).where(eq(boardFee.boardSeriesId, fromSeriesId));
     let copied = 0;
@@ -268,7 +268,7 @@ export async function confirmFees(seriesId: string, data: ConfirmBoardFeesType, 
     if (!s) throw new BoardFeeError('Board series not found', 404);
     // The series' fee grid, exclusive, before its rows (§2.1): a move into this series waits for
     // the Confirm, or the Confirm for the move — never inside it.
-    await lockFeeGrids(tx, [seriesId], 'write');
+    await lockFeeGrids(tx, [seriesId], 'exclusive');
     const ids = [...new Set(data.rows.map((r) => r.feeId))].sort();
     const rows = await tx.select().from(boardFee).where(and(eq(boardFee.boardSeriesId, seriesId), inArray(boardFee.id, ids))).orderBy(boardFee.id).for('update');
     if (rows.length !== ids.length) throw new BoardFeeError('One or more fee rows are not in this series', 404);

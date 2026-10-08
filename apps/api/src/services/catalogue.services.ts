@@ -606,7 +606,7 @@ async function followBoardChange(tx: Tx, s: typeof subject.$inferSelect, newBoar
   // subject's row in each of those series is held FOR SHARE: a Confirm of it waits for the change
   // and reaches the moved lines, or lands first and is read confirmed (the review of 40c1447).
   const why = `The subject's board changed to ${boardName(names, newBoard)}`;
-  await lockFeeGrids(tx, targets.values(), 'move');
+  await lockFeeGrids(tx, targets.values(), 'shared');
   const oldFees = await itemBoardFees(tx, items.map((i) => i.id));
   for (const it of items) {
     const to = targets.get(it.id)!;

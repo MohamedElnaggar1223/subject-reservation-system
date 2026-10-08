@@ -1,7 +1,7 @@
 #!/bin/zsh
 # The conversion proof on all four databases (copies dropped and made again), then 09 over each.
 set -u
-export PGPASSWORD=auditpass
+: "${PGPASSWORD:?set PGPASSWORD: the local test container password}"; export PGPASSWORD
 EV=/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/.audit/rework-sessions-evidence/conversion
 run_one() {
   local src=$1 copy=$2 short=$3

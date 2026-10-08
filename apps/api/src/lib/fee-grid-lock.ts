@@ -8,6 +8,7 @@
  * before its fee rows by both sides: a move **shared**, and every path that creates or confirms a
  * fee row (the grid's put and paste, its copy, copy-from's fees, Confirm) **exclusive**. A finance
  * write and a move into the same series then never overlap; moves do not wait for each other.
+ * A path making lines (insertLines' locks) takes it shared too, before the rows it prices from.
  *
  * It is a transaction-scoped advisory lock on the series id, not a mode of the series row: the
  * checkout and a change's approval take the series row FOR SHARE **after** their lines, so a row
@@ -22,11 +23,14 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 /** The advisory namespace of fee grids (the second key is the series id's hash). */
 const FEE_GRID = 4041;
 
-/** Take the fee grids of these series, in id order: `move` shared, `write` exclusive. */
-export async function lockFeeGrids(tx: Tx, seriesIds: Iterable<string | null | undefined>, mode: 'move' | 'write') {
+/**
+ * Take the fee grids of these series, in id order: `shared` by a move and by a path making lines
+ * (it reads the rows), `exclusive` by a fee write or Confirm.
+ */
+export async function lockFeeGrids(tx: Tx, seriesIds: Iterable<string | null | undefined>, mode: 'shared' | 'exclusive') {
   const ids = [...new Set([...seriesIds].filter((s): s is string => !!s))].sort();
   for (const id of ids) {
-    await tx.execute(mode === 'move'
+    await tx.execute(mode === 'shared'
       ? sql`select pg_advisory_xact_lock_shared(${sql.raw(String(FEE_GRID))}, hashtext(${id}))`
       : sql`select pg_advisory_xact_lock(${sql.raw(String(FEE_GRID))}, hashtext(${id}))`);
   }

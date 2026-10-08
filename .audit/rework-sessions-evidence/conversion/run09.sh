@@ -4,7 +4,7 @@
 set -u
 SRC=$1; T=igcse_rwa_c09${2}_test
 EV=/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/.audit/rework-sessions-evidence/conversion
-export PGPASSWORD=auditpass
+: "${PGPASSWORD:?set PGPASSWORD: the local test container password}"; export PGPASSWORD
 psql -h 127.0.0.1 -p 5433 -U audit -d postgres -c "DROP DATABASE IF EXISTS $T" >/dev/null
 psql -h 127.0.0.1 -p 5433 -U audit -d postgres -c "CREATE DATABASE $T TEMPLATE $SRC" >/dev/null
 cd /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
