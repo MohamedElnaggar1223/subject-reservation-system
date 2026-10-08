@@ -129,7 +129,9 @@ and reminders) launched 8 Oct 06:40Z** on `feature/rework-messages`; then step 4
 check done (8 Oct 08:04Z, main 9edefbb):** every flow driven from a bare template with no errors; the
 counts measured against RESERVATIONS_REWORK.md §11 (`.audit/school-forms-evidence/step4/`); seven
 observations queued under F6. **F4 and F7 resumed (08:20Z)** on the new model; F1 next, F2 after it,
-F8 last.
+F8 last. **Step 3 complete (8 Oct 2026, 13:03Z):** D's branch landed at c2d7a78 after three Opus 5.5
+passes ("confirmed: merge"); migrations 0050–0054. Landing order now F4 → F7 → F1 → F2 → F8, each
+renumbering its migrations after main's journal at its merge.
 
 ## 1. The features and their full scope
 
@@ -652,7 +654,7 @@ API and web ports):
 | Rework A — sessions, offers, fees (RESERVATIONS_REWORK.md §9 step 1); merged to main 8 Oct 2026 (b438976) | `feature/rework-sessions` | `rwa` | 3121 / 3120 |
 | Rework B — reservations (step 2); merged to main 8 Oct 2026 (88c8d5a) | `feature/rework-reservations` | `rwb` | 3111 / 3110 |
 | Rework C — money changes, charges, exceptions (step 2); merged to main 8 Oct 2026 (b76eae4) | `feature/rework-money` | `rwc` | 3141 / 3140 (A's servers took 3121/3120 because 3101/3100 were held by an older worktree's dev servers) |
-| Rework D — messages and reminders (step 3) | `feature/rework-messages` | `rwd` | 3131 / 3130 |
+| Rework D — messages and reminders (step 3); merged to main 8 Oct 2026 (c2d7a78) | `feature/rework-messages` | `rwd` | 3131 / 3130 |
 
 | Feature | Implemented | Reviewed | Merged | Notes |
 |---|---|---|---|---|
