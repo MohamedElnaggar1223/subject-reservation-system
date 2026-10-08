@@ -1,0 +1,33 @@
+# C29: the database's one-live-entry-per-cash-in index removed (0050)
+# undone in: packages/db/drizzle/0050_exam_entries.sql
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['a cash-in that names no line']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 1 failed) 28078ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a cash-in that names no line: the coordinator adds its award by hand, with the charge 100ms
+     → expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
+ Test Files  1 failed (1)
+      Tests  1 failed | 55 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line be0ebeef-3a79-461e-92ec-28484ee1d2a0: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a cash-in that names no line: the coordinator adds its award by hand, with the charge
+AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "This cash-in is already entered",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "\"\"",[39m
+[31m+   "status": 201,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:368:10
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

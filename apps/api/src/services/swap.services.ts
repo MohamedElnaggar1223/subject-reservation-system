@@ -61,6 +61,7 @@ import type {
 import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { refundFor, refundSentence } from './refund.services';
 import { executeReceiptGatedDrop, lockReceiptOf } from './receipt.services';
+import { withdrawEntriesOfLineInTx, tellWithdrawn } from './exam-entry.services';
 import { priceLine, PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { holdNewLines } from './line.services';
 import { resolveItem, availabilityConstraints } from './offer.services';
@@ -501,16 +502,12 @@ export async function approveChangeRequest(
 
   const now = new Date();
 
-  // V3 §6.12: the refund locks at drop-APPROVAL time; since the reservations rework it is the
-  // line's own (refundFor, §3.9: the percent on the course fee, the board fee while not sent).
-  const quote = await refundFor(db, cr.registrationId, now);
-  const pct = quote.percent;
-  const refundAmount = quote.amount;
-
   // A request asked before the line's deadline is approved only before it too (the review of
   // 977848d, flag 1): past it the entry is with the board.
   await assertBeforeLineDeadline(db, cr.registration);
 
+  let quote = null as Awaited<ReturnType<typeof refundFor>> | null;
+  let withdrawn: Awaited<ReturnType<typeof withdrawEntriesOfLineInTx>> = [];
   const result = await db.transaction(async (tx) => {
     // A swap registers a new subject: asked again with the student and window
     // held, before anything else is locked (F0a; see assertMayRegisterForInTx).
@@ -525,6 +522,13 @@ export async function approveChangeRequest(
       .from(registration).where(eq(registration.id, cr.registrationId)).for('update');
     if (held?.boardSeriesId) await tx.select({ id: boardSeries.id }).from(boardSeries).where(eq(boardSeries.id, held.boardSeriesId)).for('share');
     if (held) await assertBeforeLineDeadline(tx, held);
+    // V3 §6.12: the refund locks at drop-APPROVAL time; since the reservations rework it is the
+    // line's own (refundFor, §3.9: the percent on the course fee, the board fee while not sent) —
+    // priced under the line's lock, so an entry marked sent meanwhile counts (the review of
+    // 093dbd1, item 4: "mark as sent" takes the line FOR SHARE).
+    quote = await refundFor(tx, cr.registrationId, now);
+    const pct = quote.percent;
+    const refundAmount = quote.amount;
 
     // Status guard: prevent concurrent double-approval
     const [updatedCR] = await tx
@@ -547,6 +551,8 @@ export async function approveChangeRequest(
       refundReason: cr.type === 'drop' ? 'drop' : 'swap_refund',
       initiatedBy: parentId,
     });
+    // The board's entries of the dropped line withdrawn with it (F4; the review of 093dbd1, item 1).
+    withdrawn = await withdrawEntriesOfLineInTx(tx, cr.registrationId, cr.type === 'drop' ? 'the family dropped the subject' : 'the family swapped the subject', parentId, auditCtx);
 
     let newRegistrationId: string | null = null;
     if (cr.type === 'swap' && swap && eligibility) {
@@ -580,8 +586,10 @@ export async function approveChangeRequest(
     result.refundAmount <= 0
       ? `No refund applies (${result.refundPercentage}% refund window)`
       : result.gated
-        ? `${refundSentence(quote)} will be credited once the subject's receipt is returned to the school`
-        : `${refundSentence(quote)} credited to your escrow`;
+        ? `${refundSentence(quote!)} will be credited once the subject's receipt is returned to the school`
+        : `${refundSentence(quote!)} credited to your escrow`;
+  await tellWithdrawn(withdrawn, cr.type === 'drop' ? 'the family dropped the subject' : 'the family swapped the subject')
+    .catch((err) => console.error('[notification] F4 entries withdrawn (approve) failed:', err));
 
   notifyDropSwapProcessed({
     studentId,
@@ -713,25 +721,32 @@ export async function executeDirectDrop(
 
   const now = new Date();
 
-  // V3 §6.12: the refund locks at drop time (refundFor, §3.9).
-  const quote = await refundFor(db, registrationId, now);
-  const pct = quote.percent;
-  const refundAmount = quote.amount;
-
   // Atomic transaction (OI-009) — receipt-gated (D-D)
-  const result = await db.transaction(async (tx) => {
+  let withdrawn: Awaited<ReturnType<typeof withdrawEntriesOfLineInTx>> = [];
+  const { result, quote } = await db.transaction(async (tx) => {
+    // The line's receipt, then the line (MA-16's order), and only then the price: an entry marked
+    // sent meanwhile counts (the review of 093dbd1, item 4: "mark as sent" takes the line FOR SHARE).
+    await lockReceiptOf(tx, registrationId);
+    await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, registrationId)).for('update');
+    // V3 §6.12: the refund locks at drop time (refundFor, §3.9).
+    const quote = await refundFor(tx, registrationId, now);
     const dropOutcome = await executeReceiptGatedDrop(tx, {
       registrationId,
       studentId: reg.studentId,
-      refundAmount,
+      refundAmount: quote.amount,
       refundReason: 'drop',
       initiatedBy: parentId,
     });
-    const outcome = { success: true, creditedAmount: dropOutcome.gated ? 0 : refundAmount, ...dropOutcome, refundPercentage: pct };
+    // The board's entries of the dropped line withdrawn with it (F4; the review of 093dbd1, item 1).
+    withdrawn = await withdrawEntriesOfLineInTx(tx, registrationId, 'the family dropped the subject', parentId, auditCtx);
+    const outcome = { success: true, creditedAmount: dropOutcome.gated ? 0 : quote.amount, ...dropOutcome, refundPercentage: quote.percent };
     // The drop, its refund and their audit row commit together (MO-1).
     await logAction(parentId, 'DIRECT_DROP_EXECUTED', 'registration', registrationId, { status: reg.status }, outcome, auditCtx, tx);
-    return outcome;
+    return { result: outcome, quote };
   });
+  const pct = quote.percent;
+  const refundAmount = quote.amount;
+  await tellWithdrawn(withdrawn, 'the family dropped the subject').catch((err) => console.error('[notification] F4 entries withdrawn (direct drop) failed:', err));
 
   const impact =
     refundAmount <= 0
@@ -808,18 +823,23 @@ export async function executeDirectSwap(
   const newSubjectPrice = swap.price.total;
   const now = new Date();
 
-  // V3 §6.12: the drop leg's refund locks at swap time (refundFor, §3.9).
-  const quote = await refundFor(db, registrationId, now);
-  const pct = quote.percent;
-  const refundAmount = quote.amount;
-
   // Atomic transaction (OI-009) — drop leg receipt-gated (D-D)
+  let withdrawn: Awaited<ReturnType<typeof withdrawEntriesOfLineInTx>> = [];
+  let quote = null as Awaited<ReturnType<typeof refundFor>> | null;
   const result = await db.transaction(async (tx) => {
     // Asked again with the student and window held, before anything else is
     // locked (F0a; see assertMayRegisterForInTx).
     await assertMayRegisterForInTx(tx, reg.studentId, reg.sessionId);
     // The new line's locks before the old line's receipt and the line (§2.1; as the approval).
     await holdNewLines(tx, { studentId: reg.studentId, sessionId: reg.sessionId, lines: [swap.line] });
+    // The old line's receipt, then the line (MA-16's order), and only then the drop leg's price: an
+    // entry marked sent meanwhile counts (the review of 093dbd1, item 4).
+    await lockReceiptOf(tx, registrationId);
+    await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, registrationId)).for('update');
+    // V3 §6.12: the drop leg's refund locks at swap time (refundFor, §3.9).
+    quote = await refundFor(tx, registrationId, now);
+    const refundAmount = quote.amount;
+    const pct = quote.percent;
     const dropOutcome = await executeReceiptGatedDrop(tx, {
       registrationId,
       studentId: reg.studentId,
@@ -827,6 +847,8 @@ export async function executeDirectSwap(
       refundReason: 'swap_refund',
       initiatedBy: parentId,
     });
+    // The board's entries of the dropped line withdrawn with it (F4; the review of 093dbd1, item 1).
+    withdrawn = await withdrawEntriesOfLineInTx(tx, registrationId, 'the family swapped the subject', parentId, auditCtx);
 
     // The new line, pending payment (insertLines: its series, its rules, its price; created_at
     // from the column's default, the database's clock — ST-15), the dropped line's consent inherited.
@@ -850,14 +872,17 @@ export async function executeDirectSwap(
     return outcome;
   });
 
+  const pct = quote!.percent;
+  const refundAmount = quote!.amount;
+  await tellWithdrawn(withdrawn, 'the family swapped the subject').catch((err) => console.error('[notification] F4 entries withdrawn (direct swap) failed:', err));
   // NOT-007 / SWAP-004: Student receives email + in-app notification when
   // a parent directly swaps a subject for them.
   const swapImpact =
     refundAmount <= 0
       ? `No refund applies for the dropped subject (${pct}% refund window); payment for the new subject is pending.`
       : result.gated
-        ? `${refundSentence(quote)} will be credited once the old receipt is returned; payment for the new subject is pending.`
-        : `${refundSentence(quote)} credited to your escrow; payment for the new subject is pending.`;
+        ? `${refundSentence(quote!)} will be credited once the old receipt is returned; payment for the new subject is pending.`
+        : `${refundSentence(quote!)} credited to your escrow; payment for the new subject is pending.`;
 
   notifyDirectDropSwapExecuted({
     studentId: reg.studentId,

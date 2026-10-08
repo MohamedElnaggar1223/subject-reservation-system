@@ -1,0 +1,77 @@
+# C6: the entry list's missing-forecast flag removed
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x1-exam-entries.test.ts
+# expected red: ['flags a missing forecast grade']
+# result: RED as expected
+
+ ❯ test/08x1-exam-entries.test.ts (17 tests | 3 failed) 3803ms
+   × F4: candidates and entries > the entry list and its check > flags a missing forecast grade (Cambridge requires one) and every other gap; the teacher of the subject fills it 25ms
+     → expected [] to deeply equal [ 'missing_forecast' ]
+   × F4: candidates and entries > the entry list and its check > Pearson's list asks for the UCI, not a forecast; the board's rules are data the coordinator changes 41ms
+     → expected +0 to be 5 // Object.is equality
+   × F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after 4ms
+     → expected +0 to be 1 // Object.is equality
+ Test Files  1 failed (1)
+      Tests  3 failed | 14 passed (17)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x1-exam-entries.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > the entry list and its check > flags a missing forecast grade (Cambridge requires one) and every other gap; the teacher of the subject fills it
+AssertionError: expected [] to deeply equal [ 'missing_forecast' ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [[39m
+[32m-   "missing_forecast",[39m
+[32m- ][39m
+[31m+ [][39m
+
+ ❯ test/08x1-exam-entries.test.ts:148:29
+    146|       const rowA = before.rows.find((r) => r.studentId === a)!;
+    147|       const rowB = before.rows.find((r) => r.studentId === b)!;
+    148|       expect(rowA.problems).toEqual(['missing_forecast']);
+       |                             ^
+    149|       expect(rowB.problems).toEqual(['missing_option_code', 'missing_f…
+    150|       expect(before.summary).toMatchObject({ missing_forecast: 2, miss…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > the entry list and its check > Pearson's list asks for the UCI, not a forecast; the board's rules are data the coordinator changes
+AssertionError: expected +0 to be 5 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 5[39m
+[31m+ 0[39m
+
+ ❯ test/08x1-exam-entries.test.ts:186:151
+    184|       // The coordinator records that Pearson wants forecasts too: eve…
+    185|       await apiResponse(coord.api.v1.exams['board-rules'][':boardCode'…
+    186|       expect((await apiResponse(coord.api.v1.exams['entry-lists'].$get…
+       |                                                                                                                                                       ^
+    187|       await apiResponse(coord.api.v1.exams['board-rules'][':boardCode'…
+    188|       expect((await apiResponse(coord.api.v1.exams['entry-lists'].$get…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after
+AssertionError: expected +0 to be 1 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 0[39m
+
+ ❯ test/08x1-exam-entries.test.ts:324:24
+    322|     it("Cambridge fixes a forecast once sent: the teacher's change is …
+    323|       const r = await apiResponse(coord.api.v1.exams.forecasts.submit.…
+    324|       expect(r.locked).toBe(1); // A's (B's entry was withdrawn)
+       |                        ^
+    325|       const [ea] = await entriesOf(w.series.cambridgeNov, a);
+    326|       expect(await refused(w.teacher.api.v1.exams.entries[':id'].forec…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

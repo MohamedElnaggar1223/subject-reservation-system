@@ -13,7 +13,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, ROLE_LABELS, WEEKDAY_LABELS, refundPolicySentence, RefundPolicySchema, type RefundPolicy, type Role } from '@repo/validations';
+import { apiResponse, ROLE_LABELS, WEEKDAY_LABELS, COUNCIL_LABELS, ENTRY_ROUTES, ENTRY_ROUTE_LABELS, refundPolicySentence, RefundPolicySchema, type RefundPolicy, type Role } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { useI18n } from '~/lib/i18n';
@@ -32,9 +32,15 @@ const GROUPS: { id: string; title: string; hint: string }[] = [
   { id: 'refund', title: 'Refunds', hint: 'What a new session’s refund policy is.' },
   // Step C (RESERVATIONS_REWORK.md §3.7): what an exception may lift beyond the registry's own rules.
   { id: 'exceptions', title: 'Exceptions', hint: 'What the school allows an exception to lift.' },
+  // F0b's reading of the level code (the group was missing here, so the setting never showed).
+  { id: 'catalogue', title: 'Exam catalogue', hint: 'How the school’s level codes read.' },
+  // F4: the school as an exam centre.
+  { id: 'exams', title: 'Exam entries', hint: 'The school as an exam centre: its numbers with the boards, and the rules the coordinator has not confirmed yet.' },
   // Step D (RESERVATIONS_REWORK.md §3.8): the reminders' switch and hour; the rules are on Messages > Reminders.
   { id: 'reminders', title: 'Reminders', hint: 'Whether the reminder rules on Messages > Reminders go out, and at what hour of their day.' },
 ];
+
+type Centres = Record<string, { centreNumber: string | null; route: 'direct' | 'british_council' }>;
 
 /** The value as a person reads it. */
 function describeValue(s: Setting, value: unknown): string {
@@ -43,10 +49,15 @@ function describeValue(s: Setting, value: unknown): string {
   if (s.input === 'weekdays' && Array.isArray(value)) {
     return [...(value as number[])].sort((a, b) => a - b).map((d) => WEEKDAY_LABELS[d] ?? String(d)).join(', ');
   }
-  if (s.input === 'number' && typeof value === 'number') return s.unit === 'percent' ? `${value}%` : s.unit === 'days' ? `${value} ${value === 1 ? 'day' : 'days'}` : s.unit === 'hour' ? `${String(value).padStart(2, '0')}:00 Cairo time` : String(value);
+  // A number with its unit (F4's months, candidates and days before; D's hour; the rework's percent and days).
+  if (s.input === 'number' && typeof value === 'number') return s.unit === 'percent' ? `${value}%` : s.unit === 'days' ? `${value} ${value === 1 ? 'day' : 'days'}` : s.unit === 'hour' ? `${String(value).padStart(2, '0')}:00 Cairo time` : `${value}${s.unit ? ` ${s.unit}` : ''}`;
   if (s.input === 'refundPolicy') {
     const p = RefundPolicySchema.safeParse(value);
     return p.success ? refundPolicySentence(p.data) : JSON.stringify(value);
+  }
+  if (s.input === 'centres' && value && typeof value === 'object') {
+    const entries = Object.entries(value as Centres).filter(([, c]) => c.centreNumber);
+    return entries.length ? entries.map(([board, c]) => `${COUNCIL_LABELS[board as keyof typeof COUNCIL_LABELS] ?? board} ${c.centreNumber}`).join(', ') : 'None recorded';
   }
   return JSON.stringify(value);
 }
@@ -106,6 +117,49 @@ export default function SettingsClient(): React.JSX.Element {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+const fetchBoards = () => apiResponse(api.v1.catalogue.$get());
+
+/**
+ * F4: the school's centre number with each board, and whether it enters
+ * directly or through the British Council — one row per board of the
+ * catalogue. Board names stay as the boards write them.
+ */
+function CentresInput({ value, onChange }: { value: Centres; onChange: (v: Centres) => void }): React.JSX.Element {
+  const { data } = useQuery({ queryKey: ['catalogue'], queryFn: fetchBoards });
+  const boards = data?.boards ?? [];
+  const set = (code: string, patch: Partial<Centres[string]>) => {
+    const current = value[code] ?? { centreNumber: null, route: 'direct' as const };
+    onChange({ ...value, [code]: { ...current, ...patch } });
+  };
+  return (
+    <div className="space-y-2">
+      {boards.map((b) => (
+        <div key={b.code} className="grid grid-cols-1 items-center gap-2 rounded-lg border border-border p-3 sm:grid-cols-[1fr_9rem_1fr]">
+          <span className="text-sm font-medium text-foreground"><bdi data-i18n-skip="true">{b.name}</bdi></span>
+          <input
+            value={value[b.code]?.centreNumber ?? ''}
+            onChange={(e) => set(b.code, { centreNumber: e.target.value.trim() === '' ? null : e.target.value.toUpperCase() })}
+            placeholder="Centre number"
+            aria-label={`Centre number with ${b.name}`}
+            maxLength={5}
+            dir="ltr"
+            className="h-10 rounded-lg border border-border bg-background px-3 font-mono text-sm uppercase text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <select
+            value={value[b.code]?.route ?? 'direct'}
+            onChange={(e) => set(b.code, { route: e.target.value as 'direct' | 'british_council' })}
+            aria-label={`How the school enters with ${b.name}`}
+            className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            {ENTRY_ROUTES.map((r) => <option key={r} value={r}>{ENTRY_ROUTE_LABELS[r]}</option>)}
+          </select>
+        </div>
+      ))}
+      <p className="text-xs text-muted-foreground">Five letters or digits, as the board issued it (Cambridge EG123, Pearson 91234). Leave a board empty if the school does not enter with it.</p>
     </div>
   );
 }
@@ -228,10 +282,11 @@ function SettingCard({ setting: s, onSaved }: { setting: Setting; onSaved: (save
                   onChange={(e) => setDraft(e.target.value === '' ? null : Number(e.target.value))}
                   className="w-28 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
-                {s.unit && <span>{s.unit === 'percent' ? '%' : s.unit === 'hour' ? ':00, Cairo time' : 'days'}</span>}
+                {s.unit && <span>{s.unit === 'percent' ? '%' : s.unit === 'hour' ? ':00, Cairo time' : s.unit}</span>}
               </label>
             )}
             {s.input === 'refundPolicy' && <RefundPolicyEditor value={draft as RefundPolicy} onChange={setDraft} />}
+            {s.input === 'centres' && <CentresInput value={(draft ?? {}) as Centres} onChange={setDraft} />}
           </fieldset>
 
           {s.key === 'eligibility.graduateRetakes' && s.value === true && draft === false && (

@@ -1,0 +1,6 @@
+# igcse_exams_dev: the review's migration (0052_exam_entries_review)
+2026-10-08T12:58:01Z
+before: 52|1791449161130
+migrate exit 0: [⣷] applying migrations...[2K[1G[✓] migrations applied successfully!
+after: 53|1791460691369
+column: withdrawn_with_line|boolean|false|NO

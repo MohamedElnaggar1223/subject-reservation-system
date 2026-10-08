@@ -212,6 +212,7 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, { ...session, registrationsExpired: expired.length, paymentsClosed });
       } catch (err) {
         const message = clientMessage(err, 'Failed to correct the series');
+        if (err instanceof sessionService.SessionError) return error(c, message, err.status);
         return error(c, message, message.includes('not found') ? 404 : message.includes('already') ? 409 : 400);
       }
     }

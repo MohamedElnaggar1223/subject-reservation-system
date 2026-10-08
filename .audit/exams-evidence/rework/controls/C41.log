@@ -1,0 +1,61 @@
+# C41: an entry withdrawn with its line is never made again (read as withdrawn by the coordinator)
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['paid again, the next derivation makes it again']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 27365ms
+   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a payment reversal: the entry is withdrawn with the line; paid again, the next derivation makes it again 87ms
+     → expected { series: { …(4) }, …(7) } to match object { created: 1 }
+   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > what staff set on an entry withdrawn with its line is carried to the entry made again after a second payment (the review of 54c225f, item 3) 374ms
+     → expected { series: { …(4) }, …(7) } to match object { created: 1 }
+ Test Files  1 failed (1)
+      Tests  2 failed | 54 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 8ae3f946-5bd2-4fba-a986-97fa8cdd766e: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > a payment reversal: the entry is withdrawn with the line; paid again, the next derivation makes it again
+AssertionError: expected { series: { …(4) }, …(7) } to match object { created: 1 }
+(15 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "created": 1,[39m
+[31m+   "created": 0,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:544:69
+    542|       await apiResponse(w.officer.api.v1.payments[':id'].confirm.$post…
+    543|       expect((await lineOf(pl.rv!)).status).toBe('confirmed');
+    544|       expect(await derive(w.series.cambridgeNov, pf.rv!.studentId)).to…
+       |                                                                     ^
+    545|       const live = await entriesOf(w.series.cambridgeNov, pf.rv!.stude…
+    546|       expect(live.map((e) => [e.entry_code, e.status, e.registration_i…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > what staff set on an entry withdrawn with its line is carried to the entry made again after a second payment (the review of 54c225f, item 3)
+AssertionError: expected { series: { …(4) }, …(7) } to match object { created: 1 }
+(15 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "created": 1,[39m
+[31m+   "created": 0,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:561:65
+    559|       const again = await apiResponse(sr.parent.api.v1.payments.initia…
+    560|       await apiResponse(w.officer.api.v1.payments[':id'].confirm.$post…
+    561|       expect(await derive(w.series.cambridgeNov, sr.studentId)).toMatc…
+       |                                                                 ^
+    562|       const made = await one<{ id: string; option_code: string | null;…
+    563|         `select id, option_code, staff_set from exam_entry where regis…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

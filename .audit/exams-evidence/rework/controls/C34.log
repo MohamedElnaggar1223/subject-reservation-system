@@ -1,0 +1,63 @@
+# C34: "mark as sent" sends a draft whose line is no longer confirmed or whose cash-in is not paid
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['refuses an entry whose line is no longer confirmed', 'reversed, it is flagged and not sent']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 28398ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1) 185ms
+     → expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+   × F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > "mark as sent" refuses an entry whose line is no longer confirmed, naming it (the backstop should a path end a line and leave its entries) 10ms
+     → expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+ Test Files  1 failed (1)
+      Tests  2 failed | 54 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 5587811e-dc0b-44c0-adab-385016ccf34b: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1)
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "XWXMA01 Mathematics XW for Student x-xw-b is not sent: its cash-in is not paid — withdraw the entry",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "\"\"",[39m
+[31m+   "status": 200,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:406:10
+    404|       expect((await entryList(w.series.pearsonJan)).rows.find((r) => r…
+    405|       expect(await refused(coord.api.v1.exams.entries.submit.$post({ j…
+    406|         .toEqual({ status: 409, error: `${T}XMA01 Mathematics ${T} for…
+       |          ^
+    407|       expect((await one<{ status: string }>(`select status from exam_e…
+    408|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > every other path that ends a paid line withdraws its entries, in its own transaction (the review of 093dbd1, item 1) > "mark as sent" refuses an entry whose line is no longer confirmed, naming it (the backstop should a path end a line and leave its entries)
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "XW97 Biology XW for Student x-xw-nl is not sent: its reservation is dropped — withdraw the entry",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "\"\"",[39m
+[31m+   "status": 200,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:581:12
+    579|       try {
+    580|         expect(await refused(coord.api.v1.exams.entries.submit.$post({…
+    581|           .toEqual({ status: 409, error: `${T}97 Biology ${T} for Stud…
+       |            ^
+    582|         expect((await one<{ status: string }>(`select status from exam…
+    583|       } finally {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

@@ -1,0 +1,38 @@
+# Full API suite, local time (Africa/Cairo), worktree agent-ae3ddd804d82aff1d, the review of 54c225f's tree
+ ✓ test/00-harness.test.ts (4 tests) 1672ms
+ ✓ test/01-desk.test.ts (8 tests) 1604ms
+ ✓ test/02-money.test.ts (4 tests) 1666ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 1907ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 5955ms
+ ✓ test/05-object-access.test.ts (16 tests) 7138ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3594ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1738ms
+ ✓ test/08-money-rules.test.ts (51 tests) 12206ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 11757ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 7157ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 7658ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 5688ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5158ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 8508ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2647ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4274ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 3931ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4354ms
+ ✓ test/08l-board-change.test.ts (7 tests) 3372ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 6045ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 23165ms
+ ✓ test/08o-reservation-lines.test.ts (23 tests) 16252ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 8147ms
+ ✓ test/08q-charges.test.ts (46 tests) 27935ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 8697ms
+ ✓ test/08t-rework-races.test.ts (37 tests) 33516ms
+ ✓ test/08x1-exam-entries.test.ts (17 tests) 3961ms
+ ✓ test/08x2-exam-days-results.test.ts (14 tests) 3792ms
+ ✓ test/08x3-exam-races.test.ts (8 tests) 3951ms
+ ✓ test/08x4-exam-entries-rework.test.ts (56 tests) 27936ms
+ ✓ test/09-money-invariants.test.ts (54 tests) 644ms
+ Test Files  32 passed (32)
+      Tests  601 passed | 1 todo (602)
+   Start at  21:27:22
+   Duration  275.95s (transform 1.09s, setup 50ms, collect 3.84s, tests 266.02s, environment 3ms, prepare 1.09s)
+exit 0

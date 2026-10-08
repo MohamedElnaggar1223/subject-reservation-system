@@ -61,6 +61,15 @@ export const NOTIFICATION_TYPES = [
   'DECLARATION_REVIEWED',
   // Reservations rework: a moved line whose price stayed but is now to be confirmed
   'PRICE_TO_BE_CONFIRMED',
+  // F4: exam entries — the family's statement of entry and timetable, a
+  // changed paper, a withdrawn entry, results, a certificate to collect; the
+  // staff's deadline reminders.
+  'EXAM_TIMETABLE_PUBLISHED',
+  'EXAM_TIMETABLE_CHANGED',
+  'EXAM_ENTRY_WITHDRAWN',
+  'EXAM_RESULTS_PUBLISHED',
+  'EXAM_CERTIFICATE_READY',
+  'EXAM_DEADLINE_REMINDER',
   // Step D (messages and reminders): a message from the school to chosen people or a list, a
   // payment or school-fee reminder, a reminder to staff. A broadcast stays BULK_ANNOUNCEMENT and
   // a closing reminder SESSION_CLOSING_SOON, as families have always received them.
@@ -100,6 +109,12 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   PLAN_UPDATED:                     'Instalment Plan',
   DECLARATION_REVIEWED:             'Declared Sitting Reviewed',
   PRICE_TO_BE_CONFIRMED:            'Price To Be Confirmed',
+  EXAM_TIMETABLE_PUBLISHED:         'Exam Timetable Ready',
+  EXAM_TIMETABLE_CHANGED:           'Exam Timetable Changed',
+  EXAM_ENTRY_WITHDRAWN:             'Exam Entry Withdrawn',
+  EXAM_RESULTS_PUBLISHED:           'Exam Results',
+  EXAM_CERTIFICATE_READY:           'Certificate Ready to Collect',
+  EXAM_DEADLINE_REMINDER:           'Exam Deadline Coming Up',
   SCHOOL_MESSAGE:                   'Message from the School',
   PAYMENT_REMINDER:                 'Payment Reminder',
   STAFF_REMINDER:                   'Reminder',
@@ -134,6 +149,12 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   PLAN_UPDATED:                     '🗓️',
   DECLARATION_REVIEWED:             '🔎',
   PRICE_TO_BE_CONFIRMED:            '💱',
+  EXAM_TIMETABLE_PUBLISHED:         '🗓️',
+  EXAM_TIMETABLE_CHANGED:           '🗓️',
+  EXAM_ENTRY_WITHDRAWN:             '📝',
+  EXAM_RESULTS_PUBLISHED:           '🎓',
+  EXAM_CERTIFICATE_READY:           '📜',
+  EXAM_DEADLINE_REMINDER:           '⏰',
   SCHOOL_MESSAGE:                   '✉️',
   PAYMENT_REMINDER:                 '⏰',
   STAFF_REMINDER:                   '📌',

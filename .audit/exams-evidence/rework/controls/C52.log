@@ -1,0 +1,52 @@
+# C52: a sitting verified at declaration attributed to the result's importer, not the one declaring (the review of 426d565, item 7)
+# undone in: apps/api/src/services/exam-result.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['is verified at once, by the one declaring it']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 28340ms
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the one declaring it, the reason naming the result and its importer; a sitting graded absent waits for the coordinator 112ms
+     → expected 'b8cMW4xplZFXqeVBXmLiAXKZPwysn1ok' to be 'QuFJrDJ1Xv0uJuXBw8bhH7iTogjvXzJf' // Object.is equality
+   × F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a family's own declaration the results on record show is verified with no person as its answerer, the reason naming the result and its importer (the review of 54c225f, item 2) 61ms
+     → expected 'b8cMW4xplZFXqeVBXmLiAXKZPwysn1ok' to be null
+ Test Files  1 failed (1)
+      Tests  2 failed | 54 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line f95df369-eb55-4652-9067-32abfba2f05e: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a retake declared after its sitting is on record is verified at once, by the one declaring it, the reason naming the result and its importer; a sitting graded absent waits for the coordinator
+AssertionError: expected 'b8cMW4xplZFXqeVBXmLiAXKZPwysn1ok' to be 'QuFJrDJ1Xv0uJuXBw8bhH7iTogjvXzJf' // Object.is equality
+
+Expected: [32m"QuFJrDJ1Xv0uJuXBw8bhH7iTogjvXzJf"[39m
+Received: [31m"b8cMW4xplZFXqeVBXmLiAXKZPwysn1ok"[39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:849:36
+    847|       expect((await lineOf(kr)).outcome).toBe('verified');
+    848|       // The desk declared it (the review of 426d565, item 7): the adm…
+    849|       expect(await verifiedBy(kr)).toBe(w.officer.id);
+       |                                    ^
+    850|       const a = await answer(kr);
+    851|       expect(a.user_id).toBe(w.officer.id);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a sitting the school's results show: verified at declaration, only by a real grade, the importer answering (the review of 093dbd1, items 3, 7, 9) > a family's own declaration the results on record show is verified with no person as its answerer, the reason naming the result and its importer (the review of 54c225f, item 2)
+AssertionError: expected 'b8cMW4xplZFXqeVBXmLiAXKZPwysn1ok' to be null
+
+[32m- Expected:[39m 
+null
+
+[31m+ Received:[39m 
+"b8cMW4xplZFXqeVBXmLiAXKZPwysn1ok"
+
+ ❯ test/08x4-exam-entries-rework.test.ts:878:42
+    876|       } }));
+    877|       expect((await lineOf(line!.id)).outcome).toBe('verified');
+    878|       expect(await verifiedBy(line!.id)).toBeNull();
+       |                                          ^
+    879|       const a = await one<{ user_id: string | null; n: Record<string, …
+    880|         `select user_id, new_data as n from audit_log where entity_id …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

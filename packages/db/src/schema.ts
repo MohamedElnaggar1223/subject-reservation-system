@@ -3499,3 +3499,612 @@ export const courseEnrolmentRelations = relations(courseEnrolment, ({ one }) => 
   unit: one(examUnit, { fields: [courseEnrolment.unitId], references: [examUnit.id] }),
   teacher: one(teacher, { fields: [courseEnrolment.teacherId], references: [teacher.id] }),
 }));
+
+/**
+ * ============================================
+ * F4 — EXAM-ENTRY MANAGEMENT
+ * ============================================
+ *
+ * The school as an exam centre (FEATURES_PLAN.md F4; DISCOVERY_RESEARCH.md
+ * §2 and §5 notes 2, 5, 6; docs/features/EXAM_ENTRIES.md). Built on F0b's
+ * catalogue and board series: a confirmed registration is entered with its
+ * board per unit or award (`exam_entry`), the candidate carries the
+ * identifiers the boards ask for (`exam_candidate`, a candidate number per
+ * board series with its history), the series' timetable becomes each
+ * candidate's own (papers, rooms, seats, invigilators, the boards'
+ * attendance registers), results come back per unit and award keeping every
+ * attempt, and certificates are received and collected once. Nothing here
+ * takes or moves family money. The school's hard stop at a series' entry
+ * deadline (MO-10, A-08) holds for entries as for registrations: no new
+ * entry after it; a withdrawal after it is recorded with the board's fee.
+ */
+
+/**
+ * Each board's rules for entries (staff-editable data, owner decision 3):
+ * whether it needs forecast grades, a UCI or an option code, and what an
+ * amendment or a withdrawal after its dates costs (shown, never charged).
+ */
+export const examBoardRule = pgTable(
+  "exam_board_rule",
+  {
+    boardCode: text("board_code").primaryKey().references(() => examBoard.code, { onDelete: "cascade" }),
+    forecastRequired: boolean("forecast_required").notNull().default(false),
+    // Cambridge: a forecast grade cannot be changed once submitted.
+    forecastLockedOnSubmit: boolean("forecast_locked_on_submit").notNull().default(false),
+    optionCodeRequired: boolean("option_code_required").notNull().default(false),
+    uciRequired: boolean("uci_required").notNull().default(false),
+    // A candidate number is fixed once an entry in the series is submitted.
+    candidateNumberFixed: boolean("candidate_number_fixed").notNull().default(true),
+    // After the entry deadline: 'allowed_with_fee' | 'refused'.
+    amendmentAfterDeadline: text("amendment_after_deadline").notNull().default("allowed_with_fee"),
+    // From which of the series' dates an amendment costs the board's fee.
+    amendmentFeeFrom: text("amendment_fee_from").notNull().default("entry_deadline"),
+    amendmentFeeNote: text("amendment_fee_note"),
+    // Up to which date a withdrawn entry is refunded by the board ('never': not at all).
+    withdrawalRefundUntil: text("withdrawal_refund_until").notNull().default("entry_deadline"),
+    withdrawalFeeNote: text("withdrawal_fee_note"),
+    // The carry-forward period is the board's own column since the reservations rework
+    // (exam_board.carry_forward_months, step A; the line rules read it too): F4 reads and edits it there.
+    // How the board's results file names a candidate: 'candidate_number' | 'uci'.
+    resultsKey: text("results_key").notNull().default("candidate_number"),
+    notes: text("notes"),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check("exam_board_rule_amendment_valid", sql`${table.amendmentAfterDeadline} IN ('allowed_with_fee', 'refused')`),
+    check("exam_board_rule_amendment_from_valid", sql`${table.amendmentFeeFrom} IN ('entry_deadline', 'late_fee_from', 'high_late_fee_from')`),
+    check("exam_board_rule_refund_valid", sql`${table.withdrawalRefundUntil} IN ('entry_deadline', 'late_fee_from', 'high_late_fee_from', 'never')`),
+    check("exam_board_rule_results_key_valid", sql`${table.resultsKey} IN ('candidate_number', 'uci')`),
+  ]
+);
+
+/**
+ * A student as an exam candidate: the name as on their ID, date of birth and
+ * gender the boards' entry files ask for, Pearson's UCI (permanent), and the
+ * access arrangements the boards approved. The national ID or passport is in
+ * `exam_candidate_identity`, which one service reads.
+ */
+export const examCandidate = pgTable(
+  "exam_candidate",
+  {
+    studentId: text("student_id").primaryKey().references(() => user.id, { onDelete: "restrict" }),
+    legalForenames: text("legal_forenames"),
+    legalSurname: text("legal_surname"),
+    dateOfBirth: date("date_of_birth", { mode: "string" }),
+    // 'female' | 'male' — as the boards' files record it.
+    gender: text("gender"),
+    // Pearson's Unique Candidate Identifier: 13 characters, permanent.
+    uci: text("uci"),
+    // Approved access arrangements (extra time, reader, scribe…), their board reference and expiry.
+    accessArrangements: jsonb("access_arrangements").$type<string[]>().notNull().default([]),
+    accessArrangementsRef: text("access_arrangements_ref"),
+    accessArrangementsUntil: date("access_arrangements_until", { mode: "string" }),
+    notes: text("notes"),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("examCandidate_uci_idx").on(table.uci),
+    check("exam_candidate_gender_valid", sql`${table.gender} IS NULL OR ${table.gender} IN ('female', 'male')`),
+    check("exam_candidate_uci_shape", sql`${table.uci} IS NULL OR ${table.uci} ~ '^[0-9]{5}[0-9A-Z][0-9]{6}[0-9A-Z]$'`),
+  ]
+);
+
+/**
+ * The candidate's national ID or passport: sensitive. Read only by the roles
+ * that need it (coordinator, admin) through one endpoint that audits each
+ * read; never in a list, a log or an audit row.
+ */
+export const examCandidateIdentity = pgTable(
+  "exam_candidate_identity",
+  {
+    studentId: text("student_id").primaryKey().references(() => user.id, { onDelete: "restrict" }),
+    // 'national_id' | 'passport'
+    documentType: text("document_type").notNull(),
+    documentNumber: text("document_number").notNull(),
+    recordedBy: text("recorded_by").references(() => user.id, { onDelete: "set null" }),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("examCandidateIdentity_document_idx").on(table.documentType, table.documentNumber),
+    check("exam_candidate_identity_type_valid", sql`${table.documentType} IN ('national_id', 'passport')`),
+  ]
+);
+
+/**
+ * A candidate number per board series, with its history: Cambridge and
+ * Pearson each give a four-digit number per series, fixed once entries are
+ * made; the previous one is what a carry-forward or retake entry names.
+ */
+export const examCandidateNumber = pgTable(
+  "exam_candidate_number",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    boardSeriesId: text("board_series_id").notNull().references(() => boardSeries.id, { onDelete: "restrict" }),
+    boardCode: text("board_code").notNull(),
+    number: text("number").notNull(),
+    // The centre it was issued under (the school's number for the board when assigned).
+    centreNumber: text("centre_number"),
+    // 'assigned' | 'manual' | 'import'
+    source: text("source").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("examCandidateNumber_student_series_idx").on(table.studentId, table.boardSeriesId),
+    uniqueIndex("examCandidateNumber_series_number_idx").on(table.boardSeriesId, table.number),
+    check("exam_candidate_number_shape", sql`${table.number} ~ '^[0-9]{4}$'`),
+    check("exam_candidate_number_source_valid", sql`${table.source} IN ('assigned', 'manual', 'import')`),
+  ]
+);
+
+/**
+ * One entry with a board: a unit (a Pearson W unit, a paper) or an award (a
+ * Cambridge syllabus with its option code, a Pearson cash-in or International
+ * GCSE) for one candidate in one board series — derived from a confirmed
+ * line through lineItemsFor (what its item enters, since the reservations
+ * rework), or from a paid cash-in charge, or added by the coordinator.
+ * Status: draft → submitted → amended; any → withdrawn. One live entry per
+ * candidate, series and unit or award, and per cash-in charge.
+ */
+export const examEntry = pgTable(
+  "exam_entry",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    boardSeriesId: text("board_series_id").notNull().references(() => boardSeries.id, { onDelete: "restrict" }),
+    boardCode: text("board_code").notNull(),
+    registrationId: text("registration_id").references(() => registration.id, { onDelete: "restrict" }),
+    // The reservations rework (§3.6): the cash-in (or late cash-in) charge an award entry was made
+    // from — the family's paid request to the board to award the qualification (G-22).
+    chargeId: text("charge_id").references(() => charge.id, { onDelete: "restrict" }),
+    // 'unit' | 'award'
+    kind: text("kind").notNull(),
+    unitId: text("unit_id").references(() => examUnit.id, { onDelete: "restrict" }),
+    qualificationId: text("qualification_id").references(() => qualification.id, { onDelete: "restrict" }),
+    // The board's code and title at entry (WMA11, XMA01, 0610), kept as entered.
+    entryCode: text("entry_code").notNull(),
+    title: text("title").notNull(),
+    optionCode: text("option_code"),
+    tier: text("tier"),
+    // 'draft' | 'submitted' | 'amended' | 'withdrawn'
+    status: text("status").notNull().default("draft"),
+    isRetake: boolean("is_retake").notNull().default(false),
+    // Why it is a retake: 'registration' | 'history' | 'staff'
+    retakeSource: text("retake_source"),
+    // Carry forward (DISCOVERY.md Q-02): 'none' | 'suggested' | 'confirmed', with the reference the board needs.
+    carryForward: text("carry_forward").notNull().default("none"),
+    cfFromMonth: text("cf_from_month"),
+    cfFromYear: integer("cf_from_year"),
+    cfCentreNumber: text("cf_centre_number"),
+    cfCandidateNumber: text("cf_candidate_number"),
+    cfOption: text("cf_option"),
+    forecastGrade: text("forecast_grade"),
+    forecastBy: text("forecast_by").references(() => user.id, { onDelete: "set null" }),
+    forecastAt: timestamp("forecast_at", { withTimezone: true }),
+    // The forecasts were sent to the board (Cambridge: fixed from then on).
+    forecastLockedAt: timestamp("forecast_locked_at", { withTimezone: true }),
+    // Null: the candidate's own arrangements apply.
+    accessArrangements: jsonb("access_arrangements").$type<string[] | null>(),
+    // The board's fee tier when the entry was submitted — information only.
+    feeTierAtSubmission: text("fee_tier_at_submission"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    submittedBy: text("submitted_by").references(() => user.id, { onDelete: "set null" }),
+    amendedAt: timestamp("amended_at", { withTimezone: true }),
+    amendedBy: text("amended_by").references(() => user.id, { onDelete: "set null" }),
+    amendmentCount: integer("amendment_count").notNull().default(0),
+    withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+    withdrawnBy: text("withdrawn_by").references(() => user.id, { onDelete: "set null" }),
+    withdrawalReason: text("withdrawal_reason"),
+    // What the board does with its fee, as the withdrawal was told (information only).
+    withdrawalCharge: text("withdrawal_charge"),
+    withdrawalRefunded: boolean("withdrawal_refunded"),
+    // Withdrawn because its line ended (a drop, a swap, a reversal, a system drop): a derivation
+    // makes it again if the line is paid again — unlike the coordinator's own withdrawal.
+    withdrawnWithLine: boolean("withdrawn_with_line").notNull().default(false),
+    // What staff set by hand on the entry, which a derivation never brings back to the line's
+    // answer: 'retake' (ticked or unticked), 'carry' (the carry forward and its numbers), 'option'.
+    staffSet: text("staff_set").array().notNull().default(sql`'{}'::text[]`),
+    notes: text("notes"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("examEntry_studentId_idx").on(table.studentId),
+    index("examEntry_boardSeriesId_idx").on(table.boardSeriesId),
+    index("examEntry_registrationId_idx").on(table.registrationId),
+    // A cash-in charge becomes one live award entry.
+    uniqueIndex("examEntry_one_live_charge_idx").on(table.chargeId).where(sql`status <> 'withdrawn' AND charge_id IS NOT NULL`),
+    check("exam_entry_charge_award", sql`${table.chargeId} IS NULL OR ${table.kind} = 'award'`),
+    uniqueIndex("examEntry_one_live_unit_idx")
+      .on(table.studentId, table.boardSeriesId, table.unitId)
+      .where(sql`status <> 'withdrawn' AND unit_id IS NOT NULL`),
+    uniqueIndex("examEntry_one_live_award_idx")
+      .on(table.studentId, table.boardSeriesId, table.qualificationId)
+      .where(sql`status <> 'withdrawn' AND qualification_id IS NOT NULL`),
+    check("exam_entry_kind_valid", sql`${table.kind} IN ('unit', 'award')`),
+    check("exam_entry_kind_target", sql`(${table.kind} = 'unit' AND ${table.unitId} IS NOT NULL AND ${table.qualificationId} IS NULL) OR (${table.kind} = 'award' AND ${table.qualificationId} IS NOT NULL AND ${table.unitId} IS NULL)`),
+    check("exam_entry_status_valid", sql`${table.status} IN ('draft', 'submitted', 'amended', 'withdrawn')`),
+    check("exam_entry_tier_valid", sql`${table.tier} IS NULL OR ${table.tier} IN ('core', 'extended', 'foundation', 'higher')`),
+    check("exam_entry_cf_valid", sql`${table.carryForward} IN ('none', 'suggested', 'confirmed')`),
+    check("exam_entry_submitted_whole", sql`${table.status} NOT IN ('submitted', 'amended') OR ${table.submittedAt} IS NOT NULL`),
+    check("exam_entry_withdrawn_whole", sql`(${table.status} = 'withdrawn') = (${table.withdrawnAt} IS NOT NULL)`),
+  ]
+);
+
+/** What F4 keeps per board series: when its timetable, forecasts and results went out. */
+export const examSeriesState = pgTable("exam_series_state", {
+  boardSeriesId: text("board_series_id").primaryKey().references(() => boardSeries.id, { onDelete: "cascade" }),
+  timetablePublishedAt: timestamp("timetable_published_at", { withTimezone: true }),
+  timetablePublishedBy: text("timetable_published_by").references(() => user.id, { onDelete: "set null" }),
+  timetableVersion: integer("timetable_version").notNull().default(0),
+  forecastsSubmittedAt: timestamp("forecasts_submitted_at", { withTimezone: true }),
+  forecastsSubmittedBy: text("forecasts_submitted_by").references(() => user.id, { onDelete: "set null" }),
+  resultsPublishedAt: timestamp("results_published_at", { withTimezone: true }),
+  resultsPublishedBy: text("results_published_by").references(() => user.id, { onDelete: "set null" }),
+});
+
+/**
+ * The board's timetable for a series: each paper (component) with its date,
+ * session, start and duration. A paper belongs to a catalogue unit (the
+ * component a candidate sits), or to an award with a tier when the board
+ * lists the syllabus only.
+ */
+export const examPaper = pgTable(
+  "exam_paper",
+  {
+    id: text("id").primaryKey(),
+    boardSeriesId: text("board_series_id").notNull().references(() => boardSeries.id, { onDelete: "restrict" }),
+    boardCode: text("board_code").notNull(),
+    code: text("code").notNull(),
+    title: text("title").notNull(),
+    unitId: text("unit_id").references(() => examUnit.id, { onDelete: "set null" }),
+    qualificationId: text("qualification_id").references(() => qualification.id, { onDelete: "set null" }),
+    tier: text("tier"),
+    examDate: date("exam_date", { mode: "string" }).notNull(),
+    // 'am' | 'pm' | 'ev'
+    session: text("session").notNull(),
+    startTime: text("start_time").notNull(),
+    durationMinutes: integer("duration_minutes").notNull(),
+    notes: text("notes"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("examPaper_series_code_idx").on(table.boardSeriesId, table.code),
+    index("examPaper_date_idx").on(table.examDate, table.session),
+    index("examPaper_unitId_idx").on(table.unitId),
+    check("exam_paper_session_valid", sql`${table.session} IN ('am', 'pm', 'ev')`),
+    check("exam_paper_start_time", sql`${table.startTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`),
+    check("exam_paper_duration", sql`${table.durationMinutes} BETWEEN 5 AND 480`),
+    check("exam_paper_tier_valid", sql`${table.tier} IS NULL OR ${table.tier} IN ('core', 'extended', 'foundation', 'higher')`),
+  ]
+);
+
+/** How a candidate's clash (two papers at once) is handled, noted by the coordinator. */
+export const examClashNote = pgTable(
+  "exam_clash_note",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    // The two papers, the smaller id first.
+    paperAId: text("paper_a_id").notNull().references(() => examPaper.id, { onDelete: "cascade" }),
+    paperBId: text("paper_b_id").notNull().references(() => examPaper.id, { onDelete: "cascade" }),
+    resolution: text("resolution").notNull(),
+    notedBy: text("noted_by").references(() => user.id, { onDelete: "set null" }),
+    notedAt: timestamp("noted_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("examClashNote_unique_idx").on(table.studentId, table.paperAId, table.paperBId),
+    check("exam_clash_note_ordered", sql`${table.paperAId} < ${table.paperBId}`),
+  ]
+);
+
+/** A room used for one exam sitting (a date and session), with its seat grid. */
+export const examRoomSitting = pgTable(
+  "exam_room_sitting",
+  {
+    id: text("id").primaryKey(),
+    examDate: date("exam_date", { mode: "string" }).notNull(),
+    session: text("session").notNull(),
+    roomId: text("room_id").notNull().references(() => room.id, { onDelete: "restrict" }),
+    seatRows: integer("seat_rows").notNull(),
+    seatColumns: integer("seat_columns").notNull(),
+    notes: text("notes"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("examRoomSitting_unique_idx").on(table.examDate, table.session, table.roomId),
+    check("exam_room_sitting_session_valid", sql`${table.session} IN ('am', 'pm', 'ev')`),
+    check("exam_room_sitting_grid", sql`${table.seatRows} BETWEEN 1 AND 26 AND ${table.seatColumns} BETWEEN 1 AND 40`),
+  ]
+);
+
+/**
+ * A candidate's seat in one sitting: every paper they sit in that session is
+ * sat there. No seat holds two candidates and no candidate has two seats in
+ * one sitting (the two unique indexes).
+ */
+export const examSeat = pgTable(
+  "exam_seat",
+  {
+    id: text("id").primaryKey(),
+    examDate: date("exam_date", { mode: "string" }).notNull(),
+    session: text("session").notNull(),
+    roomId: text("room_id").notNull().references(() => room.id, { onDelete: "restrict" }),
+    seatLabel: text("seat_label").notNull(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    assignedBy: text("assigned_by").references(() => user.id, { onDelete: "set null" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("examSeat_seat_idx").on(table.examDate, table.session, table.roomId, table.seatLabel),
+    uniqueIndex("examSeat_student_idx").on(table.examDate, table.session, table.studentId),
+    check("exam_seat_session_valid", sql`${table.session} IN ('am', 'pm', 'ev')`),
+    check("exam_seat_label_shape", sql`${table.seatLabel} ~ '^[A-Z][0-9]{1,2}$'`),
+  ]
+);
+
+/** An invigilator in a room for a sitting; one room per invigilator per sitting. */
+export const examInvigilation = pgTable(
+  "exam_invigilation",
+  {
+    id: text("id").primaryKey(),
+    examDate: date("exam_date", { mode: "string" }).notNull(),
+    session: text("session").notNull(),
+    roomId: text("room_id").notNull().references(() => room.id, { onDelete: "restrict" }),
+    teacherId: text("teacher_id").notNull().references(() => teacher.id, { onDelete: "restrict" }),
+    isLead: boolean("is_lead").notNull().default(false),
+    assignedBy: text("assigned_by").references(() => user.id, { onDelete: "set null" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("examInvigilation_teacher_idx").on(table.examDate, table.session, table.teacherId),
+    index("examInvigilation_room_idx").on(table.examDate, table.session, table.roomId),
+    check("exam_invigilation_session_valid", sql`${table.session} IN ('am', 'pm', 'ev')`),
+  ]
+);
+
+/** The board's attendance register, as marked in the room: one row per candidate and paper. */
+export const examAttendance = pgTable(
+  "exam_attendance",
+  {
+    id: text("id").primaryKey(),
+    paperId: text("paper_id").notNull().references(() => examPaper.id, { onDelete: "restrict" }),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    // 'present' | 'absent' | 'late'
+    status: text("status").notNull(),
+    minutesLate: integer("minutes_late"),
+    note: text("note"),
+    recordedBy: text("recorded_by").references(() => user.id, { onDelete: "set null" }),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("examAttendance_unique_idx").on(table.paperId, table.studentId),
+    check("exam_attendance_status_valid", sql`${table.status} IN ('present', 'absent', 'late')`),
+    check("exam_attendance_late_minutes", sql`${table.status} <> 'late' OR ${table.minutesLate} > 0`),
+  ]
+);
+
+/** Special consideration asked of the board for a candidate (illness, bereavement, a disturbance). */
+export const examSpecialConsideration = pgTable(
+  "exam_special_consideration",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    boardSeriesId: text("board_series_id").notNull().references(() => boardSeries.id, { onDelete: "restrict" }),
+    paperId: text("paper_id").references(() => examPaper.id, { onDelete: "set null" }),
+    // 'illness' | 'bereavement' | 'accident' | 'disturbance' | 'other'
+    category: text("category").notNull(),
+    description: text("description").notNull(),
+    // Evidence kept for the board: RESTRICT, as with payment and remark evidence (RF-13).
+    evidenceFileId: text("evidence_file_id").references(() => file.id, { onDelete: "restrict" }),
+    // 'draft' | 'submitted' | 'outcome_received'
+    status: text("status").notNull().default("draft"),
+    boardReference: text("board_reference"),
+    outcome: text("outcome"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("examSpecialConsideration_student_idx").on(table.studentId),
+    index("examSpecialConsideration_series_idx").on(table.boardSeriesId),
+    check("exam_special_consideration_category_valid", sql`${table.category} IN ('illness', 'bereavement', 'accident', 'disturbance', 'other')`),
+    check("exam_special_consideration_status_valid", sql`${table.status} IN ('draft', 'submitted', 'outcome_received')`),
+  ]
+);
+
+/** One import of a board's results file: what was read, with which mapping. */
+export const examResultImport = pgTable(
+  "exam_result_import",
+  {
+    id: text("id").primaryKey(),
+    boardSeriesId: text("board_series_id").notNull().references(() => boardSeries.id, { onDelete: "restrict" }),
+    boardCode: text("board_code").notNull(),
+    fileId: text("file_id").references(() => file.id, { onDelete: "set null" }),
+    sourceName: text("source_name").notNull(),
+    mapping: jsonb("mapping").$type<Record<string, unknown>>().notNull(),
+    rowCount: integer("row_count").notNull(),
+    resultCount: integer("result_count").notNull(),
+    unmatchedCount: integer("unmatched_count").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("examResultImport_series_idx").on(table.boardSeriesId)]
+);
+
+/**
+ * A result as the board reported it: per unit (W unit, component) or award
+ * (cash-in, syllabus), per candidate and series. Every attempt is its own
+ * row (a series each), and a board's later report of the same attempt with
+ * another grade is a new row beside the first: nothing is overwritten, and
+ * which grade is of record after a remark stays the owner's question
+ * (FOUNDATION_AUDIT.md RF-09).
+ */
+export const examResult = pgTable(
+  "exam_result",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    boardSeriesId: text("board_series_id").notNull().references(() => boardSeries.id, { onDelete: "restrict" }),
+    boardCode: text("board_code").notNull(),
+    // 'unit' | 'award'
+    kind: text("kind").notNull(),
+    code: text("code").notNull(),
+    unitId: text("unit_id").references(() => examUnit.id, { onDelete: "set null" }),
+    qualificationId: text("qualification_id").references(() => qualification.id, { onDelete: "set null" }),
+    entryId: text("entry_id").references(() => examEntry.id, { onDelete: "set null" }),
+    grade: text("grade").notNull(),
+    mark: numeric("mark", { precision: 7, scale: 2, mode: "number" }),
+    maxMark: numeric("max_mark", { precision: 7, scale: 2, mode: "number" }),
+    // 'import' | 'manual'
+    source: text("source").notNull(),
+    importId: text("import_id").references(() => examResultImport.id, { onDelete: "set null" }),
+    // 'provisional' | 'published'
+    status: text("status").notNull().default("provisional"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    publishedBy: text("published_by").references(() => user.id, { onDelete: "set null" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("examResult_student_idx").on(table.studentId),
+    index("examResult_series_idx").on(table.boardSeriesId),
+    index("examResult_key_idx").on(table.studentId, table.boardSeriesId, table.kind, table.code),
+    check("exam_result_kind_valid", sql`${table.kind} IN ('unit', 'award')`),
+    check("exam_result_source_valid", sql`${table.source} IN ('import', 'manual')`),
+    check("exam_result_status_valid", sql`${table.status} IN ('provisional', 'published')`),
+    check("exam_result_published_whole", sql`(${table.status} = 'published') = (${table.publishedAt} IS NOT NULL)`),
+  ]
+);
+
+/** A saved column mapping for a board's results file, so the next import is one click. */
+export const examResultMapping = pgTable(
+  "exam_result_mapping",
+  {
+    id: text("id").primaryKey(),
+    boardCode: text("board_code").notNull(),
+    name: text("name").notNull(),
+    mapping: jsonb("mapping").$type<Record<string, unknown>>().notNull(),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("examResultMapping_name_idx").on(table.boardCode, table.name)]
+);
+
+/**
+ * A candidate's certificate from a board for a series: received, then
+ * collected once (by the candidate or someone they send, who signs the slip),
+ * or — unclaimed past the board's retention period — returned or destroyed.
+ */
+export const examCertificate = pgTable(
+  "exam_certificate",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    boardSeriesId: text("board_series_id").notNull().references(() => boardSeries.id, { onDelete: "restrict" }),
+    boardCode: text("board_code").notNull(),
+    description: text("description").notNull(),
+    // 'received' | 'collected' | 'returned_to_board' | 'destroyed'
+    status: text("status").notNull().default("received"),
+    receivedOn: date("received_on", { mode: "string" }).notNull(),
+    receivedBy: text("received_by").references(() => user.id, { onDelete: "set null" }),
+    collectedAt: timestamp("collected_at", { withTimezone: true }),
+    collectedBy: text("collected_by").references(() => user.id, { onDelete: "set null" }),
+    collectorName: text("collector_name"),
+    // 'candidate' | 'parent' | 'other'
+    collectorRelation: text("collector_relation"),
+    collectorIdChecked: text("collector_id_checked"),
+    // The signed collection slip, scanned (RESTRICT: evidence, RF-13).
+    signatureFileId: text("signature_file_id").references(() => file.id, { onDelete: "restrict" }),
+    disposedAt: timestamp("disposed_at", { withTimezone: true }),
+    disposedBy: text("disposed_by").references(() => user.id, { onDelete: "set null" }),
+    disposalReason: text("disposal_reason"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("examCertificate_student_series_idx").on(table.studentId, table.boardSeriesId),
+    index("examCertificate_status_idx").on(table.status),
+    check("exam_certificate_status_valid", sql`${table.status} IN ('received', 'collected', 'returned_to_board', 'destroyed')`),
+    check("exam_certificate_collected_whole", sql`(${table.status} = 'collected') = (${table.collectedAt} IS NOT NULL AND ${table.collectorName} IS NOT NULL)`),
+    check("exam_certificate_relation_valid", sql`${table.collectorRelation} IS NULL OR ${table.collectorRelation} IN ('candidate', 'parent', 'other')`),
+    check("exam_certificate_disposed_whole", sql`(${table.status} IN ('returned_to_board', 'destroyed')) = (${table.disposedAt} IS NOT NULL)`),
+  ]
+);
+
+/**
+ * A deadline reminder sent: the scheduler claims (series, date field, the
+ * date, days before) by inserting it, so a second instance on the same tick
+ * sends nothing (STATE_AUDIT.md ST-06, ST-12); a moved date reminds again.
+ */
+export const examDeadlineReminder = pgTable(
+  "exam_deadline_reminder",
+  {
+    boardSeriesId: text("board_series_id").notNull().references(() => boardSeries.id, { onDelete: "cascade" }),
+    dateField: text("date_field").notNull(),
+    dueOn: date("due_on", { mode: "string" }).notNull(),
+    daysBefore: integer("days_before").notNull(),
+    recipients: integer("recipients").notNull().default(0),
+    sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.boardSeriesId, table.dateField, table.dueOn, table.daysBefore] })]
+);
+
+export const examCandidateRelations = relations(examCandidate, ({ one }) => ({
+  student: one(user, { fields: [examCandidate.studentId], references: [user.id] }),
+}));
+
+export const examEntryRelations = relations(examEntry, ({ one }) => ({
+  student: one(user, { fields: [examEntry.studentId], references: [user.id] }),
+  boardSeries: one(boardSeries, { fields: [examEntry.boardSeriesId], references: [boardSeries.id] }),
+  registration: one(registration, { fields: [examEntry.registrationId], references: [registration.id] }),
+  unit: one(examUnit, { fields: [examEntry.unitId], references: [examUnit.id] }),
+  qualification: one(qualification, { fields: [examEntry.qualificationId], references: [qualification.id] }),
+  charge: one(charge, { fields: [examEntry.chargeId], references: [charge.id] }),
+}));
+
+export const examPaperRelations = relations(examPaper, ({ one }) => ({
+  boardSeries: one(boardSeries, { fields: [examPaper.boardSeriesId], references: [boardSeries.id] }),
+  unit: one(examUnit, { fields: [examPaper.unitId], references: [examUnit.id] }),
+  qualification: one(qualification, { fields: [examPaper.qualificationId], references: [qualification.id] }),
+}));
+
+export const examResultRelations = relations(examResult, ({ one }) => ({
+  student: one(user, { fields: [examResult.studentId], references: [user.id] }),
+  boardSeries: one(boardSeries, { fields: [examResult.boardSeriesId], references: [boardSeries.id] }),
+  entry: one(examEntry, { fields: [examResult.entryId], references: [examEntry.id] }),
+}));
+
+export const examCertificateRelations = relations(examCertificate, ({ one }) => ({
+  student: one(user, { fields: [examCertificate.studentId], references: [user.id] }),
+  boardSeries: one(boardSeries, { fields: [examCertificate.boardSeriesId], references: [boardSeries.id] }),
+}));

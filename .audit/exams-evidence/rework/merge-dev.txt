@@ -1,0 +1,8 @@
+# igcse_exams_merge_dev: the running system on the final merge
+2026-10-08T19:18:59Z
+create from the template: CREATE DATABASE
+migrate exit 0
+migrations: 58|1791486725177
+api started: pnpm pid 80229
+api: [email:stub] To: parent.hany@igcse.local | Subject: Registration Closed — November 2026 – January 2027 — November IGCSE
+seed exit 0: F4 demo data ready: 9 families

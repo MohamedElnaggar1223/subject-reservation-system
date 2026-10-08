@@ -1,0 +1,41 @@
+# C33: the entry check does not flag a cash-in no longer paid
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['a cash-in whose payment is reversed is flagged']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 2 failed) 28106ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a cash-in whose payment is reversed is flagged on its entry (cash_in_not_paid) 43ms
+     → expected [ 'missing_candidate_number', …(4) ] to include 'cash_in_not_paid'
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1) 160ms
+     → expected [ 'missing_candidate_number', …(4) ] to include 'cash_in_not_paid'
+ Test Files  1 failed (1)
+      Tests  2 failed | 54 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 46c41c4a-caee-43ca-b45b-fb2f55cdca4c: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a cash-in whose payment is reversed is flagged on its entry (cash_in_not_paid)
+AssertionError: expected [ 'missing_candidate_number', …(4) ] to include 'cash_in_not_paid'
+ ❯ test/08x4-exam-entries-rework.test.ts:377:28
+    375|       await apiResponse(w.finadmin.api.v1.payments[':id'].reverse.$pos…
+    376|       const row = (await entryList(w.series.pearsonJan)).rows.find((r)…
+    377|       expect(row.problems).toContain('cash_in_not_paid');
+       |                            ^
+    378|     });
+    379| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a paid cash-in whose award a whole-award line already entered is linked to that entry, no longer listed to enter; reversed, it is flagged and not sent (the review of 093dbd1, items 6 and 1)
+AssertionError: expected [ 'missing_candidate_number', …(4) ] to include 'cash_in_not_paid'
+ ❯ test/08x4-exam-entries-rework.test.ts:404:105
+    402|       // Its payment reversed: the award entry is flagged, and "mark a…
+    403|       await apiResponse(w.finadmin.api.v1.payments[':id'].reverse.$pos…
+    404|       expect((await entryList(w.series.pearsonJan)).rows.find((r) => r…
+       |                                                                                                         ^
+    405|       expect(await refused(coord.api.v1.exams.entries.submit.$post({ j…
+    406|         .toEqual({ status: 409, error: `${T}XMA01 Mathematics ${T} for…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

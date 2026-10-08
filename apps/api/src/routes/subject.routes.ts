@@ -146,7 +146,7 @@ export const subjects = new Hono<HonoEnv>()
 
       let updated;
       try {
-        updated = await subjectService.updateSubject(id, data, user.id);
+        updated = await subjectService.updateSubject(id, data, user.id, extractAuditContext(c));
       } catch (err) {
         // Post-merge validation errors (e.g. removing customPrice from a non-school subject)
         if (err instanceof Error) {

@@ -17,8 +17,9 @@
  * Contracts (FEATURES_PLAN.md §2; docs/features/CATALOGUE.md §7):
  * - F1: `getTeachingDemand(academicYearId)` — per subject and teacher, the
  *   students taught in school. Self-study forms no group.
- * - F4: `teacherOf(studentId, subjectId, academicYearStart)` — the teacher who
- *   gives the forecast grade (null: self-study, or none recorded).
+ * - F4: `teacherOf(studentId, subjectId, academicYearStart, unitId?)` — the teacher
+ *   who gives the forecast grade (null: self-study, or none recorded); the unit since
+ *   the reservations rework (an enrolment per unit).
  * - F7: `upsertEnrolments(tx, academicYearId, rows, actorId, { source: 'import', commit })`
  *   (or `batchEnrol(..., 'import')` for rows that name students and subjects as a sheet does).
  */
@@ -714,18 +715,37 @@ export async function getTeachingDemand(academicYearId: string) {
 }
 
 /**
- * F4's contract: the teacher who teaches this student this subject in the
- * academic year starting `academicYearStart` — whose forecast grade the board
- * gets. Null: self-study, no teacher recorded, or not enrolled (F4 then asks
- * the coordinator).
+ * Which of a student's open enrolments in one subject and year teaches a unit (the reservations
+ * rework keys enrolment by the unit when one is set, RESERVATIONS_REWORK.md §3.2): the unit's own;
+ * else the subject's (no unit: a whole subject, or a line from before the rework); with no unit
+ * asked (an award), the subject's, else the one teacher every unit enrolment names. None: null.
  */
-export async function teacherOf(studentId: string, subjectId: string, academicYearStart: number) {
-  const [row] = await db
-    .select({ teacherId: courseEnrolment.teacherId, teacherName: teacher.name, userId: teacher.userId, mode: courseEnrolment.mode })
+export function pickEnrolment<T extends { unitId: string | null; teacherId: string | null; mode: string }>(rows: T[], unitId?: string | null): T | null {
+  if (unitId) {
+    const own = rows.find((r) => r.unitId === unitId);
+    if (own) return own;
+  }
+  const whole = rows.find((r) => r.unitId === null);
+  if (whole) return whole;
+  if (!unitId && rows.length && new Set(rows.map((r) => `${r.mode}|${r.teacherId ?? ''}`)).size === 1) return rows[0]!;
+  return null;
+}
+
+/**
+ * F4's contract (RESERVATIONS_REWORK.md §10: `teacherOf(student, subject, unit?, year)`): the
+ * teacher who teaches this student this subject — and this unit, when one is given (an IAL unit
+ * taught by its own teacher) — in the academic year starting `academicYearStart`, whose forecast
+ * grade the board gets (`pickEnrolment`). Null: self-study, no teacher recorded, or not enrolled
+ * (F4 then asks the coordinator). The unit was added by F4 on resuming (RESERVATIONS.md §2.12).
+ */
+export async function teacherOf(studentId: string, subjectId: string, academicYearStart: number, unitId?: string | null) {
+  const rows = await db
+    .select({ unitId: courseEnrolment.unitId, teacherId: courseEnrolment.teacherId, teacherName: teacher.name, userId: teacher.userId, mode: courseEnrolment.mode })
     .from(courseEnrolment)
     .innerJoin(academicYear, eq(academicYear.id, courseEnrolment.academicYearId))
     .leftJoin(teacher, eq(teacher.id, courseEnrolment.teacherId))
     .where(and(eq(courseEnrolment.studentId, studentId), eq(courseEnrolment.subjectId, subjectId), eq(academicYear.startYear, academicYearStart), isNull(courseEnrolment.endedOn)));
+  const row = pickEnrolment(rows, unitId);
   if (!row || row.mode === 'self_study' || !row.teacherId) return null;
   return { teacherId: row.teacherId, name: row.teacherName!, userId: row.userId };
 }

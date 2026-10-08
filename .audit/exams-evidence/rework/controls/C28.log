@@ -1,0 +1,27 @@
+# C28: teacherOf ignores the unit (the subject's teacher only)
+# undone in: apps/api/src/services/enrolment.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["the P1 teacher gives P1's, not P2's"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 1 failed) 29800ms
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's 21ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 55 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 45104d8c-b3c0-44cf-b651-a0772d62f1aa: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's
+Error: Only the candidate's teacher for this subject, or the coordinator, gives this forecast
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08x4-exam-entries-rework.test.ts:153:14
+    151|       expect(units).toEqual([{ unit: `${T}WMA11`, teacher: w.teacherId…
+    152|       const [e1, e2] = await entriesOf(w.series.pearsonJan, fam.d!.stu…
+    153|       expect(await apiResponse(w.teacher.api.v1.exams.entries[':id'].f…
+       |              ^
+    154|       expect(await refused(w.teacher.api.v1.exams.entries[':id'].forec…
+    155|         .toEqual({ status: 403, error: "Only the candidate's teacher f…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

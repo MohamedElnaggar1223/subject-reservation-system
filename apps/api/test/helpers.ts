@@ -681,9 +681,13 @@ export async function holdRowLock(table: string, id: string): Promise<() => Prom
 /**
  * Wait until `n` sessions in this database are waiting on a lock — the
  * requests a test queued behind holdRowLock — so their order is the order they
- * were fired in, not a guess about how long a request takes to arrive.
+ * were fired in, not a guess about how long a request takes to arrive. Up to
+ * 20 seconds: on a loaded machine a request took longer than the 5 it had to
+ * reach its lock, and a correct race timed out (F4's final merge, 8 Oct 2026;
+ * F1 raised its own forced races' wait for the same reason). A race whose
+ * second request never queues still fails, only later.
  */
-export async function lockWaiters(n: number, ms = 5000) {
+export async function lockWaiters(n: number, ms = 20_000) {
   return waitFor(async () => {
     const [r] = await sql<{ n: string }>(
       `select count(*) as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'`

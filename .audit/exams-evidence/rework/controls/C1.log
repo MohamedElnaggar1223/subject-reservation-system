@@ -1,0 +1,265 @@
+# C1: the hard stop on an entry made by hand (its own deadline) removed
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x1-exam-entries.test.ts test/09-money-invariants.test.ts
+# expected red: ['past the deadline a new entry is refused', 'F4: no entry was made, or sent to the board, after its own deadline']
+# result: RED as expected
+
+ ❯ test/08x1-exam-entries.test.ts (17 tests | 2 failed) 3912ms
+   × F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > past the deadline a new entry is refused, and a draft cannot be sent; a withdrawal is allowed with the board's fee shown 11ms
+     → expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
+   × F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after 4ms
+     → expected 2 to be 1 // Object.is equality
+ ❯ test/09-money-invariants.test.ts (54 tests | 14 failed) 303ms
+   × money invariants over the whole database > there is money to check: every kind of movement happened in the suites above 198ms
+     → reversed: expected 0 to be greater than 0
+   × money invariants over the whole database > there are board series to check: windows feeding several, entries in them, entries closed at a deadline 1ms
+     → expired_at_a_series_deadline: expected 0 to be greater than 0
+   × money invariants over the whole database > no waiting line is still provisional when every fee row it was priced from is confirmed at the amount it recorded (a Confirm reaches every line read from its rows) 1ms
+     → expected 0 to be greater than 0
+   × money invariants over the whole database > F0a: nothing waits for, and nothing was captured into, a series its student may not sit 52ms
+     → expected 0 to be greater than 0
+   × money invariants over the whole database > F4: no entry was made, or sent to the board, after its own deadline (MO-10, A-08): its line's effective deadline, its cash-in's, else its series' entry deadline 4ms
+     → expected [ { …(4) } ] to deeply equal []
+   × money invariants over the whole database > F4: no live entry of a line no longer paid — every path that ends a paid line withdraws its entries in its own transaction (the review of 093dbd1, item 1) 1ms
+     → expected 0 to be greater than 0
+   × money invariants over the whole database > F4: an entry from a cash-in is an award entry of that charge's student, in its series, from a cash-in or late cash-in; one live entry per charge 1ms
+     → expected 0 to be greater than or equal to 2
+   × money invariants over the whole database > F4: a declared sitting verified from the board's results had a result for the line's student in that series 1ms
+     → expected 0 to be greater than 0
+   × money invariants over the whole database > F4: an entry from a registration is that registration's student's, in its series; a result from an entry is that entry's candidate's, in its series 1ms
+     → expected 0 to be greater than 0
+   × money invariants over the whole database > F4: every withdrawal and every certificate hand-over has exactly one audit row; a certificate is collected once 1ms
+     → expected [ Array(1) ] to deeply equal []
+   × money invariants over the whole database > F4: no seat holds two candidates and no candidate has two seats in a sitting; no invigilator is in two rooms of one 2ms
+     → expected 0 to be greater than 0
+   × money invariants over the whole database > there are charges, plans and exceptions to check: every kind happened in the suites above 1ms
+     → charge_payments_completed: expected 0 to be greater than 0
+   × money invariants over the whole database > every line confirmed since the rework has its two consents, the refund policy and the declaration (§3.5, §8) 1ms
+     → expected 0 to be greater than 0
+   × money invariants over the whole database > a declared sitting is answered once, by someone, and only a paid line stands with its declaration rejected (§3.5) 3ms
+     → expected 0 to be greater than 0
+ Test Files  2 failed (2)
+      Tests  16 failed | 55 passed (71)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x1-exam-entries.test.ts test/09-money-invariants.test.ts
+⎯⎯⎯⎯⎯⎯ Failed Tests 16 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > past the deadline a new entry is refused, and a draft cannot be sent; a withdrawal is allowed with the board's fee shown
+AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "The entry deadline for Cambridge International November 2026 (exams xe) (8 October 2026 at 21:37) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "\"\"",[39m
+[31m+   "status": 201,[39m
+[2m  }[22m
+
+ ❯ test/08x1-exam-entries.test.ts:253:10
+    251|       await sql(`update exam_entry set status = 'withdrawn', withdrawn…
+    252|       expect(await refused(coord.api.v1.exams.entries.$post({ json: { …
+    253|         .toEqual({ status: 409, error: stop });
+       |          ^
+    254|       expect(await refused(coord.api.v1.exams.entries.derive.$post({ j…
+    255|       const preview = await apiResponse(coord.api.v1.exams.entries.der…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/16]⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after
+AssertionError: expected 2 to be 1 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 2[39m
+
+ ❯ test/08x1-exam-entries.test.ts:324:24
+    322|     it("Cambridge fixes a forecast once sent: the teacher's change is …
+    323|       const r = await apiResponse(coord.api.v1.exams.forecasts.submit.…
+    324|       expect(r.locked).toBe(1); // A's (B's entry was withdrawn)
+       |                        ^
+    325|       const [ea] = await entriesOf(w.series.cambridgeNov, a);
+    326|       expect(await refused(w.teacher.api.v1.exams.entries[':id'].forec…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > there is money to check: every kind of movement happened in the suites above
+AssertionError: reversed: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:50:78
+     48|         (select count(*) from receipt where status = 'lost')          …
+     49|     `);
+     50|     for (const [kind, n] of Object.entries(counts!)) expect(Number(n),…
+       |                                                                              ^
+     51|   });
+     52| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > there are board series to check: windows feeding several, entries in them, entries closed at a deadline
+AssertionError: expired_at_a_series_deadline: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:407:78
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > no waiting line is still provisional when every fee row it was priced from is confirmed at the amount it recorded (a Confirm reaches every line read from its rows)
+AssertionError: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:470:184
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F0a: nothing waits for, and nothing was captured into, a series its student may not sit
+AssertionError: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:621:133
+    619|     expect(capturedWhileRefused).toEqual([]);
+    620|     // There was something to check: 08e holds preregistrations of a s…
+    621|     expect(Number((await sql<{ n: string }>(`select count(*) as n from…
+       |                                                                                                                                     ^
+    622|   });
+    623| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F4: no entry was made, or sent to the board, after its own deadline (MO-10, A-08): its line's effective deadline, its cash-in's, else its series' entry deadline
+AssertionError: expected [ { …(4) } ] to deeply equal []
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [][39m
+[31m+ [[39m
+[31m+   {[39m
+[31m+     "created_at": "2026-10-08 18:37:26.178526+00",[39m
+[31m+     "deadline": "2026-10-08 18:37:26.173549+00",[39m
+[31m+     "id": "b0cfb135-c25a-4eb6-8e0d-15a20c44507c",[39m
+[31m+     "submitted_at": null,[39m
+[31m+   },[39m
+[31m+ ][39m
+
+ ❯ test/09-money-invariants.test.ts:644:18
+    642|         and not exists (select 1 from exception x where x.policy_key =…
+    643|           and x.board_series_id = e.board_series_id and x.value_date >…
+    644|     expect(late).toEqual([]);
+       |                  ^
+    645|     // There was something to check: 08x1 withdrew an entry after its …
+    646|     // entered and sent a retake of the board's previous sitting after…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F4: no live entry of a line no longer paid — every path that ends a paid line withdraws its entries in its own transaction (the review of 093dbd1, item 1)
+AssertionError: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:660:115
+    658|       where e.status <> 'withdrawn' and r.status <> 'confirmed'`)).toE…
+    659|     // There was something to check: 08x4 ended paid lines by each pat…
+    660|     expect((await sql(`select 1 from exam_entry where withdrawn_with_l…
+       |                                                                                                                   ^
+    661|     expect((await sql(`select 1 from exam_entry where withdrawn_with_l…
+    662|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F4: an entry from a cash-in is an award entry of that charge's student, in its series, from a cash-in or late cash-in; one live entry per charge
+AssertionError: expected 0 to be greater than or equal to 2
+ ❯ test/09-money-invariants.test.ts:670:122
+    668|     expect(await sql(`select charge_id from exam_entry where charge_id…
+    669|     // There was something to check: 08x4 entered two cash-ins (one de…
+    670|     expect(Number((await sql<{ n: string }>(`select count(*) as n from…
+       |                                                                                                                          ^
+    671|   });
+    672| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F4: a declared sitting verified from the board's results had a result for the line's student in that series
+AssertionError: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:679:182
+    677|       where a.action = 'PRIOR_SITTING_VERIFIED' and a.new_data->>'reas…
+    678|         and not exists (select 1 from exam_result x where x.student_id…
+    679|     expect(Number((await sql<{ n: string }>(`select count(*) as n from…
+       |                                                                                                                                                                                      ^
+    680|   });
+    681| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F4: an entry from a registration is that registration's student's, in its series; a result from an entry is that entry's candidate's, in its series
+AssertionError: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:692:89
+    690|     expect((await sql(`
+    691|       select 1 from exam_entry e join registration r on r.id = e.regis…
+    692|       where e.withdrawn_with_line and e.board_series_id <> r.board_ser…
+       |                                                                                         ^
+    693|     expect(await sql(`
+    694|       select x.id from exam_result x join exam_entry e on e.id = x.ent…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F4: every withdrawal and every certificate hand-over has exactly one audit row; a certificate is collected once
+AssertionError: expected [ Array(1) ] to deeply equal []
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [][39m
+[31m+ [[39m
+[31m+   {[39m
+[31m+     "id": "5c451ee2-7523-46f3-aa05-2b16665a433c",[39m
+[31m+   },[39m
+[31m+ ][39m
+
+ ❯ test/09-money-invariants.test.ts:703:119
+    701|       select e.id from exam_entry e
+    702|       where e.status = 'withdrawn'
+    703|         and (select count(*) from audit_log a where a.entity_id = e.id…
+       |                                                                                                                       ^
+    704|     expect(await sql(`
+    705|       select c.id from exam_certificate c
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > F4: no seat holds two candidates and no candidate has two seats in a sitting; no invigilator is in two rooms of one
+AssertionError: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:713:93
+    711|     expect(await sql(`select exam_date, session, student_id from exam_…
+    712|     expect(await sql(`select exam_date, session, teacher_id from exam_…
+    713|     expect(Number((await sql<{ n: string }>(`select count(*) as n from…
+       |                                                                                             ^
+    714|   });
+    715| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > there are charges, plans and exceptions to check: every kind happened in the suites above
+AssertionError: charge_payments_completed: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:747:78
+    745|         (select count(*) from receipt where charge_id is not null)    …
+    746|     `);
+    747|     for (const [kind, n] of Object.entries(counts!)) expect(Number(n),…
+       |                                                                              ^
+    748|   });
+    749| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > every line confirmed since the rework has its two consents, the refund policy and the declaration (§3.5, §8)
+AssertionError: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:1028:28
+    1026|       select count(distinct c.registration_id) filter (where c.channel…
+    1027|       from registration_consent c join registration r on r.id = c.regi…
+    1028|     expect(Number(n?.app)).toBeGreaterThan(0);
+       |                            ^
+    1029|     expect(Number(n?.desk)).toBeGreaterThan(0);
+    1030|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/16]⎯
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > a declared sitting is answered once, by someone, and only a paid line stands with its declaration rejected (§3.5)
+AssertionError: expected 0 to be greater than 0
+ ❯ test/09-money-invariants.test.ts:1101:162
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/16]⎯
+
