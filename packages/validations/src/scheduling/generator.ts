@@ -26,7 +26,7 @@
 
 import {
   type EngineInput, type EngineLesson, type EngineGroup, type EngineRoom, type TimetableMeasures,
-  WEEKDAY_NAMES, measure, roomTypeWords, featureWords, compareRoomsFor,
+  WEEKDAY_NAMES, measure, roomTypeWords, featureWords, compareRoomsFor, teachingOf, dayMonthYear,
 } from './engine';
 
 export type GenerateOptions = {
@@ -111,6 +111,9 @@ export function canonicalInput(input: EngineInput): string {
     ...(input.teacherOverlaps?.length
       ? { teacherOverlaps: input.teacherOverlaps.map((o) => `${[o.a, o.b].sort().join('|')}|${o.teacherId}|${o.from}`).sort() }
       : {}),
+    ...(input.teacherSpans?.length
+      ? { teacherSpans: input.teacherSpans.map((x) => `${x.groupId}|${x.teacherId}|${x.from ?? ''}|${x.to ?? ''}`).sort() }
+      : {}),
   });
 }
 
@@ -126,14 +129,14 @@ const W_TEACHER_SPREAD = 3;
 const W_STUDENT_SPREAD = 0.5;
 
 type Why =
-  | { k: 'teacher_off' }
+  | { k: 'teacher_off'; t: number }
   | { k: 'room_off' }
   | { k: 'teacher_busy'; other: number }
   | { k: 'students_busy'; other: number }
   | { k: 'no_room' }
   | { k: 'no_suitable' }
-  | { k: 'day_limit' }
-  | { k: 'week_limit' }
+  | { k: 'day_limit'; u: number }
+  | { k: 'week_limit'; u: number }
   | { k: 'same_day'; other: number }
   | { k: 'shape' };
 
@@ -229,8 +232,25 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     if (u.teacherId && ti.has(u.teacherId)) for (const c of cells) teacherOff[ti.get(u.teacherId)! * C + c] = 1;
     if (u.roomId && ri.has(u.roomId)) for (const c of cells) roomOff[ri.get(u.roomId)! * C + c] = 1;
   }
-  const maxDay = teachers.map((t) => t.maxPerDay ?? Infinity);
   const maxWeek = teachers.map((t) => t.maxPerWeek ?? Infinity);
+  // Who teaches each group over the version's time, and each teacher's loads (engine.teachingOf):
+  // a group's lessons are off where any of its teachers is, and count in every load it is in.
+  const teaching = teachingOf(input);
+  const groupOff = new Int32Array(Math.max(1, G * C)).fill(-1); // the first of its teachers off there, or -1
+  groups.forEach((g, i) => {
+    for (const x of teaching.teachersOf.get(g.id) ?? []) {
+      const t = ti.get(x.teacherId);
+      if (t === undefined) continue;
+      for (let c = 0; c < C; c++) if (teacherOff[t * C + c] && groupOff[i * C + c] === -1) groupOff[i * C + c] = t;
+    }
+  });
+  const loads = teaching.loads.filter((x) => ti.has(x.teacherId));
+  const U = loads.length;
+  const loadTeacher = loads.map((x) => ti.get(x.teacherId)!);
+  const loadMaxDay = loads.map((x) => teachers[ti.get(x.teacherId)!]!.maxPerDay ?? Infinity);
+  const loadMaxWeek = loads.map((x) => teachers[ti.get(x.teacherId)!]!.maxPerWeek ?? Infinity);
+  const groupLoads: Int32Array[] = groups.map((g) => Int32Array.from(loads.map((x, u) => (x.groups.has(g.id) ? u : -1)).filter((u) => u >= 0)));
+  const loadSince = (u: number) => (loads[u]!.from ? ` from ${dayMonthYear(loads[u]!.from!)}` : '');
 
   // Rooms that suit each group, best first.
   const fits = (g: EngineGroup, r: EngineRoom) =>
@@ -270,7 +290,8 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
   const cellLessons: number[][] = Array.from({ length: C }, () => []);
   const groupDayCards = new Int32Array(Math.max(1, G * D));
   const teacherDayLoad = new Int32Array(Math.max(1, T * D));
-  const teacherWeekLoad = new Int32Array(Math.max(1, T));
+  const loadDay = new Int32Array(Math.max(1, U * D));
+  const loadWeek = new Int32Array(Math.max(1, U));
   const studentDayLoad = new Int32Array(Math.max(1, S * D));
 
   // Cost, kept current as lessons move.
@@ -333,10 +354,10 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     sameDay += Math.max(0, before) - Math.max(0, before - 1);
     if (t >= 0) {
       teacherDayLoad[t * D + d]! += len;
-      teacherWeekLoad[t]! += len;
       recomputeTeacherDay(t, d);
       recomputeTeacherSpread(t);
     }
+    for (const u of groupLoads[g]!) { loadDay[u * D + d]! += len; loadWeek[u]! += len; }
     for (const s of groupStudents[g]!) { studentDayLoad[s * D + d]! += len; recomputeStudentSpread(s); }
   };
 
@@ -361,10 +382,10 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     sameDay -= Math.max(0, before - 1) - Math.max(0, before - 2);
     if (t >= 0) {
       teacherDayLoad[t * D + d]! -= len;
-      teacherWeekLoad[t]! -= len;
       recomputeTeacherDay(t, d);
       recomputeTeacherSpread(t);
     }
+    for (const u of groupLoads[g]!) { loadDay[u * D + d]! -= len; loadWeek[u]! -= len; }
     for (const s of groupStudents[g]!) { studentDayLoad[s * D + d]! -= len; recomputeStudentSpread(s); }
     lCell[l] = -1;
     lRoom[l] = -1;
@@ -389,15 +410,15 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     const t = groupTeacher[g]!;
     const d = Math.floor(start / P);
     const cs = cellsOf(len, start);
+    for (const c of cs) if (groupOff[g * C + c]! >= 0) return { why: { k: 'teacher_off', t: groupOff[g * C + c]! }, room: -1 };
     if (t >= 0) {
-      for (const c of cs) if (teacherOff[t * C + c]) return { why: { k: 'teacher_off' }, room: -1 };
       for (const c of cs) if (teacherAt[t * C + c]! > 0) {
         const other = cellLessons[c]!.find((o) => groupTeacher[lGroup[o]!] === t)!;
         return { why: { k: 'teacher_busy', other }, room: -1 };
       }
-      if (teacherDayLoad[t * D + d]! + len > maxDay[t]!) return { why: { k: 'day_limit' }, room: -1 };
-      if (teacherWeekLoad[t]! + len > maxWeek[t]!) return { why: { k: 'week_limit' }, room: -1 };
     }
+    for (const u of groupLoads[g]!) if (loadDay[u * D + d]! + len > loadMaxDay[u]!) return { why: { k: 'day_limit', u }, room: -1 };
+    for (const u of groupLoads[g]!) if (loadWeek[u]! + len > loadMaxWeek[u]!) return { why: { k: 'week_limit', u }, room: -1 };
     for (const c of cs) for (const h of teacherConflictsOf[g]!) if (groupAt[h * C + c]! > 0) {
       return { why: { k: 'teacher_busy', other: cellLessons[c]!.find((o) => lGroup[o] === h)! }, room: -1 };
     }
@@ -451,12 +472,11 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
   }
   for (let l = 0; l < L; l++) {
     const g = lGroup[l]!;
-    const t = groupTeacher[g]!;
     let n = 0;
     for (const s of starts) {
       if (!shapeOk(lLen[l]!, s)) continue;
       const cs = cellsOf(lLen[l]!, s);
-      if (t >= 0 && cs.some((c) => teacherOff[t * C + c])) continue;
+      if (cs.some((c) => groupOff[g * C + c]! >= 0)) continue;
       if (needsRoomOf[g] && !roomsOf[g]!.some((r) => cs.every((c) => roomOff[r * C + c] === 0))) continue;
       n++;
     }
@@ -498,7 +518,7 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
       const g = lGroup[l]!;
       const t = groupTeacher[g]!;
       const cs = cellsOf(lLen[l]!, s);
-      if (t >= 0 && cs.some((c) => teacherOff[t * C + c])) continue;
+      if (cs.some((c) => groupOff[g * C + c]! >= 0)) continue;
       // Who is in the way at these cells: the same teacher, clashing students, the same-day partners.
       const blockers = new Set<number>();
       for (const c of cs) for (const o of cellLessons[c]!) {
@@ -654,10 +674,12 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
         ? `${grp.name} is always in ${input.rooms.find((r) => r.id === grp.roomId)?.name ?? 'its room'}, which does not suit it (out of use, too small or missing what it needs)`
         : `No room in use is ${need} seating ${grp.size}`);
     }
-    if (t >= 0) {
-      const open = starts.filter((s) => !teacherOff[t * C + s]).length;
-      if (open === 0) reasons.push(`${tName} is unavailable at every period`);
-      else if ((teacherNeeds.get(t) ?? 0) > Math.min(open, maxWeek[t]!)) {
+    {
+      // Its teachers over the version's time between them (one, without a dated change).
+      const open = starts.filter((s) => groupOff[g * C + s]! < 0).length;
+      const offNames = [...new Set(starts.map((s) => groupOff[g * C + s]!).filter((x) => x >= 0).map((x) => teachers[x]!.name))];
+      if (open === 0 && offNames.length) reasons.push(offNames.length === 1 ? `${offNames[0]} is unavailable at every period` : `${offNames.join(' and ')} between them are unavailable at every period`);
+      else if (t >= 0 && (teacherNeeds.get(t) ?? 0) > Math.min(open, maxWeek[t]!)) {
         reasons.push(`${tName} has ${teacherNeeds.get(t)} periods to teach but ${maxWeek[t]! < open ? `a limit of ${maxWeek[t]} a week` : `is available for ${open}`}`);
       }
     }
@@ -669,10 +691,18 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     // Slot by slot.
     const count = new Map<string, number>();
     const others = new Map<string, Map<number, number>>();
+    // Who is unavailable, or would pass a limit (and from when): one sentence each.
+    const offBy = new Map<string, number>();
+    const dayBy = new Map<string, number>();
+    const weekBy = new Map<string, number>();
+    const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1);
     for (const s of starts) {
       const { why } = blockAt(l, s);
       if (!why) continue;
       count.set(why.k, (count.get(why.k) ?? 0) + 1);
+      if (why.k === 'teacher_off') bump(offBy, teachers[why.t]!.name);
+      if (why.k === 'day_limit') bump(dayBy, `${teachers[loadTeacher[why.u]!]!.name}\u0000${loadSince(why.u)}`);
+      if (why.k === 'week_limit') bump(weekBy, `${teachers[loadTeacher[why.u]!]!.name}\u0000${loadSince(why.u)}`);
       if ('other' in why && why.other >= 0) {
         if (!others.has(why.k)) others.set(why.k, new Map());
         const og = lGroup[why.other]!;
@@ -687,12 +717,13 @@ export function generate(input: EngineInput, opts: GenerateOptions = {}): Genera
     const n = (k: string) => count.get(k) ?? 0;
     const of = (k: string) => `${n(k)} of the ${starts.length} periods`;
     const sentences: [string, number][] = [];
-    if (n('teacher_off')) sentences.push([`${tName} is unavailable at ${of('teacher_off')}`, n('teacher_off')]);
+    const ofN = (k: number) => `${k} of the ${starts.length} periods`;
+    for (const [who, k] of offBy) sentences.push([`${who} is unavailable at ${ofN(k)}`, k]);
     if (n('teacher_busy')) sentences.push([`${tName ?? 'Its teacher'} already teaches at ${of('teacher_busy')}: ${top('teacher_busy')}`, n('teacher_busy')]);
     if (n('students_busy')) sentences.push([`its students have another lesson at ${of('students_busy')}: ${top('students_busy')}`, n('students_busy')]);
     if (n('same_day')) sentences.push([`a rule keeps it off the day at ${of('same_day')}: ${top('same_day')}`, n('same_day')]);
-    if (n('day_limit')) sentences.push([`${tName} would pass their periods per day at ${of('day_limit')}`, n('day_limit')]);
-    if (n('week_limit')) sentences.push([`${tName} would pass their periods per week at ${of('week_limit')}`, n('week_limit')]);
+    for (const [key, k] of dayBy) { const [who, since] = key.split('\u0000'); sentences.push([`${who} would pass their periods per day${since} at ${ofN(k)}`, k]); }
+    for (const [key, k] of weekBy) { const [who, since] = key.split('\u0000'); sentences.push([`${who} would pass their periods per week${since} at ${ofN(k)}`, k]); }
     if (n('no_room')) sentences.push([`no suitable room is free at ${of('no_room')}`, n('no_room')]);
     if (n('room_off')) sentences.push([`the only suitable rooms are unavailable at ${of('room_off')}`, n('room_off')]);
     if (n('shape') && lLen[l] === 2) sentences.push([`a double cannot start at ${of('shape')} (the next period is missing or after a break)`, n('shape')]);

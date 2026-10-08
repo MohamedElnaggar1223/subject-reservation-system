@@ -656,9 +656,19 @@ export async function deleteItem(sessionId: string, offerId: string, itemId: str
  * A teacher who leaves: every item and offer naming them, every live in-school line of the offer
  * naming them, and this academic year's open enrolments of those students in the subject move to
  * the other teacher, audited.
+ *
+ * The students of those lines are locked first (RESERVATIONS.md §2.1; lib/student-locks.ts): the
+ * enrolments and teaching groups that follow are the students' (a leaving, a cohort correction, a
+ * move into a group hold the student first), so this change takes them before the session, the
+ * offer and the lines. A line made for a new student while it waited runs it again with that
+ * student locked first.
  */
 export async function replaceTeacher(sessionId: string, offerId: string, data: ReplaceOfferTeacherType, actorId: string, ctx?: AuditContext) {
-  return db.transaction(async (tx) => {
+  return withStudentsFirst((extra) => db.transaction(async (tx) => {
+    const seen = await tx.selectDistinct({ id: registration.studentId }).from(registration)
+      .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, registration.offerItemId))
+      .where(and(eq(sessionOfferItem.offerId, offerId), eq(registration.teacherId, data.fromTeacherId), inArray(registration.status, [...LIVE])));
+    const locked = await lockStudents(tx, [...seen.map((x) => x.id), ...extra]);
     const session = await sessionForChange(tx, sessionId);
     const { offer } = await offerForChange(tx, sessionId, offerId);
     if (data.fromTeacherId === data.toTeacherId) throw new OfferError('Choose another teacher to replace them with');
@@ -676,6 +686,8 @@ export async function replaceTeacher(sessionId: string, offerId: string, data: R
           .where(and(inArray(registration.offerItemId, itemIds), eq(registration.teacherId, data.fromTeacherId), inArray(registration.status, [...LIVE])))
           .orderBy(registration.id).for('update')
       : [];
+    // A line committed while this change waited for the offer: its student was not locked first.
+    assertStudentsLocked(locked, lines.map((l) => l.studentId));
     if (!onOffer.length && !onItems.length && !lines.length) throw new OfferError('That teacher does not teach this subject in this session', 404);
     await tx.insert(subjectTeacher).values({ id: randomUUID(), subjectId: offer.subjectId, teacherId: to.id }).onConflictDoNothing();
     for (const t of onOffer) {
@@ -731,9 +743,8 @@ export async function replaceTeacher(sessionId: string, offerId: string, data: R
         }
       }
       if (rows.length) {
-        // Updates only, of the open enrolments just read; the lines are held, so the students are not
-        // locked after them (RESERVATIONS.md §2.1's order: the student before the lines).
-        const r = await upsertEnrolments(tx, yearId, rows, actorId, { source: 'registrations', commit: true, ctx, follow: true, reason: data.reason, lockStudents: false });
+        // The students are held already (taken first, above): upsertEnrolments' own lock on them is theirs again.
+        const r = await upsertEnrolments(tx, yearId, rows, actorId, { source: 'registrations', commit: true, ctx, follow: true, reason: data.reason });
         enrolmentsMoved = r.updated;
         groupsFollowed = r.groupsFollowed;
       }
@@ -741,7 +752,7 @@ export async function replaceTeacher(sessionId: string, offerId: string, data: R
     await logAction(actorId, 'SESSION_OFFER_TEACHER_REPLACED', 'session_offer', offerId, { teacherId: data.fromTeacherId },
       { teacherId: to.id, reason: data.reason, items: onItems.length, lines: lines.length, enrolments: enrolmentsMoved }, ctx, tx);
     return { lines: lines.length, items: onItems.length, enrolments: enrolmentsMoved, groupsFollowed };
-  }).then(async (r) => {
+  })).then(async (r) => {
     // After the commit: the cover a group's new teacher made no longer holding is told (F1).
     await groupFollowNotices(r.groupsFollowed);
     return r;

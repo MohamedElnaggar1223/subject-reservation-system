@@ -120,12 +120,16 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
   for (const r of await sectionsBetween(studentIds, asOf, term.endsOn, executor)) {
     if (r.academicYearId === tt.academicYearId) sectionOf.set(r.studentId, { id: r.sectionId, name: r.sectionName });
   }
-  const limits = teacherIds.length
-    ? await executor.select().from(teacherLoadLimit).where(and(eq(teacherLoadLimit.academicYearId, tt.academicYearId), inArray(teacherLoadLimit.teacherId, teacherIds)))
+  // Every teacher who teaches these groups on some day from then (a dated change included): their
+  // limits and unavailability hold for the lessons they teach (round two's review, item 6).
+  const limits = allTeacherIds.length
+    ? await executor.select().from(teacherLoadLimit).where(and(eq(teacherLoadLimit.academicYearId, tt.academicYearId), inArray(teacherLoadLimit.teacherId, allTeacherIds)))
     : [];
   const rooms = await executor.select().from(room).orderBy(asc(room.name));
   const unavailable = await executor.select().from(scheduleUnavailability).where(eq(scheduleUnavailability.academicYearId, tt.academicYearId));
-  const teacherOverlaps = teacherOverlapsOf(taughtLater, new Map(rawGroups.map((x) => [x.g.id, x.g.archivedOn])), teacherOn);
+  const archivedOf = new Map(rawGroups.map((x) => [x.g.id, x.g.archivedOn]));
+  const teacherOverlaps = teacherOverlapsOf(taughtLater, archivedOf, teacherOn);
+  const teacherSpans = teacherSpansOf(taughtLater, archivedOf, asOf, term.endsOn);
   const dayRules = groupIds.length
     ? await executor.select().from(groupDayRule).where(and(eq(groupDayRule.academicYearId, tt.academicYearId), inArray(groupDayRule.groupAId, groupIds), inArray(groupDayRule.groupBId, groupIds)))
     : [];
@@ -174,8 +178,9 @@ export async function loadTimetableModel(timetableId: string, executor: Executor
       return { id: t.id, name: t.name, maxPerDay: lim?.maxPerDay ?? null, maxPerWeek: lim?.maxPerWeek ?? null };
     }).sort((a, b) => a.id.localeCompare(b.id)),
     ...(teacherOverlaps.length ? { teacherOverlaps } : {}),
+    ...(teacherSpans ? { teacherSpans } : {}),
     unavailable: unavailable
-      .filter((u) => !u.teacherId || teacherIds.includes(u.teacherId))
+      .filter((u) => !u.teacherId || allTeacherIds.includes(u.teacherId))
       .map((u) => ({ teacherId: u.teacherId, roomId: u.roomId, weekday: u.weekday, period: u.period })),
     overlaps: overlapsOf(members),
     dayRules: dayRules.map((r) => ({ a: r.groupAId, b: r.groupBId })),
@@ -238,6 +243,27 @@ function studentPeriodsOf(members: { studentId: string; groupId: string; from: s
     out[studentId] = most;
   }
   return out;
+}
+
+/**
+ * Who teaches each group when, over the version's time — only when a dated change of teacher falls
+ * inside it (else none: each group's teacher holds throughout, and the engine reads it from the
+ * group). A retired group is not taught from the day it is retired.
+ */
+function teacherSpansOf(
+  taught: { groupId: string; teacherId: string | null; from: string; to: string }[],
+  archivedOn: Map<string, string | null>,
+  asOf: string,
+  endsOn: string,
+): NonNullable<EngineInput['teacherSpans']> | null {
+  const spans = taught
+    .filter((x): x is { groupId: string; teacherId: string; from: string; to: string } => !!x.teacherId)
+    .map((x) => { const a = archivedOn.get(x.groupId); return a ? { ...x, to: x.to < addDays(a, -1) ? x.to : addDays(a, -1) } : x; })
+    .filter((x) => x.from <= x.to);
+  if (!spans.some((x) => x.from > asOf)) return null;
+  return spans
+    .map((x) => ({ groupId: x.groupId, teacherId: x.teacherId, from: x.from <= asOf ? null : x.from, to: x.to >= endsOn ? null : x.to }))
+    .sort((a, b) => a.groupId.localeCompare(b.groupId) || (a.from ?? '').localeCompare(b.from ?? '') || a.teacherId.localeCompare(b.teacherId));
 }
 
 /**

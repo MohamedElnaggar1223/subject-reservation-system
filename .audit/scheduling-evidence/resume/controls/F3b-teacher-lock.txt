@@ -1,12 +1,13 @@
-Control F3b-teacher-lock: apps/api/src/services/timetable-clash.services.ts — the guard undone ("await tx.select({ id: teacher.id }).from(teacher).where(inArray(teacher.id, teacherIds)).orderBy(asc(teacher.id)).for('update');" -> ''); ran test/08s6 test/09b at 2026-10-08T13:48:13+00:00 on igcse_scheduling_ctl_test
+Control F3b-teacher-lock: apps/api/src/services/timetable-clash.services.ts — the guard undone ("await tx.select({ id: teacher.id }).from(teacher).where(inArray(teacher.id, teacherIds)).orderBy(asc(teacher.id)).for('no key update');" -> ''); ran test/08s6 test/09b at 2026-10-08T19:21:55+00:00 on igcse_scheduling_ctl_test
 
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > two teacher changes giving one teacher two lessons at once in a published timetable: the second waits for the first and is refused 264ms
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, publishing first: the old version’s lesson is not held then and the cover is refused 419ms
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over 9ms
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those 118ms
-   × F1: scheduling invariants over the whole database > no published timetable puts a teacher in two lessons at once, on any day they teach both groups — unless the coordinator went ahead with it (recorded) 250ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > two teacher changes giving one teacher two lessons at once in a published timetable: the second waits for the first and is refused 236ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, publishing first: the old version’s lesson is not held then and the cover is refused 308ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over 2ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group’s change of teacher refused for a clash in the published timetable: its member then moves into the new teacher’s group under the move’s own check, instead of waiting 505ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those 225ms
+   × F1: scheduling invariants over the whole database > no published timetable puts a teacher in two lessons at once, on any day they teach both groups — unless the coordinator went ahead with it (recorded) 317ms
  Test Files  2 failed (2)
-      Tests  5 failed | 28 passed (33)
+      Tests  6 failed | 44 passed (50)
  FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > two teacher changes giving one teacher two lessons at once in a published timetable: the second waits for the first and is refused
     AssertionError: expected 200 to be 409 // Object.is equality
     - Expected
@@ -20,10 +21,15 @@ Control F3b-teacher-lock: apps/api/src/services/timetable-clash.services.ts — 
      ❯ lessonOf test/08s6-scheduling-rework.test.ts:78:25
          76|   const lessonOf = async (ttId: string, group: string, seq = 1) => {
          77|     const tt = await load(ttId);
- FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those
-    Error: Resolve the clashes before publishing (1): Race X5 4qp1 teaches Race R1 and Race R2 at Wednesday P4
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group’s change of teacher refused for a clash in the published timetable: its member then moves into the new teacher’s group under the move’s own check, instead of waiting
+    Error: Resolve the clashes before publishing (1): Race X5 mw43 teaches Race R1 and Race R2 at Wednesday P4
      ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
-     ❯ test/08s6-scheduling-rework.test.ts:658:5
+     ❯ test/08s6-scheduling-rework.test.ts:1033:5
+        1031|     await place(v, 'Solo G', 4, 4);
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those
+    Error: Resolve the clashes before publishing (1): Race X5 mw43 teaches Race R1 and Race R2 at Wednesday P4
+     ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+     ❯ test/08s6-scheduling-rework.test.ts:1056:5
  FAIL  test/09b-scheduling-invariants.test.ts > F1: scheduling invariants over the whole database > no published timetable puts a teacher in two lessons at once, on any day they teach both groups — unless the coordinator went ahead with it (recorded)
     AssertionError: expected [ { name: 'RW — race 1', …(3) } ] to deeply equal []
     - Expected

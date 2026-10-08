@@ -253,9 +253,13 @@ export async function checkpointPublished(tx: Tx, persons: { studentIds?: string
   // Every term still running from that day, shared: a publication of any of them (FOR UPDATE on its
   // term) waits for this change, or this change waits for it and then judges the new version.
   await tx.select({ id: academicTerm.id }).from(academicTerm).where(sql`${academicTerm.endsOn} >= ${from}`).orderBy(asc(academicTerm.id)).for('share');
+  // The teachers FOR NO KEY UPDATE, in id order: two changes giving one teacher lessons wait for each
+  // other, while a row naming the teacher (a line, an enrolment, an offer's teacher: FOR KEY SHARE
+  // through its foreign key, written before this by the caller) never blocks it — FOR UPDATE did, and
+  // two follow-ups each holding such a row and wanting the teacher deadlocked.
   const teacherIds = [...new Set(persons.teacherIds ?? [])].sort();
   if (teacherIds.length) {
-    await tx.select({ id: teacher.id }).from(teacher).where(inArray(teacher.id, teacherIds)).orderBy(asc(teacher.id)).for('update');
+    await tx.select({ id: teacher.id }).from(teacher).where(inArray(teacher.id, teacherIds)).orderBy(asc(teacher.id)).for('no key update');
   }
   const before = new Set((await publishedClashesFor(tx, persons, from)).map((c) => c.key));
   return {

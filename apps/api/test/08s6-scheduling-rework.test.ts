@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
 import {
-  admin, staff, onboard, subject, refused, one, sql, notified, holdRowLock, lockWaiters, pauseAtAudits, type Client,
+  admin, staff, onboard, subject, refused, one, sql, notified, notificationsFor, holdRowLock, lockWaiters, pauseAtAudits, waitFor, type Client,
 } from './helpers';
 import { setClockForTests } from '../src/lib/clock';
 
@@ -483,6 +483,31 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
     await notified(t.d!.c.email, 'COVER_CHANGED', 1);
   });
 
+  it("a teacher's timetable rules changed: the cover they give at a period they can no longer teach is judged again and goes, and they are told", async () => {
+    const D6 = plus(D1, 35); // a Sunday
+    const current = (await apiResponse(coordinator.api.v1.timetables.$get({ query: { termId } }))).find((v) => v.inForce)!.id;
+    const lesson = await lessonOf(current, 'Maths W P1 — ' + name('b'));
+    await apiResponse(coordinator.api.v1.cover.absences.$post({ json: { teacherId: t.b!.id, startsOn: D6, endsOn: D6, reason: 'personal' } }));
+    // A free teacher of the subject with an account (they are told).
+    const offered = (await apiResponse(coordinator.api.v1.cover.suggestions.$get({ query: { lessonId: lesson.id, date: D6 } }))).candidates;
+    const [key, who] = Object.entries(t).find(([k, x]) => k !== 'p' && offered.some((c) => c.teacherId === x.id && c.qualified && c.available))!;
+    const cover = await apiResponse(coordinator.api.v1.cover.assignments.$post({ json: { lessonId: lesson.id, date: D6, coverTeacherId: who.id } }));
+    const told = (await notificationsFor(who.c.email, 'COVER_CHANGED')).length;
+    // Their rules now keep them off that period: the cover is theirs no longer.
+    const r = await apiResponse(coordinator.api.v1.scheduling.rules.teachers[':teacherId'].$put({
+      param: { teacherId: who.id }, json: { academicYearId: yearId, maxPerDay: null, maxPerWeek: null, unavailable: [{ weekday: lesson.weekday!, period: lesson.period!, note: 'a standing meeting' }] },
+    }));
+    expect(r.coversLost).toEqual([expect.objectContaining({ id: cover.id, date: D6 })]);
+    const row = await one<{ status: string; removal: string; reason: string }>(`select status, removal, remove_reason as reason from cover_assignment where id = $1`, [cover.id]);
+    expect(row).toMatchObject({ status: 'removed', removal: 'no_longer_holds' });
+    expect(row.reason).toMatch(new RegExp(`^${name(key)}'s timetable rules changed`));
+    expect(row.reason).toContain(`${name(key)} is not available then`);
+    expect(Number((await one<{ n: string }>(`select count(*) as n from audit_log where action = 'COVER_REMOVED' and entity_id = $1`, [cover.id])).n)).toBe(1);
+    await notified(who.c.email, 'COVER_CHANGED', told + 1);
+    // The rules put back: the cover is not brought back by itself (it was removed and its people told).
+    await apiResponse(coordinator.api.v1.scheduling.rules.teachers[':teacherId'].$put({ param: { teacherId: who.id }, json: { academicYearId: yearId, maxPerDay: null, maxPerWeek: null, unavailable: [] } }));
+  });
+
   // ─── Round two, flag 3: locks and races (RESERVATIONS.md §2.1's order, F1's at its end) ──
 
   it('a teacher change and a publication at once, publishing first: the change sees the new version and is refused with the clash', async () => {
@@ -604,17 +629,34 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
     expect(await one(`select timetable_id, status from cover_assignment where id = $1`, [coverId])).toEqual({ timetable_id: v7, status: 'assigned' });
   });
 
-  it('a line’s teacher changed (the group follows) while the coordinator adds the same student elsewhere: one after the other, no deadlock, one open P1 group', async () => {
-    const release = await holdRowLock('"user"', s['7']!.studentId);
-    const change = putTeacher(officer, line['7:p1']!, { teacherId: t.b!.id, reason: 'the family asked for B' });
-    await lockWaiters(1);
-    const add = coordinator.api.v1.scheduling.groups[':id'].members.$post({ param: { id: gid['Maths W P1 (no teacher yet)']! }, json: { studentIds: [s['7']!.studentId] } });
-    await lockWaiters(2);
+  it('a line’s teacher changed at the desk while the coordinator adds the same student elsewhere, the change first: the student moves to the new teacher’s group, then the add moves them on — one after the other, one open group', async () => {
+    const f = await raceSubject('L', 2);
+    const release = await holdRowLock('"user"', f.st[0]!);
+    const change = putTeacher(officer, f.line[0]!, { teacherId: f.y, reason: 'the family asked for Y' });
+    await lockWaiters(1, WAIT);
+    const add = addTo(f.gz, f.st[0]!);
+    await lockWaiters(2, WAIT);
     await release();
     const [c, a] = await Promise.all([change, add]);
-    expect(c.status).toBe(200);
-    expect([200, 409]).toContain(a.status);
-    expect((await membershipsOf('7')).filter((m) => m.group.startsWith('Maths W P1')).length).toBe(1);
+    // X's group keeps a student enrolled with X: the student moves to Y's group; then the add to Z's.
+    expect((await apiResponse(Promise.resolve(c))).groupsFollowed).toMatchObject({ groupsGiven: [], moved: [{ studentId: f.st[0], fromGroupId: f.gx, toGroupId: f.gy }], waiting: [] });
+    expect(a.status).toBe(200);
+    expect(await openGroups(f.st[0]!)).toEqual([f.gz]);
+  });
+
+  it('… the add first: the desk change then finds the student alone in Z’s group, now with Y, and gives that group to Y', async () => {
+    const f = await raceSubject('M', 2);
+    const release = await holdRowLock('"user"', f.st[0]!);
+    const add = addTo(f.gz, f.st[0]!);
+    await lockWaiters(1, WAIT);
+    const change = putTeacher(officer, f.line[0]!, { teacherId: f.y, reason: 'the family asked for Y' });
+    await lockWaiters(2, WAIT);
+    await release();
+    const [a, c] = await Promise.all([add, change]);
+    expect(a.status).toBe(200);
+    expect((await apiResponse(Promise.resolve(c))).groupsFollowed).toMatchObject({ groupsGiven: [{ groupId: f.gz, teacherId: f.y }], moved: [], waiting: [] });
+    expect(await openGroups(f.st[0]!)).toEqual([f.gz]);
+    expect(await teacherOfGroup(f.gz)).toBe(f.y);
   });
 
   it('forming reads its students again under their locks: a student moved into a group while forming waited stays there — no refusal, no second group', async () => {
@@ -661,6 +703,342 @@ describe('F1 on the rework: units, delivery, the group following the enrolment; 
     expect(await sql(`select id, weekday, period, room_id from timetable_lesson where timetable_id = $1 order by id`, [v2])).toEqual(lessonsBefore);
     // The lock went with the request: the next run goes ahead.
     expect((await coordinator.api.v1.timetables[':id'].generate.$post({ param: { id: v2 }, json: { iterations: 1000 } })).status).toBe(200);
+  });
+
+  // ─── The review of 88898f6: the student first, everywhere; and the other items ─────────────
+
+  type RaceFix = { sub: string; offerId: string; item: string; x: string; y: string; z: string; st: string[]; line: string[]; gx: string; gy: string; gz: string };
+  /**
+   * A subject of its own for one race: a June offer taught in school by three teacher records (X, Y,
+   * Z) with one whole item; students who reserve it with X, enrolled from their lines, all in X's
+   * group; an empty group of Y and one of Z (no weekly periods: in no timetable).
+   */
+  const raceSubject = async (tag: string, students: number, teachers?: { x: string; y: string; z: string }): Promise<RaceFix> => {
+    const sub = await subject(adm, `F1R${tag}-${RUN}`, `Race ${tag}`, { course: 1000, registration: 400 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId: junS }, json: { rows: [{ keyKind: 'subject', keyId: sub, amount: 300, provisional: false }] } }));
+    const rec = async (n: string) => (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Race ${tag} ${n} ${RUN}` } })))!.id;
+    const { x, y, z } = teachers ?? { x: await rec('X'), y: await rec('Y'), z: await rec('Z') };
+    const offer = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+      param: { id: june },
+      json: {
+        subjectId: sub, courseFee: 1000,
+        teachers: [x, y, z].map((teacherId) => ({ teacherId, mode: 'in_school' as const })) as never,
+        items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: junS, availability: 'open', requiredInSeries: false }] as never,
+      },
+    })))!;
+    const item = (offer.items as unknown as string[])[0]!;
+    const st: string[] = [];
+    const lines: string[] = [];
+    for (let i = 0; i < students; i++) {
+      const f = await onboard(officer, `rr-${tag}${i}-${RUN}`, 11);
+      await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: f.studentId }, json: { cohortYear: Y - 1, reason: 'F1 rework scenario year' } }));
+      st.push(f.studentId);
+      lines.push((await reserve(f.studentId, june, [{ offerItemId: item, attempt: 'first', mode: 'in_school', teacherId: x }]))[0]!.id);
+    }
+    await apiResponse(coordinator.api.v1.enrolments.bulk.$post({ json: { academicYearId: yearId, source: 'registrations', studentIds: st, subjectMap: [], exclude: [], commit: true } }));
+    const mk = async (n: string, teacherId: string, studentIds: string[]) => (await apiResponse(coordinator.api.v1.scheduling.groups.$post({
+      json: { academicYearId: yearId, name: `Race ${tag} — ${n}`, subjectId: sub, teacherId, weeklyPeriods: 0, doublePeriods: 0, ...(studentIds.length ? { studentIds } : {}) },
+    }))).id;
+    return { sub, offerId: offer.id, item, x, y, z, st, line: lines, gx: await mk('X', x, st), gy: await mk('Y', y, []), gz: await mk('Z', z, []) };
+  };
+  const openGroups = async (studentId: string) => (await sql<{ group_id: string }>(`select group_id from teaching_group_member where student_id = $1 and ended_on is null`, [studentId])).map((r) => r.group_id);
+  const teacherOfGroup = async (groupId: string) => (await one<{ teacher_id: string | null }>(`select teacher_id from teaching_group where id = $1`, [groupId])).teacher_id;
+  const lineRow = (id: string) => one<{ status: string; teacher_id: string | null }>(`select status, teacher_id from registration where id = $1`, [id]);
+  const enrolmentRow = (studentId: string, subjectId: string) => one<{ id: string; teacher_id: string | null; ended_on: string | null }>(
+    `select id, teacher_id, ended_on from course_enrolment where student_id = $1 and subject_id = $2 order by created_at desc limit 1`, [studentId, subjectId]);
+  const replaceOn = (f: RaceFix) => coordinator.api.v1.sessions[':id'].offers[':offerId']['replace-teacher'].$post({
+    param: { id: june, offerId: f.offerId }, json: { fromTeacherId: f.x, toTeacherId: f.y, reason: 'teacher X leaves' },
+  });
+  const addTo = (groupId: string, studentId: string) => coordinator.api.v1.scheduling.groups[':id'].members.$post({ param: { id: groupId }, json: { studentIds: [studentId] } });
+  /** Two requests in a forced order: the first held at its audit row (after its first locks), the second fired while it waits. */
+  const inOrder = async <A, B>(action: string, first: () => Promise<A>, second: () => Promise<B>): Promise<[A, B]> => {
+    const pause = await pauseAtAudits([action]);
+    try {
+      const a = first();
+      await pause.paused(action, WAIT);
+      const b = second();
+      await lockWaiters(2, WAIT);
+      await pause.release(action);
+      return await Promise.all([a, b]);
+    } finally {
+      await pause.releaseAll();
+    }
+  };
+  let fxA: RaceFix, fxC: RaceFix;
+  /** How long a forced race waits for a request to reach its lock (a loaded machine is slow, not wrong). */
+  const WAIT = 20_000;
+
+  it('A’s replace-teacher takes the students of its lines first: the coordinator adding one of them elsewhere while it is under way waits, then moves the student — the replacement first', async () => {
+    const f = fxA = await raceSubject('A', 2);
+    const [r, a] = await inOrder('LINE_TEACHER_REPLACED', () => replaceOn(f), () => addTo(f.gz, f.st[0]!));
+    const done = await apiResponse(Promise.resolve(r));
+    expect(done).toMatchObject({ lines: 2, enrolments: 2 });
+    // Every member of X's group now has Y: the group is Y's (whole); then the add moves the student to Z's.
+    expect(done.groupsFollowed).toMatchObject({ groupsGiven: [{ groupId: f.gx, teacherId: f.y }], moved: [], waiting: [] });
+    expect(a.status).toBe(200);
+    expect(await openGroups(f.st[0]!)).toEqual([f.gz]);
+    expect(await openGroups(f.st[1]!)).toEqual([f.gx]);
+    expect([await teacherOfGroup(f.gx), await teacherOfGroup(f.gz)]).toEqual([f.y, f.z]);
+  });
+
+  it('… the add first: the replacement waits for it, then finds the student in Z’s group and gives each group, all its members now with Y, to Y', async () => {
+    const f = await raceSubject('B', 2);
+    const [a, r] = await inOrder('TEACHING_GROUP_MEMBERS_ADDED', () => addTo(f.gz, f.st[0]!), () => replaceOn(f));
+    expect(a.status).toBe(200);
+    const done = await apiResponse(Promise.resolve(r));
+    expect(done).toMatchObject({ lines: 2, enrolments: 2 });
+    expect(done.groupsFollowed!.groupsGiven.map((x) => [x.groupId, x.teacherId]).sort()).toEqual([[f.gx, f.y], [f.gz, f.y]].sort());
+    expect(await openGroups(f.st[0]!)).toEqual([f.gz]);
+    expect([await teacherOfGroup(f.gx), await teacherOfGroup(f.gz)]).toEqual([f.y, f.y]);
+  });
+
+  it('A’s replace-teacher and F0a’s leaving of one of its students, the replacement first: the leaving waits, then ends the enrolment and the membership the replacement moved and expires the line — no deadlock', async () => {
+    const f = fxC = await raceSubject('C', 2);
+    const [r, l] = await inOrder('LINE_TEACHER_REPLACED', () => replaceOn(f),
+      () => adm.api.v1.students[':id'].leave.$post({ param: { id: f.st[0]! }, json: { kind: 'withdrawn', leftOn: D1, reason: 'left during the replacement' } }));
+    const done = await apiResponse(Promise.resolve(r));
+    expect(done).toMatchObject({ lines: 2, enrolments: 2 });
+    expect(done.groupsFollowed).toMatchObject({ groupsGiven: [{ groupId: f.gx, teacherId: f.y }] });
+    expect((await apiResponse(Promise.resolve(l))).registrationsExpired).toBe(1);
+    expect(await lineRow(f.line[0]!)).toEqual({ status: 'expired', teacher_id: f.y });
+    expect(await enrolmentRow(f.st[0]!, f.sub)).toMatchObject({ teacher_id: f.y, ended_on: D1 });
+    expect(await openGroups(f.st[0]!)).toEqual([]);
+    expect(await openGroups(f.st[1]!)).toEqual([f.gx]);
+  });
+
+  it('… the leaving first: the replacement waits for the student, then finds the leaver’s line expired and moves the other alone', async () => {
+    const f = await raceSubject('D', 2);
+    const [l, r] = await inOrder('STUDENT_LEFT',
+      () => adm.api.v1.students[':id'].leave.$post({ param: { id: f.st[0]! }, json: { kind: 'withdrawn', leftOn: D1, reason: 'left before the replacement' } }), () => replaceOn(f));
+    expect((await apiResponse(Promise.resolve(l))).registrationsExpired).toBe(1);
+    const done = await apiResponse(Promise.resolve(r));
+    expect(done).toMatchObject({ lines: 1, enrolments: 1 });
+    expect(done.groupsFollowed).toMatchObject({ groupsGiven: [{ groupId: f.gx, teacherId: f.y }] });
+    expect(await lineRow(f.line[0]!)).toEqual({ status: 'expired', teacher_id: f.x });
+    expect(await lineRow(f.line[1]!)).toMatchObject({ teacher_id: f.y });
+  });
+
+  it('A’s replace-teacher and F0a’s cohort correction of one of its students, the replacement first: the correction waits, then expires the line now taught by Y — no deadlock', async () => {
+    const f = await raceSubject('E', 2);
+    const [r, c] = await inOrder('LINE_TEACHER_REPLACED', () => replaceOn(f),
+      () => adm.api.v1.students[':id'].cohort.$put({ param: { id: f.st[0]! }, json: { cohortYear: Y + 1, reason: 'entered a year too early' } }));
+    expect(await apiResponse(Promise.resolve(r))).toMatchObject({ lines: 2, enrolments: 2 });
+    expect((await apiResponse(Promise.resolve(c))).registrationsExpired).toBe(1);
+    expect(await lineRow(f.line[0]!)).toEqual({ status: 'expired', teacher_id: f.y });
+    expect(await enrolmentRow(f.st[0]!, f.sub)).toMatchObject({ teacher_id: f.y, ended_on: null });
+  });
+
+  it('… the correction first: the replacement waits, then finds the line expired; the other student moves to Y’s group (X’s group still has a student enrolled with X)', async () => {
+    const f = await raceSubject('F', 2);
+    const [c, r] = await inOrder('STUDENT_COHORT_CORRECTED',
+      () => adm.api.v1.students[':id'].cohort.$put({ param: { id: f.st[0]! }, json: { cohortYear: Y + 1, reason: 'entered a year too early' } }), () => replaceOn(f));
+    expect((await apiResponse(Promise.resolve(c))).registrationsExpired).toBe(1);
+    const done = await apiResponse(Promise.resolve(r));
+    expect(done).toMatchObject({ lines: 1, enrolments: 1 });
+    expect(done.groupsFollowed).toMatchObject({ groupsGiven: [], moved: [{ studentId: f.st[1], fromGroupId: f.gx, toGroupId: f.gy }], waiting: [] });
+    expect(await lineRow(f.line[0]!)).toEqual({ status: 'expired', teacher_id: f.x });
+  });
+
+  it('F0b’s enrolment change takes its student first: the coordinator adding the student elsewhere meanwhile waits, then moves them — the change first', async () => {
+    const f = await raceSubject('G', 2);
+    const e = await enrolmentRow(f.st[0]!, f.sub);
+    const [u, a] = await inOrder('ENROLMENT_UPDATED', () => coordinator.api.v1.enrolments[':id'].$put({ param: { id: e.id }, json: { teacherId: f.y } }), () => addTo(f.gz, f.st[0]!));
+    // X's group keeps a student enrolled with X: the student moves to Y's group; then the add to Z's.
+    expect((await apiResponse(Promise.resolve(u))).groupsFollowed).toMatchObject({ groupsGiven: [], moved: [{ studentId: f.st[0], fromGroupId: f.gx, toGroupId: f.gy }], waiting: [] });
+    expect(a.status).toBe(200);
+    expect(await openGroups(f.st[0]!)).toEqual([f.gz]);
+    expect(await teacherOfGroup(f.gz)).toBe(f.z);
+  });
+
+  it('… the add first: the enrolment change waits, then finds the student alone in Z’s group with Y, and gives that group to Y', async () => {
+    const f = await raceSubject('H', 2);
+    const e = await enrolmentRow(f.st[0]!, f.sub);
+    const [a, u] = await inOrder('TEACHING_GROUP_MEMBERS_ADDED', () => addTo(f.gz, f.st[0]!), () => coordinator.api.v1.enrolments[':id'].$put({ param: { id: e.id }, json: { teacherId: f.y } }));
+    expect(a.status).toBe(200);
+    expect((await apiResponse(Promise.resolve(u))).groupsFollowed).toMatchObject({ groupsGiven: [{ groupId: f.gz, teacherId: f.y }], moved: [], waiting: [] });
+    expect(await openGroups(f.st[0]!)).toEqual([f.gz]);
+  });
+
+  it('A line reserved for a new student while the replacement waited for its students: the replacement runs again with that student locked first — it never holds a line whose student it has not locked', async () => {
+    const f = await raceSubject('I', 2);
+    const c = await onboard(officer, `rr-I2-${RUN}`, 11);
+    await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: c.studentId }, json: { cohortYear: Y - 1, reason: 'F1 rework scenario year' } }));
+    const { default: pg } = await import('pg');
+    const hold = async (id: string) => {
+      const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+      await client.connect();
+      await client.query('BEGIN');
+      await client.query('SELECT id FROM "user" WHERE id = $1 FOR UPDATE', [id]);
+      const pid = (await client.query<{ p: number }>('SELECT pg_backend_pid() AS p')).rows[0]!.p;
+      return { pid, release: async () => { await client.query('COMMIT'); await client.end(); } };
+    };
+    const blockedBy = (pid: number) => waitFor(async () => Number((await one<{ n: string }>(`select count(*) as n from pg_stat_activity where $1 = any(pg_blocking_pids(pid))`, [pid])).n) > 0 || null, WAIT);
+    const first = await hold(f.st[0]!);
+    const replace = replaceOn(f);
+    await blockedBy(first.pid);
+    // Meanwhile a new student reserves the subject with X (nothing of theirs is held), and is then held.
+    const lineC = (await reserve(c.studentId, june, [{ offerItemId: f.item, attempt: 'first', mode: 'in_school', teacherId: f.x }]))[0]!.id;
+    const third = await hold(c.studentId);
+    await first.release();
+    // The replacement waits for the new student — before taking any line: theirs is free to lock.
+    await blockedBy(third.pid);
+    const probe = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await probe.connect();
+    await probe.query('BEGIN');
+    const free = await probe.query('SELECT id FROM registration WHERE id = $1 FOR UPDATE NOWAIT', [lineC]).then(() => true, (e: { code?: string }) => e.code);
+    await probe.query('ROLLBACK');
+    await probe.end();
+    await third.release();
+    expect(free).toBe(true);
+    expect(await apiResponse(replace)).toMatchObject({ lines: 3 });
+    expect(await lineRow(lineC)).toMatchObject({ teacher_id: f.y });
+  });
+
+  it('two desk changes giving whole groups of two subjects to one teacher at the same moment: one waits for the other at the teacher — both land, no server error', async () => {
+    const f = await raceSubject('J', 1);
+    const g = await raceSubject('K', 1, { x: f.x, y: f.y, z: f.z });
+    const pause = await pauseAtAudits(['LINE_TEACHER_CHANGED']);
+    const [a, b] = await (async () => {
+      try {
+        const first = putTeacher(officer, f.line[0]!, { teacherId: f.y, reason: 'the family asked for Y' });
+        const second = putTeacher(officer, g.line[0]!, { teacherId: f.y, reason: 'the family asked for Y' });
+        // Both have written Y into their lines (each holding Y's row FOR KEY SHARE) and wait here.
+        await lockWaiters(2, WAIT);
+        await pause.release('LINE_TEACHER_CHANGED');
+        return await Promise.all([first, second]);
+      } finally {
+        await pause.releaseAll();
+      }
+    })();
+    expect([a.status, b.status]).toEqual([200, 200]);
+    expect((await apiResponse(Promise.resolve(a))).groupsFollowed).toMatchObject({ groupsGiven: [{ groupId: f.gx, teacherId: f.y }] });
+    expect((await apiResponse(Promise.resolve(b))).groupsFollowed).toMatchObject({ groupsGiven: [{ groupId: g.gx, teacherId: f.y }] });
+  });
+
+  it('step D’s contract, studentsOfGroup(groupId, date): who is in a group on a date by §2’s rules — a move that day goes to the later group, a leaver is out after their last day, a section’s group follows the section', async () => {
+    const { studentsOfGroup } = await import('../src/services/group.services');
+    // The replacement's race: the first student moved from X's group to Z's on D1 (the later wins the day).
+    expect(await studentsOfGroup(fxA.gx, D1)).toEqual([fxA.st[1]]);
+    expect(await studentsOfGroup(fxA.gz, D1)).toEqual([fxA.st[0]]);
+    expect(await studentsOfGroup(fxA.gz)).toEqual([fxA.st[0]]);
+    // The leaving's race: the first student left on D1 — still in the group that day, not the next.
+    expect(await studentsOfGroup(fxC.gx, D1)).toEqual([...fxC.st].sort());
+    expect(await studentsOfGroup(fxC.gx, plus(D1, 1))).toEqual([fxC.st[1]]);
+    // A section's group follows the section.
+    expect(await studentsOfGroup(gid.homeroom!, D1)).toEqual([s['3']!.studentId]);
+  });
+
+  // ─── The review of 88898f6: delivery, dated teachers' rules, a refused whole group ─────────
+
+  it('the teaching demand reads a unit’s delivery from the offers that teach that unit: a later session’s offer of the other unit, in school, does not override the unit’s online item', async () => {
+    const phys = await subject(adm, `F1W-PHY-${RUN}`, 'Physics W', { course: 1500, registration: 600 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+    const unit = async (code: string, short: string) => (await apiResponse(coordinator.api.v1.catalogue.units.$post({ json: { boardCode: 'pearson_edexcel', code: `${code}${RUN}`, shortCode: short, title: short, unitLevel: 'as', kind: 'unit' } }))).id;
+    const [q1, q2] = [await unit('WPH11', 'Q1'), await unit('WPH12', 'Q2')];
+    await apiResponse(finadmin.api.v1['board-fees'].$put({ query: { seriesId: junS }, json: { rows: [{ keyKind: 'unit', keyId: q1, amount: 700, provisional: false }] } }));
+    const h = t.h!.id;
+    const unitItem = (label: string, unitId: string, seriesId: string, teachers?: { teacherId: string; mode: 'in_school' | 'online' }[]) =>
+      ({ label, kind: 'unit', enters: { kind: 'units', unitIds: [unitId] }, boardSeriesId: seriesId, availability: 'open', requiredInSeries: false, ...(teachers ? { teachers } : {}) });
+    const offer = async (sessionId: string, teachers: { teacherId: string; mode: 'in_school' | 'online' }[], items: Record<string, unknown>[]) =>
+      (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: sessionId }, json: { subjectId: phys, courseFee: 1000, teachers: teachers as never, items: items as never } })))!;
+    // June: Q1 taught online by H. The winter (a later session): Q2 taught by H in school.
+    const juneOffer = await offer(june, [{ teacherId: h, mode: 'online' }], [unitItem('Q1', q1, junS, [{ teacherId: h, mode: 'online' }])]);
+    await offer(winter, [{ teacherId: h, mode: 'in_school' }], [unitItem('Q2', q2, janS)]);
+    const f = await onboard(officer, `rw-ph-${RUN}`, 11);
+    await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: f.studentId }, json: { cohortYear: Y - 1, reason: 'F1 rework scenario year' } }));
+    await reserve(f.studentId, june, [{ offerItemId: (juneOffer.items as unknown as string[])[0]!, attempt: 'first', mode: 'in_school', teacherId: h }]);
+    await apiResponse(coordinator.api.v1.enrolments.bulk.$post({ json: { academicYearId: yearId, source: 'registrations', studentIds: [f.studentId], subjectMap: [], exclude: [], commit: true } }));
+    const demand = (await apiResponse(coordinator.api.v1.enrolments['teaching-demand'].$get({ query: { academicYearId: yearId } }))).filter((d) => d.subjectId === phys);
+    expect(demand.map((d) => [d.unitName, d.teacherId, d.delivery])).toEqual([['Q1', h, 'online']]);
+  });
+
+  it('a whole group handed to its students’ new teacher takes how that teacher teaches it: online, it gives up its room needs and its draft lessons’ rooms', async () => {
+    const f = await onboard(officer, `rw-bs-${RUN}`, 11);
+    await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: f.studentId }, json: { cohortYear: Y - 1, reason: 'F1 rework scenario year' } }));
+    const e = await apiResponse(coordinator.api.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: f.studentId, subjectId: bio, teacherId: t.d!.id, mode: 'in_school' } }));
+    gid['Bio solo'] = (await apiResponse(coordinator.api.v1.scheduling.groups.$post({
+      json: { academicYearId: yearId, name: 'Bio solo', subjectId: bio, teacherId: t.d!.id, weeklyPeriods: 1, doublePeriods: 0, roomType: 'classroom', studentIds: [f.studentId] },
+    }))).id;
+    const current = (await apiResponse(coordinator.api.v1.timetables.$get({ query: { termId } }))).find((v) => v.inForce)!.id;
+    const v = (await apiResponse(coordinator.api.v1.timetables.$post({ json: { termId, name: 'RW — solo draft', copyFromId: current } }))).id;
+    const placed = await place(v, 'Bio solo', 4, 1);
+    expect(placed.roomId).not.toBeNull();
+    // Teacher C teaches Biology online on the June offer.
+    const r = await apiResponse(coordinator.api.v1.enrolments[':id'].$put({ param: { id: e.id }, json: { teacherId: t.c!.id } }));
+    expect(r.groupsFollowed).toMatchObject({ groupsGiven: [{ groupId: gid['Bio solo'], teacherId: t.c!.id }] });
+    expect(await one(`select delivery, room_type, room_id, room_features from teaching_group where id = $1`, [gid['Bio solo']]))
+      .toEqual({ delivery: 'online', room_type: null, room_id: null, room_features: [] });
+    expect(await one(`select room_id from timetable_lesson where timetable_id = $1 and group_id = $2`, [v, gid['Bio solo']])).toEqual({ room_id: null });
+    expect((await load(v)).engine.groups.find((x) => x.id === gid['Bio solo'])).toMatchObject({ noRoom: true });
+  });
+
+  it('a teacher who takes a group later in the term has their own rules judged for it from that day — unavailable then, over their periods a day — by the grid, a move, publishing and the generator alike', async () => {
+    const D2 = plus(D1, 14);
+    const rec = async (n: string) => (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Span ${n} ${RUN}` } })))!.id;
+    const [x1, y1] = [await rec('X1'), await rec('Y1')];
+    const mk = async (n: string, teacherId: string) => (await apiResponse(coordinator.api.v1.scheduling.groups.$post({ json: { academicYearId: yearId, name: n, teacherId, weeklyPeriods: 1, doublePeriods: 0 } }))).id;
+    gid['Span G'] = await mk('Span G', x1);
+    gid['Span H'] = await mk('Span H', y1);
+    await apiResponse(coordinator.api.v1.scheduling.rules.teachers[':teacherId'].$put({
+      param: { teacherId: y1 }, json: { academicYearId: yearId, maxPerDay: 1, maxPerWeek: null, unavailable: [{ weekday: 2, period: 3, note: 'a standing meeting' }] },
+    }));
+    const current = (await apiResponse(coordinator.api.v1.timetables.$get({ query: { termId } }))).find((v) => v.inForce)!.id;
+    const v = (await apiResponse(coordinator.api.v1.timetables.$post({ json: { termId, name: 'RW — spans', copyFromId: current } }))).id;
+    await place(v, 'Span H', 2, 1);
+    await place(v, 'Span G', 2, 3);
+    const spanClashes = async () => (await load(v)).clashes.filter((c) => c.message.includes('Span')).map((c) => [c.kind, c.message]);
+    expect(await spanClashes()).toEqual([]);
+    // Span G goes to Y1 from D2: from then Y1 is unavailable at its lesson and has two periods on Tuesday.
+    await apiResponse(coordinator.api.v1.scheduling.groups[':id'].$put({ param: { id: gid['Span G']! }, json: { teacherId: y1, teacherFrom: D2 } }));
+    const off = `Span Y1 ${RUN} is unavailable at Tuesday P3 (Span G) from ${readable(D2)}`;
+    const limit = `Span Y1 ${RUN} teaches 2 periods on Tuesday from ${readable(D2)}; the most is 1`;
+    expect(await spanClashes()).toEqual([['teacher_unavailable', off], ['teacher_day_limit', limit]]);
+    expect((await load(v)).engine.teacherSpans).toEqual(expect.arrayContaining([
+      { groupId: gid['Span G'], teacherId: x1, from: null, to: plus(D2, -1) },
+      { groupId: gid['Span G'], teacherId: y1, from: D2, to: null },
+      { groupId: gid['Span H'], teacherId: y1, from: null, to: null },
+    ]));
+    // Publishing refuses them; a move back is refused with them.
+    const no = await refused(coordinator.api.v1.timetables[':id'].publish.$post({ param: { id: v }, json: { effectiveFrom: D1, acceptUnplaced: true } }));
+    expect(no.status).toBe(409);
+    expect(no.error).toContain(off);
+    expect(no.error).toContain(limit);
+    const g = await lessonOf(v, 'Span G');
+    await apiResponse(coordinator.api.v1.timetables[':id'].lessons[':lessonId'].move.$post({ param: { id: v, lessonId: g.id }, json: { weekday: 0, period: 4, from: { weekday: 2, period: 3 }, allowClash: true } }));
+    const back = await refused(coordinator.api.v1.timetables[':id'].lessons[':lessonId'].move.$post({ param: { id: v, lessonId: g.id }, json: { weekday: 2, period: 3, from: { weekday: 0, period: 4 } } }));
+    expect(back.status).toBe(409);
+    expect(back.error).toContain(off);
+    expect(back.error).toContain(limit);
+    // The generator keeps Span G off Tuesday P3 and off Span H's day.
+    await apiResponse(coordinator.api.v1.timetables[':id'].generate.$post({ param: { id: v }, json: { iterations: 20_000 } }));
+    expect(await spanClashes()).toEqual([]);
+    const [lg, lh] = [await lessonOf(v, 'Span G'), await lessonOf(v, 'Span H')];
+    expect(lg.weekday !== null && lh.weekday !== null).toBe(true);
+    expect(lg.weekday).not.toBe(lh.weekday);
+  });
+
+  it('a whole group’s change of teacher refused for a clash in the published timetable: its member then moves into the new teacher’s group under the move’s own check, instead of waiting', async () => {
+    const rec = async (n: string) => (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Solo ${n} ${RUN}` } })))!.id;
+    const [x2, x3] = [await rec('X2'), await rec('X3')];
+    const f = await onboard(officer, `rw-solo-${RUN}`, 11);
+    await apiResponse(adm.api.v1.students[':id'].cohort.$put({ param: { id: f.studentId }, json: { cohortYear: Y - 1, reason: 'F1 rework scenario year' } }));
+    const e = await apiResponse(coordinator.api.v1.enrolments.$post({ json: { academicYearId: yearId, studentId: f.studentId, subjectId: arabic, teacherId: x2, mode: 'in_school' } }));
+    const mk = async (n: string, teacherId: string, studentIds?: string[]) => (await apiResponse(coordinator.api.v1.scheduling.groups.$post({
+      json: { academicYearId: yearId, name: n, subjectId: arabic, teacherId, weeklyPeriods: 1, doublePeriods: 0, ...(studentIds ? { studentIds } : {}) },
+    }))).id;
+    gid['Solo G'] = await mk('Solo G', x2, [f.studentId]);
+    gid['Solo H'] = await mk('Solo H', x3);
+    // Both groups meet on Thursday at period 4 in a version published from D1.
+    const current = (await apiResponse(coordinator.api.v1.timetables.$get({ query: { termId } }))).find((v) => v.inForce)!.id;
+    const v = (await apiResponse(coordinator.api.v1.timetables.$post({ json: { termId, name: 'RW — solo', copyFromId: current } }))).id;
+    await place(v, 'Solo G', 4, 4);
+    await place(v, 'Solo H', 4, 4);
+    await apiResponse(coordinator.api.v1.timetables[':id'].publish.$post({ param: { id: v }, json: { effectiveFrom: D1, acceptUnplaced: true } }));
+    // The student's teacher becomes X3: Solo G would give X3 two lessons at once, so it is not given;
+    // the student moves into X3's group instead (their own lessons do not clash: they leave Solo G).
+    const r = await apiResponse(coordinator.api.v1.enrolments[':id'].$put({ param: { id: e.id }, json: { teacherId: x3 } }));
+    expect(r.groupsFollowed).toMatchObject({ groupsGiven: [], moved: [{ studentId: f.studentId, fromGroupId: gid['Solo G'], toGroupId: gid['Solo H'] }], waiting: [] });
+    expect(await openGroups(f.studentId)).toEqual([gid['Solo H']]);
+    expect(await teacherOfGroup(gid['Solo G']!)).toBe(x2);
   });
 
   // ─── Round two, flag 5: the roll-over into a year with a published timetable ──

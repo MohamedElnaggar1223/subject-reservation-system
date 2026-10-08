@@ -503,6 +503,13 @@ function translateInner(text: string): string | null {
     // The grid's clashes (the engine's sentences).
     [/^(.+) teaches (\d+) periods on (\w+); the most is (\d+)$/, (x) => `${x[1]} يدرّس ${x[2]} حصص يوم ${day(x[3]!)}؛ والحد الأقصى ${x[4]}`],
     [/^(.+) teaches (\d+) periods a week; the most is (\d+)$/, (x) => `${x[1]} يدرّس ${x[2]} حصة أسبوعيًا؛ والحد الأقصى ${x[3]}`],
+    // A teacher who takes a group later in the term, from that day.
+    [/^(.+) teaches (\d+) periods on (\w+) from (\d{1,2} \w+ \d{4}); the most is (\d+)$/, (x) => `${x[1]} يدرّس ${x[2]} حصص يوم ${day(x[3]!)} بدءًا من ${day(x[4]!)}؛ والحد الأقصى ${x[5]}`],
+    [/^(.+) teaches (\d+) periods a week from (\d{1,2} \w+ \d{4}); the most is (\d+)$/, (x) => `${x[1]} يدرّس ${x[2]} حصة أسبوعيًا بدءًا من ${day(x[3]!)}؛ والحد الأقصى ${x[4]}`],
+    [/^(.+) is unavailable at (.+) \((.+)\) from (\d{1,2} \w+ \d{4})$/, (x) => `${x[1]} غير متاح في ${day(x[2]!)} (${x[3]}) بدءًا من ${day(x[4]!)}`],
+    [/^(.+) would pass their periods per day from (\d{1,2} \w+ \d{4}) at (\d+) of the (\d+) periods$/i, (x) => `${x[1]} سيتجاوز حصصه اليومية بدءًا من ${day(x[2]!)} في ${x[3]} من ${x[4]} حصة`],
+    [/^(.+) would pass their periods per week from (\d{1,2} \w+ \d{4}) at (\d+) of the (\d+) periods$/i, (x) => `${x[1]} سيتجاوز حصصه الأسبوعية بدءًا من ${day(x[2]!)} في ${x[3]} من ${x[4]} حصة`],
+    [/^(.+) between them are unavailable at every period$/i, (x) => `${x[1]!.replace(/ and /g, ' و')} غير متاحين في كل الحصص مجتمعين`],
     [/^(\d+) students? (?:are|is) in both (.+) and (.+) at (.+)$/, (x) => `${x[1]} من الطلاب في ${x[2]} و${x[3]} معًا في ${day(x[4]!)}`],
     // A teacher a dated change gives two groups, from that day (the engine's sentence with its date).
     [/^(.+) teaches (.+) and (.+) at (.+) from (\d{1,2} \w+ \d{4})$/, (x) => `${x[1]} يدرّس ${x[2]} و${x[3]} في ${day(x[4]!)} بدءًا من ${day(x[5]!)}`],

@@ -93,6 +93,15 @@ export type EngineOverlap = { a: string; b: string; students: number };
  */
 export type EngineTeacherOverlap = { a: string; b: string; teacherId: string; from: string };
 
+/**
+ * Who teaches a group over the version's time, when a dated change of teacher falls inside it:
+ * one row per (group, teacher) interval, the first day's teacher included. `from` null: from the
+ * version's first day; `to` null: to its end. Absent: each group's teacher, throughout. Each
+ * teacher's unavailability applies to the group's lessons, and their limits count them, while they
+ * teach it (a teacher's periods counted afresh from each day one of their groups starts).
+ */
+export type EngineTeacherSpan = { groupId: string; teacherId: string; from: string | null; to: string | null };
+
 /** Lessons of these groups never fall on the same day (a = b: the group's own lessons). */
 export type EngineDayRule = { a: string; b: string };
 
@@ -106,6 +115,8 @@ export type EngineInput = {
   overlaps: EngineOverlap[];
   /** Pairs of groups a dated change of teacher gives one teacher (see the type). */
   teacherOverlaps?: EngineTeacherOverlap[];
+  /** Who teaches each group when, if a dated change falls inside the version's time (see the type). */
+  teacherSpans?: EngineTeacherSpan[];
   dayRules: EngineDayRule[];
   /** The school has rooms in use, so every placed lesson needs one. */
   roomsRequired: boolean;
@@ -208,7 +219,52 @@ type Index = {
   dayRulesOf: Map<string, Set<string>>;
   teacherOff: Set<string>;
   roomOff: Set<string>;
+  /** Each group's teachers over the version's time: the first day's first (`from` null), then by day. */
+  teachersOf: Map<string, { teacherId: string; from: string | null }[]>;
+  /** The loads a teacher's limits are judged on: from each day one of their groups starts, those they teach then. */
+  loads: TeacherLoad[];
+  loadsOf: Map<string, TeacherLoad[]>;
 };
+
+/** A teacher's groups from a day (null: the version's first day) — what their limits count then. */
+export type TeacherLoad = { teacherId: string; from: string | null; groups: Set<string> };
+
+/**
+ * Each group's teachers and each teacher's loads, from the spans (or, without them, each group's
+ * teacher throughout). The generator reads the same, so the grid, the server and the generator
+ * judge a dated teacher alike.
+ */
+export function teachingOf(input: EngineInput): { teachersOf: Map<string, { teacherId: string; from: string | null }[]>; loads: TeacherLoad[] } {
+  const spans: EngineTeacherSpan[] = input.teacherSpans
+    ?? input.groups.filter((g) => g.teacherId).map((g) => ({ groupId: g.id, teacherId: g.teacherId!, from: null, to: null }));
+  const known = new Set(input.groups.map((g) => g.id));
+  const teachersOf = new Map<string, { teacherId: string; from: string | null }[]>();
+  for (const sp of spans) {
+    if (!known.has(sp.groupId)) continue;
+    const list = teachersOf.get(sp.groupId) ?? [];
+    const had = list.find((x) => x.teacherId === sp.teacherId);
+    if (!had) list.push({ teacherId: sp.teacherId, from: sp.from });
+    else if (had.from !== null && (sp.from === null || sp.from < had.from)) had.from = sp.from;
+    teachersOf.set(sp.groupId, list);
+  }
+  const byFrom = (a: { from: string | null }, b: { from: string | null }) => (a.from === b.from ? 0 : a.from === null ? -1 : b.from === null ? 1 : a.from < b.from ? -1 : 1);
+  for (const list of teachersOf.values()) list.sort((a, b) => byFrom(a, b) || a.teacherId.localeCompare(b.teacherId));
+  const loads: TeacherLoad[] = [];
+  const byTeacher = new Map<string, EngineTeacherSpan[]>();
+  for (const sp of spans) if (known.has(sp.groupId)) byTeacher.set(sp.teacherId, [...(byTeacher.get(sp.teacherId) ?? []), sp]);
+  for (const [teacherId, mine] of [...byTeacher.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const starts = [...new Set(mine.map((x) => x.from))].sort((a, b) => byFrom({ from: a }, { from: b }));
+    let last = '';
+    for (const day of starts) {
+      const groups = new Set(mine.filter((x) => (day === null ? x.from === null : (x.from === null || x.from <= day) && (x.to === null || x.to >= day))).map((x) => x.groupId));
+      const key = [...groups].sort().join('|');
+      if (!groups.size || key === last) continue;
+      last = key;
+      loads.push({ teacherId, from: day, groups });
+    }
+  }
+  return { teachersOf, loads };
+}
 
 const cellKey = (weekday: number, period: number | null) => `${weekday}:${period ?? '*'}`;
 
@@ -248,7 +304,13 @@ function indexOf(input: EngineInput): Index {
     if (u.teacherId) teacherOff.add(`${u.teacherId}@${cellKey(u.weekday, u.period)}`);
     if (u.roomId) roomOff.add(`${u.roomId}@${cellKey(u.weekday, u.period)}`);
   }
+  const { teachersOf, loads } = teachingOf(input);
+  const loadsOf = new Map<string, TeacherLoad[]>();
+  for (const ld of loads) for (const gid of ld.groups) loadsOf.set(gid, [...(loadsOf.get(gid) ?? []), ld]);
   return {
+    teachersOf,
+    loads,
+    loadsOf,
     input,
     group: new Map(input.groups.map((g) => [g.id, g])),
     teacher: new Map(input.teachers.map((t) => [t.id, t])),
@@ -279,6 +341,19 @@ function periodsAt(ix: Index, length: number, weekday: number, period: number): 
 }
 
 const teacherName = (ix: Index, id: string | null) => (id ? ix.teacher.get(id)?.name ?? 'The teacher' : 'The teacher');
+/** " from 12 November 2051" for a dated teacher or load, "" from the version's first day. */
+const sinceWords = (from: string | null) => (from ? ` from ${dayMonthYear(from)}` : '');
+
+/** A group's teachers unavailable at a lesson's periods, each in the sentence evaluate() and the grid share. */
+function unavailableTeachers(ix: Index, g: EngineGroup, l: EngineLesson, weekday: number, periods: number[], where: string): Clash[] {
+  const out: Clash[] = [];
+  for (const t of ix.teachersOf.get(g.id) ?? []) {
+    if (periods.some((q) => isOff(ix.teacherOff, t.teacherId, weekday, q))) {
+      out.push({ kind: 'teacher_unavailable', lessonIds: [l.id], weekday, period: periods[0]!, message: `${teacherName(ix, t.teacherId)} is unavailable at ${where} (${g.name})${sinceWords(t.from)}` });
+    }
+  }
+  return out;
+}
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'] as const;
 /** "12 November 2051" for a YYYY-MM-DD date (the engine knows no clock or locale). */
 export const dayMonthYear = (date: string) => {
@@ -366,6 +441,11 @@ function suitableRoomsIx(ix: Index, g: EngineGroup): EngineRoom[] {
 
 // ─── Evaluation ──────────────────────────────────────────────────────────────
 
+const dayLimitMessage = (t: EngineTeacher, n: number, weekday: number, from: string | null) =>
+  `${t.name} teaches ${n} periods on ${WEEKDAY_NAMES[weekday]}${sinceWords(from)}; the most is ${t.maxPerDay}`;
+const weekLimitMessage = (t: EngineTeacher, n: number, from: string | null) =>
+  `${t.name} teaches ${n} periods a week${sinceWords(from)}; the most is ${t.maxPerWeek}`;
+
 type Placed = { lesson: EngineLesson; group: EngineGroup; weekday: number; periods: number[] };
 
 /**
@@ -406,9 +486,7 @@ export function evaluate(input: EngineInput): { clashes: Clash[]; unplaced: stri
   for (const p of placed) {
     const { lesson: l, group: g } = p;
     const where = slotName(input.days, p.weekday, p.periods[0]!);
-    if (g.teacherId && p.periods.some((q) => isOff(ix.teacherOff, g.teacherId!, p.weekday, q))) {
-      clashes.push({ kind: 'teacher_unavailable', lessonIds: [l.id], weekday: p.weekday, period: p.periods[0]!, message: `${teacherName(ix, g.teacherId)} is unavailable at ${where} (${g.name})` });
-    }
+    clashes.push(...unavailableTeachers(ix, g, l, p.weekday, p.periods, where));
     if (g.noRoom) {
       // Online: no room rule applies (a room left on its lesson is not used).
     } else if (l.roomId) {
@@ -464,28 +542,25 @@ export function evaluate(input: EngineInput): { clashes: Clash[]; unplaced: stri
     }
   }
 
-  // Teacher limits.
-  const byTeacher = new Map<string, Placed[]>();
-  for (const p of placed) if (p.group.teacherId) {
-    if (!byTeacher.has(p.group.teacherId)) byTeacher.set(p.group.teacherId, []);
-    byTeacher.get(p.group.teacherId)!.push(p);
-  }
-  for (const [tid, list] of [...byTeacher.entries()].sort((x, y) => x[0].localeCompare(y[0]))) {
-    const t = ix.teacher.get(tid);
+  // Teacher limits: per load (a teacher's groups from a day one of them starts).
+  for (const ld of ix.loads) {
+    const t = ix.teacher.get(ld.teacherId);
     if (!t) continue;
+    const list = placed.filter((p) => ld.groups.has(p.group.id));
+    if (!list.length) continue;
     if (t.maxPerDay !== null) {
       for (const d of input.days) {
         const that = list.filter((p) => p.weekday === d.weekday);
         const n = that.reduce((s, p) => s + p.periods.length, 0);
         if (n > t.maxPerDay) {
-          clashes.push({ kind: 'teacher_day_limit', lessonIds: that.map((p) => p.lesson.id), weekday: d.weekday, period: null, message: `${t.name} teaches ${n} periods on ${WEEKDAY_NAMES[d.weekday]}; the most is ${t.maxPerDay}` });
+          clashes.push({ kind: 'teacher_day_limit', lessonIds: that.map((p) => p.lesson.id), weekday: d.weekday, period: null, message: dayLimitMessage(t, n, d.weekday, ld.from) });
         }
       }
     }
     if (t.maxPerWeek !== null) {
       const n = list.reduce((s, p) => s + p.periods.length, 0);
       if (n > t.maxPerWeek) {
-        clashes.push({ kind: 'teacher_week_limit', lessonIds: list.map((p) => p.lesson.id), weekday: null, period: null, message: `${t.name} teaches ${n} periods a week; the most is ${t.maxPerWeek}` });
+        clashes.push({ kind: 'teacher_week_limit', lessonIds: list.map((p) => p.lesson.id), weekday: null, period: null, message: weekLimitMessage(t, n, ld.from) });
       }
     }
   }
@@ -598,9 +673,7 @@ function judgeAt(ix: Index, base: EngineLesson, weekday: number, period: number,
     return { weekday, period, ok: false, roomId: chosen, reasons };
   }
   const where = slotName(days, weekday, at.periods[0]!);
-  if (g.teacherId && at.periods.some((q) => isOff(ix.teacherOff, g.teacherId!, weekday, q))) {
-    reasons.push({ kind: 'teacher_unavailable', lessonIds: [l.id], weekday, period: at.periods[0]!, message: `${teacherName(ix, g.teacherId)} is unavailable at ${where} (${g.name})` });
-  }
+  reasons.push(...unavailableTeachers(ix, g, l, weekday, at.periods, where));
   if (g.noRoom) {
     // Online: no room rule applies.
   } else if (l.roomId) {
@@ -645,17 +718,18 @@ function judgeAt(ix: Index, base: EngineLesson, weekday: number, period: number,
   }
   pairs.sort((x, y) => x.cell - y.cell || x.at - y.at || x.kindRank - y.kindRank);
   reasons.push(...pairs.map((p) => p.clash));
-  // The teacher's day and week.
-  const t = g.teacherId ? ix.teacher.get(g.teacherId) : undefined;
-  if (t) {
-    const mine = others.filter((o) => o.group.teacherId === t.id);
+  // The day and week of each teacher the group has, per load it is in (as evaluate() reads them).
+  for (const ld of ix.loadsOf.get(g.id) ?? []) {
+    const t = ix.teacher.get(ld.teacherId);
+    if (!t) continue;
+    const mine = others.filter((o) => ld.groups.has(o.group.id));
     if (t.maxPerDay !== null) {
       const n = mine.filter((o) => o.weekday === weekday).reduce((s, o) => s + o.periods.length, 0) + at.periods.length;
-      if (n > t.maxPerDay) reasons.push({ kind: 'teacher_day_limit', lessonIds: [l.id], weekday, period: null, message: `${t.name} teaches ${n} periods on ${WEEKDAY_NAMES[weekday]}; the most is ${t.maxPerDay}` });
+      if (n > t.maxPerDay) reasons.push({ kind: 'teacher_day_limit', lessonIds: [l.id], weekday, period: null, message: dayLimitMessage(t, n, weekday, ld.from) });
     }
     if (t.maxPerWeek !== null) {
       const n = mine.reduce((s, o) => s + o.periods.length, 0) + at.periods.length;
-      if (n > t.maxPerWeek) reasons.push({ kind: 'teacher_week_limit', lessonIds: [l.id], weekday: null, period: null, message: `${t.name} teaches ${n} periods a week; the most is ${t.maxPerWeek}` });
+      if (n > t.maxPerWeek) reasons.push({ kind: 'teacher_week_limit', lessonIds: [l.id], weekday: null, period: null, message: weekLimitMessage(t, n, ld.from) });
     }
   }
   // Lessons kept off the same day.

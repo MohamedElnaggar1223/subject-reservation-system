@@ -1,0 +1,9 @@
+Control RV2-teacher-no-key-update: apps/api/src/services/timetable-clash.services.ts — the guard undone (".orderBy(asc(teacher.id)).for('no key update');\n  }\n  const before" -> ".orderBy(asc(teacher.id)).for('update');\n  }\n  const before"); ran test/08s6 at 2026-10-08T19:18:34+00:00 on igcse_scheduling_ctl_test
+
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > two desk changes giving whole groups of two subjects to one teacher at the same moment: one waits for the other at the teacher — both land, no server error 2202ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 38 passed (39)
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > two desk changes giving whole groups of two subjects to one teacher at the same moment: one waits for the other at the teacher — both land, no server error
+    AssertionError: expected [ 400, 200 ] to deeply equal [ 200, 200 ]
+    - Expected
+    + Received

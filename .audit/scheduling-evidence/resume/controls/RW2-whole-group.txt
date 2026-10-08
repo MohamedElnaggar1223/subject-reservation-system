@@ -1,11 +1,20 @@
-Control RW2-whole-group: apps/api/src/services/group.services.ts — the guard undone ('const whole = wanted.length === 1 &&' -> 'const whole = false && wanted.length === 1 &&'); ran test/08s6 at 2026-10-08T13:43:53+00:00 on igcse_scheduling_ctl_test
+Control RW2-whole-group: apps/api/src/services/group.services.ts — the guard undone ('const whole = wanted.length === 1 &&' -> 'const whole = false && wanted.length === 1 &&'); ran test/08s6 at 2026-10-08T19:22:47+00:00 on igcse_scheduling_ctl_test
 
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher replaced on an offer moves one unit’s members and not the other’s: the June P1 group, all its members now with the new teacher, takes them from today; the winter P2 group keeps its teacher 35ms
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > "no preference" assigned later on Teaching groups: listed with the teachers its line may take; a teacher the line may not take is refused by name; then the line, the enrolment and the group take the teacher 65ms
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > with no group of the new teacher the student stays where they are and is listed; the coordinator makes the group and Moves them (guarded) 68ms
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash 34ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher replaced on an offer moves one unit’s members and not the other’s: the June P1 group, all its members now with the new teacher, takes them from today; the winter P2 group keeps its teacher 38ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > "no preference" assigned later on Teaching groups: listed with the teachers its line may take; a teacher the line may not take is refused by name; then the line, the enrolment and the group take the teacher 52ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > with no group of the new teacher the student stays where they are and is listed; the coordinator makes the group and Moves them (guarded) 53ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash 19ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > … the add first: the desk change then finds the student alone in Z’s group, now with Y, and gives that group to Y 923ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher takes the students of its lines first: the coordinator adding one of them elsewhere while it is under way waits, then moves the student — the replacement first 945ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > … the add first: the replacement waits for it, then finds the student in Z’s group and gives each group, all its members now with Y, to Y 946ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher and F0a’s leaving of one of its students, the replacement first: the leaving waits, then ends the enrolment and the membership the replacement moved and expires the line — no deadlock 1126ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > … the leaving first: the replacement waits for the student, then finds the leaver’s line expired and moves the other alone 1035ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > … the add first: the enrolment change waits, then finds the student alone in Z’s group with Y, and gives that group to Y 907ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > two desk changes giving whole groups of two subjects to one teacher at the same moment: one waits for the other at the teacher — both land, no server error 845ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > step D’s contract, studentsOfGroup(groupId, date): who is in a group on a date by §2’s rules — a move that day goes to the later group, a leaver is out after their last day, a section’s group follows the section 1ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group handed to its students’ new teacher takes how that teacher teaches it: online, it gives up its room needs and its draft lessons’ rooms 388ms
  Test Files  1 failed (1)
-      Tests  4 failed | 18 passed (22)
+      Tests  13 failed | 26 passed (39)
  FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher replaced on an offer moves one unit’s members and not the other’s: the June P1 group, all its members now with the new teacher, takes them from today; the winter P2 group keeps its teacher
     AssertionError: expected { left: [], moved: [], …(3) } to match object { groupsGiven: [ { …(2) } ], …(2) }
     (2 matching properties omitted from actual)
@@ -19,6 +28,42 @@ Control RW2-whole-group: apps/api/src/services/group.services.ts — the guard u
     - Expected
     + Received
  FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash
-    AssertionError: expected { …(9) } to match object { …(3) }
-    (6 matching properties omitted from actual)
+    AssertionError: expected 'No group of teacher rw-c-x2ba for thi…' to match /^It would clash in the published time…/
+    - Expected: 
+    /^It would clash in the published timetable: Student rw-3-x2ba would be in Homeroom RW-X and Maths W P1 — teacher rw-a-x2ba at Sunday period 1/
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > … the add first: the desk change then finds the student alone in Z’s group, now with Y, and gives that group to Y
+    AssertionError: expected { left: [], moved: [ { …(4) } ], …(3) } to match object { groupsGiven: [ { …(2) } ], …(2) }
+    (2 matching properties omitted from actual)
+    - Expected
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher takes the students of its lines first: the coordinator adding one of them elsewhere while it is under way waits, then moves the student — the replacement first
+    AssertionError: expected { left: [], …(4) } to match object { groupsGiven: [ { …(2) } ], …(2) }
+    (2 matching properties omitted from actual)
+    - Expected
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > … the add first: the replacement waits for it, then finds the student in Z’s group and gives each group, all its members now with Y, to Y
+    AssertionError: expected [] to deeply equal [ [ …(2) ], [ …(2) ] ]
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > A’s replace-teacher and F0a’s leaving of one of its students, the replacement first: the leaving waits, then ends the enrolment and the membership the replacement moved and expires the line — no deadlock
+    AssertionError: expected { left: [], …(4) } to match object { groupsGiven: [ { …(2) } ] }
+    (4 matching properties omitted from actual)
+    - Expected
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > … the leaving first: the replacement waits for the student, then finds the leaver’s line expired and moves the other alone
+    AssertionError: expected { left: [], moved: [ { …(4) } ], …(3) } to match object { groupsGiven: [ { …(2) } ] }
+    (4 matching properties omitted from actual)
+    - Expected
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > … the add first: the enrolment change waits, then finds the student alone in Z’s group with Y, and gives that group to Y
+    AssertionError: expected { left: [], moved: [ { …(4) } ], …(3) } to match object { groupsGiven: [ { …(2) } ], …(2) }
+    (2 matching properties omitted from actual)
+    - Expected
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > two desk changes giving whole groups of two subjects to one teacher at the same moment: one waits for the other at the teacher — both land, no server error
+    AssertionError: expected { left: [], moved: [ { …(4) } ], …(3) } to match object { groupsGiven: [ { …(2) } ] }
+    (4 matching properties omitted from actual)
+    - Expected
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > step D’s contract, studentsOfGroup(groupId, date): who is in a group on a date by §2’s rules — a move that day goes to the later group, a leaver is out after their last day, a section’s group follows the section
+    AssertionError: expected [] to deeply equal [ '4FnUznRR9Qjyv19W1ep5edEqZHvP1Wzt' ]
+    - Expected
+    + Received
+ FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a whole group handed to its students’ new teacher takes how that teacher teaches it: online, it gives up its room needs and its draft lessons’ rooms
+    AssertionError: expected { left: [], moved: [], …(3) } to match object { groupsGiven: [ { …(2) } ] }
+    (4 matching properties omitted from actual)
     - Expected

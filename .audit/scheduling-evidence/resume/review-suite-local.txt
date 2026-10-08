@@ -1,0 +1,7 @@
+After the review of 88898f6: full suite, local time (Africa/Cairo), igcse_scheduling_test
+
+ Test Files  37 passed (37)
+      Tests  637 passed | 1 todo (638)
+   Duration  372.51s (transform 1.30s, setup 62ms, collect 4.91s, tests 360.98s, environment 3ms, prepare 1.27s)
+exit=0
+(✓ lines in the log: 346)

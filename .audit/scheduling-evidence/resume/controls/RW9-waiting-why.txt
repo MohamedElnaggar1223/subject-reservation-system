@@ -1,9 +1,9 @@
-Control RW9-waiting-why: apps/api/src/services/group.services.ts — the guard undone ('if (err instanceof SchedulingError) return { ok: false, why: waitingWhy(err.message) };' -> 'if (err instanceof SchedulingError) return { ok: false, why: err.message };'); ran test/08s6 at 2026-10-08T14:31:38+00:00 on igcse_scheduling_ctl_test
+Control RW9-waiting-why: apps/api/src/services/group.services.ts — the guard undone ('if (err instanceof SchedulingError) return { ok: false, why: waitingWhy(err.message) };' -> 'if (err instanceof SchedulingError) return { ok: false, why: err.message };'); ran test/08s6 at 2026-10-08T19:28:13+00:00 on igcse_scheduling_ctl_test
 
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash 93ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash 92ms
  Test Files  1 failed (1)
-      Tests  1 failed | 21 passed (22)
+      Tests  1 failed | 38 passed (39)
  FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash
     AssertionError: expected 'In the published timetable, this woul…' to match /^It would clash in the published time…/
     - Expected: 
-    /^It would clash in the published timetable: Student rw-3-28gs would be in Homeroom RW-X and Maths W P1 — teacher rw-a-28gs at Sunday period 1/
+    /^It would clash in the published timetable: Student rw-3-2yym would be in Homeroom RW-X and Maths W P1 — teacher rw-a-2yym at Sunday period 1/

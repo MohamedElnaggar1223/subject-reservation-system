@@ -1,16 +1,16 @@
-Control RW3-follow-clash-check: apps/api/src/services/group.services.ts — the guard undone ('await checkpoint.settle({ cause: `Moved to ${target.name}`, actorId });' -> 'void checkpoint;'); ran test/08s6 test/09b at 2026-10-08T13:44:07+00:00 on igcse_scheduling_ctl_test
+Control RW3-follow-clash-check: apps/api/src/services/group.services.ts — the guard undone ('await checkpoint.settle({ cause: `Moved to ${target.name}`, actorId });' -> 'void checkpoint;'); ran test/08s6 test/09b at 2026-10-08T19:23:14+00:00 on igcse_scheduling_ctl_test
 
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash 36ms
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher change dated inside a draft’s time is a clash from that day: the grid shows it, publishing refuses it, the generator keeps the two apart 124ms
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > publishing judges each cover it carries over inside the same transaction: a cover teacher who now teaches then loses it, is told, and the confirmation lists it 130ms
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > a group's teacher changed from a day: the cover arranged for its old teacher's absence from then is judged again and goes (its teacher that day is not away) 16ms
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over 325ms
-   × F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those 144ms
-   × F1: scheduling invariants over the whole database > no published timetable puts a student in two lessons at once, on any day of its term they are in both groups — unless the coordinator went ahead with it (recorded) 17ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash 37ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher change dated inside a draft’s time is a clash from that day: the grid shows it, publishing refuses it, the generator keeps the two apart 130ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > publishing judges each cover it carries over inside the same transaction: a cover teacher who now teaches then loses it, is told, and the confirmation lists it 163ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a group's teacher changed from a day: the cover arranged for its old teacher's absence from then is judged again and goes (its teacher that day is not away) 15ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > a cover assigned while a version is published, the cover first: the publication waits for it and carries it over 283ms
+   × F1 on the rework: units, delivery, the group following the enrolment; round two > rolling sections into a year with a published timetable is checked as any move: refused with the clash and its code, then recorded when the coordinator confirms exactly those 228ms
+   × F1: scheduling invariants over the whole database > no published timetable puts a student in two lessons at once, on any day of its term they are in both groups — unless the coordinator went ahead with it (recorded) 13ms
  Test Files  2 failed (2)
-      Tests  7 failed | 26 passed (33)
+      Tests  7 failed | 43 passed (50)
  FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a move that would clash in the published timetable is not made: the desk’s change stands, the student stays in their group and is listed with the clash
-    AssertionError: expected [ 'Maths W P1 — teacher rw-a-ial9' ] to deeply equal [ 'Maths W P1 — teacher rw-b-ial9' ]
+    AssertionError: expected [ 'Maths W P1 — teacher rw-a-to5m' ] to deeply equal [ 'Maths W P1 — teacher rw-b-to5m' ]
     - Expected
     + Received
  FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a teacher change dated inside a draft’s time is a clash from that day: the grid shows it, publishing refuses it, the generator keeps the two apart
@@ -18,10 +18,10 @@ Control RW3-follow-clash-check: apps/api/src/services/group.services.ts — the 
     - Expected
     + Received
  FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > publishing judges each cover it carries over inside the same transaction: a cover teacher who now teaches then loses it, is told, and the confirmation lists it
-    Error: Resolve the clashes before publishing (1): 1 student is in both Homeroom RW-X and Maths W P1 — teacher rw-a-ial9 at Sunday P1
+    Error: Resolve the clashes before publishing (1): 1 student is in both Homeroom RW-X and Maths W P1 — teacher rw-a-to5m at Sunday P1
      ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
-     ❯ test/08s6-scheduling-rework.test.ts:440:23
-        438|     const v3 = (await apiResponse(coordinator.api.v1.timetables.$post(…
+     ❯ test/08s6-scheduling-rework.test.ts:462:23
+        460|     const v3 = (await apiResponse(coordinator.api.v1.timetables.$post(…
  FAIL  test/08s6-scheduling-rework.test.ts > F1 on the rework: units, delivery, the group following the enrolment; round two > a group's teacher changed from a day: the cover arranged for its old teacher's absence from then is judged again and goes (its teacher that day is not away)
     TypeError: Cannot read properties of undefined (reading 'find')
      ❯ lessonOf test/08s6-scheduling-rework.test.ts:78:25

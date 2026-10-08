@@ -49,7 +49,7 @@ import {
   type EndGroupMembersType, type SplitGroupType, type MergeGroupsType, type ArchiveGroupType, type AssignGroupTeacherType,
 } from '@repo/validations';
 import { logAction, type AuditContext } from './audit.services';
-import { getTeachingDemand, upsertEnrolments, type EnrolmentChange } from './enrolment.services';
+import { getTeachingDemand, upsertEnrolments, offerDeliveries, type EnrolmentChange } from './enrolment.services';
 import {
   SchedulingError, isUniqueViolation, addDays, readableDate, groupMembersBetween, peakSize, teachersOn, type Tx, type Executor,
 } from './scheduling-shared.services';
@@ -951,19 +951,21 @@ function waitingWhy(message: string): string {
  * - self-study now: they leave the group after today;
  * - a new teacher: if every open member of their group now has that teacher,
  *   the group's teacher changes from today (F1's dated change, checked against
- *   the published timetables, and the cover from then judged again); otherwise
- *   they move into the smallest live group of that subject or unit whose
- *   teacher today is the new one;
- * - with no such group, or a move or a change of teacher that would add a
- *   clash to a published timetable, or a group with published lessons given to
- *   a provider, they stay where they are and are listed (`groupsWaiting`): a
- *   desk's or admin's change never fails for a timetable reason.
+ *   the published timetables, and the cover from then judged again) and takes
+ *   that teacher's delivery (online: no room); otherwise — or when that change
+ *   is refused (a clash in a published timetable, a provider) — they move into
+ *   the smallest live group of that subject or unit whose teacher today is the
+ *   new one, under the move's own check;
+ * - with no such group, or a move that would add a clash to a published
+ *   timetable, they stay where they are and are listed (`groupsWaiting`) with
+ *   the reason: a desk's or admin's change never fails for a timetable reason.
  * An enrolment just made is not placed here: forming from the course enrolment
  * adds it. Each move writes its own audit row in the transaction.
  *
- * Locks (§17): called after the caller's lines and enrolments; takes every
- * group concerned FOR UPDATE in id order, then the member rows; the published
- * check's running terms (shared) and teachers after them, then the cover.
+ * Locks (§17.3): its callers hold the students first (RESERVATIONS.md §2.1),
+ * then their lines and enrolments; this takes every group concerned FOR UPDATE
+ * in id order, then the member rows; the published check's running terms
+ * (shared) and teachers (FOR NO KEY UPDATE) after them, then the cover.
  */
 export async function followEnrolments(tx: Tx, changes: EnrolmentChange[], actorId: string, ctx?: AuditContext): Promise<FollowOutcome> {
   const out: FollowOutcome = { left: [], moved: [], groupsGiven: [], waiting: [], coversLost: [] };
@@ -1027,11 +1029,25 @@ export async function followEnrolments(tx: Tx, changes: EnrolmentChange[], actor
           g.unitId ? eq(courseEnrolment.unitId, g.unitId) : and(eq(courseEnrolment.subjectId, g.subjectId!), isNull(courseEnrolment.unitId))))
       : [];
     const whole = wanted.length === 1 && open.length > 0 && open.every((o) => enrolledWith.some((e) => e.studentId === o.studentId && e.mode === 'in_school' && (e.teacherId ?? null) === wanted[0]));
+    // Why the whole group could not follow (a clash in the published timetable): each member then
+    // tries the move into the new teacher's group, and waits with this reason only when none is made.
+    let wholeWhy: string | null = null;
     if (whole) {
       const to = wanted[0]!;
       if (to === nowTeacher) continue;
       const done = await attempt(tx, async (sp) => {
         const r = await changeGroupTeacher(sp, g, to, from, `Followed the course enrolment from ${readableDate(from)}`, actorId, ctx, { cause: `${g.name}: its students' teacher changed` });
+        // How the new teacher teaches it (the offer's word, as forming reads it): online takes no room.
+        const year = years.get(g.academicYearId)!;
+        const delivery = to && g.subjectId ? (await offerDeliveries(year.startYear, [g.subjectId], sp))(g.subjectId, g.unitId, to) : g.delivery as 'in_school' | 'online';
+        if (delivery !== g.delivery) {
+          const online = delivery === 'online';
+          await sp.update(teachingGroup).set({ delivery, ...(online ? { roomId: null, roomType: null, roomFeatures: [] } : {}), updatedAt: new Date() }).where(eq(teachingGroup.id, g.id));
+          if (online) {
+            await sp.execute(sql`update ${timetableLesson} l set room_id = null, updated_at = now() from ${timetable} t
+              where l.timetable_id = t.id and t.status = 'draft' and l.group_id = ${g.id}`);
+          }
+        }
         // A group formed while it had no teacher takes its teacher's name.
         let name = g.name;
         if (/\(no teacher yet\)$/.test(g.name) && to) {
@@ -1041,17 +1057,16 @@ export async function followEnrolments(tx: Tx, changes: EnrolmentChange[], actor
           await sp.update(teachingGroup).set({ name, updatedAt: new Date() }).where(eq(teachingGroup.id, g.id));
         }
         await syncDraftCards(sp, [g.id]);
-        await logAction(actorId, 'TEACHING_GROUP_UPDATED', 'teaching_group', g.id, { teacherId: nowTeacher, name: g.name },
-          { teacherId: to, teacherFrom: from, name, followed: 'enrolment', enrolmentIds: mine.map((c) => c.enrolmentId), coversLost: r.coversLost }, ctx, sp);
+        await logAction(actorId, 'TEACHING_GROUP_UPDATED', 'teaching_group', g.id, { teacherId: nowTeacher, name: g.name, delivery: g.delivery },
+          { teacherId: to, teacherFrom: from, name, delivery, followed: 'enrolment', enrolmentIds: mine.map((c) => c.enrolmentId), coversLost: r.coversLost }, ctx, sp);
         return { ...r, name };
       });
       if (done.ok) {
         out.groupsGiven.push({ groupId: g.id, groupName: done.value.name, teacherId: to });
         out.coversLost.push(...done.value.coversLost);
-      } else {
-        for (const c of mine) out.waiting.push({ studentId: c.studentId, groupId: g.id, groupName: g.name, teacherId: c.after.teacherId, why: done.why });
+        continue;
       }
-      continue;
+      wholeWhy = done.why;
     }
     for (const c of [...mine].sort((a, b) => a.studentId.localeCompare(b.studentId))) {
       const to = c.after.teacherId ?? null;
@@ -1062,7 +1077,7 @@ export async function followEnrolments(tx: Tx, changes: EnrolmentChange[], actor
         .sort((a, b) => (sizes.get(a.id) ?? 0) - (sizes.get(b.id) ?? 0) || a.name.localeCompare(b.name))[0];
       if (!target) {
         const [t] = to ? await tx.select({ name: teacher.name }).from(teacher).where(eq(teacher.id, to)) : [];
-        out.waiting.push({ studentId: c.studentId, groupId: g.id, groupName: g.name, teacherId: to, why: `No group of ${t?.name ?? 'no teacher'} for this subject yet` });
+        out.waiting.push({ studentId: c.studentId, groupId: g.id, groupName: g.name, teacherId: to, why: wholeWhy ?? `No group of ${t?.name ?? 'no teacher'} for this subject yet` });
         continue;
       }
       const done = await attempt(tx, async (sp) => {

@@ -1,0 +1,7 @@
+After the review of 88898f6: full suite, TZ=UTC, igcse_scheduling_test
+
+ Test Files  37 passed (37)
+      Tests  637 passed | 1 todo (638)
+   Duration  369.76s (transform 1.30s, setup 57ms, collect 4.77s, tests 358.60s, environment 3ms, prepare 1.23s)
+exit=0
+(✓ lines in the log: 342)

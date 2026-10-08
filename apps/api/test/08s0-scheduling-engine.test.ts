@@ -110,6 +110,54 @@ describe('F1: the editor engine and the generator’s explanations', () => {
     }
   }, 120_000);
 
+  it("a teacher who takes a group later in the term: their unavailability and limits judged for it from that day — the cell judgement equals the full evaluation, and the generator places within them", () => {
+    const base = school();
+    const run = generate(base, { iterations: 50_000 });
+    const at = new Map(run.placements.map((p) => [p.lessonId, p]));
+    // Physics 10 goes from teacher 4 to teacher 2 on 1 February 2050; teacher 2 is off on Monday at P1
+    // and teaches at most four periods a day.
+    const t2Groups = base.groups.filter((g) => g.teacherId === 't2').map((g) => g.id);
+    const input: EngineInput = {
+      ...base,
+      lessons: base.lessons.map((l) => ({ ...l, ...(at.get(l.id) ?? {}) })),
+      teachers: base.teachers.map((t) => (t.id === 't2' ? { ...t, maxPerDay: 4 } : t)),
+      unavailable: [...base.unavailable, { teacherId: 't2', roomId: null, weekday: 1, period: 1 }],
+      teacherSpans: [
+        ...base.groups.filter((g) => g.teacherId && g.id !== 'Physics-10').map((g) => ({ groupId: g.id, teacherId: g.teacherId!, from: null, to: null })),
+        { groupId: 'Physics-10', teacherId: 't4', from: null, to: '2050-01-31' },
+        { groupId: 'Physics-10', teacherId: 't2', from: '2050-02-01', to: null },
+      ],
+      teacherOverlaps: t2Groups.map((g) => { const [a, b] = [g, 'Physics-10'].sort() as [string, string]; return { a, b, teacherId: 't2', from: '2050-02-01' }; }),
+    };
+    const single = input.lessons.find((l) => l.groupId === 'Physics-10' && l.length === 1)!;
+    expect(judgeMove(input, single.id, 1, 1).reasons.map((c) => c.message)).toContain('Teacher 2 is unavailable at Monday P1 (Physics 10) from 1 February 2050');
+
+    let checked = 0;
+    const mismatches: string[] = [];
+    for (const l of input.lessons.filter((x) => x.groupId === 'Physics-10' || t2Groups.includes(x.groupId))) {
+      for (const o of optionsFor(input, l.id)) {
+        const moved = { ...input, lessons: input.lessons.map((x) => (x.id === l.id ? { ...x, weekday: o.weekday, period: o.period, roomId: o.roomId } : x)) };
+        const full = (evaluate(moved).byLesson[l.id] ?? []).map((c) => c.message);
+        const fast = o.reasons.map((c) => c.message);
+        checked++;
+        if (JSON.stringify(full) !== JSON.stringify(fast)) mismatches.push(`${l.id} at ${o.weekday}/${o.period}: ${JSON.stringify(fast)} vs ${JSON.stringify(full)}`);
+      }
+    }
+    expect(checked).toBeGreaterThan(500);
+    expect(mismatches).toEqual([]);
+    // The day limit is counted from the day the group joins teacher 2's load.
+    const limit = evaluate(input).clashes.concat(...input.lessons.filter((l) => l.groupId === 'Physics-10').map((l) => optionsFor(input, l.id).flatMap((o) => o.reasons)))
+      .filter((c) => c.kind === 'teacher_day_limit').map((c) => c.message);
+    expect(limit.some((m) => /^Teacher 2 teaches \d+ periods on \w+ from 1 February 2050; the most is 4$/.test(m))).toBe(true);
+
+    // The generator places nothing these rules refuse.
+    const gen = generate(input, { iterations: 50_000 });
+    const placedAt = new Map(gen.placements.map((p) => [p.lessonId, p]));
+    const placed: EngineInput = { ...input, lessons: input.lessons.map((l) => { const p = placedAt.get(l.id); return p ? { ...l, weekday: p.weekday, period: p.period, roomId: p.roomId } : { ...l, weekday: null, period: null, roomId: null }; }) };
+    expect(evaluate(placed).clashes).toEqual([]);
+    expect(gen.inputHash).not.toBe(generate({ ...input, teacherSpans: undefined }, { iterations: 1 }).inputHash);
+  }, 120_000);
+
   it('a lesson no arrangement could place says it cannot be placed; one the search did not fit says so, counting the periods', () => {
     const periods = [1, 2].map((p) => ({ period: p, label: `P${p}`, startsAt: '08:00', endsAt: '08:45', joinsNext: false }));
     const input: EngineInput = {
