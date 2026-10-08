@@ -565,3 +565,7 @@ records it.
 - 10:35Z — every control run again on the final code: 27 red (C26–C45, and C1, C4, C5, C6,
   C9, C11, C25 re-run); this document, the plan's F7 contract row, MO-25's text and RESERVATIONS.md
   §2.12's line for findOffer and findItem.
+- 10:38–10:45Z — gates green on 669cf84: API and web types; the suite in local time and with TZ=UTC,
+  29 files, 555 passed, 1 todo each; CI 37764801732 green on 669cf84.
+- Next: the Opus 5.5 review on the new model, then the lead's; at the merge, main's step D first and
+  the import's migration generated once more after D's.
