@@ -255,14 +255,19 @@ const subjects: SubjectSeed[] = [
 interface SessionSeed {
   id: string;
   name: string;
+  // Reservations rework: 'june' | 'winter' (November, with October and the January after).
   sessionType: string;
   // The exam series' year (F0a): it, not the window's dates, decides the grade.
   seriesYear: number;
   startDate: Date;
   endDate: Date;
+  courseStartsOn: string;
+  paymentDueAt: Date;
   status: string;
 }
 
+// The name is what deriveSessionName (@repo/validations) gives; the sessions start with no
+// subjects — the admin adds them on the Session screen.
 const sessions: SessionSeed[] = [
   {
     id: sessionId("june-2026"),
@@ -271,15 +276,19 @@ const sessions: SessionSeed[] = [
     seriesYear: 2026,
     startDate: new Date("2026-02-01T00:00:00Z"),
     endDate: new Date("2026-04-30T23:59:59Z"),
+    courseStartsOn: "2026-02-01",
+    paymentDueAt: new Date("2026-04-30T23:59:59Z"),
     status: "active",
   },
   {
     id: sessionId("november-2026"),
-    name: "November 2026",
-    sessionType: "november",
+    name: "November 2026 – January 2027",
+    sessionType: "winter",
     seriesYear: 2026,
     startDate: new Date("2026-07-01T00:00:00Z"),
     endDate: new Date("2026-09-30T23:59:59Z"),
+    courseStartsOn: "2026-07-01",
+    paymentDueAt: new Date("2026-09-30T23:59:59Z"),
     status: "draft",
   },
 ];

@@ -1,0 +1,33 @@
+# baseline-c99b553.log: the proof of this run, as vitest reported it (the full log, 27445 lines, 2468235 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ✓ test/00-harness.test.ts (4 tests) 1949ms
+ ✓ test/01-desk.test.ts (8 tests) 1442ms
+ ✓ test/02-money.test.ts (4 tests) 1439ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 1603ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 5021ms
+ ✓ test/05-object-access.test.ts (13 tests) 3174ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3322ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1461ms
+ ✓ test/08-money-rules.test.ts (51 tests) 8921ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 8478ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 4984ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 6508ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 4708ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 4872ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 8106ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2276ms
+ ✓ test/08i-board-series.test.ts (10 tests) 3716ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 3845ms
+ ✓ test/08k-catalogue-races.test.ts (6 tests) 3966ms
+ ✓ test/08l-board-change.test.ts (7 tests) 1596ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 4652ms
+ ✓ test/09-money-invariants.test.ts (27 tests) 258ms
+
+## Summary
+[clock] database minus host: 3.1 ms (measured within 13 ms)
+ Test Files  22 passed (22)
+      Tests  308 passed | 1 todo (309)
+   Start at  22:53:18
+   Duration  93.14s (transform 571ms, setup 29ms, collect 1.56s, tests 86.30s, environment 2ms, prepare 588ms)

@@ -60,6 +60,77 @@ Not the owner's words; each can be overturned by the owner.
 
 ---
 
+## 0c. 7 October 2026 — the admin's direction, and the plan reset
+
+The owner met the school's admin. Her priority is **subject reservations and fees paid**; her
+verdict on the current implementation: "very hard to use, counter intuitive and not usable that
+much".
+The forms the school actively uses (Drive folder "June 2027") and eight PDFs (fees per board
+and series, registration links for November 2026/January 2027 and June 2027, Cambridge's
+enquiry-about-results service) are now the ground truth. The owner's instruction, verbatim:
+"analyzing every single form and understanding every option and every thing about it and
+mapping these onto changes to our current system is key"; "if our own implementation degrades
+the experience or makes it harder or more complex then we failed"; "do not try and fix the
+current implementation and if needed just redo it all over again correctly"; "we need to plan
+first".
+
+Her points: (1) subjects registrable per paper; (2) some papers required; (3) splitting
+certificates (A Level) is a service like remarks, late cash-in, cash-in; (4) remark differs per
+board; (5) broadcast, batch and direct notifications, email and WhatsApp, not deletable by
+parents or students; (6) automated repeating reminders for payments and deadlines; (7) a
+complete rework of the logic and UI of the admin side for reservations and sessions — a session
+selects its subjects, each with its teachers, its name derived from its type, far fewer inputs;
+board series "very confusing, redundant"; (8) school fees pushed by the admin into pending
+payments; (9) the exception system revised so that "every policy, every deadline, every
+percentage, literally everything can have an exception"; (10) the teacher of a subject
+changeable later; (11) more payment data for parents (date, end date).
+
+**The plan the owner accepted (7 Oct):** Phase 0 — freeze the six in-flight agents (F1 round
+two, F2 fixes, F7 fixes, F4 review, the preview build, the walkthrough stage 1); their work stays
+on disk and on their pushed branches until each feature's future is decided. Phase 1 — digest
+every form and PDF into `SCHOOL_FORMS.md` (the register, the gap map, the questions), update
+`DISCOVERY.md`, and have the owner confirm the reading before any design. Phase 2 — design the
+rework (`RESERVATIONS_REWORK.md`: sessions from type and year with their subjects, papers,
+teachers and fees; board series kept underneath but never assembled by hand; reservations per
+paper with services as lines; admin-pushed charges; parent payment detail; one exceptions
+engine; notifications and reminders; the proven money core kept: ledger, escrow, receipts,
+takings, the 09 invariants), reviewed on Opus 5.5, then by the owner. Phase 3 — build in her
+priority order with two or three agents at most, then re-plan F1/F2/F4/F7 on the new session
+model. Phase 4 — regenerate the walkthrough (F8).
+
+The owner's answers to the five strategy questions: the freeze, agreed; the admin is not
+available until we show her the work again (no questions to her meanwhile); other cycles' forms
+exist, but "work with what we have for now"; no WhatsApp Business account — postpone the
+integration, keep it in mind; "take your time". Trail: `.audit/school-forms.tsv`.
+
+**Status (7 Oct 2026, 19:08Z).** Phase 1 done: `SCHOOL_FORMS.md`, confirmed by the owner
+("let's do it"). Phase 2 done to the review gate: `RESERVATIONS_REWORK.md` version 8 and the
+prototype `docs/prototype/reservations-rework.html`, after six Opus 5.5 reviews and two diff
+checks (its §16), the last verdict "ready for the owner"; the owner's questions Q-15 and Q-19 to
+Q-22 (its §17, DISCOVERY.md §3) stand open with the defaults the design builds. Phase 3 (its
+§9: agents A, B, C, D) waits for the owner's review of the design and the prototype.
+
+**Phase 3 started (7 Oct 2026, 19:33Z).** The owner's "let's do it": the five defaults stand
+(DISCOVERY.md Q-15, Q-19 to Q-22). Agent A launched on `feature/rework-sessions` (§7 below);
+B and C start when A's contract (`docs/features/RESERVATIONS.md` §Contracts) is on its branch;
+D after B and C. **Step 1 merged (8 Oct 2026, 03:08Z):** A's branch landed on main at b438976
+after its Opus 5.5 review ("ready to merge") and the follow-ups it asked for; A keeps its branch
+for post-merge items (the open fee-row race). B and C were each reviewed "merge after fixes 1, 2"
+(8 Oct 02:20Z and 02:35Z), are fixing, and merge in that order after main has A; D after them.
+**Step 1's follow-ups and step 2's B merged (8 Oct 2026, 04:39Z and 05:26Z):** A's fee-row race
+closed by a per-series lock, its evidence trimmed under the new 300 KB rule (CLAUDE.md, CI gate 0),
+landed at ee7eb11; B's branch, reviewed "confirmed: merge" after two rounds, landed at 88c8d5a.
+C's final merge (its migrations renumbered after B's, B's expiries settling instalment plans) is
+next, then D. **Step 2 complete (8 Oct 2026, 06:36Z):** C's branch landed at b76eae4 after three
+Opus 5.5 passes; migrations 0041–0049 are on main's journal in stamp order. C finishes two
+follow-ups on its branch (the statement's charges with the no-double-count rule for instalments;
+the desk reservation taking the year's fee and the charges in one action). **Step 3 (D, messages
+and reminders) launched 8 Oct 06:40Z** on `feature/rework-messages`; then step 4 (the lead). **Step 4's end-to-end
+check done (8 Oct 08:04Z, main 9edefbb):** every flow driven from a bare template with no errors; the
+counts measured against RESERVATIONS_REWORK.md §11 (`.audit/school-forms-evidence/step4/`); seven
+observations queued under F6. **F4 and F7 resumed (08:20Z)** on the new model; F1 next, F2 after it,
+F8 last.
+
 ## 1. The features and their full scope
 
 Each feature lists its scope, then **named scenarios** (tests in `apps/api/test`, driven
@@ -396,6 +467,16 @@ error states that say what to do; sentences, not codes; tables with sorting, fil
 and export; print layouts; performance (no screen waits on an unnecessary request). Before-and-
 after screenshots of every screen changed; a written checklist per screen.
 
+**Queued from the rework's step 4 check (8 Oct 2026, `.audit/school-forms-evidence/step4/measure-counts.json`):**
+a new session lists every active subject closed and shows the catalogue's self-study-only
+subjects to families at once (say which subjects families can see); the subject drawer has two
+forms with two Save buttons; "Dates not set" on a session is not a link to the Board Series page
+(where the next year's filter hides the series); the dates form's required reason is labelled
+"Why it changes" while a Notes field sits below; the family's Reserve page should preselect the
+only child and the only open session; the desk's parent-consent tick shows for lines the family
+reserved itself; the Arabic hydration warning from the language provider (pre-existing). Also
+from C: three hand-cast API responses in `desk.client.tsx` that predate the rework.
+
 ### F8 — The demo school and the walkthrough (last, after F6)
 
 The owner's request of 30 Sep 2026: once every feature and the UI audit are finished, an artifact
@@ -413,7 +494,14 @@ every feature once.
   pathway; an import staged for review). No real school data.
 - **The walkthrough**, ordered as one complete tour, every step driven in headless Chrome against
   the demo school so each instruction is proven to work, with a screenshot per step.
-- Produced only after F6 has landed; its format is settled with the owner then.
+- **Format (owner, 30 Sep 2026): a self-contained HTML page** — one file with the steps and
+  embedded screenshots, opened in any browser, for presenting on a screen.
+- **Timing (owner, 30 Sep 2026):** a first version as soon as F1, F2, F4 and F7 have finished
+  implementing — before their reviews — then updated as each review lands, as F5, F3 and F6
+  land, and finally after F6. Each version is driven against one running system holding every
+  feature: the merged features on `main`, and the not-yet-merged ones on a preview branch that
+  merges their branches (migrations renumbered per §3), never on `main` itself.
+- The demo school is rebuilt from its script for every version, so the page's steps stay true.
 
 ---
 
@@ -442,7 +530,7 @@ branch.
 4. **F2 (campus leave) and F5 (pathway advisor)** in parallel.
 5. **F3 (attendance).**
 6. **F6 (UI audit).**
-7. **F8 (the demo school and the walkthrough).**
+7. **F8 (the demo school and the walkthrough)** — first version after step 3's implementers finish, updated at each later step.
 
 **Every branch that lands after a parallel branch added migrations** (in step 3, possibly the
 third, after two merges):
@@ -561,17 +649,21 @@ API and web ports):
 | F3 Attendance | `feature/attendance` | `attendance` | 3031 / 3030 |
 | F7 Day-one import | `feature/import` | `import` | 3091 / 3090 |
 | F6 UI audit | `feature/ui-audit` | `ui` | 3071 / 3070 |
+| Rework A — sessions, offers, fees (RESERVATIONS_REWORK.md §9 step 1); merged to main 8 Oct 2026 (b438976) | `feature/rework-sessions` | `rwa` | 3121 / 3120 |
+| Rework B — reservations (step 2); merged to main 8 Oct 2026 (88c8d5a) | `feature/rework-reservations` | `rwb` | 3111 / 3110 |
+| Rework C — money changes, charges, exceptions (step 2); merged to main 8 Oct 2026 (b76eae4) | `feature/rework-money` | `rwc` | 3141 / 3140 (A's servers took 3121/3120 because 3101/3100 were held by an older worktree's dev servers) |
+| Rework D — messages and reminders (step 3) | `feature/rework-messages` | `rwd` | 3131 / 3130 |
 
 | Feature | Implemented | Reviewed | Merged | Notes |
 |---|---|---|---|---|
 | F0a Core foundation | yes — docs/features/FOUNDATION.md | Opus 5.5, three rounds; lead review | 29 Sep 2026, `b747d47`, main CI 36613182503 green | owner questions in FOUNDATION §12; A-12/13/14 as settings |
 | F0b Catalogue, series, enrolment | yes — docs/features/CATALOGUE.md | Opus 5.5, three rounds (eleven flags, then six, then two); lead review | 30 Sep 2026, see the trail | owner questions in CATALOGUE §12; F1's 0040 collides with F0b's 0040 |
-| F1 Scheduling | yes — `feature/scheduling`, docs/features/SCHEDULING.md; main merged at e5da650, migration 0041 | | | awaiting review; owner questions in SCHEDULING §13 |
-| F4 Exam entries | | | | |
+| F1 Scheduling | **frozen 7 Oct** at 2c2a910 on `feature/scheduling` (the round-two fixes uncommitted on the agent's disk); resumes on the rework's session model (RESERVATIONS_REWORK.md §9) | Opus 5.5, round one applied (SCHEDULING.md §16); round two (30 Sep, session log) left three flags to fix on resumption: dated teacher clashes checked across intervals, carried covers re-checked after a change, lock and race tests for memberships and covers | | |
+| F4 Exam entries | frozen 7 Oct at ec7689b (CI green on 53fd152; the lead drove every screen 30 Sep); **resumed 8 Oct 2026 08:20Z** on the rework's model (RESERVATIONS_REWORK.md §9's F4 list) in worktree `agent-ae3ddd804d82aff1d` | Opus 5.5 implementer; reviewer after its push | | |
 | F2 Campus leave | | | | |
 | F5 Pathway advisor | | | | |
 | F3 Attendance | | | | |
-| F7 Day-one import | | | | |
+| F7 Day-one import | frozen 7 Oct at e58324b (gates green on 0036d64; fixing its review's flags, last flag 6); **resumed 8 Oct 2026 08:20Z** on the rework's model (§9's F7 list) in worktree `agent-acf43230a4e06e8b4` | Opus 5.5 implementer; reviewer after its push | | |
 | F6 UI audit | | | | |
 | F8 Demo school and walkthrough | | | | owner's request, 30 Sep 2026; after F6 |
 

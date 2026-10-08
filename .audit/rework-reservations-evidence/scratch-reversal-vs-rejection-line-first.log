@@ -1,0 +1,131 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-reservations/apps/api
+
+[clock] database minus host: 1.2 ms (measured within 5 ms)
+stderr | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [32848ef3-d072-4a46-bef3-89b7132bb663] POST /api/auth/sign-up/email
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[email:stub] To: admin.zzr@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [55f99938-da34-47e0-8e13-b26385f21607] POST /api/auth/sign-in/email
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [b9f2a12a-3d2b-42ba-adb8-d0dfd4600032] POST /v1/users
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [70582443-26f7-4c2e-8946-63f593f36fc0] POST /api/auth/sign-in/email
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [fdad0c43-ad5a-48ee-bbbb-59cf8b960745] POST /v1/users
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [2a79ca26-6c16-4774-a4fc-8b3b193dfc45] POST /api/auth/sign-in/email
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [cdf483ef-4533-47f9-8e28-17827689263a] POST /v1/users
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [d00c1ef6-b0ec-47a4-8518-d0257bd2561d] POST /api/auth/sign-in/email
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [10a41f72-4476-406f-83ed-eefcff89fac5] POST /v1/teachers
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [0cb8bb9f-1586-4bfa-ab05-84acdb68c2d1] POST /v1/sessions
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [c44545fc-fe8e-400b-a0e9-67d97cb19b7f] POST /v1/board-series
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [9e40c087-0035-41b1-b414-ff2003bd4bb1] POST /v1/subjects
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [7936b724-c983-4a4a-ad51-46fc5f43f763] PUT /v1/board-fees
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection
+[INFO] [e6f54666-ce33-4ab2-ae9f-2d01ef915a03] POST /v1/sessions/b06977a0-bf8d-4a61-a765-4cb395871b11/offers
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > rejection first
+[INFO] [a1c705e1-167a-47b5-ac2e-29cd780d2f2a] POST /v1/links/desk-onboard
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > rejection first
+[email:stub] To: parent.zzr-rejection-gwog@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > rejection first
+[email:stub] To: student.zzr-rejection-gwog@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > rejection first
+[INFO] [f7a20cb6-4e79-46f8-8926-88401b347034] POST /api/auth/sign-in/email
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > rejection first
+[INFO] [1fc71302-4e74-4af5-a536-16ea1694133e] POST /api/auth/sign-in/email
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > rejection first
+[INFO] [717488b9-2eec-40ee-b5aa-7406ffe7f9c8] POST /v1/registrations/desk
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > rejection first
+[email:stub] To: parent.zzr-rejection-gwog@test.local | Subject: Payment confirmed — June 2027 — zzr-gwog | Attachments: receipt-7d936f22-644f-480d-835c-45c67802ea34.pdf
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > rejection first
+[INFO] [37e5b884-7290-436d-94a0-0cb33b0feb88] POST /v1/registrations/5ff6c2fb-4355-4ad5-9a59-db5ab18a122b/verify-prior
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > rejection first
+[INFO] [9d0bccff-ff0a-44f9-9abc-4d2bb52b98b1] POST /v1/payments/7d936f22-644f-480d-835c-45c67802ea34/reverse
+
+stderr | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > rejection first
+[api] hidden from client ("Failed to reverse payment"): Failed query: select "id", "status" from "registration" where "registration"."id" in ($1) order by "registration"."id" for update
+params: 5ff6c2fb-4355-4ad5-9a59-db5ab18a122b | cause: deadlock detected
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > rejection first
+[scratch] rejection first: [[200,"ok"],[400,"Failed to reverse payment"]] {"status":"confirmed"}
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > reversal first
+[INFO] [5b574411-674b-423b-85e6-e987e4d1e7b9] POST /v1/links/desk-onboard
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > reversal first
+[email:stub] To: parent.zzr-reversal-gwog@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > reversal first
+[email:stub] To: student.zzr-reversal-gwog@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > reversal first
+[INFO] [99e79258-b32e-4482-b425-8c9a6b346b7a] POST /api/auth/sign-in/email
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > reversal first
+[INFO] [122d5866-5140-4e09-92a4-58ac9987c026] POST /api/auth/sign-in/email
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > reversal first
+[INFO] [30fed82a-da71-45b0-9d32-c05c9bd08f56] POST /v1/registrations/desk
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > reversal first
+[email:stub] To: parent.zzr-reversal-gwog@test.local | Subject: Payment confirmed — June 2027 — zzr-gwog | Attachments: receipt-772bdf7d-1681-46ef-aca5-e5f654a5f7f7.pdf
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > reversal first
+[INFO] [fcfa6c5c-8a0b-47a6-9f6d-2ab10f65fe5b] POST /v1/payments/772bdf7d-1681-46ef-aca5-e5f654a5f7f7/reverse
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > reversal first
+[INFO] [9c436a64-a48e-4edd-b79f-7445a643b84e] POST /v1/registrations/e1e3140f-3e1f-4c30-97a5-b923c5856857/verify-prior
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > reversal first
+[email:stub] To: parent.zzr-reversal-gwog@test.local | Subject: Payment reversed — Student zzr-reversal-gwog 
+
+stdout | test/zz-scratch-reversal.test.ts > scratch: reversal against rejection > reversal first
+[scratch] reversal first: [[200,"ok"],[200,"ok"]] {"status":"expired"}
+
+ ✓ test/zz-scratch-reversal.test.ts (2 tests) 4138ms
+   ✓ scratch: reversal against rejection > rejection first  1668ms
+   ✓ scratch: reversal against rejection > reversal first  686ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  05:02:59
+   Duration  6.05s (transform 512ms, setup 2ms, collect 176ms, tests 4.14s, environment 0ms, prepare 34ms)
+

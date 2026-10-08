@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
-import {
-  admin, staff, onboard, loneStudent, subject, session, refused, one, sql, notified, audited, notificationsFor, money,
-  takings, takingsDelta, openWindow, type Client, type Takings,
-} from './helpers';
+import { admin, staff, onboard, loneStudent, subject, session, refused, one, sql, notified, audited, notificationsFor, money, takings, takingsDelta, openWindow, type Client, type Takings, reservationOf } from './helpers';
 
 /**
  * The desk is the primary channel (UX_AUDIT §1): a family walks up, staff
@@ -42,7 +39,7 @@ describe('the desk', () => {
   it('registers two subjects and takes 3000 EGP cash in one action', async () => {
     const r = await apiResponse(
       officer.api.v1.registrations.desk.$post({
-        json: { studentId, sessionId, subjectIds: [physics, chemistry], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+        json: { studentId, sessionId, ...(await reservationOf(sessionId, [physics, chemistry])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
       })
     );
     expect(r.totalCost).toBe(3000);
@@ -93,7 +90,10 @@ describe('the desk', () => {
     expect(payer).toMatchObject({ email: parent.email, role: 'parent', confirmed_by: officer.id });
 
     const toParent = await notified(parent.email, 'PAYMENT_CONFIRMED', 1);
-    expect(toParent[0]?.title).toBe('Payment confirmed — November (desk)');
+    // The session's name is derived since the reservations rework (its type, year and label).
+    const { name } = await one<{ name: string }>(`select name from registration_session where id = $1`, [sessionId]);
+    expect(name).toMatch(/^November \d{4} – January \d{4} — /);
+    expect(toParent[0]?.title).toBe(`Payment confirmed — ${name}`);
     await notified(student.email, 'PAYMENT_CONFIRMED', 1);
     expect((await notificationsFor(officer.email)).length).toBe(0);
 
@@ -109,7 +109,7 @@ describe('the desk', () => {
     const lone = await loneStudent(adm, 'desk');
     const withMoney = await refused(
       officer.api.v1.registrations.desk.$post({
-        json: { studentId: lone.id, sessionId, subjectIds: [physics], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+        json: { studentId: lone.id, sessionId, ...(await reservationOf(sessionId, [physics])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
       })
     );
     expect(withMoney.status).toBe(400);
@@ -117,7 +117,7 @@ describe('the desk', () => {
     expect(await sql(`select 1 from registration where student_id = $1`, [lone.id])).toEqual([]);
 
     const registerOnly = await apiResponse(
-      officer.api.v1.registrations.desk.$post({ json: { studentId: lone.id, sessionId, subjectIds: [physics] } })
+      officer.api.v1.registrations.desk.$post({ json: { studentId: lone.id, sessionId, ...(await reservationOf(sessionId, [physics])) } })
     );
     expect(registerOnly.registrations.map((x) => x.status)).toEqual(['pending_payment']);
     expect(registerOnly.collected).toBe(0);

@@ -1,0 +1,166 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: 0.7 ms (measured within 2 ms)
+stderr | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [b0444759-cc92-4bce-ad9e-fcce308ef02b] POST /api/auth/sign-up/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[email:stub] To: admin.p08@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [4b571505-8a05-446d-8a6d-8867530e0f3d] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [6b89900f-9a23-4f15-90ee-456807d73058] POST /v1/users
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [5d38b7bb-03c1-4410-b7d1-22cbe600e586] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [6f428420-66d8-4134-bee6-e66719341a1d] POST /v1/users
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [f3e4d8f8-06b0-4050-9ae4-7da51e5f347c] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [e47139e0-434d-455b-a993-d578a47563c6] POST /v1/teachers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [40934d12-fcca-42c6-b6be-e2b1e68f10f8] POST /v1/sessions
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [ff41890a-00b8-4756-b713-1e6886777fc3] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [e18d0e06-8f74-441a-9a13-8136ce4ca5d0] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [b0a0c167-e5f9-422a-bc02-dbce79f689f3] POST /v1/board-series
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [9612caa6-76a9-4190-be50-e964a2269004] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [24e41f6e-cda3-43d4-af7c-a1253ebc80f7] POST /v1/catalogue/qualifications
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [5aac07a2-8a90-4d45-88f5-f836ffc26bfc] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [dce79600-34c9-49b7-b9f9-ca0ae1ed385f] POST /v1/sessions/b5dec170-964f-48b1-9d08-04a6c3079563/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [80a457fc-42c1-47e4-9c8d-928bb8a5cef9] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [186e646d-416b-47b5-8d35-f0dd32fd3e18] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [b87fd1f9-0af5-454d-951a-eab7f9462253] POST /v1/sessions/b5dec170-964f-48b1-9d08-04a6c3079563/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [9fbf8a79-38ab-470e-a271-824d08244a8f] POST /v1/subjects
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [822ffd59-aed3-4166-93c4-fad2de18a0bd] PUT /v1/board-fees
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies
+[INFO] [18c237c6-26e9-46a0-90f5-9ede6354ab2f] POST /v1/sessions/b5dec170-964f-48b1-9d08-04a6c3079563/offers
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [57931e15-ffee-4d56-82c5-9f2795bee5f3] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[email:stub] To: parent.p08-pct-s-fujt@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[email:stub] To: student.p08-pct-s-fujt@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [f93aff3e-614e-4d4b-a523-ed559078aa2a] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [65b37564-7bc4-4d9c-a678-5f25cad521e5] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [c3aaf80a-ba98-4efe-bb07-6699255770cd] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[email:stub] To: parent.p08-pct-r-fujt@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[email:stub] To: student.p08-pct-r-fujt@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [7cf8db08-f165-43d2-b27a-8a5760b9cd30] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [23e03f62-6208-4519-95f0-9c09e084338d] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [2ef66802-fb66-46a8-aac6-d92e34528b64] POST /v1/links/desk-onboard
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[email:stub] To: parent.p08-pct-n-fujt@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[email:stub] To: student.p08-pct-n-fujt@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [3cbfdfb3-2d46-45f2-9f14-90a71200cd80] POST /api/auth/sign-in/email
+
+stdout | test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+[INFO] [f8c24987-ec97-408f-954c-24b1daca062c] POST /api/auth/sign-in/email
+
+ ❯ test/08p-pricing-policies.test.ts (7 tests | 1 failed | 6 skipped) 2426ms
+   ↓ 08p: pricing policies > A-16: self-study is course 50%, board 100% — on a taught subject's retake and on an untaught subject's first entry; a retake in school is 100%
+   ↓ 08p: pricing policies > a one-paper retake costs its own course fee and the qualification's board fee; it is refused with the whole subject, and as a first entry
+   ↓ 08p: pricing policies > the pricing settings change new lines only: a line keeps the price and the basis it was given
+   × 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not 921ms
+     → expected { price: 16200, course: 7000, …(3) } to match object { course: 4200, board: 4600, …(1) }
+(17 matching properties omitted from actual)
+   ↓ 08p: pricing policies > price exceptions apply in today's order — a custom price, then a percent, then a fixed discount — and are recorded on the line
+   ↓ 08p: pricing policies > a provisional board fee: the line is reserved but not payable at the checkout or the desk; confirmed at the same amount it is payable, and its due date moves to the confirmation plus the grace
+   ↓ 08p: pricing policies > confirmed higher: the lines with no payment history are re-priced on the board part with the exceptions they recorded; a line with a payment, open, failed or paid, is listed and untouched; audited and told
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08p-pricing-policies.test.ts > 08p: pricing policies > a pricing.* exception replaces its setting's percent on the lines it applies to, and is recorded in the basis; one that does not apply is not
+AssertionError: expected { price: 16200, course: 7000, …(3) } to match object { course: 4200, board: 4600, …(1) }
+(17 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "board": 4600,[39m
+[32m-   "course": 4200,[39m
+[32m-   "price": 8800,[39m
+[31m+   "board": 9200,[39m
+[31m+   "course": 7000,[39m
+[31m+   "price": 16200,[39m
+[2m  }[22m
+
+ ❯ test/08p-pricing-policies.test.ts:174:36
+    172|       const [s] = await reserve(self.studentId, session, [{ offerItemI…
+    173|       // 30% of the course fee (14,000) and 50% of the board's (9,200)…
+    174|       expect(await priceOf(s!.id)).toMatchObject({ course: 4200, board…
+       |                                    ^
+    175|       expect((await priceOf(s!.id)).basis).toMatchObject({
+    176|         coursePercent: 30, boardPercent: 50, exceptionIds: [`test-pric…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+   Start at  05:32:51
+   Duration  3.88s (transform 449ms, setup 2ms, collect 166ms, tests 2.43s, environment 0ms, prepare 30ms)
+

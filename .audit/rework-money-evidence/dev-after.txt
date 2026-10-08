@@ -1,0 +1,81 @@
+== the eight V3 types on the registry (0045), and what waits under Check these
+     id     |         type          |           policy_key           | value_number | has_date | date_is_valid_until | session_scope | subject_scope | to_check | status 
+------------+-----------------------+--------------------------------+--------------+----------+---------------------+---------------+---------------+----------+--------
+ rwc-dev-1  | discount_percent      | price.discountPercent          |        10.00 | f        |                     | t             | f             | f        | active
+ rwc-dev-10 | custom_refund_percent | refund.percent                 |        30.00 | f        |                     | f             | t             | t        | active
+ rwc-dev-2  | discount_fixed        | price.discountFixed            |       100.00 | f        |                     | f             | t             | f        | active
+ rwc-dev-3  | custom_price          | price.custom                   |      1200.00 | f        |                     | t             | t             | f        | active
+ rwc-dev-4  | fee_waiver            | gate.schoolFee                 |              | f        |                     | f             | f             | f        | active
+ rwc-dev-5  | deadline_extension    | deadline.window                |              | t        | t                   | t             | f             | f        | active
+ rwc-dev-6  | late_registration     | deadline.window                |              | t        | t                   | f             | f             | f        | active
+ rwc-dev-7  | custom_refund_percent | refund.percent                 |        90.00 | f        |                     | t             | f             | f        | active
+ rwc-dev-8  | grade10_other_series  | eligibility.grade10OtherSeries |              | f        |                     | t             | f             | f        | active
+ rwc-dev-9  | deadline_extension    | deadline.window                |              | t        | t                   | f             | t             | t        | active
+(10 rows)
+
+== one REWORK_BACKFILL_EXCEPTION row per moved exception
+ backfill_rows 
+---------------
+            10
+(1 row)
+
+== the board services seeded with stable ids (0045)
+        id        |   board_code    |       kind        | refund_rule 
+------------------+-----------------+-------------------+-------------
+ svc-cambridge-1  | cambridge       | remark            | full
+ svc-cambridge-1s | cambridge       | remark            | full
+ svc-cambridge-2  | cambridge       | remark            | full
+ svc-cambridge-2s | cambridge       | remark            | full
+ svc-cambridge-cs | cambridge       | certificate_split | full
+ svc-oxford-ats   | oxford          | remark            | full
+ svc-oxford-crc   | oxford          | remark            | full
+ svc-oxford-rom   | oxford          | remark            | full
+ svc-pearson-ats  | pearson_edexcel | remark            | full
+ svc-pearson-ci   | pearson_edexcel | cash_in           | full
+ svc-pearson-crc  | pearson_edexcel | remark            | full
+ svc-pearson-cs   | pearson_edexcel | certificate_split | full
+ svc-pearson-lci  | pearson_edexcel | late_cash_in      | full
+ svc-pearson-prm  | pearson_edexcel | remark            | full
+ svc-pearson-rom  | pearson_edexcel | remark            | full
+(15 rows)
+
+== remark fee defaults copied into open and future series, both levels
+ board_code |   level    | series_with_fee | copied 
+------------+------------+-----------------+--------
+ cambridge  | as_a_level |               6 | t
+ cambridge  | igcse      |               6 | t
+(2 rows)
+
+== the constraints of 0046
+       conname        
+----------------------
+ exception_one_holder
+ receipt_one_subject
+(2 rows)
+
+ column_name | is_nullable 
+-------------+-------------
+ value       | YES
+ student_id  | YES
+ policy_key  | NO
+(3 rows)
+
+== the migration is idempotent: the backfill run again changes nothing
+ rows_still_without_policy 
+---------------------------
+                         0
+(1 row)
+
+== remark deadlines onto the series of the session (0045 §5)
+ board_code |     service     | on_series | ahead 
+------------+-----------------+-----------+-------
+ cambridge  | svc-cambridge-1 | t         | t
+ cambridge  | svc-cambridge-2 | t         | t
+(2 rows)
+
+== backfill audit rows for services
+ service_backfill_rows 
+-----------------------
+                    14
+(1 row)
+

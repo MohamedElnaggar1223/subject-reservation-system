@@ -1,0 +1,23 @@
+# Trimmed under CLAUDE.md (Git): the vitest summary and, for a red run, the failing tests and their
+# messages; the request log of the run removed. Original: 59796 bytes, 663 lines.
+
+ ✓ test/08t-rework-races.test.ts (14 tests) 9937ms
+   ✓ 08t: the rework races > two desks reserve one subject for one student at the same moment: one line  569ms
+   ✓ 08t: the rework races > the same entry in one series from two sessions at once: the student lock serialises them and the second is refused  429ms
+   ✓ 08t: the rework races > two items of one exclusive group at once: one line, the other refused  417ms
+   ✓ 08t: the rework races > an item closed while a line is being reserved: the close waits for the line; a close that lands first refuses it  1096ms
+   ✓ 08t: the rework races > a teacher removed from the offer while a line naming them is reserved: removed first, the line is refused  571ms
+   ✓ 08t: the rework races > a fee confirmed while a line is being priced on it: the confirm waits for the line and clears it — never a line left provisional  457ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the checkout lands first: it pays the price it read, and the re-price lists the line and leaves it  617ms
+   ✓ 08t: the rework races > a re-price racing a checkout (flag 46): the lines are locked first > the re-price lands first: the checkout that read the old price is refused, nothing is charged  561ms
+   ✓ 08t: the rework races > an item's series changed while a checkout lands on its line: the checkout first, the change is refused  591ms
+   ✓ 08t: the rework races > capture and the deadline sweep on one paid preregistration at once: refunded once  618ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the checkout first: it opens its payment, and the rejection is refused while it is open  547ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the rejection first: the line expires, and the checkout that waited is refused, no payment made  597ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > verified while its payment is confirmed: both land, the line paid and verified  572ms
+   ✓ 08t: the rework races > a declared sitting answered while its line is being paid > the hold step run by two schedulers at once drops a paid unverified line once  498ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  04:00:57
+   Duration  11.63s (transform 516ms, setup 2ms, collect 188ms, tests 9.94s, environment 0ms, prepare 33ms)

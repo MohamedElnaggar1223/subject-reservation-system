@@ -16,6 +16,7 @@ import {
   seriesAcademicYearStart,
 } from '@repo/validations';
 import { Button } from '~/components/ui/button';
+import { useSwapChoices, useSwapConsent, SwapConsent } from '~/components/reservations/swap-pick';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,8 @@ type Registration = {
   studentId: string;
   sessionId: string;
   subjectId: string;
+  // The item the line enters (the reservations rework): a swap goes to another.
+  offerItemId: string;
   priceAtRegistration: number;
   // Snapshot of subject.isCore at registration time (URD CORE-002).
   // Older rows predating the column may be missing it; fall back to subject.isCore.
@@ -76,15 +79,6 @@ type Registration = {
   student: Student;
 };
 
-type AvailableSubject = {
-  id: string;
-  name: string;
-  code: string | null;
-  council: string;
-  priceInSchool: number | null;
-  customPrice: number | null;
-  isOfferedAtSchool: boolean | null;
-};
 
 // ─── Status Styling ───────────────────────────────────────────────────────────
 
@@ -125,10 +119,6 @@ function RefundPreviewNote({ registrationId }: { registrationId: string }) {
   );
 }
 
-function resolvePrice(sub: AvailableSubject): number {
-  if (!sub.isOfferedAtSchool || sub.priceInSchool == null) return sub.customPrice ?? 0;
-  return sub.priceInSchool;
-}
 
 function canRevertApproval(reg: Registration, userId: string): boolean {
   return (
@@ -475,22 +465,14 @@ function RequestSwapModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [newSubjectId, setNewSubjectId] = useState('');
+  const [choiceKey, setChoiceKey] = useState('');
   const [reason, setReason] = useState('');
   const [err, setErr] = useState('');
-
-  const { data: available = [] } = useQuery<AvailableSubject[]>({
-    queryKey: ['registrations', 'available', reg.sessionId, reg.studentId],
-    queryFn: () =>
-      apiResponse(
-        api.v1.registrations.available.$get({
-          query: { sessionId: reg.sessionId, studentId: reg.studentId },
-        })
-      ),
-  });
-
-  const selectedSub = available.find((s) => s.id === newSubjectId);
-  const newPrice = selectedSub ? resolvePrice(selectedSub) : 0;
+  // Step B: the swap names its new line (item and entry) from the session's offers.
+  const { choices, terms, isLoading } = useSwapChoices(reg.sessionId, reg.studentId, reg.offerItemId);
+  const consent = useSwapConsent();
+  const choice = choices.find((c) => c.key === choiceKey);
+  const newPrice = choice?.price ?? 0;
   const diff = newPrice - reg.priceAtRegistration;
 
   const mutation = useMutation({
@@ -498,11 +480,11 @@ function RequestSwapModal({
       apiResponse(
         api.v1.registrations[':id']['request-swap'].$post({
           param: { id: reg.id },
-          json: { newSubjectId, reason },
+          json: { line: choice!.line, reason, ...(consent.consent ? { consent: consent.consent } : {}) },
         })
       ),
     onSuccess: () => { onSuccess(); onClose(); },
-    onError: (e: Error) => setErr(e.message),
+    onError: (e: Error) => { setErr(e.message); consent.onError(e.message); },
   });
 
   return (
@@ -515,22 +497,23 @@ function RequestSwapModal({
         <RefundPreviewNote registrationId={reg.id} />
 
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">New Subject</label>
+          <label className="block text-sm font-medium text-foreground mb-1">Swap to</label>
           <select
-            value={newSubjectId}
-            onChange={(e) => setNewSubjectId(e.target.value)}
+            value={choiceKey}
+            onChange={(e) => setChoiceKey(e.target.value)}
+            disabled={isLoading}
             className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
-            <option value="">Select a subject to swap to</option>
-            {available.map((sub) => (
-              <option key={sub.id} value={sub.id}>
-                {sub.name} — {formatPrice(resolvePrice(sub))}
+            <option value="">Choose what to swap to</option>
+            {choices.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label} — {formatPrice(c.price)}{c.provisional ? ' (provisional)' : ''}
               </option>
             ))}
           </select>
         </div>
 
-        {selectedSub && (
+        {choice && (
           <div className={`text-sm rounded-lg p-3 ${diff > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20'}`}>
             <p className={`font-medium ${diff > 0 ? 'text-amber-800 dark:text-amber-300' : 'text-emerald-800 dark:text-emerald-300'}`}>
               Financial impact
@@ -557,12 +540,13 @@ function RequestSwapModal({
             placeholder="Explain why you want to swap this subject..."
           />
         </div>
+        {consent.needed && <SwapConsent terms={terms} value={consent.ticks} onChange={consent.setTicks} />}
         {err && <p className="text-sm text-destructive">{err}</p>}
         <div className="flex gap-3">
           <Button variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
           <Button
-            onClick={() => mutation.mutate()}
-            disabled={!newSubjectId || reason.length < 5 || mutation.isPending}
+            onClick={() => { setErr(''); mutation.mutate(); }}
+            disabled={!choice || reason.length < 5 || consent.blocked || mutation.isPending}
             className="flex-1"
           >
             {mutation.isPending ? 'Submitting...' : 'Submit Request'}
@@ -635,21 +619,13 @@ function DirectSwapModal({
   onClose: () => void;
   onSuccess: (studentId: string, escrowDelta: number) => void;
 }) {
-  const [newSubjectId, setNewSubjectId] = useState('');
+  const [choiceKey, setChoiceKey] = useState('');
   const [err, setErr] = useState('');
-
-  const { data: available = [] } = useQuery<AvailableSubject[]>({
-    queryKey: ['registrations', 'available', reg.sessionId, reg.studentId],
-    queryFn: () =>
-      apiResponse(
-        api.v1.registrations.available.$get({
-          query: { sessionId: reg.sessionId, studentId: reg.studentId },
-        })
-      ),
-  });
-
-  const selectedSub = available.find((s) => s.id === newSubjectId);
-  const newPrice = selectedSub ? resolvePrice(selectedSub) : 0;
+  // Step B: the swap names its new line (item and entry) from the session's offers.
+  const { choices, terms, isLoading } = useSwapChoices(reg.sessionId, reg.studentId, reg.offerItemId);
+  const consent = useSwapConsent();
+  const choice = choices.find((c) => c.key === choiceKey);
+  const newPrice = choice?.price ?? 0;
   const diff = newPrice - reg.priceAtRegistration;
 
   const mutation = useMutation({
@@ -657,11 +633,11 @@ function DirectSwapModal({
       apiResponse(
         api.v1.registrations[':id'].swap.$post({
           param: { id: reg.id },
-          json: { newSubjectId },
+          json: { line: choice!.line, ...(consent.consent ? { consent: consent.consent } : {}) },
         })
       ),
     onSuccess: () => { onSuccess(reg.studentId, reg.priceAtRegistration); onClose(); },
-    onError: (e: Error) => setErr(e.message),
+    onError: (e: Error) => { setErr(e.message); consent.onError(e.message); },
   });
 
   return (
@@ -675,22 +651,23 @@ function DirectSwapModal({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">New Subject</label>
+          <label className="block text-sm font-medium text-foreground mb-1">Swap to</label>
           <select
-            value={newSubjectId}
-            onChange={(e) => setNewSubjectId(e.target.value)}
+            value={choiceKey}
+            onChange={(e) => setChoiceKey(e.target.value)}
+            disabled={isLoading}
             className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
           >
-            <option value="">Select a subject</option>
-            {available.map((sub) => (
-              <option key={sub.id} value={sub.id}>
-                {sub.name} — {formatPrice(resolvePrice(sub))}
+            <option value="">Choose what to swap to</option>
+            {choices.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label} — {formatPrice(c.price)}{c.provisional ? ' (provisional)' : ''}
               </option>
             ))}
           </select>
         </div>
 
-        {selectedSub && (
+        {choice && (
           <div className={`text-sm rounded-lg p-3 ${diff > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20'}`}>
             <p className={`font-medium ${diff > 0 ? 'text-amber-800 dark:text-amber-300' : 'text-emerald-800 dark:text-emerald-300'}`}>
               Financial impact
@@ -706,13 +683,14 @@ function DirectSwapModal({
           </div>
         )}
         <RefundPreviewNote registrationId={reg.id} />
+        {consent.needed && <SwapConsent terms={terms} value={consent.ticks} onChange={consent.setTicks} />}
 
         {err && <p className="text-sm text-destructive">{err}</p>}
         <div className="flex gap-3">
           <Button variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
           <Button
-            onClick={() => mutation.mutate()}
-            disabled={!newSubjectId || mutation.isPending}
+            onClick={() => { setErr(''); mutation.mutate(); }}
+            disabled={!choice || consent.blocked || mutation.isPending}
             className="flex-1"
           >
             {mutation.isPending ? 'Swapping...' : 'Confirm Swap'}

@@ -1,0 +1,7 @@
+> @repo/db@0.0.0 db:migrate /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/packages/db
+> drizzle-kit migrate
+
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-money/packages/db/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣷] applying migrations...[✓] migrations applied successfully!

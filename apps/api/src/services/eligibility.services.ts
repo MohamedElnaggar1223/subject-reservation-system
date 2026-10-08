@@ -46,6 +46,7 @@ import type { Eligibility, EligibilityCode, StudentStatus } from '@repo/validati
 import { getSetting, lockSetting, onSettingChanged } from './settings.services';
 import { logActions, type ExpiryReason } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
+import { lastInstalmentBeingCheckedSql } from './plan.services';
 
 /** A calendar date as the school reads it ("12 March 2027"). */
 function readableDate(date: string): string {
@@ -149,16 +150,23 @@ async function loadSeries(sessionId: string, executor: Executor): Promise<Eligib
  * asks this module when an exception is revoked.
  */
 async function grade10Exception(studentId: string, sessionId: string, executor: Executor): Promise<string | null> {
+  // The policy registry (RESERVATIONS_REWORK.md §3.7): eligibility.grade10OtherSeries, held by
+  // the student or by their family (a parent with an approved link), for this series or for every
+  // series of their grade-10 year (no session scope).
   const [row] = await executor
     .select({ id: exception.id })
     .from(exception)
     .where(and(
-      eq(exception.studentId, studentId),
-      eq(exception.type, 'grade10_other_series'),
+      or(
+        eq(exception.studentId, studentId),
+        sql`${exception.familyId} in (select l.parent_id from parent_student_link l where l.student_id = ${studentId} and l.status = 'approved')`,
+      ),
+      eq(exception.policyKey, 'eligibility.grade10OtherSeries'),
       eq(exception.status, 'active'),
       or(isNull(exception.sessionId), eq(exception.sessionId, sessionId)),
       or(isNull(exception.validUntil), gt(exception.validUntil, new Date())),
     ))
+    .orderBy(exception.createdAt, exception.id)
     .limit(1);
   return row?.id ?? null;
 }
@@ -205,7 +213,10 @@ export async function assertMayRegisterForInTx(tx: Tx, studentId: string, sessio
 
 /** The locked judgement without the throw (a preregistration's capture holds a refused row instead). */
 export async function mayRegisterForInTx(tx: Tx, studentId: string, sessionId: string): Promise<Eligibility> {
-  await tx.select({ id: user.id }).from(user).where(eq(user.id, studentId)).for('share');
+  // The student FOR NO KEY UPDATE (the rework, §6): a student's own reservations are serialised —
+  // what gate.sameEntryOnce and gate.exclusiveItems need, since no index can express them across
+  // sessions; NO KEY so inserts referencing the student are not blocked.
+  await tx.select({ id: user.id }).from(user).where(eq(user.id, studentId)).for('no key update');
   await tx.select({ id: registrationSession.id }).from(registrationSession).where(eq(registrationSession.id, sessionId)).for('share');
   let e = await mayRegisterFor(studentId, sessionId, tx);
   if (e.grade10ExceptionId) {
@@ -311,6 +322,8 @@ export async function expireIneligibleRegistrations(
         where pr.registration_id = ${registration.id}
           and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
       )`,
+      // A plan line whose last instalment's transfer is being checked is spared too (§3.6).
+      sql`not ${lastInstalmentBeingCheckedSql(registration.id, now)}`,
     ),
     'ineligible' satisfies ExpiryReason, now, cause);
 

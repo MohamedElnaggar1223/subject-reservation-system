@@ -10,6 +10,9 @@ import {
 } from 'react';
 import { foundationArabic } from './i18n-foundation';
 import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
+import { sessionsArabic, translateSessionsText } from './i18n-sessions';
+import { moneyArabic, translateMoneyText } from './i18n-money';
+import { reservationsArabic, translateReservationsText } from './i18n-reservations';
 import { schedulingArabic, translateSchedulingText } from './i18n-scheduling';
 
 export type Language = 'en' | 'ar';
@@ -56,7 +59,8 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.notifications': 'Notifications',
     'nav.home': 'Home',
     'nav.registration': 'Registration',
-    'nav.registerSubjects': 'Register Subjects',
+    'nav.registerSubjects': 'Reserve Subjects',
+    'nav.statement': 'Statement',
     'nav.myRegistrations': 'My Registrations',
     'nav.history': 'History',
     'nav.approvals': 'Approvals',
@@ -85,6 +89,9 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.exams': 'Exams',
     'nav.catalogue': 'Exam Catalogue',
     'nav.boardSeries': 'Board Series',
+    'nav.boardServices': 'Board Services',
+    'nav.charges': 'Charges',
+    'nav.chargesDue': 'Charges & Instalments',
     'nav.timetable': 'Timetable',
     'nav.timetables': 'Timetables',
     'nav.teachingGroups': 'Teaching Groups',
@@ -190,6 +197,9 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.exams': 'الامتحانات',
     'nav.catalogue': 'دليل الامتحانات',
     'nav.boardSeries': 'دورات المجالس',
+    'nav.boardServices': 'خدمات المجالس',
+    'nav.charges': 'الرسوم الأخرى',
+    'nav.chargesDue': 'الرسوم والأقساط',
     'nav.timetable': 'الجدول الدراسي',
     'nav.timetables': 'الجداول الدراسية',
     'nav.teachingGroups': 'مجموعات التدريس',
@@ -234,7 +244,8 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.notifications': 'الإشعارات',
     'nav.home': 'الرئيسية',
     'nav.registration': 'التسجيل',
-    'nav.registerSubjects': 'تسجيل المواد',
+    'nav.registerSubjects': 'حجز المواد',
+    'nav.statement': 'كشف الحساب',
     'nav.myRegistrations': 'تسجيلاتي',
     'nav.history': 'السجل',
     'nav.approvals': 'الموافقات',
@@ -1506,6 +1517,12 @@ Object.assign(autoArabicText, foundationArabic);
 // F0b screens (lib/i18n-catalogue.ts): only words the app does not already
 // translate, so a shared word keeps the Arabic the other screens use.
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// The reservations rework's screens (lib/i18n-sessions.ts): the same rule.
+for (const [en, ar] of Object.entries(sessionsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// Step C's money screens (lib/i18n-money.ts): the same rule.
+for (const [en, ar] of Object.entries(moneyArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// Step B's screens (lib/i18n-reservations.ts): Reserve, the statement, To verify, the slip.
+for (const [en, ar] of Object.entries(reservationsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // F1: the timetable screens (their own words never replace a phrase already translated).
 for (const [en, ar] of Object.entries(schedulingArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 
@@ -1586,6 +1603,15 @@ function translateDynamicText(text: string): string | null {
   // F0b: the catalogue's, the series' and the enrolment's sentences with names in them.
   const f0bText = translateCatalogueText(text);
   if (f0bText) return f0bText;
+  // The reservations rework: session names, refund sentences, the refusals of its screens.
+  const reworkText = translateSessionsText(text);
+  if (reworkText) return reworkText;
+  // Step C: the registry's sentences, the exceptions' dialogs and refusals.
+  const moneyText = translateMoneyText(text, translateExactText);
+  if (moneyText) return moneyText;
+  // Step B: the Reserve page's results, the pricing basis, the consent and the refusals.
+  const reservationText = translateReservationsText(text);
+  if (reservationText) return reservationText;
   // F1: the grid's clashes, the generator's explanations, cover's reasons, counted phrases.
   const f1Text = translateSchedulingText(text);
   if (f1Text) return f1Text;

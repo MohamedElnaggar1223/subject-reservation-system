@@ -1,0 +1,1215 @@
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: 0.5 ms (measured within 2 ms)
+stderr | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [7fa6932a-6270-4bf2-a31b-38ebd8d9a432] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[email:stub] To: admin.n08v@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [539d8d20-e1f8-4a38-9a46-282bc2c3e789] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [2c1ffb74-2d77-44f2-b12f-d762b942cdda] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [c6dab6d6-2b9c-49ea-a3f3-e16758072b5d] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [a3dd9afd-c52d-4100-9863-6e3546495897] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [a7688718-bc87-4f34-abcf-2c220821b9e6] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [3a676385-b817-414a-8347-e66b8af13dfd] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [12c04516-a1de-4746-9a48-0f3ccb6f8c69] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [d62e4de3-f92f-4267-8f0a-ccd38dfd5f66] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [392c5b57-80c6-4331-9667-9e1a81b42654] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [c320df1a-d02a-40fc-ae7c-82e8ef92f207] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447
+[INFO] [4a596696-35e4-4c8d-b17a-29f8d5bb7f4b] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[INFO] [221e876c-29f1-4a73-963c-91edc9ebe974] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[INFO] [7dc011d2-5730-405e-8636-8509fa2bbf2a] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[INFO] [255ee693-95c1-4b51-91cf-39c4b40a151e] POST /v1/sessions/cf21004e-2efc-4b58-b9f8-9717911d850a/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[INFO] [864a3cd5-cdb1-4f11-9d14-5b92beb5dedf] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[email:stub] To: parent.n08v-drop-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[email:stub] To: student.n08v-drop-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[INFO] [ee95ffcb-39ec-49c3-b4e3-06fa1cc464c2] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[INFO] [a8146a9d-e07f-4777-8a81-3492807f8cf1] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[INFO] [92c79dde-96a1-4639-be3c-b412403050fc] POST /v1/registrations/direct
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[email:stub] To: student.n08v-drop-hm8p@test.local | Subject: Your parent registered you for 1 subject 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[INFO] [45c00684-ea61-4473-af14-ef3528c72840] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[INFO] [e3dc713e-812e-43e8-96f6-722936c8ab08] POST /v1/payments/55b0e0ce-5618-4f4d-b515-60f7b822ff19/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[INFO] [76306d24-42d3-4eb7-8796-76999ecac04f] POST /v1/registrations/50ba6a14-090d-4244-894e-8c171cfaca53/request-drop
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[email:stub] To: parent.n08v-drop-hm8p@test.local | Subject: Payment confirmed — June 2027 — n08v-hm8p | Attachments: receipt-55b0e0ce-5618-4f4d-b515-60f7b822ff19.pdf
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[INFO] [0d72bb86-09d3-4fd2-a3a2-18f257ed5bf1] PUT /v1/change-requests/82008dd3-ae81-4fa0-8086-8d1015a2d366/approve
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's
+[email:stub] To: parent.n08v-drop-hm8p@test.local | Subject: Action Required: Student n08v-drop-hm8p requested a subject drop 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [e694eb70-2cab-4cc8-9ffe-2ccdd0e818b8] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [a5c2c18f-6265-439b-9ef3-44ab13771f95] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[email:stub] To: student.n08v-drop-hm8p@test.local | Subject: Registration Open — November 2026 – January 2027 — n08v-w-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[email:stub] To: parent.n08v-drop-hm8p@test.local | Subject: Registration Open — November 2026 – January 2027 — n08v-w-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [c9508845-566b-46ca-b99e-796ca1c06663] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [a0823827-803e-439e-8a88-9f814a68f8cd] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [f3a9f4c2-c6af-49a9-8d24-c05168f9f99f] POST /v1/catalogue/units
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [29bee18a-5a1b-4465-8bc6-c38489fc4527] POST /v1/catalogue/units
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [19346ef4-22e5-46af-b495-27ae19eda3e1] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [64291b9d-3234-4626-9202-8a171eb53aaa] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [0f0c6e47-9643-4dd1-a6a1-36c222c4c508] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [d7620f79-23b3-4128-9e09-e17c4f277ca2] POST /v1/sessions/5d8f45b8-c8b7-4bae-87af-bda8e4430fda/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [52a372d7-056e-4993-8ad1-1acc7b5f2416] PUT /v1/sessions/5d8f45b8-c8b7-4bae-87af-bda8e4430fda/offers/6f10bd44-427a-4027-a401-dfd00a12609f
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [ae39fef9-eb71-44bb-ba3f-55a660f6d9d2] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[email:stub] To: parent.n08v-bio-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[email:stub] To: student.n08v-bio-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [a69de942-88ae-49da-bf5b-c3677d163137] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [e73a1b1c-3141-4197-9492-b7cde091195e] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [636c0b99-b0b6-4134-aa43-401bd9ee9fb4] PUT /v1/sessions/5d8f45b8-c8b7-4bae-87af-bda8e4430fda/offers/6f10bd44-427a-4027-a401-dfd00a12609f/items/c9ecc76f-e150-44d6-a89a-11e2dc9bc9f5
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [128c47eb-7787-43d1-a42b-f06584d3613c] PUT /v1/sessions/5d8f45b8-c8b7-4bae-87af-bda8e4430fda/offers/6f10bd44-427a-4027-a401-dfd00a12609f/items/f492074a-739f-41ea-991f-622176cb34c5
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [f81c2660-b8c9-4dfe-812f-a5a9a05d96f4] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [861bae57-3c51-4770-a8ee-67034476b27f] POST /v1/board-fees/97a7d10f-9df5-410d-9600-1536fe1dcf62/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [18f3942d-c285-46cb-a172-b6a27d2f25f7] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable
+[INFO] [81687c77-d39a-4ccf-bc36-04e8dee2344e] GET /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+[INFO] [f98376fe-dbbb-414e-9e34-d2085df295ab] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+[INFO] [320a54c4-7e4c-4072-a6c3-3ee3c85e01cf] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+[INFO] [ec144448-aaf8-404d-bfb7-8cb06e46b1c2] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+[INFO] [ae8f7d7a-4e88-4a4b-966b-d6bb13bbdedb] POST /v1/sessions/cf21004e-2efc-4b58-b9f8-9717911d850a/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+[INFO] [bc17e6a4-b651-406f-bca5-2a90922cd769] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+[email:stub] To: parent.n08v-ex-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+[email:stub] To: student.n08v-ex-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+[INFO] [2baf764f-a57f-4cf5-9424-e7ee33f6f39a] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)
+[INFO] [c179891a-b8f6-42df-96fe-f2892230e90e] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [d4bffc70-5a2a-4dbb-abfa-9610d84a7500] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [8d6455cd-4a31-4709-9ec5-7cedf7f0a6c7] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [264a07db-4679-482f-b645-dfb90f9a7c57] POST /v1/sessions/cf21004e-2efc-4b58-b9f8-9717911d850a/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [45dad515-99ef-42d6-8e21-296928143f03] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [539a9bc3-10a3-4508-8924-19ed9b42a126] PUT /v1/sessions/cf21004e-2efc-4b58-b9f8-9717911d850a/offers/31dcd484-c49d-4f67-86d6-cd1dc63b84b0
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [902b1386-d02e-4e36-a220-f4e07184cdb7] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[email:stub] To: parent.n08v-rt-a-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[email:stub] To: student.n08v-rt-a-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [2c3c2ed6-d5bd-4c20-8180-426d541f64f4] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [7d79dfd4-5972-4b34-b25f-e7bdaeea45f7] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [9b5eb8ef-a171-4a00-9b86-94f42a17c67a] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[email:stub] To: parent.n08v-rt-b-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[email:stub] To: student.n08v-rt-b-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [9c96eb7e-3b36-4a42-ba81-bfda5d492380] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [dbf12490-1002-4d09-8a6b-3347a246c3a1] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [f81e37e5-743c-4601-86d1-61ebf68c11b3] GET /v1/academic/years
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [bd1579bd-c872-4817-a830-f4cf933e2ebc] POST /v1/academic/years
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [2dcdd6fd-1aec-45d1-834a-9aff9298ff8e] POST /v1/enrolments/bulk
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited
+[INFO] [b2c12e24-b3cc-44c3-a17e-e4320d8c8e62] POST /v1/sessions/cf21004e-2efc-4b58-b9f8-9717911d850a/offers/31dcd484-c49d-4f67-86d6-cd1dc63b84b0/replace-teacher
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [e8715fc5-c31f-4678-b1af-3705457a9837] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [debadbb6-2691-4785-b40f-3309d9b0c93a] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [9a358895-abbb-4093-ac8b-20c2cf001234] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [ea35052b-ec97-493a-a78c-a718e6037c39] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [5342e652-a4b8-43cf-b09f-613abae4b43b] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [cd17cd8d-53d9-4725-ae02-398ad476caee] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [e396d4a2-4e9d-42ab-b4d7-82c1c69370b1] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [d60c3520-60fb-4ccb-8713-6e03122342bb] POST /v1/sessions/289dc8bc-fca0-48b0-be47-0fa11871526c/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [3800df92-b323-4a2d-9969-9496c5c4ed54] POST /v1/sessions/289dc8bc-fca0-48b0-be47-0fa11871526c/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [f978a2e1-7409-4d61-af81-7b6e4daabc7e] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[email:stub] To: parent.n08v-sch-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[email:stub] To: student.n08v-sch-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [cfb3a5b2-27c9-4178-a763-3bf8262deaf6] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [db99a3fe-7fa1-48f3-862b-ce3c84b0e7d1] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [441cb01c-9a11-45b5-8207-f632ae60bf3e] POST /v1/registrations/preregister
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [588ce881-48ca-4bff-b227-e1bf6ba9eef7] POST /v1/registrations/preregister
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [bdb94137-32cf-4cb9-a877-1fb6ce5248eb] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [3a2e2476-5844-4880-9bec-c9d1395f0982] POST /v1/payments/8f2b1389-c779-4aa8-a1ac-d513b6bf272d/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [023020d2-3607-4452-a310-61f5d2d9731f] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[email:stub] To: parent.n08v-sch-hm8p@test.local | Subject: Payment confirmed — June 2027 — n08v-sch-hm8p | Attachments: receipt-8f2b1389-c779-4aa8-a1ac-d513b6bf272d.pdf
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [56a13001-931c-41c3-957d-1cd3ce703a43] POST /v1/payments/64616814-438f-4c88-bc5c-74930d02e1a1/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[email:stub] To: parent.n08v-sch-hm8p@test.local | Subject: Payment confirmed — June 2027 — n08v-sch-hm8p | Attachments: receipt-64616814-438f-4c88-bc5c-74930d02e1a1.pdf
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other
+[INFO] [6ecfa5ed-9668-40ec-9756-85ad4bb61301] POST /v1/sessions/289dc8bc-fca0-48b0-be47-0fa11871526c/close
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [185716d2-0305-41be-a929-f697a746ebf2] POST /v1/catalogue/qualifications
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-drop-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-sch-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-bio-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-sch-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-ex-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-sch-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-rt-a-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-sch-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-rt-b-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-sch-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-sch-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-sch-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-drop-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-sch-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-bio-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-sch-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-ex-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-sch-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-rt-a-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-sch-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-rt-b-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-sch-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-sch-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-sch-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [86441f05-ce84-47f5-8a3e-cb124838eb55] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [dba91d5d-e78f-4cef-8335-5056ad5e9db4] PUT /v1/catalogue/registrable/6f16d51b-b611-4a45-82ad-9b0364ee9a28
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [2907e44f-d76e-452f-96ee-9f77952a1b85] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [5d6fca55-6c62-40ef-b6ac-7a286260ce5a] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [dbc65ed3-98f8-4f35-88f2-70aeffe241a0] POST /v1/sessions/e346d38e-b32a-414e-a211-19bc026f5722/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-drop-hm8p@test.local | Subject: Registration Open — June 2027 — june-igcse-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-bio-hm8p@test.local | Subject: Registration Open — June 2027 — june-igcse-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-ex-hm8p@test.local | Subject: Registration Open — June 2027 — june-igcse-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-rt-a-hm8p@test.local | Subject: Registration Open — June 2027 — june-igcse-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-rt-b-hm8p@test.local | Subject: Registration Open — June 2027 — june-igcse-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-sch-hm8p@test.local | Subject: Registration Open — June 2027 — june-igcse-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-drop-hm8p@test.local | Subject: Registration Open — June 2027 — june-igcse-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-bio-hm8p@test.local | Subject: Registration Open — June 2027 — june-igcse-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-ex-hm8p@test.local | Subject: Registration Open — June 2027 — june-igcse-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-rt-a-hm8p@test.local | Subject: Registration Open — June 2027 — june-igcse-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-rt-b-hm8p@test.local | Subject: Registration Open — June 2027 — june-igcse-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-sch-hm8p@test.local | Subject: Registration Open — June 2027 — june-igcse-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [ea4caf5c-9b65-496f-9624-750f21edd083] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-conv-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-conv-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [7f22b23c-1398-41ff-b2a3-4b508933167f] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [8dbd97e0-7345-43f2-b3a3-82bc4caa9837] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [2cd36842-1d3f-4700-88b0-24e4448c8794] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[INFO] [c2541998-ec62-49bf-a5dd-d5c8d3ec9135] POST /v1/sessions/0ede8107-f3f4-4a1a-bcb1-8614f2ce5c18/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-drop-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-bio-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-ex-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-rt-a-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-rt-b-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-sch-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: student.n08v-conv-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-drop-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-bio-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-ex-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-rt-a-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-rt-b-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-sch-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry
+[email:stub] To: parent.n08v-conv-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-new-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[INFO] [d69894c6-1749-4be5-bdb4-acbdc8056778] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[INFO] [c771b905-1776-4eb2-9523-6614b42994a0] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[INFO] [e4427b5c-c170-4e41-bc25-e2efc0f25925] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[INFO] [4336359e-eb2b-4b89-90ba-36c953135f53] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[INFO] [ef2306cd-590a-4eae-a811-7d4549f3a7c9] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[INFO] [45dfb8b4-e3cd-4c78-844d-8edf3b5a086e] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-drop-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-bio-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-ex-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-rt-a-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-rt-b-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-sch-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-conv-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-drop-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-bio-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-ex-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-rt-a-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-rt-b-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-sch-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-conv-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-a-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[INFO] [81f5e660-1d60-4699-826c-70443998fb17] POST /v1/sessions/470d5f25-ef5c-4258-9045-5cb4377b4359/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-drop-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-bio-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-ex-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-rt-a-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-rt-b-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-sch-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-conv-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-drop-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-bio-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-ex-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-rt-a-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-rt-b-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-sch-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-conv-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-se-b-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[INFO] [7d9c7591-fa80-4864-a160-82894f3e9a10] POST /v1/sessions/e847c8cb-2178-4408-ab90-f64875eb8717/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[INFO] [911444c2-5585-41d9-a1aa-d96feb708148] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: parent.n08v-se-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[email:stub] To: student.n08v-se-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[INFO] [997037b1-3cd3-4a3e-9d56-8b66700a3a4f] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[INFO] [1ba0c3aa-71ad-4b74-ad67-504e0c581e97] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too
+[INFO] [cc4a8676-6d89-4a97-bdc3-97d8ba12c227] PUT /v1/sessions/e847c8cb-2178-4408-ab90-f64875eb8717/offers/0e80e13b-3391-4ca4-a08b-039ac9b21ed0/items/f4916ded-0f02-465f-8be1-fa139e8995e8
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)
+[INFO] [e7d3eaa4-cb51-4eb0-87b6-e960645df6c1] POST /v1/catalogue/qualifications
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)
+[INFO] [e0f67a0c-51a7-429b-b81a-bd8565ff6bef] POST /v1/catalogue/units
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)
+[INFO] [b4c0a989-5c27-4ab9-b5d2-e2fa2a1de49e] POST /v1/catalogue/units
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)
+[INFO] [75fb51ac-d7bb-4a7c-ab63-d7209240caa6] PUT /v1/catalogue/qualifications/a49201b3-bc4e-43dd-b201-8148d13f7b71/units
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)
+[INFO] [97e97190-2829-44fd-b13e-c9ad0e403213] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)
+[INFO] [16e3584c-1a78-4d4c-883c-b0487d6937e7] PUT /v1/catalogue/registrable/5ea19864-6514-42b6-a053-5c2239cabd85
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)
+[INFO] [acad8734-2d98-4858-9136-69cf63f51567] POST /v1/sessions/cf21004e-2efc-4b58-b9f8-9717911d850a/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > an IGCSE award with required papers gets its one-paper retake items, unticked, in one group with the whole subject, read for the qualification (§3.2, Q-13)
+[INFO] [fd42e826-4bc7-4c7c-ba00-a536dc818605] GET /v1/sessions/cf21004e-2efc-4b58-b9f8-9717911d850a/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [a9f26bbf-533e-4a8e-8d4d-2f440e543974] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [4028ab9c-c226-4fb2-9017-c7161a9e00c3] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [ff11b706-27ae-4832-ba78-c64e70ef63e5] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [b8bbf6a4-67e7-4a1c-a811-8d26235dde23] POST /v1/sessions/fc4a8da9-2e11-48ce-ad2d-23276e699691/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [cb5d7c3a-98e2-4be2-bfde-692823508ba1] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[email:stub] To: parent.n08v-m1-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[email:stub] To: student.n08v-m1-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [6451382b-3acc-47e9-be04-5bc271d732c6] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [2295a467-f153-4d4c-a94e-f9a854a62e21] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [37fc8cd7-8b34-4072-b7ca-b131d86c49fb] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[email:stub] To: parent.n08v-m2-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[email:stub] To: student.n08v-m2-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [a722ce8b-063d-4431-b617-b0f0fe9a65a4] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [f39ba5b3-965a-4eb0-9ff2-6342231a85ba] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [7f718216-f6a9-4b5e-af1b-fcd2bc53e4bb] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[email:stub] To: parent.n08v-m3-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[email:stub] To: student.n08v-m3-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [82e5c606-80a3-401d-96e1-9fd5bbf6edde] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [ad47769b-ceed-4642-9651-4a5825a14555] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [b0771e92-0ab5-43f0-91bd-710fa6602040] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[email:stub] To: parent.n08v-m4-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[email:stub] To: student.n08v-m4-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [c6d0d622-90c6-4265-af93-4fd3a113263c] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [886c9103-f307-4fe1-9754-a0d341f91927] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [4b1edab0-8fcb-4cd5-b166-eb1f7150c9aa] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [1f0904f3-6083-40c2-9479-f902b56ccdef] POST /v1/payments/b7d71a4a-f3d0-4bfe-b49a-997d6d1aae8a/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[email:stub] To: parent.n08v-m2-hm8p@test.local | Subject: Payment confirmed — June 2027 — n08v-mon-hm8p | Attachments: receipt-b7d71a4a-f3d0-4bfe-b49a-997d6d1aae8a.pdf
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [af330a65-d67d-469c-b94c-781558e85990] GET /v1/sessions/fc4a8da9-2e11-48ce-ad2d-23276e699691/money
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval
+[INFO] [58eee58c-85fc-4612-be50-53fe2f64594d] GET /v1/sessions/fc4a8da9-2e11-48ce-ad2d-23276e699691/money
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [c2ecc3a2-fc3e-4c3f-8e72-36de8751a3b5] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [741d7907-fc05-42fe-b5b9-9d3304d33651] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [56cca09e-660e-46fc-8a62-724f97ac87ee] POST /v1/catalogue/units
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [2c2d70f1-8b6e-4cd7-a033-5cad6cc0d86f] POST /v1/catalogue/units
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [cf1a948d-c77b-404c-bdf7-62b52c3ac560] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [2670be40-0d93-4953-a2b0-0b5a1a541dfe] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [c286160e-e57c-4655-a35f-b69a897e1e53] POST /v1/sessions/1f440221-3641-412a-99ce-3fcd86ace71c/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [4da24f01-683d-45b1-abe7-f3fd2cac1995] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-lr-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-lr-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [f7b311da-ecca-455b-84eb-bad645163066] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [b8f0425e-d0aa-42ee-a208-4079570b7e94] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [9a2cf0f6-edad-4ba2-9606-94da955aadac] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [d00e50d7-0d1c-41d6-a427-641911a91eec] POST /v1/payments/b73dc5b3-6bd2-4e4b-9e1a-479c70a2de7f/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [bd661820-e973-41b1-b885-66ebfa48a369] PUT /v1/sessions/1f440221-3641-412a-99ce-3fcd86ace71c/offers/0205f415-2090-4bc3-948b-e7f3c2abf9c5/items/c96ae781-37d1-4bda-8eb2-b3a1ca505f8a
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-lr-hm8p@test.local | Subject: Payment confirmed — June 2027 — n08v-lr-hm8p | Attachments: receipt-b73dc5b3-6bd2-4e4b-9e1a-479c70a2de7f.pdf
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [a1394197-6b86-4ca4-93d2-6fe65d77615c] POST /v1/sessions/1f440221-3641-412a-99ce-3fcd86ace71c/activate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-drop-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-se-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-bio-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-ex-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-rt-a-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-rt-b-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-lr-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-sch-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-m1-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-conv-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-m2-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-m3-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: student.n08v-m4-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-drop-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-bio-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-ex-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-rt-a-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-m1-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-rt-b-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-sch-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-conv-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-se-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-m2-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-m3-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-m4-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[email:stub] To: parent.n08v-lr-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [ff7be8b4-4975-4d76-9a36-226e35286737] PUT /v1/sessions/1f440221-3641-412a-99ce-3fcd86ace71c/offers/0205f415-2090-4bc3-948b-e7f3c2abf9c5/items/c96ae781-37d1-4bda-8eb2-b3a1ca505f8a
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured
+[INFO] [a579c755-297c-47a7-9f5f-d8ba4147e108] POST /v1/sessions/1f440221-3641-412a-99ce-3fcd86ace71c/close
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [52c6d0b7-653a-41e3-b44a-fc8e3ce9d6be] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-drop-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-se-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-bio-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-ex-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-rt-a-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-rt-b-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-lr-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-sch-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-m1-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-conv-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-m2-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-m3-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-m4-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-drop-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-bio-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-ex-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-rt-a-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-m1-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-rt-b-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-sch-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-conv-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-se-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-m2-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-m3-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-m4-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-lr-hm8p@test.local | Subject: Registration Closed — June 2027 — n08v-lr-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [f7c4c333-3031-42e9-9931-209b749c7393] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [ad44d415-b1a4-45b9-bea8-60d3443aca83] POST /v1/sessions/cf21004e-2efc-4b58-b9f8-9717911d850a/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [958cb8f7-dae1-4ec9-99b4-8e8fb37772ae] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [1f6d7889-c9ac-4244-997d-7dff82c91674] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: parent.n08v-ps-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[email:stub] To: student.n08v-ps-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [e5bbff58-6d64-4698-9e7c-e477135c4212] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both
+[INFO] [870d1685-c3dc-4978-bb21-f72dd80dcaa2] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [6bce6418-5f47-49a8-b23d-3561c7fce12f] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [6aef6820-b67a-416f-8818-8f19dad6ecac] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [b0dd8cad-18ae-4562-8983-846fd87d7a90] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [9f81c4d5-9846-4005-bac9-6754932e53a4] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [d5e80e55-2f53-4293-bf08-8a789c663c48] POST /v1/sessions/cf21004e-2efc-4b58-b9f8-9717911d850a/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [c288f656-3170-4116-baf8-9abc45622c02] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[email:stub] To: parent.n08v-am-w-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[email:stub] To: student.n08v-am-w-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [3648e0bd-4294-4b45-b92b-36c69f4df971] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [786f938f-d22e-443e-8483-9571c013a0bc] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [2e6731b1-096d-4fa5-a83c-df1c56c0c014] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[email:stub] To: parent.n08v-am-p-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[email:stub] To: student.n08v-am-p-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [7eb1aed0-2a97-45a3-bcd4-cde21fc8b42d] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [0f0ecb55-dec5-4f40-b1bc-341d8b14b831] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [fec3546a-00ad-4e04-a8ea-1dc142ba37a0] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [bc327e65-6499-4e17-bb5b-87571c96efdc] POST /v1/payments/fb457abd-7eb0-4d7e-8448-5f255b23b308/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[INFO] [f58d8c16-3008-4bba-bcf5-a34d4c09d004] POST /v1/sessions/cf21004e-2efc-4b58-b9f8-9717911d850a/board-series/move
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price
+[email:stub] To: parent.n08v-am-p-hm8p@test.local | Subject: Payment confirmed — June 2027 — n08v-hm8p | Attachments: receipt-fb457abd-7eb0-4d7e-8448-5f255b23b308.pdf
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [3658d261-d42f-4a2c-b886-e5694c0098c0] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [6095df82-813f-4d45-9575-5777a20fa6a0] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-drop-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-se-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-bio-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-ex-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-rt-a-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-rt-b-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-lr-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-sch-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-m1-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-conv-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-m2-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-m3-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-m4-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-ps-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-am-w-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-am-p-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-drop-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-bio-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-ex-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-rt-a-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-m1-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-rt-b-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-sch-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-conv-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-se-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-m2-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-m3-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-ps-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-m4-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-lr-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-am-p-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-am-w-hm8p@test.local | Subject: Registration Open — June 2027 — n08v-cor-hm8p 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [49bc5e48-e0ca-457e-8166-0c5a38e9e283] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [21a9dbfd-d5c5-4bbc-a916-ef7dc3c8f871] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [f1f00ac8-1559-49ff-8787-52bb6f7f0a72] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [b7ea9508-d67f-45e2-a5bc-3e7db8420554] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [4b505ee3-f928-47bf-9d0e-ca350cead8ca] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [11aa8c6a-300d-434b-aacc-f28a58388cdd] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [d9845f78-2a18-438a-a61d-7dbf63f3c99f] POST /v1/sessions/2cb9c676-8578-47ae-abe4-f6fe9d2c5786/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [3471ccce-91b1-480c-bd26-4a8f00d0815b] POST /v1/sessions/2cb9c676-8578-47ae-abe4-f6fe9d2c5786/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [6e63a9fc-ead4-4e3b-9ff7-19f5a9741673] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: parent.n08v-cor-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[email:stub] To: student.n08v-cor-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [32193c81-b9a2-4c90-8abd-fe6382d79974] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [b2fa5bdd-d53d-4ec1-8729-0dd48c1cb89b] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed
+[INFO] [3a9a47c0-c52d-4253-bfda-5d788506edee] PUT /v1/sessions/2cb9c676-8578-47ae-abe4-f6fe9d2c5786/series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[INFO] [70850c96-7263-4ac9-bb31-a6352a8ce602] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[INFO] [7c7c3bc0-151d-416c-be7b-7bdceae4dd82] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[INFO] [b83701e2-a73e-4b0b-b140-56942a657db2] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[INFO] [0c8397d6-ec71-485d-ae8f-a019682db1a9] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[INFO] [c8a1e830-f094-4a31-b7e1-b30ca1120698] POST /v1/sessions/cf21004e-2efc-4b58-b9f8-9717911d850a/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[INFO] [0cf08b5b-5e2d-420d-ade4-83d8a3fedab2] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[email:stub] To: parent.n08v-bc-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[email:stub] To: student.n08v-bc-hm8p@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[INFO] [8620ef64-893f-4119-b065-90f431d62e4c] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[INFO] [d5853f2b-2301-41f6-8b72-157c5a30f00b] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[INFO] [6412ece8-3b1f-440f-8b60-e80dff266e49] PUT /v1/subjects/d07442e9-7125-4f65-9399-7cd5fe7bd102
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[INFO] [f0ca1fb3-e129-4eb6-993e-54a53fc7d428] POST /v1/payments/initiate
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[INFO] [859b350a-cd12-4549-aa0f-363b6b3da9d2] POST /v1/board-fees/88908c8d-3558-433b-a2f2-e8edf3a0e028/confirm
+
+stdout | test/08n-session-offers.test.ts > 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable
+[INFO] [b1eb36db-b394-4d5a-9d6a-a8e9b938f665] POST /v1/payments/initiate
+
+ ✓ test/08n-session-offers.test.ts (33 tests | 19 skipped) 8532ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > flag 1: a drop the student asked before the line's deadline cannot be approved after it; the entry is the board's  452ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > flag 2: IAL Biology units moved from October to January while the fees are provisional are priced from January's grid, so January's Confirm makes them payable  484ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > a series with no entry deadline: the sweep closes its waiting lines at the start of its exams day (MO-10 per line)  331ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > replace teacher: every line, item and this year's class of the teacher who leaves moves to the other, audited  681ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > the scheduler opens a session after one of its series has passed its deadline: capture refunds that series' paid preregistration in full and captures the other  482ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > the same award in a converted session and a new session of one series: the board takes one entry  353ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > flag 5: moving an item into a series where the student already has the same entry from another session is refused — an unmapped subject row too  378ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > the Money tab: unpaid counts what is owed (waiting for payment, unpaid preregistrations), not what waits for the parent's approval  1309ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > capture holds a paid preregistration that breaks a line rule where it is (code line_rule): its money stays held and finance is told; once the rule is met, it is captured  446ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > a prior sitting given without saying where it is known from is refused, and nothing is made; with its source, the line keeps both  333ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > the admin's move re-prices a waiting line from the target series' fee and tells the family; a paid line keeps its price  719ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > the series correction re-prices each waiting line from the corrected series' fees: a new fee is told as a new price; where finance has none, the old fee comes provisional and the family is told it is to be confirmed  396ms
+   ✓ 08n: the reviews of 977848d and 40c1447 > a board change whose fee comes across at the same amount, provisional, tells the family the price is to be confirmed; the new board's Confirm makes it payable  414ms
+
+ Test Files  1 passed (1)
+      Tests  14 passed | 19 skipped (33)
+   Start at  04:59:36
+   Duration  10.43s (transform 538ms, setup 2ms, collect 241ms, tests 8.53s, environment 0ms, prepare 33ms)
+

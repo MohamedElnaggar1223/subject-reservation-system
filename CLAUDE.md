@@ -80,6 +80,11 @@ otherwise ignored so cookies and test accounts never land in git). Rows are writ
 row written later must give the event's own time and where it comes from (`--at`, `--source`:
 the session log, a file's modification time, a CI run). Twice a batch of rows was written with
 one time for events hours apart; the script refuses a row with the previous row's time.
+Evidence (`.audit/*-evidence/`: control logs, screenshots, measurements) is force-added like the
+trail, but a run's log is kept as its proof — the vitest summary and, for a red run, the failing
+tests and their messages — not the request log of the whole suite; nothing over 300 KB goes in.
+CI's first step fails on any larger file under `.audit` (once an agent force-added 109 MB of
+full-suite logs).
 
 ## The desk comes first
 

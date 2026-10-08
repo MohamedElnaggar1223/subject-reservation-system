@@ -7,6 +7,7 @@
 
 import { z } from 'zod';
 import { ROLES, type Role } from '../roles';
+import { CreatePolicyException, PolicyKeySchema } from './policies';
 
 export const EXCEPTION_TYPES = [
   'discount_percent',
@@ -104,8 +105,21 @@ export type CreateExceptionType = z.infer<typeof CreateException>;
 
 export const ListExceptionsQuery = z.object({
   studentId: z.string().min(1).optional(),
-  // 'lapsed': a grade-10 exception whose validUntil passed (F0a's scheduler step).
-  status: z.enum(['active', 'revoked', 'lapsed']).optional(),
+  // The reservations rework (§3.7): a family's own exceptions (a parent account).
+  familyId: z.string().min(1).optional(),
+  // 'lapsed': past its validUntil (F0a's grade-10 step; a plan's lapse). 'used': a one-shot gate
+  // used by the reservation it let through, or a plan whose line was paid from its deposits.
+  status: z.enum(['active', 'revoked', 'lapsed', 'used']).optional(),
   type: ExceptionTypeSchema.optional(),
+  policyKey: PolicyKeySchema.optional(),
 });
 export type ListExceptionsQueryType = z.infer<typeof ListExceptionsQuery>;
+
+/**
+ * POST /v1/exceptions takes either shape (§3.7): a policy of the registry with its scope, or one of
+ * the eight legacy types ({ type, studentId, sessionId?, subjectId?, value?, validUntil? }), which
+ * the API maps onto its policy key exactly as the migration does (LEGACY_TYPE_TO_POLICY), so a
+ * caller written before the registry keeps working for one release.
+ */
+export const GrantException = z.union([CreatePolicyException, CreateException]);
+export type GrantExceptionType = z.infer<typeof GrantException>;

@@ -1,97 +1,236 @@
 /**
- * Refund Window Service (V3 §6.12, D-L)
+ * Refunds (V3 §6.12, D-L; the reservations rework, RESERVATIONS_REWORK.md §3.9, Q-19).
  *
- * Money going back out is time-scaled: finance-admin-defined windows
- * carry percentages; a drop inside a window refunds that percentage of
- * the registration's snapshot price.
+ * `refundFor(line, at)` is the one answer to "what does a drop of this line give back now?",
+ * asked by every drop: a family's (directly or through a change request), a swap's drop leg, a
+ * preregistration cancelled, the desk's drop past a deadline, and an instalment plan's settlement.
  *
- * Scope resolution:
- * 1. Windows scoped to the registration's SESSION win.
- * 2. Otherwise windows scoped to the session's ACADEMIC YEAR apply.
- * 3. If the resolved scope has windows configured, gaps between/after
- *    them are 0%.
- * 4. If NO windows exist for either scope, refunds stay 100% —
- *    pre-V3 behavior until finance configures schedules.
+ * - **A line reserved since the rework** refunds from its `refund_policy_snapshot` — the steps in
+ *   weeks the family consented to (step B writes it at consent; a line made before consent existed
+ *   reads its session's policy instead) — counted from its **anchor**, resolved now: a
+ *   `refund.courseStart` exception (line or offer scope) › the first lesson of the student's
+ *   teaching group (F1, when it is live: the seam `firstLessonFor`) › the offer's
+ *   `course_starts_on` › the session's. Then a `refund.percent` exception replaces the step.
+ *   **The percent applies to the course fee**; the board fee comes back in full while the entry
+ *   has **not been sent** and not at all after: a line never confirmed was never sent; a confirmed
+ *   line is sent by F4's mark when F4 is live (the seam `entrySentAt`), else once its effective
+ *   deadline (the retake deadline, the entry deadline, or its series' exams' start) has passed.
+ *   A custom-priced line (course = the total, board = 0) refunds its total by the course rule.
+ * - **A converted line** (`legacy.converted`, or a session with no policy) refunds as V3 did:
+ *   the session's absolute refund windows (else its academic year's; none: 100%; a gap: 0%), or
+ *   a `refund.percent` exception, on the whole price (Q-19's default keeps today's basis for
+ *   them).
+ * - MO-21 (a series that never opened refunds 100% of the whole price) is the caller's: the
+ *   deadline sweep's preregistration refund and a cancellation past the deadline do not ask here.
+ * - A line under an instalment plan refunds nothing itself (nothing was paid to it); its deposits
+ *   are settled by plan.services' rule, which asks here what a paid drop would give back.
  *
- * The percentage locks at drop-APPROVAL time (never at receipt-return
- * time — paperwork delay must not cost the parent money).
+ * The percentage locks when the drop is decided (never at receipt-return time — paperwork delay
+ * must not cost the parent money).
  */
 
-import { db, refundWindow, eq } from '@repo/db';
+import { db, refundWindow, registration, registrationSession, sessionOffer, sessionOfferItem, eq } from '@repo/db';
 import { randomUUID } from 'crypto';
-import type { CreateRefundWindowType } from '@repo/validations';
+import type { CreateRefundWindowType, RefundPolicy } from '@repo/validations';
 import { academicYearForDate } from './school-fee.services';
-import { customRefundPercent } from './exception.services';
+import { activeExceptions } from './exception-registry.services';
+import { effectiveDeadlineFor } from './deadline.services';
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type Executor = typeof db | Tx;
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/**
- * The refund percentage applying to a drop of the given session's
- * registration at `date`. Returns 0–100.
- */
-export async function refundPercentage(
-  date: Date,
-  sessionId: string,
-  studentId?: string
-): Promise<number> {
-  // Hook 4 (§6.3): a custom_refund_percent exception overrides windows
-  if (studentId) {
-    const override = await customRefundPercent(studentId, sessionId);
-    if (override !== null) return override;
+/** The absolute windows of a session (else its academic year): V3's rule, for converted lines. */
+async function windowsPercent(executor: Executor, at: Date, sessionId: string, sessionStart: Date): Promise<number> {
+  let windows = await executor.select().from(refundWindow).where(eq(refundWindow.sessionId, sessionId));
+  if (windows.length === 0) {
+    windows = await executor.select().from(refundWindow).where(eq(refundWindow.academicYear, academicYearForDate(sessionStart)));
   }
-
-  const sess = await db.query.registrationSession.findFirst({
-    where: (s, { eq }) => eq(s.id, sessionId),
-    columns: { startDate: true },
-  });
-
-  const sessionWindows = await db.query.refundWindow.findMany({
-    where: (w, { eq }) => eq(w.sessionId, sessionId),
-  });
-
-  let windows = sessionWindows;
-  if (windows.length === 0 && sess) {
-    const year = academicYearForDate(sess.startDate);
-    windows = await db.query.refundWindow.findMany({
-      where: (w, { eq }) => eq(w.academicYear, year),
-    });
-  }
-
   if (windows.length === 0) return 100; // nothing configured → gate off
-
-  const match = windows.find((w) => w.startsAt <= date && date <= w.endsAt);
+  const match = windows.find((w) => w.startsAt <= at && at <= w.endsAt);
   return match ? match.percentage : 0;
 }
 
 /**
- * Preview for the parent-facing confirm dialogs: "You will receive
- * X% = EGP Y back" before committing to a drop/swap (§6.12).
+ * F1's seam (§3.1): the first lesson of the student's teaching group for the line's offer and
+ * unit, once scheduling is live. Until then none, and the offer's or the session's course start
+ * anchors the line.
+ */
+export async function firstLessonFor(_executor: Executor, _line: { id: string; studentId: string; offerItemId: string }): Promise<string | null> {
+  return null;
+}
+
+/**
+ * F4's seam (§3.9): when the line's entry was marked sent to the board, once exam entries are
+ * live. Until then none, and a confirmed line is sent when its effective deadline has passed.
+ */
+export async function entrySentAt(_executor: Executor, _lineId: string): Promise<Date | null> {
+  return null;
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+
+/** The start of a school day (Africa/Cairo), as an instant. */
+export function cairoDayStart(day: string): Date {
+  const probe = new Date(`${day}T12:00:00Z`);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Africa/Cairo', hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  }).formatToParts(probe);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const cairoAsUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'));
+  const offset = cairoAsUtc - probe.getTime();
+  return new Date(Date.parse(`${day}T00:00:00Z`) - offset);
+}
+
+/** The policy week `at` falls in, counted from the anchor day (week 1: its first seven days). */
+export function policyWeek(anchorDay: string, at: Date): number {
+  const days = Math.floor((at.getTime() - cairoDayStart(anchorDay).getTime()) / DAY);
+  return days < 0 ? 1 : Math.floor(days / 7) + 1;
+}
+
+/** The step of a policy for a week. */
+export function stepPercent(steps: RefundPolicy['steps'], week: number): number {
+  for (const s of steps) if (s.throughWeek === null || week <= s.throughWeek) return s.percent;
+  return steps[steps.length - 1]?.percent ?? 0;
+}
+
+const asDay = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
+
+type Snapshot =
+  | { kind: 'weeks'; steps: RefundPolicy['steps'] }
+  | { kind: 'dates'; windows: { startsAt: string; endsAt: string; percent: number }[] };
+
+export type RefundQuote = {
+  registrationId: string;
+  /** The percent that applies (to the course fee; to the whole price on a converted line). */
+  percent: number;
+  /** 'policy': the line's steps; 'windows': V3's absolute windows (a converted line). */
+  basis: 'policy' | 'windows';
+  /** A refund.percent exception decided the percent. */
+  byException: boolean;
+  /** The anchor day and week, for a policy line. */
+  anchor: string | null;
+  week: number | null;
+  coursePart: number;
+  boardPart: number;
+  /** Whether the line's entry counts as sent to the board now (its board fee then stays). */
+  boardSent: boolean;
+  amount: number;
+  fullPrice: number;
+};
+
+/**
+ * What a drop of this line at `at` gives back (§3.9). `neverSent`: count the board fee as not
+ * sent whatever the line's status (a line held at its deadline under `hold`, never entered).
+ */
+export async function refundFor(
+  executor: Executor,
+  lineId: string,
+  at: Date = new Date(),
+  opts: { neverSent?: boolean } = {},
+): Promise<RefundQuote> {
+  const [l] = await executor
+    .select({
+      id: registration.id, studentId: registration.studentId, sessionId: registration.sessionId, subjectId: registration.subjectId,
+      offerItemId: registration.offerItemId, status: registration.status, price: registration.priceAtRegistration,
+      courseFee: registration.courseFeeAtRegistration, boardFee: registration.registrationFeeAtRegistration,
+      snapshot: registration.refundPolicySnapshot, legacy: registration.legacy,
+      boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId,
+      declarationRejected: registration.declarationRejected,
+      sessionStart: registrationSession.startDate, sessionCourseStart: registrationSession.courseStartsOn, sessionPolicy: registrationSession.refundPolicy,
+      offerId: sessionOffer.id, offerCourseStart: sessionOffer.courseStartsOn,
+    })
+    .from(registration)
+    .innerJoin(registrationSession, eq(registrationSession.id, registration.sessionId))
+    .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, registration.offerItemId))
+    .innerJoin(sessionOffer, eq(sessionOffer.id, sessionOfferItem.offerId))
+    .where(eq(registration.id, lineId));
+  if (!l) throw new Error('Registration not found');
+
+  const scope = { sessionId: l.sessionId, subjectId: l.subjectId, offerId: l.offerId, offerItemId: l.offerItemId, registrationId: l.id };
+  // The oldest active one, as V3's custom refund percent was read (exception.services, hook 4).
+  const [percentExc] = (await activeExceptions(executor, l.studentId, ['refund.percent'], scope, { now: at })).filter((r) => r.value != null);
+
+  const converted = (l.legacy as { converted?: boolean } | null)?.converted === true;
+  const snapshot: Snapshot | null = (l.snapshot as Snapshot | null) ?? (l.sessionPolicy ? { kind: 'weeks', steps: l.sessionPolicy.steps } : null);
+  if (converted || !snapshot) {
+    // V3's rule on the whole price, as today.
+    const percent = percentExc ? percentExc.value! : await windowsPercent(executor, at, l.sessionId, l.sessionStart);
+    const amount = round2((l.price * percent) / 100);
+    return {
+      registrationId: l.id, percent, basis: 'windows', byException: !!percentExc, anchor: null, week: null,
+      coursePart: amount, boardPart: 0, boardSent: false, amount, fullPrice: l.price,
+    };
+  }
+
+  let percent: number;
+  let anchor: string | null = null;
+  let week: number | null = null;
+  if (snapshot.kind === 'dates') {
+    const w = snapshot.windows;
+    const match = w.find((x) => new Date(x.startsAt) <= at && at <= new Date(x.endsAt));
+    percent = w.length === 0 ? 100 : match ? match.percent : 0;
+  } else {
+    const [startExc] = (await activeExceptions(executor, l.studentId, ['refund.courseStart'], scope, { now: at })).filter((r) => r.valueDate);
+    anchor = startExc ? asDay(startExc.valueDate!) : (await firstLessonFor(executor, l)) ?? l.offerCourseStart ?? l.sessionCourseStart;
+    week = policyWeek(anchor, at);
+    percent = stepPercent(snapshot.steps, week);
+  }
+  if (percentExc) percent = percentExc.value!;
+
+  // "Sent" is per line: never confirmed, never sent; else F4's mark, else the effective deadline.
+  let boardSent = false;
+  if (!opts.neverSent && (l.status === 'confirmed' || l.status === 'dropped_pending_receipt')) {
+    const marked = await entrySentAt(executor, l.id);
+    if (marked) boardSent = marked <= at;
+    else {
+      const d = await effectiveDeadlineFor(executor, l);
+      boardSent = !!d.at && d.at <= at;
+    }
+  }
+  const coursePart = round2((l.courseFee * percent) / 100);
+  const boardPart = boardSent ? 0 : round2(l.boardFee);
+  return {
+    registrationId: l.id, percent, basis: 'policy', byException: !!percentExc, anchor, week,
+    coursePart, boardPart, boardSent, amount: round2(coursePart + boardPart), fullPrice: l.price,
+  };
+}
+
+/** How a refund reads in a notice: "EGP 1,000.00 (50% of the course fee and the board fee)". */
+export function refundSentence(q: Pick<RefundQuote, 'amount' | 'percent' | 'basis' | 'boardPart'>): string {
+  if (q.basis === 'windows') return `EGP ${q.amount.toFixed(2)} (${q.percent}%)`;
+  return `EGP ${q.amount.toFixed(2)} (${q.percent}% of the course fee${q.boardPart > 0 ? ' and the board fee' : ''})`;
+}
+
+/**
+ * Preview for the confirm dialogs: "You will receive EGP Y back" before deciding a drop or a
+ * swap (§6.12; §3.9 for its parts).
  */
 export async function previewRefund(registrationId: string) {
-  const reg = await db.query.registration.findFirst({
-    where: (r, { eq }) => eq(r.id, registrationId),
-    columns: { id: true, sessionId: true, studentId: true, priceAtRegistration: true, status: true },
-  });
-  if (!reg) throw new Error('Registration not found');
-
-  const percentage = await refundPercentage(new Date(), reg.sessionId, reg.studentId);
+  const q = await refundFor(db, registrationId, new Date());
   return {
-    registrationId: reg.id,
-    percentage,
-    amount: round2((reg.priceAtRegistration * percentage) / 100),
-    fullPrice: reg.priceAtRegistration,
+    registrationId: q.registrationId,
+    percentage: q.percent,
+    amount: q.amount,
+    fullPrice: q.fullPrice,
+    coursePart: q.coursePart,
+    boardPart: q.boardPart,
+    boardSent: q.boardSent,
+    basis: q.basis,
   };
 }
 
 // ─── Window management (finance admin) ───────────────────────────────────────
 
 /**
- * Windows in one scope may not overlap: refundPercentage takes the first
- * window containing the date, so two overlapping windows made the refund
- * depend on row order (money audit MA-11). Windows are inclusive at both
- * ends, so one ending exactly when the next starts overlaps too.
+ * Windows in one scope may not overlap: a converted line's refund takes the first window
+ * containing the date, so two overlapping windows made the refund depend on row order (money
+ * audit MA-11). Windows are inclusive at both ends, so one ending exactly when the next starts
+ * overlaps too. Since the reservations rework only converted sessions and academic years read
+ * them (§3.9): a new line refunds from its own snapshot.
  */
 export async function createWindow(data: CreateRefundWindowType) {
   const sameScope = await db.query.refundWindow.findMany({

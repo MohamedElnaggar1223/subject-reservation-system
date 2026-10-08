@@ -1,0 +1,43 @@
+{
+  "source": "igcse_foundation_backfill_rich3_dev",
+  "copy": "igcse_rwc_proof_rich3",
+  "seeded_at_main": [
+    "session sess_november-2026: a window at 50% today",
+    "the academic year 2025-2026 (session sess_june-2026): a window at 30% today"
+  ],
+  "migrations": {
+    "source": 37,
+    "at_main": 45,
+    "at_branch": 48
+  },
+  "rows": "2 confirmed, 9 lines, 0 exceptions, 0 refund windows",
+  "lines": [
+    {
+      "id": "096d04ac-5568-4cca-9b98-92cb1c48e8b1",
+      "before": {
+        "percentage": 50,
+        "amount": 750
+      },
+      "after": {
+        "percentage": 50,
+        "amount": 750,
+        "basis": "windows"
+      },
+      "match": true
+    },
+    {
+      "id": "bf-reg-1",
+      "before": {
+        "percentage": 30,
+        "amount": 0
+      },
+      "after": {
+        "percentage": 30,
+        "amount": 0,
+        "basis": "windows"
+      },
+      "match": true
+    }
+  ],
+  "all_match": true
+}

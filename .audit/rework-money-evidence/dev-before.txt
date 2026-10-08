@@ -1,0 +1,28 @@
+INSERT 0 10
+         type          | count 
+-----------------------+-------
+ custom_price          |     1
+ custom_refund_percent |     2
+ deadline_extension    |     2
+ discount_fixed        |     1
+ discount_percent      |     1
+ fee_waiver            |     1
+ grade10_other_series  |     1
+ late_registration     |     1
+(8 rows)
+
+INSERT 0 3
+INSERT 0 2
+     council     |   service_type    | amount_per_paper 
+-----------------+-------------------+------------------
+ cambridge       | clerical_check    |           900.00
+ cambridge       | review_of_marking |          1600.00
+ pearson_edexcel | review_of_marking |          1400.00
+(3 rows)
+
+  council  |     session_id     |   service_type    
+-----------+--------------------+-------------------
+ cambridge | sess_november-2026 | clerical_check
+ cambridge | sess_november-2026 | review_of_marking
+(2 rows)
+

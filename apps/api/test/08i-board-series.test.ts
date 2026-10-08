@@ -1,23 +1,25 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { apiResponse, academicYearStartOf, academicYearShortLabel } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, audited, notified, notificationsFor, waitFor, money,
-  openWindow, runPaymentDeadlines, type Client,
-} from './helpers';
+import { apiResponse, academicYearStartOf } from '@repo/validations';
+import { admin, staff, onboard, subject, session, refused, one, sql, audited, notified, notificationsFor, waitFor, money, sessionName, openWindow, runPaymentDeadlines, type Client, reservationOf } from './helpers';
 
 /**
- * F0b — board series and the windows that feed them (FEATURES_PLAN.md F0b;
- * DISCOVERY_RESEARCH.md §5 note 1; IMPORT_SPIKE.md IS-05, IS-14).
+ * F0b — board series (FEATURES_PLAN.md F0b; DISCOVERY_RESEARCH.md §5 note 1; IMPORT_SPIKE.md
+ * IS-05, IS-14), on the reservations rework's model (RESERVATIONS_REWORK.md §3.3): a session's
+ * items are each entered in one series, attached when the item is placed in it; the window's
+ * series panel is gone.
  *
- * One window feeds two Pearson series with different entry deadlines — IAL
- * October and IAL January of the same academic year — and each deadline is
- * enforced on its own series (MO-10 per board series): the grace after the
- * close is capped by each checkout's own series, confirmation, references
- * and new registrations are refused per series, and the scheduler's sweep
- * closes each series at its own time with the money outcome asserted.
+ * One session's Pearson items sit in two series with different entry deadlines — IAL October
+ * (Mathematics) and IAL January (Biology) of the same academic year — and each deadline is
+ * enforced on its own series (MO-10 per board series): the grace after the close is capped by
+ * each checkout's own series, confirmation, references and new registrations are refused per
+ * series, and the scheduler's sweep closes each series at its own time with the money outcome
+ * asserted.
  *
- * Window pair: january / as_level (08, 08b and 08c close theirs); it is closed
- * in this file.
+ * Changed by the reservations rework (trail rows "assertion"): a series is placed per item
+ * (refused per item when it is not of the session's year and kind); a subject not offered is
+ * refused as such; the admin's move goes to a sibling item; a board change follows the item to
+ * the new board's default series; a deadline may fall before the session's end (pre-authorised:
+ * 08i's window-end-versus-deadline scenarios), with every money outcome per series kept.
  */
 
 const escrowOf = async (studentId: string) =>
@@ -37,13 +39,27 @@ describe('F0b: board series', () => {
   type Family = { parent: Client; student: Client; studentId: string };
   const family = (tag: string): Promise<Family> => onboard(officer, `bs-${tag}`, 12);
   const direct = async (f: Family, subjectIds: string[]) =>
-    apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, subjectIds, studentId: f.studentId } }));
+    apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, ...(await reservationOf(windowId, subjectIds)), studentId: f.studentId } }));
   const checkout = (f: Family, ids: string[], method: 'instapay' | 'in_school', escrow = 0) =>
     apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: ids, paymentMethod: method, escrowAmountToApply: escrow } }));
+  // A series with neither an entry deadline nor an exam start takes no line (§3.3): the exams' start is on record.
   const series = (json: { month: 'january' | 'june' | 'october' | 'november'; year: number }) =>
-    apiResponse(coordinator.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', label: 'series', ...json } }));
-  const setWindow = (json: { series: { boardSeriesId: string; isDefault: boolean }[]; routes: { subjectId: string; boardSeriesId: string }[] }) =>
-    adm.api.v1.sessions[':id']['board-series'].$put({ param: { id: windowId }, json });
+    apiResponse(coordinator.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', label: 'series', examsStart: `${json.year + 1}-12-31`, ...json } }));
+  /** The whole item of a subject in the session, and its offer. */
+  const itemOf = (subjectId: string) => one<{ id: string; offer_id: string }>(
+    `select i.id, i.offer_id from session_offer_item i join session_offer o on o.id = i.offer_id
+     where i.session_id = $1 and o.subject_id = $2 and i.availability <> 'closed' order by i.id limit 1`, [windowId, subjectId]);
+  /** Place a subject's item in a series (the coordinator's per-item choice, §3.3). */
+  const place = async (subjectId: string, boardSeriesId: string) => {
+    const it = await itemOf(subjectId);
+    return coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
+      param: { id: windowId, offerId: it.offer_id, itemId: it.id }, json: { boardSeriesId, reason: 'where the board sits it' },
+    });
+  };
+  /** The subject's board fee in a series (its registration fee, confirmed). */
+  const fee = (seriesId: string, subjectId: string) => apiResponse(finadmin.api.v1['board-fees'].$put({
+    query: { seriesId }, json: { rows: [{ keyKind: 'subject', keyId: subjectId, amount: 400, provisional: false }] },
+  }));
 
   beforeAll(async () => {
     adm = await admin('bs');
@@ -63,19 +79,16 @@ describe('F0b: board series', () => {
     jan = (await series({ month: 'january', year: Y + 1 })).id;
     june = (await series({ month: 'june', year: Y + 1 })).id;
     nextOct = (await series({ month: 'october', year: Y + 1 })).id;
+    for (const id of [subj.MA3!, subj.MA4!, subj.BI4!, subj.BI5!]) { await fee(oct, id); await fee(jan, id); }
   });
 
-  describe('a window feeds series of its own academic year and kind', () => {
-    it("refuses a June series and a series of another academic year, each with the rule's sentence", async () => {
-      expect(await refused(setWindow({ series: [{ boardSeriesId: june, isDefault: true }], routes: [] }))).toEqual({
-        status: 400, error: `This window is for January ${Y + 1}: it feeds October, November or January series, not Pearson Edexcel June ${Y + 1} (series)`,
+  describe("a session's items are entered in series of its own academic year and kind", () => {
+    it("refuses a June series and a series of another academic year for an item, each with the rule's sentence", async () => {
+      expect(await refused(place(subj.MA3!, june))).toEqual({
+        status: 400, error: `Pearson Edexcel June ${Y + 1} (series) is not a series of this session (October or November ${Y}, or January ${Y + 1})`,
       });
-      expect(await refused(setWindow({ series: [{ boardSeriesId: nextOct, isDefault: true }], routes: [] }))).toEqual({
-        status: 400,
-        error: `Pearson Edexcel October ${Y + 1} (series) is in ${academicYearShortLabel(Y + 1)}; this window is for January ${Y + 1}, in ${academicYearShortLabel(Y)}. Every series a window feeds is in the window's academic year`,
-      });
-      expect(await refused(setWindow({ series: [{ boardSeriesId: oct, isDefault: true }, { boardSeriesId: jan, isDefault: true }], routes: [] }))).toEqual({
-        status: 400, error: 'Choose which Pearson Edexcel series is the default for this window',
+      expect(await refused(place(subj.MA3!, nextOct))).toEqual({
+        status: 400, error: `Pearson Edexcel October ${Y + 1} (series) is not a series of this session (October or November ${Y}, or January ${Y + 1})`,
       });
       // And the database refuses what gets past the service.
       await expect(sql(
@@ -84,113 +97,119 @@ describe('F0b: board series', () => {
       )).rejects.toThrow();
     });
 
-    it('feeds IAL October (the Pearson default) and IAL January, with Biology routed to January', async () => {
-      const r = await apiResponse(setWindow({
-        series: [{ boardSeriesId: oct, isDefault: true }, { boardSeriesId: jan, isDefault: false }],
-        routes: [{ subjectId: subj.BI4!, boardSeriesId: jan }, { subjectId: subj.BI5!, boardSeriesId: jan }],
-      }));
-      expect(r).toEqual({ sessionId: windowId, series: 2, routes: 2, registrationsRouted: 0 });
-      await audited([windowId], ['SESSION_BOARD_SERIES_SET']);
+    it('Mathematics is placed in IAL October and Biology in IAL January: each series attached by its items', async () => {
+      for (const id of [subj.MA3!, subj.MA4!]) await apiResponse(place(id, oct));
+      for (const id of [subj.BI4!, subj.BI5!]) await apiResponse(place(id, jan));
+      const it = await itemOf(subj.MA3!);
+      await audited([it.id], ['OFFER_ITEM_SERIES_CHANGED']);
       const view = await apiResponse(coordinator.api.v1.sessions[':id']['board-series'].$get({ param: { id: windowId } }));
-      expect(view.session).toMatchObject({ academicYearStart: Y, series: `January ${Y + 1}` });
-      expect(view.series.map((s) => [s.name, s.isDefault])).toEqual([
-        [`Pearson Edexcel October ${Y} (series)`, true], [`Pearson Edexcel January ${Y + 1} (series)`, false],
+      expect(view.session).toMatchObject({ academicYearStart: Y, sessionType: 'winter' });
+      // The Pearson series are the two the items are in (the suite's own series, now unused, detached).
+      expect(view.series.filter((s) => s.boardCode === 'pearson_edexcel').map((s) => [s.name, s.items.map((i) => i.subjectName).sort()])).toEqual([
+        [`Pearson Edexcel January ${Y + 1} (series)`, ['Biology Unit 4 (series)', 'Biology Unit 5 (series)']],
+        [`Pearson Edexcel October ${Y} (series)`, ['Pure Mathematics 3 (series)', 'Pure Mathematics 4 (series)']],
       ]);
-      const entersIn = Object.fromEntries(view.subjects.map((s) => [s.code, s.entersIn]));
-      expect(entersIn).toMatchObject({ 'BS-MA3': oct, 'BS-MA4': oct, 'BS-BI4': jan, 'BS-BI5': jan, 'BS-GEO': null });
-      // The window's series was implied by its type and year (F0a); a correction
-      // that would leave its board series in another academic year is refused.
-      const move = await refused(adm.api.v1.sessions[':id'].series.$put({ param: { id: windowId }, json: { sessionType: 'january', seriesYear: Y + 2, reason: 'wrong year typed' } }));
-      expect(move.status).toBe(400);
-      expect(move.error).toMatch(/^This window feeds Pearson Edexcel (October|January) .+, which would no longer fit: .+ — change the window's series on its board series panel first$/);
     });
   });
 
-  describe('each registration is entered in its window\'s series of its board', () => {
+  describe("each registration is entered in its item's series", () => {
     let a: Family;
-    it('Mathematics goes to October, Biology to January; a subject of a board the window feeds no series of is refused and not offered', async () => {
+    it('Mathematics goes to October, Biology to January; a subject the session does not offer is refused and not listed', async () => {
+      // Geography is taken off the session (no line yet): not offered.
+      const geo = await itemOf(subj.GEO!);
+      await apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId'].$delete({ param: { id: windowId, offerId: geo.offer_id } }));
       a = await family('route');
       const regs = await direct(a, [subj.MA3!, subj.BI4!]);
       const bySubject = Object.fromEntries(regs.map((r) => [r.subjectId, r.id]));
       expect(await seriesOfRegistration(bySubject[subj.MA3!]!)).toBe(oct);
       expect(await seriesOfRegistration(bySubject[subj.BI4!]!)).toBe(jan);
 
-      const available = (await apiResponse(a.parent.api.v1.registrations.available.$get({ query: { sessionId: windowId, studentId: a.studentId } })))
-        .filter((s) => s.code.startsWith('BS-'));
-      // Not the two already registered, not Geography (no Cambridge series here).
+      // Step B: the offers read (GET /registrations/available is gone) — the items not yet held.
+      const read = await apiResponse(a.parent.api.v1.registrations.offers.$get({ query: { sessionId: windowId, studentId: a.studentId } }));
+      const available = read.offers.filter((o) => o.subject.code.startsWith('BS-')).flatMap((o) => o.items.filter((i) => !i.held).map((i) => ({ code: o.subject.code, series: i.series })));
+      // Not the two already registered, not Geography (not offered here).
       expect(available.map((s) => s.code).sort()).toEqual(['BS-BI5', 'BS-MA4']);
-      expect(available.find((s) => s.code === 'BS-BI5')!.boardSeries).toMatchObject({ id: jan, name: `Pearson Edexcel January ${Y + 1} (series)` });
-      expect(await refused(a.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, subjectIds: [subj.GEO!], studentId: a.studentId } }))).toEqual({
-        status: 400,
-        error: 'Geography (series) is entered with Cambridge International, and this window feeds no Cambridge International series — ask the admin to add one to the window',
+      expect(available.find((s) => s.code === 'BS-BI5')!.series).toMatchObject({ id: jan, month: 'january', year: Y + 1, label: 'series' });
+      // A subject the session does not offer has no item to reserve: the line names one not on offer.
+      expect(await refused(a.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, ...(await reservationOf(windowId, [subj.GEO!])), studentId: a.studentId } }))).toEqual({
+        status: 404, error: 'That item is not on offer in this session',
       });
-      // The database routes a registration no path named a series for, and refuses another board's series.
+      // The database enters a line in its item's series and refuses another.
+      const ma4 = await itemOf(subj.MA4!);
       await expect(sql(
-        `insert into registration (id, student_id, session_id, subject_id, price_at_registration, status, requested_by, board_series_id)
-         values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment', $1, $4)`,
-        [a.studentId, windowId, subj.GEO!, oct],
+        `insert into registration (id, student_id, session_id, subject_id, price_at_registration, status, requested_by, board_series_id, offer_item_id, due_at)
+         values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment', $1, $4, $5, now())`,
+        [a.studentId, windowId, subj.MA4!, jan, ma4.id],
       )).rejects.toThrow();
     });
 
     it('the admin moves a registration to the other series of its board, with a reason; history stays', async () => {
       const [ma3] = await sql<{ id: string }>(`select id from registration where student_id = $1 and subject_id = $2`, [a.studentId, subj.MA3!]);
+      // The admin's move goes to an item entering the same in the target series: none yet.
+      expect(await refused(adm.api.v1.sessions[':id']['board-series'].move.$post({
+        param: { id: windowId }, json: { registrationIds: [ma3!.id], boardSeriesId: jan, reason: 'sits P3 in January instead' },
+      }))).toEqual({ status: 409, error: `Pure Mathematics 3 (series) has no item entering the same in Pearson Edexcel January ${Y + 1} (series) — add one to the subject (or move the item's series) first` });
+      const it = await itemOf(subj.MA3!);
+      const sibling = await apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId'].items.$post({
+        param: { id: windowId, offerId: it.offer_id },
+        json: { label: 'Whole subject (January)', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: jan, availability: 'open', requiredInSeries: false },
+      }));
       const moved = await apiResponse(adm.api.v1.sessions[':id']['board-series'].move.$post({
         param: { id: windowId }, json: { registrationIds: [ma3!.id], boardSeriesId: jan, reason: 'sits P3 in January instead' },
       }));
       expect(moved).toMatchObject({ moved: 1, alreadyThere: 0, boardSeriesId: jan });
       expect(await seriesOfRegistration(ma3!.id)).toBe(jan);
       await audited([ma3!.id], ['REGISTRATION_SERIES_MOVED']);
-      // …and back, so the deadlines below read as designed.
+      // …and back, so the deadlines below read as designed; the January item, with no line, is removed.
       await apiResponse(adm.api.v1.sessions[':id']['board-series'].move.$post({
         param: { id: windowId }, json: { registrationIds: [ma3!.id], boardSeriesId: oct, reason: 'back to October after all' },
       }));
-      // A series with registrations cannot leave the window.
-      expect(await refused(setWindow({ series: [{ boardSeriesId: jan, isDefault: true }], routes: [] }))).toEqual({
-        status: 409, error: `Pearson Edexcel October ${Y} (series) has 1 registration in this window — move them to another series first; its entries stay on record`,
+      await apiResponse(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$delete({ param: { id: windowId, offerId: it.offer_id, itemId: sibling.id } }));
+      // An item with live lines cannot be unticked.
+      expect(await refused(coordinator.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$delete({ param: { id: windowId, offerId: it.offer_id, itemId: it.id } }))).toEqual({
+        status: 409, error: 'Whole subject has 1 live line: move or drop it first',
       });
     });
 
-    it("the coordinator's answer moves a subject to another board: its live registrations follow to that board's series, or nothing changes", async () => {
+    it("the coordinator's answer moves a subject to another board: its item and live lines follow to that board's default series", async () => {
       const che = await subject(adm, 'BS-CHE', 'Chemistry (series)', { course: 1000, registration: 400 }, { qualificationLevel: 'as_level', council: 'pearson_edexcel' });
+      await fee(oct, che);
+      await apiResponse(place(che, oct));
       const z = await family('board');
       const reg = (await direct(z, [che]))[0]!.id;
       expect(await seriesOfRegistration(reg)).toBe(oct);
       const oxfordAward = await apiResponse(coordinator.api.v1.catalogue.qualifications.$post({
         json: { boardCode: 'oxford', code: '9621', title: 'Chemistry (AS)', level: 'as_level', suite: 'OxfordAQA International AS', subjectArea: 'Chemistry', entryMethod: 'qualification' },
       }));
-      const toOxford = () => coordinator.api.v1.catalogue.registrable[':subjectId'].$put({
+      // MO-10 per line: the line's cut-off (October's exams' start: no entry deadline yet) is the
+      // same where it goes, so OxfordAQA's November gets that date first.
+      const octExams = (await one<{ d: string }>(`select exams_start::text as d from board_series where id = $1`, [oct])).d;
+      const [oxRow] = await sql<{ id: string }>(`select id from board_series where board_code = 'oxford' and month = 'november' and year = $1 and label = ''`, [Y]);
+      if (oxRow) await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id: oxRow.id }, json: { examsStart: octExams } }));
+      else await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'oxford', month: 'november', year: Y, examsStart: octExams } }));
+      const r = await apiResponse(coordinator.api.v1.catalogue.registrable[':subjectId'].$put({
         param: { subjectId: che }, json: { boardCode: 'oxford', qualificationId: oxfordAward.id, unitIds: [], reason: 'coordinator: Chemistry is OxfordAQA' },
-      });
-      // The window feeds no OxfordAQA series yet: refused, nothing moved.
-      expect(await refused(toOxford())).toEqual({
-        status: 409, error: 'January (AS, series) has 1 registration for Chemistry (series) and feeds no OxfordAQA series — add one to the window first',
-      });
-      expect((await one<{ council: string }>(`select council from subject where id = $1`, [che])).council).toBe('pearson_edexcel');
-      expect(await seriesOfRegistration(reg)).toBe(oct);
-      // With OxfordAQA's January series on the window, the registration follows the subject.
-      const oxJan = (await apiResponse(coordinator.api.v1['board-series'].$post({ json: { boardCode: 'oxford', month: 'january', year: Y + 1, label: 'series' } }))).id;
-      await apiResponse(setWindow({
-        series: [{ boardSeriesId: oct, isDefault: true }, { boardSeriesId: jan, isDefault: false }, { boardSeriesId: oxJan, isDefault: true }],
-        routes: [{ subjectId: subj.BI4!, boardSeriesId: jan }, { subjectId: subj.BI5!, boardSeriesId: jan }],
       }));
-      expect(await apiResponse(toOxford())).toMatchObject({ boardCode: 'oxford', registrationsMoved: 1 });
-      expect(await seriesOfRegistration(reg)).toBe(oxJan);
+      expect(r).toMatchObject({ boardCode: 'oxford', registrationsMoved: 1 });
+      // OxfordAQA's November of the session (its AS default).
+      const oxNov = await one<{ id: string }>(`select id from board_series where board_code = 'oxford' and month = 'november' and year = $1 and label = ''`, [Y]);
+      expect(await seriesOfRegistration(reg)).toBe(oxNov.id);
       await audited([reg], ['REGISTRATION_SERIES_MOVED']);
       expect((await one<{ council: string }>(`select council from subject where id = $1`, [che])).council).toBe('oxford');
     });
   });
 
-  describe('a window feeding two board series with different deadlines, each enforced (MO-10 per series)', () => {
+  describe('a session whose items sit in two board series with different deadlines, each enforced (MO-10 per series)', () => {
     let b: Family, d: Family, e: Family, f: Family, x: Family;
     let bPay: string, dPay: string, ePay: string, fPay: string, bReg: string, dReg: string, eReg: string, fReg: string;
     let octDeadline: Date, janDeadline: Date;
 
-    it('only the admin sets an entry deadline, after the window closes and in the future; the late-fee dates are information', async () => {
+    it('only the admin sets an entry deadline, in the future; it may fall before the session closes; the late-fee dates are information', async () => {
       // Families with money in flight in each series before the close.
       b = await family('b'); d = await family('d'); e = await family('e'); f = await family('f'); x = await family('x');
       // B pays for Mathematics (October) by InstaPay, with 200 from escrow, and sends the reference.
       const fundB = await apiResponse(officer.api.v1.registrations.desk.$post({
-        json: { studentId: b.studentId, sessionId: windowId, subjectIds: [subj.MA4!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+        json: { studentId: b.studentId, sessionId: windowId, ...(await reservationOf(windowId, [subj.MA4!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
       }));
       await apiResponse(b.parent.api.v1.registrations[':id'].drop.$post({ param: { id: fundB.registrations[0]!.id }, json: { reason: 'setup for escrow' } }));
       expect(await escrowOf(b.studentId)).toBe(1400);
@@ -207,7 +226,7 @@ describe('F0b: board series', () => {
       fReg = (await direct(f, [subj.BI4!]))[0]!.id;
       fPay = (await checkout(f, [fReg], 'instapay')).id!;
 
-      // The window will close in a minute; the board calendars come in.
+      // The session will close in a minute; the board calendars come in.
       await sql(`update registration_session set end_date = now() + interval '1 minute' where id = $1`, [windowId]);
       const now = Date.now();
       octDeadline = new Date(now + 2 * 60 * 60 * 1000);
@@ -217,7 +236,9 @@ describe('F0b: board series', () => {
       expect(await refused(setDeadline(coordinator, oct, octDeadline))).toEqual({
         status: 403, error: "Only an admin sets the exam board's entry deadline: past it the school closes every unconfirmed payment on the series (MO-10)",
       });
-      expect(await refused(setDeadline(adm, oct, new Date(now - 60 * 1000)))).toEqual({ status: 400, error: "The board's entry deadline must be after the registration window closes" });
+      // Changed (pre-authorised): a deadline in the past is refused as such — it used to be
+      // refused as "before the window closes", a rule the rework retires (the cut-off is per item).
+      expect(await refused(setDeadline(adm, oct, new Date(now - 60 * 1000)))).toEqual({ status: 400, error: "The board's entry deadline must be in the future" });
       expect(await refused(adm.api.v1['board-series'][':id'].$put({ param: { id: oct }, json: { entryDeadline: octDeadline } }))).toEqual({
         status: 400, error: 'Please provide a reason (min 5 characters)',
       });
@@ -229,14 +250,13 @@ describe('F0b: board series', () => {
       const late = await apiResponse(coordinator.api.v1['board-series'][':id'].$put({ param: { id: jan }, json: { lateFeeFrom: '2026-10-17', highLateFeeFrom: '2026-11-14', notes: 'fee doubles, then trebles' } }));
       expect(late).toMatchObject({ lateFeeFrom: '2026-10-17', highLateFeeFrom: '2026-11-14' });
       await audited([jan], ['BOARD_SERIES_UPDATED']);
-      // The window cannot now close on or after the earlier deadline (MO-10).
-      const moved = await refused(adm.api.v1.sessions[':id'].$put({
-        param: { id: windowId },
-        // @ts-expect-error — the route reads its body by session status, without zValidator (as the web does)
-        json: { endDate: new Date(octDeadline.getTime() + 60 * 1000), reason: 'extend past the October deadline' },
+      // Changed (pre-authorised): the session may now stay open past the earlier deadline — what
+      // October's items can do ends at October's deadline (it was refused). Then back to a minute.
+      const extended = await apiResponse(adm.api.v1.sessions[':id'].$put({
+        param: { id: windowId }, json: { endDate: new Date(octDeadline.getTime() + 60 * 1000), reason: 'extend past the October deadline' },
       }));
-      expect(moved.status).toBe(400);
-      expect(moved.error).toMatch(/^The window cannot close on or after the exam board's entry deadline \(.+\) — move the board deadline first$/);
+      expect(new Date(extended.endDate).getTime()).toBe(octDeadline.getTime() + 60 * 1000);
+      await sql(`update registration_session set end_date = now() + interval '1 minute' where id = $1`, [windowId]);
     });
 
     it('at the close, the time left to send a reference is capped by each checkout\'s own series (MO-10)', async () => {
@@ -267,7 +287,7 @@ describe('F0b: board series', () => {
       await apiResponse(finadmin.api.v1.exceptions.$post({
         json: { type: 'deadline_extension', studentId: x.studentId, sessionId: windowId, validUntil: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), reason: 'late family, approved by the head' },
       }));
-      const lateOct = await refused(x.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, subjectIds: [subj.MA4!], studentId: x.studentId } }));
+      const lateOct = await refused(x.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, ...(await reservationOf(windowId, [subj.MA4!])), studentId: x.studentId } }));
       expect(lateOct.status).toBe(422);
       expect(lateOct.error).toMatch(deadlineSentence);
       const xJan = (await direct(x, [subj.BI5!]))[0]!.id;
@@ -300,7 +320,8 @@ describe('F0b: board series', () => {
       expect(await statusOf('registration', fReg)).toBe('expired');
       expect(await statusOf('registration', dReg)).toBe('confirmed');
       const notEntered = await waitFor(async () => (await notificationsFor(x.student.email, 'SESSION_CLOSED')).find((n) => n.title.startsWith('Not entered')) ?? null);
-      expect(notEntered.body).toMatch(new RegExp(`^The exam board's entry deadline for Pearson Edexcel January ${Y + 1} \\(series\\) \\(.+\\) has passed, so these subjects registered in January \\(AS, series\\) were not entered: Biology Unit 5 \\(series\\)\\.$`));
+      const name = (await sessionName(windowId)).replace(/[()]/g, '\\$&');
+      expect(notEntered.body).toMatch(new RegExp(`^The exam board's entry deadline for Pearson Edexcel January ${Y + 1} \\(series\\) \\(.+\\) has passed, so these subjects registered in ${name} were not entered: Biology Unit 5 \\(series\\)\\.$`));
       // An entry in a series past its deadline cannot be moved.
       expect(await refused(adm.api.v1.sessions[':id']['board-series'].move.$post({
         param: { id: windowId }, json: { registrationIds: [dReg], boardSeriesId: oct, reason: 'too late to move' },

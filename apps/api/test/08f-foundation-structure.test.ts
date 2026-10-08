@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, academicYearLabel } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, openWindow, audited, schoolToday, clientFor,
-  type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, openWindow, audited, schoolToday, clientFor, type Client, reservationOf } from './helpers';
 
 /**
  * F0a — the settings store, uploads, the academic structure, sections and
@@ -58,8 +55,24 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
         'schoolFee.graduatesExempt': false,
         'schoolFee.newYearWithoutSchedule': false,
         'calendar.schoolWeekdays': true,
+        // The reservations rework (step 1): the pricing, payment and refund policies are finance's and the admin's.
+        'pricing.selfStudyCoursePercent': false,
+        'pricing.selfStudyBoardPercent': false,
+        'pricing.retakeTaughtCoursePercent': false,
+        'pricing.onePaperCoursePercent': false,
+        'pricing.payOnProvisionalFee': false,
+        'payment.graceDays': false,
+        'refund.defaultPolicy.june': false,
+        'refund.defaultPolicy.winter': false,
+        // The reservations rework (step C): the overdue expiry is finance's and the admin's; late
+        // board entries (Q-20) the admin's alone.
+        'payment.expireOverdueAfterDays': false,
+        'exceptions.boardEntryDeadline': false,
         // F0b: what "A.S./A.2." marks is the coordinator's answer (IS-01).
         'catalogue.levelCodeReading': true,
+        // The reservations rework, step B: whether an unverified declared sitting is held at its
+        // deadline is the owner's question (Q-22): the admin's setting.
+        'verification.unverifiedAtDeadline': false,
       });
     });
 
@@ -162,7 +175,7 @@ describe('F0a: settings, uploads, academic structure, sections, teaching', () =>
     it("only the parent's own evidence for this child attaches to a payment; finance then reads a legacy document so attached (O-5)", async () => {
       const oct = await session(adm, 'October (AS, F0a uploads)', 'october', 'a_level', { ...openWindow(), activate: true });
       const sub = await subject(adm, 'F0S-AL', 'Chemistry (A2, F0a uploads)', { course: 900, registration: 100 }, { qualificationLevel: 'a_level' });
-      const reg = (await apiResponse(a.parent.api.v1.registrations.direct.$post({ json: { sessionId: oct, subjectIds: [sub], studentId: a.studentId } })))[0]!.id;
+      const reg = (await apiResponse(a.parent.api.v1.registrations.direct.$post({ json: { sessionId: oct, ...(await reservationOf(oct, [sub])), studentId: a.studentId } })))[0]!.id;
       const pay = (await apiResponse(a.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [reg], paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
       const note = await apiResponse(upload(a.parent, 'supporting_document', file(PDF, 'n.pdf', 'application/pdf'), a.studentId));
       const other = await family('up-c');

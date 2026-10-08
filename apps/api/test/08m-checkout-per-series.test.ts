@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, seriesYearInAcademicYear } from '@repo/validations';
-import {
-  admin, staff, onboard, subject, session, refused, one, sql, audited, money, takings, takingsDelta,
-  futureWindow, runPaymentDeadlines, type Client,
-} from './helpers';
+import { admin, staff, onboard, subject, session, refused, one, sql, audited, money, takings, takingsDelta, futureWindow, runPaymentDeadlines, subjectFeeIn, type Client, reservationOf } from './helpers';
 
 /**
  * F0b — money is taken per entry deadline (the review of 682907a, flags 3 and
@@ -15,14 +12,26 @@ import {
  * names each series to pay separately; the desk splits one action into one
  * payment per deadline, each confirmed with its receipts; series with the
  * same deadline share a checkout. A deadline change that would split an open
- * checkout is refused. And MO-21 per series: in a draft window feeding
- * October and January, October's deadline refunds only October's
+ * checkout is refused. And MO-21 per series: in a draft session whose items
+ * sit October and January, October's deadline refunds only October's
  * preregistrations, and a January one cancelled after it is judged by
  * January's own deadline.
  *
- * The open window takes a (type, level) pair no earlier file holds open, and
- * is closed at the end.
+ * The reservations rework: a session's series are its items' — each subject's
+ * item is placed in its series (`place`), where F0b fed the window and routed
+ * subjects. The open session (a winter AS session of its own label) is closed
+ * at the end.
  */
+
+/** A subject's item in a session placed in a series, its board fee there set first (the Session and Fees screens). */
+async function place(adm: Client, sessionId: string, subjectId: string, boardSeriesId: string) {
+  await subjectFeeIn(adm, boardSeriesId, subjectId);
+  const it = await one<{ id: string; offer_id: string }>(
+    `select i.id, i.offer_id from session_offer_item i join session_offer o on o.id = i.offer_id where i.session_id = $1 and o.subject_id = $2 and i.availability <> 'closed'`, [sessionId, subjectId]);
+  return adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({
+    param: { id: sessionId, offerId: it.offer_id, itemId: it.id }, json: { boardSeriesId, reason: 'the series it is sat in' },
+  });
+}
 
 const days = (n: number) => n * 24 * 60 * 60 * 1000;
 const statusOf = async (table: 'payment' | 'registration', id: string) =>
@@ -38,11 +47,11 @@ describe('F0b: one checkout per entry deadline', () => {
   const Y = academicYearStartOf();
   const subj: Record<string, string> = {};
   let windowId: string, x: string, z: string, later: string, windowEnd: Date;
-  let type: 'october' | 'november' | 'january', level: 'as_level' | 'a_level', otherMonth: 'october' | 'january';
+  const type = 'october' as const, level = 'as_level' as const, otherMonth = 'january' as const;
 
   type Family = { parent: Client; student: Client; studentId: string };
   const direct = async (f: Family, subjectIds: string[]) =>
-    (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, subjectIds, studentId: f.studentId } }))).map((r) => r.id);
+    (await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: windowId, ...(await reservationOf(windowId, subjectIds)), studentId: f.studentId } }))).map((r) => r.id);
   const checkout = (f: Family, ids: string[]) =>
     f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: ids, paymentMethod: 'instapay', escrowAmountToApply: 0 } });
   const mkSeries = async (month: 'january' | 'october' | 'november', label: string) =>
@@ -54,11 +63,6 @@ describe('F0b: one checkout per entry deadline', () => {
     adm = await admin('ckd');
     officer = await staff(adm, 'finance_officer', 'ckd');
     finadmin = await staff(adm, 'finance_admin', 'ckd');
-    const open = new Set((await sql<{ t: string; l: string }>(`select session_type as t, qualification_level as l from registration_session where status = 'active'`)).map((r) => `${r.t}|${r.l}`));
-    const pair = (['october|as_level', 'october|a_level', 'november|as_level', 'november|a_level', 'january|as_level', 'january|a_level'] as const).find((p) => !open.has(p));
-    expect(pair).toBeDefined();
-    [type, level] = pair!.split('|') as [typeof type, typeof level];
-    otherMonth = type === 'january' ? 'october' : 'january';
     for (const tag of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'PO', 'PJ']) {
       subj[tag] = await subject(adm, `CKD-${tag}`, `Deadlines ${tag}`, { course: 1000, registration: 500 }, { qualificationLevel: level, council: 'pearson_edexcel' });
     }
@@ -70,14 +74,10 @@ describe('F0b: one checkout per entry deadline', () => {
     x = await mkSeries(type, 'deadlines X');
     z = await mkSeries(type, 'deadlines Z');
     later = await mkSeries(otherMonth, 'deadlines later');
-    // B, E and G go to the later series; C to Z, whose deadline is X's.
-    await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({
-      param: { id: windowId },
-      json: {
-        series: [{ boardSeriesId: x, isDefault: true }, { boardSeriesId: z, isDefault: false }, { boardSeriesId: later, isDefault: false }],
-        routes: [{ subjectId: subj.B!, boardSeriesId: later }, { subjectId: subj.E!, boardSeriesId: later }, { subjectId: subj.G!, boardSeriesId: later }, { subjectId: subj.C!, boardSeriesId: z }],
-      },
-    }));
+    // B, E and G are sat in the later series; C in Z, whose deadline is X's; the rest in X.
+    for (const tag of ['A', 'D', 'F', 'PO', 'PJ']) await apiResponse(place(adm, windowId, subj[tag]!, x));
+    for (const tag of ['B', 'E', 'G']) await apiResponse(place(adm, windowId, subj[tag]!, later));
+    await apiResponse(place(adm, windowId, subj.C!, z));
     await apiResponse(setDeadline(x, new Date(windowEnd.getTime() + days(5))));
     await apiResponse(setDeadline(z, new Date(windowEnd.getTime() + days(5))));
     await apiResponse(setDeadline(later, new Date(windowEnd.getTime() + days(10))));
@@ -125,7 +125,7 @@ describe('F0b: one checkout per entry deadline', () => {
     const f2 = await onboard(officer, 'ckd-2', 12);
     const before = await takings(officer);
     const r = await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f2.studentId, sessionId: windowId, subjectIds: [subj.D!, subj.E!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: f2.studentId, sessionId: windowId, ...(await reservationOf(windowId, [subj.D!, subj.E!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }));
     expect(r.collected).toBe(3000);
     expect(r.notCollected).toEqual([]);
@@ -174,7 +174,7 @@ describe('F0b: one checkout per entry deadline', () => {
     const f5 = await onboard(officer, 'ckd-5', 12);
     // 3000 in the wallet: two subjects paid at the desk, then dropped (no refund window: all back).
     const funded = await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f5.studentId, sessionId: windowId, subjectIds: [subj.PO!, subj.PJ!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+      json: { studentId: f5.studentId, sessionId: windowId, ...(await reservationOf(windowId, [subj.PO!, subj.PJ!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
     }));
     for (const reg of funded.registrations) {
       await apiResponse(f5.parent.api.v1.registrations[':id'].drop.$post({ param: { id: reg.id }, json: { reason: 'fund the wallet for the split' } }));
@@ -184,7 +184,7 @@ describe('F0b: one checkout per entry deadline', () => {
     const before = await takings(officer);
     // A (earlier deadline) and B (later): 2000 from the wallet covers A in full and 500 of B.
     const r = await apiResponse(officer.api.v1.registrations.desk.$post({
-      json: { studentId: f5.studentId, sessionId: windowId, subjectIds: [subj.A!, subj.B!], collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 2000 } },
+      json: { studentId: f5.studentId, sessionId: windowId, ...(await reservationOf(windowId, [subj.A!, subj.B!])), collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 2000 } },
     }));
     expect(r.collected).toBe(1000);
     const byFirst = r.payments.map((p) => [p.escrowApplied, p.collected]);
@@ -241,6 +241,17 @@ describe('F0b: one checkout per entry deadline', () => {
 
   it("the admin's move may not split an open checkout across deadlines", async () => {
     const f4 = await onboard(officer, 'ckd-4', 12);
+    // The reservations rework: a line moves to another series with an item of its subject there
+    // (an admin's move is behind the item's series) — A and C get one in the later series, closed
+    // so that new lines keep going to their own.
+    for (const tag of ['A', 'C']) {
+      await subjectFeeIn(adm, later, subj[tag]!);
+      const o = await one<{ id: string }>(`select id from session_offer where session_id = $1 and subject_id = $2`, [windowId, subj[tag]!]);
+      await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].items.$post({
+        param: { id: windowId, offerId: o.id },
+        json: { label: 'Whole subject (later)', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: later, availability: 'closed', requiredInSeries: false },
+      }));
+    }
     const [a, c] = await direct(f4, [subj.A!, subj.C!]);
     const pay = (await apiResponse(checkout(f4, [a!, c!]))).id!;
     const moved = await refused(adm.api.v1.sessions[':id']['board-series'].move.$post({
@@ -259,8 +270,13 @@ describe('F0b: one checkout per entry deadline', () => {
   });
 });
 
-describe("F0b: a window's first series may not split an open checkout across deadlines", () => {
-  it('refused, nothing entered, until the checkout is settled', async () => {
+// Changed by the reservations rework (trail row "assertion"): F0b refused feeding a window its first
+// series when an open checkout would then span two deadlines. A line is always in its item's series
+// now, so the same guard stands on the change that can split a checkout — moving an item to a
+// series with another deadline (offer.services.ts changeItemSeries): refused, nothing moved, until
+// the checkout is settled. The outcome is F0b's; the action and its sentence are the item's.
+describe("F0b: an item's series change may not split an open checkout across deadlines", () => {
+  it('refused, nothing moved, until the checkout is settled', async () => {
     const adm = await admin('ckw');
     const officer = await staff(adm, 'finance_officer', 'ckw');
     const Y = academicYearStartOf();
@@ -269,37 +285,33 @@ describe("F0b: a window's first series may not split an open checkout across dea
     const w = await session(adm, 'October (AS, window guard)', 'october', 'as_level', { ...futureWindow(), seriesYear: seriesYearInAcademicYear('october', Y) });
     const end = new Date((await one<{ end: string }>(`select end_date as "end" from registration_session where id = $1`, [w])).end);
     const f = await onboard(officer, 'ckw-1', 12);
-    // The window feeds no series yet: both preregistrations carry none, and share one checkout.
-    const ids = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, subjectIds: [one1, two], studentId: f.studentId } }))).map((r) => r.id);
+    // Both items are in the session's one series so far: the two preregistrations share one checkout.
+    const ids = (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, ...(await reservationOf(w, [one1, two])), studentId: f.studentId } }))).map((r) => r.id);
+    const first = (await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [ids[0]!])).s;
     const pay = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: ids, paymentMethod: 'instapay', escrowAmountToApply: 0 } }))).id!;
     const mk = async (month: 'october' | 'january', days: number) => {
       const id = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month, year: seriesYearInAcademicYear(month, Y), label: 'window guard' } }))).id;
       await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id }, json: { entryDeadline: new Date(end.getTime() + days * 24 * 60 * 60 * 1000), reason: 'board key dates published' } }));
       return id;
     };
-    const oct = await mk('october', 5);
     const jan = await mk('january', 10);
-    const feed = () => adm.api.v1.sessions[':id']['board-series'].$put({
-      param: { id: w }, json: { series: [{ boardSeriesId: oct, isDefault: true }, { boardSeriesId: jan, isDefault: false }], routes: [{ subjectId: two, boardSeriesId: jan }] },
-    });
-    expect(await refused(feed())).toEqual({
+    expect(await refused(place(adm, w, two, jan))).toEqual({
       status: 409,
-      error: "1 checkout still open pays for this window's registrations, which these series would enter with different deadlines — confirm or cancel it first, or route the subjects to series with the same deadline",
+      error: '1 checkout still open would pay for two deadlines after this move — confirm or cancel it first',
     });
-    expect(await sql(`select board_series_id from registration where id in ($1, $2)`, ids)).toEqual([{ board_series_id: null }, { board_series_id: null }]);
-    expect(await sql(`select id from session_board_series where session_id = $1`, [w])).toEqual([]);
-    // Settled, the same change goes through.
+    expect(await sql(`select board_series_id as s from registration where id in ($1, $2)`, ids)).toEqual([{ s: first }, { s: first }]);
+    // Settled, the same change goes through, the line with its item.
     await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({ param: { id: pay } }));
-    await apiResponse(feed());
-    expect((await sql<{ s: string }>(`select board_series_id as s from registration where id in ($1, $2) order by board_series_id`, ids)).map((x) => x.s).sort()).toEqual([oct, jan].sort());
+    await apiResponse(place(adm, w, two, jan));
+    expect((await sql<{ s: string }>(`select board_series_id as s from registration where id in ($1, $2)`, ids)).map((x) => x.s).sort()).toEqual([first, jan].sort());
   });
 });
 
-describe('F0b: MO-21 per series — a draft window feeding October and January', () => {
+describe('F0b: MO-21 per series — a draft session whose items sit October and January', () => {
   let adm: Client, officer: Client, finadmin: Client;
   const Y = academicYearStartOf();
 
-  it("October's deadline refunds only October's preregistrations; a January one cancelled after it gets the refund window's rate", async () => {
+  it("October's deadline refunds only October's preregistrations; a January one cancelled after it gets the policy's rate on the course fee and its board fee back", async () => {
     adm = await admin('ckp');
     officer = await staff(adm, 'finance_officer', 'ckp');
     finadmin = await staff(adm, 'finance_admin', 'ckp');
@@ -310,12 +322,15 @@ describe('F0b: MO-21 per series — a draft window feeding October and January',
       (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'pearson_edexcel', month, year: seriesYearInAcademicYear(month, Y), label: 'prereg per series' } }))).id;
     const oct = await mk('october');
     const jan = await mk('january');
-    await apiResponse(adm.api.v1.sessions[':id']['board-series'].$put({
-      param: { id: w }, json: { series: [{ boardSeriesId: oct, isDefault: true }, { boardSeriesId: jan, isDefault: false }], routes: [{ subjectId: pj, boardSeriesId: jan }] },
-    }));
+    // Dates for both (a series with none takes no line); the scenario moves them below.
+    for (const id of [oct, jan]) {
+      await apiResponse(adm.api.v1['board-series'][':id'].$put({ param: { id }, json: { entryDeadline: new Date(Date.now() + 200 * 24 * 60 * 60 * 1000), reason: 'board key dates published' } }));
+    }
+    await apiResponse(place(adm, w, po, oct));
+    await apiResponse(place(adm, w, pj, jan));
     const f = await onboard(officer, 'ckp-1', 12);
     const prereg = async (subjectId: string) =>
-      (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, subjectIds: [subjectId], studentId: f.studentId } })))[0]!.id;
+      (await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: { sessionId: w, ...(await reservationOf(w, [subjectId])), studentId: f.studentId } })))[0]!.id;
     const pay = async (id: string) => {
       const p = (await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [id], paymentMethod: 'in_school', escrowAmountToApply: 0 } }))).id!;
       await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: p }, json: { instrumentUsed: 'cash' } }));
@@ -325,10 +340,13 @@ describe('F0b: MO-21 per series — a draft window feeding October and January',
     expect((await one<{ s: string }>(`select board_series_id as s from registration where id = $1`, [j])).s).toBe(jan);
     await pay(o);
     await pay(j);
-    const hour = 60 * 60 * 1000;
-    await apiResponse(finadmin.api.v1.receipts['refund-windows'].$post({
-      json: { sessionId: w, startsAt: new Date(Date.now() - hour).toISOString(), endsAt: new Date(Date.now() + 24 * hour).toISOString(), percentage: 50, label: 'October window: half back' },
-    }));
+    // Changed by the reservations rework (RESERVATIONS_REWORK.md §3.9, §3.10; Q-19's default; trail
+    // row "assertion"): a line refunds from its session's policy — here the winter default, 100% to
+    // week 2, 50% in weeks 3–6 — counted from the course start, on the course fee; the board fee of a
+    // preregistration (never confirmed, so never sent) comes back in full. The course start is put 15
+    // days back (week 3) where a 50% refund window used to be posted.
+    const day = (d: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(Date.now() + d * 24 * 60 * 60 * 1000));
+    await apiResponse(adm.api.v1.sessions[':id'].$put({ param: { id: w }, json: { courseStartsOn: day(-15), reason: 'the course started two weeks ago' } }));
     const wallet = async () => {
       const x = await one<{ balance: string; held: string }>(`select balance, held_balance as held from escrow where student_id = $1`, [f.studentId]);
       return { free: money(x.balance), held: money(x.held) };
@@ -346,9 +364,10 @@ describe('F0b: MO-21 per series — a draft window feeding October and January',
     await audited([o], ['PREREG_REFUNDED_AT_DEADLINE']);
     expect(await wallet()).toEqual({ free: 1500, held: 1500 });
 
-    // January's own deadline has not passed: cancelling is the family's own drop, at the window's rate.
+    // January's own deadline has not passed: cancelling is the family's own drop, at the policy's
+    // rate on the course fee (500 of 1,000) and the board fee in full (500): 2,500 free (was 2,250).
     const cancelled = await apiResponse(f.parent.api.v1.registrations[':id']['cancel-prereg'].$post({ param: { id: j } }));
     expect(cancelled).toMatchObject({ funded: true, refundPercentage: 50 });
-    expect(await wallet()).toEqual({ free: 2250, held: 0 });
+    expect(await wallet()).toEqual({ free: 2500, held: 0 });
   });
 });

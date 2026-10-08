@@ -1,0 +1,339 @@
+
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+> vitest run "test/08j"
+
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: 2.8 ms (measured within 7 ms)
+stderr | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [a0b120c0-74a3-4325-86f6-fe10b1371c37] POST /api/auth/sign-up/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[email:stub] To: admin.enr@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [851c8142-2d6c-43fa-a6be-bcb2e9ad8da1] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [3fbcb581-8f20-4633-bd59-8c0a1d9bab35] POST /v1/users
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [4d917133-58c1-465a-8960-c2834a5700e7] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [de90fe6f-90e7-41af-b94b-72ad65fb2cca] POST /v1/users
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [27b1254d-4043-4007-945d-190aa6491852] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [f094ce50-0174-41ab-b44b-a79ce911b078] POST /v1/users
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [ba54eab6-e160-454b-be9a-0d973c7adf68] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [3485e1c6-4c01-4db3-8588-3f87a0307794] POST /v1/users
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [b2841fe7-ae8f-4616-af04-02ddafac8596] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [7d9db86a-35b6-4d10-88c9-8ac935dd865a] POST /v1/subjects
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [a800b298-4a29-4491-b411-57af910ee80d] POST /v1/subjects
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [e52a12a8-54e3-4657-a2ee-ce83972f8cc5] POST /v1/subjects
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [c14d3c88-97cb-4864-affa-32c60525fe78] POST /v1/subjects
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [32e252ff-e05b-4d77-abc0-96ce1cad16a3] GET /v1/academic/years
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [158b4da2-0adf-48fa-b3f1-739492c00ba0] POST /v1/academic/years
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [a81e4c83-f43e-4ca0-82b8-3609d61782ae] POST /v1/academic/years
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [ff78cc59-6192-4ff8-9f46-107ee08a693e] POST /v1/links/desk-onboard
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[email:stub] To: parent.enr-s1@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[email:stub] To: student.enr-s1@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [1901c5af-7a30-4819-8c56-564cae0f3fb7] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [bd611718-65f8-4730-b7be-7bbd62cf9472] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [8a316ab4-998d-4315-b275-bdeaa3421515] POST /v1/links/desk-onboard
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[email:stub] To: parent.enr-s2@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[email:stub] To: student.enr-s2@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [4e37f940-22f1-4995-a77a-e110d56a13a3] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [dde31456-fa47-474b-b583-2c15d06a1486] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [e69d7aff-1334-40dc-a964-db33887580b1] POST /v1/links/desk-onboard
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[email:stub] To: parent.enr-s3@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[email:stub] To: student.enr-s3@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [64890cb5-6709-4bae-923a-d059c96756a9] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [055660db-d86c-41fd-9122-04dc68892c1c] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [0b5f4071-7cca-4fb6-a4c5-a4a4733f0bc2] POST /v1/links/desk-onboard
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[email:stub] To: parent.enr-s5@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[email:stub] To: student.enr-s5@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [7fed834f-cdd1-4279-963a-43d85ba7da8d] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [48c1d413-4769-4a9f-bd7e-a4cd6db8e2f0] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [e2cfb0cd-9d39-4849-ac08-7a4b49f2d585] POST /v1/links/desk-onboard
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[email:stub] To: parent.enr-s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[email:stub] To: student.enr-s4@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [c902b286-5cfd-4f12-a305-86ffa1e50a5d] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [d8c83858-0d1e-4c01-afed-2209ffeb9d78] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [92c2983d-2885-4b1d-9118-619ff68b88c4] POST /v1/academic/sections
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [65e1a55a-1f92-4de7-a2a3-1dc5e61734e6] POST /v1/academic/sections/ce85ec74-7c80-4009-a799-b6b39192561b/members
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [a4448db6-bd36-4f73-b33b-f51aaca9c709] POST /v1/sessions
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [e74bd629-44f2-435d-9ea4-c619ea96107e] POST /v1/board-series
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [b4c114f5-fffe-43f4-a801-13b120252c8c] POST /v1/teachers
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [8ff8f536-2793-4a37-93c1-1508a99b2595] POST /v1/sessions/a31262ce-d595-4636-b38d-a1a4996ffcea/offers
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [28e7e611-9a42-46f9-b457-abe151db943f] PUT /v1/board-fees
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [eb9e7b36-1f25-4087-8754-3a8b69d36ca2] POST /v1/sessions/a31262ce-d595-4636-b38d-a1a4996ffcea/offers
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [1c55a3ea-9a5a-4738-9a7f-31d9b8a4e7f9] PUT /v1/board-fees
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [94006001-8aac-44ed-94b2-a542ac44d17b] POST /v1/sessions/a31262ce-d595-4636-b38d-a1a4996ffcea/offers
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [4a9c0f52-5ebd-4b39-b4ca-15ab54d466f3] PUT /v1/board-fees
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [d36fa568-44b0-4717-b9c4-fc58570aa607] POST /v1/sessions/a31262ce-d595-4636-b38d-a1a4996ffcea/offers
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [0f429f15-d62d-42d8-927b-ec0b77583d1a] PUT /v1/board-fees
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [ecb09a9c-31f9-45de-8b8c-e52f2dd2e6b3] PUT /v1/sessions/a31262ce-d595-4636-b38d-a1a4996ffcea/offers/1bbd4b5b-5523-4eb7-b301-707dbc8d7939
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment
+[INFO] [0ac3675b-beb9-4110-b760-c1529af4bee0] PUT /v1/sessions/a31262ce-d595-4636-b38d-a1a4996ffcea/offers/3fd84130-ca3d-4c41-82e3-b6400dc88576
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > a student is enrolled in a subject with a teacher; the teacher becomes linked to the subject
+[INFO] [8046e162-d9ec-43c2-a0e8-ffbd6c05c37d] POST /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > a student is enrolled in a subject with a teacher; the teacher becomes linked to the subject
+[INFO] [deaa675f-1b8c-4ef1-9fd8-d7a9256a2f65] POST /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > what cannot be taught is refused with a sentence; self-study has no teacher
+[INFO] [2ff0607e-e020-461d-af83-a2cb27f89613] POST /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > what cannot be taught is refused with a sentence; self-study has no teacher
+[INFO] [78c52242-6f05-45eb-9549-5caa3170d8e3] POST /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > what cannot be taught is refused with a sentence; self-study has no teacher
+[INFO] [3db44052-c77b-4551-9a14-162cbcc80bfe] POST /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > the teacher or mode changes in place; an enrolment ends with a reason and stays as history
+[INFO] [a8107ff2-e9ee-4f02-97ed-913bd8d1253b] POST /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > the teacher or mode changes in place; an enrolment ends with a reason and stays as history
+[INFO] [2ecb7da1-fa6f-4310-a735-bee1be684b10] PUT /v1/enrolments/3608bbb7-a713-473c-aad7-fdce82ea291d
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > the teacher or mode changes in place; an enrolment ends with a reason and stays as history
+[INFO] [18687910-7cf3-4c37-a9ef-52ba9fa5775f] PUT /v1/enrolments/3608bbb7-a713-473c-aad7-fdce82ea291d
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > the teacher or mode changes in place; an enrolment ends with a reason and stays as history
+[INFO] [3f0d79d3-f856-49b3-bbf7-c99e7ef06749] POST /v1/enrolments/3608bbb7-a713-473c-aad7-fdce82ea291d/end
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > the teacher or mode changes in place; an enrolment ends with a reason and stays as history
+[INFO] [adc64da0-a6c4-49a4-92c4-f3ac88f9e61b] POST /v1/enrolments/3608bbb7-a713-473c-aad7-fdce82ea291d/end
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > the teacher or mode changes in place; an enrolment ends with a reason and stays as history
+[INFO] [2015fdd3-d909-4594-8dd9-b131d3bab5b6] GET /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > the teacher or mode changes in place; an enrolment ends with a reason and stays as history
+[INFO] [402a0503-b4e0-4d9a-8b49-af9a483f4e9a] GET /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > a student who leaves the school stops being taught: their enrolments end with the leaving, and new ones are refused
+[INFO] [b9347eab-9f70-43a0-bcda-cc02226bee1f] POST /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > a student who leaves the school stops being taught: their enrolments end with the leaving, and new ones are refused
+[INFO] [22f1a654-eaf4-42b2-a27e-a87dfe35d88b] POST /v1/students/wkclfrVrZCKZNS2i5wxi3gq3sUTHa0aM/leave
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > one at a time > a student who leaves the school stops being taught: their enrolments end with the leaving, and new ones are refused
+[INFO] [5ec6418d-7635-4caa-bc9a-bccdaab1b1d2] POST /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > in bulk > an enrolment carried forward: last year's subjects, teachers and modes, previewed, then committed once
+[INFO] [51c5c9d8-a37a-4611-a813-3120c3fb17b6] POST /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > in bulk > an enrolment carried forward: last year's subjects, teachers and modes, previewed, then committed once
+[INFO] [732c2bcf-c723-4817-b08c-8dd69cf14a03] POST /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > in bulk > an enrolment carried forward: last year's subjects, teachers and modes, previewed, then committed once
+[INFO] [115f514a-19a5-4c16-aade-411fb78116b4] POST /v1/enrolments
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > in bulk > an enrolment carried forward: last year's subjects, teachers and modes, previewed, then committed once
+[INFO] [7159f416-faee-47a5-b06d-88feb857eace] POST /v1/enrolments/bulk
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > in bulk > an enrolment carried forward: last year's subjects, teachers and modes, previewed, then committed once
+[INFO] [9b9347a8-c6ee-43fa-926b-447740676762] POST /v1/enrolments/bulk
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > in bulk > an enrolment carried forward: last year's subjects, teachers and modes, previewed, then committed once
+[INFO] [2c19dbcc-36bd-4c22-a3b2-7152558d020d] POST /v1/enrolments/bulk
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > in bulk > from registrations: the teacher each registration names, and self-study where it was taken outside school
+[INFO] [61a31819-71fb-4593-951f-392178091bb1] POST /v1/registrations/preregister
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > in bulk > from registrations: the teacher each registration names, and self-study where it was taken outside school
+[INFO] [33202ec2-80a2-4834-8c98-c107f9493f8f] POST /v1/enrolments/bulk
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > in bulk > a whole section at once, with one teacher per subject
+[INFO] [7569729b-b27e-46ee-a8bb-5417cdfac8c1] POST /v1/enrolments/section
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > in bulk > rows pasted from a sheet: by student ID or email, subject code and teacher name; what does not resolve is listed, not guessed
+[INFO] [b54041d3-05c5-4ff3-b7e6-09c0c6d85c9a] POST /v1/enrolments/batch
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > in bulk > rows pasted from a sheet: by student ID or email, subject code and teacher name; what does not resolve is listed, not guessed
+[INFO] [37bb7e56-ca5c-406f-b60e-f4aedb2b3203] POST /v1/enrolments/batch
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > registrations checked against enrolments — flagged, never blocked > a registration without an enrolment is flagged, and the registration stands
+[INFO] [466089a9-231e-4c83-a377-c7303e20768b] POST /v1/registrations/preregister
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > registrations checked against enrolments — flagged, never blocked > a registration without an enrolment is flagged, and the registration stands
+[INFO] [13ef868f-223f-4268-98ce-c79196dbff92] GET /v1/enrolments/check
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > registrations checked against enrolments — flagged, never blocked > a registration without an enrolment is flagged, and the registration stands
+[INFO] [e1a3d63f-24d6-4aed-a07d-dc63c9b5f229] GET /v1/enrolments/student/Stjwpc0WcXY5L7ydaj061zYTlFNZx2wp
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > registrations checked against enrolments — flagged, never blocked > a registration without an enrolment is flagged, and the registration stands
+[INFO] [154201da-e310-42ce-9d8b-bad7a6a55e41] GET /v1/enrolments/student/Stjwpc0WcXY5L7ydaj061zYTlFNZx2wp
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > registrations checked against enrolments — flagged, never blocked > a mode or teacher that disagrees is flagged too
+[INFO] [a4dd44fb-babf-46f2-90a3-27d3d29fc65d] PUT /v1/subjects/25d3192b-5e15-46d0-ad4d-15c2e43a1395/teachers
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > registrations checked against enrolments — flagged, never blocked > a mode or teacher that disagrees is flagged too
+[INFO] [07904465-9045-4dd4-899b-cdaad9e5b2dd] POST /v1/registrations/preregister
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > registrations checked against enrolments — flagged, never blocked > a mode or teacher that disagrees is flagged too
+[INFO] [680549ef-0f94-43a1-bf08-b64d94f14d01] GET /v1/enrolments/check
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > teaching: self-study forms no group > a self-study enrolment is excluded from teaching: no group, no class list, no count
+[INFO] [5692693f-e3cb-4013-84d1-5faa118ae5fa] GET /v1/enrolments/teaching-demand
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > teaching: self-study forms no group > a self-study enrolment is excluded from teaching: no group, no class list, no count
+[INFO] [edd96323-2de0-47b0-b9ac-3808d6a73e08] GET /v1/enrolments/class
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > teaching: self-study forms no group > a self-study enrolment is excluded from teaching: no group, no class list, no count
+[INFO] [a450525c-64cc-4244-a1a3-ea7be5567cf8] GET /v1/teaching/me
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > two people at once > two coordinators commit the same rows at the same moment: each enrolment is made once
+[INFO] [52fa40c8-6869-4671-a94d-ee81415a360c] POST /v1/users
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > two people at once > two coordinators commit the same rows at the same moment: each enrolment is made once
+[INFO] [3a6f9c35-3c26-4579-989c-03f207169e65] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > two people at once > two coordinators commit the same rows at the same moment: each enrolment is made once
+[INFO] [3c06c0fd-1477-4918-b580-aaa14877ceb2] POST /v1/enrolments/batch
+[INFO] [a7478db4-d1c5-471a-8ddd-ed4b9df2e9c2] POST /v1/enrolments/batch
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > two people at once > rows committed while the student leaves: the leaving ends them too, never an open enrolment for a student who left
+[INFO] [e7893276-7ed9-41a3-9731-5f53db013bec] POST /v1/links/desk-onboard
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > two people at once > rows committed while the student leaves: the leaving ends them too, never an open enrolment for a student who left
+[email:stub] To: parent.enr-s6@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > two people at once > rows committed while the student leaves: the leaving ends them too, never an open enrolment for a student who left
+[email:stub] To: student.enr-s6@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > two people at once > rows committed while the student leaves: the leaving ends them too, never an open enrolment for a student who left
+[INFO] [6646e3be-d8ee-4da7-865e-4d08fcd6cda5] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > two people at once > rows committed while the student leaves: the leaving ends them too, never an open enrolment for a student who left
+[INFO] [e5fb6c20-6fd0-41c0-ab44-629a9b4deeaf] POST /api/auth/sign-in/email
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > two people at once > rows committed while the student leaves: the leaving ends them too, never an open enrolment for a student who left
+[INFO] [15731633-cca9-45b7-a848-b0bb4224b011] POST /v1/enrolments/batch
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > two people at once > rows committed while the student leaves: the leaving ends them too, never an open enrolment for a student who left
+[INFO] [341fd57f-cf9c-4d2e-9d4c-2147553ca149] POST /v1/students/x8LdeHmATpBIp5pjhPBfYERw3kx1Kcvx/leave
+
+stdout | test/08j-course-enrolment.test.ts > F0b: course enrolment > two people at once > a single enrolment and a section enrolment of the same student at once: one open enrolment
+[INFO] [f7be1d78-ccc2-44e4-8ed1-ffed5e890ae1] POST /v1/enrolments
+[INFO] [f551697b-68bd-4d5d-af18-f44af1353a1b] POST /v1/enrolments/section
+
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 4806ms
+   ✓ F0b: course enrolment > two people at once > rows committed while the student leaves: the leaving ends them too, never an open enrolment for a student who left  540ms
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Start at  00:09:49
+   Duration  6.73s (transform 543ms, setup 3ms, collect 241ms, tests 4.81s, environment 0ms, prepare 36ms)
+

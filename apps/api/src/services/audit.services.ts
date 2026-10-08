@@ -115,9 +115,15 @@ export async function logActions(
 // the cohort. 'ineligible' is F0a's: the student may no longer sit the series
 // (withdrawn, cohort or series corrected, A-12 off, exception revoked), with
 // the cause in `detail`.
+// The reservations rework (§3.1, §3.10 item 8) adds `overdue` (payment.expireOverdueAfterDays),
+// `plan_revoked`, `plan_lapsed` and `plan_ended` (an instalment payment failed on a line no longer
+// payable); step B adds `declaration_rejected` and `hold_unverified`.
 export type ExpiryReason =
   | 'session_closed' | 'entry_deadline' | 'graduated' | 'payment_closed' | 'preregistration_unfunded_at_deadline'
-  | 'ineligible';
+  | 'ineligible' | 'overdue' | 'plan_revoked' | 'plan_lapsed' | 'plan_ended'
+  // Step B (RESERVATIONS_REWORK.md §3.5): a declared sitting rejected on a waiting line; one still
+  // unverified at its deadline under `verification.unverifiedAtDeadline = hold`.
+  | 'declaration_rejected' | 'hold_unverified';
 
 /**
  * One REGISTRATION_EXPIRED row per registration the system expired, with the

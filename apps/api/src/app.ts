@@ -39,6 +39,8 @@ import { teachingRoutes } from './routes/teaching.routes';
 import { catalogueRoutes } from './routes/catalogue.routes';
 import { boardSeriesRoutes } from './routes/board-series.routes';
 import { enrolmentRoutes } from './routes/enrolment.routes';
+import { boardFeeRoutes } from './routes/board-fee.routes';
+import { lineRoutes, sessionVerifyRoutes, statementRoutes } from './routes/reservation.routes';
 import { schedulingRoutes } from './routes/scheduling.routes';
 import { timetableRoutes } from './routes/timetable.routes';
 import { scheduleRoutes, icalRoutes } from './routes/schedule.routes';
@@ -50,6 +52,10 @@ import { schoolFees } from './routes/school-fee.routes';
 import { receipts } from './routes/receipt.routes';
 import { exceptions } from './routes/exception.routes';
 import { remarks } from './routes/remark.routes';
+// The reservations rework, step C: charges, board services, the policy registry.
+import { charges } from './routes/charge.routes';
+import { boardServices } from './routes/board-service.routes';
+import { policies } from './routes/policy.routes';
 
 /**
  * Rate limiters (auth: brute force; v1: abuse).
@@ -396,8 +402,11 @@ const v1 = new Hono<HonoEnv>()
   .route('/users', users)
   .route('/subjects', subjects)
   .route('/sessions', sessions)
+  .route('/sessions', sessionVerifyRoutes)
   .route('/registrations', registrations)
   .route('/registrations', registrationSwapRoutes)
+  .route('/registrations', lineRoutes)
+  .route('/statement', statementRoutes)
   .route('/payments', payments)
   .route('/escrow', escrowRoutes)
   .route('/change-requests', changeRequestRoutes)
@@ -416,7 +425,12 @@ const v1 = new Hono<HonoEnv>()
   // F0b: the exam catalogue, board series, course enrolment
   .route('/catalogue', catalogueRoutes)
   .route('/board-series', boardSeriesRoutes)
+  .route('/board-fees', boardFeeRoutes)
   .route('/enrolments', enrolmentRoutes)
+  // The reservations rework, step C
+  .route('/charges', charges)
+  .route('/board-services', boardServices)
+  .route('/policies', policies)
   // F1: scheduling
   .route('/scheduling', schedulingRoutes)
   .route('/timetables', timetableRoutes)

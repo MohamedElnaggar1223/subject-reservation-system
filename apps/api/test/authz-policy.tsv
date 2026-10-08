@@ -84,7 +84,7 @@ POST	/v1/registrations/:id/swap	D	D	A	D	D	D	D	D	D
 GET	/v1/registrations/:id	D	A	A	A	A	A	D	D	D
 POST	/v1/registrations/admin-override	D	D	D	D	D	A	D	D	D
 PUT	/v1/registrations/approve	D	D	A	D	D	D	D	D	D
-GET	/v1/registrations/available	D	A	A	A	A	A	D	D	D
+
 POST	/v1/registrations/desk	D	D	D	A	A	A	D	D	D
 POST	/v1/registrations/desk/collect	D	D	D	A	A	A	D	D	D
 POST	/v1/registrations/direct	D	D	A	D	D	D	D	D	D
@@ -130,11 +130,11 @@ GET	/v1/school-fees/status	D	A	A	A	A	A	D	D	D
 GET	/v1/session	D	A	A	A	A	A	A	A	A
 POST	/v1/sessions/:id/activate	D	D	D	D	D	A	D	D	D
 POST	/v1/sessions/:id/close	D	D	D	D	D	A	D	D	D
-GET	/v1/sessions/:id	D	D	D	D	D	A	D	D	D
+GET	/v1/sessions/:id	D	D	D	A	A	A	A	D	D
 PUT	/v1/sessions/:id	D	D	D	D	D	A	D	D	D
 GET	/v1/sessions/active	D	A	A	A	A	A	A	D	D
 GET	/v1/sessions/upcoming	D	A	A	A	A	A	A	D	D
-GET	/v1/sessions	D	D	D	D	D	A	A	D	D
+GET	/v1/sessions	D	D	D	A	A	A	A	D	D
 POST	/v1/sessions	D	D	D	D	D	A	D	D	D
 PUT	/v1/subjects/:id/activate	D	D	D	D	D	A	D	D	D
 PUT	/v1/subjects/:id/core	D	D	D	D	D	A	D	D	D
@@ -225,7 +225,6 @@ DELETE	/v1/board-series/:id	D	D	D	D	D	A	A	D	D
 GET	/v1/board-series/inferred	D	D	D	A	A	A	A	D	D
 POST	/v1/board-series/inferred/checked	D	D	D	D	D	A	A	D	D
 GET	/v1/sessions/:id/board-series	D	D	D	D	D	A	A	D	D
-PUT	/v1/sessions/:id/board-series	D	D	D	D	D	A	D	D	D
 POST	/v1/sessions/:id/board-series/move	D	D	D	D	D	A	D	D	D
 GET	/v1/enrolments	D	D	D	A	A	A	A	D	D
 GET	/v1/enrolments/check	D	D	D	A	A	A	A	D	D
@@ -239,6 +238,54 @@ POST	/v1/enrolments/:id/end	D	D	D	D	D	A	A	D	D
 POST	/v1/enrolments/bulk	D	D	D	D	D	A	A	D	D
 POST	/v1/enrolments/section	D	D	D	D	D	A	A	D	D
 POST	/v1/enrolments/batch	D	D	D	D	D	A	A	D	D
+# The reservations rework, step 1 (RESERVATIONS_REWORK.md §5; docs/features/RESERVATIONS.md §2.9):
+# the session's links sheet (offers, teachers, items) is the admin's and the coordinator's; the
+# Money tab the admin's and finance's; the grade-10 bulk the admin's and the coordinator's; the fee
+# grids the admin's and the finance admin's (the coordinator reads them); a student's offers the
+# student, a linked parent and staff with student records (the handler checks which student).
+POST	/v1/sessions/:id/copy-from	D	D	D	D	D	A	D	D	D
+GET	/v1/sessions/:id/offers	D	D	D	D	D	A	A	D	D
+GET	/v1/sessions/:id/offers/addable	D	D	D	D	D	A	A	D	D
+POST	/v1/sessions/:id/offers	D	D	D	D	D	A	A	D	D
+PUT	/v1/sessions/:id/offers/:offerId	D	D	D	D	D	A	A	D	D
+DELETE	/v1/sessions/:id/offers/:offerId	D	D	D	D	D	A	A	D	D
+POST	/v1/sessions/:id/offers/:offerId/replace-teacher	D	D	D	D	D	A	A	D	D
+POST	/v1/sessions/:id/offers/:offerId/items	D	D	D	D	D	A	A	D	D
+PUT	/v1/sessions/:id/offers/:offerId/items/:itemId	D	D	D	D	D	A	A	D	D
+DELETE	/v1/sessions/:id/offers/:offerId/items/:itemId	D	D	D	D	D	A	A	D	D
+GET	/v1/sessions/:id/money	D	D	D	A	A	A	D	D	D
+POST	/v1/sessions/:id/grade10/preview	D	D	D	D	D	A	A	D	D
+POST	/v1/sessions/:id/grade10/commit	D	D	D	D	D	A	A	D	D
+GET	/v1/board-fees	D	D	D	D	A	A	A	D	D
+PUT	/v1/board-fees	D	D	D	D	A	A	D	D	D
+POST	/v1/board-fees/:seriesId/confirm	D	D	D	D	A	A	D	D	D
+POST	/v1/board-fees/:seriesId/reprice	D	D	D	D	A	A	D	D	D
+POST	/v1/board-fees/:seriesId/copy	D	D	D	D	A	A	D	D	D
+POST	/v1/board-fees/:seriesId/parse	D	D	D	D	A	A	D	D	D
+GET	/v1/registrations/offers	D	A	A	A	A	A	A	D	D
+# The reservations rework, step C (docs/features/RESERVATIONS_MONEY.md §5): charges, board services, the registry, the desk-drop, the push.
+GET	/v1/board-services	D	A	A	A	A	A	A	D	D
+PUT	/v1/board-services/:id	D	D	D	D	D	A	A	D	D
+PUT	/v1/board-services/deadlines	D	D	D	D	D	A	A	D	D
+PUT	/v1/board-services/fees	D	D	D	D	A	A	D	D	D
+PUT	/v1/board-services/:id/refund-rule	D	D	D	D	A	A	D	D	D
+GET	/v1/charges	D	A	A	A	A	A	D	D	D
+POST	/v1/charges	D	A	A	A	A	A	D	D	D
+POST	/v1/charges/:id/accept	D	D	D	A	A	A	D	D	D
+POST	/v1/charges/:id/cancel	D	D	D	A	A	A	D	D	D
+POST	/v1/charges/:id/refund	D	D	D	D	A	A	D	D	D
+GET	/v1/exceptions/check-these	D	D	D	D	A	A	A	D	D
+POST	/v1/exceptions/:id/confirm	D	D	D	D	A	A	A	D	D
+POST	/v1/exceptions/:id/release	D	D	D	D	A	A	D	D	D
+POST	/v1/exceptions/:id/revocation	D	D	D	D	A	A	A	D	D
+GET	/v1/policies	D	D	D	A	A	A	A	D	D
+POST	/v1/registrations/:id/desk-drop	D	D	D	A	A	A	D	D	D
+POST	/v1/school-fees/push	D	D	D	D	A	A	D	D	D
+GET	/v1/sessions/:id/to-verify	D	D	D	A	A	A	A	D	D
+GET	/v1/sessions/:id/refund-terms	D	A	A	A	A	A	A	D	D
+POST	/v1/registrations/:id/verify-prior	D	D	D	A	A	A	A	D	D
+PUT	/v1/registrations/:id/teacher	D	D	D	A	A	A	A	D	D
+GET	/v1/statement	D	A	A	A	A	A	A	D	D
 # F1 (FEATURES_PLAN.md): scheduling. Groups, the year's rules, timetables, the generator, publishing,
 # exports and cover are the coordinator's and the admin's. The views decide in the handler who may read
 # which student, teacher, room or section (05: another family, another class, a cover teacher outside

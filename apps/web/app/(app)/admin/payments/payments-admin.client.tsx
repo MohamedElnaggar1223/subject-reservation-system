@@ -175,24 +175,43 @@ export default function AdminPaymentsClient() {
                     )}
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">
-                      Subjects ({pay.paymentRegistrations.length})
-                    </p>
-                    <ul className="space-y-0.5">
-                      {pay.paymentRegistrations.map((pr) => (
-                        <li key={pr.registrationId} className="text-xs text-card-foreground flex justify-between">
-                          <span>
-                            {pr.registration.subject.name}
-                            <span className="text-muted-foreground ml-1 font-mono text-xs">
-                              ({pr.registration.subject.code})
-                            </span>
-                          </span>
-                          <span className="text-muted-foreground shrink-0 ml-2">
-                            {pr.registration.priceAtRegistration.toFixed(2)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    {/* A line payment lists its subjects; a charge payment (§3.10 item 1) its charges. */}
+                    {pay.paymentRegistrations.length > 0 || pay.paymentCharges.length === 0 ? (
+                      <>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">
+                          Subjects ({pay.paymentRegistrations.length})
+                        </p>
+                        <ul className="space-y-0.5">
+                          {pay.paymentRegistrations.map((pr) => (
+                            <li key={pr.registrationId} className="text-xs text-card-foreground flex justify-between">
+                              <span>
+                                {pr.registration.subject.name}
+                                <span className="text-muted-foreground ml-1 font-mono text-xs">
+                                  ({pr.registration.subject.code})
+                                </span>
+                              </span>
+                              <span className="text-muted-foreground shrink-0 ml-2">
+                                {pr.registration.priceAtRegistration.toFixed(2)}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">
+                          Charges ({pay.paymentCharges.length})
+                        </p>
+                        <ul className="space-y-0.5">
+                          {pay.paymentCharges.map((pc) => (
+                            <li key={pc.chargeId} className="text-xs text-card-foreground flex justify-between">
+                              <span>{pc.charge.description}</span>
+                              <span className="text-muted-foreground shrink-0 ml-2">{pc.charge.amount.toFixed(2)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
                   </div>
                 </div>
 

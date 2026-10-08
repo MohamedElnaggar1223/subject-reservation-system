@@ -1,38 +1,42 @@
 /**
- * Registration Session Service
+ * Registration sessions (RESERVATIONS_REWORK.md §3.1, §4.1; docs/features/RESERVATIONS.md §1.1).
  *
- * Business logic for all registration window operations:
- * - CRUD for sessions (admin)
- * - Lifecycle management: draft → active → closed
- * - Active session queries (all authenticated users)
- * - Auto-close for expired windows
+ * A session is one cycle of the school: its type (June, or winter: November with October and
+ * the January after) and year make it, its name is derived, and its offers are its content
+ * (offer.services.ts). Its own dates say when families may reserve; what each item can do ends
+ * at its series' deadline (§3.3), so a session may stay open past one of them.
  *
- * Key rules enforced here:
- * - Only one active session per sessionType at a time (also enforced by DB partial unique index)
- * - Draft sessions: any field may be updated
- * - Active sessions: only endDate may be extended; all changes are audit-logged
- * - Closed sessions: no updates allowed
- *
- * All database imports come from @repo/db — never from drizzle-orm directly.
+ * - Lifecycle: draft → active → closed; one active session per (type, year, label).
+ * - A draft's header may change freely; an active session's end (with a reason), course start,
+ *   payment due date and — until the first line carries a consent — its refund policy.
+ * - Closed sessions are history.
  */
 
-import { db, registrationSession, registration, changeRequest, paymentRegistration, payment, user, examBoard, eq, and, lte, inArray, notInArray, isNull, sql } from '@repo/db';
+import {
+  db, registrationSession, registration, changeRequest, paymentRegistration, payment, user, examBoard, registrationConsent,
+  sessionOffer, sessionOfferItem, subject, boardSeries, sessionBoardSeries,
+  eq, and, lte, inArray, notInArray, isNull, sql,
+} from '@repo/db';
 import { capturePreregistrationsForSession } from './prereg.services';
 import { notifySessionOpened, createNotification, notifyPaymentReferenceDue } from './notification.services';
 import { failPayment, closeStrandedPayments } from './payment.services';
-import { schoolDate } from './window.services';
 import { logAction, logActions, type AuditContext } from './audit.services';
 import { expireWaitingRegistrations } from './expiry.services';
+import { lastInstalmentBeingCheckedSql } from './plan.services';
 import { expireIneligibleRegistrations } from './eligibility.services';
-import { A_LEVEL_ONLY_SESSION_TYPES, A_LEVEL_ONLY_MESSAGE, seriesLabel, type CorrectSessionSeriesType, type SessionType } from '@repo/validations';
+import { deriveSessionName, seriesLabel, sessionSeriesMonths, type CorrectSessionSeriesType, type CreateSessionType, type UpdateSessionType } from '@repo/validations';
 import { env } from '../env';
 import { randomUUID } from 'crypto';
-import { linkNewWindowSeries, seriesRuleSentence, windowDeadlines, windowChangeMisfit, windowPastDeadlineSentence, boardSeriesName } from './series.services';
-import type {
-  CreateSessionType,
-  UpdateDraftSessionType,
-  UpdateActiveSessionType,
-} from '@repo/validations';
+import { seriesRuleSentence, windowChangeMisfit, boardSeriesName, openCheckoutsSpanningDeadlines } from './series.services';
+import { findOrCreateSeries, defaultSeriesFor, attachSeries, copyOffersFrom } from './offer.services';
+import { effectiveDeadlinesOf } from './deadline.services';
+import { schoolDate } from './window.services';
+import { getSetting } from './settings.services';
+import { dueDateFor, redateLines } from './deadline.services';
+import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
+import { lockMoveFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
+import { recheckLines, LineRuleError } from './line-rules.services';
+import { PricingError } from './pricing.services';
 
 /**
  * Determine the correct initial status when creating a session.
@@ -40,6 +44,13 @@ import type {
  */
 function resolveInitialStatus(startDate: Date): 'draft' | 'active' {
   return startDate <= new Date() ? 'active' : 'draft';
+}
+
+/** A refusal with the status the route answers. */
+export class SessionError extends Error {
+  constructor(message: string, public readonly status: 400 | 404 | 409 = 400) {
+    super(message);
+  }
 }
 
 /**
@@ -78,17 +89,59 @@ export async function getSessions(filters?: {
       if (filters?.sessionType) conditions.push(eq(s.sessionType, filters.sessionType));
       return conditions.length > 0 ? and(...conditions) : undefined;
     },
-    // F0b: the board series each window feeds, with their entry deadlines.
-    with: { boardSeriesLinks: { columns: { isDefault: true }, with: { boardSeries: { columns: { id: true, boardCode: true, month: true, year: true, label: true, entryDeadline: true } } } } },
+    // The board series each session's items are entered in, with their deadlines.
+    with: { boardSeriesLinks: { columns: { isDefault: true }, with: { boardSeries: { columns: { id: true, boardCode: true, month: true, year: true, label: true, entryDeadline: true, retakeDeadline: true, examsStart: true } } } } },
     orderBy: (s, { desc }) => [desc(s.startDate)],
   });
   const names = new Map((await db.select({ code: examBoard.code, name: examBoard.name }).from(examBoard)).map((b) => [b.code, b.name]));
-  return rows.map(({ boardSeriesLinks, ...s }) => ({
-    ...s,
-    boardSeries: boardSeriesLinks
-      .map((l) => ({ id: l.boardSeries.id, name: boardSeriesName(names, l.boardSeries), boardCode: l.boardSeries.boardCode, entryDeadline: l.boardSeries.entryDeadline, isDefault: l.isDefault }))
-      .sort((a, b) => (a.entryDeadline?.getTime() ?? Infinity) - (b.entryDeadline?.getTime() ?? Infinity) || a.name.localeCompare(b.name)),
-  }));
+  const ids = rows.map((r) => r.id);
+  // The list's second and third lines (§4.1): subjects and boards; lines, paid, unpaid, outstanding.
+  const [offerCounts, lineSums] = ids.length
+    ? await Promise.all([
+        db.execute(sql`
+          select o.session_id as id, count(*)::int as offers, count(distinct s.council)::int as boards
+          from session_offer o join subject s on s.id = o.subject_id
+          where o.session_id in (${sql.join(ids.map((id) => sql`${id}`), sql`, `)}) and o.availability <> 'closed'
+          group by o.session_id`).then((r) => r.rows as { id: string; offers: number; boards: number }[]),
+        db.execute(sql`
+          select r.session_id as id,
+            count(*) filter (where r.status not in ('rejected', 'expired', 'dropped'))::int as lines,
+            count(*) filter (where r.status = 'confirmed')::int as paid,
+            count(*) filter (where r.status in ('pending_approval', 'pending_payment'))::int as unpaid,
+            coalesce(sum(r.price_at_registration) filter (where r.status = 'pending_payment'), 0)::numeric as outstanding,
+            count(*) filter (where r.status = 'pending_payment' and r.due_at < now())::int as overdue
+          from registration r
+          where r.session_id in (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
+          group by r.session_id`).then((r) => r.rows as { id: string; lines: number; paid: number; unpaid: number; outstanding: string; overdue: number }[]),
+      ])
+    : [[], []];
+  const now = new Date();
+  return rows.map(({ boardSeriesLinks, ...s }) => {
+    const o = offerCounts.find((x) => x.id === s.id);
+    const l = lineSums.find((x) => x.id === s.id);
+    return {
+      ...s,
+      boardSeries: boardSeriesLinks
+        .map((link) => ({
+          id: link.boardSeries.id, name: boardSeriesName(names, link.boardSeries), boardCode: link.boardSeries.boardCode,
+          boardName: names.get(link.boardSeries.boardCode) ?? link.boardSeries.boardCode, month: link.boardSeries.month,
+          year: link.boardSeries.year, label: link.boardSeries.label,
+          entryDeadline: link.boardSeries.entryDeadline, retakeDeadline: link.boardSeries.retakeDeadline, examsStart: link.boardSeries.examsStart,
+          entryDeadlinePassed: !!link.boardSeries.entryDeadline && link.boardSeries.entryDeadline <= now,
+          isDefault: link.isDefault,
+        }))
+        .sort((a, b) => (a.entryDeadline?.getTime() ?? Infinity) - (b.entryDeadline?.getTime() ?? Infinity) || a.name.localeCompare(b.name)),
+      summary: {
+        offers: o?.offers ?? 0,
+        boards: o?.boards ?? 0,
+        lines: l?.lines ?? 0,
+        paid: l?.paid ?? 0,
+        unpaid: l?.unpaid ?? 0,
+        overdue: l?.overdue ?? 0,
+        outstanding: Number(l?.outstanding ?? 0),
+      },
+    };
+  });
 }
 
 /**
@@ -122,7 +175,8 @@ export async function getActiveSession(sessionType: string) {
  */
 export async function hasActiveSessionOfType(
   sessionType: string,
-  qualificationLevel: string,
+  seriesYear: number,
+  label: string,
   excludeId?: string
 ): Promise<boolean> {
   const found = await db.query.registrationSession.findFirst({
@@ -130,7 +184,8 @@ export async function hasActiveSessionOfType(
       const base = and(
         eq(s.status, 'active'),
         eq(s.sessionType, sessionType),
-        eq(s.qualificationLevel, qualificationLevel),
+        eq(s.seriesYear, seriesYear),
+        eq(s.label, label),
       );
       return excludeId ? and(base, ne(s.id, excludeId)) : base;
     },
@@ -138,6 +193,9 @@ export async function hasActiveSessionOfType(
   });
   return !!found;
 }
+
+const sameCycle = (s: { sessionType: string; seriesYear: number; label: string }) =>
+  `An active ${deriveSessionName(s.sessionType, s.seriesYear, s.label)} session already exists. Close it before opening another.`;
 
 /**
  * Create a new registration session.
@@ -151,205 +209,179 @@ export async function hasActiveSessionOfType(
  * Returns the created session.
  * Throws if the immediate-active path would violate the unique-per-type constraint.
  */
-export async function createSession(data: CreateSessionType, actorId?: string) {
+/**
+ * Create a session (§4.1): six inputs — type, year, reserve from, reserve to, course starts,
+ * payment due. The name is derived; the refund policy is the type's setting; with
+ * `copyFromSessionId` the offers, teachers, items, availability and course fees come across and
+ * the board fees come across provisional. A session whose start has come opens at once (one
+ * active session per type, year and label). Created and audited in one transaction.
+ */
+export async function createSession(data: CreateSessionType, actorId: string, ctx?: AuditContext) {
   const initialStatus = resolveInitialStatus(data.startDate);
-
-  const qualificationLevel = data.qualificationLevel ?? 'igcse';
-
-  if (initialStatus === 'active') {
-    const conflict = await hasActiveSessionOfType(data.sessionType, qualificationLevel);
-    if (conflict) {
-      throw new Error(
-        `An active ${qualificationLevel} ${data.sessionType} session already exists. Close it before opening a new one.`
-      );
-    }
+  const label = data.label ?? '';
+  if (initialStatus === 'active' && (await hasActiveSessionOfType(data.type, data.year, label))) {
+    throw new SessionError(sameCycle({ sessionType: data.type, seriesYear: data.year, label }), 409);
   }
-
   const id = randomUUID();
-
-  // F0b: the window and the board series it feeds are created together.
-  const created = await db.transaction(async (tx) => {
-    const [row] = await tx
-      .insert(registrationSession)
-      .values({
-        id,
-        name: data.name,
-        sessionType: data.sessionType,
-        seriesYear: data.seriesYear,
-        qualificationLevel,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        status: initialStatus,
-        editHistory: [],
-      })
-      .returning();
-    if (data.boardSeries?.length) await linkNewWindowSeries(tx, row!, data.boardSeries, actorId ?? null);
-    return row;
-  }).catch((err) => {
+  const name = deriveSessionName(data.type, data.year, label);
+  const refundPolicy = await getSetting(data.type === 'june' ? 'refund.defaultPolicy.june' : 'refund.defaultPolicy.winter');
+  try {
+    const created = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(registrationSession)
+        .values({
+          id,
+          name,
+          sessionType: data.type,
+          seriesYear: data.year,
+          label,
+          qualificationLevel: null,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          courseStartsOn: data.courseStartsOn,
+          paymentDueAt: data.paymentDueAt,
+          refundPolicy,
+          status: initialStatus,
+          editHistory: [],
+        })
+        .returning();
+      const copied = data.copyFromSessionId ? await copyOffersFrom(tx, row!, data.copyFromSessionId, actorId) : null;
+      await logAction(actorId, 'SESSION_CREATED', 'session', id, null, { ...(row as Record<string, unknown>), copied }, ctx, tx);
+      return { ...row!, copied };
+    });
+    if (initialStatus === 'active') {
+      const students = await db.query.user.findMany({ where: (u, { eq: eqOp }) => eqOp(u.role, 'student'), columns: { id: true } });
+      const parents = await db.query.user.findMany({ where: (u, { eq: eqOp }) => eqOp(u.role, 'parent'), columns: { id: true } });
+      notifySessionOpened({
+        sessionId: id,
+        sessionName: name,
+        sessionType: data.type,
+        deadline: data.endDate,
+        studentIds: students.map((s) => s.id),
+        parentIds: parents.map((p) => p.id),
+      }).catch((err) => console.error('[notification] session-opened (immediate) failed:', err));
+    }
+    return created;
+  } catch (err) {
+    if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') {
+      throw new SessionError(sameCycle({ sessionType: data.type, seriesYear: data.year, label }), 409);
+    }
     const sentence = seriesRuleSentence(err);
-    if (sentence) throw new Error(sentence);
+    if (sentence) throw new SessionError(sentence, 409);
     throw err;
-  });
-
-  if (initialStatus === 'active') {
-    const students = await db.query.user.findMany({
-      where: (u, { eq: eqOp }) => eqOp(u.role, 'student'),
-      columns: { id: true },
-    });
-    const parents = await db.query.user.findMany({
-      where: (u, { eq: eqOp }) => eqOp(u.role, 'parent'),
-      columns: { id: true },
-    });
-    notifySessionOpened({
-      sessionId: id,
-      sessionName: data.name,
-      sessionType: data.sessionType,
-      deadline: data.endDate,
-      studentIds: students.map((s) => s.id),
-      parentIds: parents.map((p) => p.id),
-    }).catch((err) => console.error('[notification] session-opened (immediate) failed:', err));
   }
-
-  return created;
 }
 
-export class DraftSessionError extends Error {
-  constructor(message: string, public readonly status: 400 | 409) {
-    super(message);
+/** Copy an earlier session's offers into this one (an open or draft session). */
+export async function copySessionFrom(id: string, fromSessionId: string, actorId: string) {
+  try {
+    return await db.transaction(async (tx) => {
+      const [s] = await tx.select().from(registrationSession).where(eq(registrationSession.id, id)).for('share');
+      if (!s) throw new SessionError('Session not found', 404);
+      if (s.status === 'closed') throw new SessionError('This session is closed');
+      return copyOffersFrom(tx, s, fromSessionId, actorId);
+    });
+  } catch (err) {
+    const sentence = seriesRuleSentence(err);
+    if (sentence) throw new SessionError(sentence, 409);
+    throw err;
   }
 }
 
 /**
- * Update a DRAFT session, audited in the same transaction (SESSION_UPDATED,
- * before and after, with the reason).
- *
- * All fields may be changed while the session has not yet been activated,
- * except its exam series (type and year) once anyone has preregistered for
- * it: the series decides each student's grade, so that change goes through
- * the audited series correction (PUT /sessions/:id/series), which asks
- * again whether each student may sit it (F0a). Returns the updated session,
- * or undefined if it is not found or no longer a draft.
+ * Change a session's header, audited in the same transaction (SESSION_UPDATED, before and
+ * after, with the reason). A draft may change its dates, course start, payment due date and
+ * refund policy; an active session its end (in the future, with a reason), course start and
+ * payment due date, and its refund policy until the first line carries a consent (§3.1) —
+ * after that, only an exception changes one student's. A closed session is history. The type and
+ * year change only through "Correct series". A new payment due date moves the due dates of the
+ * session's waiting lines (dueDateFor), each audited.
  */
-export async function updateDraftSession(
-  id: string,
-  data: UpdateDraftSessionType,
-  actorId: string,
-  reason: string | null,
-  auditCtx?: AuditContext,
-) {
+export async function updateSession(id: string, data: UpdateSessionType, actorId: string, ctx?: AuditContext) {
   return db.transaction(async (tx) => {
     const [current] = await tx.select().from(registrationSession).where(eq(registrationSession.id, id)).for('update');
-    if (!current || current.status !== 'draft') return undefined;
-
-    // V3 §5.5: validate the MERGED state never yields a January IGCSE
-    // session (no January IGCSE series exists in Egypt).
-    const mergedType = data.sessionType ?? current.sessionType;
-    const mergedLevel = data.qualificationLevel ?? current.qualificationLevel;
-    if (A_LEVEL_ONLY_SESSION_TYPES.includes(mergedType as SessionType) && mergedLevel === 'igcse') {
-      throw new DraftSessionError(A_LEVEL_ONLY_MESSAGE, 400);
-    }
-    // F0b: the window still closes before the entry deadline of every series
-    // it feeds — read under the window's lock, so a deadline moved while this
-    // waited is the one judged (the route's check ran before the lock) —
-    // and the series still fit it (its academic year, June or not).
-    const { earliest } = await windowDeadlines(id, tx);
-    if (earliest && (data.endDate ?? current.endDate) >= earliest) throw new DraftSessionError(windowPastDeadlineSentence(earliest), 400);
-    const misfit = await windowChangeMisfit(tx, id, {
-      sessionType: mergedType,
-      seriesYear: data.seriesYear ?? current.seriesYear,
-      qualificationLevel: mergedLevel,
-      endDate: data.endDate ?? current.endDate,
-    });
-    if (misfit) throw new DraftSessionError(misfit, 400);
-
-    const seriesChanges =
-      (data.sessionType !== undefined && data.sessionType !== current.sessionType) ||
-      (data.seriesYear !== undefined && data.seriesYear !== current.seriesYear);
-    if (seriesChanges) {
-      const [taken] = await tx.select({ id: registration.id }).from(registration)
-        .where(and(eq(registration.sessionId, id), notInArray(registration.status, ['dropped', 'rejected', 'expired'])))
-        .limit(1);
-      if (taken) {
-        throw new DraftSessionError(
-          'This window already has preregistrations: change its exam series with "Correct series", which records a reason and checks each student again',
-          409,
-        );
+    if (!current) throw new SessionError('Session not found', 404);
+    if (current.status === 'closed') throw new SessionError('Cannot update a closed session');
+    const next: Partial<typeof registrationSession.$inferInsert> = {};
+    if (current.status === 'active') {
+      if (data.startDate && data.startDate.getTime() !== current.startDate.getTime()) {
+        throw new SessionError('An open session keeps its start date');
       }
+      if (data.endDate && data.endDate.getTime() !== current.endDate.getTime()) {
+        if (data.endDate <= new Date()) throw new SessionError('New end date must be in the future (close the session to end it now)');
+        if (!data.reason || data.reason.trim().length < 5) throw new SessionError('Please provide a reason for the deadline change');
+        next.endDate = data.endDate;
+        if (data.endDate.getTime() > Date.now() + 24 * 60 * 60 * 1000) next.reminderSentAt = null;
+      }
+    } else {
+      if (data.startDate) next.startDate = data.startDate;
+      if (data.endDate) next.endDate = data.endDate;
     }
-
-    const [updated] = await tx
-      .update(registrationSession)
-      .set({ ...data, updatedAt: new Date() })
-      .where(and(eq(registrationSession.id, id), eq(registrationSession.status, 'draft')))
-      .returning();
-    await logAction(actorId, 'SESSION_UPDATED', 'session', id, current as Record<string, unknown>,
-      {
-        ...(updated as Record<string, unknown>),
-        _updateReason: reason,
-        ...(seriesChanges ? { seriesChanged: { from: seriesLabel(current.sessionType, current.seriesYear), to: seriesLabel(mergedType, updated!.seriesYear) } } : {}),
-      },
-      auditCtx, tx);
-    return updated;
+    if ((next.endDate ?? current.endDate) <= (next.startDate ?? current.startDate)) throw new SessionError('End date must be after start date');
+    if (data.courseStartsOn && data.courseStartsOn !== current.courseStartsOn) next.courseStartsOn = data.courseStartsOn;
+    if (data.paymentDueAt && data.paymentDueAt.getTime() !== current.paymentDueAt.getTime()) next.paymentDueAt = data.paymentDueAt;
+    if (data.refundPolicy && JSON.stringify(data.refundPolicy) !== JSON.stringify(current.refundPolicy)) {
+      const [consented] = await tx.select({ id: registrationConsent.id }).from(registrationConsent)
+        .innerJoin(registration, eq(registration.id, registrationConsent.registrationId))
+        .where(and(eq(registration.sessionId, id), eq(registrationConsent.kind, 'refund_policy'))).limit(1);
+      if (consented) throw new SessionError('A family has consented to this session\'s refund policy: it can no longer change (an exception changes one student\'s)', 409);
+      next.refundPolicy = data.refundPolicy;
+    }
+    if (!Object.keys(next).length) throw new SessionError('Nothing to change');
+    const history = Object.entries(next)
+      .filter(([k]) => k !== 'reminderSentAt')
+      .map(([field, v]) => ({
+        editedBy: actorId, editedAt: new Date().toISOString(), field,
+        oldValue: JSON.stringify((current as Record<string, unknown>)[field] ?? null), newValue: JSON.stringify(v ?? null), reason: data.reason ?? undefined,
+      }));
+    const [updated] = await tx.update(registrationSession).set({
+      ...next,
+      editHistory: sql`COALESCE(${registrationSession.editHistory}, '[]'::jsonb) || ${JSON.stringify(history)}::jsonb`,
+      updatedAt: new Date(),
+    }).where(eq(registrationSession.id, id)).returning();
+    // The payment due date moved: the waiting lines' due dates follow.
+    let dueMoved = 0;
+    if (next.paymentDueAt) {
+      const waiting = await tx.select({ id: registration.id }).from(registration)
+        .where(and(eq(registration.sessionId, id), inArray(registration.status, ['pending_approval', 'pending_payment', 'preregistered'])))
+        .orderBy(registration.id).for('update');
+      dueMoved = await redateLines(tx, waiting.map((w) => w.id), actorId, 'the session\'s payment due date changed');
+    }
+    await logAction(actorId, 'SESSION_UPDATED', 'session', id,
+      Object.fromEntries(Object.keys(next).map((k) => [k, (current as Record<string, unknown>)[k] ?? null])),
+      { ...next, reason: data.reason ?? null, dueDatesMoved: dueMoved }, ctx, tx);
+    return { ...updated!, dueDatesMoved: dueMoved };
   });
 }
 
 /**
- * Change the deadline of an ACTIVE session.
- *
- * Only the endDate may be changed once a session is active. The route
- * layer requires the new endDate to be in the future AND different from
- * the current one; this function accepts both forward extensions and
- * earlier-but-still-future deadlines. Every change is appended to the
- * editHistory audit trail with the adminId, timestamp, old value, new
- * value, and a mandatory reason. When the new endDate is more than 24
- * hours away, reminderSentAt is reset so NOT-002 fires again for the
- * new deadline (see H-7 in FIX_AND_COMPLETION_PLAN notes).
- *
- * Returns the updated session, or undefined if not found / wrong status.
+ * The session's header for its screen (§4.2): the session, the series its items are entered in
+ * (deadlines), and whether its refund policy can still change.
  */
-export async function extendActiveSessionDeadline(
-  id: string,
-  data: UpdateActiveSessionType,
-  adminId: string
-) {
-  const session = await getSessionById(id);
-  if (!session || session.status !== 'active') return undefined;
-
-  // Atomic JSONB append — wraps the new entry in an array so the || operator
-  // concatenates arrays rather than merging objects, preventing TOCTOU races.
-  const newEntryArray = JSON.stringify([{
-    editedBy: adminId,
-    editedAt: new Date().toISOString(),
-    field: 'endDate',
-    oldValue: session.endDate.toISOString(),
-    newValue: data.endDate.toISOString(),
-    reason: data.reason,
-  }]);
-
-  // If the deadline moves more than 24h into the future, clear the
-  // "reminder already sent" flag so NOT-002 fires again relative to the
-  // new endDate. Otherwise users miss the updated closing warning.
-  const in24h = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const shouldResetReminder = data.endDate > in24h;
-
-  const [updated] = await db
-    .update(registrationSession)
-    .set({
-      endDate: data.endDate,
-      editHistory: sql`COALESCE(${registrationSession.editHistory}, '[]'::jsonb) || ${newEntryArray}::jsonb`,
-      ...(shouldResetReminder ? { reminderSentAt: null } : {}),
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(registrationSession.id, id),
-        eq(registrationSession.status, 'active')
-      )
-    )
-    .returning();
-
-  return updated;
+export async function getSessionDetail(id: string) {
+  const s = await getSessionById(id);
+  if (!s) return undefined;
+  const names = new Map((await db.select({ code: examBoard.code, name: examBoard.name }).from(examBoard)).map((b) => [b.code, b.name]));
+  const links = await db.select({ series: boardSeries }).from(sessionBoardSeries).innerJoin(boardSeries, eq(boardSeries.id, sessionBoardSeries.boardSeriesId))
+    .where(eq(sessionBoardSeries.sessionId, id));
+  const [consented] = await db.select({ id: registrationConsent.id }).from(registrationConsent)
+    .innerJoin(registration, eq(registration.id, registrationConsent.registrationId))
+    .where(and(eq(registration.sessionId, id), eq(registrationConsent.kind, 'refund_policy'))).limit(1);
+  const [offers] = await db.select({ n: sql<number>`count(*)::int` }).from(sessionOffer).where(eq(sessionOffer.sessionId, id));
+  const now = new Date();
+  return {
+    ...s,
+    months: sessionSeriesMonths(s.sessionType, s.seriesYear),
+    refundPolicyLocked: !!consented,
+    offers: offers?.n ?? 0,
+    series: links.map(({ series: b }) => ({
+      id: b.id, name: boardSeriesName(names, b), boardCode: b.boardCode, boardName: names.get(b.boardCode) ?? b.boardCode, month: b.month, year: b.year, label: b.label,
+      entryDeadline: b.entryDeadline, retakeDeadline: b.retakeDeadline, examsStart: b.examsStart,
+      entryDeadlinePassed: !!b.entryDeadline && b.entryDeadline <= now, reservable: !!(b.entryDeadline || b.examsStart),
+    })).sort((a, b) => (a.entryDeadline?.getTime() ?? Infinity) - (b.entryDeadline?.getTime() ?? Infinity) || a.name.localeCompare(b.name)),
+  };
 }
+
 
 /**
  * Correct a window's exam series (type and year), in any status, with a
@@ -360,32 +392,103 @@ export async function extendActiveSessionDeadline(
  */
 export async function correctSessionSeries(id: string, data: CorrectSessionSeriesType, adminId: string, auditCtx?: AuditContext) {
   try {
-    return await db.transaction(async (tx) => {
+    const out = await withStudentsFirst((extra) => db.transaction(async (tx) => {
+      // The students with live lines first (§6: every path that puts a line into a series), then the session.
+      const students = await tx.selectDistinct({ id: registration.studentId }).from(registration)
+        .where(and(eq(registration.sessionId, id), notInArray(registration.status, ['rejected', 'expired', 'dropped'])));
+      const locked = await lockStudents(tx, [...students.map((s) => s.id), ...extra]);
       const [sess] = await tx.select().from(registrationSession).where(eq(registrationSession.id, id)).for('update');
       if (!sess) throw new Error('Session not found');
       if (sess.sessionType === data.sessionType && sess.seriesYear === data.seriesYear) {
-        throw new Error(`This window is already for the ${seriesLabel(data.sessionType, data.seriesYear)} series`);
+        throw new Error(`This session is already for the ${deriveSessionName(data.sessionType, data.seriesYear)} series`);
       }
-      if (A_LEVEL_ONLY_SESSION_TYPES.includes(data.sessionType) && sess.qualificationLevel === 'igcse') {
-        throw new Error(A_LEVEL_ONLY_MESSAGE);
+      // Since the reservations rework the session's items carry it into the corrected series: each
+      // item goes to the corresponding series of the new type and year (same board, month and
+      // label; a June item of a winter correction to its default), with its live lines. Lines that
+      // are history pin their series, which then no longer fits: refused, as F0b refused a window
+      // whose fed series would not fit.
+      const items = await tx.select({ id: sessionOfferItem.id, seriesId: sessionOfferItem.boardSeriesId, offerId: sessionOfferItem.offerId, subjectLevel: subject.qualificationLevel })
+        .from(sessionOfferItem).innerJoin(sessionOffer, eq(sessionOffer.id, sessionOfferItem.offerId)).innerJoin(subject, eq(subject.id, sessionOffer.subjectId))
+        .where(eq(sessionOfferItem.sessionId, id)).orderBy(sessionOfferItem.id).for('update', { of: sessionOfferItem });
+      const history = await tx.select({ n: sql<number>`count(*)::int` }).from(registration)
+        .where(and(eq(registration.sessionId, id), inArray(registration.status, ['rejected', 'expired', 'dropped']), sql`${registration.boardSeriesId} is not null`));
+      const months = sessionSeriesMonths(data.sessionType, data.seriesYear);
+      const plan: { itemId: string; to: string | null }[] = [];
+      for (const it of items) {
+        if (!it.seriesId) { plan.push({ itemId: it.id, to: null }); continue; }
+        const [s] = await tx.select().from(boardSeries).where(eq(boardSeries.id, it.seriesId));
+        const same = months.find((m) => m.month === s!.month);
+        const to = same
+          ? (await findOrCreateSeries(tx, s!.boardCode, same.month, same.year, s!.label, adminId)).id
+          : await defaultSeriesFor(tx, data, s!.boardCode, it.subjectLevel === 'igcse' ? 'igcse' : it.subjectLevel === 'as_level' ? 'as' : 'a_level', adminId);
+        plan.push({ itemId: it.id, to });
       }
-      // F0b: the board series the window feeds must still fit its series.
-      const misfit = await windowChangeMisfit(tx, id, { ...sess, sessionType: data.sessionType, seriesYear: data.seriesYear });
-      if (misfit) throw new Error(misfit);
+      const moving = plan.some((p, i) => p.to !== items[i]!.seriesId);
+      if (moving && (history[0]?.n ?? 0) > 0) {
+        const misfit = await windowChangeMisfit(tx, id, { sessionType: data.sessionType, seriesYear: data.seriesYear });
+        if (misfit) throw new Error(`${misfit} (its lines that are history stay in the series they were in)`);
+      }
+      // The fee rows each item will read in its corrected series (carried provisional from the
+      // series it is in where finance has none), FOR SHARE before the lines — Confirm's order, so a
+      // Confirm of one lands first or waits and reaches the moved lines (the review of 40c1447).
+      await lockMoveFeeRows(tx, plan.map((p, n) => ({ itemId: p.itemId, fromSeriesId: items[n]!.seriesId, toSeriesId: p.to })), adminId, 'The session\'s series was corrected');
+      const live = await tx.select().from(registration)
+        .where(and(eq(registration.sessionId, id), notInArray(registration.status, ['rejected', 'expired', 'dropped'])))
+        .orderBy(registration.id).for('update');
+      // A line committed while the correction waited for the session: its student was not locked first.
+      assertStudentsLocked(locked, live.map((l) => l.studentId));
+      const now = new Date();
+      const passed = [...(await effectiveDeadlinesOf(tx, live.map((l) => l.id))).values()].find((d) => d.at && d.at <= now);
+      if (passed) throw new Error(`A line of this session is past its deadline (${schoolDate(passed.at!)}): its entry is made, and the session's series can no longer be corrected`);
+      // Out of the old series (items, then their live lines), the old links gone, the session corrected…
+      for (const p of plan) await tx.update(sessionOfferItem).set({ boardSeriesId: null }).where(eq(sessionOfferItem.id, p.itemId));
+      for (const l of live) await tx.update(registration).set({ boardSeriesId: null }).where(eq(registration.id, l.id));
+      await tx.execute(sql`
+        delete from session_board_series l where l.session_id = ${id}
+          and not exists (select 1 from registration r where r.session_id = l.session_id and r.board_series_id = l.board_series_id)`);
       const [updated] = await tx
         .update(registrationSession)
-        .set({ sessionType: data.sessionType, seriesYear: data.seriesYear, updatedAt: new Date() })
+        .set({ sessionType: data.sessionType, seriesYear: data.seriesYear, name: deriveSessionName(data.sessionType, data.seriesYear, sess.label), updatedAt: now })
         .where(eq(registrationSession.id, id))
         .returning();
+      // …then into the corresponding series.
+      for (const p of plan) {
+        if (!p.to) continue;
+        await attachSeries(tx, id, p.to, adminId);
+        await tx.update(sessionOfferItem).set({ boardSeriesId: p.to, updatedAt: now }).where(eq(sessionOfferItem.id, p.itemId));
+      }
+      for (const l of live) {
+        const to = plan.find((p) => p.itemId === l.offerItemId)?.to ?? null;
+        await tx.update(registration).set({ boardSeriesId: to, updatedAt: now }).where(eq(registration.id, l.id));
+      }
+      const spanning = await openCheckoutsSpanningDeadlines(tx, { registrationIds: live.map((l) => l.id) });
+      if (spanning > 0) throw new Error(`${spanning} checkout${spanning === 1 ? '' : 's'} still open would pay for two deadlines after the correction — confirm or cancel ${spanning === 1 ? 'it' : 'them'} first`);
       await logAction(adminId, 'SESSION_SERIES_CORRECTED', 'session', id,
         { sessionType: sess.sessionType, seriesYear: sess.seriesYear },
-        { sessionType: data.sessionType, seriesYear: data.seriesYear, reason: data.reason }, auditCtx, tx);
+        { sessionType: data.sessionType, seriesYear: data.seriesYear, reason: data.reason, itemsMoved: plan.filter((p) => p.to).length, linesMoved: live.length }, auditCtx, tx);
+      await logActions(live.map((l) => ({
+        userId: adminId, action: 'LINE_SERIES_MOVED' as const, entityType: 'registration' as const, entityId: l.id,
+        previousData: { boardSeriesId: l.boardSeriesId }, newData: { boardSeriesId: plan.find((p) => p.itemId === l.offerItemId)?.to ?? null, reason: data.reason },
+      })), tx);
+      // What the lines cost in the corrected series: its fee rows (held since before the lines),
+      // each student's lines checked again there.
+      let repriced: RepricedLine[] = [];
+      try {
+        await recheckLines(tx, live.map((l) => l.id));
+        repriced = await repriceMovedLines(tx, live.map((l) => l.id), adminId, 'the session\'s series was corrected');
+      } catch (err) {
+        if (err instanceof LineRuleError || err instanceof PricingError) throw new SessionError(err.message, 409);
+        throw err;
+      }
+      await redateLines(tx, live.map((l) => l.id), adminId, 'the session\'s series was corrected');
       const expired = await expireIneligibleRegistrations(tx, { sessionIds: [id] }, 'series_corrected');
-      return { session: updated!, expired };
-    });
+      return { session: updated!, expired, repriced };
+    }));
+    await tellPriceChanged(out.repriced, "The session's exam series was corrected, and with it the board fee");
+    return { session: out.session, expired: out.expired };
   } catch (err) {
     if ((err as { cause?: { code?: string } } | null)?.cause?.code === '23505') {
-      throw new Error(`Another ${data.sessionType} window of this level is already open — close it first`);
+      throw new Error(`Another ${deriveSessionName(data.sessionType, data.seriesYear)} session is already open — close it first`);
     }
     const sentence = seriesRuleSentence(err);
     if (sentence) throw new Error(sentence);
@@ -405,21 +508,11 @@ export async function correctSessionSeries(id: string, data: CorrectSessionSerie
 export async function activateSession(id: string) {
   const session = await getSessionById(id);
   if (!session || session.status !== 'draft') return undefined;
-  // Past the board's deadline no entry can be made, and opening would capture
-  // the held money of paid preregistrations for entries the board refuses.
-  // F0b: past the deadline of any board series the window feeds (a window
-  // closes before every one of them, so this is a window already over).
-  const { earliest } = await windowDeadlines(id);
-  if (earliest && earliest <= new Date()) {
-    throw new Error(`This series cannot be opened: the exam board's entry deadline (${schoolDate(earliest)}) has passed`);
-  }
-
-  const conflict = await hasActiveSessionOfType(session.sessionType, session.qualificationLevel, id);
-  if (conflict) {
-    throw new Error(
-      `An active ${session.qualificationLevel} ${session.sessionType} session already exists. Close it before activating this one.`
-    );
-  }
+  // Since the rework a session may open after one of its series' deadlines has passed: that
+  // series' items are simply closed, and the capture refunds in full (MO-21) a paid
+  // preregistration whose line's deadline has passed rather than confirming it (§3.3).
+  const conflict = await hasActiveSessionOfType(session.sessionType, session.seriesYear, session.label, id);
+  if (conflict) throw new Error(sameCycle(session));
 
   // The app-level conflict check above handles the common case, but a
   // race between two admins clicking "Activate" on draft sessions of the
@@ -455,9 +548,7 @@ export async function activateSession(id: string) {
       'code' in err &&
       (err as { code?: string }).code === '23505'
     ) {
-      throw new Error(
-        `An active ${session.sessionType} session already exists. Close it before activating this one.`
-      );
+      throw new Error(sameCycle(session));
     }
     throw err;
   }
@@ -504,13 +595,12 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
   // made just before the close after it, and the close then skipped or failed it.
   const closedAt = sql`coalesce((select ${registrationSession.closedAt} from ${registrationSession} where ${registrationSession.id} = ${sessionId}), now())`;
   const graceEnds = now.getTime() + env.INSTAPAY_REFERENCE_GRACE_HOURS * 60 * 60 * 1000;
-  // Never past the board's entry deadline — F0b: the earliest deadline of the
-  // board series the checkout's own subjects are entered in.
+  // Never past the checkout's deadline — the earliest effective deadline of the lines it
+  // covers (a qualifying retake's is its series' retake deadline; §3.3).
   const referenceDueFor = async (paymentId: string) => {
     const [row] = await db.execute(sql`
-      select min(bs.entry_deadline) as deadline
+      select min(line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected)) as deadline
       from payment_registration pr join registration r on r.id = pr.registration_id
-      join board_series bs on bs.id = r.board_series_id
       where pr.payment_id = ${paymentId}`).then((r) => r.rows as { deadline: string | Date | null }[]);
     const deadline = row?.deadline ? new Date(row.deadline).getTime() : Infinity;
     return new Date(Math.min(graceEnds, deadline));
@@ -581,6 +671,8 @@ export async function finalizePendingRecords(sessionId: string): Promise<{
         where pr.registration_id = ${registration.id}
           and (p.status = 'pending_verification' or (p.status = 'pending' and p.reference_due_at > ${now}))
       )`,
+      // A plan line whose last instalment's transfer is being checked is spared too (§3.6).
+      sql`not ${lastInstalmentBeingCheckedSql(registration.id, now)}`,
     ),
     'session_closed', now));
 
@@ -818,8 +910,8 @@ export async function autoManageSessions(): Promise<{
 }> {
   const now = new Date();
 
-  // Close expired active sessions — return sessionType so the scheduler can
-  // call progressGrades() for each unique sessionType that just closed.
+  // Close expired active sessions (no grade moves at a close since F0a: a grade is derived from
+  // the cohort and the series' academic year).
   const closedResult = await db
     .update(registrationSession)
     .set({ status: 'closed', closedAt: sql`now()`, updatedAt: now })
@@ -831,18 +923,17 @@ export async function autoManageSessions(): Promise<{
     )
     .returning({ id: registrationSession.id, name: registrationSession.name, sessionType: registrationSession.sessionType });
 
-  // Activate draft sessions whose startDate has arrived — never one whose
-  // window has already ended: opening it would close it on the next tick,
-  // after capturing paid preregistrations' held money, possibly for entries
-  // the board no longer takes (the database keeps the board's deadline after
-  // the window's end, so a draft past its deadline is past its end too;
-  // review of fc1a101, flag 4; MO-21).
-  // We do this one at a time to respect the unique constraint per sessionType
+  // Activate draft sessions whose startDate has arrived — never one whose reserving has already
+  // ended: opening it would close it on the next tick. A session whose series' deadline has passed
+  // still opens (the reservations rework, §3.3: the cut-off is per item): capture asks each
+  // preregistration its own deadline first, so nothing is captured for an entry the board no
+  // longer takes (MO-21: a paid one is refunded in full, an unfunded one expires).
+  // One at a time, for the one-active-session rule per (type, year, label).
   const draftsDue = await db.query.registrationSession.findMany({
     where: (s, { eq, lte, gt, and }) =>
       and(eq(s.status, 'draft'), lte(s.startDate, now), gt(s.endDate, now)),
     // name + endDate included so the scheduler can use them for NOT-001 notifications
-    columns: { id: true, sessionType: true, qualificationLevel: true, name: true, endDate: true },
+    columns: { id: true, sessionType: true, seriesYear: true, label: true, name: true, endDate: true },
     orderBy: (s, { asc }) => [asc(s.startDate)],
   });
 
@@ -850,7 +941,7 @@ export async function autoManageSessions(): Promise<{
   const activatedSessions: { id: string; name: string; sessionType: string; endDate: Date }[] = [];
 
   for (const draft of draftsDue) {
-    const conflict = await hasActiveSessionOfType(draft.sessionType, draft.qualificationLevel);
+    const conflict = await hasActiveSessionOfType(draft.sessionType, draft.seriesYear, draft.label);
     if (!conflict) {
       // Only a draft still in draft: an admin may have activated (or
       // activated and closed) it since the read. A clash with a session

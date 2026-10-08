@@ -9,6 +9,7 @@
  */
 
 import { db } from '@repo/db';
+import { getSetting } from './settings.services';
 import { academicYearForDate, getSchoolFeeStanding } from './school-fee.services';
 import { standingToday, type StudentStanding } from './eligibility.services';
 import { sectionOf } from './academic.services';
@@ -31,7 +32,7 @@ export type HomeSummary = {
   role: 'parent' | 'student';
   children: ChildSummary[];
   totals: { owing: number; actionsNeeded: number };
-  openSessions: { id: string; name: string; endDate: Date; qualificationLevel: string }[];
+  openSessions: { id: string; name: string; endDate: Date; qualificationLevel: string | null }[];
 };
 
 async function summariseStudent(studentId: string): Promise<ChildSummary> {
@@ -56,7 +57,7 @@ async function summariseStudent(studentId: string): Promise<ChildSummary> {
             'dropped_pending_receipt',
           ])
         ),
-      columns: { id: true, status: true, priceAtRegistration: true },
+      columns: { id: true, status: true, priceAtRegistration: true, priceProvisional: true },
     }),
     db.query.escrow.findFirst({
       where: (e, { eq }) => eq(e.studentId, studentId),
@@ -69,7 +70,10 @@ async function summariseStudent(studentId: string): Promise<ChildSummary> {
     }),
   ]);
 
-  const payable = registrations.filter((r) => r.status === 'pending_payment');
+  // A line on a provisional board fee is reserved, not payable, until the fee is confirmed
+  // (§3.4) — unless the school takes payment at that price; the checkout refuses it otherwise.
+  const payOnProvisional = await getSetting('pricing.payOnProvisionalFee');
+  const payable = registrations.filter((r) => r.status === 'pending_payment' && (!r.priceProvisional || payOnProvisional));
   const owing = payable.reduce((sum, r) => sum + r.priceAtRegistration, 0);
 
   // Receipts the family must physically bring back before a drop completes

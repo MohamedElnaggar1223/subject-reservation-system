@@ -1,0 +1,105 @@
+# control-nine-sees-the-race.log: the proof of this run, as vitest reported it (the full log, 62008 lines, 5841817 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ✓ test/00-harness.test.ts (4 tests) 1535ms
+ ✓ test/01-desk.test.ts (8 tests) 1524ms
+ ✓ test/02-money.test.ts (4 tests) 1722ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 2042ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 5055ms
+ ✓ test/05-object-access.test.ts (13 tests) 3709ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3609ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1672ms
+ ✓ test/08-money-rules.test.ts (51 tests) 11517ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 11438ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 6305ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 7578ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 5586ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5340ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 8665ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2511ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4182ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 4010ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4444ms
+ ✓ test/08l-board-change.test.ts (7 tests) 3398ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 5915ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 22713ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 7885ms
+ ❯ test/08t-rework-races.test.ts (19 tests | 2 failed) 12181ms
+ ❯ test/09-money-invariants.test.ts (30 tests | 1 failed) 380ms
+
+## Failed tests
+   × 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after 585ms
+   × 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line 712ms
+   × money invariants over the whole database > no waiting line is still provisional when every fee row it was priced from is confirmed at the amount it recorded (a Confirm reaches every line read from its rows) 6ms
+
+## Failures
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > the move first: the fee row created during it waits for it — the move, finding no fee there, is refused; the row is made after
+AssertionError: expected true to be false // Object.is equality
+- Expected
++ Received
+- false
++ true
+ ❯ test/08t-rework-races.test.ts:542:35
+    540|       }
+    541|       const [m, c, cf] = await Promise.all([moving!, creating!, confir…
+    542|       expect(await stuck(s.line)).toBe(false);
+       |                                   ^
+    543|       expect([m.status, await errorOf(m)]).toEqual([409, expect.string…
+    544|       expect(c.status).toBe(200);
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a fee row that exists nowhere when the admin's move begins, created and confirmed by finance around it (the series' fee grid) > finance first: the move waits for the fee row being created, holds it, and the Confirm that follows waits for the move and reaches the moved line
+AssertionError: expected true to be false // Object.is equality
+- Expected
++ Received
+- false
++ true
+ ❯ test/08t-rework-races.test.ts:577:35
+    575|       }
+    576|       const [c, m, cf] = await Promise.all([creating!, moving!, confir…
+    577|       expect(await stuck(s.line)).toBe(false);
+       |                                   ^
+    578|       expect(c.status).toBe(200);
+    579|       expect([m.status, await errorOf(m)]).toEqual([200, null]);
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > no waiting line is still provisional when every fee row it was priced from is confirmed at the amount it recorded (a Confirm reaches every line read from its rows)
+AssertionError: expected [ { …(3) }, { …(3) } ] to deeply equal []
+- Expected
++ Received
+- []
++ [
++   {
++     "id": "44e54e79-ab56-40c6-8557-2fbf2adb23a3",
++     "rows": [
++       {
++         "amount": 600,
++         "id": "2c5d3e58-fbd8-461b-96cf-e393569a093c",
++         "keyId": "55b53361-3348-4f3c-95ad-1a81814c69b9",
++         "keyKind": "qualification",
++         "provisional": true,
++       },
++     ],
++     "status": "pending_payment",
++   },
++   {
++     "id": "49107ad9-6311-4b85-ac98-a01abf090866",
++     "rows": [
++       {
++         "amount": 600,
++         "id": "ea2447e1-ef76-4bfd-894a-eadb5643a3a2",
++         "keyId": "b8c3a4f0-6c89-42ac-bf87-62830f1b032a",
++         "keyKind": "qualification",
++         "provisional": true,
++       },
++     ],
++     "status": "pending_payment",
++   },
++ ]
+ ❯ test/09-money-invariants.test.ts:443:19
+
+## Summary
+[clock] database minus host: -0.3 ms (measured within 1 ms)
+ Test Files  2 failed | 23 passed (25)
+      Tests  3 failed | 374 passed | 1 todo (378)
+   Start at  06:39:48
+   Duration  152.30s (transform 800ms, setup 42ms, collect 2.52s, tests 144.92s, environment 2ms, prepare 827ms)

@@ -25,6 +25,7 @@
 
 import {
   db, courseEnrolment, academicYear, subject, teacher, subjectTeacher, user, section, sectionMembership, registration, registrationSession,
+  sessionOfferItem, sessionOfferItemUnit, examUnit,
   eq, and, inArray, isNull, sql, asc, or,
 } from '@repo/db';
 import { randomUUID } from 'crypto';
@@ -276,10 +277,20 @@ export async function endOpenEnrolments(tx: Tx, studentId: string, endedOn: stri
 export type EnrolmentRowInput = {
   studentId: string;
   subjectId: string;
+  /**
+   * The unit, when the enrolment is per unit (the reservations rework, §3.2 and §10: a line of
+   * an item entering units — a Pearson IAL paper — is taught per unit, its own teacher each).
+   * One open enrolment per (student, unit, year) with one, per (student, subject, year) without.
+   */
+  unitId?: string | null;
   teacherId: string | null;
   mode: EnrolmentMode;
   sourceRef?: string | null;
 };
+
+/** What makes an enrolment one: its unit when it has one, else its subject (the two unique indexes). */
+const enrolmentKey = (r: { studentId: string; subjectId: string; unitId?: string | null }) =>
+  r.unitId ? `${r.studentId}|u:${r.unitId}` : `${r.studentId}|${r.subjectId}`;
 
 export type EnrolmentRowOutcome = EnrolmentRowInput & {
   outcome: 'create' | 'created' | 'exists' | 'refused';
@@ -321,18 +332,18 @@ export async function upsertEnrolments(
     subjectIds.length ? tx.select({ id: subject.id, name: subject.name, code: subject.code, isActive: subject.isActive, isOfferedAtSchool: subject.isOfferedAtSchool }).from(subject).where(inArray(subject.id, subjectIds)) : [],
     teacherIds.length ? tx.select({ id: teacher.id, name: teacher.name, isActive: teacher.isActive }).from(teacher).where(inArray(teacher.id, teacherIds)) : [],
     studentIds.length
-      ? tx.select({ studentId: courseEnrolment.studentId, subjectId: courseEnrolment.subjectId }).from(courseEnrolment)
+      ? tx.select({ studentId: courseEnrolment.studentId, subjectId: courseEnrolment.subjectId, unitId: courseEnrolment.unitId }).from(courseEnrolment)
           .where(and(eq(courseEnrolment.academicYearId, y.id), isNull(courseEnrolment.endedOn), inArray(courseEnrolment.studentId, studentIds)))
       : [],
   ]);
   const studentBy = new Map(students.map((s) => [s.id, s]));
   const subjectBy = new Map(subjects.map((s) => [s.id, s]));
   const teacherBy = new Map(teachers.map((t) => [t.id, t]));
-  const enrolled = new Set(existing.map((e) => `${e.studentId}|${e.subjectId}`));
+  const enrolled = new Set(existing.map(enrolmentKey));
   const seen = new Set<string>();
 
   const out: EnrolmentRowOutcome[] = rows.map((r) => {
-    const key = `${r.studentId}|${r.subjectId}`;
+    const key = enrolmentKey(r);
     const teacherId = r.mode === 'self_study' ? null : r.teacherId;
     const base = { ...r, teacherId };
     const refuse = (reason: string): EnrolmentRowOutcome => ({ ...base, outcome: 'refused', reason });
@@ -359,11 +370,11 @@ export async function upsertEnrolments(
     // One run at a time per year: a second waits, then finds these rows.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${'enrolment:' + y.id}))`);
     const inserted = await tx.insert(courseEnrolment).values(toCreate.map((r) => ({
-      id: randomUUID(), academicYearId: y.id, studentId: r.studentId, subjectId: r.subjectId, teacherId: r.teacherId,
+      id: randomUUID(), academicYearId: y.id, studentId: r.studentId, subjectId: r.subjectId, unitId: r.unitId ?? null, teacherId: r.teacherId,
       mode: r.mode, source: opts.source, sourceRef: r.sourceRef ?? null, startedOn, createdBy: actorId,
-    }))).onConflictDoNothing().returning({ studentId: courseEnrolment.studentId, subjectId: courseEnrolment.subjectId });
-    const made = new Set(inserted.map((i) => `${i.studentId}|${i.subjectId}`));
-    for (const r of toCreate) r.outcome = made.has(`${r.studentId}|${r.subjectId}`) ? 'created' : 'exists';
+    }))).onConflictDoNothing().returning({ studentId: courseEnrolment.studentId, subjectId: courseEnrolment.subjectId, unitId: courseEnrolment.unitId });
+    const made = new Set(inserted.map(enrolmentKey));
+    for (const r of toCreate) r.outcome = made.has(enrolmentKey(r)) ? 'created' : 'exists';
     created = inserted.length;
     for (const pair of new Set(toCreate.filter((r) => r.teacherId && r.outcome === 'created').map((r) => `${r.teacherId}|${r.subjectId}`))) {
       const [t, s] = pair.split('|') as [string, string];
@@ -371,7 +382,7 @@ export async function upsertEnrolments(
     }
     if (created) {
       await logAction(actorId, 'ENROLMENTS_BULK_CREATED', 'academic_year', y.id, null,
-        { source: opts.source, created, teacherLinks, rows: toCreate.filter((r) => r.outcome === 'created').map((r) => ({ studentId: r.studentId, subjectId: r.subjectId, teacherId: r.teacherId, mode: r.mode })) },
+        { source: opts.source, created, teacherLinks, rows: toCreate.filter((r) => r.outcome === 'created').map((r) => ({ studentId: r.studentId, subjectId: r.subjectId, ...(r.unitId ? { unitId: r.unitId } : {}), teacherId: r.teacherId, mode: r.mode })) },
         opts.ctx, tx);
     }
   }
@@ -447,31 +458,47 @@ export async function bulkEnrol(data: BulkEnrolType, actorId: string, ctx?: Audi
       candidates = rows.flatMap((r) => {
         const to = subjectMap.has(r.subjectId) ? subjectMap.get(r.subjectId)! : r.subjectId;
         if (!to) return [];
-        return [{ studentId: r.studentId, subjectId: to, teacherId: r.teacherId, mode: r.mode as EnrolmentMode, sourceRef: `enrolment:${r.id}` }];
+        // A unit's enrolment carries its unit while its subject carries on; mapped to another subject, it is the subject's.
+        return [{ studentId: r.studentId, subjectId: to, unitId: to === r.subjectId ? r.unitId : null, teacherId: r.teacherId, mode: r.mode as EnrolmentMode, sourceRef: `enrolment:${r.id}` }];
       });
     }
   } else {
     const regYear = data.registrationYear ?? y.startYear;
     sourceYearLabel = academicYearShortLabel(regYear);
     const rows = await db
-      .select({ id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId, teacherId: registration.teacherId, outside: registration.takenOutsideSchool })
+      .select({
+        id: registration.id, studentId: registration.studentId, subjectId: registration.subjectId, teacherId: registration.teacherId,
+        outside: registration.takenOutsideSchool, mode: registration.mode, itemId: registration.offerItemId, entersKind: sessionOfferItem.entersKind,
+      })
       .from(registration)
       .innerJoin(registrationSession, eq(registrationSession.id, registration.sessionId))
+      .innerJoin(sessionOfferItem, eq(sessionOfferItem.id, registration.offerItemId))
       .where(and(LIVE_REGISTRATION, sql`school_series_academic_year_start(${registrationSession.sessionType}, ${registrationSession.seriesYear}) = ${regYear}`))
       .orderBy(registration.studentId, registration.subjectId, registration.createdAt);
-    candidates = rows.flatMap((r) => {
+    // A line of an item entering units is taught per unit: one enrolment per unit, the line's teacher each.
+    const unitItems = [...new Set(rows.filter((r) => r.entersKind === 'units').map((r) => r.itemId))];
+    const unitsOf = new Map<string, string[]>();
+    if (unitItems.length) {
+      for (const u of await db.select().from(sessionOfferItemUnit).where(inArray(sessionOfferItemUnit.itemId, unitItems)).orderBy(sessionOfferItemUnit.unitId)) {
+        unitsOf.set(u.itemId, [...(unitsOf.get(u.itemId) ?? []), u.unitId]);
+      }
+    }
+    candidates = rows.flatMap((r): EnrolmentRowInput[] => {
       const to = subjectMap.has(r.subjectId) ? subjectMap.get(r.subjectId)! : r.subjectId;
       if (!to) return [];
-      return [{ studentId: r.studentId, subjectId: to, teacherId: r.outside ? null : r.teacherId, mode: (r.outside ? 'self_study' : 'in_school') as EnrolmentMode, sourceRef: `registration:${r.id}` }];
+      const selfStudy = r.outside || r.mode === 'self_study';
+      const base = { studentId: r.studentId, subjectId: to, teacherId: selfStudy ? null : r.teacherId, mode: (selfStudy ? 'self_study' : 'in_school') as EnrolmentMode, sourceRef: `registration:${r.id}` };
+      const units = to === r.subjectId ? unitsOf.get(r.itemId) ?? [] : [];
+      return units.length ? units.map((unitId) => ({ ...base, unitId })) : [{ ...base, unitId: null }];
     });
   }
-  // One row per (student, subject): the first source row wins.
+  // One row per (student, subject), or per (student, unit): the first source row wins.
   const byPair = new Map<string, EnrolmentRowInput>();
   for (const c of candidates) {
     if (inSections && !inSections.has(c.studentId)) continue;
     if (onlyStudents && !onlyStudents.has(c.studentId)) continue;
-    const key = `${c.studentId}|${c.subjectId}`;
-    if (exclude.has(key) || byPair.has(key)) continue;
+    const key = enrolmentKey(c);
+    if (exclude.has(`${c.studentId}|${c.subjectId}`) || byPair.has(key)) continue;
     byPair.set(key, c);
   }
   const result = await db.transaction((tx) => upsertEnrolments(tx, y.id, [...byPair.values()], actorId, {
@@ -653,8 +680,8 @@ export async function checkEnrolments(academicYearId: string, studentId?: string
 // ─── Contracts for F1 and F4, and the teacher's own classes ──────────────────
 
 /**
- * F1's contract: per subject and teacher, the students taught in school this
- * year (a teaching group's source). Self-study enrolments are not taught and
+ * F1's contract: per subject, unit (when the enrolments are per unit) and teacher, the students
+ * taught in school this year (a teaching group's source). Self-study enrolments are not taught and
  * form no group; enrolments with no teacher yet form one group per subject
  * with `teacherId` null.
  */
@@ -662,24 +689,31 @@ export async function getTeachingDemand(academicYearId: string) {
   const y = await yearOrThrow(academicYearId);
   const rows = await db
     .select({
-      subjectId: courseEnrolment.subjectId, teacherId: courseEnrolment.teacherId, studentId: courseEnrolment.studentId,
+      subjectId: courseEnrolment.subjectId, unitId: courseEnrolment.unitId, unitCode: examUnit.code, teacherId: courseEnrolment.teacherId, studentId: courseEnrolment.studentId,
       subjectName: subject.name, subjectCode: subject.code, qualificationLevel: subject.qualificationLevel, teacherName: teacher.name, studentName: user.name,
     })
     .from(courseEnrolment)
     .innerJoin(subject, eq(subject.id, courseEnrolment.subjectId))
     .innerJoin(user, eq(user.id, courseEnrolment.studentId))
     .leftJoin(teacher, eq(teacher.id, courseEnrolment.teacherId))
+    .leftJoin(examUnit, eq(examUnit.id, courseEnrolment.unitId))
     .where(and(eq(courseEnrolment.academicYearId, y.id), isNull(courseEnrolment.endedOn), eq(courseEnrolment.mode, 'in_school')))
     .orderBy(asc(subject.name), asc(teacher.name), asc(user.name));
   const sections = await sectionsOf(rows.map((r) => r.studentId), y.id);
   const groups = new Map<string, {
-    subjectId: string; subjectName: string; subjectCode: string; qualificationLevel: string; teacherId: string | null; teacherName: string | null;
+    subjectId: string; subjectName: string; subjectCode: string; qualificationLevel: string;
+    /** The unit taught, when the enrolments are per unit (the reservations rework, §10); null for the subject. */
+    unitId: string | null; unitCode: string | null;
+    teacherId: string | null; teacherName: string | null;
     students: { studentId: string; name: string; sectionId: string | null; section: string | null }[];
   }>();
   for (const r of rows) {
-    const key = `${r.subjectId}|${r.teacherId ?? ''}`;
+    const key = `${r.subjectId}|${r.unitId ?? ''}|${r.teacherId ?? ''}`;
     if (!groups.has(key)) {
-      groups.set(key, { subjectId: r.subjectId, subjectName: r.subjectName, subjectCode: r.subjectCode, qualificationLevel: r.qualificationLevel, teacherId: r.teacherId, teacherName: r.teacherName, students: [] });
+      groups.set(key, {
+        subjectId: r.subjectId, subjectName: r.subjectName, subjectCode: r.subjectCode, qualificationLevel: r.qualificationLevel,
+        unitId: r.unitId, unitCode: r.unitCode, teacherId: r.teacherId, teacherName: r.teacherName, students: [],
+      });
     }
     const sec = sections.get(r.studentId) ?? null;
     groups.get(key)!.students.push({ studentId: r.studentId, name: r.studentName, sectionId: sec?.id ?? null, section: sec?.name ?? null });

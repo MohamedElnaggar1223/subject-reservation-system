@@ -1,0 +1,253 @@
+
+> @repo/api@ test /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+> vitest run "test/08n" "-t" "October's deadline passes inside the open session"
+
+
+ RUN  v3.2.7 /Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/rework-sessions/apps/api
+
+[clock] database minus host: -1.9 ms (measured within 1 ms)
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [7afc4399-c264-4941-b039-198edb49284f] POST /api/auth/sign-up/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[email:stub] To: admin.n08w@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [8552b26c-391a-4c03-b87b-284c55d2cb72] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [775643df-6b6c-488d-b018-84df78121592] POST /v1/users
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [0f603e5a-8659-497d-b1fe-6981a1354a8d] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [afa87cd4-ce77-4ac8-98f9-6b09e7193c62] POST /v1/teachers
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [07aff1ad-c49d-4afa-acc1-33d003f79669] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [03af5f21-f87b-4395-8dce-defc606101d8] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [ed4507c6-824d-4fe5-86cd-afa2a46f3d55] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [e12bcb0b-3481-47f6-bdbe-42be05524746] POST /v1/subjects
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [d38f09ae-e751-40af-a7c1-85189f3878b7] POST /v1/sessions
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [3696c4ae-6627-40aa-9c2c-b50ba3991fee] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [3b1f8b50-affe-440a-af03-5aadd89258d4] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [dbffa556-4167-4008-8454-c9a75fd516d8] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [8d6fb291-b801-4764-b958-c1cf6f0e9d29] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [6f0b9f67-157d-4c07-beee-9ef4ac8a7121] POST /v1/board-series
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [eddf41b7-b34b-410d-ad19-d86c78dea5ba] POST /v1/sessions/9579ce0b-def1-49c7-b48d-33ef648264a8/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [73f1fc8a-9a53-4c72-b7f1-4a324c211a84] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [a5612150-5949-4dc3-88c6-279fd1accc49] POST /v1/sessions/9579ce0b-def1-49c7-b48d-33ef648264a8/offers/2beed5a2-4253-4c2d-8a81-23f9575bdd10/items
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [2859bca7-a50e-4184-a6aa-120268a4cff2] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [bc4f41ba-7434-4c13-8223-befe4a72c608] POST /v1/sessions/9579ce0b-def1-49c7-b48d-33ef648264a8/offers/2beed5a2-4253-4c2d-8a81-23f9575bdd10/items
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [24447851-7730-4cb8-a581-b3f2cf755a69] POST /v1/sessions/9579ce0b-def1-49c7-b48d-33ef648264a8/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [832b92c4-cf0b-4ae3-94a9-d7fe73308f90] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [1dc60e6f-01b6-4936-9730-941ed6a42a98] POST /v1/sessions/9579ce0b-def1-49c7-b48d-33ef648264a8/offers/b0327517-94ce-4668-bf61-7443d36e3cfa/items
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [5fa35f6e-2500-48f5-bc75-f34bed4a868d] POST /v1/sessions/9579ce0b-def1-49c7-b48d-33ef648264a8/offers
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [9708c910-2059-4d31-a917-35e5f8dbfb16] PUT /v1/board-fees
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[INFO] [84e16a82-17c7-42fc-8132-60fa086d1c5d] POST /v1/sessions/9579ce0b-def1-49c7-b48d-33ef648264a8/offers/88a05f05-9155-4a4a-add9-850a3290c5de/items
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [f7655017-0e3a-4378-896c-0e72a08fec0f] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[email:stub] To: parent.n08w-oct-a-fec5@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[email:stub] To: student.n08w-oct-a-fec5@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [1d20f8f9-0c18-40ce-a117-f32b834b3c47] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [eb868d25-7896-4d94-88b9-92351977ecba] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [20e11f11-72a2-46e4-8a2c-116b266c7eb0] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[email:stub] To: parent.n08w-oct-b-fec5@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[email:stub] To: student.n08w-oct-b-fec5@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [9b7ca6a5-89d4-42c3-8fe8-d5ea86ba77b7] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [57eb47da-e6a5-411f-abb0-45cfa203c230] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [e04a42b3-6c69-4302-88d2-c0c9e541f2a4] PUT /v1/board-series/e0684908-4230-4a4a-a892-9998a76bbe47
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [99109888-9702-4cc3-b370-9d8f4e05d24b] POST /v1/links/desk-onboard
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[email:stub] To: parent.n08w-oct-c-fec5@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[email:stub] To: student.n08w-oct-c-fec5@test.local | Subject: Verify your email — IGCSE System 
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [4b8bfb7f-6d87-4a37-b575-f04647956366] POST /api/auth/sign-in/email
+
+stdout | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+[INFO] [c1b6ced6-ff6a-4e8b-a9c6-8f9dda8bb0cb] POST /api/auth/sign-in/email
+
+ ❯ test/08n-session-offers.test.ts (15 tests | 1 failed | 14 skipped) 2299ms
+   ↓ 08n: sessions and offers > a June session from scratch: its derived name, a subject added with its teacher and course fee, its item in the board's June series; an item landing in a series not on record makes it, with a warning
+   ↓ 08n: sessions and offers > the next June copied from it: offers, teachers and items in the next year's series; board fees provisional; audited
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > an IGCSE item is refused in October and January; Cambridge AS defaults to November, Pearson AS to October
+   × 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only 928ms
+     → promise resolved "[ { …(35) } ]" instead of rejecting
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a Cambridge retake of the previous June is reservable until the retake deadline after the entry deadline passed; a first entry is not; a retake of an older sitting is cut off at the entry deadline; the retake is due by the retake deadline
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > a series with neither an entry deadline nor an exam start takes no line
+   ↓ 08n: a winter session, each item cut off at its own deadline (§3.3) > A-12: a graduate may reserve the winter session when graduate retakes are allowed
+   ↓ 08n: capture asks each preregistration its deadline first (MO-21; flags 42, 48, 58) > a paid one refunded in full, an unfunded one expired, one with an open payment left to its sweep, a SO-4 held one untouched; the rest captured
+   ↓ 08n: the line rules (§3.5) > AS and A Level of one subject cannot be reserved together (one exclusive group); one of them can
+   ↓ 08n: the line rules (§3.5) > the same entry twice in one series across two sessions is refused: the board takes one entry
+   ↓ 08n: the line rules (§3.5) > a first entry without its required item is refused; with it, accepted
+   ↓ 08n: the line rules (§3.5) > a carried sitting outside the board's carry-forward period is refused (Cambridge: 13 months); inside it, accepted
+   ↓ 08n: the line rules (§3.5) > self-study on a first entry is refused where the school teaches the subject; allowed where it does not; a retake names its sitting
+   ↓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > the preview lists, the commit registers the core offers with the school consent once, a second commit changes nothing; a family reserving alone must include the core
+   ↓ 08n: grade 10 in bulk (A-15) and due dates (§3.1) > a line is due at the session's payment date, capped by its series' deadline; one reserved after the payment date gets the grace
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+   Start at  01:05:01
+   Duration  3.66s (transform 432ms, setup 2ms, collect 170ms, tests 2.30s, environment 0ms, prepare 32ms)
+
+ ELIFECYCLE  Test failed. See above for more details.
+stderr | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[env] RESEND_API_KEY not set — email sending will be stubbed
+
+stderr | test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3)
+[email] RESEND_API_KEY not set — running in stub mode (no emails sent)
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-session-offers.test.ts > 08n: a winter session, each item cut off at its own deadline (§3.3) > October's deadline passes inside the open session: October's item takes no new line, January's does; the sweep closes October's waiting lines only
+AssertionError: promise resolved "[ { …(35) } ]" instead of rejecting
+
+[32m- Expected:[39m 
+Error {
+  "message": "rejected promise",
+}
+
+[31m+ Received:[39m 
+[
+  {
+    "approvalComments": null,
+    "approvedAt": null,
+    "approvedBy": null,
+    "attempt": "first",
+    "boardSeriesId": "e0684908-4230-4a4a-a892-9998a76bbe47",
+    "courseFeeAtRegistration": 2000,
+    "createdAt": 2026-10-07T22:05:05.172Z,
+    "droppedAt": null,
+    "dueAt": 2026-10-07T22:04:04.885Z,
+    "gradeReceived": null,
+    "id": "17e26427-41eb-4622-a645-4222f78925e2",
+    "isRetake": false,
+    "legacy": null,
+    "mode": "in_school",
+    "offerItemId": "55f0fbe4-9fe9-4a81-883a-75c8048c7bb4",
+    "priceAtRegistration": 2800,
+    "priceProvisional": false,
+    "pricingBasis": {
+      "attempt": "first",
+      "boardFeeBase": 800,
+      "boardPercent": 100,
+      "courseFee": 2000,
+      "courseFeeBase": 2000,
+      "coursePercent": 100,
+      "customPrice": false,
+      "exceptionIds": [],
+      "feeRows": [
+        {
+          "amount": 800,
+          "id": "6a053c7c-c5eb-4ca5-9ca0-e29a4df8ef89",
+          "keyId": "d1f7cdab-076d-4001-9383-0e45ec08506f",
+          "keyKind": "subject",
+          "provisional": false,
+        },
+      ],
+      "itemKind": "whole",
+      "mode": "in_school",
+      "onePaperPercent": 100,
+      "registrationFee": 800,
+      "total": 2800,
+      "v": 1,
+    },
+    "priorCandidateNumber": null,
+    "priorCentre": null,
+    "priorSittingSeriesId": null,
+    "priorSittingSource": null,
+    "refundPolicySnapshot": null,
+    "registrationFeeAtRegistration": 800,
+    "requestedBy": "NA5QATvx1JuG7wwERX5Lg9i31W0BAdVI",
+    "resultRecordedAt": null,
+    "resultRecordedBy": null,
+    "sessionId": "9579ce0b-def1-49c7-b48d-33ef648264a8",
+    "status": "pending_payment",
+    "studentId": "NA5QATvx1JuG7wwERX5Lg9i31W0BAdVI",
+    "subjectId": "d1f7cdab-076d-4001-9383-0e45ec08506f",
+    "takenOutsideSchool": false,
+    "teacherId": "05256739-930f-49df-97ab-dd10d160af0a",
+    "updatedAt": 2026-10-07T22:05:05.172Z,
+    "wasCoreAtRegistration": false,
+  },
+]
+
+ ❯ test/08n-session-offers.test.ts:235:116
+    233|     await sql(`update board_series set entry_deadline = now() - interv…
+    234|     const c = await onboard(officer, `n08w-oct-c-${RUN}`, 12);
+    235|     await expect(reserve(c.studentId, w, [{ offerItemId: ialOct, attem…
+       |                                                                                                                    ^
+    236|       .rejects.toThrow(/deadline/);
+    237|     const [cJan] = await reserve(c.studentId, w, [{ offerItemId: ialJa…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

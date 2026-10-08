@@ -1,0 +1,52 @@
+# Trimmed under CLAUDE.md (Git): the vitest summary and, for a red run, the failing tests and their
+# messages; the request log of the run removed. Original: 88148 bytes, 954 lines.
+
+ ❯ test/08o-reservation-lines.test.ts (15 tests | 1 failed) 10455ms
+   ✓ 08o: reservation lines (step B) > a family reserves in the app: one line per item with the entry chosen, both consents required and recorded, the refund steps frozen  628ms
+   × 08o: reservation lines (step B) > the price the page showed is the price charged: a line priced otherwise in between is refused, nothing made 385ms
+   ✓ 08o: reservation lines (step B) > a family declares a retake with its sitting: created when not on record, priced as a retake, listed to verify; a first entry names none  669ms
+   ✓ 08o: reservation lines (step B) > a sitting the system knows is filled in and not listed to verify; its retake runs to the retake deadline  356ms
+   ✓ 08o: reservation lines (step B) > the coordinator verifies: the line stands; a carry-forward from another centre records the previous centre and candidate number; answered once  655ms
+   ✓ 08o: reservation lines (step B) > rejected on an unpaid line: refused while a checkout is open; then it expires (declaration_rejected), the family is told, and may reserve a first entry  367ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line before the first-entry deadline: the line stands as paid with declaration_rejected (a first entry for F4), the family is told  320ms
+   ✓ 08o: reservation lines (step B) > rejected on a paid line after the first-entry deadline: dropped through the receipt-gated drop with today's refund  348ms
+   ✓ 08o: reservation lines (step B) > unverified at the deadline: entered as declared by default; under hold the sweep expires a waiting line and drops a paid one, once  1304ms
+   ✓ 08o: reservation lines (step B) > the school's grade-10 lines carry the school's consent; the family gives its own at checkout; a line without consent is never paid or confirmed  691ms
+   ✓ 08o: reservation lines (step B) > a swap's new line inherits the dropped line's consent and refund steps  748ms
+   ✓ 08o: reservation lines (step B) > the teacher on a line: "no preference" assigned later; changed on a paid line the enrolment follows and the price does not; self-study is not re-priced  716ms
+   ✓ 08o: reservation lines (step B) > the desk: reserve only; reserve and collect takes one payment per entry deadline, a provisional line reserved and collected once its fee is confirmed  712ms
+   ✓ 08o: reservation lines (step B) > the family's flow: a student asks, a parent approves and pays by series; the statement's numbers are the ledger's, one payment per entry deadline  387ms
+   ✓ 08o: reservation lines (step B) > GET /registrations/available is gone: the Reserve pages read /registrations/offers 271ms
+ ❯ test/08o-reservation-lines.test.ts:189:8
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08o-reservation-lines.test.ts > 08o: reservation lines (step B) > the price the page showed is the price charged: a line priced otherwise in between is refused, nothing made
+AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": StringContaining "changed while this was open",
+-   "status": 409,
++   "error": "\"\"",
++   "status": 201,
+  }
+
+ ❯ test/08o-reservation-lines.test.ts:189:8
+    187|     expect(shown).toBe(23200);
+    188|     expect(await refused(f.parent.api.v1.registrations.direct.$post({ …
+    189|       .toEqual({ status: 409, error: expect.stringContaining('changed …
+       |        ^
+    190|     expect(await sql(`select 1 from registration where student_id = $1…
+    191|     expect(await apiResponse(f.parent.api.v1.registrations.direct.$pos…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 passed (15)
+   Start at  02:49:33
+   Duration  12.22s (transform 516ms, setup 2ms, collect 201ms, tests 10.46s, environment 0ms, prepare 42ms)

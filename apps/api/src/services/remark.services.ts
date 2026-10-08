@@ -34,6 +34,8 @@ import type {
   UpsertRemarkDeadlineType,
 } from '@repo/validations';
 import { creditEscrow, getEscrowBalance } from './escrow.services';
+import { serviceFeeFor, ChargeError } from './charge.services';
+import { serviceLevelOf } from '@repo/validations';
 import { notifyEscrowBalanceChanged } from './notification.services';
 import { isAttachableEvidence } from './file.services';
 import { REMARK_CONSENT_PURPOSES } from '@repo/validations';
@@ -135,7 +137,7 @@ export async function createRemarkRequest(
   const reg = await db.query.registration.findFirst({
     where: (r, { eq }) => eq(r.id, data.registrationId),
     with: {
-      subject: { columns: { id: true, name: true, council: true } },
+      subject: { columns: { id: true, name: true, council: true, qualificationLevel: true } },
       session: { columns: { id: true, name: true } },
     },
   });
@@ -162,13 +164,30 @@ export async function createRemarkRequest(
     throw new Error('Only students and parents can request remarks');
   }
 
-  // Deadline check (per council + series + service, when configured)
-  const deadlineRow = await db.query.remarkDeadline.findFirst({
+  // The reservations rework (§3.6): the request picks a board service of the line's board — named,
+  // or mapped from V3's service type (clerical_check → Cambridge 1 / clerical re-check;
+  // review_of_marking → 2 / review of marking; script_copy → 1S / access to scripts;
+  // priority_review → Pearson's priority review).
+  const service = data.boardServiceId
+    ? await db.query.boardService.findFirst({ where: (s, { eq }) => eq(s.id, data.boardServiceId!) })
+    : await db.query.boardService.findFirst({ where: (s, { eq, and }) => and(eq(s.boardCode, reg.subject.council), eq(s.legacyServiceType, data.serviceType!)) });
+  if (data.boardServiceId && (!service || service.boardCode !== reg.subject.council || service.kind !== 'remark')) {
+    throw new Error('That service is not one of this subject\'s board');
+  }
+  if (service && !service.isActive) throw new Error(`${service.label} is not offered`);
+  const serviceType = data.serviceType ?? service?.legacyServiceType ?? (service ? service.code : null);
+  if (!serviceType) throw new Error('Choose the service');
+
+  // Deadline: the service's in the line's series, else V3's per window.
+  const seriesDeadline = service && reg.boardSeriesId
+    ? await db.query.boardServiceDeadline.findFirst({ where: (d, { eq, and }) => and(eq(d.boardSeriesId, reg.boardSeriesId!), eq(d.boardServiceId, service.id)) })
+    : null;
+  const deadlineRow = seriesDeadline ?? await db.query.remarkDeadline.findFirst({
     where: (d, { eq, and }) =>
       and(
         eq(d.council, reg.subject.council),
         eq(d.sessionId, reg.sessionId),
-        eq(d.serviceType, data.serviceType)
+        eq(d.serviceType, serviceType)
       ),
   });
   if (deadlineRow && deadlineRow.deadline < new Date()) {
@@ -177,17 +196,30 @@ export async function createRemarkRequest(
     );
   }
 
-  // Fee from the configured schedule (per paper)
-  const feeRow = await db.query.remarkFeeSchedule.findFirst({
-    where: (f, { eq, and }) =>
-      and(eq(f.council, reg.subject.council), eq(f.serviceType, data.serviceType)),
-  });
-  if (!feeRow) {
-    throw new Error(
-      'The remark fee for this council and service has not been configured yet — ask the school to set it up'
-    );
+  // Fee: the series' grid for the service at the line's level (per paper when the service is per
+  // component); a series with no row yet takes V3's schedule as its default (serviceFeeFor). A
+  // service of no board service (V3 rows only) keeps V3's schedule.
+  const level = serviceLevelOf(reg.subject.qualificationLevel);
+  let perPaper: number;
+  if (service && reg.boardSeriesId) {
+    const fee = await db.transaction((tx) => serviceFeeFor(tx, { seriesId: reg.boardSeriesId!, serviceId: service.id, level, actorId: requesterId }))
+      .catch((err) => {
+        if (err instanceof ChargeError) throw new Error('The remark fee for this council and service has not been configured yet — ask the school to set it up');
+        throw err;
+      });
+    perPaper = fee.amount;
+  } else {
+    const feeRow = await db.query.remarkFeeSchedule.findFirst({
+      where: (f, { eq, and }) => and(eq(f.council, reg.subject.council), eq(f.serviceType, serviceType)),
+    });
+    if (!feeRow) {
+      throw new Error(
+        'The remark fee for this council and service has not been configured yet — ask the school to set it up'
+      );
+    }
+    perPaper = feeRow.amountPerPaper;
   }
-  const feeCharged = round2(feeRow.amountPerPaper * data.papers.length);
+  const feeCharged = round2(service && !service.perComponent ? perPaper : perPaper * data.papers.length);
 
   const requestId = randomUUID();
   const created = await db.transaction(async (tx) => {
@@ -228,7 +260,9 @@ export async function createRemarkRequest(
         id: requestId,
         studentId,
         registrationId: data.registrationId,
-        serviceType: data.serviceType,
+        serviceType,
+        boardServiceId: service?.id ?? null,
+        serviceLevel: service ? level : null,
         status: initialStatus,
         requestedBy: requesterId,
         ...(requesterRole === 'parent'
@@ -450,7 +484,15 @@ export async function recordOutcome(
     if (!itemIds.has(item.itemId)) throw new Error('Unknown remark item');
   }
 
-  const refundDue = data.gradeChanged && rr.feeCharged > 0 && !rr.feeRefunded;
+  // The refund on a changed grade is the service's rule (§3.6, Q-21: seeded "full", today's
+  // behaviour): the whole fee, the fee less a fixed amount per paper, or nothing.
+  const service = rr.boardServiceId ? await db.query.boardService.findFirst({ where: (s, { eq }) => eq(s.id, rr.boardServiceId!) }) : null;
+  const ruleAmount = !service || service.refundRule === 'full'
+    ? rr.feeCharged
+    : service.refundRule === 'none'
+      ? 0
+      : round2(Math.max(0, rr.feeCharged - (service.refundDeduction ?? 0) * rr.items.length));
+  const refundDue = data.gradeChanged && rr.feeCharged > 0 && !rr.feeRefunded && ruleAmount > 0;
 
   await db.transaction(async (tx) => {
     const [updated] = await tx
@@ -476,7 +518,7 @@ export async function recordOutcome(
       await creditEscrow(
         {
           studentId: rr.studentId,
-          amount: rr.feeCharged,
+          amount: ruleAmount,
           reason: 'payment_refund',
           initiatedBy: staffId,
           relatedRegistrationId: rr.registrationId,
@@ -486,7 +528,7 @@ export async function recordOutcome(
     }
     // The outcome, the fee refund and their audit row commit together (MO-1).
     await logAction(staffId, 'REMARK_OUTCOME_RECORDED', 'remark_request', id, { status: 'submitted' },
-      { ...data, refunded: refundDue, refundAmount: refundDue ? rr.feeCharged : 0 } as unknown as Record<string, unknown>, auditCtx, tx);
+      { ...data, refunded: refundDue, refundAmount: refundDue ? ruleAmount : 0, refundRule: service?.refundRule ?? 'full' } as unknown as Record<string, unknown>, auditCtx, tx);
   });
 
   if (refundDue) {
@@ -498,9 +540,9 @@ export async function recordOutcome(
     notifyEscrowBalanceChanged({
       studentId: rr.studentId,
       studentName: student?.name ?? 'Student',
-      previousBalance: newBalance - rr.feeCharged,
+      previousBalance: newBalance - ruleAmount,
       newBalance,
-      changeAmount: rr.feeCharged,
+      changeAmount: ruleAmount,
       reason: 'Remark fee refunded — grade changed',
     }).catch((err) => console.error('[notification] remark refund notify failed:', err));
   }
@@ -581,6 +623,8 @@ export async function getRemarkRequests(scope: {
           session: { columns: { id: true, name: true } },
         },
       },
+      // The reservations rework (§3.6): the board's own service the request was made for.
+      boardService: { columns: { id: true, label: true } },
     },
     orderBy: (r, { desc }) => [desc(r.createdAt)],
   });

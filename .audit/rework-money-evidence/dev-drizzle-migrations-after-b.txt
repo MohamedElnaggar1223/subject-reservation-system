@@ -1,0 +1,36 @@
+igcse_rwc_dev recreated from igcse_template_dev (34 migrations) at 06:01:58Z.
+
+1. Migrated with origin/main's own migration folder (84d60ca: A's 0042-0044, B's 0045 and 0046), 06:02:04Z:
+ id |     hash     |  created_at   
+----+--------------+---------------
+ 47 | a01dc9925533 | 1791429312401
+ 46 | bdb5ea90784d | 1791429270826
+ 45 | 3407e00ff520 | 1791425757386
+ 44 | 55c03d4adc8a | 1791404015550
+ 43 | e90b57046893 | 1791403589919
+ 42 | f3b1f51cf334 | 1791403580403
+(6 rows)
+
+
+   Then, at main's state, V3-shaped rows seeded (/tmp/rwc/dev_seed_v3_exceptions.sql: ten exceptions of
+   the eight V3 types; dev_seed_v3_remarks.sql: three remark fees, two remark deadlines; placeholders).
+
+2. Then migrated at feature/rework-money (C's 0047-0049 after B's), 06:02:13Z:
+ id |     hash     |  created_at   
+----+--------------+---------------
+ 50 | 3b4f47f66d44 | 1791437760565
+ 49 | ca5731f965a7 | 1791437759565
+ 48 | 57c1d7aee2c7 | 1791437758565
+ 47 | a01dc9925533 | 1791429312401
+ 46 | bdb5ea90784d | 1791429270826
+ 45 | 3407e00ff520 | 1791425757386
+(6 rows)
+
+
+Rows 48-50 are step C's 0047_rework_money_structure, 0048_rework_money_backfill and
+0049_rework_money_constraints, applied after B's 0046 (row 47, when 1791429312401) on a database
+that already had it. The backfill on that copy: the ten V3 exceptions on the registry
+(deadline.window 3, refund.percent 2, one each of grade10OtherSeries, schoolFee, custom,
+discountFixed, discountPercent; 2 under Check these), 12 service fees copied provisional from V3's
+remark fees, 2 service deadlines, 24 backfill audit rows. charge_effective_deadline reads
+registration.declaration_rejected.

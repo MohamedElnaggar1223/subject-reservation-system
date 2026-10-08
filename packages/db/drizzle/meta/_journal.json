@@ -292,22 +292,78 @@
     {
       "idx": 41,
       "version": "7",
-      "when": 1790735967232,
-      "tag": "0041_scheduling",
+      "when": 1791403580403,
+      "tag": "0041_rework_structure",
       "breakpoints": true
     },
     {
       "idx": 42,
       "version": "7",
-      "when": 1790739924567,
-      "tag": "0042_scheduling_review",
+      "when": 1791403589919,
+      "tag": "0042_rework_backfill",
       "breakpoints": true
     },
     {
       "idx": 43,
       "version": "7",
-      "when": 1790739943687,
-      "tag": "0043_scheduling_review_backfill",
+      "when": 1791404015550,
+      "tag": "0043_rework_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1791425757386,
+      "tag": "0044_rework_sessions_followups",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1791429270826,
+      "tag": "0045_rework_reservations",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1791429312401,
+      "tag": "0046_rework_reservations_consent_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1791437758565,
+      "tag": "0047_rework_money_structure",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1791437759565,
+      "tag": "0048_rework_money_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1791437760565,
+      "tag": "0049_rework_money_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791461383773,
+      "tag": "0050_scheduling",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1791461439438,
+      "tag": "0051_scheduling_leavings",
       "breakpoints": true
     }
   ]

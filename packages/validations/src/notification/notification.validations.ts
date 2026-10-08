@@ -51,6 +51,16 @@ export const NOTIFICATION_TYPES = [
   'LINK_DECISION',
   // Staff: a preregistration held at its series' opening (F0a)
   'PREREGISTRATION_HELD',
+  // Reservations rework: a line re-priced when the board confirmed its fee, or moved
+  'PRICE_CHANGED',
+  // Reservations rework, step C: a charge added or pushed, or what happened to it; a plan's news
+  'CHARGE_ADDED',
+  'CHARGE_UPDATED',
+  'PLAN_UPDATED',
+  // Step B: the school's answer to a declared sitting (a retake or a carry-forward)
+  'DECLARATION_REVIEWED',
+  // Reservations rework: a moved line whose price stayed but is now to be confirmed
+  'PRICE_TO_BE_CONFIRMED',
   // F1: the timetable and cover
   'TIMETABLE_PUBLISHED',
   'COVER_ASSIGNED',
@@ -84,6 +94,12 @@ export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
   LINK_REQUEST_RECEIVED:            'New Parent Link Request',
   LINK_DECISION:                    'Link Request Decision',
   PREREGISTRATION_HELD:             'Preregistration Held',
+  PRICE_CHANGED:                    'Price Changed',
+  CHARGE_ADDED:                     'New Charge',
+  CHARGE_UPDATED:                   'Charge Updated',
+  PLAN_UPDATED:                     'Instalment Plan',
+  DECLARATION_REVIEWED:             'Declared Sitting Reviewed',
+  PRICE_TO_BE_CONFIRMED:            'Price To Be Confirmed',
   TIMETABLE_PUBLISHED:              'Timetable Published',
   COVER_ASSIGNED:                   'Cover Lesson for You',
   LESSON_COVERED:                   'A Lesson Is Covered',
@@ -114,6 +130,12 @@ export const NOTIFICATION_TYPE_ICONS: Record<NotificationType, string> = {
   LINK_REQUEST_RECEIVED:            '🔗',
   LINK_DECISION:                    '🔗',
   PREREGISTRATION_HELD:             '⏸️',
+  PRICE_CHANGED:                    '💱',
+  CHARGE_ADDED:                     '🧾',
+  CHARGE_UPDATED:                   '🧾',
+  PLAN_UPDATED:                     '🗓️',
+  DECLARATION_REVIEWED:             '🔎',
+  PRICE_TO_BE_CONFIRMED:            '💱',
   TIMETABLE_PUBLISHED:              '🗓️',
   COVER_ASSIGNED:                   '🧑‍🏫',
   LESSON_COVERED:                   '🔁',

@@ -1,0 +1,305 @@
+# run2.log: the proof of this run, as vitest reported it (the full log, 21866 lines, 1924101 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ✓ test/00-harness.test.ts (4 tests) 1479ms
+ ✓ test/01-desk.test.ts (8 tests) 1504ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 1945ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 5743ms
+ ❯ test/08-money-rules.test.ts (51 tests | 6 failed) 20264ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 10705ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 5771ms
+ ❯ test/08d-foundation-grade.test.ts (28 tests | 1 failed | 6 skipped) 7244ms
+ ❯ test/08e-foundation-eligibility-changes.test.ts (10 tests | 3 failed) 5376ms
+ ❯ test/08f-foundation-structure.test.ts (20 tests | 1 failed) 5081ms
+ ❯ test/08g-foundation-races.test.ts (14 tests | 6 failed) 7225ms
+
+## Failed tests
+   × money rules > the registration window closes with money in flight > an unpaid desk checkout fails at close, its escrow comes back, and the student is told which subject was not completed 5026ms
+   × money rules > the registration window closes with money in flight > at the exam board's entry deadline, everything still unconfirmed on the series is closed, extension or not (MO-10) 12ms
+   × money rules > the registration window closes with money in flight > a transfer found on the statement after its payment closed is recorded by a finance admin and credited to escrow 7ms
+   × money rules > the registration window closes with money in flight > a transfer found later can be undone by a finance admin the same day, while its escrow is unspent (MO-24) 7ms
+   × money rules > a preregistration paid after its session opened > past a later series' board deadline a preregistration can no longer be made, paid or confirmed, and what was paid comes back in full (MO-10, MO-21) 5318ms
+   × money rules > a preregistration paid after its session opened > a family reference set aside by a transfer found later cannot be submitted again 72ms
+   × F0a: grade and eligibility > the school-fee gate by series (row 4's fee; A-13; A-14) > A-14 'hold': a series in next year whose fee has not opened waits; 'proceed' lets it through 361ms
+   × F0a: when eligibility changes after a registration exists > an admin corrects a window's series: registrations students may no longer sit expire, audited with the correction 364ms
+   × F0a: when eligibility changes after a registration exists > a draft window's series cannot be edited once anyone has preregistered: the audited series correction is the way 426ms
+   × F0a: when eligibility changes after a registration exists > a draft window with no preregistrations: its series may be edited, and the change is audited 113ms
+   × F0a: settings, uploads, academic structure, sections, teaching > the settings store > every reader sees every key, its default, and whether they may change it 14ms
+   × F0a: races > a registration racing an eligibility change is never left waiting > a withdrawal: the registration commits first, then the withdrawal expires it 300ms
+   × F0a: races > a registration racing an eligibility change is never left waiting > a transfer: the registration commits first, then the transfer expires it 306ms
+   × F0a: races > a registration racing an eligibility change is never left waiting > a cohort correction: the registration commits first, then the correction expires it 306ms
+   × F0a: races > a registration racing an eligibility change is never left waiting > a window's series corrected: the registration commits first, then the correction expires it 389ms
+   × F0a: races > a registration racing an eligibility change is never left waiting > a grade-10 exception revoked: the registration it allowed commits first, then the revocation expires it 296ms
+   × F0a: races > a registration racing an eligibility change is never left waiting > A-12 turned off: a graduate's registration commits first, then the change expires it 326ms
+
+## Failures
+ FAIL  test/08d-foundation-grade.test.ts > F0a: grade and eligibility > every registration path asks mayRegisterFor
+Error: Failed query: insert into registration (id, student_id, session_id, subject_id, price_at_registration, course_fee_at_registration, registration_fee_at_registration, status, requested_by)
+                 values ($1, $2, $3, $4, 1200, 1000, 200, $5, $6)
+params: 8d6e7d39-8f2b-47b9-8ff0-d8d6a670b88a,k2Q47OWbmP2qpBOpLngl4uxhvaUOIN42,e04dc87f-b79c-4330-82d6-a1c79f23e0eb,ebec3833-d22d-4c52-bcd8-72cf24b19b27,pending_approval,k2Q47OWbmP2qpBOpLngl4uxhvaUOIN42
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:73:11
+ ❯ sql test/helpers.ts:63:18
+     61|     q = s`${q}${params[i - 1]}${s.raw(parts[i] ?? '')}`;
+     62|   }
+     63|   const result = await db.execute(q);
+       |                  ^
+     64|   return result.rows as T[];
+     65| }
+ ❯ seed test/08d-foundation-grade.test.ts:229:7
+ ❯ test/08d-foundation-grade.test.ts:272:26
+Caused by: error: A line enters an item of its session's offer
+ ❯ ../../node_modules/.pnpm/pg-pool@3.10.1_pg@8.16.3/node_modules/pg-pool/index.js:45:11
+ ❯ ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:71:12
+ ❯ sql test/helpers.ts:63:18
+ ❯ seed test/08d-foundation-grade.test.ts:229:7
+ ❯ test/08d-foundation-grade.test.ts:272:26
+
+ FAIL  test/08d-foundation-grade.test.ts > F0a: grade and eligibility > every registration path asks mayRegisterFor
+TypeError: Cannot read properties of undefined (reading 'g10')
+ ❯ test/08d-foundation-grade.test.ts:282:125
+    280|       // (09 checks that nothing waits for a series its student may no…
+    281|       for (const s of [seeded.approval!, seeded.payment!]) {
+    282|         await sql(`delete from registration where id in ($1, $2) and s…
+       |                                                                                                                             ^
+    283|       }
+    284|     });
+
+ FAIL  test/08-money-rules.test.ts > money rules > the registration window closes with money in flight > an unpaid desk checkout fails at close, its escrow comes back, and the student is told which subject was not completed
+Error: waitFor: timed out
+ ❯ waitFor test/helpers.ts:389:38
+    387|     const v = await probe();
+    388|     if (v) return v;
+    389|     if (Date.now() > deadline) throw new Error('waitFor: timed out');
+       |                                      ^
+    390|     await new Promise((r) => setTimeout(r, 100));
+    391|   }
+ ❯ test/08-money-rules.test.ts:791:22
+
+ FAIL  test/08-money-rules.test.ts > money rules > the registration window closes with money in flight > at the exam board's entry deadline, everything still unconfirmed on the series is closed, extension or not (MO-10)
+Error: This session is closed: its subjects are history
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ placeItemsIn test/helpers.ts:366:7
+    364|     if (sub) await setSuiteFee(adm, seriesId, sub);
+    365|     if (it.series_label === s.label) {
+    366|       await apiResponse(adm.api.v1.sessions[':id'].offers[':offerId'].…
+       |       ^
+    367|         param: { id: sessionId, offerId: it.offer_id, itemId: it.id },…
+    368|       }));
+ ❯ feedSeries test/helpers.ts:343:3
+ ❯ test/08-money-rules.test.ts:901:24
+
+ FAIL  test/08-money-rules.test.ts > money rules > the registration window closes with money in flight > a transfer found on the statement after its payment closed is recorded by a finance admin and credited to escrow
+AssertionError: expected 404 to be 403 // Object.is equality
+- Expected
++ Received
+- 403
++ 404
+ ❯ test/08-money-rules.test.ts:979:145
+    977| 
+    978|       // A finance admin only: nothing undoes it.
+    979|       expect((await refused(record(officer, artPay, { notes: 'found on…
+       |                                                                                                                                                 ^
+    980| 
+    981|       // Nothing undoes it, so no more than the payment was for.
+
+ FAIL  test/08-money-rules.test.ts > money rules > the registration window closes with money in flight > a transfer found later can be undone by a finance admin the same day, while its escrow is unspent (MO-24)
+AssertionError: expected 404 to be 403 // Object.is equality
+- Expected
++ Received
+- 403
++ 404
+ ❯ test/08-money-rules.test.ts:1019:61
+    1017|         by.api.v1.payments[':id']['undo-transfer'].$post({ param: { id…
+    1018|       const before = await takings(officer);
+    1019|       expect((await refused(undo(officer, musPay))).status).toBe(403);
+       |                                                             ^
+    1020| 
+    1021|       // Not while the escrow it added is spent: a refund request hold…
+
+ FAIL  test/08-money-rules.test.ts > money rules > a preregistration paid after its session opened > past a later series' board deadline a preregistration can no longer be made, paid or confirmed, and what was paid comes back in full (MO-10, MO-21)
+Error: waitFor: timed out
+ ❯ waitFor test/helpers.ts:389:38
+    387|     const v = await probe();
+    388|     if (v) return v;
+    389|     if (Date.now() > deadline) throw new Error('waitFor: timed out');
+       |                                      ^
+    390|     await new Promise((r) => setTimeout(r, 100));
+    391|   }
+ ❯ test/08-money-rules.test.ts:1200:28
+
+ FAIL  test/08-money-rules.test.ts > money rules > a preregistration paid after its session opened > a family reference set aside by a transfer found later cannot be submitted again
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+- Expected
++ Received
+  {
+-   "error": "This transaction reference has already been submitted for another payment. Double-check your InstaPay receipt.",
+-   "status": 409,
++   "error": "\"\"",
++   "status": 200,
+  }
+ ❯ test/08-money-rules.test.ts:1228:21
+    1226|       }))).id!;
+    1227|       const again = await refused(f.parent.api.v1.payments[':id']['ins…
+    1228|       expect(again).toEqual({ status: 409, error: 'This transaction re…
+       |                     ^
+    1229|       expect(await statusOf('payment', pay)).toBe('pending');
+    1230|       await apiResponse(f.parent.api.v1.payments[':id'].cancel.$post({…
+
+ FAIL  test/08d-foundation-grade.test.ts > F0a: grade and eligibility > the school-fee gate by series (row 4's fee; A-13; A-14) > A-14 'hold': a series in next year whose fee has not opened waits; 'proceed' lets it through
+AssertionError: expected 'The 2027-2028 school fee is not open …' to be 'The 2027-2028 school fee is not open …' // Object.is equality
+Expected: "The 2027-2028 school fee is not open yet — registration for the November 2027 series waits until it opens"
+Received: "The 2027-2028 school fee is not open yet — registration for the Winter 2027 series waits until it opens"
+ ❯ test/08d-foundation-grade.test.ts:452:26
+
+ FAIL  test/08e-foundation-eligibility-changes.test.ts > F0a: when eligibility changes after a registration exists > an admin corrects a window's series: registrations students may no longer sit expire, audited with the correction
+Error: This session's items are entered in Cambridge International November 2026 (t3-gz10), which would no longer fit June 2028 (every series is in the session's academic year and, like it, June or not) — move its items first
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08e-foundation-eligibility-changes.test.ts:186:15
+    184|     const reg = (await apiResponse(f.parent.api.v1.registrations.direc…
+    185|     // The window was really for next year's June: past grade 12 by th…
+    186|     const r = await apiResponse(adm.api.v1.sessions[':id'].series.$put…
+       |               ^
+    187|       param: { id: nov }, json: { sessionType: 'june', seriesYear: ser…
+    188|     }));
+
+ FAIL  test/08e-foundation-eligibility-changes.test.ts > F0a: when eligibility changes after a registration exists > a draft window's series cannot be edited once anyone has preregistered: the audited series correction is the way
+AssertionError: expected 400 to be 409 // Object.is equality
+- Expected
++ Received
+- 409
++ 400
+ ❯ test/08e-foundation-eligibility-changes.test.ts:295:22
+    293| 
+    294|     const r = await refused(editDraft(draft, { seriesYear: thisYear + …
+    295|     expect(r.status).toBe(409);
+       |                      ^
+    296|     expect(r.error).toContain('Correct series');
+    297|     expect((await one<{ series_year: number }>(`select series_year fro…
+
+ FAIL  test/08e-foundation-eligibility-changes.test.ts > F0a: when eligibility changes after a registration exists > a draft window with no preregistrations: its series may be edited, and the change is audited
+AssertionError: expected 400 to be 200 // Object.is equality
+- Expected
++ Received
+- 200
++ 400
+ ❯ test/08e-foundation-eligibility-changes.test.ts:309:24
+    307|     const draft = await session(adm, 'January (AS, F0a draft edit)', '…
+    308|     const res = await editDraft(draft, { seriesYear: seriesYearInAcade…
+    309|     expect(res.status).toBe(200);
+       |                        ^
+    310|     const row = await one<{ changed: { from: string; to: string }; rea…
+    311|       `select new_data->'seriesChanged' as changed, new_data->>'_updat…
+
+ FAIL  test/08f-foundation-structure.test.ts > F0a: settings, uploads, academic structure, sections, teaching > the settings store > every reader sees every key, its default, and whether they may change it
+AssertionError: expected { …(13) } to deeply equal { …(5) }
+- Expected
++ Received
+  {
+    "calendar.schoolWeekdays": true,
+    "catalogue.levelCodeReading": true,
+    "eligibility.graduateRetakes": false,
++   "payment.graceDays": false,
++   "pricing.onePaperCoursePercent": false,
++   "pricing.payOnProvisionalFee": false,
++   "pricing.retakeTaughtCoursePercent": false,
++   "pricing.selfStudyBoardPercent": false,
++   "pricing.selfStudyCoursePercent": false,
++   "refund.defaultPolicy.june": false,
++   "refund.defaultPolicy.winter": false,
+    "schoolFee.graduatesExempt": false,
+    "schoolFee.newYearWithoutSchedule": false,
+  }
+ ❯ test/08f-foundation-structure.test.ts:56:20
+     54|       expect(byKey['calendar.schoolWeekdays']).toMatchObject({ value: …
+     55|       const mine = Object.fromEntries((await apiResponse(coordinator.a…
+     56|       expect(mine).toEqual({
+       |                    ^
+     57|         'eligibility.graduateRetakes': false,
+     58|         'schoolFee.graduatesExempt': false,
+
+ FAIL  test/08g-foundation-races.test.ts > F0a: races > a registration racing an eligibility change is never left waiting > a withdrawal: the registration commits first, then the withdrawal expires it
+error: A line enters an item of its session's offer
+ ❯ ../../node_modules/.pnpm/pg@8.16.3/node_modules/pg/lib/client.js:545:17
+ ❯ holdInsert test/08g-foundation-races.test.ts:43:3
+     41|   await client.connect();
+     42|   await client.query('BEGIN');
+     43|   await client.query(
+       |   ^
+     44|     `insert into registration (id, student_id, session_id, subject_id,…
+     45|      values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment'…
+ ❯ race test/08g-foundation-races.test.ts:83:21
+ ❯ test/08g-foundation-races.test.ts:122:28
+
+ FAIL  test/08g-foundation-races.test.ts > F0a: races > a registration racing an eligibility change is never left waiting > a transfer: the registration commits first, then the transfer expires it
+error: A line enters an item of its session's offer
+ ❯ ../../node_modules/.pnpm/pg@8.16.3/node_modules/pg/lib/client.js:545:17
+ ❯ holdInsert test/08g-foundation-races.test.ts:43:3
+     41|   await client.connect();
+     42|   await client.query('BEGIN');
+     43|   await client.query(
+       |   ^
+     44|     `insert into registration (id, student_id, session_id, subject_id,…
+     45|      values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment'…
+ ❯ race test/08g-foundation-races.test.ts:83:21
+ ❯ test/08g-foundation-races.test.ts:135:28
+
+ FAIL  test/08g-foundation-races.test.ts > F0a: races > a registration racing an eligibility change is never left waiting > a cohort correction: the registration commits first, then the correction expires it
+error: A line enters an item of its session's offer
+ ❯ ../../node_modules/.pnpm/pg@8.16.3/node_modules/pg/lib/client.js:545:17
+ ❯ holdInsert test/08g-foundation-races.test.ts:43:3
+     41|   await client.connect();
+     42|   await client.query('BEGIN');
+     43|   await client.query(
+       |   ^
+     44|     `insert into registration (id, student_id, session_id, subject_id,…
+     45|      values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment'…
+ ❯ race test/08g-foundation-races.test.ts:83:21
+ ❯ test/08g-foundation-races.test.ts:148:28
+
+ FAIL  test/08g-foundation-races.test.ts > F0a: races > a registration racing an eligibility change is never left waiting > a window's series corrected: the registration commits first, then the correction expires it
+error: A line enters an item of its session's offer
+ ❯ ../../node_modules/.pnpm/pg@8.16.3/node_modules/pg/lib/client.js:545:17
+ ❯ holdInsert test/08g-foundation-races.test.ts:43:3
+     41|   await client.connect();
+     42|   await client.query('BEGIN');
+     43|   await client.query(
+       |   ^
+     44|     `insert into registration (id, student_id, session_id, subject_id,…
+     45|      values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment'…
+ ❯ race test/08g-foundation-races.test.ts:83:21
+ ❯ test/08g-foundation-races.test.ts:162:28
+
+ FAIL  test/08g-foundation-races.test.ts > F0a: races > a registration racing an eligibility change is never left waiting > a grade-10 exception revoked: the registration it allowed commits first, then the revocation expires it
+error: A line enters an item of its session's offer
+ ❯ ../../node_modules/.pnpm/pg@8.16.3/node_modules/pg/lib/client.js:545:17
+ ❯ holdInsert test/08g-foundation-races.test.ts:43:3
+     41|   await client.connect();
+     42|   await client.query('BEGIN');
+     43|   await client.query(
+       |   ^
+     44|     `insert into registration (id, student_id, session_id, subject_id,…
+     45|      values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment'…
+ ❯ race test/08g-foundation-races.test.ts:83:21
+ ❯ test/08g-foundation-races.test.ts:177:28
+
+ FAIL  test/08g-foundation-races.test.ts > F0a: races > a registration racing an eligibility change is never left waiting > A-12 turned off: a graduate's registration commits first, then the change expires it
+error: A line enters an item of its session's offer
+ ❯ ../../node_modules/.pnpm/pg@8.16.3/node_modules/pg/lib/client.js:545:17
+ ❯ holdInsert test/08g-foundation-races.test.ts:43:3
+     41|   await client.connect();
+     42|   await client.query('BEGIN');
+     43|   await client.query(
+       |   ^
+     44|     `insert into registration (id, student_id, session_id, subject_id,…
+     45|      values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment'…
+ ❯ race test/08g-foundation-races.test.ts:83:21
+ ❯ test/08g-foundation-races.test.ts:193:30
+
+## Summary
+[clock] database minus host: -0.1 ms (measured within 2 ms)
+ Test Files  5 failed | 6 passed (11)
+      Tests  17 failed | 158 passed | 6 skipped | 1 todo (182)
+   Start at  23:54:52
+   Duration  75.97s (transform 576ms, setup 14ms, collect 993ms, tests 72.34s, environment 1ms, prepare 335ms)
