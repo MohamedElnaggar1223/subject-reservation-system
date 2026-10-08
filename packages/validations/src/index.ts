@@ -44,6 +44,7 @@ export * from './exception/policies'
 export * from './charge/charge.validations'
 export * from './remark/remark.validations'
 export * from './desk/desk.validations'
+export * from './message/message.validations'
 
 /**
  * F0a — core foundation: the academic year and grade rules, the academic

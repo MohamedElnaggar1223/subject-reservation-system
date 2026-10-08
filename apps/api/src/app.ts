@@ -31,6 +31,8 @@ import { payments } from './routes/payment.routes';
 import { escrowRoutes } from './routes/escrow.routes';
 import { registrationSwapRoutes, changeRequestRoutes } from './routes/swap.routes';
 import { notificationRoutes } from './routes/notification.routes';
+import { messageRoutes } from './routes/message.routes';
+import { reminderRoutes } from './routes/reminder.routes';
 import { audit } from './routes/audit.routes';
 import { academicRoutes } from './routes/academic.routes';
 import { studentRoutes } from './routes/student.routes';
@@ -338,7 +340,12 @@ const v1 = new Hono<HonoEnv>()
    * - GET    /v1/notifications/unread-count       - Unread count for badge
    * - PUT    /v1/notifications/read-all           - Mark all as read
    * - PUT    /v1/notifications/:id/read           - Mark single as read
-   * - POST   /v1/notifications/admin/announce     - Admin bulk announcement (NOT-011)
+   *
+   * Messages and reminders (step D, RESERVATIONS_REWORK.md §3.8) at /v1/messages and
+   * /v1/reminders (they replaced the admin's announce and scheduled routes):
+   * - GET/POST /v1/messages, POST /v1/messages/:id/cancel, POST /v1/messages/audiences/resolve,
+   *   GET /v1/messages/audiences, GET /v1/messages/lists, GET/POST/PUT /v1/messages/templates,
+   *   GET /v1/messages/deliveries; GET/PUT /v1/reminders/rules, GET /v1/reminders/sent
    *
    * Audit log routes mounted at /v1/audit (admin only):
    * - GET    /v1/audit/logs                       - Paginated audit log with filters (REP-006)
@@ -398,6 +405,8 @@ const v1 = new Hono<HonoEnv>()
   .route('/escrow', escrowRoutes)
   .route('/change-requests', changeRequestRoutes)
   .route('/notifications', notificationRoutes)
+  .route('/messages', messageRoutes)
+  .route('/reminders', reminderRoutes)
   .route('/audit', audit)
   .route('/reports', reports)
   .route('/teachers', teachers)

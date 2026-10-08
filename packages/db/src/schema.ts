@@ -2877,6 +2877,285 @@ export const scheduledAnnouncementRelations = relations(scheduledAnnouncement, (
 
 /**
  * ============================================
+ * MESSAGES AND REMINDERS (reservations rework, step D; RESERVATIONS_REWORK.md §3.8)
+ * ============================================
+ *
+ * A message goes to an audience on its channels. Sending it writes, in one transaction, the
+ * family's ordinary notification row for each in-app recipient (the notification centre families
+ * keep: they mark read, nobody deletes) and one delivery row per recipient and channel; an email
+ * delivery is queued there and sent after the commit, claimed first, its outcome recorded on it.
+ * Reminder rules are run by the scheduler; each reminder is claimed in `reminder_sent` (unique per
+ * kind, target, anchor day and offset) before it is sent, so two scheduler instances send it once
+ * (STATE_AUDIT.md ST-06, ST-12). `scheduled_announcement` is kept one release; its rows moved here
+ * (0051).
+ */
+
+/** An audience: a broadcast, a batch list or chosen people; a saved one is offered by name in the picker. */
+export const messageAudience = pgTable(
+  "message_audience",
+  {
+    id: text("id").primaryKey(),
+    // 'broadcast' | 'batch' | 'direct'
+    kind: text("kind").notNull(),
+    // The definition (@repo/validations AudienceDefinition), resolved when the message is sent.
+    definition: jsonb("definition").$type<Record<string, unknown>>().notNull(),
+    // A saved audience: its name in the picker. A message's own audience is a copy, never edited.
+    name: text("name"),
+    saved: boolean("saved").notNull().default(false),
+    // How many recipients it resolved to when sent (or last resolved for a preview).
+    resolvedCount: integer("resolved_count"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    // What it came from before step D (an old announcement's recipient group).
+    legacy: jsonb("legacy").$type<Record<string, unknown>>(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("messageAudience_saved_name_idx").on(sql`lower(${table.name})`).where(sql`saved`),
+    check("message_audience_kind_valid", sql`${table.kind} IN ('broadcast', 'batch', 'direct')`),
+    check("message_audience_saved_named", sql`NOT ${table.saved} OR ${table.name} IS NOT NULL`),
+  ]
+);
+
+/** The school's texts, in English and Arabic; a built-in one has the `key` the reminder rules are seeded with. */
+export const messageTemplate = pgTable(
+  "message_template",
+  {
+    id: text("id").primaryKey(),
+    key: text("key"),
+    name: text("name").notNull(),
+    titleEn: text("title_en").notNull(),
+    bodyEn: text("body_en").notNull(),
+    titleAr: text("title_ar").notNull(),
+    bodyAr: text("body_ar").notNull(),
+    active: boolean("active").notNull().default(true),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("messageTemplate_key_idx").on(table.key).where(sql`key IS NOT NULL`),
+    uniqueIndex("messageTemplate_name_idx").on(sql`lower(${table.name})`),
+  ]
+);
+
+/**
+ * A reminder rule: a kind, the days around its anchor (−7 = seven days before), a repeat after the
+ * last of them until its target is done, the channels and the texts. session_id null: every
+ * session; a session's own rule of the kind overrides it there (inactive: off for that session;
+ * inherits_at set: dropped, the session follows the rule for every session again).
+ */
+export const reminderRule = pgTable(
+  "reminder_rule",
+  {
+    id: text("id").primaryKey(),
+    // 'payment_due' | 'session_closing' | 'entry_deadline' | 'school_fee_due' | 'declared_retakes_to_verify'
+    kind: text("kind").notNull(),
+    sessionId: text("session_id").references(() => registrationSession.id, { onDelete: "restrict" }),
+    offsetsDays: integer("offsets_days").array().notNull(),
+    repeatEveryDays: integer("repeat_every_days"),
+    // 'paid' | 'closed' | 'deadline' | 'verified' (the kind's)
+    until: text("until").notNull(),
+    channels: text("channels").array().notNull(),
+    templateId: text("template_id").notNull().references(() => messageTemplate.id, { onDelete: "restrict" }),
+    // The text for the days after the date (a payment still owed), when it differs.
+    overdueTemplateId: text("overdue_template_id").references(() => messageTemplate.id, { onDelete: "restrict" }),
+    active: boolean("active").notNull().default(true),
+    inheritsAt: timestamp("inherits_at", { withTimezone: true }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("reminderRule_global_idx").on(table.kind).where(sql`session_id IS NULL`),
+    uniqueIndex("reminderRule_session_idx").on(table.kind, table.sessionId).where(sql`session_id IS NOT NULL`),
+    check("reminder_rule_kind_valid", sql`${table.kind} IN ('payment_due', 'session_closing', 'entry_deadline', 'school_fee_due', 'declared_retakes_to_verify')`),
+    check("reminder_rule_until_valid", sql`${table.until} IN ('paid', 'closed', 'deadline', 'verified')`),
+    check("reminder_rule_offsets_valid", sql`cardinality(${table.offsetsDays}) BETWEEN 1 AND 12`),
+    check("reminder_rule_repeat_valid", sql`${table.repeatEveryDays} IS NULL OR ${table.repeatEveryDays} BETWEEN 1 AND 60`),
+    check("reminder_rule_channels_valid", sql`cardinality(${table.channels}) > 0 AND ${table.channels} <@ ARRAY['in_app', 'email', 'whatsapp']::text[]`),
+    check("reminder_rule_global_never_inherits", sql`${table.sessionId} IS NOT NULL OR ${table.inheritsAt} IS NULL`),
+  ]
+);
+
+/** A message: its audience, its text (a template or written), its channels, when, and what became of it. */
+export const message = pgTable(
+  "message",
+  {
+    id: text("id").primaryKey(),
+    audienceId: text("audience_id").notNull().references(() => messageAudience.id, { onDelete: "restrict" }),
+    templateId: text("template_id").references(() => messageTemplate.id, { onDelete: "restrict" }),
+    // Written text (when no template): the English, or the one language typed, and optionally the Arabic.
+    title: text("title"),
+    body: text("body"),
+    titleAr: text("title_ar"),
+    bodyAr: text("body_ar"),
+    // 'en' | 'ar' | 'both'
+    language: text("language").notNull().default("both"),
+    // 'in_app' | 'email' | 'whatsapp' (reserved: no sender until the school has a business account)
+    channels: text("channels").array().notNull(),
+    // { sessionId? }: what {session} and {closes} read when the audience names no session.
+    context: jsonb("context").$type<Record<string, unknown>>(),
+    // The notification type its in-app rows carry (BULK_ANNOUNCEMENT for a broadcast, as before).
+    notificationType: text("notification_type").notNull(),
+    // 'staff' | 'reminder' | 'legacy_announcement'
+    source: text("source").notNull().default("staff"),
+    reminderRuleId: text("reminder_rule_id").references(() => reminderRule.id, { onDelete: "restrict" }),
+    // 'scheduled' | 'sent' | 'cancelled' | 'failed'
+    status: text("status").notNull(),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    recipientCount: integer("recipient_count"),
+    error: text("error"),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: text("cancelled_by").references(() => user.id, { onDelete: "set null" }),
+    cancelReason: text("cancel_reason"),
+    // The scheduled_announcement row it was moved from (0051), once.
+    legacyAnnouncementId: text("legacy_announcement_id"),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("message_status_scheduled_idx").on(table.status, table.scheduledAt),
+    index("message_createdAt_idx").on(table.createdAt),
+    index("message_reminderRuleId_idx").on(table.reminderRuleId),
+    uniqueIndex("message_legacy_announcement_idx").on(table.legacyAnnouncementId).where(sql`legacy_announcement_id IS NOT NULL`),
+    check("message_status_valid", sql`${table.status} IN ('scheduled', 'sent', 'cancelled', 'failed')`),
+    check("message_source_valid", sql`${table.source} IN ('staff', 'reminder', 'legacy_announcement')`),
+    check("message_language_valid", sql`${table.language} IN ('en', 'ar', 'both')`),
+    check("message_channels_valid", sql`cardinality(${table.channels}) > 0 AND ${table.channels} <@ ARRAY['in_app', 'email', 'whatsapp']::text[]`),
+    check("message_has_text", sql`${table.templateId} IS NOT NULL OR (${table.title} IS NOT NULL AND ${table.body} IS NOT NULL)`),
+    check("message_scheduled_has_time", sql`${table.status} <> 'scheduled' OR ${table.scheduledAt} IS NOT NULL`),
+    check("message_sent_has_time", sql`${table.status} <> 'sent' OR ${table.sentAt} IS NOT NULL`),
+    check("message_reminder_has_rule", sql`(${table.source} = 'reminder') = (${table.reminderRuleId} IS NOT NULL)`),
+  ]
+);
+
+/**
+ * One recipient on one channel (and, for a message about a child — a payment reminder, a session's
+ * unpaid list — that child): the text as sent, the in-app notification row, the outcome.
+ */
+export const messageDelivery = pgTable(
+  "message_delivery",
+  {
+    id: text("id").primaryKey(),
+    messageId: text("message_id").notNull().references(() => message.id, { onDelete: "restrict" }),
+    recipientId: text("recipient_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    // The student the delivery is about (a child of a parent recipient, or the student themself).
+    studentId: text("student_id").references(() => user.id, { onDelete: "set null" }),
+    channel: text("channel").notNull(),
+    // 'queued' | 'sending' | 'sent' | 'failed'
+    status: text("status").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    // The address an email went to, as it was when sent.
+    address: text("address"),
+    notificationId: text("notification_id").references(() => notification.id, { onDelete: "set null" }),
+    error: text("error"),
+    attempts: integer("attempts").notNull().default(0),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("messageDelivery_messageId_idx").on(table.messageId),
+    index("messageDelivery_recipientId_idx").on(table.recipientId),
+    index("messageDelivery_status_idx").on(table.status, table.channel),
+    uniqueIndex("messageDelivery_one_idx").on(table.messageId, table.recipientId, table.channel, sql`coalesce(${table.studentId}, '')`),
+    uniqueIndex("messageDelivery_notification_idx").on(table.notificationId).where(sql`notification_id IS NOT NULL`),
+    check("message_delivery_channel_valid", sql`${table.channel} IN ('in_app', 'email', 'whatsapp')`),
+    check("message_delivery_status_valid", sql`${table.status} IN ('queued', 'sending', 'sent', 'failed')`),
+    check("message_delivery_failed_says_why", sql`${table.status} <> 'failed' OR ${table.error} IS NOT NULL`),
+    check("message_delivery_sent_has_time", sql`${table.status} <> 'sent' OR ${table.sentAt} IS NOT NULL`),
+  ]
+);
+
+/**
+ * The claim of one reminder: kind × target × the anchor's day × offset, unique, inserted before
+ * anything is sent and in the same transaction as the message, its deliveries and notifications.
+ * A second scheduler instance's insert conflicts and sends nothing.
+ */
+export const reminderSent = pgTable(
+  "reminder_sent",
+  {
+    id: text("id").primaryKey(),
+    ruleId: text("rule_id").notNull().references(() => reminderRule.id, { onDelete: "restrict" }),
+    kind: text("kind").notNull(),
+    // 'line' | 'charge' | 'session' | 'series_entry' | 'series_retake' | 'verification'
+    targetKind: text("target_kind").notNull(),
+    targetId: text("target_id").notNull(),
+    // The date the offsets count from, as the school's day (Cairo): a moved date is a new reminder.
+    anchorOn: date("anchor_on", { mode: "string" }).notNull(),
+    offsetDays: integer("offset_days").notNull(),
+    // The student the target belongs to (a line's, a charge's).
+    studentId: text("student_id").references(() => user.id, { onDelete: "set null" }),
+    sessionId: text("session_id").references(() => registrationSession.id, { onDelete: "set null" }),
+    messageId: text("message_id").notNull().references(() => message.id, { onDelete: "restrict" }),
+    sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("reminderSent_claim_idx").on(table.kind, table.targetKind, table.targetId, table.anchorOn, table.offsetDays),
+    index("reminderSent_messageId_idx").on(table.messageId),
+    index("reminderSent_studentId_idx").on(table.studentId),
+    check("reminder_sent_target_kind_valid", sql`${table.targetKind} IN ('line', 'charge', 'session', 'series_entry', 'series_retake', 'verification')`),
+  ]
+);
+
+export const messageAudienceRelations = relations(messageAudience, ({ one, many }) => ({
+  createdByUser: one(user, { fields: [messageAudience.createdBy], references: [user.id] }),
+  messages: many(message),
+}));
+export const messageTemplateRelations = relations(messageTemplate, ({ many }) => ({
+  messages: many(message),
+}));
+export const messageRelations = relations(message, ({ one, many }) => ({
+  audience: one(messageAudience, { fields: [message.audienceId], references: [messageAudience.id] }),
+  template: one(messageTemplate, { fields: [message.templateId], references: [messageTemplate.id] }),
+  reminderRule: one(reminderRule, { fields: [message.reminderRuleId], references: [reminderRule.id] }),
+  createdByUser: one(user, { fields: [message.createdBy], references: [user.id] }),
+  deliveries: many(messageDelivery),
+  claims: many(reminderSent),
+}));
+export const messageDeliveryRelations = relations(messageDelivery, ({ one }) => ({
+  message: one(message, { fields: [messageDelivery.messageId], references: [message.id] }),
+  recipient: one(user, { fields: [messageDelivery.recipientId], references: [user.id], relationName: "deliveryRecipient" }),
+  student: one(user, { fields: [messageDelivery.studentId], references: [user.id], relationName: "deliveryStudent" }),
+  notification: one(notification, { fields: [messageDelivery.notificationId], references: [notification.id] }),
+}));
+export const reminderRuleRelations = relations(reminderRule, ({ one, many }) => ({
+  session: one(registrationSession, { fields: [reminderRule.sessionId], references: [registrationSession.id] }),
+  template: one(messageTemplate, { fields: [reminderRule.templateId], references: [messageTemplate.id], relationName: "ruleTemplate" }),
+  overdueTemplate: one(messageTemplate, { fields: [reminderRule.overdueTemplateId], references: [messageTemplate.id], relationName: "ruleOverdueTemplate" }),
+  claims: many(reminderSent),
+}));
+export const reminderSentRelations = relations(reminderSent, ({ one }) => ({
+  rule: one(reminderRule, { fields: [reminderSent.ruleId], references: [reminderRule.id] }),
+  message: one(message, { fields: [reminderSent.messageId], references: [message.id] }),
+  student: one(user, { fields: [reminderSent.studentId], references: [user.id] }),
+}));
+
+
+/**
+ * ============================================
  * F0a — SCHOOL SETTINGS
  * ============================================
  *

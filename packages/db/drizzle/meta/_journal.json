@@ -351,6 +351,20 @@
       "when": 1791437760565,
       "tag": "0049_rework_money_constraints",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791444538626,
+      "tag": "0050_rework_messages_structure",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1791444609348,
+      "tag": "0051_rework_messages_backfill",
+      "breakpoints": true
     }
   ]
 }
