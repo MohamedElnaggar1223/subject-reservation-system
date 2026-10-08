@@ -142,4 +142,32 @@ describe('F1: the editor engine and the generator’s explanations', () => {
     const lab = run.unplaced.find((u) => u.groupId === 'L')!;
     expect(lab).toMatchObject({ cause: 'impossible', summary: 'Lab group, lesson 1 cannot be placed: no room in use is a science lab seating 1' });
   });
+
+  it('a student who changed sets during the term is counted once for the load: no "impossible" from periods they never have at once (round two, flag 7)', () => {
+    const periods = [1, 2].map((p) => ({ period: p, label: `P${p}`, startsAt: '08:00', endsAt: '08:45', joinsNext: false }));
+    const input: EngineInput = {
+      days: [{ weekday: 0, periods }],
+      teachers: [{ id: 'ta', name: 'Teacher A', maxPerDay: null, maxPerWeek: null }],
+      rooms: [{ id: 'r1', name: 'Room 1', type: 'classroom', capacity: 30, features: [], isActive: true }, { id: 'r2', name: 'Room 2', type: 'classroom', capacity: 30, features: [], isActive: true }],
+      // Student x is in Set 1 until a day, then in Set 2: never in both at once (no overlap).
+      groups: [
+        { id: 'S1', name: 'Set 1', teacherId: 'ta', size: 1, students: ['x'], roomType: null, roomFeatures: [], roomId: null, preferredRoomId: null },
+        { id: 'S2', name: 'Set 2', teacherId: null, size: 1, students: ['x'], roomType: null, roomFeatures: [], roomId: null, preferredRoomId: null },
+      ],
+      lessons: [1, 2].flatMap((n) => ['S1', 'S2'].map((g) => ({ id: `${g}-${n}`, groupId: g, seq: n, length: 1, weekday: null, period: null, roomId: null, locked: false }))),
+      overlaps: [],
+      // Set 2's lessons on different days, and the week has one: its second lesson cannot go in.
+      dayRules: [{ a: 'S2', b: 'S2' }],
+      unavailable: [], roomsRequired: true,
+      studentPeriods: { x: 2 },
+    };
+    const counted = generate(input, { iterations: 1000 }).unplaced.find((u) => u.groupId === 'S2')!;
+    expect(counted.cause).toBe('not_fitted');
+    expect(counted.reasons.join(' ')).not.toMatch(/periods of lessons a week in all/);
+    // Without the model's count (every group summed) the same lesson was called impossible.
+    const { studentPeriods: _sp, ...summed } = input;
+    const old = generate(summed, { iterations: 1000 }).unplaced.find((u) => u.groupId === 'S2')!;
+    expect(old.cause).toBe('impossible');
+    expect(old.reasons).toContain('Some of its students have 4 periods of lessons a week in all, and the week has 2');
+  });
 });

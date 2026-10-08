@@ -430,6 +430,23 @@ export async function formGroups(data: FormGroupsType, actorId: string, ctx?: Au
         studentIds: plans.flatMap((p) => p.adding.map((a) => a.studentId)),
         groupIds: plans.filter((p) => p.groupId && p.action !== 'unchanged').map((p) => p.groupId!),
       });
+      // Read again under the locks: a student another change put in a group of the key meanwhile (a
+      // move, the enrolment's follow-up) stays there — this run does not add them a second time.
+      const addingIds = [...new Set(plans.flatMap((p) => p.adding.map((a) => a.studentId)))];
+      if (addingIds.length) {
+        const nowOpen = await tx.select({ studentId: teachingGroupMember.studentId, subjectId: teachingGroupMember.subjectId, unitId: teachingGroupMember.unitId })
+          .from(teachingGroupMember)
+          .where(and(inArray(teachingGroupMember.studentId, addingIds), eq(teachingGroupMember.academicYearId, y.id), isNull(teachingGroupMember.endedOn)));
+        const grouped = new Set(nowOpen.map((m) => `${m.studentId}|${memberKey(m)}`));
+        for (const p of plans) {
+          const key = memberKey({ subjectId: p.subject.id, unitId: p.unit?.id ?? null });
+          const before = p.adding.length;
+          p.adding = p.adding.filter((a) => !grouped.has(`${a.studentId}|${key}`));
+          p.total -= before - p.adding.length;
+          if (p.action === 'update' && !p.adding.length && !p.removing.length) p.action = 'unchanged';
+          if (p.action === 'create' && !p.adding.length) p.action = 'unchanged';
+        }
+      }
       const commit = async () => {
         const touched: string[] = [];
         for (const p of plans) {

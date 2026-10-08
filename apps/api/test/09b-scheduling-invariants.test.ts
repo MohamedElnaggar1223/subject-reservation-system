@@ -10,6 +10,15 @@ import { sql } from './helpers';
 const OVERLAP = `a.timetable_id = b.timetable_id and a.id < b.id and a.weekday = b.weekday
   and a.period <= b.period + b.length - 1 and b.period <= a.period + a.length - 1`;
 
+/** Each group's teacher from a day to a day (dated rows; a group never dated: its teacher throughout). */
+const TAUGHT = `taught as (
+  select x.group_id, x.teacher_id, x.started_on as f, coalesce(x.ended_on, 'infinity'::date) as t
+    from teaching_group_teacher x where x.teacher_id is not null and (x.ended_on is null or x.ended_on >= x.started_on)
+  union all
+  select g.id, g.teacher_id, '-infinity'::date, 'infinity'::date from teaching_group g
+   where g.teacher_id is not null and not exists (select 1 from teaching_group_teacher x where x.group_id = g.id)
+)`;
+
 describe('F1: scheduling invariants over the whole database', () => {
   it('no published timetable puts a teacher in two lessons at once, on any day they teach both groups — unless the coordinator went ahead with it (recorded)', async () => {
     expect(await sql(`
@@ -70,28 +79,33 @@ describe('F1: scheduling invariants over the whole database', () => {
     expect(await sql(`select id from timetable_lesson where (weekday is null) <> (period is null) or (locked and weekday is null)`)).toEqual([]);
   });
 
-  it("a draft's lesson cards match its groups' weekly periods and doubles", async () => {
+  it("a draft's lesson cards match its groups' weekly periods and doubles — none for a group a provider teaches", async () => {
     expect(await sql(`
       select t.name as timetable, g.name as group_name, g.weekly_periods, g.double_periods,
              coalesce(sum(l.length), 0) as periods, count(l.id) filter (where l.length = 2) as doubles
         from timetable t join academic_term term on term.id = t.term_id
         join teaching_group g on g.academic_year_id = t.academic_year_id
           and (g.archived_on is null or g.archived_on > greatest(term.starts_on, (now() at time zone 'Africa/Cairo')::date))
+        left join teacher tg on tg.id = g.teacher_id
         left join timetable_lesson l on l.timetable_id = t.id and l.group_id = g.id
        where t.status = 'draft'
-       group by t.name, g.name, g.weekly_periods, g.double_periods
-      having coalesce(sum(l.length), 0) <> g.weekly_periods or count(l.id) filter (where l.length = 2) <> g.double_periods`)).toEqual([]);
+       group by t.name, g.name, g.weekly_periods, g.double_periods, tg.kind
+      having coalesce(sum(l.length), 0) <> (case when tg.kind = 'provider' then 0 else g.weekly_periods end)
+          or count(l.id) filter (where l.length = 2) <> (case when tg.kind = 'provider' then 0 else g.double_periods end)`)).toEqual([]);
     expect(await sql(`
       select t.name, g.name from timetable_lesson l join timetable t on t.id = l.timetable_id and t.status = 'draft'
       join academic_term term on term.id = t.term_id join teaching_group g on g.id = l.group_id
       where g.archived_on is not null and g.archived_on <= greatest(term.starts_on, (now() at time zone 'Africa/Cairo')::date)`)).toEqual([]);
   });
 
-  it("a member's subject is its group's; nobody is in a group after leaving the school; one open group per subject", async () => {
-    expect(await sql(`select m.id from teaching_group_member m join teaching_group g on g.id = m.group_id where m.subject_id is distinct from g.subject_id`)).toEqual([]);
+  it("a member's subject and unit are its group's; nobody is in a group after leaving the school; one open group per unit, or per subject with no unit", async () => {
+    expect(await sql(`select m.id from teaching_group_member m join teaching_group g on g.id = m.group_id
+      where m.subject_id is distinct from g.subject_id or m.unit_id is distinct from g.unit_id`)).toEqual([]);
+    expect(await sql(`select student_id, unit_id from teaching_group_member where ended_on is null and unit_id is not null
+      group by student_id, unit_id, academic_year_id having count(*) > 1`)).toEqual([]);
     expect(await sql(`select m.id from teaching_group_member m join "user" u on u.id = m.student_id
       where u.left_on is not null and (m.ended_on is null or m.ended_on > greatest(u.left_on, m.started_on - 1))`)).toEqual([]);
-    expect(await sql(`select student_id, subject_id from teaching_group_member where ended_on is null and subject_id is not null
+    expect(await sql(`select student_id, subject_id from teaching_group_member where ended_on is null and subject_id is not null and unit_id is null
       group by student_id, subject_id, academic_year_id having count(*) > 1`)).toEqual([]);
     expect(await sql(`select m.id from teaching_group_member m join teaching_group g on g.id = m.group_id where g.kind = 'section'`)).toEqual([]);
   });
@@ -121,7 +135,17 @@ describe('F1: scheduling invariants over the whole database', () => {
                                 order by v.effective_from desc, v.published_at desc limit 1))`)).toEqual([]);
     // A removed arrangement says why; a live one does not.
     expect(await sql(`select id from cover_assignment where (status = 'removed') <> (removal is not null)
-      or removal not in ('by_hand', 'absence_withdrawn', 'cover_teacher_away', 'timetable_changed')`)).toEqual([]);
+      or removal not in ('by_hand', 'absence_withdrawn', 'cover_teacher_away', 'timetable_changed', 'no_longer_holds')`)).toEqual([]);
+    // Round two, flag 2: a live cover never sits against a lesson of the cover teacher's own that day
+    // (the version in force then, their teaching on that date: a group's teacher is dated).
+    expect(await sql(`
+      with ${TAUGHT}
+      select c.id, c.date from cover_assignment c join timetable_lesson l on l.id = c.lesson_id
+        join timetable_lesson o on o.timetable_id = c.timetable_id and o.id <> l.id and o.weekday = l.weekday
+          and o.period <= l.period + l.length - 1 and l.period <= o.period + o.length - 1
+        join teaching_group og on og.id = o.group_id and (og.archived_on is null or og.archived_on > c.date)
+        join taught ta on ta.group_id = o.group_id and ta.teacher_id = c.cover_teacher_id and c.date between ta.f and ta.t
+       where c.status = 'assigned'`)).toEqual([]);
     // Nobody gives cover on a day they are recorded away (at the lesson's periods).
     expect(await sql(`
       select c.id from cover_assignment c join timetable_lesson l on l.id = c.lesson_id
@@ -142,6 +166,18 @@ describe('F1: scheduling invariants over the whole database', () => {
     expect(await sql(`select pc.id from published_clash pc join timetable t on t.id = pc.timetable_id
        join timetable_lesson a on a.id = pc.lesson_a_id join timetable_lesson b on b.id = pc.lesson_b_id
       where t.status <> 'published' or a.timetable_id <> pc.timetable_id or b.timetable_id <> pc.timetable_id`)).toEqual([]);
+  });
+
+  it("the rework's model (RESERVATIONS_REWORK.md §10): a provider teaches outside the timetable — no published lesson of a group on a day a provider teaches it; an online group's draft lessons take no room", async () => {
+    expect(await sql(`
+      with ${TAUGHT}
+      select t.name, g.name as group_name from timetable_lesson l join timetable t on t.id = l.timetable_id and t.status = 'published'
+        join academic_term term on term.id = t.term_id join teaching_group g on g.id = l.group_id
+        join taught ta on ta.group_id = l.group_id join teacher p on p.id = ta.teacher_id and p.kind = 'provider'
+       where l.weekday is not null and greatest(ta.f, t.effective_from) <= least(ta.t, term.ends_on)`)).toEqual([]);
+    expect(await sql(`
+      select l.id from timetable_lesson l join timetable t on t.id = l.timetable_id and t.status = 'draft'
+        join teaching_group g on g.id = l.group_id where g.delivery = 'online' and l.room_id is not null`)).toEqual([]);
   });
 
   it('every leaving is kept: a student away now has an open leaving that matches it, and nobody has two', async () => {
