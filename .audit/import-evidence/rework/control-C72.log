@@ -1,12 +1,12 @@
 # C72: a326890 item 3: a copy records the reason of a self-study-only offer it brings at 0 (converted or copied)
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 13658ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 159ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13998ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 152ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  15.32s (transform 696ms, setup 2ms, collect 270ms, tests 13.66s, environment 0ms, prepare 31ms)
- ❯ test/08n-import.test.ts:1635:39
+   Duration  15.71s (transform 701ms, setup 2ms, collect 325ms, tests 14.00s, environment 0ms, prepare 36ms)
+ ❯ test/08n-import.test.ts:1686:39
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -19,19 +19,19 @@ AssertionError: expected [] to deeply equal [ { …(2) } ]
 
 - [
 -   {
--     "reason": "copied from November 2026 – January 2027 — t7-fajj; priced at the board fee alone",
+-     "reason": "copied from November 2026 – January 2027 — t7-j7wm; priced at the board fee alone",
 -     "subject": "Fee Rule Untaught (imp)",
 -   },
 - ]
 + []
 
- ❯ test/08n-import.test.ts:1635:39
-    1633|       const winterName = (await one<{ name: string }>(`select name fro…
-    1634|       const copiedFrom = { subject: 'Fee Rule Untaught (imp)', reason:…
-    1635|       expect(copied.zeroFeeSelfStudy).toEqual([copiedFrom]);
+ ❯ test/08n-import.test.ts:1686:39
+    1684|       const winterName = (await one<{ name: string }>(`select name fro…
+    1685|       const copiedFrom = { subject: 'Fee Rule Untaught (imp)', reason:…
+    1686|       expect(copied.zeroFeeSelfStudy).toEqual([copiedFrom]);
        |                                       ^
-    1636|       expect(await one(`select new_data->'zeroFeeSelfStudy' as z from …
-    1637|       for (const id of [winter, next]) await apiResponse(adm.api.v1.se…
+    1687|       expect(await one(`select new_data->'zeroFeeSelfStudy' as z from …
+    1688|       for (const id of [winter, next]) await apiResponse(adm.api.v1.se…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

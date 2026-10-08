@@ -1,14 +1,14 @@
 # C48: item 2: the commit makes every line of a split row
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 2 failed) 13293ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 315ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 193ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 14464ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 340ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 207ms
  Test Files  1 failed (1)
       Tests  2 failed | 66 passed (68)
-   Duration  15.22s (transform 645ms, setup 2ms, collect 271ms, tests 13.29s, environment 0ms, prepare 32ms)
- ❯ test/08n-import.test.ts:1004:34
- ❯ test/08n-import.test.ts:1031:34
+   Duration  16.31s (transform 700ms, setup 4ms, collect 309ms, tests 14.46s, environment 0ms, prepare 35ms)
+ ❯ test/08n-import.test.ts:1005:34
+ ❯ test/08n-import.test.ts:1032:34
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
@@ -25,13 +25,13 @@ AssertionError: expected { students: 1, parents: 1, …(6) } to match object { r
 +   "registrations": 2,
   }
 
- ❯ test/08n-import.test.ts:1004:34
-    1002|       expect(v.summary.plan).toMatchObject({ registrations: 3 });
-    1003|       const out = await apiResponse(adm.api.v1.imports[':id'].commit.$…
-    1004|       expect(out.result.created).toMatchObject({ registrations: 3 });
+ ❯ test/08n-import.test.ts:1005:34
+    1003|       expect(v.summary.plan).toMatchObject({ registrations: 3 });
+    1004|       const out = await apiResponse(adm.api.v1.imports[':id'].commit.$…
+    1005|       expect(out.result.created).toMatchObject({ registrations: 3 });
        |                                  ^
-    1005|       expect(out.result.rowsSplit).toEqual([{ row: 'Units row 5', line…
-    1006|       const st = await one<{ id: string }>(`select id from "user" wher…
+    1006|       expect(out.result.rowsSplit).toEqual([{ row: 'Units row 5', line…
+    1007|       const st = await one<{ id: string }>(`select id from "user" wher…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -47,13 +47,13 @@ AssertionError: expected { students: 1, parents: 1, …(6) } to match object { r
 +   "registrations": 1,
   }
 
- ❯ test/08n-import.test.ts:1031:34
-    1029|       expect(r.problems.filter((p) => p.severity === 'error')).toEqual…
-    1030|       const out = await apiResponse(adm.api.v1.imports[':id'].commit.$…
-    1031|       expect(out.result.created).toMatchObject({ registrations: 2 });
+ ❯ test/08n-import.test.ts:1032:34
+    1030|       expect(r.problems.filter((p) => p.severity === 'error')).toEqual…
+    1031|       const out = await apiResponse(adm.api.v1.imports[':id'].commit.$…
+    1032|       expect(out.result.created).toMatchObject({ registrations: 2 });
        |                                  ^
-    1032|       expect(out.result.rowsSplit).toEqual([{ row: 'Two units row 3', …
-    1033|     });
+    1033|       expect(out.result.rowsSplit).toEqual([{ row: 'Two units row 3', …
+    1034|     });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

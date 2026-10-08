@@ -1,34 +1,34 @@
 # C5: the coordinator may not map a series to a session (re-run on the new base)
 # undone in apps/api/src/services/import.services.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 12 failed) 12803ms
-   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the coordinator's pending answers are mapping settings: carry forward read as an AS result 33ms
-   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > commit: every family in its own transaction, exactly what the review showed 118ms
+ ❯ test/08n-import.test.ts (68 tests | 12 failed) 12428ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the coordinator's pending answers are mapping settings: carry forward read as an AS result 31ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > commit: every family in its own transaction, exactly what the review showed 112ms
    × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the accounts: exactly the reviewed people, with their cohort, phones normalised, no password (they set one), linked 1ms
-   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > an imported parent signs in once they set a password through "Forgot password" (the link goes to their email) 71ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > an imported parent signs in once they set a password through "Forgot password" (the link goes to their email) 70ms
    × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > sections, enrolments, history and money history: each traceable to its line 1ms
    × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the import is committed: nothing more changes it 1ms
-   × F7: the day-one import > a re-run of the same file changes nothing > staged again, it carries the review over and finds everything already there 68ms
-   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 44ms
-   × F7: the day-one import > a re-run of the same file changes nothing > a child under a new email who is already an account in the system holds the family until staff say which 28ms
-   × F7: the day-one import > the money record (F-01): history only, never a payment > recorded on the students as history; no payment, receipt or balance moves; the same file again adds nothing 19ms
-   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 21ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > the list of imports: every file, its state and its counts 3ms
+   × F7: the day-one import > a re-run of the same file changes nothing > staged again, it carries the review over and finds everything already there 40ms
+   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 40ms
+   × F7: the day-one import > a re-run of the same file changes nothing > a child under a new email who is already an account in the system holds the family until staff say which 27ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > recorded on the students as history; no payment, receipt or balance moves; the same file again adds nothing 23ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 23ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the list of imports: every file, its state and its counts 4ms
  Test Files  1 failed (1)
       Tests  12 failed | 56 passed (68)
-   Duration  14.77s (transform 716ms, setup 2ms, collect 323ms, tests 12.80s, environment 0ms, prepare 32ms)
- ❯ test/08n-import.test.ts:315:130
- ❯ test/08n-import.test.ts:330:19
- ❯ test/08n-import.test.ts:349:41
- ❯ test/08n-import.test.ts:386:30
- ❯ test/08n-import.test.ts:397:76
- ❯ test/08n-import.test.ts:447:117
- ❯ test/08n-import.test.ts:464:67
- ❯ test/08n-import.test.ts:500:25
- ❯ test/08n-import.test.ts:517:70
- ❯ test/08n-import.test.ts:1434:58
- ❯ test/08n-import.test.ts:1462:53
- ❯ test/08n-import.test.ts:1667:21
+   Duration  14.22s (transform 671ms, setup 2ms, collect 308ms, tests 12.43s, environment 0ms, prepare 31ms)
+ ❯ test/08n-import.test.ts:316:130
+ ❯ test/08n-import.test.ts:331:19
+ ❯ test/08n-import.test.ts:350:41
+ ❯ test/08n-import.test.ts:387:30
+ ❯ test/08n-import.test.ts:398:76
+ ❯ test/08n-import.test.ts:448:117
+ ❯ test/08n-import.test.ts:465:67
+ ❯ test/08n-import.test.ts:501:25
+ ❯ test/08n-import.test.ts:518:70
+ ❯ test/08n-import.test.ts:1485:58
+ ❯ test/08n-import.test.ts:1513:53
+ ❯ test/08n-import.test.ts:1718:21
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
@@ -46,13 +46,13 @@ AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 
 +   "status": 200,
   }
 
- ❯ test/08n-import.test.ts:315:130
-    313|       // Registering families in a window is the admin's.
-    314|       const nov = v.mapping.series.find((s) => s.key === `november-${Y…
-    315|       expect(await refused(putSettings(coordinator, firstBatch, { seri…
+ ❯ test/08n-import.test.ts:316:130
+    314|       // Registering families in a window is the admin's.
+    315|       const nov = v.mapping.series.find((s) => s.key === `november-${Y…
+    316|       expect(await refused(putSettings(coordinator, firstBatch, { seri…
        |                                                                                                                                  ^
-    316|         status: 403, error: 'Registering families in an open window is…
-    317|       });
+    317|         status: 403, error: 'Registering families in an open window is…
+    318|       });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
 
@@ -106,13 +106,13 @@ AssertionError: expected { status: 'partial', result: { …(8) } } to match obje
 +   "status": "partial",
   }
 
- ❯ test/08n-import.test.ts:330:19
-    328|       before = await snapshot();
-    329|       const out = await apiResponse(coordinator.api.v1.imports[':id'].…
-    330|       expect(out).toMatchObject({
+ ❯ test/08n-import.test.ts:331:19
+    329|       before = await snapshot();
+    330|       const out = await apiResponse(coordinator.api.v1.imports[':id'].…
+    331|       expect(out).toMatchObject({
        |                   ^
-    331|         status: 'committed',
-    332|         result: {
+    332|         status: 'committed',
+    333|         result: {
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
 
@@ -149,13 +149,13 @@ AssertionError: expected [ 'bassem@import.test.local', …(7) ] to deeply equal 
 -   "tarek@import.test.local",
   ]
 
- ❯ test/08n-import.test.ts:349:41
-    347|         `select u.email, u.role, u.name, u.phone, u.cohort_year, (sele…
-    348|          from "user" u where u.email like $1 and u.email <> $2 order b…
-    349|       expect(users.map((u) => u.email)).toEqual([
+ ❯ test/08n-import.test.ts:350:41
+    348|         `select u.email, u.role, u.name, u.phone, u.cohort_year, (sele…
+    349|          from "user" u where u.email like $1 and u.email <> $2 order b…
+    350|       expect(users.map((u) => u.email)).toEqual([
        |                                         ^
-    350|         'amir', 'bassem', 'dina', 'eman', 'ezz.nader', 'farid', 'fikry…
-    351|         'mostafa', 'mostafa.kids', 'nader', 'omar.mostafa', 'rami', 'r…
+    351|         'amir', 'bassem', 'dina', 'eman', 'ezz.nader', 'farid', 'fikry…
+    352|         'mostafa', 'mostafa.kids', 'nader', 'omar.mostafa', 'rami', 'r…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
 
@@ -168,7 +168,7 @@ Error: expected 1 row, got 0 for: select identifier from verification where iden
        |                                ^
      70|   return rows[0] as T;
      71| }
- ❯ test/08n-import.test.ts:386:30
+ ❯ test/08n-import.test.ts:387:30
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
 
@@ -191,13 +191,13 @@ AssertionError: expected [ 'dina 12F' ] to deeply equal [ 'amir 11F', 'bassem 11
 -   "said.family 11K",
   ]
 
- ❯ test/08n-import.test.ts:397:76
-    395|         `select u.email, s.name as section from section_membership m j…
-    396|          where u.email like $1 and m.academic_year_id = $2 order by u.…
-    397|       expect(members.map((m) => `${m.email.replace(D, '')} ${m.section…
+ ❯ test/08n-import.test.ts:398:76
+    396|         `select u.email, s.name as section from section_membership m j…
+    397|          where u.email like $1 and m.academic_year_id = $2 order by u.…
+    398|       expect(members.map((m) => `${m.email.replace(D, '')} ${m.section…
        |                                                                            ^
-    398|         'amir 11F', 'bassem 11G', 'dina 12F', 'eman 11H', 'farid 11H',…
-    399|       ]);
+    399|         'amir 11F', 'bassem 11G', 'dina 12F', 'eman 11H', 'farid 11H',…
+    400|       ]);
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯
 
@@ -207,13 +207,13 @@ AssertionError: expected 'partial' to be 'committed' // Object.is equality
 Expected: "committed"
 Received: "partial"
 
- ❯ test/08n-import.test.ts:447:117
-    445| 
-    446|     it('the import is committed: nothing more changes it', async () =>…
-    447|       expect((await one<{ status: string }>(`select status from import…
+ ❯ test/08n-import.test.ts:448:117
+    446| 
+    447|     it('the import is committed: nothing more changes it', async () =>…
+    448|       expect((await one<{ status: string }>(`select status from import…
        |                                                                                                                     ^
-    448|       expect(await refused(coordinator.api.v1.imports[':id'].commit.$p…
-    449|       expect(await refused(coordinator.api.v1.imports[':id'].rows.$put…
+    449|       expect(await refused(coordinator.api.v1.imports[':id'].commit.$p…
+    450|       expect(await refused(coordinator.api.v1.imports[':id'].rows.$put…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
 
@@ -225,19 +225,19 @@ AssertionError: expected [ [ …(2) ] ] to deeply equal [ [ …(2) ] ]
 
   [
     [
-      "c8c284f3-a1c1-4ec7-8410-04b1610cd920",
+      "ef6045ff-01c5-4f18-83fd-09ac4d6e3372",
 -     "committed",
 +     "partial",
     ],
   ]
 
- ❯ test/08n-import.test.ts:464:67
-    462|       expect(rowAt(v, '2024', 19)).toMatchObject({ decision: 'skip', d…
-    463|       expect(v.settings.carryForward).toBe('result');
-    464|       expect(v.batch.sameFileBefore.map((b) => [b.id, b.status])).toEq…
+ ❯ test/08n-import.test.ts:465:67
+    463|       expect(rowAt(v, '2024', 19)).toMatchObject({ decision: 'skip', d…
+    464|       expect(v.settings.carryForward).toBe('result');
+    465|       expect(v.batch.sameFileBefore.map((b) => [b.id, b.status])).toEq…
        |                                                                   ^
-    465|       // Every importing line: nothing new to make.
-    466|       const importing = v.rows.filter((r) => r.decision === 'import');
+    466|       // Every importing line: nothing new to make.
+    467|       const importing = v.rows.filter((r) => r.decision === 'import');
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
 
@@ -253,13 +253,13 @@ AssertionError: expected { rows: 25, importing: 23, …(11) } to match object { 
 +   "heldFamilies": 8,
   }
 
- ❯ test/08n-import.test.ts:500:25
-    498|       expect(person(v, 'student', `karim.l${D}`).mergedInto).toBe(`kar…
-    499|       expect(v.settings.carryForward).toBe('result');
-    500|       expect(v.summary).toMatchObject({ heldFamilies: 0 });
+ ❯ test/08n-import.test.ts:501:25
+    499|       expect(person(v, 'student', `karim.l${D}`).mergedInto).toBe(`kar…
+    500|       expect(v.settings.carryForward).toBe('result');
+    501|       expect(v.summary).toMatchObject({ heldFamilies: 0 });
        |                         ^
-    501|       expect(rowAt(v, '2024', 22).plan).toMatchObject({ student: 'matc…
-    502|       const out = await apiResponse(coordinator.api.v1.imports[':id'].…
+    502|       expect(rowAt(v, '2024', 22).plan).toMatchObject({ student: 'matc…
+    503|       const out = await apiResponse(coordinator.api.v1.imports[':id'].…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
 
@@ -275,13 +275,13 @@ AssertionError: expected undefined to match object { severity: 'error', …(1) }
 + Received: 
 undefined
 
- ❯ test/08n-import.test.ts:517:70
-    515|       let v = await fetchView(coordinator, id);
-    516|       const k = person(v, 'student', `karim.lotfy2${D}`);
-    517|       expect(k.problems.find((p) => p.code === 'duplicate_account')).t…
+ ❯ test/08n-import.test.ts:518:70
+    516|       let v = await fetchView(coordinator, id);
+    517|       const k = person(v, 'student', `karim.lotfy2${D}`);
+    518|       expect(k.problems.find((p) => p.code === 'duplicate_account')).t…
        |                                                                      ^
-    518|       expect(k.possibleAccounts.map((a) => a.email)).toEqual([`karim.l…
-    519|       expect(v.families.find((f) => f.students.includes(`karim.lotfy2$…
+    519|       expect(k.possibleAccounts.map((a) => a.email)).toEqual([`karim.l…
+    520|       expect(v.families.find((f) => f.students.includes(`karim.lotfy2$…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
 

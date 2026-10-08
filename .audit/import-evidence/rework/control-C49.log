@@ -1,12 +1,12 @@
 # C49: item 2: findOffer takes the one offer entering any unit named when none enters them all (the code left for staff)
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 13683ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 14510ms
    × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 48ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  15.37s (transform 651ms, setup 2ms, collect 270ms, tests 13.68s, environment 0ms, prepare 31ms)
- ❯ test/08n-import.test.ts:1022:28
+   Duration  16.42s (transform 695ms, setup 2ms, collect 309ms, tests 14.51s, environment 0ms, prepare 35ms)
+ ❯ test/08n-import.test.ts:1023:28
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -18,7 +18,7 @@ AssertionError: expected null to deeply equal [ { code: 'p1', …(2) }, …(1) ]
   {
     "code": "p1",
     "itemLabel": "P1",
-    "offerItemId": "e682ab1e-46c7-4295-bbd3-ebe1c82f1012",
+    "offerItemId": "ec2a0937-bc96-4e7e-983d-8709464a3e0f",
   },
   {
     "code": "p5",
@@ -30,13 +30,13 @@ AssertionError: expected null to deeply equal [ { code: 'p1', …(2) }, …(1) ]
 + Received: 
 null
 
- ❯ test/08n-import.test.ts:1022:28
-    1020|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
-    1021|       let r = rowAt(await fetchView(adm, id), 'Two units', 3);
-    1022|       expect(r.plan.split).toEqual([{ code: 'p1', offerItemId: items.P…
+ ❯ test/08n-import.test.ts:1023:28
+    1021|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
+    1022|       let r = rowAt(await fetchView(adm, id), 'Two units', 3);
+    1023|       expect(r.plan.split).toEqual([{ code: 'p1', offerItemId: items.P…
        |                            ^
-    1023|       expect(r.plan.lines).toEqual([]);
-    1024|       expect(r.problems.find((p) => p.code === 'item_unclear')).toEqua…
+    1024|       expect(r.plan.lines).toEqual([]);
+    1025|       expect(r.problems.find((p) => p.code === 'item_unclear')).toEqua…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

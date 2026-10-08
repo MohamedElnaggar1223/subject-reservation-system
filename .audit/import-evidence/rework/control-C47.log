@@ -1,14 +1,14 @@
 # C47: item 2: a row naming several units or papers is split, one item per code (findItemsByCode)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 2 failed) 13079ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 82ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 36ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13781ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 90ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 38ms
  Test Files  1 failed (1)
       Tests  2 failed | 66 passed (68)
-   Duration  15.05s (transform 686ms, setup 2ms, collect 269ms, tests 13.08s, environment 0ms, prepare 32ms)
- ❯ test/08n-import.test.ts:991:30
- ❯ test/08n-import.test.ts:1022:28
+   Duration  15.64s (transform 706ms, setup 2ms, collect 308ms, tests 13.78s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:992:30
+ ❯ test/08n-import.test.ts:1023:28
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
@@ -20,25 +20,25 @@ AssertionError: expected null to deeply equal [ { code: 'paper 1', …(2) }, …
   {
     "code": "paper 1",
     "itemLabel": "Paper 1",
-    "offerItemId": "0a5095f9-199f-41fe-9001-c34df404cb60",
+    "offerItemId": "ba75c595-84a3-435d-9011-9cfdea232fd4",
   },
   {
     "code": "paper 2",
     "itemLabel": "Paper 2",
-    "offerItemId": "c11e4821-9d42-489b-ba2a-51bd93924e52",
+    "offerItemId": "ad16e856-6240-4a38-a633-7c461743567f",
   },
 ]
 
 + Received: 
 null
 
- ❯ test/08n-import.test.ts:991:30
-    989|       // One line of the sheet, two papers the session offers as two i…
-    990|       const set = rowAt(v, 'Units', 5);
-    991|       expect(set.plan.split).toEqual([
+ ❯ test/08n-import.test.ts:992:30
+    990|       // One line of the sheet, two papers the session offers as two i…
+    991|       const set = rowAt(v, 'Units', 5);
+    992|       expect(set.plan.split).toEqual([
        |                              ^
-    992|         { code: 'paper 1', offerItemId: items['Paper 1'], itemLabel: '…
-    993|         { code: 'paper 2', offerItemId: items['Paper 2'], itemLabel: '…
+    993|         { code: 'paper 1', offerItemId: items['Paper 1'], itemLabel: '…
+    994|         { code: 'paper 2', offerItemId: items['Paper 2'], itemLabel: '…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -49,7 +49,7 @@ AssertionError: expected null to deeply equal [ { code: 'p1', …(2) }, …(1) ]
   {
     "code": "p1",
     "itemLabel": "P1",
-    "offerItemId": "70139142-c63e-48e9-854f-6a88195b0a8f",
+    "offerItemId": "cfcb0fb8-64fe-4dd0-b5b2-d911c3ef7e16",
   },
   {
     "code": "p5",
@@ -61,13 +61,13 @@ AssertionError: expected null to deeply equal [ { code: 'p1', …(2) }, …(1) ]
 + Received: 
 null
 
- ❯ test/08n-import.test.ts:1022:28
-    1020|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
-    1021|       let r = rowAt(await fetchView(adm, id), 'Two units', 3);
-    1022|       expect(r.plan.split).toEqual([{ code: 'p1', offerItemId: items.P…
+ ❯ test/08n-import.test.ts:1023:28
+    1021|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
+    1022|       let r = rowAt(await fetchView(adm, id), 'Two units', 3);
+    1023|       expect(r.plan.split).toEqual([{ code: 'p1', offerItemId: items.P…
        |                            ^
-    1023|       expect(r.plan.lines).toEqual([]);
-    1024|       expect(r.problems.find((p) => p.code === 'item_unclear')).toEqua…
+    1024|       expect(r.plan.lines).toEqual([]);
+    1025|       expect(r.problems.find((p) => p.code === 'item_unclear')).toEqua…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

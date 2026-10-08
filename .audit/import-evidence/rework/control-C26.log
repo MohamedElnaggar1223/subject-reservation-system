@@ -1,14 +1,14 @@
 # C26: flag 3: a line's fixes and decision carried from earlier files whatever their bytes (by what the line says)
 # undone in apps/api/src/services/import.services.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 2 failed) 13705ms
-   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 48ms
-   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 38ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 14340ms
+   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 50ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 25ms
  Test Files  1 failed (1)
       Tests  2 failed | 66 passed (68)
-   Duration  16.14s (transform 727ms, setup 2ms, collect 299ms, tests 13.70s, environment 0ms, prepare 34ms)
- ❯ test/08n-import.test.ts:492:41
- ❯ test/08n-import.test.ts:1462:53
+   Duration  16.57s (transform 742ms, setup 2ms, collect 332ms, tests 14.34s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:493:41
+ ❯ test/08n-import.test.ts:1513:53
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
@@ -25,13 +25,13 @@ AssertionError: expected { kind: 'sheet', …(32) } to match object { Object (st
 +   "studentEmail": "",
   }
 
- ❯ test/08n-import.test.ts:492:41
-    490|       // The earlier files' decisions, found by what each line says: t…
-    491|       // email, the class, the confirmed link, the skip; the merge by …
-    492|       expect(rowAt(v, '2024', 13).data).toMatchObject({ studentEmail: …
+ ❯ test/08n-import.test.ts:493:41
+    491|       // The earlier files' decisions, found by what each line says: t…
+    492|       // email, the class, the confirmed link, the skip; the merge by …
+    493|       expect(rowAt(v, '2024', 13).data).toMatchObject({ studentEmail: …
        |                                         ^
-    493|       expect(rowAt(v, '2024', 15).data).toMatchObject({ studentEmail: …
-    494|       expect(rowAt(v, '2024', 18).data).toMatchObject({ parentEmail: `…
+    494|       expect(rowAt(v, '2024', 15).data).toMatchObject({ studentEmail: …
+    495|       expect(rowAt(v, '2024', 18).data).toMatchObject({ parentEmail: `…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -49,13 +49,13 @@ AssertionError: expected { …(25) } to match object { decision: 'skip', …(1) 
 +   "decisionSource": "default",
   }
 
- ❯ test/08n-import.test.ts:1462:53
-    1460|       const v = await fetchView(coordinator, id);
-    1461|       // Every later line moved down one: what staff decided goes with…
-    1462|       expect(v.rows.find((r) => r.rowNumber === 5)).toMatchObject({ de…
+ ❯ test/08n-import.test.ts:1513:53
+    1511|       const v = await fetchView(coordinator, id);
+    1512|       // Every later line moved down one: what staff decided goes with…
+    1513|       expect(v.rows.find((r) => r.rowNumber === 5)).toMatchObject({ de…
        |                                                     ^
-    1463|       expect(v.rows.filter((r) => r.decision === 'import').map((r) => …
-    1464|       const out = await apiResponse(coordinator.api.v1.imports[':id'].…
+    1514|       expect(v.rows.filter((r) => r.decision === 'import').map((r) => …
+    1515|       const out = await apiResponse(coordinator.api.v1.imports[':id'].…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

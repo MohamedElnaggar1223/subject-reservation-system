@@ -1,14 +1,14 @@
 # C59: item 2: a "one paper" note is one line, never split by the papers the subject names (the early return since 2ca07a4's item 1)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 2 failed) 13591ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a "one paper" note on a row naming two papers is one line: never split; staff choose the one paper 55ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 140ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 14336ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a "one paper" note on a row naming two papers is one line: never split; staff choose the one paper 62ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 194ms
  Test Files  1 failed (1)
       Tests  2 failed | 66 passed (68)
-   Duration  15.33s (transform 651ms, setup 2ms, collect 277ms, tests 13.59s, environment 0ms, prepare 34ms)
- ❯ test/08n-import.test.ts:1045:44
- ❯ test/08n-import.test.ts:1091:93
+   Duration  16.25s (transform 702ms, setup 2ms, collect 317ms, tests 14.34s, environment 0ms, prepare 37ms)
+ ❯ test/08n-import.test.ts:1046:44
+ ❯ test/08n-import.test.ts:1095:93
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
@@ -25,12 +25,12 @@ AssertionError: expected [ [ …(3) ], [] ] to deeply equal [ null, [] ]
 +     {
 +       "code": "paper 1",
 +       "itemLabel": "Paper 1",
-+       "offerItemId": "bd363fa4-ce68-49f5-b8f4-e0e2a622f383",
++       "offerItemId": "5bfd83ee-1b0b-4306-91cc-395b699049c1",
 +     },
 +     {
 +       "code": "paper 2",
 +       "itemLabel": "Paper 2",
-+       "offerItemId": "56e0428f-a4c2-4d16-9ac0-6d9508b64d9b",
++       "offerItemId": "68d51b33-f3ce-4087-8973-61dcc178692b",
 +     },
 +     {
 +       "code": "one paper only",
@@ -41,7 +41,7 @@ AssertionError: expected [ [ …(3) ], [] ] to deeply equal [ null, [] ]
     [],
   ]
 
- ❯ test/08n-import.test.ts:1045:44
+ ❯ test/08n-import.test.ts:1046:44
 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
@@ -59,13 +59,13 @@ AssertionError: expected { code: 'item_unclear', …(2) } to deeply equal { code
     "severity": "error",
   }
 
- ❯ test/08n-import.test.ts:1091:93
-    1089|       // Two: staff choose which; none: staff choose the item, the not…
-    1090|       expect(rowAt(v, 'One paper only', 4).plan.lines).toEqual([]);
-    1091|       expect(rowAt(v, 'One paper only', 4).problems.find((p) => p.code…
+ ❯ test/08n-import.test.ts:1095:93
+    1093|       // Two: staff choose which; none: staff choose the item, the not…
+    1094|       expect(rowAt(v, 'One paper only', 4).plan.lines).toEqual([]);
+    1095|       expect(rowAt(v, 'One paper only', 4).problems.find((p) => p.code…
        |                                                                                             ^
-    1092|         code: 'item_unclear', severity: 'error', detail: 'Imp Physics …
-    1093|       });
+    1096|         code: 'item_unclear', severity: 'error', detail: 'Imp Physics …
+    1097|       });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

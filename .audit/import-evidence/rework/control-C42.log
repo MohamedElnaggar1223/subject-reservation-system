@@ -1,22 +1,22 @@
 # C42: findOffer: a unit line finds the offer whose item enters the unit it names
 # undone in apps/api/src/services/offer.services.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 6 failed) 11581ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 143ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 54ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders) 614ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction 314ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line whose family's confirmation is not on the sheet is an error: the import records the sheet's confirmation as the consent 33ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce) 424ms
+ ❯ test/08n-import.test.ts (68 tests | 6 failed) 12535ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 86ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 41ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders) 626ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the review asks the rules on lines without holding an exception row: a GET answers while the student's gate exception is held by another transaction 313ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line whose family's confirmation is not on the sheet is an error: the import records the sheet's confirmation as the consent 39ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce) 482ms
  Test Files  1 failed (1)
       Tests  6 failed | 62 passed (68)
-   Duration  13.51s (transform 673ms, setup 3ms, collect 276ms, tests 11.58s, environment 0ms, prepare 33ms)
- ❯ test/08n-import.test.ts:983:47
- ❯ test/08n-import.test.ts:1022:28
- ❯ test/08n-import.test.ts:1207:27
- ❯ test/08n-import.test.ts:1270:122
- ❯ test/08n-import.test.ts:1292:31
- ❯ test/08n-import.test.ts:1315:110
+   Duration  14.54s (transform 714ms, setup 2ms, collect 320ms, tests 12.54s, environment 0ms, prepare 35ms)
+ ❯ test/08n-import.test.ts:984:47
+ ❯ test/08n-import.test.ts:1023:28
+ ❯ test/08n-import.test.ts:1258:27
+ ❯ test/08n-import.test.ts:1321:122
+ ❯ test/08n-import.test.ts:1343:31
+ ❯ test/08n-import.test.ts:1366:110
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
@@ -32,7 +32,7 @@ AssertionError: expected [] to match object [ { …(6) } ]
 -     "code": null,
 -     "found": "label",
 -     "itemLabel": "P1",
--     "offerItemId": "5004590c-6d2c-46a2-98d2-3090bd48f0af",
+-     "offerItemId": "07dab147-f50c-4f3f-b934-433cf31f0b58",
 -     "price": {
 -       "boardFee": 4800,
 -       "courseFee": 900,
@@ -43,7 +43,7 @@ AssertionError: expected [] to match object [ { …(6) } ]
 - ]
 + []
 
- ❯ test/08n-import.test.ts:983:47
+ ❯ test/08n-import.test.ts:984:47
 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
@@ -55,7 +55,7 @@ AssertionError: expected null to deeply equal [ { code: 'p1', …(2) }, …(1) ]
   {
     "code": "p1",
     "itemLabel": "P1",
-    "offerItemId": "5004590c-6d2c-46a2-98d2-3090bd48f0af",
+    "offerItemId": "07dab147-f50c-4f3f-b934-433cf31f0b58",
   },
   {
     "code": "p5",
@@ -67,13 +67,13 @@ AssertionError: expected null to deeply equal [ { code: 'p1', …(2) }, …(1) ]
 + Received: 
 null
 
- ❯ test/08n-import.test.ts:1022:28
-    1020|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
-    1021|       let r = rowAt(await fetchView(adm, id), 'Two units', 3);
-    1022|       expect(r.plan.split).toEqual([{ code: 'p1', offerItemId: items.P…
+ ❯ test/08n-import.test.ts:1023:28
+    1021|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
+    1022|       let r = rowAt(await fetchView(adm, id), 'Two units', 3);
+    1023|       expect(r.plan.split).toEqual([{ code: 'p1', offerItemId: items.P…
        |                            ^
-    1023|       expect(r.plan.lines).toEqual([]);
-    1024|       expect(r.problems.find((p) => p.code === 'item_unclear')).toEqua…
+    1024|       expect(r.plan.lines).toEqual([]);
+    1025|       expect(r.problems.find((p) => p.code === 'item_unclear')).toEqua…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
 
@@ -91,13 +91,13 @@ AssertionError: expected { rows: 2, importing: 2, …(11) } to match object { re
 +   "readyFamilies": 0,
   }
 
- ❯ test/08n-import.test.ts:1207:27
-    1205|         await putRows(adm, id, { rowIds: [rowAt(v, `Lock ${tag}`, 3).i…
-    1206|         v = await fetchView(adm, id);
-    1207|         expect(v.summary).toMatchObject({ readyFamilies: 1, heldFamili…
+ ❯ test/08n-import.test.ts:1258:27
+    1256|         await putRows(adm, id, { rowIds: [rowAt(v, `Lock ${tag}`, 3).i…
+    1257|         v = await fetchView(adm, id);
+    1258|         expect(v.summary).toMatchObject({ readyFamilies: 1, heldFamili…
        |                           ^
-    1208|         // Hold one of the two students the way a reservation does (FO…
-    1209|         // there before any line. Held second in id order, a commit th…
+    1259|         // Hold one of the two students the way a reservation does (FO…
+    1260|         // there before any line. Held second in id order, a commit th…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
 
@@ -110,7 +110,7 @@ AssertionError: expected undefined to be 'Mathematics A.S./A.L. (imp) — P2 tak
 + Received: 
 undefined
 
- ❯ test/08n-import.test.ts:1270:122
+ ❯ test/08n-import.test.ts:1321:122
 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
@@ -121,19 +121,19 @@ AssertionError: expected undefined to match object { itemLabel: 'M1', …(1) }
 - Expected: 
 {
   "itemLabel": "M1",
-  "offerItemId": "fb03f31a-282c-420b-9ff5-0a1bcacfe7f4",
+  "offerItemId": "8b57b4b7-24b4-400e-819a-41d04e05f3af",
 }
 
 + Received: 
 undefined
 
- ❯ test/08n-import.test.ts:1292:31
-    1290|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
-    1291|       const r = rowAt(await fetchView(adm, id), 'NoConfirm', 3);
-    1292|       expect(r.plan.lines[0]).toMatchObject({ itemLabel: 'M1', offerIt…
+ ❯ test/08n-import.test.ts:1343:31
+    1341|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
+    1342|       const r = rowAt(await fetchView(adm, id), 'NoConfirm', 3);
+    1343|       expect(r.plan.lines[0]).toMatchObject({ itemLabel: 'M1', offerIt…
        |                               ^
-    1293|       expect(r.problems.find((p) => p.code === 'consent_missing')).toE…
-    1294|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
+    1344|       expect(r.problems.find((p) => p.code === 'consent_missing')).toE…
+    1345|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
 
@@ -147,18 +147,18 @@ AssertionError: expected [ { code: 'not_offered', …(2) } ] to deeply equal []
 + [
 +   {
 +     "code": "not_offered",
-+     "detail": "November 2026 – January 2027 — t4-q2u3 offers no subject for \"Pure Mathematics 1 (P1)\"",
++     "detail": "November 2026 – January 2027 — t4-gyhc offers no subject for \"Pure Mathematics 1 (P1)\"",
 +     "severity": "error",
 +   },
 + ]
 
- ❯ test/08n-import.test.ts:1315:110
-    1313|       ] }]), 'race.xlsx', 'school_sheet');
-    1314|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
-    1315|       expect(rowAt(await fetchView(adm, id), 'Lock race', 3).problems.…
+ ❯ test/08n-import.test.ts:1366:110
+    1364|       ] }]), 'race.xlsx', 'school_sheet');
+    1365|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
+    1366|       expect(rowAt(await fetchView(adm, id), 'Lock race', 3).problems.…
        |                                                                                                              ^
-    1316|       // The import is held inside its family's transaction, its line …
-    1317|       // IMPORT_REGISTRATION row); the desk reserves the same unit for…
+    1367|       // The import is held inside its family's transaction, its line …
+    1368|       // IMPORT_REGISTRATION row); the desk reserves the same unit for…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
 

@@ -1,11 +1,11 @@
 # C70: a326890 item 1: "(Theory Paper ONLY)" is a one-paper retake (the ICT form)
 # undone in apps/api/src/services/import/normalise.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 14354ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 198ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 14149ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 240ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  16.57s (transform 720ms, setup 2ms, collect 323ms, tests 14.35s, environment 0ms, prepare 35ms)
+   Duration  15.89s (transform 618ms, setup 2ms, collect 273ms, tests 14.15s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:1104:24
 
 # failures (messages)

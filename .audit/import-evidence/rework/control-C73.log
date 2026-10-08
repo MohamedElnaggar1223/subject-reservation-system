@@ -1,11 +1,11 @@
 # C73: the review of d2fa2cd: "(Paper 41/42 ONLY)" is a one-paper retake (a paper code between "paper" and "only")
 # undone in apps/api/src/services/import/normalise.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 14507ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 208ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 14145ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 191ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  16.34s (transform 722ms, setup 2ms, collect 306ms, tests 14.51s, environment 0ms, prepare 34ms)
+   Duration  16.44s (transform 719ms, setup 2ms, collect 361ms, tests 14.15s, environment 0ms, prepare 32ms)
  ❯ test/08n-import.test.ts:1109:25
 
 # failures (messages)

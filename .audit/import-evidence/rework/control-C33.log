@@ -1,16 +1,16 @@
 # C33: s9: a provisional fee row prices the line provisional at its amount, never 0 (priceLine reads provisional rows)
 # undone in apps/api/src/services/pricing.services.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 3 failed) 13708ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 179ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 387ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 19ms
+ ❯ test/08n-import.test.ts (68 tests | 3 failed) 15166ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 238ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 471ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 16ms
  Test Files  1 failed (1)
       Tests  3 failed | 65 passed (68)
-   Duration  15.46s (transform 658ms, setup 2ms, collect 269ms, tests 13.71s, environment 0ms, prepare 32ms)
- ❯ test/08n-import.test.ts:650:45
- ❯ test/08n-import.test.ts:705:56
- ❯ test/08n-import.test.ts:753:63
+   Duration  17.10s (transform 694ms, setup 2ms, collect 302ms, tests 15.17s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:651:45
+ ❯ test/08n-import.test.ts:706:56
+ ❯ test/08n-import.test.ts:754:63
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
@@ -24,13 +24,13 @@ AssertionError: expected [ { code: 'price_provisional', …(2) } ] to deeply equ
   [
     {
       "code": "price_provisional",
--     "detail": "board fee 600 in Pearson Edexcel November 2026 (t1-jj0y)",
-+     "detail": "board fee 0 in Pearson Edexcel November 2026 (t1-jj0y)",
+-     "detail": "board fee 600 in Pearson Edexcel November 2026 (t1-76xk)",
++     "detail": "board fee 0 in Pearson Edexcel November 2026 (t1-76xk)",
       "severity": "info",
     },
   ]
 
- ❯ test/08n-import.test.ts:650:45
+ ❯ test/08n-import.test.ts:651:45
 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
@@ -58,13 +58,13 @@ AssertionError: expected [ [ 'live.one', …(12) ], …(7) ] to deeply equal [ [
       "Mr Live",
       100,
 
- ❯ test/08n-import.test.ts:705:56
-    703|          left join teacher t on t.id = r.teacher_id where r.session_id…
-    704|       expect(lines.map((r) => [r.email.replace(D, ''), r.subject, r.at…
-    705|         r.basis.coursePercent, r.basis.boardPercent])).toEqual([
+ ❯ test/08n-import.test.ts:706:56
+    704|          left join teacher t on t.id = r.teacher_id where r.session_id…
+    705|       expect(lines.map((r) => [r.email.replace(D, ''), r.subject, r.at…
+    706|         r.basis.coursePercent, r.basis.boardPercent])).toEqual([
        |                                                        ^
-    706|         ['live.one', 'Live Subject A', 'first', 'in_school', 1500, 100…
-    707|         ['live.one', 'Live Subject B', 'first', 'in_school', 1500, 100…
+    707|         ['live.one', 'Live Subject A', 'first', 'in_school', 1500, 100…
+    708|         ['live.one', 'Live Subject B', 'first', 'in_school', 1500, 100…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
 
@@ -77,13 +77,13 @@ AssertionError: expected 9950 to be 10550 // Object.is equality
 - 10550
 + 9950
 
- ❯ test/08n-import.test.ts:753:63
-    751|       expect(imported).toHaveLength(8);
-    752|       expect(imported.every((l) => l.unpaid && !l.paid && l.status ===…
-    753|       expect(imported.reduce((a, l) => a + l.outstanding, 0)).toBe(150…
+ ❯ test/08n-import.test.ts:754:63
+    752|       expect(imported).toHaveLength(8);
+    753|       expect(imported.every((l) => l.unpaid && !l.paid && l.status ===…
+    754|       expect(imported.reduce((a, l) => a + l.outstanding, 0)).toBe(150…
        |                                                               ^
-    754|       expect(imported.filter((l) => l.provisional).map((l) => [l.subje…
-    755|     });
+    755|       expect(imported.filter((l) => l.provisional).map((l) => [l.subje…
+    756|     });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
 

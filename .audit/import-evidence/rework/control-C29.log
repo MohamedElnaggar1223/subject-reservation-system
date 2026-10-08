@@ -1,14 +1,14 @@
 # C29: flag 3: the money-record fingerprint without the line's position
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 2 failed) 13858ms
-   × F7: the day-one import > the money record (F-01): history only, never a payment > recorded on the students as history; no payment, receipt or balance moves; the same file again adds nothing 88ms
-   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 28ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 14192ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > recorded on the students as history; no payment, receipt or balance moves; the same file again adds nothing 86ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 31ms
  Test Files  1 failed (1)
       Tests  2 failed | 66 passed (68)
-   Duration  15.93s (transform 727ms, setup 2ms, collect 310ms, tests 13.86s, environment 0ms, prepare 38ms)
- ❯ test/08n-import.test.ts:1450:113
- ❯ test/08n-import.test.ts:1463:101
+   Duration  16.03s (transform 739ms, setup 2ms, collect 319ms, tests 14.19s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:1501:113
+ ❯ test/08n-import.test.ts:1514:101
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
@@ -22,13 +22,13 @@ AssertionError: expected false to be true // Object.is equality
 - true
 + false
 
- ❯ test/08n-import.test.ts:1450:113
-    1448|       const again = await stage(coordinator, moneyRecord(), 'money-rec…
-    1449|       v = await fetchView(coordinator, again);
-    1450|       expect(v.rows.filter((r) => r.decision === 'import').every((r) =…
+ ❯ test/08n-import.test.ts:1501:113
+    1499|       const again = await stage(coordinator, moneyRecord(), 'money-rec…
+    1500|       v = await fetchView(coordinator, again);
+    1501|       expect(v.rows.filter((r) => r.decision === 'import').every((r) =…
        |                                                                                                                 ^
-    1451|       await apiResponse(coordinator.api.v1.imports[':id'].commit.$post…
-    1452|       expect(await snapshot()).toEqual({ ...before, money: before.mone…
+    1502|       await apiResponse(coordinator.api.v1.imports[':id'].commit.$post…
+    1503|       expect(await snapshot()).toEqual({ ...before, money: before.mone…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -54,13 +54,13 @@ AssertionError: expected [ [ 2, 'create' ], …(2) ] to deeply equal [ [ 2, 'cre
     ],
   ]
 
- ❯ test/08n-import.test.ts:1463:101
-    1461|       // Every later line moved down one: what staff decided goes with…
-    1462|       expect(v.rows.find((r) => r.rowNumber === 5)).toMatchObject({ de…
-    1463|       expect(v.rows.filter((r) => r.decision === 'import').map((r) => …
+ ❯ test/08n-import.test.ts:1514:101
+    1512|       // Every later line moved down one: what staff decided goes with…
+    1513|       expect(v.rows.find((r) => r.rowNumber === 5)).toMatchObject({ de…
+    1514|       expect(v.rows.filter((r) => r.decision === 'import').map((r) => …
        |                                                                                                     ^
-    1464|       const out = await apiResponse(coordinator.api.v1.imports[':id'].…
-    1465|       expect(out.result.created).toMatchObject({ money: 1 });
+    1515|       const out = await apiResponse(coordinator.api.v1.imports[':id'].…
+    1516|       expect(out.result.created).toMatchObject({ money: 1 });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

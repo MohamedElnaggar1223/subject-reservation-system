@@ -1,9 +1,9 @@
 # C44: the commit holds the student before its lines (assertMayRegisterForInTx), as every reservation path does (s6)
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ✓ test/08n-import.test.ts (68 tests) 13515ms
+ ✓ test/08n-import.test.ts (68 tests) 14954ms
  Test Files  1 passed (1)
       Tests  68 passed (68)
-   Duration  15.35s (transform 666ms, setup 2ms, collect 270ms, tests 13.52s, environment 0ms, prepare 32ms)
+   Duration  16.86s (transform 719ms, setup 2ms, collect 307ms, tests 14.95s, environment 0ms, prepare 33ms)
 
 # failures (messages)

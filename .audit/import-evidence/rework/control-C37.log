@@ -1,12 +1,12 @@
 # C37: the lead's Q2: a retake that names no sitting is an error (retake_sitting_missing)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 13826ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 174ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 14073ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 168ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  15.55s (transform 661ms, setup 2ms, collect 269ms, tests 13.83s, environment 0ms, prepare 33ms)
- ❯ test/08n-import.test.ts:646:93
+   Duration  16.12s (transform 695ms, setup 2ms, collect 303ms, tests 14.07s, environment 0ms, prepare 35ms)
+ ❯ test/08n-import.test.ts:647:93
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -24,7 +24,7 @@ AssertionError: expected undefined to deeply equal { Object (code, severity, ...
 + Received: 
 undefined
 
- ❯ test/08n-import.test.ts:646:93
+ ❯ test/08n-import.test.ts:647:93
 
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

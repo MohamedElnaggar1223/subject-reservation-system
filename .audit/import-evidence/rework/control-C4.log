@@ -1,12 +1,12 @@
 # C4: the commit module may not touch a payment table (re-run on the new base)
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 13522ms
-   × F7: the day-one import > the money record (F-01): history only, never a payment > the import cannot make a payment: the code that commits it touches no payment, escrow or receipt table 6ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13607ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > the import cannot make a payment: the code that commits it touches no payment, escrow or receipt table 7ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  15.17s (transform 691ms, setup 2ms, collect 303ms, tests 13.52s, environment 0ms, prepare 33ms)
- ❯ test/08n-import.test.ts:1476:88
+   Duration  15.28s (transform 657ms, setup 2ms, collect 277ms, tests 13.61s, environment 0ms, prepare 33ms)
+ ❯ test/08n-import.test.ts:1527:88
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -22,13 +22,13 @@ AssertionError: ../src/services/import/commit.ts: expected [ 'payment' ] to deep
 +   "payment",
 + ]
 
- ❯ test/08n-import.test.ts:1476:88
-    1474|         const text = readFileSync(fileURLToPath(new URL(f, import.meta…
-    1475|         const fromDb = [...text.matchAll(/import\s*\{([^}]*)\}\s*from\…
-    1476|         expect(fromDb.split(',').map((x) => x.trim()).filter((x) => mo…
+ ❯ test/08n-import.test.ts:1527:88
+    1525|         const text = readFileSync(fileURLToPath(new URL(f, import.meta…
+    1526|         const fromDb = [...text.matchAll(/import\s*\{([^}]*)\}\s*from\…
+    1527|         expect(fromDb.split(',').map((x) => x.trim()).filter((x) => mo…
        |                                                                                        ^
-    1477|         expect(/\b(insert|update)\s+(into\s+)?"?(payment|escrow|escrow…
-    1478|       }
+    1528|         expect(/\b(insert|update)\s+(into\s+)?"?(payment|escrow|escrow…
+    1529|       }
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

@@ -1,12 +1,12 @@
 # C41: history is a sitting only before the item's series (the same series is the same sitting)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 13516ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > history committed after November ended is still not a sitting for a line of November itself: the same series is the same sitting 192ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 14577ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > history committed after November ended is still not a sitting for a line of November itself: the same series is the same sitting 234ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  15.24s (transform 660ms, setup 2ms, collect 276ms, tests 13.52s, environment 0ms, prepare 32ms)
- ❯ test/08n-import.test.ts:857:31
+   Duration  16.82s (transform 722ms, setup 2ms, collect 315ms, tests 14.58s, environment 0ms, prepare 36ms)
+ ❯ test/08n-import.test.ts:858:31
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -31,13 +31,13 @@ AssertionError: expected { code: null, exists: false, …(13) } to match object 
     "series": StringMatching /^Cambridge International November \d{4}/,
   }
 
- ❯ test/08n-import.test.ts:857:31
-    855|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
-    856|       const r = rowAt(await fetchView(adm, id), 'Same', 3);
-    857|       expect(r.plan.lines[0]).toMatchObject({ series: expect.stringMat…
+ ❯ test/08n-import.test.ts:858:31
+    856|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
+    857|       const r = rowAt(await fetchView(adm, id), 'Same', 3);
+    858|       expect(r.plan.lines[0]).toMatchObject({ series: expect.stringMat…
        |                               ^
-    858|       expect(r.problems.find((p) => p.code.startsWith('self_study'))).…
-    859|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
+    859|       expect(r.problems.find((p) => p.code.startsWith('self_study'))).…
+    860|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 
