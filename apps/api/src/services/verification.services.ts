@@ -21,9 +21,12 @@
  *   under `hold` the deadline sweep expires a waiting line (`hold_unverified`) and drops a paid
  *   one through the receipt-gated drop with that day's refund, the board fee counted not sent.
  *
- * Locks: the receipt first, then the line (the order of every drop and reversal, MA-16), then
- * the line's payments are read. A checkout locks the line too, so a rejection and a checkout of
- * one line run one after the other (08t).
+ * Locks: the line first, then its receipt (the lead's order of 8 Oct, the pair A's approval of a
+ * change request takes: the line under its deadline re-check, then the receipt-gated drop's
+ * receipt), then the line's payments are read. A checkout locks the line too, so a rejection and
+ * a checkout of one line run one after the other, and so do a rejection and a parent's approval
+ * (08t). A payment reversal and a receipt's void or return still take the receipt first (MA-16,
+ * ST-14): docs/features/RESERVATIONS_LINES.md §10 asks for one order.
  */
 
 import {
@@ -159,10 +162,10 @@ async function loadLine(executor: typeof db | Tx, id: string): Promise<LineRow |
   };
 }
 
-/** The receipt first, then the line (the order of every drop and reversal, MA-16); returns the line as it is now. */
+/** The line first, then its receipt (as A's approval of a change request); returns the line as it is now. */
 async function lockLine(tx: Tx, id: string) {
-  await tx.select({ id: receipt.id }).from(receipt).where(eq(receipt.registrationId, id)).for('update');
   await tx.select({ id: registration.id }).from(registration).where(eq(registration.id, id)).for('update');
+  await tx.select({ id: receipt.id }).from(receipt).where(eq(receipt.registrationId, id)).for('update');
   return loadLine(tx, id);
 }
 

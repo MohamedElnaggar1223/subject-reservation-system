@@ -467,6 +467,67 @@ describe('08t: the rework races', () => {
       expect(await state(id)).toEqual({ status: 'confirmed', outcome: 'verified', payments: '1' });
     });
 
+    // The lead's lock order (8 Oct): the line, then its receipt — the pair a parent's approval of a
+    // drop takes (its deadline re-check under the line's lock, then the receipt-gated drop) and the
+    // pair the coordinator's answer takes. Both orders forced: one waits, nothing deadlocks.
+    describe("a parent's approval of a drop against the coordinator's rejection of the same paid line", () => {
+      const paidDeclared = async (tag: string) => {
+        const f = await onboard(officer, `t08-apr-${tag}-${RUN}`, 11);
+        const desk = await apiResponse(officer.api.v1.registrations.desk.$post({
+          json: { studentId: f.studentId, sessionId: s1, lines: [declared()], consent: CONSENT, collectNow: { instrumentUsed: 'cash', escrowAmountToApply: 0 } },
+        }));
+        const id = desk.registrations[0]!.id;
+        // The paid line has its receipt at the desk: both sides lock it.
+        expect(await one(`select status from receipt where registration_id = $1`, [id])).toEqual({ status: 'pending_issue' });
+        const cr = await apiResponse(f.student.api.v1.registrations[':id']['request-drop'].$post({ param: { id }, json: { reason: 'race: no longer sitting it' } }));
+        const approve = () => f.parent.api.v1['change-requests'][':id'].approve.$put({ param: { id: cr.id }, json: {} });
+        return { id, approve };
+      };
+      const after = (id: string) => one<{ status: string; outcome: string | null; rejected: boolean; drops: string }>(
+        `select r.status, r.prior_sitting_verified_outcome as outcome, r.declaration_rejected as rejected,
+          (select count(*) from escrow_transaction e where e.related_registration_id = r.id and e.reason = 'drop') as drops
+         from registration r where r.id = $1`, [id]);
+
+      it('the approval first: the line is dropped, and the rejection that waited finds nothing to answer', async () => {
+        const { id, approve } = await paidDeclared('af');
+        const release = await holdRowLock('registration', id);
+        let apr: Promise<Res> | undefined;
+        let rej: Promise<Res> | undefined;
+        try {
+          apr = approve();
+          await lockWaiters(1);
+          rej = reject(id);
+          await lockWaiters(2);
+        } finally {
+          await release();
+        }
+        const [a, r] = await Promise.all([apr!, rej!]);
+        expect(a.status).toBe(200);
+        expect(r.status).toBe(409);
+        expect(((await r.json()) as { error: string }).error).toBe('This line is no longer reserved: there is nothing to verify');
+        expect(await after(id)).toEqual({ status: 'dropped', outcome: null, rejected: false, drops: '1' });
+      });
+
+      it('the rejection first: the paid line stands as a first entry, then the approval drops it', async () => {
+        const { id, approve } = await paidDeclared('rf');
+        const release = await holdRowLock('registration', id);
+        let apr: Promise<Res> | undefined;
+        let rej: Promise<Res> | undefined;
+        try {
+          rej = reject(id);
+          await lockWaiters(1);
+          apr = approve();
+          await lockWaiters(2);
+        } finally {
+          await release();
+        }
+        const [r, a] = await Promise.all([rej!, apr!]);
+        expect(r.status).toBe(200);
+        expect(a.status).toBe(200);
+        expect(await after(id)).toEqual({ status: 'dropped', outcome: 'rejected', rejected: true, drops: '1' });
+      });
+    });
+
     it('the hold step run by two schedulers at once drops a paid unverified line once', async () => {
       const { holdUnverifiedAtDeadline } = await import('../src/services/verification.services');
       const holdSeries = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `t08h-${RUN}`, entryDeadline: new Date(Date.now() + days(30)), retakeDeadline: new Date(Date.now() + days(35)) } })))!.id;

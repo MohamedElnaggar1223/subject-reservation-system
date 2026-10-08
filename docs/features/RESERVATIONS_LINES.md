@@ -98,8 +98,9 @@ first. Shown as the Session screen's **To verify** tab (§6.4).
 prevCandidateNumber?, reason, evidence? }` — the coordinator and the admin; the finance desk too,
 with `evidence` (what it was shown: the board's statement), as §3.5 says the desk may verify when
 the family brings it. The centre and candidate number are taken only with `verified`. A sitting
-is answered once (409 after). Locks: the line's receipt, then the line `FOR UPDATE` (MA-16's
-order, as every drop), then its payments are read.
+is answered once (409 after). Locks: the line `FOR UPDATE`, then its receipt (the lead's order
+of 8 Oct, the pair A's approval of a change request takes; §8 decision 12, §10.7), then its
+payments are read.
 
 | Line when answered | `verified` | `rejected` |
 |---|---|---|
@@ -254,7 +255,9 @@ right.
   gone.
 - **08t** (A's file, extended): two desks at once (the loser 409, one consent pair); a declared
   sitting answered while its line is paid — checkout first, rejection first, verified while
-  confirmed; the hold step by two schedulers. A's races now reserve through the desk's endpoint
+  confirmed; a parent's approval of a drop against the coordinator's rejection of the same paid
+  line, both orders (one waits, nothing deadlocks); the hold step by two schedulers. A's races
+  now reserve through the desk's endpoint
   (typed client); the fee-confirm race stays on the services (a request cannot be paused between
   its fee lock and its commit).
 - **05**: cross-family cases for `/statement` (by student and by family), `/to-verify`,
@@ -273,7 +276,8 @@ right.
   green — doubled by the re-check; both red); the statement's parent link; swap consent
   inheritance; the teacher pool; self-study to taught; the hold step's lock (alone green —
   doubled by the drop's conditional update; both red); the rejection's sent state; "owes now"
-  on the desk and the home.
+  on the desk and the home; the line-before-receipt order (receipt first again: the approval race
+  deadlocks).
 
 ## 8. Decisions and why
 
@@ -289,7 +293,7 @@ right.
    A's §5 lists the snapshot under C; §1.6/§2.10 and the brief give it to B, so B built it.
 4. **`hold` reaches only deadlines that passed while it was on.** A line whose deadline passed
    under `enter_as_declared` was entered then; dropping it when the setting changes would act on
-   a decision already made. Owner question Q-B1.
+   a decision already made. Confirmed by the lead (decision 13, Q-B1).
 5. **A waiting line with a payment open is not ended by a rejection or by hold**: the rejection
    is refused until finance confirms or rejects the payment; hold leaves it to the deadline sweep
    on the same tick. A line is never expired under an open payment.
@@ -304,6 +308,19 @@ right.
     checkout take the money, not by series: a Cambridge retake of the previous sitting is its own
     payment.
 11. **The onboarded family stays open**: §11 counts on it.
+12. **The line before its receipt** in the answer to a declared sitting and in the hold step (the
+    lead, 8 Oct), so a parent's approval of a drop and the coordinator's rejection of the same
+    line queue instead of deadlocking (08t forces both orders; the receipt-first order deadlocks
+    there, control `lock-order-receipt-first`). The opposite pair remains elsewhere: §10.7.
+13. **Decided by the lead from the design (8 Oct), formerly questions for the owner:**
+    - Q-B1: `hold` acts only on deadlines that pass after it is turned on, as built; a line whose
+      deadline had already passed was entered as declared, and F4 lists it as "declared,
+      unverified".
+    - Q-B2: the finance desk's verification with the board's statement in hand is sufficient
+      (§3.5: "the desk may verify when the family shows the board's statement"); no second
+      confirmation.
+    - Q-B3: a rejected declaration that stands on a paid line never raises a price adjustment
+      automatically; finance decides with an explicit `price_adjustment` charge (§3.5, §3.6).
 
 ## 9. Deferred, and why
 
@@ -343,25 +360,27 @@ right.
    with no prior sitting); the Reserve page and the swap pickers read `item.open` per attempt and
    each price row's `open` (an object was always truthy, so the merge alone would have offered
    closed entries: fixed in 2f09f43 and driven with an item past its entry deadline).
-7. **A's `approveChangeRequest` now locks the line before its receipt** (the deadline re-check
-   under the line's lock, then `executeReceiptGatedDrop` takes the receipt): MA-16's order is the
-   receipt first. B's answer to a declared sitting and the hold step take the receipt first, so a
-   parent's approval and a rejection of the same line at the same moment can deadlock (Postgres
-   aborts one). Taking the receipt before the line in the re-check would keep one order.
+7. **One lock order for a line and its receipt is still needed.** B now takes the line before its
+   receipt (the lead's order, matching A's approval re-check and A's preregistration cancel).
+   But a payment reversal (payment, receipts, then lines), a receipt's void (ST-14: "Receipt
+   first, then its registration — the order a drop, a return and a reversal lock them in") and
+   its return take the receipt first, and so does `executeReceiptGatedDrop` itself; MA-16's fix
+   reads "The drop locks the receipt first (the reversal's order)" — the opposite of "MA-16's
+   drop takes the line it drops first". Measured: with B's answer line-first, a coordinator's
+   rejection holding a paid line while finance reverses its payment deadlocks, and Postgres
+   aborts the reversal ("Failed to reverse payment"; scratch run,
+   `scratch-reversal-vs-rejection-line-first.log`, "deadlock detected"); with B receipt-first, the
+   approval race deadlocks instead (control `lock-order-receipt-first`). Either the reversal, the
+   void and the return take the line first (audited code: MA-16, ST-14), or A's approval re-check,
+   A's preregistration cancel and B's answer take the receipt first. A deadlock aborts one side
+   with an error and corrupts nothing, but the order should be one.
 8. **C**: `consentStanding` / `writeConsents` for the checkout and the desk; `refundForSystemDrop`
    to replace; `statementFor`'s `charges`. **D**: `DECLARATION_REVIEWED` notifications exist; the
    Remind button waits.
 
 ## 11. Questions for the owner
 
-- **Q-B1 (Q-22's reading).** Under `hold`, should a declaration still unverified when the
-  setting is turned on be dropped at once if its deadline already passed, or only declarations
-  whose deadline passes after? Built: only after.
-- **Q-B2.** The finance desk may verify a declared sitting when the family shows the board's
-  statement; it must say what it saw. Is the coordinator's word needed as well?
-- **Q-B3.** A rejected declaration on a paid line before the first-entry deadline stands as a
-  first entry, and the family paid a retake's (or self-study's) price. Should the system raise the
-  price adjustment itself, or is finance's explicit charge (C) the rule?
+None open. The three this step raised were answered by the lead from the design (§8, decision 13).
 
 ## 12. Progress log
 
@@ -409,3 +428,10 @@ Times UTC, from the trail (`.audit/rework-reservations.tsv`), which holds each e
 - 01:39Z–01:42Z — **gates green on 2f09f43** (the merge and its fixes): the API suite in local time
   and with `TZ=UTC` (26 files, 376 passed, 1 todo each), API check-types; web check-types on the
   final tree. The commit after it widens two selects and updates this document and the trail.
+- 01:53Z — the lead's message: dev servers restarted on 3111/3110 against `igcse_rwb_dev`, left up
+  for the lead's drive and the reviewer.
+- 01:58Z–02:03Z — the answer to a declared sitting and the hold step take the line before its
+  receipt; 08t forces a parent's approval against the coordinator's rejection in both orders
+  (16 passed); control red (deadlock) with the receipt first; a scratch run shows the reversal
+  still takes the receipt first and deadlocks against a line-first rejection (§10.7). The lead's
+  answers to Q-B1–Q-B3 recorded (§8, decision 13).
