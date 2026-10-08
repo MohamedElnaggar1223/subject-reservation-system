@@ -543,9 +543,108 @@ export const importArabic: Record<string, string> = {
   'the subject is not mapped to the catalogue': 'المادة غير مطابقة مع الدليل',
   'choose the window for this series on the Mapping tab': 'اختر نافذة هذه الدورة في تبويب المطابقة',
   'spaces': 'مسافات',
+  // ── The reservations rework: lines in a session (RESERVATIONS_REWORK.md §9's F7 list) ──
+  // A reservation line is سطر (as the rework's screens); an item بند; a first entry قيد أول; a retake إعادة.
+  'Self-study on a first entry of a subject the school teaches': 'دراسة ذاتية في قيد أول لمادة تدرّسها المدرسة',
+  'Self-study on a first entry needs the exception: grant it on the Exceptions page or make it a retake with its sitting. Or choose on the line: in school, or enrol only; or change the Self-study setting when the coordinator answers.':
+    'الدراسة الذاتية في قيد أول تحتاج إلى الاستثناء: امنحه في صفحة الاستثناءات أو اجعلها إعادة مع دورتها. أو اختر في السطر: في المدرسة، أو الالتحاق فقط؛ أو غيّر إعداد الدراسة الذاتية حين يجيب المنسق.',
+  'Self-study on a first entry needs the exception: grant it on the Exceptions page or make it a retake with its sitting':
+    'الدراسة الذاتية في قيد أول تحتاج إلى الاستثناء: امنحه في صفحة الاستثناءات أو اجعلها إعادة مع دورتها',
+  'A sitting before is known (the student’s history) or named on the line: a retake in self-study, at the self-study share.':
+    'دورة سابقة معروفة (سجل الطالب) أو مذكورة في السطر: إعادة بدراسة ذاتية، بنسبة الدراسة الذاتية.',
+  'Enrolled as self-study; its line is in self-study.': 'التحاق بدراسة ذاتية؛ وسطره دراسة ذاتية.',
+  'The fee note says self-study, the self-study answer says No': 'ملاحظة الرسوم تقول دراسة ذاتية، وإجابة الدراسة الذاتية تقول لا',
+  'The line is read as self-study (the note is the school’s own); check it with the family and set Self-study on the line if the answer is right.':
+    'يُقرأ السطر دراسة ذاتية (الملاحظة من المدرسة نفسها)؛ تحقق من الأسرة وحدّد الدراسة الذاتية في السطر إن كانت الإجابة صحيحة.',
+  'A retake that names no earlier sitting': 'إعادة لا تسمّي دورة سابقة',
+  'The sheet says a retake (or a second entry), and neither the student’s history nor the line names the sitting it follows. Name the sitting on the line (it is then the desk’s declaration, verified on the session’s To verify tab), or make it a first entry.':
+    'يقول الجدول إنها إعادة (أو قيد ثانٍ)، ولا يذكر سجل الطالب ولا السطر الدورة التي تتبعها. سمِّ الدورة في السطر (فتكون تصريح المكتب، ويُتحقق منها في تبويب «للتحقق» في الجلسة)، أو اجعلها قيدًا أول.',
+  'The subjects of this series and level are entered with more than one board; each line goes to its item’s board series.':
+    'تُقيَّد مواد هذه الدورة والمستوى لدى أكثر من مجلس؛ ويذهب كل سطر إلى دورة مجلس بنده.',
+  'The catalogue row is turned off on Subjects: history keeps it, but no enrolment or line is made for it until it is turned on again.':
+    'صف الدليل معطّل في صفحة المواد: يحفظه السجل السابق، ولا يُنشأ له التحاق ولا سطر حتى يُفعَّل من جديد.',
+  'The line would be refused': 'سيُرفض السطر',
+  'The session would refuse this line (the reason is given): eligibility, the school fee, the session or the series closed, or a rule on lines. Import the series as history, skip the row, or fix what is refused.':
+    'سترفض الجلسة هذا السطر (مع ذكر السبب): الأهلية، أو الرسوم المدرسية، أو إغلاق الجلسة أو الدورة، أو قاعدة من قواعد السطور. استورد الدورة سجلًا سابقًا، أو استبعد السطر، أو صحّح ما يُرفض.',
+  'The session does not offer this subject': 'لا تقدّم الجلسة هذه المادة',
+  'No subject of the session fits the line’s words. Add it on the session’s Subjects tab (its teachers, items and course fee), map the line to the right catalogue row, or import its series as history.':
+    'لا تطابق أي مادة في الجلسة كلمات السطر. أضفها في تبويب المواد في الجلسة (معلموها وبنودها ورسوم تدريسها)، أو طابق السطر مع صف الدليل الصحيح، أو استورد دورته سجلًا سابقًا.',
+  'Which item of the subject?': 'أي بند من المادة؟',
+  'The line’s words fit none, or more than one, of the subject’s items (the whole subject, a unit, a route, a one-paper retake). Choose the item on the line.':
+    'لا تطابق كلمات السطر أيًّا من بنود المادة، أو تطابق أكثر من بند (المادة كاملة، أو وحدة، أو مسار، أو إعادة ورقة واحدة). اختر البند في السطر.',
+  'No board fee in the series’ grid': 'لا رسوم مجلس في جدول الدورة',
+  'The item has no fee row in its board series yet (the grid is named). Set it on the session’s Fees tab — provisional until the board publishes is fine — and the line is priced from it; nothing is ever priced at 0 for want of a fee.':
+    'ليس للبند صف رسوم في دورة مجلسه بعد (الجدول مذكور). حدّده في تبويب الرسوم في الجلسة — والمؤقت حتى ينشر المجلس مقبول — فيُسعَّر السطر منه؛ ولا يُسعَّر شيء بصفر لغياب الرسوم.',
+  'The board fee is provisional': 'رسوم المجلس مؤقتة',
+  'The series’ grid holds a provisional fee: the line is reserved at that price, marked provisional, and is paid once the school confirms the board’s fee.':
+    'يحمل جدول الدورة رسومًا مؤقتة: يُحجز السطر بهذا السعر، موسومًا مؤقتًا، ويُدفع حين تؤكد المدرسة رسوم المجلس.',
+  'No confirmation from the family on the line': 'لا تأكيد من الأسرة في السطر',
+  'A line made in a session records the sheet’s “I confirm my registration” as the family’s consent (the imported channel); this line has none. Import its series as history, or skip the line; the desk can reserve it with the parent’s signature.':
+    'السطر المنشأ في جلسة يسجّل «أؤكد تسجيلي» من الجدول موافقةً للأسرة (قناة الاستيراد)؛ وهذا السطر بلا تأكيد. استورد دورته سجلًا سابقًا، أو استبعد السطر؛ ويستطيع المكتب حجزه بتوقيع ولي الأمر.',
+  'The teacher named does not teach it in the session': 'المعلم المذكور لا يدرّسها في الجلسة',
+  'The line takes the subject’s only teacher in the session, or none yet (the coordinator assigns one later). Add the teacher to the subject on the session’s Subjects tab if the sheet is right.':
+    'يأخذ السطر المعلم الوحيد للمادة في الجلسة، أو لا أحد بعد (يعيّن المنسق معلمًا لاحقًا). أضف المعلم إلى المادة في تبويب المواد في الجلسة إن كان الجدول صحيحًا.',
+  'No prices, payments or receipts: nothing is paid by this import. Lines it makes are priced from the session’s fee grids and wait for payment; money before the system comes from the money record, as history only.':
+    'لا أسعار ولا مدفوعات ولا إيصالات: لا يُدفع شيء بهذا الاستيراد. تُسعَّر السطور التي ينشئها من جداول رسوم الجلسة وتنتظر الدفع؛ والمال قبل النظام يأتي من السجل المالي، سجلًا سابقًا فقط.',
+  'Only as a retake (the forms’ rule): a first entry waits for staff': 'كإعادة فقط (قاعدة النماذج): القيد الأول ينتظر الموظفين',
+  'Enrolled as self-study, no exam line made': 'التحاق بدراسة ذاتية، دون سطر امتحان',
+  'Lines awaiting payment in the session': 'سطور بانتظار الدفع في الجلسة',
+  // The Mapping tab
+  "History records what each student registered for before the system; nothing is owed. The session of the same series takes the lines as reservations awaiting payment — each on the subject and item the sheet names, priced from the session's fee grids — and the family then pays through the app or the desk. That choice is the admin's.":
+    'يسجل السجل السابق ما سجّله كل طالب قبل النظام؛ ولا يُستحق شيء. وتأخذ جلسة الدورة نفسها السطور حجوزاتٍ بانتظار الدفع — كلٌّ على المادة والبند اللذين يذكرهما الجدول، بسعر من جداول رسوم الجلسة — ثم تدفع الأسرة عبر التطبيق أو المكتب. وهذا الاختيار للمدير.',
+  'A session of this series is open': 'جلسة هذه الدورة مفتوحة',
+  'A session of this series is open — the admin can reserve these lines': 'جلسة هذه الدورة مفتوحة — يستطيع المدير حجز هذه السطور',
+  'No session of this series.': 'لا توجد جلسة لهذه الدورة.',
+  "Each subject as the sheet writes it, with its level code, is a registrable row of the catalogue — a whole subject, a unit (P1) or a paper set. Found by name, code or unit; check each. A subject left unmapped is kept in history in the sheet's words, with no enrolment or line. A line in a session is found on the session's subjects and their items.":
+    'كل مادة كما يكتبها الجدول، مع رمز مستواها، صف قابل للتسجيل في الدليل — مادة كاملة، أو وحدة (P1)، أو مجموعة أوراق. يُعثر عليها بالاسم أو الرمز أو الوحدة؛ تحقق من كل واحدة. والمادة غير المطابَقة تُحفظ في السجل السابق بكلمات الجدول، دون التحاق ولا سطر. ويُعثر على سطر الجلسة في مواد الجلسة وبنودها.',
+  'The admin adds the missing ones to the catalogue from this screen, or on the Subjects page.': 'يضيف المدير الناقص منها إلى الدليل من هذه الشاشة، أو في صفحة المواد.',
+  "Each becomes a registrable row of the catalogue. The board is today's assumption (units and paper sets: Pearson Edexcel IAL; the rest: Cambridge) — change it here or later on the Catalogue. A subject carries no price: a line is priced from its session's course fee and the board fee in the series' grid, and nothing is reserved until both are set.":
+    'تصبح كل واحدة صفًا قابلًا للتسجيل في الدليل. المجلس افتراض اليوم (الوحدات ومجموعات الأوراق: Pearson Edexcel IAL؛ والباقي: Cambridge) — غيّره هنا أو لاحقًا في الدليل. لا تحمل المادة سعرًا: يُسعَّر السطر من رسوم التدريس في جلسته ورسوم المجلس في جدول الدورة، ولا يُحجز شيء حتى يُحدَّد الاثنان.',
+  // The row editor: the line in the session
+  'The line in the session': 'السطر في الجلسة',
+  'Subject and item': 'المادة والبند',
+  'Chosen on the line': 'مختار في السطر',
+  'Board series': 'دورة المجلس',
+  'Entry': 'القيد',
+  'self-study': 'دراسة ذاتية',
+  'in school': 'في المدرسة',
+  'Sitting it follows': 'الدورة التي يتبعها',
+  'From the student’s history (legacy)': 'من سجل الطالب (السجل السابق)',
+  'Declared by the desk — listed to verify': 'صرّح بها المكتب — مدرجة للتحقق',
+  'None (self-study)': 'لا أحد (دراسة ذاتية)',
+  'No preference yet': 'بلا تفضيل بعد',
+  'Price': 'السعر',
+  'course': 'التدريس',
+  'at': 'بنسبة',
+  '+ board': '+ المجلس',
+  'Board fee provisional': 'رسوم المجلس مؤقتة',
+  'Not priced: the series’ grid has no fee for it': 'غير مسعَّر: لا رسوم له في جدول الدورة',
+  'No line yet: see the problems above.': 'لا سطر بعد: انظر المشكلات أعلاه.',
+  'Item': 'البند',
+  'As the sheet’s words find it': 'كما تجده كلمات الجدول',
+  'The item of the session this line is': 'بند الجلسة الذي يمثّله هذا السطر',
+  'As the sheet says': 'كما يقول الجدول',
+  'The sitting a retake follows (the desk’s declaration, verified on To verify)': 'الدورة التي تتبعها الإعادة (تصريح المكتب، ويُتحقق منها في «للتحقق»)',
+  'Sitting month': 'شهر الدورة',
+  'Sitting year': 'سنة الدورة',
+  'Name this sitting': 'سمِّ هذه الدورة',
+  'Enrol as self-study only (no exam line)': 'التحاق بدراسة ذاتية فقط (بلا سطر امتحان)',
+  'Line awaiting payment': 'سطر بانتظار الدفع',
+  'Reserved already': 'محجوز بالفعل',
+  'lines awaiting payment': 'سطور بانتظار الدفع',
+  'Reserving lines for families in a session and adding subjects to the catalogue are the admin’s steps; everything else here is yours.':
+    'حجز السطور للأسر في جلسة وإضافة المواد إلى الدليل من خطوات المدير؛ وكل ما عدا ذلك هنا لك.',
+  // Problem details
+  'enrolled as self-study, no exam line made': 'التحاق بدراسة ذاتية، دون سطر امتحان',
+  'a first entry in self-study, by the student’s exception': 'قيد أول بدراسة ذاتية، باستثناء الطالب',
+  'choose the session for this series on the Mapping tab': 'اختر جلسة هذه الدورة في تبويب المطابقة',
+  'no item fits': 'لا يطابق أي بند',
 };
 
 /** The import's sentences with a name, a number, a code or a year in them. */
+const MONTHS_AR: Record<string, string> = { January: 'يناير', June: 'يونيو', October: 'أكتوبر', November: 'نوفمبر' };
+const monthAr = (m: string) => MONTHS_AR[m] ?? m;
+
 export function translateImportText(text: string): string | null {
   const rules: [RegExp, (m: RegExpExecArray) => string][] = [
     [/^Commit (\d+) families\?$/, (m) => `اعتماد ${m[1]} أسر؟`],
@@ -583,6 +682,30 @@ export function translateImportText(text: string): string | null {
     [/^Select (.+) row (\d+)$/, (m) => `حدد ${m[1]} السطر ${m[2]}`],
     [/^Add (.+)$/, (m) => `أضف ${m[1]}`],
     [/^(.+) is taught at school$/, (m) => `${m[1]} تُدرَّس في المدرسة`],
+    // The reservations rework: the lines a row makes in a session, and the refusals the session gives.
+    [/^Lines awaiting payment in (.+) \((.+)\)$/, (m) => `سطور بانتظار الدفع في ${m[1]} (${m[2]})`],
+    [/^Lines awaiting payment in (.+)$/, (m) => `سطور بانتظار الدفع في ${m[1]}`],
+    [/^(.+) offers no subject for "(.+)"$/, (m) => `لا تقدّم ${m[1]} مادة لـ "${m[2]}"`],
+    [/^a retake of (\w+) (\d{4}) \(the student’s history\)$/, (m) => `إعادة لدورة ${monthAr(m[1]!)} ${m[2]} (سجل الطالب)`],
+    [/^a retake of (\w+) (\d{4}) \(named on the sheet or the line, to verify\)$/, (m) => `إعادة لدورة ${monthAr(m[1]!)} ${m[2]} (مذكورة في الجدول أو السطر، للتحقق)`],
+    [/^"(.+)": name the sitting it follows on the line, or make it a first entry$/, (m) => `"${m[1]}": سمِّ الدورة التي يتبعها في السطر، أو اجعله قيدًا أول`],
+    [/^a retake: name the sitting it follows on the line, or make it a first entry$/, () => 'إعادة: سمِّ الدورة التي يتبعها في السطر، أو اجعله قيدًا أول'],
+    [/^(.+) does not teach (.+) in (.+)$/, (m) => `${m[1]} لا يدرّس ${m[2]} في ${m[3]}`],
+    [/^board fee ([\d.,]+) in (.+)$/, (m) => `رسوم المجلس ${m[1]} في ${m[2]}`],
+    [/^(.+) has no board fee in (.+) yet — set one on the session's Fees tab$/, (m) => `${m[1]} بلا رسوم مجلس في ${m[2]} بعد — حدّدها في تبويب الرسوم في الجلسة`],
+    [/^(.+) is not open for reservations$/, (m) => `${m[1]} غير مفتوحة للحجز`],
+    [/^(.+) takes retakes only this cycle$/, (m) => `${m[1]} للإعادة فقط هذه الدورة`],
+    [/^(.+) is already reserved in (.+): the board takes one entry$/, (m) => `${m[1]} محجوزة بالفعل في ${m[2]}: يقبل المجلس قيدًا واحدًا`],
+    [/^(.+) and (.+) cannot be reserved together$/, (m) => `لا يمكن حجز ${m[1]} و${m[2]} معًا`],
+    [/^(.+) is closed in this session$/, (m) => `${m[1]} مغلقة في هذه الجلسة`],
+    [/^(.+) is self-study only: the school does not teach it this cycle$/, (m) => `${m[1]} دراسة ذاتية فقط: لا تدرّسها المدرسة هذه الدورة`],
+    [/^(.+) carries an earlier sitting forward: name the series it is carried from$/, (m) => `${m[1]} يحمل دورة سابقة: سمِّ الدورة المحمولة منها`],
+    [/^(.+): no enrolment while it is turned off$/, (m) => `${m[1]}: لا التحاق ما دامت معطّلة`],
+    [/^(\w+) (\d{4}) is not a sitting of (.+) before this one: name another sitting on the line$/, (m) => `${monthAr(m[1]!)} ${m[2]} ليست دورة لـ ${m[3]} قبل هذه: سمِّ دورة أخرى في السطر`],
+    [/^(.+) is entered in no board series: it cannot be reserved$/, (m) => `${m[1]} غير مقيّدة في أي دورة مجلس: لا يمكن حجزها`],
+    [/^(.+) is entered in a board series with no entry deadline and no exam dates yet: it opens for reservations once they are set$/, (m) => `${m[1]} مقيّدة في دورة مجلس بلا موعد قيد ولا مواعيد امتحانات بعد: تُفتح للحجز حين تُحدَّد`],
+    [/^The registration window is not open: the exam board's (entry|retake) deadline for this series \((.+)\) has passed$/, (m) => `نافذة التسجيل غير مفتوحة: انقضى موعد ${m[1] === 'retake' ? 'الإعادة' : 'القيد'} لدى المجلس لهذه الدورة (${m[2]})`],
+    [/^The registration window is not open: this series' exams start on (.+) and it has no entry deadline$/, (m) => `نافذة التسجيل غير مفتوحة: تبدأ امتحانات هذه الدورة في ${m[1]} ولا موعد قيد لها`],
   ];
   // A detail made of several sentences: each translated on its own.
   if (text.includes('; ')) {

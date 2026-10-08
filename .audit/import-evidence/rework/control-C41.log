@@ -1,0 +1,43 @@
+# C41: history is a sitting only before the item's series (the same series is the same sitting)
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (54 tests | 1 failed) 10651ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > history committed after November ended is still not a sitting for a line of November itself: the same series is the same sitting 194ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 53 passed (54)
+   Duration  12.72s (transform 660ms, setup 2ms, collect 244ms, tests 10.65s, environment 0ms, prepare 35ms)
+ ❯ test/08n-import.test.ts:836:27
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > history committed after November ended is still not a sitting for a line of November itself: the same series is the same sitting
+AssertionError: expected { …(13) } to match object { series: StringMatching{…}, …(2) }
+(16 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "attempt": "first",[39m
+[32m-   "priorSitting": null,[39m
+[31m+   "attempt": "retake",[39m
+[31m+   "priorSitting": {[39m
+[31m+     "from": "history",[39m
+[31m+     "month": "november",[39m
+[31m+     "source": "legacy",[39m
+[31m+     "year": 2026,[39m
+[31m+   },[39m
+[2m    "series": StringMatching /^Cambridge International November \d{4}/,[22m
+[2m  }[22m
+
+ ❯ test/08n-import.test.ts:836:27
+    834|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
+    835|       const r = rowAt(await fetchView(adm, id), 'Same', 3);
+    836|       expect(r.plan.line).toMatchObject({ series: expect.stringMatchin…
+       |                           ^
+    837|       expect(r.problems.find((p) => p.code.startsWith('self_study'))).…
+    838|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -99,7 +99,7 @@ def trim(log: str) -> str:
     lines = log.splitlines()
     keep = [l for l in lines if l.strip().startswith(('✓ test', '× ', '❯ test', 'Test Files', 'Tests ', 'Duration'))]
     start = next((i for i, l in enumerate(lines) if 'Failed Tests' in l), None)
-    end = next((i for i, l in enumerate(lines) if l.strip().startswith('Test Files')), len(lines))
+    end = next((i for i, l in enumerate(lines) if start is not None and i > start and l.strip().startswith('Test Files')), len(lines))
     failures = [l for l in lines[start:end] if not l.startswith(('stdout', 'stderr', '['))][:260] if start is not None else []
     return '\n'.join(['# summary', *keep, '', '# failures (messages)', *failures]) + '\n'
 

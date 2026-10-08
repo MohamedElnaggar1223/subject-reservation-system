@@ -1,0 +1,15 @@
+# C42: findOffer: a unit line finds the offer whose item enters the unit it names
+# undone in apps/api/src/services/offer.services.ts
+# summary
+ ❯ test/08n-import.test.ts (53 tests | 3 failed) 10624ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); Papers 1 and 2 wait for staff to choose 49ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line whose family's confirmation is not on the sheet is an error: the import records the sheet's confirmation as the consent 38ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the student lock lets one through (gate.sameEntryOnce) 498ms
+ Test Files  1 failed (1)
+      Tests  3 failed | 50 passed (53)
+   Duration  12.36s (transform 692ms, setup 2ms, collect 267ms, tests 10.62s, environment 0ms, prepare 34ms)
+ ❯ test/08n-import.test.ts:902:46
+ ❯ test/08n-import.test.ts:930:27
+ ❯ test/08n-import.test.ts:952:110
+
+# failures (messages)

@@ -574,11 +574,14 @@ export async function computeView({ batch, rows, people }: ImportViewInput) {
   if (unmatched.length) {
     const names = [...new Set(unmatched.map((p) => lower(p.name)).filter(Boolean))];
     const phones = [...new Set(unmatched.map((p) => p.phone).filter((x): x is string => !!x))];
-    const candidates = await db.select({ id: user.id, name: user.name, email: user.email, role: user.role, phone: user.phone }).from(user)
+    // Accounts this file's own commit made are its people, not accounts already in the system: a look-alike
+    // among them is the review's warning (duplicate_student, duplicate_parent), as before the commit began.
+    const ownAccounts = new Set(people.map((p) => p.userId).filter((x): x is string => !!x));
+    const candidates = (await db.select({ id: user.id, name: user.name, email: user.email, role: user.role, phone: user.phone }).from(user)
       .where(and(inArray(user.role, ['student', 'parent']), or(
         names.length ? inArray(sql`lower(${user.name})`, names) : undefined,
         phones.length ? inArray(user.phone, phones) : undefined,
-      )));
+      )))).filter((c) => !ownAccounts.has(c.id));
     const candidateIds = candidates.map((c) => c.id);
     const links = candidateIds.length
       ? await db.select({ parentId: parentStudentLink.parentId, studentId: parentStudentLink.studentId }).from(parentStudentLink)

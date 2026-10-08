@@ -1,0 +1,13 @@
+# C31: s9: the review refuses a line whose item has no fee row, naming the grid (fee_missing)
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (53 tests | 2 failed) 10678ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 252ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 194ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 51 passed (53)
+   Duration  12.61s (transform 699ms, setup 3ms, collect 284ms, tests 10.68s, environment 0ms, prepare 37ms)
+ ❯ test/08n-import.test.ts:613:44
+ ❯ test/08n-import.test.ts:1143:83
+
+# failures (messages)

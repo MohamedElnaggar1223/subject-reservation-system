@@ -1,0 +1,11 @@
+# C27: flag 3: a person's decisions carried by email from every earlier file
+# undone in apps/api/src/services/import.services.ts
+# summary
+ ❯ test/08n-import.test.ts (53 tests | 1 failed) 10042ms
+   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 50ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 52 passed (53)
+   Duration  11.93s (transform 700ms, setup 3ms, collect 266ms, tests 10.04s, environment 0ms, prepare 37ms)
+ ❯ test/08n-import.test.ts:494:62
+
+# failures (messages)

@@ -1,0 +1,11 @@
+# C43: the review asks the rules on lines as the commit will (assertLineRules, rolled back)
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (53 tests | 1 failed) 10335ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); Papers 1 and 2 wait for staff to choose 93ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 52 passed (53)
+   Duration  12.45s (transform 737ms, setup 3ms, collect 328ms, tests 10.34s, environment 0ms, prepare 43ms)
+ ❯ test/08n-import.test.ts:905:92
+
+# failures (messages)

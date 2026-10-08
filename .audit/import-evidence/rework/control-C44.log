@@ -1,0 +1,38 @@
+# C44: the commit holds the student before its lines (assertMayRegisterForInTx), as every reservation path does (s6)
+# undone in apps/api/src/services/import/commit.ts
+# summary
+ ❯ test/08n-import.test.ts (54 tests | 1 failed) 12109ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce) 845ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 53 passed (54)
+   Duration  14.51s (transform 774ms, setup 2ms, collect 291ms, tests 12.11s, environment 0ms, prepare 38ms)
+ ❯ test/08n-import.test.ts:984:23
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce)
+AssertionError: expected [ …(2) ] to deeply equal [ Array(1) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    {[22m
+[31m+     "session_id": "da2da018-daaa-4087-a813-1c1d874d76d0",[39m
+[31m+   },[39m
+[31m+   {[39m
+[2m      "session_id": "df16abed-1d47-43c7-8cfe-a45bc9c8f50b",[22m
+[2m    },[22m
+[2m  ][22m
+
+ ❯ test/08n-import.test.ts:984:23
+    982|         const lines = await sql<{ session_id: string }>(`select r.sess…
+    983|           where r.student_id = $1 and r.board_series_id = $2 and i.lab…
+    984|         expect(lines).toEqual([{ session_id: sess }]);
+       |                       ^
+    985|         expect(c.status).toBe(200);
+    986|         expect(d.status).toBe(409);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

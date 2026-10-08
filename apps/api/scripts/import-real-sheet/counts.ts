@@ -88,7 +88,9 @@ try {
   const report = (title: string, v: View) => {
     lines.push(`## ${title}`, '');
     lines.push(`Rows ${v.summary.rows}; importing ${v.summary.importing}; left out ${v.summary.skipped}. Families ${v.summary.families}: ready ${v.summary.readyFamilies}, held back ${v.summary.heldFamilies}, committed ${v.summary.committedFamilies}. Rows with an error ${v.summary.rowsWithErrors}.`, '');
-    lines.push('Tabs: ' + v.mapping.tabs.map((t) => `${t.name} (${t.kind}, ${t.lines} lines${t.mainSeries ? `, ${t.mainSeries}` : ''})`).join('; '), '');
+    // Session tabs by name ("2024", "Sheet1"); any other tab only as a count: a hand-made roster tab may be named after a person.
+    lines.push('Tabs: ' + v.mapping.tabs.filter((t) => t.kind === 'session').map((t) => `${t.name} (${t.kind}, ${t.lines} lines${t.mainSeries ? `, ${t.mainSeries}` : ''})`).join('; ')
+      + `; other tabs: ${v.mapping.tabs.filter((t) => t.kind !== 'session').length}`, '');
     lines.push('Notes: ' + v.notes.map((n) => n.code).join(', '), '');
     lines.push('Series groups: ' + v.mapping.series.map((s) => `${s.key} ${s.rows} rows, boards ${s.boards.join('+') || '-'}`).join('; '), '');
     lines.push('What a commit would make: ' + JSON.stringify(v.summary.plan), '');
@@ -122,11 +124,49 @@ try {
   if (missing.length) {
     await apiResponse(adm.v1.imports[':id'].subjects.$post({ param: { id: first }, json: { subjects: missing.map((s, i) => ({
       key: s.key, name: s.subject, code: `RUN-${String(i + 1).padStart(3, '0')}`, qualificationLevel: (s.levelSuggested ?? 'igcse') as 'igcse' | 'as_level' | 'a_level',
-      council: (s.isUnit ? 'pearson_edexcel' : 'cambridge') as 'pearson_edexcel' | 'cambridge', isOfferedAtSchool: s.taughtInSchool, courseFee: 0, registrationFee: 0,
+      council: (s.isUnit ? 'pearson_edexcel' : 'cambridge') as 'pearson_edexcel' | 'cambridge', isOfferedAtSchool: s.taughtInSchool,
     })) } }));
   }
   v = await view(first);
   report(`After the admin added ${missing.length} catalogue rows (no other review)`, v);
+
+  // Review flag 7: how each self-study line was read — the yes/no answer, the fee note, or a note against an explicit "No".
+  {
+    const sheetRows = v.rows.filter((r) => r.data.kind === 'sheet' && r.decision === 'import') as (View['rows'][number] & { data: { kind: 'sheet'; selfStudy: boolean; selfStudyAnswer: string | null; feeNote: string | null } })[];
+    const self = sheetRows.filter((r) => r.data.selfStudy);
+    const noteSays = (r: (typeof self)[number]) => !!r.data.feeNote && /self\s*study|external/i.test(r.data.feeNote);
+    const groups: [string, (typeof self)][] = [
+      ['answer Yes', self.filter((r) => r.data.selfStudyAnswer === 'yes')],
+      ['no answer, the fee note says self-study', self.filter((r) => r.data.selfStudyAnswer === null && noteSays(r))],
+      ['answer No, the fee note says self-study (flagged)', self.filter((r) => r.data.selfStudyAnswer === 'no' && noteSays(r))],
+    ];
+    lines.push('## Self-study lines by how they were read (review flag 7)', '', `Self-study lines importing: ${self.length}.`, '');
+    for (const [label, rs] of groups) lines.push(`- ${label}: ${rs.length} (${[...new Set(rs.map((r) => r.tab))].map((t) => `${t} ${rs.filter((r) => r.tab === t).length}`).join(', ')}) rows ${rs.slice(0, 20).map(ref).join(', ')}`);
+    lines.push(`- self_study_contradiction flagged: ${v.rows.filter((r) => r.problems.some((p) => p.code === 'self_study_contradiction')).length} rows`, '');
+  }
+
+  // The reservations rework: the live tab's series mapped to its session (the admin's), with no subject offered yet —
+  // what the school's links sheet must offer before any line can be made. Then back to history (the coordinator's default).
+  {
+    const main = v.mapping.tabs.find((t) => t.kind === 'session' && t.mainSeries && /November|October|January/.test(t.mainSeries));
+    const winterYear = main?.mainSeries ? Number(/\d{4}/.exec(main.mainSeries)![0]) - (/January/.test(main.mainSeries) ? 1 : 0) : Y;
+    const sess = await apiResponse(adm.v1.sessions.$post({ json: {
+      type: 'winter', year: winterYear, startDate: new Date(Date.now() - 86_400_000).toISOString(), endDate: new Date(Date.now() + 60 * 86_400_000).toISOString(),
+      courseStartsOn: new Date().toISOString().slice(0, 10), paymentDueAt: new Date(Date.now() + 60 * 86_400_000).toISOString(),
+    } }));
+    const groups = (await view(first)).mapping.series.filter((g) => g.windows.some((w) => w.id === sess.id));
+    await apiResponse(adm.v1.imports[':id'].settings.$put({ param: { id: first }, json: { series: Object.fromEntries(groups.map((g) => [g.key, { mode: 'window' as const, sessionId: sess.id }])) } }));
+    const live = await view(first);
+    const liveRows = live.rows.filter((r) => r.plan.registration === 'live' || r.plan.registration === 'live_exists');
+    const byCode = new Map<string, number>();
+    for (const r of liveRows) for (const p of r.problems) if (p.severity === 'error') byCode.set(p.code, (byCode.get(p.code) ?? 0) + 1);
+    const notOffered = new Set(liveRows.filter((r) => r.problems.some((p) => p.code === 'not_offered')).map((r) => r.subjectKey));
+    lines.push('## The live series mapped to its session, nothing offered yet (the rework)', '',
+      `Series groups mapped: ${groups.map((g) => g.key).join(', ') || 'none'}. Lines that would be lines in the session: ${liveRows.length}.`, '',
+      `Errors on them: ${JSON.stringify(Object.fromEntries(byCode))}. Distinct subjects (as the sheet writes them, with level) the session must offer first: ${notOffered.size}.`, '');
+    await apiResponse(adm.v1.imports[':id'].settings.$put({ param: { id: first }, json: { series: Object.fromEntries(groups.map((g) => [g.key, { mode: 'history' as const, sessionId: null }])) } }));
+  }
+  v = await view(first);
 
   const out = await apiResponse(coord.v1.imports[':id'].commit.$post({ param: { id: first } }));
   // Staff names and ids are people too: only their count is reported.

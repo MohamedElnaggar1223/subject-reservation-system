@@ -1,0 +1,13 @@
+# C29: flag 3: the money-record fingerprint without the line's position
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (53 tests | 2 failed) 10337ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > recorded on the students as history; no payment, receipt or balance moves; the same file again adds nothing 81ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 27ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 51 passed (53)
+   Duration  12.14s (transform 665ms, setup 2ms, collect 233ms, tests 10.34s, environment 0ms, prepare 31ms)
+ ❯ test/08n-import.test.ts:1032:113
+ ❯ test/08n-import.test.ts:1045:101
+
+# failures (messages)

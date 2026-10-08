@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, academicYearShortLabel, seriesYearInAcademicYear, seriesOrder } from '@repo/validations';
 import {
-  app, admin, staff, onboard, subject, session, seriesOfSession, teachOffer, refused, one, sql, audited, openWindow, holdRowLock, lockWaiters, waitFor, CONSENT, type Client,
+  app, admin, staff, onboard, subject, session, seriesOfSession, teachOffer, refused, one, sql, audited, openWindow, holdRowLock, lockWaiters, waitFor, pauseAtAudits, CONSENT, type Client,
 } from './helpers';
 import { schoolSheet, sclRoster, moneyRecord, workbook, zip, serial, years, liveTabRows, historyTabRows, rosterTabRows, D, type Cell } from './import-fixtures';
 
@@ -524,6 +524,23 @@ describe('F7: the day-one import', () => {
     });
   });
 
+  describe('look-alikes inside one file are the review\'s warnings, and the commit makes what the review showed', () => {
+    it('two families whose children share a name and whose parents share a phone are both committed: an account the same commit made is not an account already in the system', async () => {
+      const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', '', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
+      const id = await stage(coordinator, workbook([{ name: 'Look-alikes', rows: [[`Nov. ${Y} Session`], header,
+        ['Look Alike', '11G', 'O.L.', 'Computer Science', 'Mr Karim', serial(Y, 11), '01070707070', `look.alike.a${D}`, 'Look Parent A', `look.parent.a${D}`, '01071717171', 'I confirm my registration', 'No'],
+        ['Look Alike', '11G', 'O.L.', 'Computer Science', 'Mr Karim', serial(Y, 11), '01072727272', `look.alike.b${D}`, 'Look Parent B', `look.parent.b${D}`, '01071717171', 'I confirm my registration', 'No'],
+      ] }]), 'look-alikes.xlsx', 'school_sheet');
+      expect((await putSettings(coordinator, id, { enrol: false, createSections: false })).status).toBe(200);
+      const v = await fetchView(coordinator, id);
+      expect(person(v, 'student', `look.alike.b${D}`).problems.map((p) => [p.code, p.severity])).toEqual([['duplicate_student', 'warning']]);
+      expect(v.summary).toMatchObject({ families: 2, readyFamilies: 2, heldFamilies: 0 });
+      const out = await apiResponse(coordinator.api.v1.imports[':id'].commit.$post({ param: { id } }));
+      expect(out.result.families).toEqual({ committed: 2, failed: 0 });
+      expect(out.result.created).toMatchObject({ students: 2, parents: 2, links: 2 });
+    });
+  });
+
   describe('lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin\'s)', () => {
     let windowId: string, seriesId: string, seriesName: string, liveBatch: string, finadmin: Client, mrLive: string;
     const level = 'as_level' as const;
@@ -826,6 +843,18 @@ describe('F7: the day-one import', () => {
         .toEqual({ attempt: 'retake', mode: 'self_study', source: 'legacy', board: 'cambridge', month: 'november', year: Y, price: 1000, course_pct: 50 });
       expect(subjectN).toBeTruthy();
     });
+
+    it('history committed after November ended is still not a sitting for a line of November itself: the same series is the same sitting', async () => {
+      // The winter session of Y, whose Cambridge items are in November Y: the series the history is of.
+      const winter = await session(adm, 'Winter session (interim rule, same series)', 'november', 'as_level', { ...openWindow(), activate: true, seriesYear: Y });
+      const id = await stage(adm, workbook([{ name: 'Same', rows: [[`Nov. ${Y} Session`], header, row('Yes')] }]), 'november-self.xlsx', 'school_sheet');
+      expect((await putSettings(adm, id, { series: { [`november-${Y}-as_level`]: { mode: 'window', sessionId: winter } }, enrol: false, createSections: false })).status).toBe(200);
+      const r = rowAt(await fetchView(adm, id), 'Same', 3);
+      expect(r.plan.line).toMatchObject({ series: expect.stringMatching(/^Cambridge International November \d{4}/), attempt: 'first', priorSitting: null });
+      expect(r.problems.find((p) => p.code.startsWith('self_study'))).toMatchObject({ code: 'self_study_on_taught', severity: 'error' });
+      await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
+      await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: winter }, json: { reason: 'interim rule scenario done' } }));
+    });
   });
 
   describe('the note and the self-study answer (review flag 7), and the family\'s confirmation on a line', () => {
@@ -932,7 +961,7 @@ describe('F7: the day-one import', () => {
       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ param: { id } }));
     });
 
-    it('the import and the desk reserving the same unit in one board series from two sessions at the same moment: the student lock lets one through (gate.sameEntryOnce)', async () => {
+    it('the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce)', async () => {
       const { student, studentId, parent: par } = await onboard(officer, 'imp-race', 11);
       // Another winter session offering IAL Mathematics with its P1 in the same board series.
       const other = await session(adm, 'Winter session (import, race)', 'november', 'as_level', { ...openWindow(), activate: true, seriesYear: seriesYearInAcademicYear('november', Y) });
@@ -946,27 +975,35 @@ describe('F7: the day-one import', () => {
       const header: Cell[] = ['Student Name', 'Class & Grade', 'Specification', 'Subject', 'Teacher', 'Student No.', 'Student Email', '', 'Parent Email', 'Parent No.', '', ''];
       // Its own tab name: a file with another's tabs and titles is that sheet exported again, and carries its mapping (flag 3).
       const id = await stage(adm, workbook([{ name: 'Lock race', rows: [[`Nov. ${Y} Session`], header,
-        ['Student imp-race', '11K', 'A.S.', 'Pure Mathematics 1 (P1)', 'Teacher of the IAL units (imp)', '01111111111', student.email, 'Parent imp-race', par.email, '01000000000', 'I confirm my registration', 'No'],
+        // A class with no section this year: no section place is made, so nothing but the lines touches the student.
+        ['Student imp-race', '11Z', 'A.S.', 'Pure Mathematics 1 (P1)', 'Teacher of the IAL units (imp)', '01111111111', student.email, 'Parent imp-race', par.email, '01000000000', 'I confirm my registration', 'No'],
       ] }]), 'race.xlsx', 'school_sheet');
       expect((await putSettings(adm, id, { series: { [`november-${Y}-as_level`]: { mode: 'window', sessionId: sess } }, enrol: false, createSections: false })).status).toBe(200);
       expect(rowAt(await fetchView(adm, id), 'Lock race', 3).problems.filter((p) => p.severity === 'error')).toEqual([]);
-      const release = await holdRowLock('"user"', studentId);
-      const commit = adm.api.v1.imports[':id'].commit.$post({ param: { id } });
-      const desk = officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: other, lines: [{ offerItemId: made.items[0]!, attempt: 'first', mode: 'in_school' }], consent: CONSENT } });
-      await lockWaiters(2);
-      await release();
-      const [c, d] = await Promise.all([commit, desk]);
-      const lines = await sql<{ session_id: string }>(`select r.session_id from registration r join session_offer_item i on i.id = r.offer_item_id
-        where r.student_id = $1 and r.board_series_id = $2 and i.label = 'P1' and r.status not in ('expired', 'dropped', 'rejected')`, [studentId, series]);
-      expect(lines).toHaveLength(1);
-      const sentence = /is already reserved in Pearson Edexcel November \d{4} \(.+\) \(.+\): the board takes one entry$/;
-      if (lines[0]!.session_id === sess) {
-        expect(d.status).toBe(409);
-        expect(((await d.json()) as { error: string }).error).toMatch(sentence);
-      } else {
+      // The import is held inside its family's transaction, its line made and not yet committed (at its
+      // IMPORT_REGISTRATION row); the desk reserves the same unit for the student from the other session
+      // meanwhile. The import holds the student (FOR NO KEY UPDATE), so the desk waits for it and then
+      // sees its line: one live line in the series, the desk refused with gate.sameEntryOnce's sentence.
+      const pause = await pauseAtAudits(['IMPORT_REGISTRATION']);
+      try {
+        const commit = adm.api.v1.imports[':id'].commit.$post({ param: { id } });
+        await pause.paused('IMPORT_REGISTRATION');
+        const desk = officer.api.v1.registrations.desk.$post({ json: { studentId, sessionId: other, lines: [{ offerItemId: made.items[0]!, attempt: 'first', mode: 'in_school' }], consent: CONSENT } });
+        // The desk either waits behind the student lock or, with no lock to wait on, runs to its end.
+        let deskDone = false;
+        void desk.then(() => { deskDone = true; });
+        await waitFor(async () => deskDone || Number((await one<{ n: string }>(
+          `select count(*) as n from pg_locks l join pg_stat_activity a on a.pid = l.pid where not l.granted and l.locktype <> 'advisory' and a.datname = current_database()`)).n) >= 1 || null);
+        await pause.release('IMPORT_REGISTRATION');
+        const [c, d] = await Promise.all([commit, desk]);
+        const lines = await sql<{ session_id: string }>(`select r.session_id from registration r join session_offer_item i on i.id = r.offer_item_id
+          where r.student_id = $1 and r.board_series_id = $2 and i.label = 'P1' and r.status not in ('expired', 'dropped', 'rejected')`, [studentId, series]);
+        expect(lines).toEqual([{ session_id: sess }]);
         expect(c.status).toBe(200);
-        const failed = (await one<{ error: string }>(`select error from import_row where batch_id = $1`, [id])).error;
-        expect(failed).toMatch(sentence);
+        expect(d.status).toBe(409);
+        expect(((await d.json()) as { error: string }).error).toMatch(/is already reserved in Pearson Edexcel November \d{4} \(.+\) \(.+\): the board takes one entry$/);
+      } finally {
+        await pause.releaseAll();
       }
       await apiResponse(adm.api.v1.sessions[':id'].close.$post({ param: { id: other }, json: { reason: 'import race done' } }));
     });

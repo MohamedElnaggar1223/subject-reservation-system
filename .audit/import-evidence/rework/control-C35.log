@@ -1,0 +1,11 @@
+# C35: s9: a line with no confirmation on the sheet is an error (consent_missing)
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (53 tests | 1 failed) 10693ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line whose family's confirmation is not on the sheet is an error: the import records the sheet's confirmation as the consent 68ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 52 passed (53)
+   Duration  12.50s (transform 677ms, setup 2ms, collect 264ms, tests 10.69s, environment 0ms, prepare 33ms)
+ ❯ test/08n-import.test.ts:931:68
+
+# failures (messages)

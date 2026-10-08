@@ -1,0 +1,13 @@
+# C26: flag 3: a line's fixes and decision carried from earlier files whatever their bytes (by what the line says)
+# undone in apps/api/src/services/import.services.ts
+# summary
+ ❯ test/08n-import.test.ts (53 tests | 2 failed) 11160ms
+   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 48ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 31ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 51 passed (53)
+   Duration  13.82s (transform 784ms, setup 3ms, collect 329ms, tests 11.16s, environment 0ms, prepare 46ms)
+ ❯ test/08n-import.test.ts:488:41
+ ❯ test/08n-import.test.ts:1044:53
+
+# failures (messages)

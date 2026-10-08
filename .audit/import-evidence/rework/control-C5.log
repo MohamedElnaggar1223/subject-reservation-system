@@ -1,0 +1,33 @@
+# C5: the coordinator may not map a series to a session (re-run on the new base)
+# undone in apps/api/src/services/import.services.ts
+# summary
+ ❯ test/08n-import.test.ts (53 tests | 12 failed) 9331ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the coordinator's pending answers are mapping settings: carry forward read as an AS result 37ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > commit: every family in its own transaction, exactly what the review showed 124ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the accounts: exactly the reviewed people, with their cohort, phones normalised, no password (they set one), linked 2ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > an imported parent signs in once they set a password through "Forgot password" (the link goes to their email) 73ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > sections, enrolments, history and money history: each traceable to its line 1ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the import is committed: nothing more changes it 1ms
+   × F7: the day-one import > a re-run of the same file changes nothing > staged again, it carries the review over and finds everything already there 51ms
+   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 45ms
+   × F7: the day-one import > a re-run of the same file changes nothing > a child under a new email who is already an account in the system holds the family until staff say which 33ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > recorded on the students as history; no payment, receipt or balance moves; the same file again adds nothing 26ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 27ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the list of imports: every file, its state and its counts 5ms
+ Test Files  1 failed (1)
+      Tests  12 failed | 41 passed (53)
+   Duration  11.14s (transform 686ms, setup 3ms, collect 286ms, tests 9.33s, environment 0ms, prepare 40ms)
+ ❯ test/08n-import.test.ts:311:130
+ ❯ test/08n-import.test.ts:326:19
+ ❯ test/08n-import.test.ts:345:41
+ ❯ test/08n-import.test.ts:382:30
+ ❯ test/08n-import.test.ts:393:76
+ ❯ test/08n-import.test.ts:443:117
+ ❯ test/08n-import.test.ts:460:67
+ ❯ test/08n-import.test.ts:496:25
+ ❯ test/08n-import.test.ts:513:70
+ ❯ test/08n-import.test.ts:1016:58
+ ❯ test/08n-import.test.ts:1044:53
+ ❯ test/08n-import.test.ts:1165:21
+
+# failures (messages)
