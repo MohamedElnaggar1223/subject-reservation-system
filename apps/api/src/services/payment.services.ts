@@ -531,6 +531,7 @@ export async function confirmPayment(
             boardSeriesId: registration.boardSeriesId,
             attempt: registration.attempt,
             priorSittingSeriesId: registration.priorSittingSeriesId,
+            declarationRejected: registration.declarationRejected,
             price: registration.priceAtRegistration,
           })
           .from(registration)
@@ -782,7 +783,7 @@ async function failOpenPayment(
     const expired: { id: string; studentId: string; subjectId: string; sessionId: string }[] = [];
     if (opts.expireIfClosed) {
       const regs = await tx
-        .select({ id: registration.id, sessionId: registration.sessionId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId })
+        .select({ id: registration.id, sessionId: registration.sessionId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt, priorSittingSeriesId: registration.priorSittingSeriesId, declarationRejected: registration.declarationRejected })
         .from(paymentRegistration)
         .innerJoin(registration, eq(registration.id, paymentRegistration.registrationId))
         .where(and(eq(paymentRegistration.paymentId, paymentId), eq(registration.status, 'pending_payment')));

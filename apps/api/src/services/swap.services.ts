@@ -61,7 +61,7 @@ import type {
 import { creditEscrow, getEscrowBalance } from './escrow.services';
 import { refundPercentage } from './refund.services';
 import { executeReceiptGatedDrop, lockReceiptOf } from './receipt.services';
-import { priceLine } from './pricing.services';
+import { priceLine, PRICE_CHANGED_REFUSAL } from './pricing.services';
 import { resolveItem, availabilityConstraints } from './offer.services';
 import { reserveLines, inheritConsents, writeConsents } from './reservation.services';
 import { effectiveDeadlineFor } from './deadline.services';
@@ -159,6 +159,8 @@ async function makeSwapLine(
 }
 
 const SWAP_CONSENT_NEEDED = 'Tick the refund policy and the declaration for the new subject: the subject being dropped was registered before the school recorded them';
+/** The parent's approval of a swap whose new line is priced otherwise than the request showed. */
+export const SWAP_PRICE_CHANGED = 'The price of the subject to swap to has changed since the swap was asked for: ask for the swap again to see the new price';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -182,7 +184,7 @@ function round2(n: number): number {
  */
 async function assertBeforeLineDeadline(
   executor: Parameters<typeof effectiveDeadlineFor>[0],
-  line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null; studentId: string },
+  line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null; declarationRejected: boolean | null; studentId: string },
 ) {
   const deadline = await effectiveDeadlineFor(executor, line);
   if (deadline.at && deadline.at <= new Date()) {
@@ -487,11 +489,13 @@ export async function approveChangeRequest(
     // Priced now, the way a fresh reservation made now would be; the quote on the request
     // (priceAtRequest) is what the parent was shown. Its series, its rules and whether the item
     // is already held are checked when the line is made (reserveLines).
-    // The parent approves the price the request showed (priceAtRequest): the line is made at it or
-    // refused with PRICE_CHANGED_REFUSAL under its locks (reserveLines), as the checkout does.
+    // A request made since step B (it names its line, new_line) showed the parent a price for that
+    // exact line: approval makes it at that price or is refused (SWAP_PRICE_CHANGED), compared
+    // under the line's locks (reserveLines), as the checkout does. A request from before step B
+    // priced the subject, not this line: it is made at today's price, as approval always did.
     const asked = await storedSwapLine(cr, cr.registration.sessionId);
     swap = await swapQuote(cr.registration.studentId, cr.registration.sessionId,
-      cr.priceAtRequest != null ? { ...asked, expectedPrice: Number(cr.priceAtRequest) } : asked);
+      cr.newLine && cr.priceAtRequest != null ? { ...asked, expectedPrice: Number(cr.priceAtRequest) } : asked);
   }
 
   const now = new Date();
@@ -548,6 +552,9 @@ export async function approveChangeRequest(
         studentId: cr.registration.studentId, sessionId: cr.registration.sessionId, line: swap.line, fromRegistrationId: cr.registrationId,
         requestedBy: cr.registration.studentId, approvedBy: parentId, approvedAt: now,
         approvalComments: `Swap from registration ${cr.registrationId}`, eligibility, consentBy: cr.requestedBy, consentAt: cr.createdAt,
+      }).catch((err: unknown) => {
+        if (err instanceof Error && err.message === PRICE_CHANGED_REFUSAL) throw new Error(SWAP_PRICE_CHANGED);
+        throw err;
       });
       newRegistrationId = made.id;
     }

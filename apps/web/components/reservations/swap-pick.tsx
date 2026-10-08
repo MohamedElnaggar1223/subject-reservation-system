@@ -13,10 +13,8 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { InferRequestType } from 'hono/client';
 import { api } from '~/lib/hono';
-import { refundConsentText, DECLARATION_TEXT } from '@repo/validations';
-import { fetchReserveOffers, reserveOffersKey, useRefundTerms, type fetchRefundTerms } from './reserve';
-
-type RefundTerms = Awaited<ReturnType<typeof fetchRefundTerms>>['terms'];
+import { DECLARATION_TEXT } from '@repo/validations';
+import { fetchReserveOffers, reserveOffersKey, useRefundTerms, RefundTermsSentence, type RefundTermsState } from './reserve';
 
 type SwapLine = InferRequestType<(typeof api.v1.registrations)[':id']['swap']['$post']>['json']['line'];
 
@@ -53,12 +51,12 @@ export function useSwapChoices(sessionId: string, studentId: string, currentItem
 }
 
 /** The family's two ticks, shown when the dropped line has no consent to give (converted from before the rework). */
-export function SwapConsent({ terms, value, onChange }: { terms: RefundTerms | null; value: { refund: boolean; decl: boolean }; onChange: (v: { refund: boolean; decl: boolean }) => void }) {
+export function SwapConsent({ terms, value, onChange }: { terms: RefundTermsState; value: { refund: boolean; decl: boolean }; onChange: (v: { refund: boolean; decl: boolean }) => void }) {
   return (
     <div className="space-y-2 rounded-lg border border-border p-3 text-sm">
       <label className="flex items-start gap-2">
-        <input type="checkbox" className="mt-0.5 h-4 w-4" checked={value.refund} onChange={(e) => onChange({ ...value, refund: e.target.checked })} />
-        <span>{refundConsentText(terms)}</span>
+        <input type="checkbox" className="mt-0.5 h-4 w-4" checked={value.refund} disabled={!terms.ready} onChange={(e) => onChange({ ...value, refund: e.target.checked })} />
+        <RefundTermsSentence state={terms} />
       </label>
       <label className="flex items-start gap-2">
         <input type="checkbox" className="mt-0.5 h-4 w-4" checked={value.decl} onChange={(e) => onChange({ ...value, decl: e.target.checked })} />

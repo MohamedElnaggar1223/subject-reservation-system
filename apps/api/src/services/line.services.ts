@@ -116,7 +116,8 @@ export async function insertLines(tx: Tx, input: InsertLinesInput) {
     const it = byId.get(l.offerItemId);
     if (!it || it.item.sessionId !== input.sessionId) throw new LineError('That item is not on offer in this session', 404);
     if (!it.item.boardSeriesId) throw new LineError(`${it.subjectName} is entered in no board series: it cannot be reserved`);
-    const d = await effectiveDeadlineFor(tx, { boardSeriesId: it.item.boardSeriesId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId ?? null, studentId: input.studentId });
+    // A line being made has no answer to a declaration yet (declarationRejected false).
+    const d = await effectiveDeadlineFor(tx, { boardSeriesId: it.item.boardSeriesId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId ?? null, declarationRejected: false, studentId: input.studentId });
     if (!d.at) {
       throw new LineError(`${it.subjectName} is entered in a board series with no entry deadline and no exam dates yet: it opens for reservations once they are set`);
     }

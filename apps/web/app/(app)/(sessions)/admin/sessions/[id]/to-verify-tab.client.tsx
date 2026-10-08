@@ -18,7 +18,7 @@ import type { InferRequestType } from 'hono/client';
 import { api } from '~/lib/hono';
 import { apiResponse, FINANCE_ROLES, hasRole, ROLES } from '@repo/validations';
 import { Button } from '~/components/ui/button';
-import { Badge } from '~/components/ui/tone';
+import { Badge, Notice } from '~/components/ui/tone';
 import { ErrorState, LoadingState, EmptyState } from '~/components/ui/query-state';
 import { Money, Day, Modal, Field, INPUT_CLASS, TEXTAREA_CLASS, ErrorLine, errorText, type SessionDetail } from '../sessions-shared';
 
@@ -154,7 +154,9 @@ function AnswerModal({ row, outcome, finance, sessionId, onClose }: { row: Row; 
         <p className="text-sm text-foreground">
           <bdi data-i18n-skip="true">{row.student.name}</bdi> · <bdi data-i18n-skip="true">{row.line.subject}</bdi> · <bdi data-i18n-skip="true">{row.sitting?.name ?? ''}</bdi>
         </p>
-        <p className={`rounded-lg px-3 py-2 text-sm ${refusedWhileOpen ? 'bg-amber-50 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300' : 'bg-muted text-muted-foreground'}`}>{effect}</p>
+        {refusedWhileOpen
+          ? <Notice tone="warning">{effect}</Notice>
+          : <p className="rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">{effect}</p>}
         {outcome === 'verified' && row.line.carriesForward && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Previous centre (another centre only)" htmlFor="prev-centre">

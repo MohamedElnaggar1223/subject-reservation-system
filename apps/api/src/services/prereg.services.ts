@@ -278,7 +278,7 @@ export async function capturePreregistrationsForSession(sessionId: string): Prom
   const preregs = await db.query.registration.findMany({
     where: (r, { eq, and }) =>
       and(eq(r.sessionId, sessionId), eq(r.status, 'preregistered')),
-    columns: { id: true, studentId: true, subjectId: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true },
+    columns: { id: true, studentId: true, subjectId: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true, declarationRejected: true },
   });
 
   let captured = 0;

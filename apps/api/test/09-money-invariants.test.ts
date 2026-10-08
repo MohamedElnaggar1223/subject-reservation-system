@@ -646,15 +646,19 @@ describe('money invariants over the whole database', () => {
     `);
     expect(rows).toEqual([]);
     // Standing rejected: paid (confirmed, a paid preregistration), since dropped through the receipt
-    // gate, or paid when rejected and its payment reversed after (a reversal undoes the payment, not
-    // the answer: 08t's reversal race).
+    // gate, or paid when rejected (a payment confirmed before the answer) and that payment reversed
+    // after it — a reversal undoes the payment, not the answer (08t's reversal race) — the line then
+    // waiting for payment again, or expired at its deadline since.
     const standing = await sql(`
       select r.id, r.status from registration r
       where r.declaration_rejected
         and not (r.status in ('confirmed', 'dropped', 'dropped_pending_receipt')
           or (r.status = 'preregistered' and exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed'))
-          or exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id
-                     where pr.registration_id = r.id and p.status = 'refunded' and p.reversed_at is not null and p.reversed_at >= r.prior_sitting_verified_at))
+          or (r.status in ('pending_payment', 'expired')
+              and exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id
+                          where pr.registration_id = r.id and p.status = 'refunded'
+                            and p.confirmed_at is not null and p.confirmed_at <= r.prior_sitting_verified_at
+                            and p.reversed_at is not null and p.reversed_at >= r.prior_sitting_verified_at)))
     `);
     expect(standing).toEqual([]);
     // An expiry or a system drop on a declared sitting followed from it: rejected, or unverified under hold.

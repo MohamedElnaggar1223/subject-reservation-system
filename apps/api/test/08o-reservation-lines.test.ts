@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { apiResponse, academicYearStartOf, PRICE_POLICY_KEYS } from '@repo/validations';
 import { admin, staff, onboard, subject, refused, one, sql, audited, money, notified, runPaymentDeadlines, CONSENT, type Client } from './helpers';
 
@@ -402,6 +402,79 @@ describe('08o: reservation lines (step B)', () => {
     expect(new Date(row!.d).getTime()).toBe(entry);
   });
 
+  it('a paid preregistration whose declaration was rejected, captured between the entry and retake deadlines: refunded in full, not confirmed (MO-21)', async () => {
+    // A session not open yet, its own Cambridge June series (entry deadline, then a later retake deadline).
+    const camP = await mkSeries('cambridge', 'june', Y + 1, `o08pr-${RUN}`, { entryDeadline: at(100), retakeDeadline: at(110) });
+    await fee(camP, bio, 9200);
+    const draft = (await apiResponse(adm.api.v1.sessions.$post({ json: {
+      type: 'june', year: Y + 1, label: `o08pr-${RUN}`, startDate: at(30).toISOString(), endDate: at(120).toISOString(),
+      courseStartsOn: cairoDate(at(30)), paymentDueAt: at(90).toISOString(),
+    } })))!.id;
+    const bioDraft = await offerOne(draft, bio, 14000, camP, [teacherA]);
+    const f = await onboard(officer, `o08-prerej-${RUN}`, 11);
+    // A declared retake of November (Cambridge's sitting before June): it runs to the retake deadline.
+    const [pre] = await apiResponse(f.parent.api.v1.registrations.preregister.$post({ json: {
+      sessionId: draft, studentId: f.studentId, lines: [retake(bioDraft, { mode: 'self_study', priorSitting: { month: 'november', year: Y } })], consent: CONSENT,
+    } }));
+    const id = pre!.id;
+    const pay = await apiResponse(f.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [id], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
+    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay.id! }, json: { instrumentUsed: 'cash' } }));
+    const price = Number((await lineOf(id)).price);
+    expect(await escrowOf(f.studentId)).toMatchObject({ held: price });
+    // Rejected while paid and held: it stands as a first entry.
+    expect(await apiResponse(verify(coordinator, id, { outcome: 'rejected', reason: 'no November result for this candidate' })))
+      .toMatchObject({ outcome: 'rejected', effect: 'stands' });
+    // The entry deadline passes, the retake deadline is still ahead; the session opens and capture runs.
+    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [camP]);
+    await sql(`update registration_session set status = 'active', start_date = now() - interval '1 day' where id = $1`, [draft]);
+    const { capturePreregistrationsForSession } = await import('../src/services/prereg.services');
+    const run = await capturePreregistrationsForSession(draft);
+    // A first entry past its deadline is never entered: the held money goes back in full.
+    expect(run).toMatchObject({ captured: 0, refundedAtDeadline: 1 });
+    expect((await lineOf(id)).status).toBe('dropped');
+    expect(await escrowOf(f.studentId)).toMatchObject({ held: 0 });
+    expect(money((await one<{ s: string }>(`select coalesce(sum(amount), 0) as s from escrow_transaction where related_registration_id = $1 and type = 'credit'`, [id])).s)).toBe(price);
+  });
+
+  it("the deadline sweeps read a rejected declaration as a first entry: a reverted waiting line expires, a held preregistration is refunded, at the entry deadline", async () => {
+    // Its own series: an entry deadline, then a later retake deadline.
+    const camS = await mkSeries('cambridge', 'june', Y + 1, `o08sw-${RUN}`, { entryDeadline: at(30), retakeDeadline: at(35) });
+    await fee(camS, bio, 9200);
+    const open = await mkSession('june', Y + 1, `o08sw-${RUN}`);
+    const bioOpen = await offerOne(open, bio, 14000, camS, [teacherA]);
+    const declared = retake(bioOpen, { mode: 'self_study', priorSitting: { month: 'november', year: Y } });
+    // A waiting line with the flag: paid at the desk, rejected (it stands), then its payment reversed.
+    const f = await onboard(officer, `o08-swp-${RUN}`, 11);
+    const desk = await apiResponse(deskCollect(f.studentId, open, [declared]));
+    const id = desk.registrations[0]!.id;
+    await apiResponse(verify(coordinator, id, { outcome: 'rejected', reason: 'no November result for this candidate' }));
+    await apiResponse(finadmin.api.v1.payments[':id'].reverse.$post({ param: { id: desk.payments[0]!.id }, json: { reason: 'confirmed by mistake', moneyReturned: true } }));
+    expect(await lineOf(id)).toMatchObject({ status: 'pending_payment', declaration_rejected: true });
+    // A held preregistration with the flag, in a session not open yet, in the same series.
+    const draft = (await apiResponse(adm.api.v1.sessions.$post({ json: {
+      type: 'june', year: Y + 1, label: `o08swd-${RUN}`, startDate: at(60).toISOString(), endDate: at(120).toISOString(),
+      courseStartsOn: cairoDate(at(60)), paymentDueAt: at(90).toISOString(),
+    } })))!.id;
+    const bioDraft = await offerOne(draft, bio, 14000, camS, [teacherA]);
+    const g = await onboard(officer, `o08-swh-${RUN}`, 11);
+    const [pre] = await apiResponse(g.parent.api.v1.registrations.preregister.$post({ json: { sessionId: draft, studentId: g.studentId, lines: [retake(bioDraft, { mode: 'self_study', priorSitting: { month: 'november', year: Y } })], consent: CONSENT } }));
+    const prePay = await apiResponse(g.parent.api.v1.payments.initiate.$post({ json: { registrationIds: [pre!.id], paymentMethod: 'in_school', escrowAmountToApply: 0 } }));
+    await apiResponse(officer.api.v1.payments[':id'].confirm.$post({ param: { id: prePay.id! }, json: { instrumentUsed: 'cash' } }));
+    await apiResponse(verify(coordinator, pre!.id, { outcome: 'rejected', reason: 'no November result for this candidate' }));
+    expect(await lineOf(pre!.id)).toMatchObject({ status: 'preregistered', declaration_rejected: true });
+    const prePrice = Number((await lineOf(pre!.id)).price);
+    // The entry deadline passes; the retake deadline is still ahead.
+    await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [camS]);
+    await runPaymentDeadlines();
+    expect(await lineOf(id)).toMatchObject({ status: 'expired' });
+    expect(await expiryOf(id)).toEqual({ status: 'expired', reason: 'entry_deadline' });
+    const { refundPreregistrationsAtDeadline } = await import('../src/services/prereg.services');
+    await refundPreregistrationsAtDeadline(draft, camS);
+    expect((await lineOf(pre!.id)).status).toBe('dropped');
+    expect(await escrowOf(g.studentId)).toMatchObject({ held: 0 });
+    expect(money((await one<{ s: string }>(`select coalesce(sum(amount), 0) as s from escrow_transaction where related_registration_id = $1 and type = 'credit'`, [pre!.id])).s)).toBe(prePrice);
+  });
+
   it("rejected on a paid line after the first-entry deadline: dropped through the receipt-gated drop with today's refund", async () => {
     const f = await onboard(officer, `o08-rejl-${RUN}`, 11);
     // A retake of November (Cambridge's latest sitting before June) runs to the retake deadline.
@@ -413,10 +486,11 @@ describe('08o: reservation lines (step B)', () => {
     await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [camL]);
     const before = await escrowOf(f.studentId);
     const r = await apiResponse(verify(coordinator, id, { outcome: 'rejected', reason: 'the sitting was another candidate' }));
-    // The paper is out: the refund (the session's window, 50% of 16,200) waits for it to come back.
-    expect(r).toMatchObject({ outcome: 'rejected', effect: 'dropped', gated: true, refundAmount: 8100, refundPercentage: 50 });
+    // The paper is out: the refund waits for it to come back — the window's 50% of the course part
+    // (16,200 − 9,200 = 7,000: 3,500) and the board fee in full, not sent (9,200): 12,700.
+    expect(r).toMatchObject({ outcome: 'rejected', effect: 'dropped', gated: true, refundAmount: 12700, refundPercentage: 50 });
     expect(await lineOf(id)).toMatchObject({ status: 'dropped_pending_receipt', outcome: 'rejected', declaration_rejected: false });
-    expect(await one(`select status, refund_amount_on_return as amount from receipt where id = $1`, [rc.id])).toEqual({ status: 'return_required', amount: '8100.00' });
+    expect(await one(`select status, refund_amount_on_return as amount from receipt where id = $1`, [rc.id])).toEqual({ status: 'return_required', amount: '12700.00' });
     // Its own deadline (the retake deadline) has not passed: the board fee is not sent yet, so the
     // window's percentage applies to the whole price (the case below keeps a sent board fee).
     expect(await one(`select new_data->>'boardSent' as sent, new_data->>'boardFeeKept' as kept from audit_log where action = 'PRIOR_SITTING_REJECTED' and entity_id = $1`, [id]))
@@ -424,7 +498,7 @@ describe('08o: reservation lines (step B)', () => {
     expect(await escrowOf(f.studentId)).toEqual(before);
     await apiResponse(officer.api.v1.receipts[':id'].return.$post({ param: { id: rc.id }, json: {} }));
     expect(await lineOf(id)).toMatchObject({ status: 'dropped' });
-    expect(await escrowOf(f.studentId)).toEqual({ free: money(before.free + 8100), held: before.held });
+    expect(await escrowOf(f.studentId)).toEqual({ free: money(before.free + 12700), held: before.held });
     const [n] = await notified(f.parent.email, 'DECLARATION_REVIEWED', 1);
     expect(n!.body).toContain("the board's first-entry deadline has passed");
   });
@@ -489,9 +563,10 @@ describe('08o: reservation lines (step B)', () => {
     expect(await lineOf(w!.id)).toMatchObject({ status: 'expired', outcome: null });
     expect(await expiryOf(w!.id)).toEqual({ status: 'expired', reason: 'hold_unverified' });
     expect(await lineOf(p)).toMatchObject({ status: 'dropped' });
-    expect(await escrowOf(paid.studentId)).toEqual({ free: money(before.free + 8100), held: before.held });
+    // Held, never entered: 50% of the course part (3,500) and the board fee in full (9,200).
+    expect(await escrowOf(paid.studentId)).toEqual({ free: money(before.free + 12700), held: before.held });
     expect((await one<{ n: Record<string, unknown> }>(`select new_data as n from audit_log where entity_id = $1 and action = 'LINE_DROPPED_UNVERIFIED'`, [p])).n)
-      .toMatchObject({ status: 'dropped', refundAmount: 8100, refundPercentage: 50, gated: false, setting: 'hold' });
+      .toMatchObject({ status: 'dropped', refundAmount: 12700, refundPercentage: 50, gated: false, setting: 'hold' });
     // A first entry waiting at the deadline: the deadline's own expiry, as always.
     expect(await expiryOf(pl!.id)).toEqual({ status: 'expired', reason: 'entry_deadline' });
     await notified(paid.parent.email, 'DECLARATION_REVIEWED', 1);
@@ -570,14 +645,26 @@ describe('08o: reservation lines (step B)', () => {
       param: { id: hd.registrations[0]!.id }, json: { line: first(bioItem, { teacherId: teacherB }), reason: 'prefers Biology this year' },
     }));
     expect(Number(hcr.priceAtRequest)).toBe(23200);
+    // A request from before step B (no new_line: it priced the subject, not a line) approved at the
+    // same moment: made at today's price, as approval always did.
+    const k = await onboard(officer, `o08-swapo-${RUN}`, 11);
+    const kd = await apiResponse(deskCollect(k.studentId, june, [first(matItem)]));
+    const kcr = await apiResponse(k.student.api.v1.registrations[':id']['request-swap'].$post({
+      param: { id: kd.registrations[0]!.id }, json: { line: first(bioItem, { teacherId: teacherB }), reason: 'prefers Biology this year' },
+    }));
+    await sql(`update change_request set new_line = null where id = $1`, [kcr.id]);
     await sql(`update board_fee set amount = amount + 100 where board_series_id = $1 and key_id = $2`, [camJ, bio]);
     try {
-      const { PRICE_CHANGED_REFUSAL } = await import('../src/services/pricing.services');
+      const { SWAP_PRICE_CHANGED } = await import('../src/services/swap.services');
       expect(await refused(h.parent.api.v1['change-requests'][':id'].approve.$put({ param: { id: hcr.id }, json: {} })))
-        .toMatchObject({ error: PRICE_CHANGED_REFUSAL });
+        .toMatchObject({ error: SWAP_PRICE_CHANGED });
       expect(await one(`select status from change_request where id = $1`, [hcr.id])).toEqual({ status: 'pending_approval' });
       expect((await lineOf(hd.registrations[0]!.id)).status).toBe('confirmed');
       expect(await sql(`select 1 from registration where student_id = $1 and offer_item_id = $2`, [h.studentId, bioItem])).toEqual([]);
+      // The old request is approved, its line made at today's price (23,300).
+      expect(await apiResponse(k.parent.api.v1['change-requests'][':id'].approve.$put({ param: { id: kcr.id }, json: {} }))).toMatchObject({ success: true, type: 'swap' });
+      const [kl] = await sql<{ price: string }>(`select price_at_registration as price from registration where student_id = $1 and offer_item_id = $2`, [k.studentId, bioItem]);
+      expect(money(kl!.price)).toBe(23300);
     } finally {
       await sql(`update board_fee set amount = amount - 100 where board_series_id = $1 and key_id = $2`, [camJ, bio]);
     }
@@ -642,6 +729,41 @@ describe('08o: reservation lines (step B)', () => {
     expect(await refused(g.parent.api.v1.registrations[':id'].teacher.$put({ param: { id: m!.id }, json: { teacherId: null, reason: 'no preference please' } }))).toMatchObject({ status: 403 });
     expect(await refused(coordinator.api.v1.registrations[':id'].teacher.$put({ param: { id: m!.id }, json: { teacherId: null, reason: 'no preference please' } })))
       .toEqual({ status: 409, error: `Mathematics (08o ${RUN}) has one teacher this cycle: "no preference" is for a subject with several` });
+  });
+
+  it("the teacher change asks the self-study gate as the line rules do: a rejected declaration is a first entry; a one-shot exception is locked and used once", async () => {
+    const { lineExceptions } = await import('../src/services/line-exceptions');
+    // A retake whose declaration was rejected while paid stands as a first entry: not moved to self-study by staff.
+    const f = await onboard(officer, `o08-tgate-${RUN}`, 11);
+    const desk = await apiResponse(deskCollect(f.studentId, june, [retake(bioItem, { teacherId: teacherA, priorSitting: { month: 'november', year: Y - 1 } })]));
+    const id = desk.registrations[0]!.id;
+    await apiResponse(verify(coordinator, id, { outcome: 'rejected', reason: 'no result for this candidate' }));
+    expect(await lineOf(id)).toMatchObject({ status: 'confirmed', declaration_rejected: true, mode: 'in_school' });
+    const toSelfStudy = (lineId: string) => coordinator.api.v1.registrations[':id'].teacher.$put({ param: { id: lineId }, json: { teacherId: null, mode: 'self_study', reason: 'studies alone from now' } });
+    expect(await refused(toSelfStudy(id)))
+      .toEqual({ status: 409, error: `Biology (08o ${RUN}) is a first entry the school teaches: it is taken in school unless the student holds the self-study exception` });
+    // With a one-shot gate exception (the registry is C's; the adapter is stood in for here): it is
+    // asked FOR UPDATE, the change goes through, and the exception is marked used — once.
+    const grant = { id: `test-gate-${f.studentId}`, policyKey: 'gate.selfStudyFirstEntry' as const, value: null, valueDate: null, oneShot: true, scope: {} };
+    const used: string[] = [];
+    const original = lineExceptions.active;
+    const asked: (string | undefined)[] = [];
+    const active = vi.spyOn(lineExceptions, 'active').mockImplementation(async (executor, studentId, keys, scope, opts) => {
+      const own = await original.call(lineExceptions, executor, studentId, keys, scope, opts);
+      if (studentId !== f.studentId || !keys.includes('gate.selfStudyFirstEntry')) return own;
+      asked.push(opts?.lock);
+      return used.includes(grant.id) ? own : [grant, ...own];
+    });
+    const markUsed = vi.spyOn(lineExceptions, 'markUsed').mockImplementation(async (_tx, ids) => { used.push(...ids); });
+    try {
+      expect(await apiResponse(toSelfStudy(id))).toMatchObject({ mode: 'self_study', teacherId: null, repriced: false });
+      expect(asked).toEqual(['update']);
+      expect(used).toEqual([grant.id]);
+      expect(markUsed).toHaveBeenCalledTimes(1);
+    } finally {
+      active.mockRestore();
+      markUsed.mockRestore();
+    }
   });
 
   // ─── The desk (§4.3) ───────────────────────────────────────────────────────

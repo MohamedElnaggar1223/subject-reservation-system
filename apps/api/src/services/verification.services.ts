@@ -52,6 +52,7 @@ export class VerificationError extends Error {
 }
 
 const DECLARED = ['declared_by_family', 'declared_by_desk'] as const;
+export const PAID_MEANWHILE = 'This line was paid while the answer was being given: open it again and answer again';
 const WAITING = ['pending_approval', 'pending_payment', 'preregistered'] as const;
 const OPEN = ['pending', 'pending_verification'] as const;
 
@@ -76,7 +77,7 @@ export async function listToVerify(sessionId: string, show: 'awaiting' | 'decide
       ps.id as "priorSeriesId", ps.board_code as "priorBoard", ps.month as "priorMonth", ps.year as "priorYear", ps.label as "priorLabel", pb.name as "priorBoardName",
       ru.name as "declaredBy", ru.role as "declaredByRole",
       line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) as deadline,
-      line_effective_deadline('first', null, r.board_series_id) as "firstEntryDeadline",
+      r.board_series_id as "boardSeriesId", r.prior_sitting_series_id as "priorSittingSeriesId",
       exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status = 'completed') as paid,
       exists (select 1 from payment_registration pr join payment p on p.id = pr.payment_id where pr.registration_id = r.id and p.status in ('pending', 'pending_verification')) as "paymentOpen",
       (select sec.name from section_membership m join section sec on sec.id = m.section_id
@@ -96,11 +97,18 @@ export async function listToVerify(sessionId: string, show: 'awaiting' | 'decide
     order by ${decided ? sql`r.prior_sitting_verified_at desc` : sql`deadline asc nulls last`}, u.name, s.name`)
     .then((r) => r.rows as Record<string, unknown>[]);
   const now = Date.now();
-  return {
-    session,
-    show,
-    lines: rows.map((r) => {
-      const deadline = r.deadline ? new Date(r.deadline as string) : null;
+  // Each line's deadlines as effectiveDeadlineFor gives them for its student — a late board entry
+  // granted while the setting is on (Q-20) counts, as it does when the line is answered.
+  const deadlines = await Promise.all(rows.map(async (r) => {
+    const key = { boardSeriesId: (r.boardSeriesId as string | null) ?? null, studentId: r.studentId as string };
+    const [own, first] = await Promise.all([
+      effectiveDeadlineFor(db, { ...key, attempt: r.attempt as string, priorSittingSeriesId: (r.priorSittingSeriesId as string | null) ?? null, declarationRejected: Boolean(r.declarationRejected) }),
+      effectiveDeadlineFor(db, { ...key, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false }),
+    ]);
+    return { own: own.at, first: first.at };
+  }));
+  const lines = rows.map((r, i) => {
+      const deadline = deadlines[i]!.own;
       return {
         id: r.id as string,
         status: r.status as string,
@@ -120,14 +128,16 @@ export async function listToVerify(sessionId: string, show: 'awaiting' | 'decide
         deadline,
         daysLeft: deadline ? Math.ceil((deadline.getTime() - now) / 86_400_000) : null,
         // Which answer applies to a paid line: before it the line stands as a first entry, after it is dropped.
-        firstEntryDeadlinePassed: !!r.firstEntryDeadline && new Date(r.firstEntryDeadline as string).getTime() <= now,
+        firstEntryDeadlinePassed: !!deadlines[i]!.first && deadlines[i]!.first!.getTime() <= now,
         outcome: (r.outcome as 'verified' | 'rejected' | null) ?? null,
         decidedAt: r.decidedAt ? new Date(r.decidedAt as string) : null,
         decidedBy: (r.decidedBy as string | null) ?? null,
         declarationRejected: Boolean(r.declarationRejected),
       };
-    }),
-  };
+    });
+  // Most urgent first, by the deadline as computed (awaiting); the latest answers first (decided: the query's order).
+  if (!decided) lines.sort((a, b) => (a.deadline?.getTime() ?? Infinity) - (b.deadline?.getTime() ?? Infinity));
+  return { session, show, lines };
 }
 
 // ─── Telling the family ──────────────────────────────────────────────────────
@@ -248,7 +258,9 @@ export async function verifyPriorSitting(
     // Paid: before the first-entry deadline the line stands (entered as a first entry); after it,
     // it cannot be entered at all (MO-10) and is dropped with the "sent" rule's refund. A paid
     // preregistration stands either way: its series' opening or its deadline's MO-21 refund settles it.
-    const first = await effectiveDeadlineFor(tx, { boardSeriesId: line.boardSeriesId, attempt: 'first', priorSittingSeriesId: null });
+    // A first entry's deadline for this student: a late board entry granted to them counts while
+    // the setting is on (Q-20), as it does for the line's own deadline below.
+    const first = await effectiveDeadlineFor(tx, { boardSeriesId: line.boardSeriesId, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false, studentId: line.studentId });
     const pastFirstEntry = !!first.at && first.at <= now;
     if (!pastFirstEntry || line.status === 'preregistered') {
       await tx.update(registration).set({ ...decided, declarationRejected: true }).where(eq(registration.id, registrationId));
@@ -256,10 +268,14 @@ export async function verifyPriorSitting(
         { outcome: 'rejected', effect: 'stands', declarationRejected: true, priorSittingSeriesId: line.priorSittingSeriesId, ...why }, ctx, tx);
       return { outcome: 'rejected', effect: 'stands' };
     }
+    // Paid while this answer waited for the line: its receipt was made after lockLine looked for
+    // one, so the drop below would take it after the line — against MA-16's order (a reversal of
+    // that payment takes the receipt first). Refused; asked again, the receipt is taken first.
+    if (before.status !== 'confirmed') throw new VerificationError(PAID_MEANWHILE, 409);
     // The board fee follows the per-line "sent" rule (§3.5, §3.9): sent once the line's own
     // effective deadline has passed (F4's mark will say so too). A declared retake of the board's
     // previous sitting runs to the retake deadline, so between the two deadlines it is not sent.
-    const own = await effectiveDeadlineFor(tx, line);
+    const own = await effectiveDeadlineFor(tx, { ...line, studentId: line.studentId });
     const boardSent = !!own.at && own.at <= now;
     const refund = await refundForSystemDrop(line, now, { boardSent });
     const drop = await executeReceiptGatedDrop(tx, {
@@ -315,20 +331,20 @@ export async function holdUnverifiedAtDeadline(now: Date = new Date()) {
   if (!sinceAt) return { expired: 0, dropped: 0 };
   const since = { at: sinceAt };
   const due = await db.execute(sql`
-    select r.id from registration r
+    select r.id, r.status from registration r
     where r.prior_sitting_source in ('declared_by_family', 'declared_by_desk') and r.prior_sitting_verified_outcome is null
       and r.status in ('pending_approval', 'pending_payment', 'confirmed')
       and line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) <= ${now}
       and line_effective_deadline(r.attempt, r.prior_sitting_series_id, r.board_series_id, r.declaration_rejected) > ${since.at}
-    order by r.id`).then((x) => x.rows as { id: string }[]);
+    order by r.id`).then((x) => x.rows as { id: string; status: string }[]);
   let expired = 0;
   let dropped = 0;
-  for (const { id } of due) {
+  for (const { id, status: found } of due) {
     try {
       const done = await db.transaction(async (tx) => {
         const line = await lockLine(tx, id);
         if (!line || line.outcome || !(DECLARED as readonly string[]).includes(line.priorSittingSource ?? '')) return null;
-        const d = await effectiveDeadlineFor(tx, line);
+        const d = await effectiveDeadlineFor(tx, { ...line, studentId: line.studentId });
         if (!d.at || d.at > now || d.at <= since.at) return null;
         if (line.status === 'pending_approval' || line.status === 'pending_payment') {
           if ((await paymentState(tx, id)).open) return null;
@@ -339,6 +355,9 @@ export async function holdUnverifiedAtDeadline(now: Date = new Date()) {
           return { line, effect: 'expired' as const, deadline: d.at };
         }
         if (line.status !== 'confirmed') return null;
+        // Paid since this tick found it waiting: its receipt was made after lockLine looked for one
+        // (MA-16's order); left to the next tick, which takes the receipt first.
+        if (found !== 'confirmed') return null;
         const refund = await refundForSystemDrop(line, now, { boardSent: false });
         const drop = await executeReceiptGatedDrop(tx, { registrationId: id, studentId: line.studentId, refundAmount: refund.amount, refundReason: 'drop', initiatedBy: line.studentId });
         await logAction(null, 'LINE_DROPPED_UNVERIFIED', 'registration', id, { status: 'confirmed' },

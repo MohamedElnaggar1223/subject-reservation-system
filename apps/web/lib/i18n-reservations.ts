@@ -38,6 +38,10 @@ export const reservationsArabic: Record<string, string> = {
   '(payable once confirmed)': '(تُدفع حين تُؤكَّد)',
   'Paid per entry deadline:': 'يُدفع لكل موعد قيد:',
   '(retake deadline)': '(موعد الإعادة)',
+  'The refund terms could not be loaded, so nothing can be reserved yet: reload the page to try again.': 'تعذّر تحميل شروط الاسترداد، فلا يمكن الحجز بعد: أعد تحميل الصفحة للمحاولة مرة أخرى.',
+  'Loading the refund terms…': 'جارٍ تحميل شروط الاسترداد…',
+  'The price of the subject to swap to has changed since the swap was asked for: ask for the swap again to see the new price':
+    'تغيّر سعر المادة المطلوب الاستبدال إليها منذ طلب الاستبدال: اطلب الاستبدال مرة أخرى لترى السعر الجديد',
   'A payment for this line is in progress: a rejection is refused until the Finance Workbench confirms or rejects it.': 'دفعة هذا السطر قيد التنفيذ: يُرفض عدم التأكيد حتى يؤكدها مكتب المالية أو يرفضها.',
   'Not paid: the line ends and the family is told it may reserve a first entry.': 'غير مدفوع: ينتهي السطر وتُبلَّغ الأسرة بأنها تستطيع حجز قيد أول.',
   "Paid and held until the session opens: the line stands as a first entry; its capture or the deadline's refund settles it.": 'مدفوع ومحتجز حتى تُفتح الجلسة: يبقى السطر قيدًا أول؛ ويحسمه تحصيله أو استرداد الموعد.',

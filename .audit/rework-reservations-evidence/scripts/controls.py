@@ -133,6 +133,38 @@ CONTROLS = {
         "${alias}.board_series_id, ${alias}.declaration_rejected)`);",
         "${alias}.board_series_id)`); // CONTROL: the flag not passed",
         ['test/08o-reservation-lines.test.ts'], 'a rejected declaration is a first entry'),
+    'flag-capture': ('apps/api/src/services/prereg.services.ts',
+        "    columns: { id: true, studentId: true, subjectId: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true, declarationRejected: true },",
+        "    columns: { id: true, studentId: true, subjectId: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true }, // CONTROL: the flag not read",
+        ['test/08o-reservation-lines.test.ts'], 'paid preregistration whose declaration'),
+    'flag-sweep': ('apps/api/src/services/payment.services.ts',
+        "          sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}, ${registration.declarationRejected}) <= ${now}`,",
+        "          sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}) <= ${now}`, // CONTROL: the flag not passed",
+        ['test/08o-reservation-lines.test.ts'], 'deadline sweeps read'),
+    'flag-prereg-refund': ('apps/api/src/services/prereg.services.ts',
+        "      sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}, ${registration.declarationRejected}) <= ${now}`,",
+        "      sql`line_effective_deadline(${registration.attempt}, ${registration.priorSittingSeriesId}, ${registration.boardSeriesId}) <= ${now}`, // CONTROL: the flag not passed",
+        ['test/08o-reservation-lines.test.ts'], 'deadline sweeps read'),
+    'refund-not-sent-board': ('apps/api/src/services/reservation.services.ts',
+        "    amount: round2(coursePart + (opts.boardSent ? 0 : boardFee)),",
+        "    amount: round2(opts.boardSent ? coursePart : (line.priceAtRegistration * percentage) / 100), // CONTROL: the window's percentage of the whole price when not sent",
+        ['test/08o-reservation-lines.test.ts'], 'first-entry deadline|unverified at the deadline'),
+    'paid-meanwhile': ('apps/api/src/services/verification.services.ts',
+        "    if (before.status !== 'confirmed') throw new VerificationError(PAID_MEANWHILE, 409);",
+        "    void PAID_MEANWHILE; // CONTROL: the paid-meanwhile refusal undone",
+        ['test/08t-rework-races.test.ts'], 'payment confirmed while a rejection waits'),
+    'swap-old-request': ('apps/api/src/services/swap.services.ts',
+        "      cr.newLine && cr.priceAtRequest != null ? { ...asked, expectedPrice: Number(cr.priceAtRequest) } : asked);",
+        "      cr.priceAtRequest != null ? { ...asked, expectedPrice: Number(cr.priceAtRequest) } : asked); // CONTROL: compared for every request",
+        ['test/08o-reservation-lines.test.ts'], "a swap's new line"),
+    'teacher-gate-lock': ('apps/api/src/services/line-teacher.services.ts',
+        "      }, { lock: 'update' });",
+        "      }, { lock: 'share' }); // CONTROL: read FOR SHARE",
+        ['test/08o-reservation-lines.test.ts'], 'self-study gate'),
+    'teacher-gate-flag': ('apps/api/src/services/line-teacher.services.ts',
+        "    const firstEntry = line.attempt === 'first' || line.declarationRejected;",
+        "    const firstEntry = line.attempt === 'first'; // CONTROL: a rejected declaration read as a retake",
+        ['test/08o-reservation-lines.test.ts'], 'self-study gate'),
     'owing-provisional-desk': ('apps/api/src/services/desk.services.ts',
         "    r.status === 'pending_payment' && (!r.priceProvisional || payOnProvisional);\n",
         "    r.status === 'pending_payment' || payOnProvisional; // CONTROL: the provisional exclusion undone\n",
@@ -163,6 +195,7 @@ def run(name):
                            env=dict(os.environ, TEST_DB_NAME='igcse_rwb_test'), capture_output=True, text=True)
         out = r.stdout + r.stderr
         open(log, 'w').write(out)
+        subprocess.run(['python3', '/tmp/rwb/trim-logs.py', os.path.basename(log)], check=False, capture_output=True)
     finally:
         for full, src in originals.items():
             open(full, 'w').write(src)

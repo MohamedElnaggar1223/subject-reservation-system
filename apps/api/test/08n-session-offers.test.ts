@@ -317,7 +317,7 @@ describe('08n: a winter session, each item cut off at its own deadline (§3.3)',
     const raw = await one<{ entry: string; retake: string }>(`select entry_deadline as entry, retake_deadline as retake from board_series where id = $1`, [camNov]);
     const s = { entry: new Date(raw.entry), retake: new Date(raw.retake) };
     expect(s.retake.getTime()).toBeGreaterThan(s.entry.getTime());
-    const line = { boardSeriesId: camNov, attempt: 'retake', priorSittingSeriesId: camJune };
+    const line = { boardSeriesId: camNov, attempt: 'retake', priorSittingSeriesId: camJune, declarationRejected: false };
     expect(await effectiveDeadlineFor(db, line)).toEqual({ at: s.retake, kind: 'retake' });
     expect(await effectiveDeadlineFor(db, { ...line, declarationRejected: true })).toEqual({ at: s.entry, kind: 'entry' });
     // The rule in SQL: the fourth argument (step B passes the line's declaration_rejected); three arguments read as not rejected.
@@ -1310,10 +1310,10 @@ describe('08n: the reviews of 977848d and 40c1447', () => {
     try {
       // Off (the default): the board's deadline is a hard stop, whatever was granted.
       await expect(reserve(f.studentId, june, [line])).rejects.toThrow(/entry deadline for this series .* has passed/);
-      expect(await effectiveDeadlineFor(db, { boardSeriesId: late, attempt: 'first', priorSittingSeriesId: null, studentId: f.studentId })).toEqual({ at: entry, kind: 'entry' });
+      expect(await effectiveDeadlineFor(db, { boardSeriesId: late, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false, studentId: f.studentId })).toEqual({ at: entry, kind: 'entry' });
       // On: the grant is the student's entry deadline there; another student's stands.
       await setting(true);
-      expect(await effectiveDeadlineFor(db, { boardSeriesId: late, attempt: 'first', priorSittingSeriesId: null, studentId: f.studentId })).toEqual({ at: until, kind: 'entry' });
+      expect(await effectiveDeadlineFor(db, { boardSeriesId: late, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false, studentId: f.studentId })).toEqual({ at: until, kind: 'entry' });
       const listed = await apiResponse(f.parent.api.v1.registrations.offers.$get({ query: { sessionId: june, studentId: f.studentId } }));
       expect(listed!.offers.find((o) => o.subject.id === sub)!.items.find((i) => i.id === item)).toMatchObject({ open: { first: true, retake: true } });
       const [made] = await reserve(f.studentId, june, [line]);

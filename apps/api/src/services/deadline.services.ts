@@ -31,7 +31,7 @@ export type LineDeadlineKey = {
    * Step B's `registration.declaration_rejected`: a retake whose declared sitting the school
    * rejected is a first entry for the board — its deadline is the entry deadline (§3.5).
    */
-  declarationRejected?: boolean | null;
+  declarationRejected: boolean | null;
   /** The line's student: a late board entry granted to them (Q-20) is read when given. */
   studentId?: string | null;
 };
@@ -169,7 +169,7 @@ export async function dueDateFor(executor: Executor, input: DueDateInput): Promi
     .select({
       id: registration.id, studentId: registration.studentId, sessionId: registration.sessionId, subjectId: registration.subjectId,
       offerItemId: registration.offerItemId, boardSeriesId: registration.boardSeriesId, attempt: registration.attempt,
-      priorSittingSeriesId: registration.priorSittingSeriesId, createdAt: registration.createdAt,
+      priorSittingSeriesId: registration.priorSittingSeriesId, declarationRejected: registration.declarationRejected, createdAt: registration.createdAt,
       priceProvisional: registration.priceProvisional, pricingBasis: registration.pricingBasis, paymentDueAt: registrationSession.paymentDueAt,
     })
     .from(registration)

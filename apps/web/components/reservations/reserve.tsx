@@ -58,9 +58,20 @@ export const reserveOffersKey = (sessionId: string, studentId: string) => ['regi
 
 /** The refund terms a reservation in this session freezes at consent: weeks, or a converted session's dates. */
 export const fetchRefundTerms = (sessionId: string) => apiResponse(api.v1.sessions[':id']['refund-terms'].$get({ param: { id: sessionId } }));
-export function useRefundTerms(sessionId: string | null | undefined) {
-  const q = useQuery({ queryKey: ['sessions', sessionId, 'refund-terms'], queryFn: () => fetchRefundTerms(sessionId!), enabled: !!sessionId, retry: false });
-  return q.data?.terms ?? null;
+export type RefundTermsState = { terms: Awaited<ReturnType<typeof fetchRefundTerms>>['terms'] | null; ready: boolean; failed: boolean };
+export function useRefundTerms(sessionId: string | null | undefined): RefundTermsState {
+  const q = useQuery({ queryKey: ['sessions', sessionId, 'refund-terms'], queryFn: () => fetchRefundTerms(sessionId!), enabled: !!sessionId, retry: 1 });
+  return { terms: q.data?.terms ?? null, ready: !!q.data, failed: q.isError };
+}
+
+/**
+ * The refund-policy tick's sentence: the terms the tick freezes once they are read; until then a
+ * loading line, and if they cannot be read, a sentence saying so (the tick and Reserve stay off).
+ */
+export function RefundTermsSentence({ state }: { state: RefundTermsState }) {
+  if (state.ready) return <span>{refundConsentText(state.terms)}</span>;
+  if (state.failed) return <span className="text-destructive">The refund terms could not be loaded, so nothing can be reserved yet: reload the page to try again.</span>;
+  return <span className="text-muted-foreground">Loading the refund terms…</span>;
 }
 
 // ─── Words ───────────────────────────────────────────────────────────────────
@@ -122,6 +133,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
     retry: false,
   });
   const terms = useRefundTerms(desk ? null : sessionId);
+  const termsReady = desk || terms.ready;
   const [picks, setPicks] = useState<Record<string, Pick>>({});
   const [refundTick, setRefundTick] = useState(false);
   const [declTick, setDeclTick] = useState(false);
@@ -204,7 +216,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
     bySeries.set(key, { ...cur, amount: cur.amount + (c.price?.total ?? 0), provisional: cur.provisional || !!c.price?.provisional });
   }
   const consented = desk ? deskTick : refundTick && declTick;
-  const ready = chosen.length > 0 && chosen.every((c) => c.price && !c.missing) && consented;
+  const ready = chosen.length > 0 && chosen.every((c) => c.price && !c.missing) && consented && termsReady;
 
   const linesOut = (): Line[] => chosen.map((c) => {
     const line: Line = { offerItemId: c.it.id, attempt: c.attempt, mode: c.mode, expectedPrice: c.price!.total ?? undefined };
@@ -335,8 +347,8 @@ export function Reserve({ viewer, studentId, sessionId, onDone }: {
           ) : (
             <>
               <label className="flex items-start gap-2">
-                <input type="checkbox" className="mt-0.5 h-4 w-4" checked={refundTick} onChange={(e) => setRefundTick(e.target.checked)} />
-                <span>{refundConsentText(terms)}</span>
+                <input type="checkbox" className="mt-0.5 h-4 w-4" checked={refundTick} disabled={!terms.ready} onChange={(e) => setRefundTick(e.target.checked)} />
+                <RefundTermsSentence state={terms} />
               </label>
               <label className="flex items-start gap-2">
                 <input type="checkbox" className="mt-0.5 h-4 w-4" checked={declTick} onChange={(e) => setDeclTick(e.target.checked)} />

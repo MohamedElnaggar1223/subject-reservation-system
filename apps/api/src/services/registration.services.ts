@@ -54,7 +54,7 @@ import { reserveLines } from './reservation.services';
  * for a line, its own effective deadline decides; for a new reservation (`null`), each new
  * line's deadline is checked when it is made.
  */
-async function assertWindowOpen(studentId: string, sessionId: string, line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null } | null) {
+async function assertWindowOpen(studentId: string, sessionId: string, line: { boardSeriesId: string | null; attempt: string; priorSittingSeriesId: string | null; declarationRejected: boolean | null } | null) {
   const w = await sessionWindow(studentId, sessionId, line);
   if (w.open) return;
   throw new Error(windowRefusal(w));

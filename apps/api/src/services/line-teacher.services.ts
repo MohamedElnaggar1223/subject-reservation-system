@@ -64,16 +64,21 @@ export async function changeLineTeacher(registrationId: string, input: ChangeLin
       throw new LineTeacherError(`${name} is reserved as self-study and priced so: to be taught, drop it and reserve it in school`, 409);
     }
     // A first entry of a subject the school teaches is not taken outside school unless the student
-    // holds the exception (gate.selfStudyFirstEntry, G-09): a staff change is not the exception.
-    if (mode === 'self_study' && line.mode === 'in_school' && line.attempt === 'first'
+    // holds the exception (gate.selfStudyFirstEntry, G-09): a staff change is not the exception. A
+    // retake whose declaration was rejected is a first entry (§3.5). The gate is asked as
+    // assertLineRules asks it: the exception row FOR UPDATE, a one-shot one marked used here.
+    const firstEntry = line.attempt === 'first' || line.declarationRejected;
+    if (mode === 'self_study' && line.mode === 'in_school' && firstEntry
       && !availabilityConstraints(facts.offerAvailability, facts.itemAvailability).selfStudyOnly) {
       const held = await lineExceptions.active(tx, line.studentId, ['gate.selfStudyFirstEntry'], {
-        sessionId: facts.sessionId, subjectId: facts.subjectId, offerId: facts.offerId, offerItemId: facts.itemId,
+        sessionId: facts.sessionId, subjectId: facts.subjectId, offerId: facts.offerId, offerItemId: facts.itemId, registrationId: line.id,
         ...(facts.boardSeriesId ? { boardSeriesId: facts.boardSeriesId } : {}),
-      }, { lock: 'share' });
-      if (!held.length) {
+      }, { lock: 'update' });
+      const grant = held[0];
+      if (!grant) {
         throw new LineTeacherError(`${name} is a first entry the school teaches: it is taken in school unless the student holds the self-study exception`, 409);
       }
+      if (grant.oneShot) await lineExceptions.markUsed(tx, [grant.id], { registrationIds: [line.id], actorId });
     }
     let teacherId: string | null = null;
     if (mode === 'in_school') {

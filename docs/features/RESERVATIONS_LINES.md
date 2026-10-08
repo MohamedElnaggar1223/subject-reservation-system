@@ -118,7 +118,7 @@ while a payment is open.
 | waiting, a payment open | stands | **refused 409**: "A payment for this line is in progress: confirm or reject it in the Finance Workbench first" (08t forces both orders) |
 | paid (confirmed, or a funded preregistration), before the first-entry deadline | stands | **stands** with `declaration_rejected = true` (F4 enters it as a first entry); the family is told; finance decides any price adjustment (C's charge) |
 | a funded preregistration, after that deadline | stands | stands as above: its capture or MO-21's deadline refund settles it |
-| confirmed, after the first-entry deadline | stands | **dropped** through `executeReceiptGatedDrop` (MA-16: the paper receipt comes back before the money moves); the refund from `refundForSystemDrop(line, now, { boardSent })` where `boardSent` is the line's own sent state (its effective deadline passed): sent, the window's percentage of the price less the recorded board fee; not sent (a declared retake of the previous sitting before the retake deadline), of the whole price; `boardSent` and `boardFeeKept` on the audit row |
+| confirmed, after the first-entry deadline | stands | **dropped** through `executeReceiptGatedDrop` (MA-16: the paper receipt comes back before the money moves); the refund from `refundForSystemDrop(line, now, { boardSent })` where `boardSent` is the line's own sent state (its effective deadline passed): the window's percentage of the course part (the price less the recorded board fee), and the board fee in full while it is not sent (a declared retake of the previous sitting before the retake deadline), none once sent; `boardSent` and `boardFeeKept` on the audit row. A line paid while the answer waited for it (its receipt made after the answer looked for one) is refused with "open it again and answer again" rather than dropped with the receipt taken after the line |
 
 ### 3.4 Unverified at the deadline: the setting and the hold step
 
@@ -131,7 +131,11 @@ line as declared, unverified. `hold`: `holdUnverifiedAtDeadline(now)` runs first
   (`hold_unverified`); with a payment open it is left to the deadline sweep that follows on the
   same tick (which fails the payment and expires the line, as at any deadline);
 - a confirmed line → **dropped** through the receipt-gated drop with that day's refund, the
-  board fee counted **not sent** (a held line was never entered), audit `LINE_DROPPED_UNVERIFIED`;
+  board fee counted **not sent** (a held line was never entered: refunded in full, beside the
+  window's percentage of the course part), audit `LINE_DROPPED_UNVERIFIED`; a line found waiting
+  and confirmed by the time it is locked is left to the next tick (its receipt is then taken
+  first) — not reachable through a confirmation, which refuses a line past its deadline (MO-10),
+  so a defence only;
 - only a deadline that passed **while `hold` was in force** counts — from the moment the value
   became `hold` (its latest `SETTING_CHANGED` row to `hold`; the setting row's own time only for
   a row never changed through the settings page): a line whose deadline passed under
@@ -145,12 +149,15 @@ line as declared, unverified. `hold`: `holdUnverifiedAtDeadline(now)` runs first
 ### 3.5 The refund seam
 
 `refundForSystemDrop(line, at, { boardSent })` (reservation.services) is the one place a system
-drop of a declared sitting computes its refund: the design's rule with today's percentage (the
-refund windows', or a custom exception's: `refundPercentage`) until C's `refundFor` merges —
-board fee **sent**: the percentage of `price − registration_fee_at_registration` (the school has
-paid the board); **not sent**: the percentage of the whole price. It returns `boardFeeKept`. C
-replaces the body (the review, 8 Oct, flag 1: before, `boardSent` was ignored and a rejected
-line past its own deadline refunded a board fee the school had already paid).
+drop of a declared sitting computes its refund: the design's rule (RESERVATIONS_REWORK.md §3.10)
+with today's percentage (the refund windows', or a custom exception's: `refundPercentage`) until
+C's `refundFor` merges — the **course part** (`price − registration_fee_at_registration`) by the
+percentage, and the **board fee in full while it is not sent** (none once sent: the school has
+paid the board). It returns `boardFeeKept`. C replaces the body with `refundFor` and the amounts
+must not change then (08o pins them: 12,700 for a not-sent drop and 3,500 for a sent one, on a
+16,200 line with a 9,200 board fee at 50%). History: the first review found `boardSent`
+ignored (a sent board fee refunded); the second found the not-sent case keeping part of a board
+fee the school never paid.
 
 ## 4. The teacher on a line
 
@@ -165,9 +172,11 @@ same moment waits, or is seen), then the line `FOR UPDATE`. Rules, each with its
 - `mode: 'self_study'` takes the teacher off; a self-study line is **not** moved to taught (it was
   priced as self-study: drop it and reserve it in school); a move to self-study is **not**
   re-priced (a refund is finance's own act);
-- a **first entry** of an item the school teaches is not moved to self-study unless the student
-  holds `gate.selfStudyFirstEntry` (G-09): a staff change is not the exception (the review, 8
-  Oct, flag 7); a retake may move;
+- a **first entry** of an item the school teaches — a retake whose declaration was rejected
+  counts as one (§3.5) — is not moved to self-study unless the student holds
+  `gate.selfStudyFirstEntry` (G-09): a staff change is not the exception. The gate is asked as
+  `assertLineRules` asks it: the exception `FOR UPDATE`, a one-shot one marked used (the reviews
+  of 8 Oct, flags 7 and 5); a retake may move;
 - nothing to change → 409;
 - the line keeps its price; `taken_outside_school` follows the mode; audit
   `LINE_TEACHER_CHANGED`;
@@ -230,13 +239,17 @@ reserved (grade 10). "Owes now" (and the family home's owing) leave out a provis
 Child and session pickers (the session preselected when there is one), the school-fee notice
 when the fee is not settled, the `Reserve` card with the two consents (the refund terms the tick
 freezes written out — the session's steps in weeks, or a converted session's windows as dates,
-from `GET /v1/sessions/:id/refund-terms` — and the declaration). A student's reservation is sent to the parent for approval; a parent's
+from `GET /v1/sessions/:id/refund-terms` — and the declaration). While the terms load the tick
+says so and stays off; if they cannot be read it says so, and nothing can be reserved. A student's reservation is sent to the parent for approval; a parent's
 is a direct reservation, or a preregistration when the session has not opened; then **Pay now**
 to the checkout by series. The checkout asks the family's consent for lines the school reserved,
 showing the terms of each line's session (`familyConsentTerms` on the checkout summary). A swap
-the parent approves makes its line at the price the request showed (`priceAtRequest`) or is
-refused with `PRICE_CHANGED_REFUSAL`, as the checkout is; a swap that must ask for consent (the
-dropped line has none to give) shows the same terms.
+asked since step B (it names its line) is approved at the price the request showed
+(`priceAtRequest`) or refused with its own sentence ("The price of the subject to swap to has
+changed since the swap was asked for: ask for the swap again to see the new price", in English
+and Arabic); a request from before step B priced the subject, not a line, and is made at today's
+price, as approval always did. A swap that must ask for consent (the dropped line has none to
+give) shows the same terms, with the same loading and failure states.
 
 ### 6.3 The statement (§4.5)
 
@@ -250,7 +263,8 @@ answered; the Reserve page marks a declared carry-forward the same way.
 **To verify** (coordinator, admin, finance): Awaiting and Answered; Verify (centre and candidate
 number on a carry-forward, reason; the finance desk's evidence) and Not confirmed (reason), each
 saying the one outcome that applies to that line (unpaid; paid and held; paid before or after the
-first-entry deadline), and refusing a rejection while a payment is open. **Money** (A's): a section filter added, the student linked
+first-entry deadline, a granted late entry counted), and refusing a rejection while a payment
+is open (a warning `Notice`). **Money** (A's): a section filter added, the student linked
 to the statement, **Remind** shown disabled ("Reminders arrive with the messages step", D's),
 Export as A built it.
 
@@ -287,7 +301,13 @@ right.
   (escrow asserted in both cases); the statement's outstanding equals the Money tab's unpaid; a
   family's declaration bounded to two years and its series' audit reason; a taught first entry
   not moved to self-study by staff; a swap approved at a changed price refused; hold counting from
-  its change row.
+  its change row. After the second review: a rejected preregistration captured between the
+  deadlines refunded in full; the deadline sweep and the preregistration refund reading the flag;
+  the not-sent refund (12,700) and the sent one (3,500); a swap from before step B approved at
+  today's price beside a new one refused with its own sentence; the teacher change's gate with a
+  rejected declaration and a one-shot exception locked and used once. 08t: a payment confirmed
+  while a rejection waits for the line — the rejection refused ("answer again"), then dropped
+  with the receipt taken first.
 - **08t** (A's file, extended): two desks at once (the loser 409, one consent pair); a declared
   sitting answered while its line is paid — checkout first, rejection first, verified while
   confirmed; a parent's approval of a drop against the coordinator's rejection of the same paid
@@ -322,6 +342,14 @@ right.
   checkout's terms; a taught first entry not moved to self-study; the statement's outstanding; the
   family's two-year bound; hold from its change row; the swap approval's price. The answer's row
   lock was run again on the receipt-first code (02:24Z) so its log matches the row that cites it.
+  After the merge of `main`, 3 for the flag (the statement, `effectiveDeadlinesOf`,
+  `lineDeadlineSql`); after the second review, 8 more, all red: capture's columns, the sweep's and
+  the preregistration refund's conditions, the not-sent board fee, the paid-meanwhile refusal,
+  the old swap's price, the teacher gate's lock and its rejected-declaration rule. 41 controls in
+  all (39 red; the 2 green ones each doubled, red with both layers undone), counting
+  `lock-order-receipt-first`, which proved the brief line-first order of 7550f5f and is obsolete
+  since its revert. Logs are kept
+  trimmed: the run's summary, the failing tests and their messages.
 
 ## 8. Decisions and why
 
@@ -383,17 +411,36 @@ right.
 
 ## 10. For the lead
 
-1. **Done by A (on `main`, b438976), wired by B at the merge:** `line_effective_deadline` reads a
-   rejected declaration as a first entry (its fourth argument, A's 0044). B passes
-   `declaration_rejected` in `lineDeadlineSql` (so the sweep, the checkout's grouping and every
-   reader of it), `effectiveDeadlinesOf`, the deadline sweep's and the preregistration refund's
-   column conditions, the series correction's move, the statement, the Money tab, the InstaPay
-   reference's cap, the To verify list and the hold step, and the line objects handed to
-   `effectiveDeadlineFor` (the answer's line, the approval's re-check, the item's and the admin's
-   moves) carry it; 09's per-series rules read it too. 08o: a declared retake of the previous
-   sitting runs to the retake deadline, and rejected while paid it reads the entry deadline (the
-   statement, `effectiveDeadlinesOf`, `lineDeadlineSql`); three controls red. C's
-   `charge_effective_deadline` is C's at its merge.
+1. **Done by A (on `main`, b438976), wired by B at the merge and after the second review:**
+   `line_effective_deadline` reads a rejected declaration as a first entry (its fourth argument,
+   A's 0044). The flag is now **required** on `LineDeadlineKey` (`declarationRejected: boolean |
+   null`), so no line object can leave it out by accident (the second review found four that did,
+   each defaulting to "not rejected"). Every reader, in SQL and in TypeScript:
+   - SQL, with `declaration_rejected` as the fourth argument: `lineDeadlineSql` (the deadline
+     sweep's open payments, the checkout's grouping and every reader of it),
+     `effectiveDeadlinesOf`, the deadline sweep's expiry condition, the preregistration refund's
+     condition, the series correction's move, the statement (lines and payments), the Money tab,
+     the InstaPay reference's cap, the hold step's query, and 09's per-series rules;
+   - TypeScript, the line objects handed to `effectiveDeadlineFor` and `sessionWindow`, each
+     reading the column: preregistration capture and cancellation, `confirmPayment`'s lines
+     (both `sessionWindow` calls), `failOpenPayment`'s expiry check, `collectAtDesk`,
+     `dueDateFor`, the approval's re-check and `assertBeforeLineDeadline`'s callers, the item's
+     and the admin's moves, the answer to a declaration (its own deadline), the hold step's
+     re-check and the To verify list;
+   - `false` by construction where no line exists yet or a first entry is meant: a line being
+     made (`insertLines`), the offers read's first-entry cut-off, the answer's and the To verify
+     list's first-entry deadline (with the student, so a granted late entry counts there too, as
+     on the line's own deadline).
+   08o: a declared retake of the previous sitting reads the retake deadline, and rejected while
+   paid the entry deadline (the statement, `effectiveDeadlinesOf`, `lineDeadlineSql`); a held
+   preregistration rejected and captured between the two deadlines is refunded in full, not
+   confirmed (MO-21); the deadline sweep expires a reverted waiting line and the preregistration
+   refund returns a held one at the entry deadline. Six controls red (the statement,
+   `effectiveDeadlinesOf`, `lineDeadlineSql`, capture's columns, the sweep's and the
+   preregistration refund's conditions). The hold step's query passes the flag too, but it only
+   selects unanswered declarations (`declaration_rejected` false), so no test can tell it from
+   three arguments: it is passed for the rule's sake. C's `charge_effective_deadline` is C's at
+   its merge.
 2. **Done by A:** the grade-10 commit freezes the refund steps with the school's consent; A's §5
    says the snapshot is B's at consent; `replaceTeacher` moves enrolments per unit; the offers
    read lists only confirmed lines as known sittings (as B's server does).
@@ -426,7 +473,12 @@ right.
    preregistration cancel is A's to change; A writes the pair into RESERVATIONS.md §2.1 as
    "receipt, then line (MA-16)". 08t: approval against rejection and reversal against rejection,
    both orders each, green; controls `lock-order-line-first` and `approval-line-first` red.
-8. **C**: `consentStanding` / `writeConsents` for the checkout and the desk; `refundForSystemDrop`
+8. **C**: the two expiries step B makes directly — a rejected declaration on an unpaid line
+   (`verifyPriorSitting`) and `hold` at the deadline (`holdUnverifiedAtDeadline`) — set the line
+   `expired` without C's plan settlement; at C's merge they go through it (on C's list too). The
+   teacher change asks `gate.selfStudyFirstEntry` as `assertLineRules` does (the exception `FOR
+   UPDATE`, a one-shot one marked used through the adapter's `markUsed`), so C's registry inherits
+   it with no change here. `consentStanding` / `writeConsents` for the checkout and the desk; `refundForSystemDrop`
    to replace; `statementFor`'s `charges`. **D**: `DECLARATION_REVIEWED` notifications exist; the
    Remind button waits.
 9. **Dev databases** migrated through A's migrations before B's consent guard (0046) hold interim lines B's trigger
@@ -523,3 +575,13 @@ Times UTC, from the trail (`.audit/rework-reservations.tsv`), which holds each e
   present), then dropped (`migcheck-at-main.txt`, `migcheck-at-branch.txt`).
 - 03:31Z–03:36Z — **gates green on 8f9aed9** (the merge of main): API and web check-types; the API
   suite in local time and with `TZ=UTC`, 26 files, 402 passed, 1 todo each; useQuery generics 25.
+- 04:20Z — the evidence folder force-added (988f771, docs only): run logs trimmed to the vitest
+  summary and the failures, screenshots under 300 KB, the scripts' local credentials read from
+  the environment; scanned (no cookies or tokens, test emails only, placeholder names and the
+  template's demo officer).
+- 04:21Z–04:58Z — the second review's list: the flag required on every line object (the four
+  missing selects and the rest, §10.1); the not-sent board fee refunded in full; the
+  paid-meanwhile refusal; the old swap requests; the teacher gate as the line rules ask it; the
+  09 rule tightened; the late entry on the first-entry deadline; the warning Notice; the terms'
+  loading and failure states; four proof screenshots (the dates sentence in English and Arabic,
+  the grade-10 checkout's terms, the slip's mark). Eight controls red.

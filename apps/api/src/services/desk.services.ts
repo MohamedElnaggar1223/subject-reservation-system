@@ -414,7 +414,7 @@ async function confirmDeskPayment(
 export async function collectAtDesk(staffId: string, data: DeskCollectType, auditCtx?: AuditContext) {
   const regs = await db.query.registration.findMany({
     where: (r, { inArray }) => inArray(r.id, data.registrationIds),
-    columns: { id: true, studentId: true, sessionId: true, status: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true, priceProvisional: true },
+    columns: { id: true, studentId: true, sessionId: true, status: true, priceAtRegistration: true, boardSeriesId: true, attempt: true, priorSittingSeriesId: true, declarationRejected: true, priceProvisional: true },
   });
   if (regs.length !== data.registrationIds.length || regs.some((r) => r.studentId !== data.studentId)) {
     throw new Error('One or more subjects do not belong to this student');

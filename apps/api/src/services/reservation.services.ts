@@ -333,12 +333,12 @@ export async function reserveLines(
 /**
  * What a line dropped by the system on a declared sitting gets back: a rejection after the
  * first-entry deadline (the board fee by the "sent" rule) or `hold` at the deadline (the board
- * fee counted not sent). The design's rule with today's percentage (the refund windows', or the
- * custom exception's: refund.services `refundPercentage`) until step C's `refundFor(line, at)`
- * lands and replaces this body:
- * - the board fee not sent: the percentage of the whole price;
- * - the board fee sent (the school has paid the board): the percentage of the price less the
- *   board fee the line recorded (`registration_fee_at_registration`) — that fee is not refunded.
+ * fee counted not sent). The design's rule (RESERVATIONS_REWORK.md §3.10) with today's percentage
+ * (the refund windows', or the custom exception's: refund.services `refundPercentage`) until step
+ * C's `refundFor(line, at)` replaces this body — with the same amounts:
+ * - the course part (the price less the board fee the line recorded,
+ *   `registration_fee_at_registration`) by the percentage;
+ * - the board fee in full while it is not sent (the school never paid the board), none once sent.
  */
 export async function refundForSystemDrop(
   line: { sessionId: string; studentId: string; priceAtRegistration: number; registrationFeeAtRegistration: number },
@@ -346,6 +346,11 @@ export async function refundForSystemDrop(
   opts: { boardSent: boolean },
 ): Promise<{ amount: number; percentage: number; boardFeeKept: number }> {
   const percentage = await refundPercentage(at, line.sessionId, line.studentId);
-  const boardFeeKept = opts.boardSent ? Math.min(line.priceAtRegistration, Math.max(0, line.registrationFeeAtRegistration)) : 0;
-  return { amount: round2(((line.priceAtRegistration - boardFeeKept) * percentage) / 100), percentage, boardFeeKept: round2(boardFeeKept) };
+  const boardFee = Math.min(line.priceAtRegistration, Math.max(0, line.registrationFeeAtRegistration));
+  const coursePart = ((line.priceAtRegistration - boardFee) * percentage) / 100;
+  return {
+    amount: round2(coursePart + (opts.boardSent ? 0 : boardFee)),
+    percentage,
+    boardFeeKept: round2(opts.boardSent ? boardFee : 0),
+  };
 }

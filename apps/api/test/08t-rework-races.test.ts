@@ -537,6 +537,42 @@ describe('08t: the rework races', () => {
       });
     });
 
+    it("a payment confirmed while a rejection waits for the line: the rejection is refused (try again), then answered with the receipt first", async () => {
+      // Between the entry deadline and the retake deadline: a declared retake of the previous sitting is still payable.
+      const sw = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: Y + 1, label: `t08pm-${RUN}`, entryDeadline: new Date(Date.now() + days(30)), retakeDeadline: new Date(Date.now() + days(35)) } })))!.id;
+      const sp = await mkSession(`t08pm-${RUN}`);
+      await feeFor(sw, subA);
+      const item = (await offerOf(sp, subA, [whole(sw)])).items[0]!;
+      const f = await onboard(officer, `t08-pm-${RUN}`, 11);
+      const [line] = await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: {
+        sessionId: sp, studentId: f.studentId, lines: [{ offerItemId: item, attempt: 'retake', mode: 'in_school', teacherId, priorSitting: { month: 'november', year: Y } }], consent: CONSENT,
+      } }));
+      const id = line!.id;
+      const pay = await apiResponse(checkout(f, id));
+      await sql(`update board_series set entry_deadline = now() - interval '1 minute' where id = $1`, [sw]);
+      // No receipt yet: the rejection finds none to lock, then waits for the line behind the confirmation.
+      expect(await sql(`select 1 from receipt where registration_id = $1`, [id])).toEqual([]);
+      const release = await holdRowLock('registration', id);
+      let conf: Promise<Res> | undefined;
+      let rej: Promise<Res> | undefined;
+      try {
+        conf = officer.api.v1.payments[':id'].confirm.$post({ param: { id: pay.id! }, json: { instrumentUsed: 'cash' } });
+        await lockWaiters(1);
+        rej = reject(id);
+        await lockWaiters(2);
+      } finally {
+        await release();
+      }
+      expect((await conf!).status).toBe(200);
+      const r = await rej!;
+      const { PAID_MEANWHILE } = await import('../src/services/verification.services');
+      expect([r.status, ((await r.json()) as { error?: string }).error]).toEqual([409, PAID_MEANWHILE]);
+      expect(await state(id)).toEqual({ status: 'confirmed', outcome: null, payments: '1' });
+      // Asked again: the receipt exists and is taken first; past the first-entry deadline the paid line is dropped.
+      const again = await apiResponse(reject(id));
+      expect(again).toMatchObject({ outcome: 'rejected', effect: 'dropped' });
+    });
+
     describe("a payment reversal against the coordinator's rejection of the same paid line", () => {
       const paidAtDesk = async (tag: string) => {
         const f = await onboard(officer, `t08-rev-${tag}-${RUN}`, 11);
@@ -621,7 +657,7 @@ describe('08t: the rework races', () => {
       expect((await one<{ status: string }>(`select status from registration where id = $1`, [id])).status).toBe('dropped');
       expect(Number((await one<{ n: string }>(`select count(*) as n from escrow_transaction where related_registration_id = $1 and reason = 'drop'`, [id])).n)).toBe(1);
       expect(Number((await one<{ n: string }>(`select count(*) as n from audit_log where entity_id = $1 and action = 'LINE_DROPPED_UNVERIFIED'`, [id])).n)).toBe(1);
-      // No refund window on this session: today's computation gives the whole price back.
+      // No refund window on this session (100%): the course part and the board fee, never sent: the whole price.
       expect(money((await one<{ s: string }>(`select sum(amount) as s from escrow_transaction where related_registration_id = $1 and reason = 'drop'`, [id])).s)).toBe(1500);
       await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'verification.unverifiedAtDeadline' }, json: { value: 'enter_as_declared', reason: 'race done' } }));
     });
