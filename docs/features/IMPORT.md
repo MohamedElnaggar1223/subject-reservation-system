@@ -666,6 +666,7 @@ records it.
   41 red and C44 green (its lock now doubled by `lockStudents`); C60, both locks undone, red.
 - 13:34–13:38Z — the split driven in English and Arabic, and the family's Reserve page in Arabic with
   a session closed while open (`f7s-*.png`); the servers left running on 3091/3090 for the lead.
+- 13:47Z — pushed ed02c2b; CI 37786206839 green (564 passed, 1 todo).
 - Next: the reviewer confirms items 1 and 2 on the diff; the final merge waits for F4 on main (main
   has D at c2d7a78, its migrations to 0054): origin/main merged as its own commit, 0050_import
   regenerated after main's last migration with a later stamp and its snapshot chained, the order
