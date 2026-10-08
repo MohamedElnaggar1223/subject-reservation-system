@@ -517,3 +517,9 @@ Times UTC, from the trail (`.audit/rework-reservations.tsv`), which holds each e
   A's snapshot, `when` after A's). The flag wired (§10.1). `igcse_rwb_dev` dropped (nobody
   connected), recreated from `igcse_template_dev`, migrated to 0046, the placeholder demo session
   seeded again; B's API restarted on it.
+- 03:32Z — the migration order proven on a scratch copy of `igcse_template_dev`: migrated at
+  origin/main (45 migrations, the last A's 0044 at 1791425757386), then at this branch (47: B's 0045
+  at 1791429270826 and 0046 at 1791429312401 applied, the step-B columns and the consent trigger
+  present), then dropped (`migcheck-at-main.txt`, `migcheck-at-branch.txt`).
+- 03:31Z–03:36Z — **gates green on 8f9aed9** (the merge of main): API and web check-types; the API
+  suite in local time and with `TZ=UTC`, 26 files, 402 passed, 1 todo each; useQuery generics 25.
