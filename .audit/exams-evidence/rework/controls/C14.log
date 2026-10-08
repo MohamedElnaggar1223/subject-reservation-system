@@ -1,0 +1,49 @@
+# C14: a reminder sends its notices before its claim (outside the transaction)
+# undone in: apps/api/src/services/exam-deadline.services.ts
+# ran: test/08x3-exam-races.test.ts
+# expected red: ['send each deadline reminder once', 'leaves no claim and no notice behind']
+# result: RED as expected
+
+ ❯ test/08x3-exam-races.test.ts (8 tests | 2 failed) 4951ms
+   × F4: races > two scheduler instances on the same tick send each deadline reminder once 21ms
+     → expected 6 to be 2 // Object.is equality
+   × F4: races > a reminder that fails leaves no claim and no notice behind; the next tick sends it 34ms
+     → expected [ { '?column?': 1 } ] to have a length of +0 but got 1
+ Test Files  1 failed (1)
+      Tests  2 failed | 6 passed (8)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x3-exam-races.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x3-exam-races.test.ts > F4: races > two scheduler instances on the same tick send each deadline reminder once
+AssertionError: expected 6 to be 2 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 2[39m
+[31m+ 6[39m
+
+ ❯ test/08x3-exam-races.test.ts:142:21
+    140|     const notes = await one<{ n: number }>(`select count(*)::int as n …
+    141|       [coord.id, w.series.cambridgeNov, w.series.pearsonJan]);
+    142|     expect(notes.n).toBe(2);
+       |                     ^
+    143|   });
+    144| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x3-exam-races.test.ts > F4: races > a reminder that fails leaves no claim and no notice behind; the next tick sends it
+AssertionError: expected [ { '?column?': 1 } ] to have a length of +0 but got 1
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 1[39m
+
+ ❯ test/08x3-exam-races.test.ts:159:35
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

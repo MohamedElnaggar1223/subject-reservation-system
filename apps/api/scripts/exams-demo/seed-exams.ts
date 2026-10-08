@@ -125,7 +125,7 @@ async function main() {
   const camJun = series.find((s) => s.boardCode === 'cambridge' && s.month === 'june' && s.year === 2026 && !s.label)!.id;
   const now = Date.now();
   await apiResponse(admin.v1['board-series'][':id'].$put({ param: { id: camNov }, json: {
-    entryDeadline: new Date(now + 14 * DAY), reason: 'the school\'s date for the exam-entries demo', forecastGradesDue: cairoDate(new Date(now + 20 * DAY)),
+    entryDeadline: new Date(now + 14 * DAY), retakeDeadline: new Date(now + 18 * DAY), reason: 'the school\'s date for the exam-entries demo', forecastGradesDue: cairoDate(new Date(now + 20 * DAY)),
     accessArrangementsDue: cairoDate(new Date(now + 10 * DAY)), examsStart: '2026-10-26', examsEnd: '2026-11-20', resultsOn: '2027-01-13', certificatesOn: '2027-03-31',
     lateFeeFrom: cairoDate(new Date(now + 15 * DAY)), lateEntriesClose: cairoDate(new Date(now + 21 * DAY)),
   } }));
@@ -238,6 +238,11 @@ async function main() {
   }
   const hanaP1 = lineIds['hana.ibrahim']?.[1];
   if (hanaP1) await apiResponse(officer.v1.charges.$post({ json: { studentId: students['hana.ibrahim']!, kind: 'cash_in', boardServiceId: 'svc-pearson-ci', registrationId: hanaP1 } }));
+  // Ziad's cash-in names no line (asked at the desk for units banked earlier): the coordinator adds its award by hand.
+  if (lineIds['ziad.fouad']) {
+    const zc = await apiResponse(officer.v1.charges.$post({ json: { studentId: students['ziad.fouad']!, kind: 'cash_in', boardServiceId: 'svc-pearson-ci', boardSeriesId: pearsonJan, level: 'as_a_level' } }));
+    await apiResponse(officer.v1.registrations.desk.collect.$post({ json: { studentId: students['ziad.fouad']!, chargeIds: [zc.id], instrumentUsed: 'cash' } }));
+  }
   // Yara's carried-forward sitting verified by the coordinator, with the other centre's numbers.
   const yaraLine = lineIds['yara.nabil']?.[0];
   if (yaraLine) {

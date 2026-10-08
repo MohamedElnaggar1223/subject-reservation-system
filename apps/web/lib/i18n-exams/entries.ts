@@ -92,18 +92,18 @@ export const entriesArabic: Record<string, string> = {
   // ── Exam entries ──
   'Exam entries': 'قيود الامتحانات',
   'Exam entries — IGCSE': 'قيود الامتحانات - IGCSE',
-  'What each candidate is entered for with the board in a series, made from the confirmed registrations. Tick entries to mark them as sent to the board or to withdraw them; each row says what the board would refuse.':
-    'ما قُيِّد به كل مرشح لدى المجلس في الدورة، مأخوذًا من التسجيلات المؤكدة. علِّم القيود لتسجيلها كمُرسلة إلى المجلس أو لسحبها؛ ويذكر كل صف ما قد يرفضه المجلس.',
+  'What each candidate is entered for with the board in a series, made from the paid reservations and cash-ins. Tick entries to mark them as sent to the board or to withdraw them; each row says what the board would refuse.':
+    'ما قُيِّد له كل مرشح لدى المجلس في دورة، من الحجوزات وطلبات الشهادة (Cash-in) المدفوعة. حدد القيود لتسجيلها كمُرسلة إلى المجلس أو لسحبها؛ يذكر كل صف ما قد يرفضه المجلس.',
   "The board's entry list": 'قائمة القيد للمجلس',
   'Forecast grades': 'الدرجات المتوقعة',
-  "Entries belong to a board series. Add the boards' sittings on the Board series page first; the entries of each come from its confirmed registrations.":
-    'تنتمي القيود إلى دورة مجلس. أضف دورات المجالس من صفحة دورات المجالس أولًا؛ وتأتي قيود كل دورة من تسجيلاتها المؤكدة.',
+  "Entries belong to a board series. Add the boards' sittings on the Board series page first; the entries of each come from its paid reservations.":
+    'تنتمي القيود إلى دورة لدى المجلس. أضف دورات المجالس في صفحة دورات المجالس أولًا؛ تأتي قيود كلٍّ منها من حجوزاتها المدفوعة.',
   'Only one candidate:': 'مرشح واحد فقط:',
   'This candidate could not be found. Go back to every candidate in the series.': 'تعذر العثور على هذا المرشح. ارجع إلى كل المرشحين في الدورة.',
   'Every candidate in the series': 'كل المرشحين في الدورة',
   'Also entered in': 'مقيد أيضًا في',
   // Derive
-  'Derive entries from registrations': 'إنشاء القيود من التسجيلات',
+  'Derive entries from reservations': 'إنشاء القيود من الحجوزات',
   'Each confirmed registration becomes what its board takes: a Cambridge syllabus as the award with its option code, Pearson units one by one. See what it would make first; nothing is made until you confirm.':
     'يصبح كل تسجيل مؤكد ما يقبله مجلسه: منهج Cambridge كمؤهل برمز خياره، ووحدات Pearson وحدة وحدة. اطّلع أولًا على ما سيُنشأ؛ لا يُنشأ شيء حتى تؤكد.',
   'Preview': 'معاينة',
@@ -115,7 +115,7 @@ export const entriesArabic: Record<string, string> = {
   'Nothing can be made': 'لا يمكن إنشاء شيء',
   'No confirmed registration in this series yet. Registrations become entries once they are confirmed (paid).':
     'لا يوجد تسجيل مؤكد في هذه الدورة بعد. تصبح التسجيلات قيودًا بعد تأكيدها (دفعها).',
-  'Everything confirmed is already entered: there is nothing new to make.': 'كل ما هو مؤكد مقيد بالفعل: لا يوجد جديد لإنشائه.',
+  'Everything paid is already entered: there is nothing new to make.': 'كل ما دُفع مُقيَّد بالفعل: لا شيء جديد يُنشأ.',
   'Show only what is new or needs a choice': 'اعرض الجديد وما يحتاج اختيارًا فقط',
   'Registered subject': 'المادة المسجلة',
   'To do': 'المطلوب',
@@ -189,8 +189,8 @@ export const entriesArabic: Record<string, string> = {
   'Not saved.': 'لم يُحفظ.',
   'This candidate has no entry in this series': 'ليس لهذا المرشح قيد في هذه الدورة',
   'No entries in this series yet': 'لا توجد قيود في هذه الدورة بعد',
-  'Entries are made from confirmed registrations: use Preview above to see what the registrations enter, then make them. An entry the registrations cannot make is added by hand.':
-    'تُنشأ القيود من التسجيلات المؤكدة: استخدم المعاينة أعلاه لترى ما تقيّده التسجيلات، ثم أنشئها. والقيد الذي لا تُنشئه التسجيلات يُضاف يدويًا.',
+  'Entries are made from paid reservations: use Preview above to see what they enter, then make them. An entry the reservations cannot make is added by hand.':
+    'تُنشأ القيود من الحجوزات المدفوعة: استخدم المعاينة أعلاه لترى ما تقيّده، ثم أنشئها. ويُضاف يدويًا ما لا تُنشئه الحجوزات.',
   'Loading the entries…': 'جارٍ تحميل القيود…',
   'The entries did not load': 'لم تُحمَّل القيود',
   // Details
@@ -264,8 +264,8 @@ export const entriesArabic: Record<string, string> = {
   'The columns are assumed': 'الأعمدة مفترضة',
   "The boards' own templates are not in hand yet, so each column below is our reading of the board portal's fields, marked “assumed”. Check the columns and their order against the board's template before uploading the file. Column names stay as the board's portal writes them.":
     'نماذج المجالس نفسها ليست متاحة بعد، لذا فكل عمود أدناه قراءتنا لحقول بوابة المجلس، ومُعلَّم "مفترض". راجع الأعمدة وترتيبها مع نموذج المجلس قبل رفع الملف. تبقى أسماء الأعمدة كما تكتبها بوابة المجلس.',
-  "The list is made from the series' entries. Derive them from the confirmed registrations on the Entries page.":
-    'تُعدّ القائمة من قيود الدورة. أنشئها من التسجيلات المؤكدة في صفحة القيود.',
+  "The list is made from the series' entries. Derive them from the paid reservations on the Entries page.":
+    'تُبنى القائمة من قيود الدورة. أنشئها من الحجوزات المدفوعة في صفحة القيود.',
   'Every row': 'كل الصفوف',
   'Ready': 'جاهز',
   "Download for the board's portal": 'تنزيل لبوابة المجلس',
@@ -347,6 +347,8 @@ export const entriesArabic: Record<string, string> = {
 
   // ── The reservations rework (docs/features/EXAM_ENTRIES.md §2a) ──
   'Past its deadline': 'بعد موعده النهائي',
+  'Retake deadline': 'آخر موعد للإعادة',
+  '1 paid reservation': 'حجز مدفوع واحد',
   'Held: sitting not verified': 'معلّق: الدورة السابقة لم يُتحقق منها',
   'Cash-in awaiting payment': 'طلب الشهادة (Cash-in) بانتظار الدفع',
   'Choose the award': 'اختر المؤهل',
@@ -378,6 +380,8 @@ export const entriesArabic: Record<string, string> = {
   'Reserved subject': 'المادة المحجوزة',
   'No reservation (added by hand)': 'لا يوجد حجز (أُضيف يدويًا)',
   'From a paid cash-in': 'من طلب شهادة (Cash-in) مدفوع',
+  "Only a retake of the board's previous series is still entered and sent, until the retake deadline. A first entry is not made or sent; a withdrawal is still recorded, with what the board does with its fee.":
+    'لا يُقيَّد ولا يُرسل الآن إلا إعادة لدورة المجلس السابقة، حتى آخر موعد للإعادة. لا يُنشأ قيد أول ولا يُرسل؛ ويظل السحب يُسجَّل مع ما يفعله المجلس برسمه.',
   // ── Forecast grades ──
   'Forecast grades — IGCSE': 'الدرجات المتوقعة - IGCSE',
   "Every entry whose board asks for a forecast grade, by series and subject. Teachers give their own candidates' grades; you can give any of them.":
@@ -457,6 +461,7 @@ export const entriesRules: Rule[] = [
   [/^(\d+) amendments$/, (m) => `${m[1]} تعديلات`],
   [/^Made (\d+) new entries\.$/, (m) => `أُنشئ ${m[1]} قيدًا جديدًا.`],
   [/^(\d+) confirmed registrations$/, (m) => `${m[1]} تسجيلات مؤكدة`],
+  [/^(\d+) paid reservations$/, (m) => `${m[1]} حجوزات مدفوعة`],
   [/^(\d+) new entries to make$/, (m) => `${m[1]} قيود جديدة ستُنشأ`],
   [/^(\d+) subjects not mapped$/, (m) => `${m[1]} مواد غير مربوطة`],
   [/^Make the (\d+) new entries$/, (m) => `أنشئ القيود الجديدة (${m[1]})`],

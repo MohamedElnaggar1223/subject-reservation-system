@@ -216,6 +216,7 @@ export const candidatesArabic: Record<string, string> = {
   'Still to do': 'ما بقي إنجازه',
   'Hard stop': 'الحد النهائي',
   "Entry deadline (the school's hard stop)": 'آخر موعد للقيد (الحد النهائي للمدرسة)',
+  'Retake deadline (the hard stop for a retake of the previous series)': 'آخر موعد للإعادة (الحد النهائي لإعادة الدورة السابقة)',
   'After this time nothing more is entered, paid or confirmed for the series.': 'بعد هذا الوقت لا يُقيَّد ولا يُدفع ولا يُؤكَّد شيء آخر للدورة.',
   'Nothing outstanding': 'لا شيء متبقٍ',
   'Open entries': 'فتح القيود',

@@ -1,0 +1,26 @@
+# C28: teacherOf ignores the unit (the subject's teacher only)
+# undone in: apps/api/src/services/enrolment.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["the P1 teacher gives P1's, not P2's"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 10009ms
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's 26ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > what a line's item enters (lineItemsFor) > the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's
+Error: Only the candidate's teacher for this subject, or the coordinator, gives this forecast
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08x4-exam-entries-rework.test.ts:137:14
+    135|       expect(units).toEqual([{ unit: `${T}WMA11`, teacher: w.teacherId…
+    136|       const [e1, e2] = await entriesOf(w.series.pearsonJan, fam.d!.stu…
+    137|       expect(await apiResponse(w.teacher.api.v1.exams.entries[':id'].f…
+       |              ^
+    138|       expect(await refused(w.teacher.api.v1.exams.entries[':id'].forec…
+    139|         .toEqual({ status: 403, error: "Only the candidate's teacher f…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

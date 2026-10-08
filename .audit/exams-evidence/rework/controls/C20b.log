@@ -1,0 +1,71 @@
+# C20b: carry forward not taken from the line's prior sitting (the suggest flow only)
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['a sitting at another centre, verified with its centre and candidate number', 'a sitting here, verified without another centre']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 2 failed) 9714ms
+   × F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting at another centre, verified with its centre and candidate number, is carried forward with them 76ms
+     → expected [ [ 'XW9700', 'BY', 'none', …(4) ] ] to deeply equal [ [ 'XW9700', 'BY', …(5) ] ]
+   × F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting here, verified without another centre, is carried forward with the school's centre and the candidate's number then 69ms
+     → expected [ [ 'none', null, null ] ] to deeply equal [ [ 'confirmed', 'EG123', '0777' ] ]
+ Test Files  1 failed (1)
+      Tests  2 failed | 16 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting at another centre, verified with its centre and candidate number, is carried forward with them
+AssertionError: expected [ [ 'XW9700', 'BY', 'none', …(4) ] ] to deeply equal [ [ 'XW9700', 'BY', …(5) ] ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    [[22m
+[2m      "XW9700",[22m
+[2m      "BY",[22m
+[32m-     "confirmed",[39m
+[32m-     "june",[39m
+[32m-     2026,[39m
+[32m-     "EG999",[39m
+[32m-     "0452",[39m
+[31m+     "none",[39m
+[31m+     null,[39m
+[31m+     null,[39m
+[31m+     null,[39m
+[31m+     null,[39m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:195:10
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting here, verified without another centre, is carried forward with the school's centre and the candidate's number then
+AssertionError: expected [ [ 'none', null, null ] ] to deeply equal [ [ 'confirmed', 'EG123', '0777' ] ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    [[22m
+[32m-     "confirmed",[39m
+[32m-     "EG123",[39m
+[32m-     "0777",[39m
+[31m+     "none",[39m
+[31m+     null,[39m
+[31m+     null,[39m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:209:10
+    207|       await derive(w.series.cambridgeNov, fam.cf2!.studentId);
+    208|       expect((await entriesOf(w.series.cambridgeNov, fam.cf2!.studentI…
+    209|         .toEqual([['confirmed', 'EG123', '0777']]);
+       |          ^
+    210|     });
+    211| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

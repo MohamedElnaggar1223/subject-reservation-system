@@ -1,0 +1,37 @@
+# C26: derivation reads the series' entry deadline, not the line's (the retake deadline ignored)
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["a retake of the board's previous sitting is still entered and sent"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 10019ms
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent 17ms
+     → expected { series: { …(4) }, …(6) } to match object { pastDeadline: true, refusal: null }
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent
+AssertionError: expected { series: { …(4) }, …(6) } to match object { pastDeadline: true, refusal: null }
+(12 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "pastDeadline": true,[22m
+[32m-   "refusal": null,[39m
+[31m+   "refusal": "The entry deadline for Cambridge International June 2027 (exams xw june) (8 October 2026 at 12:43) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)",[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:449:23
+    447|     it("past the entry deadline a retake of the board's previous sitti…
+    448|       const preview = await derive(juneSeries, undefined, false);
+    449|       expect(preview).toMatchObject({ pastDeadline: true, refusal: nul…
+       |                       ^
+    450|       expect(Object.fromEntries(preview.rows.map((r) => [r.registratio…
+    451|       expect(preview.rows.find((r) => r.registrationId === j2)!.deadli…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

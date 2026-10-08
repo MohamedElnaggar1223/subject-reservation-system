@@ -1,0 +1,40 @@
+# C32: the entry check does not list a declared, unverified sitting
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['entered as declared (the default)', 'held when the school holds unverified sittings']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 2 failed) 10866ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified 209ms
+     → expected [ 'missing_candidate_number', …(4) ] to include 'prior_sitting_unverified'
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 35ms
+     → expected [ 'missing_candidate_number', …(4) ] to include 'prior_sitting_held'
+ Test Files  1 failed (1)
+      Tests  2 failed | 16 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > entered as declared (the default): the check lists it as declared, unverified
+AssertionError: expected [ 'missing_candidate_number', …(4) ] to include 'prior_sitting_unverified'
+ ❯ test/08x4-exam-entries-rework.test.ts:241:81
+    239|       await derive(w.series.pearsonJan, fam.f!.studentId);
+    240|       const list = await entryList(w.series.pearsonJan);
+    241|       expect(list.rows.find((r) => r.studentId === fam.e!.studentId)!.…
+       |                                                                                 ^
+    242|       expect(list.rows.find((r) => r.studentId === fam.f!.studentId)!.…
+    243|       expect(list.summary.prior_sitting_unverified).toBe(2);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes
+AssertionError: expected [ 'missing_candidate_number', …(4) ] to include 'prior_sitting_held'
+ ❯ test/08x4-exam-entries-rework.test.ts:252:31
+    250|         const list = await entryList(w.series.pearsonJan);
+    251|         const fRow = list.rows.find((r) => r.studentId === fam.f!.stud…
+    252|         expect(fRow.problems).toContain('prior_sitting_held');
+       |                               ^
+    253|         expect(fRow.problems).not.toContain('prior_sitting_unverified'…
+    254|         const preview = await derive(w.series.pearsonJan, fam.f!.stude…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

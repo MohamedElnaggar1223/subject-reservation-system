@@ -1,0 +1,75 @@
+# C2: the hard stop on sending a draft (its own deadline) removed
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x1-exam-entries.test.ts test/08x4-exam-entries-rework.test.ts
+# expected red: ['past the deadline a new entry is refused', 'a first entry is not sent']
+# result: RED as expected
+
+ ❯ test/08x1-exam-entries.test.ts (17 tests | 2 failed) 4618ms
+   × F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > past the deadline a new entry is refused, and a draft cannot be sent; a withdrawal is allowed with the board's fee shown 110ms
+     → expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+   × F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after 6ms
+     → expected 2 to be 1 // Object.is equality
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 9984ms
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent 55ms
+     → expected 200 to be 409 // Object.is equality
+ Test Files  2 failed (2)
+      Tests  3 failed | 32 passed (35)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x1-exam-entries.test.ts test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > past the deadline a new entry is refused, and a draft cannot be sent; a withdrawal is allowed with the board's fee shown
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "The entry deadline for Cambridge International November 2026 (exams xe) (8 October 2026 at 12:38) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "\"\"",[39m
+[31m+   "status": 200,[39m
+[2m  }[22m
+
+ ❯ test/08x1-exam-entries.test.ts:259:109
+    257|       // Sending a draft after the deadline is sending a late entry: r…
+    258|       await sql(`update exam_entry set status = 'draft', withdrawn_at …
+    259|       expect(await refused(coord.api.v1.exams.entries.submit.$post({ j…
+       |                                                                                                             ^
+    260|       // …unless it truly went before the deadline: the time it went i…
+    261|       const before = new Date(new Date(deadline.d).getTime() - 1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after
+AssertionError: expected 2 to be 1 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 2[39m
+
+ ❯ test/08x1-exam-entries.test.ts:324:24
+    322|     it("Cambridge fixes a forecast once sent: the teacher's change is …
+    323|       const r = await apiResponse(coord.api.v1.exams.forecasts.submit.…
+    324|       expect(r.locked).toBe(1); // A's (B's entry was withdrawn)
+       |                        ^
+    325|       const [ea] = await entriesOf(w.series.cambridgeNov, a);
+    326|       expect(await refused(w.teacher.api.v1.exams.entries[':id'].forec…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent
+AssertionError: expected 200 to be 409 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 409[39m
+[31m+ 200[39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:465:24
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

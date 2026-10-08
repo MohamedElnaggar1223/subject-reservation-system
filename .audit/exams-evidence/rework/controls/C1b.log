@@ -1,0 +1,38 @@
+# C1b: derivation's per-line cut-off removed (a line past its deadline entered)
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['a first entry is not sent']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 10023ms
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent 18ms
+     → expected { …(4) } to deeply equal { …(4) }
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent
+AssertionError: expected { …(4) } to deeply equal { …(4) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "6b030c77-45fc-4aa1-86da-0c4f725c4530": "entered",[22m
+[32m-   "afeab1db-c633-423b-933e-d471016672c5": "past_deadline",[39m
+[31m+   "afeab1db-c633-423b-933e-d471016672c5": "ready",[39m
+[2m    "d68ec3ec-6a71-431b-97df-15e87a4dd5cf": "ready",[22m
+[2m    "e2a4114e-f3d6-4d3a-8791-ab50d1bb2aab": "entered",[22m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:450:90
+    448|       const preview = await derive(juneSeries, undefined, false);
+    449|       expect(preview).toMatchObject({ pastDeadline: true, refusal: nul…
+    450|       expect(Object.fromEntries(preview.rows.map((r) => [r.registratio…
+       |                                                                                          ^
+    451|       expect(preview.rows.find((r) => r.registrationId === j2)!.deadli…
+    452|       expect(preview.rows.find((r) => r.registrationId === j4)!.note)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

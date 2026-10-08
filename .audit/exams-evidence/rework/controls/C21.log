@@ -1,0 +1,55 @@
+# C21: a cash-in entered before it is paid (derivation)
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['accepted but not paid']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 9957ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered 34ms
+     → expected { registrationId: null, …(11) } to match object { outcome: 'awaiting_payment', …(2) }
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > accepted but not paid: listed as "cash-in awaiting payment", not entered
+AssertionError: expected { registrationId: null, …(11) } to match object { outcome: 'awaiting_payment', …(2) }
+(16 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "entries": [],[39m
+[32m-   "note": "Cash-in awaiting payment: Cash-in (claim the award) — Pearson Edexcel January 2027 (exams xw) (EGP 700.00) — entered once it is paid",[39m
+[32m-   "outcome": "awaiting_payment",[39m
+[31m+   "entries": [[39m
+[31m+     {[39m
+[31m+       "carryForward": "none",[39m
+[31m+       "cfCandidateNumber": null,[39m
+[31m+       "cfCentreNumber": null,[39m
+[31m+       "cfFromMonth": null,[39m
+[31m+       "cfFromYear": null,[39m
+[31m+       "cfOption": null,[39m
+[31m+       "entryCode": "XWXMA01",[39m
+[31m+       "existingEntryId": null,[39m
+[31m+       "isRetake": false,[39m
+[31m+       "kind": "award",[39m
+[31m+       "optionCode": null,[39m
+[31m+       "qualificationId": "061ab564-ab4d-4e1c-924f-230f21a4f2f2",[39m
+[31m+       "retakeSource": null,[39m
+[31m+       "state": "new",[39m
+[31m+       "tier": null,[39m
+[31m+       "title": "Mathematics XW",[39m
+[31m+       "unitId": null,[39m
+[31m+     },[39m
+[31m+   ],[39m
+[31m+   "note": null,[39m
+[31m+   "outcome": "ready",[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:311:19
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

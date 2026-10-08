@@ -72,7 +72,7 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
     <section className="mb-6 rounded-xl border border-border bg-card p-4 shadow-sm" aria-labelledby="derive-title">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="max-w-3xl">
-          <h2 id="derive-title" className="text-sm font-semibold text-foreground">Derive entries from registrations</h2>
+          <h2 id="derive-title" className="text-sm font-semibold text-foreground">Derive entries from reservations</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Each paid reservation becomes what its item enters with the board: a Cambridge syllabus as the award with its option code, Pearson units one by one, a paid cash-in as its award. See what it would make first; nothing is made until you confirm.
           </p>
@@ -91,7 +91,7 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
       {preview && (
         <div className="mt-4 space-y-3">
           <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-foreground">
-            <span>{preview.summary.registrations === 1 ? '1 confirmed registration' : `${preview.summary.registrations} confirmed registrations`}</span>
+            <span>{preview.summary.registrations === 1 ? '1 paid reservation' : `${preview.summary.registrations} paid reservations`}</span>
             <span className="font-semibold">{preview.summary.newEntries === 1 ? '1 new entry to make' : `${preview.summary.newEntries} new entries to make`}</span>
             {preview.summary.notMapped > 0 && (
               <span className="text-amber-700 dark:text-amber-400">{preview.summary.notMapped === 1 ? '1 subject not mapped' : `${preview.summary.notMapped} subjects not mapped`}</span>
@@ -103,7 +103,7 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
           ) : preview.summary.registrations === 0 ? (
             <Notice tone="info">No paid reservation in this series yet. Reservations become entries once they are paid.</Notice>
           ) : preview.summary.newEntries === 0 ? (
-            <Notice tone="success">Everything confirmed is already entered: there is nothing new to make.</Notice>
+            <Notice tone="success">Everything paid is already entered: there is nothing new to make.</Notice>
           ) : null}
 
           {rows.length > 0 && (
@@ -165,7 +165,7 @@ export function DerivePanel({ series, studentId }: { series: BoardSeriesRow; stu
                                 {e.isRetake && <Badge tone="info">Retake</Badge>}
                                 {e.carryForward === 'suggested' && <Badge tone="warning">Carry forward suggested</Badge>}
                                 {e.carryForward === 'confirmed' && e.cfFromMonth && e.cfFromYear && (
-                                  <Badge tone="info"><span>Carried forward from</span> <SeriesWords name={`${e.cfFromMonth.charAt(0).toUpperCase()}${e.cfFromMonth.slice(1)} ${e.cfFromYear}`} /></Badge>
+                                  <Badge tone="info" className="gap-1"><span>Carried forward from</span> <SeriesWords name={`${e.cfFromMonth.charAt(0).toUpperCase()}${e.cfFromMonth.slice(1)} ${e.cfFromYear}`} /></Badge>
                                 )}
                               </li>
                             ))}

@@ -1,0 +1,32 @@
+# C29: the database's one-live-entry-per-cash-in index removed (0050)
+# undone in: packages/db/drizzle/0050_exam_entries.sql
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['a cash-in that names no line']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 10000ms
+   × F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a cash-in that names no line: the coordinator adds its award by hand, with the charge 137ms
+     → expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a cash-in becomes its award entry, carrying its charge > a cash-in that names no line: the coordinator adds its award by hand, with the charge
+AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "This cash-in is already entered",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "\"\"",[39m
+[31m+   "status": 201,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:352:10
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

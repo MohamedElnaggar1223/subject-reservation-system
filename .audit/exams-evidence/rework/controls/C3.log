@@ -1,0 +1,33 @@
+# C3: the national ID read opened to all staff (route and service)
+# undone in: apps/api/src/routes/exam-entry.routes.ts, apps/api/src/services/exam-candidate.services.ts
+# ran: test/08x1-exam-entries.test.ts
+# expected red: ['are read only by the coordinator and the admin']
+# result: RED as expected
+
+ ❯ test/08x1-exam-entries.test.ts (17 tests | 1 failed) 4447ms
+   × F4: candidates and entries > national IDs > are read only by the coordinator and the admin, each read audited without the number; never in a list, a log or an audit row 32ms
+     → expected 200 to be 403 // Object.is equality
+ Test Files  1 failed (1)
+      Tests  1 failed | 16 passed (17)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x1-exam-entries.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > national IDs > are read only by the coordinator and the admin, each read audited without the number; never in a list, a log or an audit row
+AssertionError: expected 200 to be 403 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 403[39m
+[31m+ 200[39m
+
+ ❯ test/08x1-exam-entries.test.ts:351:128
+    349|         // Everyone else is refused: the desk, a teacher, the gate, th…
+    350|         for (const who of [w.officer, w.finadmin, w.teacher, w.gate, w…
+    351|           expect((await refused(who.api.v1.exams.candidates[':studentI…
+       |                                                                                                                                ^
+    352|         }
+    353|         // Lists, the candidate's page and entry lists carry whether o…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

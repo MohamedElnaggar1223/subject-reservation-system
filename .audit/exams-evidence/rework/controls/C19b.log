@@ -1,0 +1,41 @@
+# C19b: a rejected declaration not read as a first entry
+# undone in: apps/api/src/services/line.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["a retake comes from the line's attempt"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 9779ms
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry 134ms
+     → expected [ [ 'XW97', true, …(2) ] ] to deeply equal [ [ 'XW97', false, null, …(1) ] ]
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry
+AssertionError: expected [ [ 'XW97', true, …(2) ] ] to deeply equal [ [ 'XW97', false, null, …(1) ] ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    [[22m
+[2m      "XW97",[22m
+[32m-     false,[39m
+[32m-     null,[39m
+[31m+     true,[39m
+[31m+     "registration",[39m
+[2m      "02dc31b6-69ed-4145-8be9-bf81af11905b",[22m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:165:10
+    163|         .toEqual([[`${T}97`, true, 'registration', rt]]);
+    164|       expect((await entriesOf(w.series.cambridgeNov, fam.rj!.studentId…
+    165|         .toEqual([[`${T}97`, false, null, rj]]);
+       |          ^
+    166|       const list = await entryList(w.series.cambridgeNov);
+    167|       expect(list.rows.find((r) => r.studentId === fam.rt!.studentId)!…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

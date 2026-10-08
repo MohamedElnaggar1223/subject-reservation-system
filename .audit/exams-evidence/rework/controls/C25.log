@@ -1,0 +1,37 @@
+# C25: a held line (declared, unverified, hold) can be sent
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['held when the school holds unverified sittings']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 9929ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes 47ms
+     → expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > held when the school holds unverified sittings: not derived, not sent; verified, it goes
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "XWWMA12 follows a declared earlier sitting the school has not verified: it is held until it is (the To verify tab), and not sent",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "\"\"",[39m
+[31m+   "status": 200,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:258:12
+    256|         const [fe] = await entriesOf(w.series.pearsonJan, fam.f!.stude…
+    257|         expect(await refused(coord.api.v1.exams.entries.submit.$post({…
+    258|           .toEqual({ status: 409, error: `${T}WMA12 follows a declared…
+       |            ^
+    259|         expect((await one<{ status: string }>(`select status from exam…
+    260|         // The coordinator verifies it: it goes.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -1,0 +1,30 @@
+# C13: an entry's row lock removed (withdraw and amend)
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x3-exam-races.test.ts
+# expected red: ['a withdrawal and an amendment of the same entry at once']
+# result: RED as expected
+
+ ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 4604ms
+   × F4: races > a withdrawal and an amendment of the same entry at once run one after the other: the second finds it withdrawn 254ms
+     → expected 'Failed to change the entry' to be 'This entry was withdrawn: add a new o…' // Object.is equality
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x3-exam-races.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x3-exam-races.test.ts > F4: races > a withdrawal and an amendment of the same entry at once run one after the other: the second finds it withdrawn
+AssertionError: expected 'Failed to change the entry' to be 'This entry was withdrawn: add a new o…' // Object.is equality
+
+Expected: [32m"This entry was withdrawn: add a new one instead"[39m
+Received: [31m"Failed to change the entry"[39m
+
+ ❯ test/08x3-exam-races.test.ts:82:52
+     80|     expect(wd.ok).toBe(true);
+     81|     expect(am.ok).toBe(false);
+     82|     expect(String((am as { e: Error }).e.message)).toBe('This entry wa…
+       |                                                    ^
+     83|     expect(await one(`select status, option_code from exam_entry where…
+     84|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -1,0 +1,33 @@
+# C7: clash detection removed
+# undone in: apps/api/src/services/exam-timetable.services.ts
+# ran: test/08x2-exam-days-results.test.ts
+# expected red: ['a clash across boards flagged']
+# result: RED as expected
+
+ ❯ test/08x2-exam-days-results.test.ts (14 tests | 1 failed) 4107ms
+   × F4: exam days, results and certificates > the exam timetable > each candidate's own timetable, extra time counted; a clash across boards flagged, and how it is handled noted 19ms
+     → expected [] to have a length of 1 but got +0
+ Test Files  1 failed (1)
+      Tests  1 failed | 13 passed (14)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x2-exam-days-results.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x2-exam-days-results.test.ts > F4: exam days, results and certificates > the exam timetable > each candidate's own timetable, extra time counted; a clash across boards flagged, and how it is handled noted
+AssertionError: expected [] to have a length of 1 but got +0
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 0[39m
+
+ ❯ test/08x2-exam-days-results.test.ts:106:26
+    104|         ['XD97/33', d2, '09:00', '11:30', 30],
+    105|       ]);
+    106|       expect(tt.clashes).toHaveLength(1);
+       |                          ^
+    107|       expect(tt.clashes[0]!.papers.map((p) => p.code).sort()).toEqual(…
+    108| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

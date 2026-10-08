@@ -1,0 +1,27 @@
+# C15: a parent's link to the child not checked (family endpoints)
+# undone in: apps/api/src/services/exam-shared.ts
+# ran: test/05-object-access.test.ts
+# expected red: ['F4 exam entries']
+# result: RED as expected
+
+ ❯ test/05-object-access.test.ts (16 tests | 1 failed) 7693ms
+   × object-level access between families > F4 exam entries: another family reads none of A's exams; a teacher reaches only their own candidates and room; the gate nothing 2687ms
+     → parentB reads A statement answered 200: {"success":true,"data":{"generatedOn":"2026-10-08","series":{"id":"e0a19209-fba7-4fe3-bbfc-37e128b3d255","name":"Cambridge International November 2026 (exams oa4)","boardName":"Cambridge International: expected 200 to be greater than or equal to 400
+ Test Files  1 failed (1)
+      Tests  1 failed | 15 passed (16)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/05-object-access.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/05-object-access.test.ts > object-level access between families > F4 exam entries: another family reads none of A's exams; a teacher reaches only their own candidates and room; the gate nothing
+AssertionError: parentB reads A statement answered 200: {"success":true,"data":{"generatedOn":"2026-10-08","series":{"id":"e0a19209-fba7-4fe3-bbfc-37e128b3d255","name":"Cambridge International November 2026 (exams oa4)","boardName":"Cambridge International: expected 200 to be greater than or equal to 400
+ ❯ refusedAs test/05-object-access.test.ts:30:96
+     28|   const body = (await res.json().catch(() => ({}))) as { error?: unkno…
+     29|   attempts.push([label, String(res.status), typeof body.error === 'str…
+     30|   expect(res.status, `${label} answered ${res.status}: ${JSON.stringif…
+       |                                                                                                ^
+     31|   expect(res.status, `${label} answered ${res.status}`).toBeLessThan(5…
+     32|   return res.status;
+ ❯ test/05-object-access.test.ts:472:16
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -1,0 +1,80 @@
+# C9: the certificate hand-over's status guard removed
+# undone in: apps/api/src/services/exam-certificate.services.ts
+# ran: test/08x3-exam-races.test.ts test/08x2-exam-days-results.test.ts
+# expected red: ['a certificate collected at two desks at once', 'collected once at the desk']
+# result: RED as expected
+
+ ❯ test/08x2-exam-days-results.test.ts (14 tests | 2 failed) 4262ms
+   × F4: exam days, results and certificates > certificates > collected once at the desk, with the collector and a slip to sign; a second hand-over is told who took it 12ms
+     → expected 200 to be 409 // Object.is equality
+   × F4: exam days, results and certificates > certificates > an unclaimed certificate is kept for the retention period, then may be destroyed with a reason 21ms
+     → expected { status: 400, …(1) } to deeply equal { status: 409, …(1) }
+ ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 3890ms
+   × F4: races > a certificate collected at two desks at once: collected once, the other officer told who took it 249ms
+     → expected true to be false // Object.is equality
+ Test Files  2 failed (2)
+      Tests  3 failed | 19 passed (22)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x3-exam-races.test.ts test/08x2-exam-days-results.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x2-exam-days-results.test.ts > F4: exam days, results and certificates > certificates > collected once at the desk, with the collector and a slip to sign; a second hand-over is told who took it
+AssertionError: expected 200 to be 409 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 409[39m
+[31m+ 200[39m
+
+ ❯ test/08x2-exam-days-results.test.ts:364:28
+    362|       expect(got).toMatchObject({ status: 'collected', collectorName: …
+    363|       const again = await refused(w.finadmin.api.v1.exams.certificates…
+    364|       expect(again.status).toBe(409);
+       |                            ^
+    365|       expect(again.error).toMatch(/^This certificate was already colle…
+    366|       const slip = await apiResponse(w.officer.api.v1.exams.certificat…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/08x2-exam-days-results.test.ts > F4: exam days, results and certificates > certificates > an unclaimed certificate is kept for the retention period, then may be destroyed with a reason
+AssertionError: expected { status: 400, …(1) } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "This certificate is no longer here to collect",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "Failed to record the collection",[39m
+[31m+   "status": 400,[39m
+[2m  }[22m
+
+ ❯ test/08x2-exam-days-results.test.ts:391:10
+    389|       expect(gone).toMatchObject({ status: 'destroyed', disposalReason…
+    390|       expect((await refused(w.officer.api.v1.exams.certificates[':id']…
+    391|         .toEqual({ status: 409, error: 'This certificate is no longer …
+       |          ^
+    392|     });
+    393|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/08x3-exam-races.test.ts > F4: races > a certificate collected at two desks at once: collected once, the other officer told who took it
+AssertionError: expected true to be false // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- false[39m
+[31m+ true[39m
+
+ ❯ test/08x3-exam-races.test.ts:128:19
+    126|     const [r1, r2] = await Promise.all([first, second]);
+    127|     expect(r1.ok).toBe(true);
+    128|     expect(r2.ok).toBe(false);
+       |                   ^
+    129|     expect(String((r2 as { e: Error }).e.message)).toMatch(/^This cert…
+    130|     expect(await one(`select status, collector_name from exam_certific…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

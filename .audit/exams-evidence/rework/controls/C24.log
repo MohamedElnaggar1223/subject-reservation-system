@@ -1,0 +1,40 @@
+# C24: the board's results do not verify a declared sitting
+# undone in: apps/api/src/services/exam-result.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["the board's results verify a declared sitting"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 10103ms
+   × F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > the board's results verify a declared sitting (step B's answer, by the importer); a sitting with no result is left to the coordinator 69ms
+     → expected [] to deeply equal [ { …(4) } ]
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a declared sitting not verified: listed by the entry check, entered as declared or held > the board's results verify a declared sitting (step B's answer, by the importer); a sitting with no result is left to the coordinator
+AssertionError: expected [] to deeply equal [ { …(4) } ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [[39m
+[32m-   {[39m
+[32m-     "code": "XWWMA11",[39m
+[32m-     "grade": "D",[39m
+[32m-     "registrationId": "a56a3d9c-535e-400d-b989-cff20ca7f208",[39m
+[32m-     "studentId": "7qhlNcNMuVIo6J4RKnQNm8ECRb0NJybH",[39m
+[32m-   },[39m
+[32m- ][39m
+[31m+ [][39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:276:37
+    274|         boardSeriesId: june, commit: true, source: { text: `UCI,Unit C…
+    275|       } }));
+    276|       expect(done.sittingsVerified).toEqual([{ registrationId: lines.e…
+       |                                     ^
+    277|       expect((await lineOf(lines.e!)).outcome).toBe('verified');
+    278|       expect((await lineOf(gLine!)).outcome).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

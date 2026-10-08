@@ -300,8 +300,8 @@ driven in headless Chrome as its role in English and Arabic (`.audit/exams-evide
 |---|---|---|---|
 | **Deadlines** `/exams/deadlines` | coordinator, admin | each board's key-dates PDF pinned by the desk; to know what is left, count blanks in three sheets and ask finance | every board's dates in order, today marked, days left; each date counts what is outstanding live and links to the screen that fixes it; the entry deadline carries its time (the hard stop) |
 | **Candidates** `/exams/candidates` | coordinator, admin | a candidates sheet with names retyped from ID photocopies, one column of numbers per series, national IDs readable by anyone with the file; blanks found by filtering each column | one searchable table; each gap a board refuses is one filter with its count; a row opens in place; a UCI changes only with a reason; the national ID shows its last four, the full number for 30 s on request (audited); "Assign candidate numbers" keeps last series' numbers and previews before saving |
-| **Entries** `/exams/entries` | coordinator, admin | a sheet per series typed from the confirmed registrations; option codes looked up in the syllabus PDF; a "sent?" column; fees for withdrawals looked up in the handbook | derived from the registrations in one click with a preview; option and tier chosen from the syllabus's own; what the board would refuse beside each row; sent or withdrawn in bulk, with the board's fee shown before and after; a change after sending asks why; past the deadline the screen says nothing new is made |
-| **Entry lists** `/exams/entry-lists` | coordinator, admin | the entry sheet copied into the board's template column by column; problems learnt from the portal's rejection report | rows already in the portal's columns (marked assumed), each with what the board would refuse and a link to fix it; download of the ready rows; confirmed registrations with no entry listed with the fix; the board's rules on the same page, changed with a reason |
+| **Entries** `/exams/entries` | coordinator, admin | a sheet per series typed from the confirmed registrations; option codes looked up in the syllabus PDF; the retakes and carried sittings remembered from the forms' notes; cash-ins found in the receipt book; a "sent?" column; fees for withdrawals looked up in the handbook | derived from the paid reservations and cash-ins in one click with a preview that says, per line, what its item enters, the sitting it follows and whether it is verified, and why a line is held, past its deadline, awaiting its cash-in's payment or needing its award chosen; option and tier chosen from the syllabus's own; a paid cash-in whose line does not say the award added by hand with it; what the board would refuse beside each row; sent or withdrawn in bulk, with the board's fee shown before and after; a change after sending asks why; past the entry deadline the screen says only a retake of the previous series is still entered, until the retake deadline |
+| **Entry lists** `/exams/entry-lists` | coordinator, admin | the entry sheet copied into the board's template column by column; problems learnt from the portal's rejection report | rows already in the portal's columns (marked assumed), each with what the board would refuse and a link to fix it (a declared sitting not verified links the session's To verify tab); download of the ready rows; paid reservations with no entry listed with the fix (a held one says why), and paid cash-ins with no entry; the board's rules on the same page — the carry-forward period now the board's own — changed with a reason |
 | **Forecast grades** `/exams/forecasts` | teacher (own candidates), coordinator, admin | grades emailed back by teachers and retyped into the portal; chasing by memory | the teacher's own candidates by series and subject, due date and days left, saved on leaving the box; a grade the level does not use refused at once; the coordinator sees who gave each and marks a series sent |
 | **Timetable** `/exams/timetable` | coordinator, admin | the board's PDF copied by hand; clashes found with a ruler, extra time forgotten; families phoned when a paper moves | the board's table pasted as it is, columns recognised; each line new / changed / unchanged / wrong before saving; clashes for every candidate across boards with extra time, each with how it is handled; Publish tells families, a moved paper tells only those who sit it |
 | **Exam days** `/exams/days` | coordinator, admin | the hall drawn on squared paper, registers copied per room, a rota on the wall, consideration requests in an email folder | a card per sitting with candidates, seated and invigilators per room; "Seat everyone" with a preview (separate-room candidates listed to seat by hand); a desk for two refused by the database, naming who sits there; registers print per paper and room; special consideration per candidate and paper with its evidence |
@@ -317,9 +317,11 @@ the admin to their candidate details.
 
 ## 9. Tests
 
-`08x1-exam-entries`, `08x2-exam-days-results`, `08x3-exam-races` (with `exam-helpers.ts`: a
-school of every role, a catalogue per suite tag, an open window on the one free pair, families
-registered at the desk), cases in `05` and rules in `09`.
+`08x1-exam-entries`, `08x2-exam-days-results`, `08x3-exam-races`, `08x4-exam-entries-rework` (with
+`exam-helpers.ts`: a school of every role, a catalogue per suite tag, since the rework a winter
+session whose offers' items enter that catalogue, fee grids per series, families reserved and paid
+at the desk with lines and consent), cases in `05` and rules in `09`. Every September scenario of
+08x1–08x3 and 05 runs on the new model unchanged (its world only is built differently).
 
 | Scenario (FEATURES_PLAN §1 F4) | Test |
 |---|---|
@@ -332,17 +334,40 @@ registered at the desk), cases in `05` and rules in `09`.
 | a certificate collected once (a race test) | 08x3 "a certificate collected at two desks at once"; 08x2 "collected once at the desk…" |
 | national IDs hidden from roles without the need | 08x1 "national IDs … read only by the coordinator and the admin…"; 05; 09 |
 
+**On the rework's model** (`08x4-exam-entries-rework`, 18 scenarios, §2a's table):
+
+| §9 / §10 item | Scenario |
+|---|---|
+| entries from `lineItemsFor` (the item, not the subject row) | "two items of one subject are two lines, each entered as its own unit with its own line" |
+| `teacherOf(…, unit)` | "the forecast's teacher is the one who teaches that unit (teacherOf with the unit): the P1 teacher gives P1's, not P2's" |
+| retake from the attempt; a rejected declaration a first entry | "a retake comes from the line's attempt; a rejected declaration is entered as a first entry" |
+| `carry_forward_months` on `exam_board` | "the carry-forward period is the board's own column (exam_board), edited on the board rules and read by the line rules" |
+| carry forward from the verified sitting with its centre and number | "a sitting at another centre, verified with its centre and candidate number, is carried forward with them"; "a sitting here, verified without another centre…" |
+| suggest-and-confirm only without a prior sitting | "a line with no prior sitting of its own keeps the suggest-and-confirm flow (exams.carryForward)…" |
+| a declared, unverified sitting listed, entered or held | "entered as declared (the default): the check lists it as declared, unverified"; "held when the school holds unverified sittings: not derived, not sent; verified, it goes" |
+| the result verifying a declared sitting | "the board's results verify a declared sitting (step B's answer, by the importer); a sitting with no result is left to the coordinator" |
+| a cash-in entry carrying its charge | "accepted but not paid: listed as 'cash-in awaiting payment', not entered"; "paid: derived as the award its line's item enters, with exam_entry.charge_id"; "a cash-in that names no line: the coordinator adds its award by hand, with the charge"; "a cash-in whose payment is reversed is flagged on its entry" |
+| mark as sent → the board fee sent for `refundFor` | "a two-unit line with one unit sent: the board fee stays, the course part by the policy…" (preview 1,500 before: 50% of the 1,000 course fee plus the 1,000 board fee; 500 after; the drop refunds 500); "the same line with none sent: the board fee comes back in full" (1,500) |
+| MO-10 per line; the desk-drop's withdrawal | "past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent"; "the desk drops a paid line past its deadline: its entries are withdrawn with it…" |
+
 Races (08x3): two derivations, two numberings, a withdrawal against an amendment, one seat for two
 candidates, two results imports, a certificate at two desks, two scheduler instances, a failed
 reminder retried. 05: another family (every student-scoped endpoint "not found", staff endpoints
 refused), another class (a teacher refused another teacher's candidate's forecast and another
-room's register), the gate (nothing). 09: no entry made or sent after its series' deadline; an
-entry is its registration's student's in its series, a result its entry's; one withdrawal and one
-hand-over audit row each; no seat double-booked, no candidate seated twice, no invigilator in two
-rooms; no national ID in an audit row.
+room's register), the gate (nothing). 09: no entry made or sent after its own deadline (its line's
+effective deadline, its cash-in's, else its series' entry deadline — and there was a retake entered
+and sent between the two); an entry is its registration's student's in its series, a result its
+entry's; an entry from a cash-in is an award of that charge's student in its series, one per charge;
+a declared sitting verified from results had a result there; one withdrawal and one hand-over audit
+row each; no seat double-booked, no candidate seated twice, no invigilator in two rooms; no national
+ID in an audit row.
 
-**Negative controls** (`.audit/exams-evidence/controls.py`; one trail row each; logs in
-`.audit/exams-evidence/controls/`): each guard undone once, its tests red, restored.
+**Negative controls**, re-run on the rework's model (`.audit/exams-evidence/rework/controls.py`;
+one trail row each; logs — the vitest summary and the failing tests with their messages — in
+`.audit/exams-evidence/rework/controls/`): each guard undone once, its tests red, restored. C1–C17
+are September's guards on the new code (C1, C2 now the per-entry deadline; C8 the index in 0050);
+C18–C33 the rework's (the table below them). September's logs stay in the ignored
+`.audit/exams-evidence/controls/`.
 
 | Control | Undone | Red |
 |---|---|---|
@@ -363,6 +388,20 @@ rooms; no national ID in an audit row.
 | C15 | a parent's link to the child (family endpoints) | 05 |
 | C16 | a teacher's register limited to the room they invigilate | 08x2, 05 |
 | C17 | the entry list sorted by the entry's own code (put back: a column Cambridge's list lacks) | 08x1 |
+| C1b | derivation's per-line cut-off (a line past its own deadline entered) | 08x4 |
+| C18 | `lineItemsFor` reading the subject row's units instead of the line's item | 08x4 |
+| C19, C19b | the retake from the line's attempt; a rejected declaration read as a first entry | 08x4 |
+| C20, C20b | carry forward from the verified sitting's previous centre and number; from the line's prior sitting at all | 08x4 |
+| C21, C22 | a cash-in entered only once paid (derived; by hand) | 08x4 |
+| C23 | `refundFor`'s seam `entrySentAt` wired to "mark as sent" | 08x4 |
+| C24 | the results import verifying declared sittings | 08x4 |
+| C25, C31 | a held line not sent; not derived | 08x4 |
+| C26, C26b | the line's own deadline (the retake deadline) in derivation; in sending | 08x4 |
+| C27 | the desk-drop withdrawing the line's entries (`withdrawEntry`) | 08x4 |
+| C28 | `teacherOf` with the unit | 08x4 |
+| C29 | the database's one-live-entry-per-cash-in index (0050) | 08x4 |
+| C30 | the carry-forward period written to `exam_board` | 08x4 |
+| C32, C33 | the check listing a declared unverified sitting; a cash-in no longer paid | 08x4 |
 
 ## 10. Decisions and why
 
@@ -384,6 +423,42 @@ rooms; no national ID in an audit row.
   row and cell limits) rather than a new dependency: F1 and F7 share the lockfile in parallel.
 - **Deadline reminders claim and send in one transaction** per reminder, so a failure leaves no
   claim and the next tick retries; one series' failure does not stop the others.
+
+On the reservations rework's model (8 Oct 2026; the trail's build rows of 09:05Z and 09:37Z):
+
+- **The contracts §10 named but main did not have are the smallest pieces in their owners' files**
+  (`lineItemsFor` in A's line.services, `chargesOfKind` in C's charge.services, the unit on
+  `teacherOf`), agreed with the lead before they were written, and noted in A's and C's documents.
+  A `subject` item (every converted line, and the suites' own) enters the subject row's catalogue
+  mapping, so a line converted from a window still derives its entries.
+- **"Sent" is the earliest entry of the line marked sent**, withdrawn ones included (the lead): the
+  board fee is one amount per line in `refundFor`, so a partly sent line is a sent line; the
+  preview and the drop's notice name the entries sent and when, so the desk can explain it.
+- **A cash-in is entered once paid** (the lead): the award its line's item enters (A's
+  `item.qualification_id`, an award cashed in by units), else by hand with the charge; one
+  accepted and not paid is listed "cash-in awaiting payment" in the preview and not entered. A
+  cash-in's entry is cut off at its service's deadline (C's `board_service_deadline`), else the
+  series' entry deadline.
+- **The hard stop is per line, for making and for sending alike**: the line's effective deadline as
+  A computes it (`effectiveDeadlinesOf`, Q-20's late entry included). A derivation is refused only
+  when the series' entry deadline has passed and no line is still open, with the series' sentence
+  as before; otherwise the rows past their deadline are listed and not made.
+- **Held means not entered**: under `hold` derivation leaves a declared, unverified line out and
+  "mark as sent" refuses its entry already made; the check flags it either way, and its fix is the
+  session's To verify tab. The setting stays B's and the admin's.
+- **Results only verify**: a result for what the line enters, in the declared series, verifies the
+  sitting through B's own answer (its locks, its audit row, the importer as the one who answered,
+  the result as the evidence), after the import commits, each line in its own transaction. A
+  missing result rejects nothing: results files are partial (F-07) and the coordinator answers.
+- **The carry-forward period has one home**, `exam_board.carry_forward_months`; F4's board rules
+  read and edit it there (one audit row), so the period the coordinator sets is the one the line
+  rules refuse a declared sitting with.
+- **The suggest flow stays for a line with no prior sitting whose item fixes no route** (a whole
+  A Level award): a route the family chose (A Level in one series, A2 carried forward) is never
+  overridden by a suggestion.
+- **The desk-drop withdraws in its own transaction** (after the receipt and the line, MA-16's order;
+  the entries `FOR UPDATE` after the line), so a drop never leaves a live entry behind and a failed
+  drop withdraws nothing; the family is told of each withdrawal after the commit.
 
 ## 11. Deferred, and why
 
@@ -414,6 +489,24 @@ rooms; no national ID in an audit row.
 - **The Entries screen after a deadline** was photographed with the series' responses changed in
   the browser (`entries-after-deadline-MOCKED-*.png`, named so); no demo series has passed its
   deadline yet. The refusal itself is the API's and is proven by 08x1 and control C1.
+
+On the reservations rework's model (8 Oct 2026):
+
+- **An F4 result as a `known` sitting at reservation time** (§3.5: "known — an earlier line or an
+  F4 result"): B's `knownSittingsOf` still reads earlier lines only (its document §9 left this to
+  F4). F4 verifies a declared sitting from results after the fact instead; making a result a
+  `known` sitting changes B's reservation path and its offers read (a sitting with no line), so it
+  is left for B's owner and the lead to place.
+- **Other system drops do not withdraw entries**: the desk-drop does (C's seam); a paid line dropped
+  by B's rejection after the first-entry deadline or by `hold` at its deadline keeps its entries,
+  which the check then flags ("its registration is no longer confirmed — withdraw the entry"). Under
+  `hold` such a line was never entered; after a rejection the entry may have gone (its board fee
+  stays, §3.5), so withdrawing it is the coordinator's act with the board.
+- **Migration numbers**: 0050 and 0051 follow main's 0049; step D's migrations land first, so they
+  are renumbered once more at the final merge (a journal `when` later than D's last).
+- **The demo seed's new shapes** (a carried-forward A2 at another centre, an unpaid cash-in, a
+  declared retake verified by June's results) are for the screens; the template's own converted
+  session closed on 30 Sep, so the seed opens a new winter session labelled "exams demo".
 
 ## 12. Questions for the owner (through the coordinator)
 
@@ -453,3 +546,29 @@ rooms; no national ID in an audit row.
   dictionaries committed (bf17f59); §8 and §11 written.
 - 06:05Z — gates green at 5d338a5: api and web check-types; the suite in local time and in UTC
   (25 files, 353 passed, 1 todo; `.audit/exams-evidence/suite-{local,utc}-5d338a5.log`).
+- 2026-10-07 — frozen at ec7689b (CI green on 53fd152) while the reservations were redone.
+
+On the reservations rework's model (8 Oct 2026, UTC; the trail has a row per step):
+
+- 08:10Z — resumed by the Opus 5.5 implementer; read CLAUDE.md, RESERVATIONS_REWORK.md §3, §6, §9,
+  §10, the steps' documents A, B and C, FEATURES_PLAN §4, §5, §7, this document and its trail. Git
+  from lead-env only, with plumbing (a temporary index, commit-tree, update-ref).
+- 08:23Z — main 2a26557 merged as its own commit (1a3ba69): 17 conflicts resolved by hand, the
+  rework's side winning on the model; F4's migrations regenerated after 0049 as 0050 and 0051.
+- 08:57Z — F4's own API watcher of 30 Sep stopped by its PIDs; `igcse_exams_dev` recreated from the
+  template and migrated (main's 50 migrations, then the branch's 52), the order proved on a copy.
+- 09:05Z — the first pass compiles and is pushed (2d0e380, CI green): `lineItemsFor`,
+  `chargesOfKind`, `teacherOf` with the unit, derivation from lines and paid cash-ins, the per-line
+  hard stop, `exam_entry.charge_id`, the carry-forward period on `exam_board`; the test world and
+  the demo seed on sessions, offers, items and desk lines. Both money defaults confirmed by the lead.
+- 09:37Z — the §9 items wired and proved (398b527, CI green): 08x4's 18 scenarios, C's seams
+  `entrySentAt` and `withdrawEntry`, results verifying declared sittings, 09's rules, the screens
+  and their Arabic. The full suite: 32 files, 561 passed, 1 todo, in local time and in UTC.
+- 09:38Z–09:44Z — controls C1–C33 (37 in all) on the new code: each red once with its guard undone,
+  then restored (`.audit/exams-evidence/rework/controls/`).
+- 09:46Z–09:55Z — the running system (API 3043, web 3040) seeded on the new model; the changed
+  screens driven as the coordinator and as a parent at phone width, in English and Arabic; four
+  defects found by driving fixed (`.audit/exams-evidence/rework/screens/`).
+- 10:04Z — gates green on the final tree: api and web check-types; the full suite in local time and
+  in UTC, 32 files, 561 passed, 1 todo each (`.audit/exams-evidence/rework/suite-{local,utc}-final.log`).
+  Ready for the Opus 5.5 review.

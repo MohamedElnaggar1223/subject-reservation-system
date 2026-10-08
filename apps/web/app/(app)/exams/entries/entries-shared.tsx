@@ -85,12 +85,21 @@ export function Dialog({
 // ─── The series' deadline, as the entry screens show it ──────────────────────
 
 /**
+ * Past the entry deadline, a retake of the board's previous series is still entered and sent until
+ * the series' retake deadline (the reservations rework, §3.3: each line cut off at its own deadline).
+ */
+export const retakeStillOpen = (series: BoardSeriesRow) => series.entryDeadlinePassed && !series.retakeDeadlinePassed && !!series.retakeDeadline;
+/** Nothing more can be entered or sent in the series. */
+export const entriesClosed = (series: BoardSeriesRow) => series.entryDeadlinePassed && !retakeStillOpen(series);
+
+/**
  * The entry deadline with days left (or passed: the school's hard stop,
  * MO-10), the board's fee tier today and the forecast grades' due date.
  */
 export function SeriesDeadlineStatus({ series, className }: { series: BoardSeriesRow; className?: string }): React.JSX.Element {
   const tier = feeTierOn(series, todayInSchool());
-  const passed = series.entryDeadlinePassed;
+  const passed = entriesClosed(series);
+  const retakes = retakeStillOpen(series);
   return (
     <div className={cn('mb-6 space-y-3', className)}>
       <div className="flex flex-wrap items-start gap-x-8 gap-y-3 rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -101,6 +110,15 @@ export function SeriesDeadlineStatus({ series, className }: { series: BoardSerie
             <DeadlineBadge iso={series.entryDeadline} />
           </p>
         </div>
+        {series.retakeDeadline && (
+          <div>
+            <p className="text-xs text-muted-foreground">Retake deadline</p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+              <InstantText iso={series.retakeDeadline} />
+              <DeadlineBadge iso={series.retakeDeadline} />
+            </p>
+          </div>
+        )}
         <div>
           <p className="text-xs text-muted-foreground">The board&apos;s fee today</p>
           <p className="mt-0.5"><Badge tone={tier === 'standard' ? 'neutral' : 'warning'}>{FEE_TIER_LABELS[tier]}</Badge></p>
@@ -115,6 +133,11 @@ export function SeriesDeadlineStatus({ series, className }: { series: BoardSerie
           </div>
         )}
       </div>
+      {retakes && (
+        <Notice tone="warning" title="The entry deadline has passed">
+          Only a retake of the board&apos;s previous series is still entered and sent, until the retake deadline. A first entry is not made or sent; a withdrawal is still recorded, with what the board does with its fee.
+        </Notice>
+      )}
       {passed && (
         <Notice tone="danger" title="The entry deadline has passed">
           No new entries are made for this series, and none is marked as sent after the deadline. A withdrawal is still recorded, with what the board does with its fee.

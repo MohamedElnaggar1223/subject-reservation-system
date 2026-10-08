@@ -35,7 +35,7 @@ import {
   EXAMS_KEY, BoardText, Code, ProblemChips, SeriesSelect, fetchEntryList, useSeriesChoice, type BoardSeriesRow, type EntryListData,
 } from '../exam-f4-shared';
 import { InstantText } from '../exams-shared';
-import { FlashNotice, SeriesDeadlineStatus, deriveEntries, type Flash } from '../entries/entries-shared';
+import { FlashNotice, SeriesDeadlineStatus, deriveEntries, entriesClosed, type Flash } from '../entries/entries-shared';
 import { BoardRulesPanel } from './board-rules.client';
 
 type Fix = 'candidate' | 'entries' | 'forecasts' | 'settings' | 'verify' | 'desk';
@@ -182,7 +182,7 @@ function ListBody({ data, series }: { data: EntryListData; series: BoardSeriesRo
       {rows.length === 0 ? (
         <EmptyState
           title="No entries in this series yet"
-          message="The list is made from the series' entries. Derive them from the confirmed registrations on the Entries page."
+          message="The list is made from the series' entries. Derive them from the paid reservations on the Entries page."
           action={<Button asChild variant="outline"><Link href={`/exams/entries?series=${series.id}` as Route}>Entries</Link></Button>}
         />
       ) : (
@@ -300,7 +300,7 @@ function Unentered({ data, series }: { data: EntryListData; series: BoardSeriesR
     },
     onError: (err: Error) => setFlash({ tone: 'danger', title: 'Nothing was made.', lines: [err.message] }),
   });
-  const passed = data.series.pastDeadline;
+  const passed = entriesClosed(series);
   return (
     <section className="mb-8" aria-labelledby="unentered-title">
       <h2 id="unentered-title" className="mb-1 font-display text-lg font-bold text-foreground">Paid reservations with no entry</h2>

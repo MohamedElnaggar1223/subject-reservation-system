@@ -1,7 +1,7 @@
 /**
  * The boards' entry lists (FEATURES_PLAN.md F4; docs/features/EXAM_ENTRIES.md
  * §3): one row per live entry in the board portal's fields, what each row is
- * missing, the confirmed registrations with no entry, and the board's rules —
+ * missing, the paid reservations with no entry, and the board's rules —
  * the coordinator's and the admin's. The series lives in the address.
  */
 

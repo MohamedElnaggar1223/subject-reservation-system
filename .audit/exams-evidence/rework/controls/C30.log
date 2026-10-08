@@ -1,0 +1,33 @@
+# C30: the carry-forward period not written to the board's own column
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["the carry-forward period is the board's own column"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 9971ms
+   × F4 on the reservations rework > carry forward from the line's verified prior sitting > the carry-forward period is the board's own column (exam_board), edited on the board rules and read by the line rules 11ms
+     → expected 13 to be 4 // Object.is equality
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > carry forward from the line's verified prior sitting > the carry-forward period is the board's own column (exam_board), edited on the board rules and read by the line rules
+AssertionError: expected 13 to be 4 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 4[39m
+[31m+ 13[39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:175:121
+    173|     it('the carry-forward period is the board\'s own column (exam_boar…
+    174|       await apiResponse(coord.api.v1.exams['board-rules'][':boardCode'…
+    175|       expect((await one<{ m: number }>(`select carry_forward_months as…
+       |                                                                                                                         ^
+    176|       const rules = await apiResponse(coord.api.v1.exams['board-rules'…
+    177|       expect(rules.find((r) => r.boardCode === 'cambridge')).toMatchOb…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

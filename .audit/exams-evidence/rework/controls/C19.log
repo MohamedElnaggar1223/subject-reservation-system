@@ -1,0 +1,67 @@
+# C19: a retake not read from the line's attempt
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["a retake comes from the line's attempt"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 2 failed) 9766ms
+   × F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry 133ms
+     → expected [ [ 'XW97', false, null, …(1) ] ] to deeply equal [ [ 'XW97', true, …(2) ] ]
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent 37ms
+     → expected { …(16) } to match object { is_retake: true, …(1) }
+ Test Files  1 failed (1)
+      Tests  2 failed | 16 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > what a line's item enters (lineItemsFor) > a retake comes from the line's attempt; a rejected declaration is entered as a first entry
+AssertionError: expected [ [ 'XW97', false, null, …(1) ] ] to deeply equal [ [ 'XW97', true, …(2) ] ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    [[22m
+[2m      "XW97",[22m
+[32m-     true,[39m
+[32m-     "registration",[39m
+[31m+     false,[39m
+[31m+     null,[39m
+[2m      "d10628ab-1560-4b40-b6e6-41251009a11b",[22m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:163:10
+    161|       await derive(w.series.cambridgeNov, fam.rj!.studentId);
+    162|       expect((await entriesOf(w.series.cambridgeNov, fam.rt!.studentId…
+    163|         .toEqual([[`${T}97`, true, 'registration', rt]]);
+       |          ^
+    164|       expect((await entriesOf(w.series.cambridgeNov, fam.rj!.studentId…
+    165|         .toEqual([[`${T}97`, false, null, rj]]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent
+AssertionError: expected { …(16) } to match object { is_retake: true, …(1) }
+(14 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "is_retake": true,[39m
+[32m-   "retake_source": "registration",[39m
+[31m+   "is_retake": false,[39m
+[31m+   "retake_source": null,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:458:18
+    456|       expect(await entriesOf(juneSeries, jf.j4!.studentId)).toEqual([]…
+    457|       const [e2] = await entriesOf(juneSeries, jf.j2!.studentId);
+    458|       expect(e2).toMatchObject({ is_retake: true, retake_source: 'regi…
+       |                  ^
+    459|       const deadline = new Date((await one<{ d: string }>(`select entr…
+    460|       expect(new Date(e2!.created_at).getTime()).toBeGreaterThan(deadl…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

@@ -21,12 +21,12 @@ import { Notice } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
 import { SELECT_CLASS, useCatalogue } from '../exams-shared';
 import { EXAMS_KEY, fetchCandidates, fetchEntryList, type BoardSeriesRow } from '../exam-f4-shared';
-import { EntryLine, FlashNotice, createEntry, type Flash } from './entries-shared';
+import { EntryLine, FlashNotice, createEntry, entriesClosed, type Flash } from './entries-shared';
 
 export function AddEntryPanel({ series, studentId }: { series: BoardSeriesRow; studentId: string | null }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState<Flash>(null);
-  const passed = series.entryDeadlinePassed;
+  const passed = entriesClosed(series);
   return (
     <section className="mb-6 rounded-xl border border-border bg-card p-4 shadow-sm" aria-labelledby="add-entry-title">
       <div className="flex flex-wrap items-start justify-between gap-3">

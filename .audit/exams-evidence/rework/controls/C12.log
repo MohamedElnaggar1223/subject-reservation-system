@@ -1,0 +1,26 @@
+# C12: candidate numbering's lock removed
+# undone in: apps/api/src/services/exam-candidate.services.ts
+# ran: test/08x3-exam-races.test.ts
+# expected red: ['number the same series at once']
+# result: RED as expected
+
+ ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 9669ms
+   × F4: races > two coordinators number the same series at once: every candidate one number, every number one candidate 5026ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x3-exam-races.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x3-exam-races.test.ts > F4: races > two coordinators number the same series at once: every candidate one number, every number one candidate
+Error: waitFor: timed out
+ ❯ waitFor test/helpers.ts:482:38
+    480|     const v = await probe();
+    481|     if (v) return v;
+    482|     if (Date.now() > deadline) throw new Error('waitFor: timed out');
+       |                                      ^
+    483|     await new Promise((r) => setTimeout(r, 100));
+    484|   }
+ ❯ test/08x3-exam-races.test.ts:59:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

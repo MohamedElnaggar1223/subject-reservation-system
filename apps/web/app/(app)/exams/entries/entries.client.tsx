@@ -12,7 +12,7 @@
  * nothing that says a row is missing the tier or the option until the board
  * refuses it.
  *
- * Here: the entries are derived from the confirmed registrations in one
+ * Here: the entries are derived from the paid reservations in one
  * click, with a preview that says what each registration enters and what it
  * cannot; each entry carries its option code as a choice of the syllabus's
  * own codes (saved as it changes), and beside it what the board would
@@ -48,7 +48,7 @@ export default function EntriesClient(): React.JSX.Element {
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight text-foreground">Exam entries</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            What each candidate is entered for with the board in a series, made from the confirmed registrations. Tick entries to mark them as sent to the board or to withdraw them; each row says what the board would refuse.
+            What each candidate is entered for with the board in a series, made from the paid reservations and cash-ins. Tick entries to mark them as sent to the board or to withdraw them; each row says what the board would refuse.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
@@ -71,7 +71,7 @@ export default function EntriesClient(): React.JSX.Element {
       ) : !chosen ? (
         <EmptyState
           title="No board series yet"
-          message="Entries belong to a board series. Add the boards' sittings on the Board series page first; the entries of each come from its confirmed registrations."
+          message="Entries belong to a board series. Add the boards' sittings on the Board series page first; the entries of each come from its paid reservations."
           action={<Button asChild variant="outline"><Link href="/exams/series">Board series</Link></Button>}
         />
       ) : (

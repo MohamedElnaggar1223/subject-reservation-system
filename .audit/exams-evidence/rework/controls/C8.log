@@ -1,0 +1,98 @@
+# C8: the database's one-candidate-per-seat index removed (0050)
+# undone in: packages/db/drizzle/0050_exam_entries.sql
+# ran: test/08x2-exam-days-results.test.ts test/08x3-exam-races.test.ts
+# expected red: ['no seat holds two candidates', 'the same free seat at once']
+# result: RED as expected
+
+ ❯ test/08x2-exam-days-results.test.ts (14 tests | 2 failed) 4414ms
+   × F4: exam days, results and certificates > rooms and seats > a sitting is seated room by room, candidates of a paper together; no seat holds two candidates 53ms
+     → expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+   × F4: exam days, results and certificates > rooms and seats > invigilators: one room each per sitting; a teacher keeps only the register of their own room 32ms
+     → expected [ [ 'XD Hall', 3, 1, 1 ], …(1) ] to deeply equal [ [ 'XD Hall', 2, 1, 1 ], …(1) ]
+ ❯ test/08x3-exam-races.test.ts (8 tests | 1 failed) 3977ms
+   × F4: races > two coordinators put two candidates in the same free seat at once: one is seated, the other told whose it is 45ms
+     → expected [ true, true ] to deeply equal [ false, true ]
+ Test Files  2 failed (2)
+      Tests  3 failed | 19 passed (22)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x2-exam-days-results.test.ts test/08x3-exam-races.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x2-exam-days-results.test.ts > F4: exam days, results and certificates > rooms and seats > a sitting is seated room by room, candidates of a paper together; no seat holds two candidates
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "Seat A1 in XD Hall is already Student x-xd-b's",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "\"\"",[39m
+[31m+   "status": 200,[39m
+[2m  }[22m
+
+ ❯ test/08x2-exam-days-results.test.ts:164:10
+    162|       // A seat already taken is refused, naming who sits there.
+    163|       expect(await refused(coord.api.v1.exams.seats.$put({ json: { ...…
+    164|         .toEqual({ status: 409, error: 'Seat A1 in XD Hall is already …
+       |          ^
+    165|       expect(await refused(coord.api.v1.exams.seats.$put({ json: { ...…
+    166|         .toEqual({ status: 400, error: 'XD Hall has rows A–B and seats…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/08x2-exam-days-results.test.ts > F4: exam days, results and certificates > rooms and seats > invigilators: one room each per sitting; a teacher keeps only the register of their own room
+AssertionError: expected [ [ 'XD Hall', 3, 1, 1 ], …(1) ] to deeply equal [ [ 'XD Hall', 2, 1, 1 ], …(1) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    [[22m
+[2m      "XD Hall",[22m
+[32m-     2,[39m
+[31m+     3,[39m
+[2m      1,[22m
+[2m      1,[22m
+[2m    ],[22m
+[2m    [[22m
+[2m      "XD Room 2",[22m
+[32m-     1,[39m
+[31m+     0,[39m
+[2m      1,[22m
+[32m-     1,[39m
+[31m+     0,[39m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ test/08x2-exam-days-results.test.ts:208:93
+    206|       const s1 = sittings.sittings.find((s) => s.examDate === d1 && s.…
+    207|       expect(s1).toMatchObject({ candidates: 3, seated: 3 });
+    208|       expect(s1.rooms.map((r) => [r.name, r.seated, r.invigilators, r.…
+       |                                                                                             ^
+    209| 
+    210|       const duties = await apiResponse(w.teacher.api.v1.exams.invigila…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/08x3-exam-races.test.ts > F4: races > two coordinators put two candidates in the same free seat at once: one is seated, the other told whose it is
+AssertionError: expected [ true, true ] to deeply equal [ false, true ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[32m-   false,[39m
+[31m+   true,[39m
+[2m    true,[22m
+[2m  ][22m
+
+ ❯ test/08x3-exam-races.test.ts:95:35
+     93|     const seat = (studentId: string) => settle(apiResponse(coord.api.v…
+     94|     const [r1, r2] = await Promise.all([seat(a), seat(c)]);
+     95|     expect([r1.ok, r2.ok].sort()).toEqual([false, true]);
+       |                                   ^
+     96|     const winner = (await one<{ student_id: string }>(`select student_…
+     97|     const loser = r1.ok ? r2 : r1;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

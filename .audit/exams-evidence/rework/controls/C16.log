@@ -1,0 +1,49 @@
+# C16: a teacher's register not limited to the room they invigilate
+# undone in: apps/api/src/services/exam-day.services.ts
+# ran: test/08x2-exam-days-results.test.ts test/05-object-access.test.ts
+# expected red: ['a teacher keeps only the register of their own room', 'F4 exam entries']
+# result: RED as expected
+
+ ❯ test/05-object-access.test.ts (16 tests | 1 failed) 7957ms
+   × object-level access between families > F4 exam entries: another family reads none of A's exams; a teacher reaches only their own candidates and room; the gate nothing 2521ms
+     → teacher reads room B's register answered 200: {"success":true,"data":{"paper":{"id":"be0b5eec-600d-42ec-b86b-40f33681b26d","code":"OA497/12","title":"Paper 1","examDate":"2026-11-27","session":"am","startTime":"09:00","durationMinutes":60},"serie: expected 200 to be greater than or equal to 400
+ ❯ test/08x2-exam-days-results.test.ts (14 tests | 1 failed) 3857ms
+   × F4: exam days, results and certificates > rooms and seats > invigilators: one room each per sitting; a teacher keeps only the register of their own room 58ms
+     → expected 200 to be 403 // Object.is equality
+ Test Files  2 failed (2)
+      Tests  2 failed | 28 passed (30)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x2-exam-days-results.test.ts test/05-object-access.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/05-object-access.test.ts > object-level access between families > F4 exam entries: another family reads none of A's exams; a teacher reaches only their own candidates and room; the gate nothing
+AssertionError: teacher reads room B's register answered 200: {"success":true,"data":{"paper":{"id":"be0b5eec-600d-42ec-b86b-40f33681b26d","code":"OA497/12","title":"Paper 1","examDate":"2026-11-27","session":"am","startTime":"09:00","durationMinutes":60},"serie: expected 200 to be greater than or equal to 400
+ ❯ refusedAs test/05-object-access.test.ts:30:96
+     28|   const body = (await res.json().catch(() => ({}))) as { error?: unkno…
+     29|   attempts.push([label, String(res.status), typeof body.error === 'str…
+     30|   expect(res.status, `${label} answered ${res.status}: ${JSON.stringif…
+       |                                                                                                ^
+     31|   expect(res.status, `${label} answered ${res.status}`).toBeLessThan(5…
+     32|   return res.status;
+ ❯ test/05-object-access.test.ts:492:14
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08x2-exam-days-results.test.ts > F4: exam days, results and certificates > rooms and seats > invigilators: one room each per sitting; a teacher keeps only the register of their own room
+AssertionError: expected 200 to be 403 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 403[39m
+[31m+ 200[39m
+
+ ❯ test/08x2-exam-days-results.test.ts:219:120
+    217|       expect(reg.centreNumber).toBeNull();
+    218|       // Another room's register, or another teacher's, is refused.
+    219|       expect((await refused(w.teacher.api.v1.exams.registers.$get({ qu…
+       |                                                                                                                        ^
+    220|       expect((await refused(w.teacher2.api.v1.exams.registers.$get({ q…
+    221|       await apiResponse(w.teacher.api.v1.exams.registers.$put({ json: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

@@ -30,7 +30,7 @@ import {
   EXAMS_KEY, BoardText, Code, EntryStatusBadge, ProblemChips, fetchEntries, type BoardSeriesRow, type EntryRow,
 } from '../exam-f4-shared';
 import {
-  Dialog, EntryLine, FlashNotice, isSent, submitEntries, toLocalInput, updateEntry, withdrawEntry, type Flash,
+  Dialog, EntryLine, FlashNotice, entriesClosed, isSent, submitEntries, toLocalInput, updateEntry, withdrawEntry, type Flash,
 } from './entries-shared';
 
 const RETAKE_SOURCE: Record<string, string> = {
@@ -144,7 +144,7 @@ export function EntriesTable({ series, studentId }: { series: BoardSeriesRow; st
       {rows.length === 0 ? (
         <EmptyState
           title={studentId ? 'This candidate has no entry in this series' : 'No entries in this series yet'}
-          message="Entries are made from confirmed registrations: use Preview above to see what the registrations enter, then make them. An entry the registrations cannot make is added by hand."
+          message="Entries are made from paid reservations: use Preview above to see what they enter, then make them. An entry the reservations cannot make is added by hand."
         />
       ) : (
         <div className="rounded-xl border border-border bg-card shadow-sm">
@@ -312,7 +312,7 @@ function EntryRowView({
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             <span>{e.kind === 'unit' ? 'Unit' : 'Award'}</span>
-            {!e.registrationId && <> · <span>Added by hand</span></>}
+            {e.chargeId ? <> · <span>From a paid cash-in</span></> : !e.registrationId && <> · <span>Added by hand</span></>}
           </p>
         </td>
         <td className="px-3 py-2.5">
@@ -603,7 +603,7 @@ function SendDialog({ series, entries, onClose, onDone }: { series: BoardSeriesR
   const drafts = entries.filter((e) => e.status === 'draft');
   const already = entries.length - drafts.length;
   // Past the deadline only a time before it is taken: entries that went on time and are recorded late.
-  const passed = series.entryDeadlinePassed;
+  const passed = entriesClosed(series);
   const [when, setWhen] = useState<'now' | 'earlier'>(passed ? 'earlier' : 'now');
   const [at, setAt] = useState(() => (passed ? '' : toLocalInput(new Date())));
   const [error, setError] = useState('');

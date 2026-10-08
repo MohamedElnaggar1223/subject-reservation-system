@@ -1,0 +1,26 @@
+# C26b: sending reads the series' entry deadline, not the line's
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["a retake of the board's previous sitting is still entered and sent"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (18 tests | 1 failed) 9670ms
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent 35ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 17 passed (18)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > past the entry deadline a retake of the board's previous sitting is still entered and sent, until the retake deadline; a first entry is not sent
+Error: The entry deadline for Cambridge International June 2027 (exams xw june) (8 October 2026 at 12:43) has passed: the school makes no new entries after it — the board's late entries are not taken (MO-10)
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08x4-exam-entries-rework.test.ts:461:14
+    459|       const deadline = new Date((await one<{ d: string }>(`select entr…
+    460|       expect(new Date(e2!.created_at).getTime()).toBeGreaterThan(deadl…
+    461|       expect(await apiResponse(coord.api.v1.exams.entries.submit.$post…
+       |              ^
+    462|       // J3's draft is a first entry: sending it now is a late entry.
+    463|       const [e3] = await entriesOf(juneSeries, jf.j3!.studentId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
