@@ -1,14 +1,14 @@
 # C31: s9: the review refuses a line whose item has no fee row, naming the grid (fee_missing)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 2 failed) 14366ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 186ms
-   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 213ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13560ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 174ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 167ms
  Test Files  1 failed (1)
       Tests  2 failed | 66 passed (68)
-   Duration  16.41s (transform 698ms, setup 2ms, collect 319ms, tests 14.37s, environment 0ms, prepare 35ms)
+   Duration  15.36s (transform 730ms, setup 2ms, collect 296ms, tests 13.56s, environment 0ms, prepare 30ms)
  ❯ test/08n-import.test.ts:635:44
- ❯ test/08n-import.test.ts:1620:83
+ ❯ test/08n-import.test.ts:1625:83
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
@@ -22,7 +22,7 @@ AssertionError: expected [] to deeply equal [ { code: 'fee_missing', …(2) } ]
 - [
 -   {
 -     "code": "fee_missing",
--     "detail": "Whole subject has no board fee in Pearson Edexcel November 2026 (t1-ra2v) yet — set one on the session's Fees tab",
+-     "detail": "Whole subject has no board fee in Pearson Edexcel November 2026 (t1-vhg3) yet — set one on the session's Fees tab",
 -     "severity": "error",
 -   },
 - ]
@@ -39,20 +39,20 @@ AssertionError: expected undefined to deeply equal { code: 'fee_missing', …(2)
 - Expected: 
 {
   "code": "fee_missing",
-  "detail": "Whole subject has no board fee in Cambridge International November 2026 (t6-ra2v) yet — set one on the session's Fees tab",
+  "detail": "Whole subject has no board fee in Cambridge International November 2026 (t6-vhg3) yet — set one on the session's Fees tab",
   "severity": "error",
 }
 
 + Received: 
 undefined
 
- ❯ test/08n-import.test.ts:1620:83
-    1618|       expect((await putSettings(adm, id, { series: { [`november-${Y}-i…
-    1619|       v = await fetchView(adm, id);
-    1620|       expect(rowAt(v, 'Extra', 3).problems.find((p) => p.code === 'fee…
+ ❯ test/08n-import.test.ts:1625:83
+    1623|       expect((await putSettings(adm, id, { series: { [`november-${Y}-i…
+    1624|       v = await fetchView(adm, id);
+    1625|       expect(rowAt(v, 'Extra', 3).problems.find((p) => p.code === 'fee…
        |                                                                                   ^
-    1621|         code: 'fee_missing', severity: 'error', detail: `Whole subject…
-    1622|       });
+    1626|         code: 'fee_missing', severity: 'error', detail: `Whole subject…
+    1627|       });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

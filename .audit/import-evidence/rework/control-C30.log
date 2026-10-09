@@ -1,11 +1,11 @@
 # C30: flag 7: a self-study note against an explicit "No" is flagged (self_study_contradiction)
 # undone in apps/api/src/services/import/normalise.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 14343ms
-   × F7: the day-one import > the note and the self-study answer (review flag 7), and the family's confirmation on a line > a fee note that says self-study against an explicit "No" is read as self-study and flagged; the same "No" with no note, or "Yes" with it, is not 36ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 14092ms
+   × F7: the day-one import > the note and the self-study answer (review flag 7), and the family's confirmation on a line > a fee note that says self-study against an explicit "No" is read as self-study and flagged; the same "No" with no note, or "Yes" with it, is not 29ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  16.14s (transform 684ms, setup 2ms, collect 301ms, tests 14.34s, environment 0ms, prepare 32ms)
+   Duration  16.02s (transform 727ms, setup 2ms, collect 297ms, tests 14.09s, environment 0ms, prepare 32ms)
  ❯ test/08n-import.test.ts:922:96
 
 # failures (messages)

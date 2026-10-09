@@ -1,22 +1,22 @@
 # C36: the lead's Q2: a sitting from the student's history is the legacy source
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 6 failed) 14489ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 223ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 419ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the declared sittings are on the session's To verify tab; the legacy one is not; the desk's offers read does not take sheet history as a known sitting 21ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 29ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed after November had ended: a past sitting, so June takes it as a legacy retake in self-study, at the self-study share 61ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 103ms
+ ❯ test/08n-import.test.ts (68 tests | 6 failed) 13290ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 162ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 356ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the declared sittings are on the session's To verify tab; the legacy one is not; the desk's offers read does not take sheet history as a known sitting 7ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 11ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed after November had ended: a past sitting, so June takes it as a legacy retake in self-study, at the self-study share 56ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 90ms
  Test Files  1 failed (1)
       Tests  6 failed | 62 passed (68)
-   Duration  16.80s (transform 766ms, setup 2ms, collect 421ms, tests 14.49s, environment 0ms, prepare 33ms)
+   Duration  15.05s (transform 719ms, setup 2ms, collect 308ms, tests 13.29s, environment 0ms, prepare 32ms)
  ❯ test/08n-import.test.ts:638:44
  ❯ test/08n-import.test.ts:706:56
  ❯ test/08n-import.test.ts:730:111
  ❯ test/08n-import.test.ts:746:68
  ❯ test/08n-import.test.ts:842:71
- ❯ test/08n-import.test.ts:1215:51
+ ❯ test/08n-import.test.ts:1220:51
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
@@ -174,13 +174,13 @@ AssertionError: expected [ Array(1) ] to match object [ { …(5) } ]
     },
   ]
 
- ❯ test/08n-import.test.ts:1215:51
-    1213|       const legacy = { month: 'june', year: Y, source: 'legacy', from:…
-    1214|       // In school: a first entry carrying the AS sitting, at the full…
-    1215|       expect(rowAt(v, 'Nov carry', 3).plan.lines).toMatchObject([{ off…
+ ❯ test/08n-import.test.ts:1220:51
+    1218|       const legacy = { month: 'june', year: Y, source: 'legacy', from:…
+    1219|       // In school: a first entry carrying the AS sitting, at the full…
+    1220|       expect(rowAt(v, 'Nov carry', 3).plan.lines).toMatchObject([{ off…
        |                                                   ^
-    1216|       expect(rowAt(v, 'Nov carry', 3).problems.filter((p) => p.severit…
-    1217|       // Self-study: still a first entry — it needs the exception, nev…
+    1221|       expect(rowAt(v, 'Nov carry', 3).problems.filter((p) => p.severit…
+    1222|       // Self-study: still a first entry — it needs the exception, nev…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
 

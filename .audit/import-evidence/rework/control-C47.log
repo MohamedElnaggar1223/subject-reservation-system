@@ -1,12 +1,12 @@
 # C47: item 2: a row naming several units or papers is split, one item per code (findItemsByCode)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 2 failed) 13781ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 90ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 38ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13602ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 78ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 32ms
  Test Files  1 failed (1)
       Tests  2 failed | 66 passed (68)
-   Duration  15.64s (transform 706ms, setup 2ms, collect 308ms, tests 13.78s, environment 0ms, prepare 34ms)
+   Duration  15.46s (transform 729ms, setup 2ms, collect 302ms, tests 13.60s, environment 0ms, prepare 30ms)
  ❯ test/08n-import.test.ts:992:30
  ❯ test/08n-import.test.ts:1023:28
 
@@ -20,12 +20,12 @@ AssertionError: expected null to deeply equal [ { code: 'paper 1', …(2) }, …
   {
     "code": "paper 1",
     "itemLabel": "Paper 1",
-    "offerItemId": "ba75c595-84a3-435d-9011-9cfdea232fd4",
+    "offerItemId": "dfccf961-8496-49be-93b8-3e74ea2224d2",
   },
   {
     "code": "paper 2",
     "itemLabel": "Paper 2",
-    "offerItemId": "ad16e856-6240-4a38-a633-7c461743567f",
+    "offerItemId": "40280faa-6983-4682-8cca-86b2a1b0ebf5",
   },
 ]
 
@@ -49,7 +49,7 @@ AssertionError: expected null to deeply equal [ { code: 'p1', …(2) }, …(1) ]
   {
     "code": "p1",
     "itemLabel": "P1",
-    "offerItemId": "cfcb0fb8-64fe-4dd0-b5b2-d911c3ef7e16",
+    "offerItemId": "a40c2a9f-a709-4c61-8cc2-871ee44b0f0c",
   },
   {
     "code": "p5",

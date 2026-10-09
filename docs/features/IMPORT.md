@@ -758,4 +758,6 @@ records it.
 - 2026-10-09 00:01Z–00:11Z — **the final merge**: origin/main 2d95638 (step D, F4, A's follow-up)
   merged as its own commit, 13 conflicts resolved by hand (the merge commit's message lists each);
   0050_import regenerated as 0058_import after main's 0057, the same DDL, the order proven on a copy.
+- 00:13–00:39Z — on 8562e17: types green; the suite in local time, then with TZ=UTC, 34 files, 724
+  passed, 1 todo each; every control with its own row: 54 red, C44 green as since 7003e74 (C60 covers it).
 - Next: the lead merges feature/import into main.

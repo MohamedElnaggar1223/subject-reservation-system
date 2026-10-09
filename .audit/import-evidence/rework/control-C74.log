@@ -1,11 +1,11 @@
 # C74: the review of 7fb133a: two papers joined by "and" are not one paper (the line splits)
 # undone in apps/api/src/services/import/normalise.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 13812ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 178ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13489ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the forms' "(One paper ONLY)" is never the whole subject: the subject's one one-paper item, else staff choose among them (the review of 2ca07a4, item 1) 150ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  15.81s (transform 672ms, setup 2ms, collect 303ms, tests 13.81s, environment 0ms, prepare 37ms)
+   Duration  15.20s (transform 705ms, setup 2ms, collect 289ms, tests 13.49s, environment 0ms, prepare 32ms)
  ❯ test/08n-import.test.ts:1158:71
 
 # failures (messages)

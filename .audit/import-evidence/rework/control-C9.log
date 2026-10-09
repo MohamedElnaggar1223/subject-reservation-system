@@ -1,12 +1,12 @@
 # C9: two children under one email hold their family (re-run on the new base)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 2 failed) 13450ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13576ms
    × F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > IS-06 identity: a missing email, two children under one email, a duplicate family, one email for student and parent, a child with two parents, a staff email 6ms
    × F7: the day-one import > a sheet with the spike's known problems, staged with every problem flagged > the mapping suggests the catalogue rows and teachers; what a commit would do is counted 2ms
  Test Files  1 failed (1)
       Tests  2 failed | 66 passed (68)
-   Duration  15.15s (transform 666ms, setup 2ms, collect 306ms, tests 13.45s, environment 0ms, prepare 33ms)
+   Duration  15.29s (transform 725ms, setup 2ms, collect 306ms, tests 13.58s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:201:43
  ❯ test/08n-import.test.ts:260:25
 

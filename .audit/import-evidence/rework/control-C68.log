@@ -1,11 +1,11 @@
 # C68: a326890 item 2: the fee note's column carries a fee marker in most of its matching cells (an entry-type column says retake, no fee)
 # undone in apps/api/src/services/import/normalise.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 14149ms
-   × F7: the day-one import > the note and the self-study answer (review flag 7), and the family's confirmation on a line > the fee note's column is never the parent's name nor an entry-type answer: a column already given a role is left out, and a fee column's cells carry a fee marker (the review of 2ca07a4's round, item 2) 37ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13385ms
+   × F7: the day-one import > the note and the self-study answer (review flag 7), and the family's confirmation on a line > the fee note's column is never the parent's name nor an entry-type answer: a column already given a role is left out, and a fee column's cells carry a fee marker (the review of 2ca07a4's round, item 2) 30ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  15.68s (transform 593ms, setup 2ms, collect 272ms, tests 14.15s, environment 0ms, prepare 31ms)
+   Duration  15.02s (transform 678ms, setup 2ms, collect 278ms, tests 13.38s, environment 0ms, prepare 28ms)
  ❯ test/08n-import.test.ts:907:43
 
 # failures (messages)

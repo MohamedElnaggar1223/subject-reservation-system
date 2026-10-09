@@ -1,24 +1,24 @@
 # C38: the lead's addition: self-study on a first entry of a taught item is an error, never priced at the share silently
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 7 failed) 13653ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 207ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > a first entry in self-study is a line once the student has the exception: the line uses it once 81ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > history of the session's own series, or of a later one, is not a sitting before it: a first entry, in the review as at the commit 181ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed while November was still running: not a sitting before June, so self-study is a first entry, refused without the exception 60ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > history committed after November ended is still not a sitting for a line of November itself: the same series is the same sitting 165ms
-   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > a course the student dropped is not a sitting: a self-study line after it is a first entry, refused without the exception — history in the system as in the file (the review of 8 Oct, item 3) 110ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 104ms
+ ❯ test/08n-import.test.ts (68 tests | 7 failed) 13026ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 179ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > a first entry in self-study is a line once the student has the exception: the line uses it once 60ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > history of the session's own series, or of a later one, is not a sitting before it: a first entry, in the review as at the commit 140ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > committed while November was still running: not a sitting before June, so self-study is a first entry, refused without the exception 49ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > history committed after November ended is still not a sitting for a line of November itself: the same series is the same sitting 150ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > a course the student dropped is not a sitting: a self-study line after it is a first entry, refused without the exception — history in the system as in the file (the review of 8 Oct, item 3) 108ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 95ms
  Test Files  1 failed (1)
       Tests  7 failed | 61 passed (68)
-   Duration  15.46s (transform 670ms, setup 2ms, collect 303ms, tests 13.65s, environment 0ms, prepare 32ms)
+   Duration  14.72s (transform 718ms, setup 2ms, collect 293ms, tests 13.03s, environment 0ms, prepare 30ms)
  ❯ test/08n-import.test.ts:627:91
  ❯ test/08n-import.test.ts:765:114
  ❯ test/08n-import.test.ts:796:92
  ❯ test/08n-import.test.ts:833:71
  ❯ test/08n-import.test.ts:859:71
  ❯ test/08n-import.test.ts:885:75
- ❯ test/08n-import.test.ts:1219:96
+ ❯ test/08n-import.test.ts:1224:96
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
@@ -167,13 +167,13 @@ AssertionError: expected { code: 'self_study_on_taught', …(2) } to match objec
 +   "severity": "info",
   }
 
- ❯ test/08n-import.test.ts:1219:96
-    1217|       // Self-study: still a first entry — it needs the exception, nev…
-    1218|       expect(rowAt(v, 'Nov carry', 4).plan.lines).toMatchObject([{ att…
-    1219|       expect(rowAt(v, 'Nov carry', 4).problems.find((p) => p.code === …
+ ❯ test/08n-import.test.ts:1224:96
+    1222|       // Self-study: still a first entry — it needs the exception, nev…
+    1223|       expect(rowAt(v, 'Nov carry', 4).plan.lines).toMatchObject([{ att…
+    1224|       expect(rowAt(v, 'Nov carry', 4).problems.find((p) => p.code === …
        |                                                                                                ^
-    1220|       // The carry-forward note read as a result: the sitting it is ca…
-    1221|       expect(rowAt(v, 'Nov carry', 5).plan.lines).toMatchObject([{ att…
+    1225|       // The carry-forward note read as a result: the sitting it is ca…
+    1226|       expect(rowAt(v, 'Nov carry', 5).plan.lines).toMatchObject([{ att…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
 

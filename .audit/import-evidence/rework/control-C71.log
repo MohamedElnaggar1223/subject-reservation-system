@@ -1,11 +1,11 @@
 # C71: a326890 item 2: a drifted fee note carries a fee marker (never an entry-type answer)
 # undone in apps/api/src/services/import/normalise.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 13944ms
-   × F7: the day-one import > the note and the self-study answer (review flag 7), and the family's confirmation on a line > the fee note's column is never the parent's name nor an entry-type answer: a column already given a role is left out, and a fee column's cells carry a fee marker (the review of 2ca07a4's round, item 2) 30ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13366ms
+   × F7: the day-one import > the note and the self-study answer (review flag 7), and the family's confirmation on a line > the fee note's column is never the parent's name nor an entry-type answer: a column already given a role is left out, and a fee column's cells carry a fee marker (the review of 2ca07a4's round, item 2) 28ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  15.66s (transform 660ms, setup 2ms, collect 283ms, tests 13.94s, environment 0ms, prepare 32ms)
+   Duration  15.33s (transform 747ms, setup 2ms, collect 308ms, tests 13.37s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:908:43
 
 # failures (messages)

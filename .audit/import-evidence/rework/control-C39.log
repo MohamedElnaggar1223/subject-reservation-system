@@ -1,11 +1,11 @@
 # C39: the student's gate.selfStudyFirstEntry exception lets a first entry in self-study through
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 14096ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > a first entry in self-study is a line once the student has the exception: the line uses it once 81ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 14020ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > a first entry in self-study is a line once the student has the exception: the line uses it once 124ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  15.93s (transform 671ms, setup 2ms, collect 298ms, tests 14.10s, environment 0ms, prepare 34ms)
+   Duration  15.71s (transform 756ms, setup 2ms, collect 301ms, tests 14.02s, environment 0ms, prepare 32ms)
  ❯ test/08n-import.test.ts:769:91
 
 # failures (messages)

@@ -1,12 +1,12 @@
 # C46: item 1: on an item that needs a prior series, a legacy or noted sitting is the carried sitting of a first entry unless the note or staff say retake
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 15219ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 120ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13430ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a carry-forward route ("A2, carry forward") with the student's ended AS history is a first entry carrying it, never a retake; in self-study it needs the exception; staff's "First entry" keeps the sitting; a carry-forward note read as a result is its sitting 104ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  17.13s (transform 689ms, setup 2ms, collect 301ms, tests 15.22s, environment 0ms, prepare 33ms)
- ❯ test/08n-import.test.ts:1215:51
+   Duration  15.26s (transform 749ms, setup 2ms, collect 300ms, tests 13.43s, environment 0ms, prepare 30ms)
+ ❯ test/08n-import.test.ts:1220:51
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -24,18 +24,18 @@ AssertionError: expected [ Array(1) ] to match object [ { …(5) } ]
 -     "attempt": "first",
 +     "attempt": "retake",
       "mode": "in_school",
-      "offerItemId": "34d0c465-a834-4af1-abb2-fed652c3b361",
+      "offerItemId": "a8983ca8-1a8c-4789-aa5d-43564ffb53de",
       "price": {
         "coursePercent": 100,
         "total": 1400,
 
- ❯ test/08n-import.test.ts:1215:51
-    1213|       const legacy = { month: 'june', year: Y, source: 'legacy', from:…
-    1214|       // In school: a first entry carrying the AS sitting, at the full…
-    1215|       expect(rowAt(v, 'Nov carry', 3).plan.lines).toMatchObject([{ off…
+ ❯ test/08n-import.test.ts:1220:51
+    1218|       const legacy = { month: 'june', year: Y, source: 'legacy', from:…
+    1219|       // In school: a first entry carrying the AS sitting, at the full…
+    1220|       expect(rowAt(v, 'Nov carry', 3).plan.lines).toMatchObject([{ off…
        |                                                   ^
-    1216|       expect(rowAt(v, 'Nov carry', 3).problems.filter((p) => p.severit…
-    1217|       // Self-study: still a first entry — it needs the exception, nev…
+    1221|       expect(rowAt(v, 'Nov carry', 3).problems.filter((p) => p.severit…
+    1222|       // Self-study: still a first entry — it needs the exception, nev…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

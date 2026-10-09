@@ -1,22 +1,22 @@
 # C5: the coordinator may not map a series to a session (re-run on the new base)
 # undone in apps/api/src/services/import.services.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 12 failed) 12428ms
-   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the coordinator's pending answers are mapping settings: carry forward read as an AS result 31ms
-   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > commit: every family in its own transaction, exactly what the review showed 112ms
+ ❯ test/08n-import.test.ts (68 tests | 12 failed) 12709ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the coordinator's pending answers are mapping settings: carry forward read as an AS result 32ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > commit: every family in its own transaction, exactly what the review showed 106ms
    × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the accounts: exactly the reviewed people, with their cohort, phones normalised, no password (they set one), linked 1ms
-   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > an imported parent signs in once they set a password through "Forgot password" (the link goes to their email) 70ms
+   × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > an imported parent signs in once they set a password through "Forgot password" (the link goes to their email) 71ms
    × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > sections, enrolments, history and money history: each traceable to its line 1ms
    × F7: the day-one import > the review, then a commit creating exactly the reviewed rows > the import is committed: nothing more changes it 1ms
-   × F7: the day-one import > a re-run of the same file changes nothing > staged again, it carries the review over and finds everything already there 40ms
-   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 40ms
-   × F7: the day-one import > a re-run of the same file changes nothing > a child under a new email who is already an account in the system holds the family until staff say which 27ms
-   × F7: the day-one import > the money record (F-01): history only, never a payment > recorded on the students as history; no payment, receipt or balance moves; the same file again adds nothing 23ms
-   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 23ms
+   × F7: the day-one import > a re-run of the same file changes nothing > staged again, it carries the review over and finds everything already there 45ms
+   × F7: the day-one import > a re-run of the same file changes nothing > the same sheet re-exported with one extra line keeps every decision and duplicates nothing 64ms
+   × F7: the day-one import > a re-run of the same file changes nothing > a child under a new email who is already an account in the system holds the family until staff say which 36ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > recorded on the students as history; no payment, receipt or balance moves; the same file again adds nothing 22ms
+   × F7: the day-one import > the money record (F-01): history only, never a payment > the money record re-exported with a line inserted at the top adds only that line, and keeps what staff left out 20ms
    × F7: the day-one import > the catalogue from the review, and a file put aside > the list of imports: every file, its state and its counts 4ms
  Test Files  1 failed (1)
       Tests  12 failed | 56 passed (68)
-   Duration  14.22s (transform 671ms, setup 2ms, collect 308ms, tests 12.43s, environment 0ms, prepare 31ms)
+   Duration  14.54s (transform 733ms, setup 2ms, collect 304ms, tests 12.71s, environment 0ms, prepare 31ms)
  ❯ test/08n-import.test.ts:316:130
  ❯ test/08n-import.test.ts:331:19
  ❯ test/08n-import.test.ts:350:41
@@ -26,9 +26,9 @@
  ❯ test/08n-import.test.ts:465:67
  ❯ test/08n-import.test.ts:501:25
  ❯ test/08n-import.test.ts:518:70
- ❯ test/08n-import.test.ts:1485:58
- ❯ test/08n-import.test.ts:1513:53
- ❯ test/08n-import.test.ts:1718:21
+ ❯ test/08n-import.test.ts:1490:58
+ ❯ test/08n-import.test.ts:1518:53
+ ❯ test/08n-import.test.ts:1723:21
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
@@ -225,7 +225,7 @@ AssertionError: expected [ [ …(2) ] ] to deeply equal [ [ …(2) ] ]
 
   [
     [
-      "ef6045ff-01c5-4f18-83fd-09ac4d6e3372",
+      "a635a55c-fbe7-4796-97cb-8f40a1dfd7eb",
 -     "committed",
 +     "partial",
     ],

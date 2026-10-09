@@ -1,12 +1,12 @@
 # C35: s9: a line with no confirmation on the sheet is an error (consent_missing)
 # undone in apps/api/src/services/import/view.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 1 failed) 14541ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line whose family's confirmation is not on the sheet is an error: the import records the sheet's confirmation as the consent 63ms
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13624ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line whose family's confirmation is not on the sheet is an error: the import records the sheet's confirmation as the consent 58ms
  Test Files  1 failed (1)
       Tests  1 failed | 67 passed (68)
-   Duration  16.61s (transform 752ms, setup 2ms, collect 372ms, tests 14.54s, environment 0ms, prepare 36ms)
- ❯ test/08n-import.test.ts:1344:68
+   Duration  15.46s (transform 727ms, setup 2ms, collect 288ms, tests 13.62s, environment 0ms, prepare 32ms)
+ ❯ test/08n-import.test.ts:1349:68
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
@@ -24,13 +24,13 @@ AssertionError: expected undefined to deeply equal { code: 'consent_missing', �
 + Received: 
 undefined
 
- ❯ test/08n-import.test.ts:1344:68
-    1342|       const r = rowAt(await fetchView(adm, id), 'NoConfirm', 3);
-    1343|       expect(r.plan.lines[0]).toMatchObject({ itemLabel: 'M1', offerIt…
-    1344|       expect(r.problems.find((p) => p.code === 'consent_missing')).toE…
+ ❯ test/08n-import.test.ts:1349:68
+    1347|       const r = rowAt(await fetchView(adm, id), 'NoConfirm', 3);
+    1348|       expect(r.plan.lines[0]).toMatchObject({ itemLabel: 'M1', offerIt…
+    1349|       expect(r.problems.find((p) => p.code === 'consent_missing')).toE…
        |                                                                    ^
-    1345|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
-    1346|     });
+    1350|       await apiResponse(adm.api.v1.imports[':id'].discard.$post({ para…
+    1351|     });
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
 

@@ -1,14 +1,14 @@
 # C53: item 4: "Add …" translated only as the import's own aria-label ("Add X to the catalogue")
 # undone in apps/api/../web/lib/i18n-import.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 2 failed) 14601ms
-   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > A's and B's sentences are not the import's: the two the September patterns half-translated have their own words; the rest reach their own translators 10ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13473ms
+   × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > A's and B's sentences are not the import's: the two the September patterns half-translated have their own words; the rest reach their own translators 13ms
    × F7: the day-one import > the Arabic: the import's sentences, and other screens' left to their own translators (the review of 8 Oct, item 4) > the import's own sentences read in Arabic, with A's line refusals it shows on a line 1ms
  Test Files  1 failed (1)
       Tests  2 failed | 66 passed (68)
-   Duration  16.73s (transform 713ms, setup 2ms, collect 313ms, tests 14.60s, environment 0ms, prepare 33ms)
- ❯ test/08n-import.test.ts:1420:167
- ❯ test/08n-import.test.ts:1435:69
+   Duration  15.16s (transform 724ms, setup 2ms, collect 292ms, tests 13.47s, environment 0ms, prepare 32ms)
+ ❯ test/08n-import.test.ts:1425:167
+ ❯ test/08n-import.test.ts:1440:69
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
@@ -25,13 +25,13 @@ AssertionError: expected [ 'Add the room', 'أضف the room' ] to deeply equal [
 +   "أضف the room",
   ]
 
- ❯ test/08n-import.test.ts:1420:167
-    1418|       expect(translateImportText(core)).toBeNull();
-    1419|       expect(translateSessionsText(core)).toBe('جلسة يونيو للصف 10 تتط…
-    1420|       for (const s of ['Add the room', 'Add to the calendar', 'Add a s…
+ ❯ test/08n-import.test.ts:1425:167
+    1423|       expect(translateImportText(core)).toBeNull();
+    1424|       expect(translateSessionsText(core)).toBe('جلسة يونيو للصف 10 تتط…
+    1425|       for (const s of ['Add the room', 'Add to the calendar', 'Add a s…
        |                                                                                                                                                                       ^
-    1421|       // MO-9's refusal on the session's Subjects tab (A's screen).
-    1422|       expect(translateSessionsText("Astronomy has no course fee: set t…
+    1426|       // MO-9's refusal on the session's Subjects tab (A's screen).
+    1427|       expect(translateSessionsText("Astronomy has no course fee: set t…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
@@ -41,13 +41,13 @@ AssertionError: expected 'أضف Astronomy to the catalogue' to be 'أضف Astro
 Expected: "أضف Astronomy إلى الدليل"
 Received: "أضف Astronomy to the catalogue"
 
- ❯ test/08n-import.test.ts:1435:69
-    1433|         .toBe('Imp Physics Two: تقول الملاحظة ورقة واحدة — اختر أيّها …
-    1434|       expect(translateImportText('As the sheet’s words find it: Paper …
-    1435|       expect(translateImportText('Add Astronomy to the catalogue')).to…
+ ❯ test/08n-import.test.ts:1440:69
+    1438|         .toBe('Imp Physics Two: تقول الملاحظة ورقة واحدة — اختر أيّها …
+    1439|       expect(translateImportText('As the sheet’s words find it: Paper …
+    1440|       expect(translateImportText('Add Astronomy to the catalogue')).to…
        |                                                                     ^
-    1436|       expect(translateImportText('Mathematics — P2 takes retakes only …
-    1437|       expect(translateImportText('Biology is closed in this session'))…
+    1441|       expect(translateImportText('Mathematics — P2 takes retakes only …
+    1442|       expect(translateImportText('Biology is closed in this session'))…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 

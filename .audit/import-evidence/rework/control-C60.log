@@ -1,16 +1,16 @@
 # C60: item 5 with C44: the student held before the lines by neither lockStudents (both calls) nor assertMayRegisterForInTx
 # undone in apps/api/src/services/import/commit.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 3 failed) 17890ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders) 5731ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds a family's students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3) 434ms
-   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce) 699ms
+ ❯ test/08n-import.test.ts (68 tests | 3 failed) 17596ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds every student with lines before the first line, in id order: while it waits for either of a family's two students, none of their fee rows is held (both orders) 5740ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the commit holds a family's students before any row that names a subject: while a subject is held FOR UPDATE (a board change), the commit waiting on it already holds the student (the review of 2ca07a4, item 3) 496ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > the import and the desk reserving the same unit in one board series from two sessions at the same moment: the import holds the student, so the desk waits and is refused (gate.sameEntryOnce) 713ms
  Test Files  1 failed (1)
       Tests  3 failed | 65 passed (68)
-   Duration  19.83s (transform 683ms, setup 2ms, collect 338ms, tests 17.89s, environment 0ms, prepare 35ms)
- ❯ test/08n-import.test.ts:1270:11
- ❯ test/08n-import.test.ts:1306:22
- ❯ test/08n-import.test.ts:1385:23
+   Duration  19.42s (transform 733ms, setup 2ms, collect 305ms, tests 17.60s, environment 0ms, prepare 30ms)
+ ❯ test/08n-import.test.ts:1275:11
+ ❯ test/08n-import.test.ts:1311:22
+ ❯ test/08n-import.test.ts:1390:23
 
 # failures (messages)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
@@ -24,7 +24,7 @@ Error: waitFor: timed out
        |                                      ^
     483|     await new Promise((r) => setTimeout(r, 100));
     484|   }
- ❯ test/08n-import.test.ts:1270:11
+ ❯ test/08n-import.test.ts:1275:11
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
 
@@ -37,13 +37,13 @@ AssertionError: expected false to be true // Object.is equality
 - true
 + false
 
- ❯ test/08n-import.test.ts:1306:22
-    1304|         catch (err) { if ((err as { code?: string }).code === '55P03')…
-    1305|         finally { await c.query('rollback').catch(() => {}); await c.e…
-    1306|         expect(held).toBe(true);
+ ❯ test/08n-import.test.ts:1311:22
+    1309|         catch (err) { if ((err as { code?: string }).code === '55P03')…
+    1310|         finally { await c.query('rollback').catch(() => {}); await c.e…
+    1311|         expect(held).toBe(true);
        |                      ^
-    1307|         await release();
-    1308|         expect((await apiResponse(commit)).result.created).toMatchObje…
+    1312|         await release();
+    1313|         expect((await apiResponse(commit)).result.created).toMatchObje…
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
 
@@ -55,20 +55,20 @@ AssertionError: expected [ …(2) ] to deeply equal [ Array(1) ]
 
   [
     {
-+     "session_id": "80e5e1b0-77ea-4d7c-b260-dd4ff91f4155",
-+   },
-+   {
-      "session_id": "dad3d758-cdb1-4003-b430-1dda88a927c7",
+      "session_id": "93a6b718-bb05-49f0-8a67-763d485b43d0",
     },
++   {
++     "session_id": "ece20046-7b02-4efd-b04a-a7d081ebb590",
++   },
   ]
 
- ❯ test/08n-import.test.ts:1385:23
-    1383|         const lines = await sql<{ session_id: string }>(`select r.sess…
-    1384|           where r.student_id = $1 and r.board_series_id = $2 and i.lab…
-    1385|         expect(lines).toEqual([{ session_id: sess }]);
+ ❯ test/08n-import.test.ts:1390:23
+    1388|         const lines = await sql<{ session_id: string }>(`select r.sess…
+    1389|           where r.student_id = $1 and r.board_series_id = $2 and i.lab…
+    1390|         expect(lines).toEqual([{ session_id: sess }]);
        |                       ^
-    1386|         expect(c.status).toBe(200);
-    1387|         expect(d.status).toBe(409);
+    1391|         expect(c.status).toBe(200);
+    1392|         expect(d.status).toBe(409);
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
 

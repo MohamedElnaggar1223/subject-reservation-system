@@ -1,13 +1,13 @@
 # C33: s9: a provisional fee row prices the line provisional at its amount, never 0 (priceLine reads provisional rows)
 # undone in apps/api/src/services/pricing.services.ts
 # summary
- ❯ test/08n-import.test.ts (68 tests | 3 failed) 15166ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 238ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 471ms
-   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 16ms
+ ❯ test/08n-import.test.ts (68 tests | 3 failed) 13900ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 164ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the admin commits: lines through insertLines, priced from the grids, with the sheet's consent on the imported channel and the sitting's source; never paid 372ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the statement and the session's Money tab show the imported lines as any line: price, basis, provisional, outstanding, the sitting and the consent 11ms
  Test Files  1 failed (1)
       Tests  3 failed | 65 passed (68)
-   Duration  17.10s (transform 694ms, setup 2ms, collect 302ms, tests 15.17s, environment 0ms, prepare 34ms)
+   Duration  15.66s (transform 724ms, setup 2ms, collect 297ms, tests 13.90s, environment 0ms, prepare 30ms)
  ❯ test/08n-import.test.ts:651:45
  ❯ test/08n-import.test.ts:706:56
  ❯ test/08n-import.test.ts:754:63
@@ -24,8 +24,8 @@ AssertionError: expected [ { code: 'price_provisional', …(2) } ] to deeply equ
   [
     {
       "code": "price_provisional",
--     "detail": "board fee 600 in Pearson Edexcel November 2026 (t1-76xk)",
-+     "detail": "board fee 0 in Pearson Edexcel November 2026 (t1-76xk)",
+-     "detail": "board fee 600 in Pearson Edexcel November 2026 (t1-po6r)",
++     "detail": "board fee 0 in Pearson Edexcel November 2026 (t1-po6r)",
       "severity": "info",
     },
   ]
