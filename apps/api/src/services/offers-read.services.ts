@@ -15,6 +15,7 @@ import { mayRegisterFor } from './eligibility.services';
 import { availabilityConstraints } from './offer.services';
 import { priceLine } from './pricing.services';
 import { effectiveDeadlineFor } from './deadline.services';
+import { examSittingsOf, examKeysOf } from './reservation.services';
 
 const MONTH_ORDER: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
 
@@ -31,12 +32,13 @@ export async function offersForStudent(studentId: string, sessionId: string) {
   const offers = await db.execute(sql`
     select o.id, o.availability, o.grade10_core as "grade10Core", o.course_fee as "courseFee", o.notes,
       s.id as "subjectId", s.name as "subjectName", s.code as "subjectCode", s.council as "boardCode", b.name as "boardName",
-      s.qualification_level as "level"
+      s.qualification_level as "level", s.qualification_id as "subjectQualificationId",
+      coalesce((select array_agg(su.unit_id order by su.unit_id) from subject_unit su where su.subject_id = s.id), '{}') as "subjectUnits"
     from session_offer o join subject s on s.id = o.subject_id join exam_board b on b.code = s.council
     where o.session_id = ${sessionId} and o.availability <> 'closed' and s.is_active
     order by o.sort_order, s.name`).then((r) => r.rows as {
       id: string; availability: string; grade10Core: boolean; courseFee: string; notes: string | null; subjectId: string; subjectName: string;
-      subjectCode: string; boardCode: string; boardName: string; level: string;
+      subjectCode: string; boardCode: string; boardName: string; level: string; subjectQualificationId: string | null; subjectUnits: string[];
     }[]);
   const offerIds = offers.map((o) => o.id);
   const items = offerIds.length ? await db.execute(sql`
@@ -73,6 +75,8 @@ export async function offersForStudent(studentId: string, sessionId: string) {
     x.entersKind === 'award' || x.entersKind === 'option'
       ? (x.qualificationId ? [`q:${x.qualificationId}`] : [`s:${x.subjectId}`])
       : x.entersKind === 'units' ? x.units.map((u) => `u:${u}`) : [`s:${x.subjectId}`];
+  // F4's results and sent entries of this student (step B's known sittings, RESERVATIONS_LINES.md §3.1).
+  const exams = await examSittingsOf(studentId);
   const now = new Date();
   const outOffers = [];
   for (const o of offers) {
@@ -83,10 +87,26 @@ export async function offersForStudent(studentId: string, sessionId: string) {
       const keys = keysOf({ entersKind: i.entersKind as string, qualificationId: i.qualificationId as string | null, subjectId: o.subjectId, units: i.units as string[] });
       // An earlier sitting the record knows: a confirmed line only. A dropped line was never sat (B's
       // review): the family may still declare it, and the school then verifies it.
-      const known = history
+      const fromLines = history
         .filter((h) => h.sessionId !== sessionId && h.status === 'confirmed' && h.seriesId)
         .filter((h) => keysOf(h).some((k) => keys.includes(k)) || h.subjectId === o.subjectId)
-        .map((h) => ({ registrationId: h.id, sessionName: h.sessionName, seriesId: h.seriesId!, series: `${h.boardName} ${SERIES_MONTH_LABELS[h.month as SeriesMonth] ?? h.month} ${h.year}`, status: h.status }));
+        .map((h) => ({
+          registrationId: h.id as string | null, sessionName: h.sessionName as string | null, seriesId: h.seriesId!,
+          series: `${h.boardName} ${SERIES_MONTH_LABELS[h.month as SeriesMonth] ?? h.month} ${h.year}`, status: h.status,
+          source: 'line' as 'line' | 'result' | 'entry', month: h.month as string, year: Number(h.year), grade: null as string | null,
+        }));
+      // A result on record or an entry sent to the board for what the item enters (step B, from F4).
+      const examKeys = examKeysOf({ entersKind: i.entersKind as string, qualificationId: i.qualificationId as string | null, units: i.units as string[], subjectQualificationId: o.subjectQualificationId, subjectUnits: o.subjectUnits });
+      // Only those before this item's series: F4 holds entries of this series and later ones too.
+      const here = i.year ? Number(i.year) * 12 + (MONTH_ORDER[i.month as string] ?? 0) : null;
+      const fromExams = exams.filter((e) => examKeys.includes(e.key))
+        .filter((e) => here === null || e.year * 12 + (MONTH_ORDER[e.month] ?? 0) < here).map((e) => ({
+        registrationId: null as string | null, sessionName: null as string | null, seriesId: e.seriesId, series: e.series, status: e.source as string,
+        source: e.source as 'line' | 'result' | 'entry', month: e.month as string, year: e.year, grade: e.grade,
+      }));
+      // Latest first.
+      const known = [...fromLines, ...fromExams]
+        .sort((a, b) => (b.year * 12 + (MONTH_ORDER[b.month] ?? 0)) - (a.year * 12 + (MONTH_ORDER[a.month] ?? 0)));
       const held = history.find((h) => h.itemId === i.id && h.sessionId === sessionId && !['rejected', 'expired', 'dropped'].includes(h.status));
       const combos: { attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study' }[] = [];
       if (!c.closed) {

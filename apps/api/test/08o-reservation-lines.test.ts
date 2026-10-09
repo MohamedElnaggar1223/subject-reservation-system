@@ -307,6 +307,68 @@ describe('08o: reservation lines (step B)', () => {
     expect((await toVerify(june)).some((l) => l.id === line!.id)).toBe(true);
   });
 
+  it("F4's results and sent entries are known sittings: the retake is pre-set with its series, priced as a retake and cut off at the retake deadline; a withdrawn entry is not", async () => {
+    // A Cambridge IGCSE syllabus mapped to a subject; November's series sets a retake deadline after its entry deadline.
+    const cat = coordinator.api.v1.catalogue;
+    const award = await apiResponse(cat.qualifications.$post({ json: {
+      boardCode: 'cambridge', code: `F4${RUN}`.toUpperCase().slice(0, 8), title: `Chemistry (08o ${RUN})`, level: 'igcse', suite: 'Cambridge IGCSE',
+      subjectArea: `Chemistry (08o ${RUN})`, entryMethod: 'syllabus_option',
+    } }));
+    const chem = await subject(adm, `RWO-CHE-${RUN}`, `Chemistry (08o ${RUN})`, { course: 12000, registration: 9000 });
+    await apiResponse(cat.registrable[':subjectId'].$put({ param: { subjectId: chem }, json: { boardCode: 'cambridge', qualificationId: award.id, unitIds: [] } }));
+    const june = await mkSeries('cambridge', 'june', Y, `o08f4j-${RUN}`);
+    const nov = await mkSeries('cambridge', 'november', Y, `o08f4n-${RUN}`, { entryDeadline: at(20), retakeDeadline: at(25) });
+    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: nov }, json: { rows: [{ keyKind: 'qualification', keyId: award.id, amount: 9000, provisional: false }] } }));
+    const winter = await mkSession('winter', Y, `o08f4-${RUN}`);
+    const item = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({ param: { id: winter }, json: {
+      subjectId: chem, courseFee: 12000, teachers: [{ teacherId: teacherA, mode: 'in_school' }],
+      items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'award', qualificationId: award.id }, boardSeriesId: nov, availability: 'open', requiredInSeries: false }],
+    } })))!.items[0]!;
+
+    // F4's records of June (what its results import and entry submission leave; the tables are F4's).
+    const fR = await onboard(officer, `o08-f4r-${RUN}`, 11);
+    const fE = await onboard(officer, `o08-f4e-${RUN}`, 11);
+    const fW = await onboard(officer, `o08-f4w-${RUN}`, 11);
+    const fD = await onboard(officer, `o08-f4d-${RUN}`, 11);
+    await sql(`insert into exam_result (id, student_id, board_series_id, board_code, kind, code, qualification_id, grade, source, status)
+      values (gen_random_uuid(), $1, $2, 'cambridge', 'award', $3, $4, 'B', 'manual', 'provisional')`, [fR.studentId, june, award.code, award.id]);
+    // Sent to the board (submitted); one withdrawn after it was sent (F4's withdraw, with its audit
+    // row: 09's rule); one a draft, never sent. fE is entered for November itself too, which is no
+    // earlier sitting of a November item.
+    const entry = async (studentId: string, status: 'submitted' | 'draft', series = june) => (await sql<{ id: string }>(`insert into exam_entry (id, student_id, board_series_id, board_code, kind, qualification_id, entry_code, title, status, submitted_at)
+      values (gen_random_uuid(), $1, $2, 'cambridge', 'award', $3, $4, 'Chemistry', $5, $6) returning id`,
+      [studentId, series, award.id, award.code, status, status === 'draft' ? null : new Date()]))[0]!.id;
+    await entry(fE.studentId, 'submitted');
+    await entry(fE.studentId, 'submitted', nov);
+    await apiResponse(coordinator.api.v1.exams.entries[':id'].withdraw.$post({ param: { id: await entry(fW.studentId, 'submitted') }, json: { reason: 'the candidate withdrew' } }));
+    await entry(fD.studentId, 'draft');
+
+    const offered = async (studentId: string) => (await apiResponse(officer.api.v1.registrations.offers.$get({ query: { sessionId: winter, studentId } })))
+      .offers.flatMap((o) => o.items).find((i) => i.id === item)!;
+    const dates = await one<{ retake: string }>(`select retake_deadline as retake from board_series where id = $1`, [nov]);
+    for (const [f, source, grade] of [[fR, 'result', 'B'], [fE, 'entry', null]] as const) {
+      // The page knows the sitting: the retake is pre-set with its series and where it is known from.
+      const read = await offered(f.studentId);
+      expect(read.knownSittings).toEqual([expect.objectContaining({ seriesId: june, source, grade, registrationId: null, month: 'june', year: Y })]);
+      // Reserved as a retake naming nothing: the known sitting filled in, not declared, not listed to verify.
+      const [line] = await apiResponse(f.parent.api.v1.registrations.direct.$post({ json: { sessionId: winter, studentId: f.studentId, lines: [retake(item, { teacherId: teacherA })], consent: CONSENT } }));
+      const l = await one<{ prior: string; source: string; attempt: string; price: string; basis: { attempt: string; coursePercent: number; boardPercent: number }; deadline: string }>(
+        `select prior_sitting_series_id as prior, prior_sitting_source as source, attempt, price_at_registration as price, pricing_basis as basis,
+           line_effective_deadline(attempt, prior_sitting_series_id, board_series_id, declaration_rejected) as deadline
+         from registration where id = $1`, [line!.id]);
+      expect(l).toMatchObject({ prior: june, source: 'known', attempt: 'retake', price: '21000.00' });
+      expect(l.basis).toMatchObject({ attempt: 'retake', coursePercent: 100, boardPercent: 100 });
+      // A retake of the board's previous sitting (June before November): the retake deadline.
+      expect(new Date(l.deadline).getTime()).toBe(new Date(dates.retake).getTime());
+      expect((await toVerify(winter)).some((x) => x.id === line!.id)).toBe(false);
+    }
+    // A withdrawn entry was taken back from the board, a draft never went: no known sitting, the retake must be declared.
+    expect((await offered(fW.studentId)).knownSittings).toEqual([]);
+    expect((await offered(fD.studentId)).knownSittings).toEqual([]);
+    expect(await refused(fW.parent.api.v1.registrations.direct.$post({ json: { sessionId: winter, studentId: fW.studentId, lines: [retake(item, { teacherId: teacherA })], consent: CONSENT } })))
+      .toMatchObject({ status: 400, error: expect.stringMatching(/^A retake of Chemistry \(08o .+\) names the sitting it follows/) });
+  });
+
   it('the coordinator verifies: the line stands; a carry-forward from another centre records the previous centre and candidate number; answered once', async () => {
     const f = await onboard(officer, `o08-cf-${RUN}`, 12);
     // The desk names the AS sitting the A2 carries forward: declared by the desk, consent on the desk channel.

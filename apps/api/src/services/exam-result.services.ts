@@ -584,6 +584,10 @@ export async function getSittings(studentId: string, familyView = false) {
       boardName: names.get(s.boardCode) ?? s.boardCode,
       kind: v.kind as 'unit' | 'award',
       code: v.code,
+      // What the sitting entered in the catalogue (step B matches it to what an item enters: its
+      // known sittings, RESERVATIONS_LINES.md §3.1).
+      unitId,
+      qualificationId: qualId,
       title: v.entry?.title ?? unit?.title ?? qual?.title ?? v.code,
       subjectArea: qual?.subjectArea ?? unitAwards.find((a) => a.unitId === unitId)?.subjectArea ?? null,
       // An award's level ('igcse' | 'as_level' | 'a_level'), or a unit's own ('igcse' | 'as' | 'a2').

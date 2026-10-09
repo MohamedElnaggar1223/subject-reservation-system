@@ -84,7 +84,12 @@ const AVAILABILITY: Record<string, string> = { retake_only: 'Retakes only', self
 
 const entryKey = (p: { attempt: string; mode: string }) => `${p.attempt}|${p.mode}`;
 /** A sitting is known when the student sat it: a confirmed line (a dropped one was never sat, so it is declared). */
-const knownOf = (it: Item) => it.knownSittings.filter((k) => k.status === 'confirmed');
+/**
+ * The sittings the school knows of, latest first: a confirmed line (a dropped one was never sat, so
+ * it is declared), a result on record, or an entry sent to the board (F4).
+ */
+const knownOf = (it: Item) => it.knownSittings.filter((k) => k.source !== 'line' || k.status === 'confirmed');
+const KNOWN_WORD: Record<string, string> = { line: 'sat', result: 'sat', entry: 'entered for' };
 const isKnown = (it: Item) => knownOf(it).length > 0;
 /** Open per attempt (docs/features/RESERVATIONS.md §2.12): a first entry to the entry deadline, a retake of the previous sitting to the retake deadline. */
 const reservable = (it: Item) => it.open.first || it.open.retake;
@@ -211,7 +216,8 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
       return { month: month!, year: Number(year) };
     }
     if (c.attempt !== 'retake') return null;
-    const known = knownOf(c.it).map((k) => declarable.find((x) => x.seriesId === k.seriesId)).filter((x) => !!x);
+    // The latest known sitting, as the server fills it in (each carries its month and year).
+    const known = knownOf(c.it).map((k) => ({ month: k.month, year: k.year }));
     return known.sort((a, b) => ym(b.month, b.year) - ym(a.month, a.year))[0] ?? null;
   };
   const deadlineOf = (c: (typeof chosen)[number]): { at: string | null; retake: boolean } => {
@@ -441,7 +447,7 @@ function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings }: {
             <td className="px-3 py-2 align-top">
               <span>{it.label}</span>
               {it.availability !== 'open' && AVAILABILITY[it.availability] && <> <Badge tone="warning">{AVAILABILITY[it.availability]}</Badge></>}
-              {isKnown(it) && <> <Badge tone="info"><span>sat</span>&nbsp;<bdi data-i18n-skip="true">{knownOf(it)[0]!.series}</bdi></Badge></>}
+              {isKnown(it) && <> <Badge tone="info"><span>{KNOWN_WORD[knownOf(it)[0]!.source] ?? 'sat'}</span>&nbsp;<bdi data-i18n-skip="true">{knownOf(it)[0]!.series}</bdi>{knownOf(it)[0]!.source === 'result' && <>&nbsp;<span>(result on record)</span></>}</Badge></>}
               {it.held && <> <Badge tone="success">already reserved</Badge></>}
               {!reservable(it) && !it.held && <> <Badge tone="neutral">closed for new entries</Badge></>}
               {!it.open.first && it.open.retake && !it.held && <> <Badge tone="warning">retakes of the previous sitting only</Badge></>}
