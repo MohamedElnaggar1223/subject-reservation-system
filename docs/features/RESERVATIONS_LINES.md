@@ -76,7 +76,7 @@ unverified) or `hold`.
 
 | The page sends | The line gets | `prior_sitting_source` |
 |---|---|---|
-| a retake (or a carry-forward item, `needs_prior_series`) naming nothing, and the student has a known sitting of what the item enters before its series — a confirmed line in another session, a result on record (F4), or an entry sent to the board (F4) | the latest such sitting | `known` |
+| a retake (or a carry-forward item, `needs_prior_series`) naming nothing, and the student has a known sitting of what the item enters — a confirmed line in another session, or before the item's series a result on record (F4) or an entry sent to the board (F4) | the latest such sitting | `known` |
 | a retake naming `priorSittingSeriesId` (a series on record) or `priorSitting { month, year }` | that series; for a month and year not on record, a `board_series` row with no dates and an empty label is created (`findOrCreateSeries`, audited `BOARD_SERIES_CREATED` with the reason "Created when a family (or the desk) declared a sitting not on record") | `known` when it is one of the student's known sittings, else `declared_by_family` (app paths) or `declared_by_desk` (staff paths) |
 | a retake with no sitting and nothing known | refused by A's `gate.retakeDeclared` sentence | — |
 | a first entry naming a sitting | refused (a first entry follows no sitting) unless its item carries one forward | — |
@@ -94,16 +94,25 @@ the item's own series:
   absent, pending or withheld is no sitting), the latest report;
 - an **F4 entry sent to the board** for it and not withdrawn (submitted or amended; a draft never
   went, a withdrawn one was taken back).
-F4's two are read through F4's `getSittings` (`examSittingsOf` in reservation.services) and
+F4's two are read through F4's `getSittings` (`examSittingsOf` in reservation.services),
 matched to what the item enters (`examKeysOf`: its award, its units, or for a `subject` item its
-subject row's mapping). The one addition to F4's code: `getSittings` returns each sitting's
+subject row's mapping), and kept only before the item's series (F4 holds entries of the series
+itself and later ones; confirmed lines are read as before). The one addition to F4's code: `getSittings` returns each sitting's
 `unitId` and `qualificationId` (the catalogue ids it already read), which the match needs. The
 offers read (`GET /registrations/offers`, A's file) lists the same known sittings with their
 `source` (`line`, `result`, `entry`), month, year and grade, so the family's Reserve page and the
 desk pre-set the retake with its series ("sat … (result on record)", "entered for …") and ask for
 no declaration; `knownSittingsOf` fills it in on the server. Such a line is `known`, priced as the
 retake it is, and runs to the series' retake deadline when the sitting is the board's previous one
-(08o; control `known-from-f4`, and `known-f4-sent-only` for the sent rule).
+(08o; controls `known-from-f4`, `known-f4-sent-only` for the sent rule, `known-f4-series-before`
+and `known-f4-series-before-read` for the series rule on the server and in the read).
+
+A sitting the page or the desk **names** is `known` when it is one of the student's confirmed
+lines, as before; one that F4's results show stays the declaration it is, and F4 verifies it at
+declaration with the result and its importer as the evidence (`verifyDeclaredAtDeclarationInTx`;
+08x4, the reviews of 093dbd1 and 54c225f; control `named-f4-declared` turns those two tests red).
+The Reserve page names no sitting for an item with a known one (it shows no picker), so naming one
+is the API's or an old page's; a named sitting that only a sent entry shows is listed to verify.
 
 ### 3.2 The To verify list
 
@@ -609,3 +618,9 @@ Times UTC, from the trail (`.audit/rework-reservations.tsv`), which holds each e
   from. 08o: a result and a sent entry pre-set the retake, priced as one, to the retake deadline; a
   withdrawn and a draft entry do not; two controls red. The Reserve page's school-fee notice is one
   sentence now (its "The" stayed English in Arabic). Driven in English and Arabic.
+- 2026-10-09 00:44Z–00:57Z — the gates on e280177 were red (4 tests): F4's 08x4 verify-at-declaration
+  pair (a named sitting with a result became `known`), 08n's known-sittings read (the new series
+  filter dropped a confirmed line of a same-month series) and 09's withdrawal audit rule (08o's
+  withdrawn entry was written without F4's audit row). Now: a named sitting is `known` only when
+  a confirmed line's (§3.1), the series filter applies to F4's sittings only, and 08o withdraws
+  through F4's endpoint; a November entry case and three more controls, all red.

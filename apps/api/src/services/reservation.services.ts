@@ -125,8 +125,9 @@ export async function examSittingsOf(studentId: string) {
  * The student's known sittings of what an item enters, latest first: their confirmed lines in
  * other sessions (sat: a dropped line was never sat, so naming it is a declaration the school
  * verifies) entering the same award, unit or row, or of the same subject; and F4's results and
- * sent entries for what the item enters (`examSittingsOf`). Only sittings before the item's own
- * series. The Reserve page reads the offers read's `knownSittings`, built the same way.
+ * sent entries for what the item enters (`examSittingsOf`) before the item's own series (F4 holds
+ * entries of this series and later ones too, which are no earlier sitting). The Reserve page reads
+ * the offers read's `knownSittings`, built the same way.
  */
 export async function knownSittingsOf(executor: Executor, studentId: string, sessionId: string, item: ItemFacts) {
   const r = await executor.execute(sql`
@@ -141,13 +142,13 @@ export async function knownSittingsOf(executor: Executor, studentId: string, ses
     .filter((h) => entryKeys(h).some((k) => keys.includes(k)) || h.subjectId === item.subjectId)
     .map((h) => ({ registrationId: h.id as string | null, seriesId: h.seriesId, source: 'line' as 'line' | 'result' | 'entry', year: Number(h.year), month: h.month }));
   const examKeys = examKeysOf(item);
+  const here = item.year && item.month ? item.year * 12 + schoolMonthIndex(item.month) : null;
   const exams = examKeys.length
     ? (await examSittingsOf(studentId)).filter((e) => examKeys.includes(e.key))
+      .filter((e) => here === null || e.year * 12 + schoolMonthIndex(e.month) < here)
       .map((e) => ({ registrationId: null as string | null, seriesId: e.seriesId, source: e.source as 'line' | 'result' | 'entry', year: e.year, month: e.month as string }))
     : [];
-  const here = item.year && item.month ? item.year * 12 + schoolMonthIndex(item.month) : null;
   return [...lines, ...exams]
-    .filter((k) => here === null || k.year * 12 + schoolMonthIndex(k.month) < here)
     .sort((a, b) => (b.year * 12 + schoolMonthIndex(b.month)) - (a.year * 12 + schoolMonthIndex(a.month)))
     .map(({ registrationId, seriesId, source }) => ({ registrationId, seriesId, source }));
 }
@@ -169,10 +170,13 @@ const itemName = (it: { kind: string; subjectName: string; label: string }) => (
  * Resolve what a page sent into the lines `insertLines` makes, in the caller's transaction:
  * - the sitting a retake (or a carry-forward item) follows: the series named, or the series of
  *   the month and year named, created with no dates when not on record; with none named, the
- *   student's latest known sitting of what the item enters;
- * - how it is known: `known` when it is one of the student's known sittings, else declared by
- *   whoever is reserving (`declared_by_family` from the app, `declared_by_desk` from staff) —
- *   listed on the session's To verify tab;
+ *   student's latest known sitting of what the item enters (a confirmed line, an F4 result or an
+ *   entry sent to the board);
+ * - how it is known: `known` when filled in so, or when the sitting named is one of the student's
+ *   confirmed lines; else declared by whoever is reserving (`declared_by_family` from the app,
+ *   `declared_by_desk` from staff) — listed on the session's To verify tab. A sitting named that
+ *   F4's results show stays the declaration it is: F4 verifies it at declaration, the result and
+ *   its importer as the evidence (`verifyDeclaredAtDeclarationInTx`, EXAM_ENTRIES.md);
  * - a first entry names no earlier sitting unless its item carries one forward;
  * - the teacher: none in self-study; the item's (or offer's) only teacher when the page named
  *   none or "no preference"; "no preference" (null) where there are several.
@@ -204,7 +208,8 @@ export async function resolveReservationLines(
     const carries = l.attempt === 'retake' || it.needsPriorSeries;
     if (priorId && !carries) throw new ReservationError(`A first entry of ${name} follows no earlier sitting: choose "retake" to name one`);
     const known = carries ? await knownSittingsOf(tx, a.studentId, a.sessionId, it) : [];
-    if (carries && !priorId && known.length) priorId = known[0]!.seriesId;
+    const filled = carries && !priorId && known.length > 0;
+    if (filled) priorId = known[0]!.seriesId;
     let source: PriorSittingSource | null = null;
     if (priorId) {
       const [p] = await tx.select({ boardCode: boardSeries.boardCode, month: boardSeries.month, year: boardSeries.year })
@@ -216,7 +221,8 @@ export async function resolveReservationLines(
       if (it.year && it.month && p.year * 12 + schoolMonthIndex(p.month) >= it.year * 12 + schoolMonthIndex(it.month)) {
         throw new ReservationError(`The earlier sitting of ${name} must come before the series it is entered in`);
       }
-      source = known.some((k) => k.seriesId === priorId) ? 'known' : a.declaredBy === 'family' ? 'declared_by_family' : 'declared_by_desk';
+      source = filled || known.some((k) => k.source === 'line' && k.seriesId === priorId) ? 'known'
+        : a.declaredBy === 'family' ? 'declared_by_family' : 'declared_by_desk';
       // A family declares a sitting of the board's last two years (§3.5: its picker offers those);
       // an older one is declared at the desk, which sees the family's papers.
       if (source === 'declared_by_family' && it.year && it.month

@@ -97,14 +97,15 @@ export async function offersForStudent(studentId: string, sessionId: string) {
         }));
       // A result on record or an entry sent to the board for what the item enters (step B, from F4).
       const examKeys = examKeysOf({ entersKind: i.entersKind as string, qualificationId: i.qualificationId as string | null, units: i.units as string[], subjectQualificationId: o.subjectQualificationId, subjectUnits: o.subjectUnits });
-      const fromExams = exams.filter((e) => examKeys.includes(e.key)).map((e) => ({
+      // Only those before this item's series: F4 holds entries of this series and later ones too.
+      const here = i.year ? Number(i.year) * 12 + (MONTH_ORDER[i.month as string] ?? 0) : null;
+      const fromExams = exams.filter((e) => examKeys.includes(e.key))
+        .filter((e) => here === null || e.year * 12 + (MONTH_ORDER[e.month] ?? 0) < here).map((e) => ({
         registrationId: null as string | null, sessionName: null as string | null, seriesId: e.seriesId, series: e.series, status: e.source as string,
         source: e.source as 'line' | 'result' | 'entry', month: e.month as string, year: e.year, grade: e.grade,
       }));
-      // Latest first, and only sittings before this item's series (a later one is no earlier sitting).
-      const here = i.year ? Number(i.year) * 12 + (MONTH_ORDER[i.month as string] ?? 0) : null;
+      // Latest first.
       const known = [...fromLines, ...fromExams]
-        .filter((k) => here === null || k.year * 12 + (MONTH_ORDER[k.month] ?? 0) < here)
         .sort((a, b) => (b.year * 12 + (MONTH_ORDER[b.month] ?? 0)) - (a.year * 12 + (MONTH_ORDER[a.month] ?? 0)));
       const held = history.find((h) => h.itemId === i.id && h.sessionId === sessionId && !['rejected', 'expired', 'dropped'].includes(h.status));
       const combos: { attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study' }[] = [];

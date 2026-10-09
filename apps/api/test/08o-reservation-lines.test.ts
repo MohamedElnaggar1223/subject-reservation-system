@@ -332,12 +332,15 @@ describe('08o: reservation lines (step B)', () => {
     const fD = await onboard(officer, `o08-f4d-${RUN}`, 11);
     await sql(`insert into exam_result (id, student_id, board_series_id, board_code, kind, code, qualification_id, grade, source, status)
       values (gen_random_uuid(), $1, $2, 'cambridge', 'award', $3, $4, 'B', 'manual', 'provisional')`, [fR.studentId, june, award.code, award.id]);
-    // Sent to the board (submitted); one withdrawn after it was sent; one a draft, never sent.
-    const entry = (studentId: string, status: string) => sql(`insert into exam_entry (id, student_id, board_series_id, board_code, kind, qualification_id, entry_code, title, status, submitted_at, withdrawn_at)
-      values (gen_random_uuid(), $1, $2, 'cambridge', 'award', $3, $4, 'Chemistry', $5, $6, $7)`,
-      [studentId, june, award.id, award.code, status, status === 'draft' ? null : new Date(), status === 'withdrawn' ? new Date() : null]);
+    // Sent to the board (submitted); one withdrawn after it was sent (F4's withdraw, with its audit
+    // row: 09's rule); one a draft, never sent. fE is entered for November itself too, which is no
+    // earlier sitting of a November item.
+    const entry = async (studentId: string, status: 'submitted' | 'draft', series = june) => (await sql<{ id: string }>(`insert into exam_entry (id, student_id, board_series_id, board_code, kind, qualification_id, entry_code, title, status, submitted_at)
+      values (gen_random_uuid(), $1, $2, 'cambridge', 'award', $3, $4, 'Chemistry', $5, $6) returning id`,
+      [studentId, series, award.id, award.code, status, status === 'draft' ? null : new Date()]))[0]!.id;
     await entry(fE.studentId, 'submitted');
-    await entry(fW.studentId, 'withdrawn');
+    await entry(fE.studentId, 'submitted', nov);
+    await apiResponse(coordinator.api.v1.exams.entries[':id'].withdraw.$post({ param: { id: await entry(fW.studentId, 'submitted') }, json: { reason: 'the candidate withdrew' } }));
     await entry(fD.studentId, 'draft');
 
     const offered = async (studentId: string) => (await apiResponse(officer.api.v1.registrations.offers.$get({ query: { sessionId: winter, studentId } })))
