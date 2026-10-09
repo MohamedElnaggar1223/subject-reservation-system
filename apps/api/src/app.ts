@@ -46,6 +46,7 @@ import { examTimetableRoutes } from './routes/exam-timetable.routes';
 import { examResultRoutes } from './routes/exam-result.routes';
 import { boardFeeRoutes } from './routes/board-fee.routes';
 import { lineRoutes, sessionVerifyRoutes, statementRoutes } from './routes/reservation.routes';
+import { importRoutes } from './routes/import.routes';
 import { isGrantedRole, isGranted } from './lib/role-grants';
 import { reports } from './routes/report.routes';
 import { teachers } from './routes/teacher.routes';
@@ -375,6 +376,9 @@ const v1 = new Hono<HonoEnv>()
    *                      exam timetable, rooms, seats, invigilators, the
    *                      boards' registers, special consideration, results,
    *                      certificates, the deadlines dashboard
+   * F7 — the day-one import:
+   * - /v1/imports        a file staged, reviewed (fix, merge, skip, mapping)
+   *                      and committed one family per transaction
    *
    * Reports routes mounted at /v1/reports (admin only):
    * - GET    /v1/reports/dashboard                - Admin dashboard metrics (REP-008)
@@ -440,7 +444,9 @@ const v1 = new Hono<HonoEnv>()
   // timetable and exam days, results, certificates, the deadlines.
   .route('/exams', examEntryRoutes)
   .route('/exams', examTimetableRoutes)
-  .route('/exams', examResultRoutes);
+  .route('/exams', examResultRoutes)
+  // F7: the day-one import
+  .route('/imports', importRoutes);
 
 // Mount v1 under /v1 (keep chaining for proper RPC typing)
 // Exported for in-process tests (app.request) and for index.ts to serve.

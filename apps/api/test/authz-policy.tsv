@@ -361,3 +361,13 @@ GET	/v1/messages/deliveries	D	D	D	A	A	A	D	D	D
 GET	/v1/reminders/rules	D	D	D	D	A	A	D	D	D
 PUT	/v1/reminders/rules	D	D	D	D	A	A	D	D	D
 GET	/v1/reminders/sent	D	D	D	D	A	A	D	D	D
+# F7, the day-one import (docs/features/IMPORT.md §7): staging, the review, the fixes and the commit are the admin's and the coordinator's; adding catalogue rows is the admin's.
+GET	/v1/imports	D	D	D	D	D	A	A	D	D
+POST	/v1/imports	D	D	D	D	D	A	A	D	D
+GET	/v1/imports/:id	D	D	D	D	D	A	A	D	D
+PUT	/v1/imports/:id/settings	D	D	D	D	D	A	A	D	D
+PUT	/v1/imports/:id/rows	D	D	D	D	D	A	A	D	D
+PUT	/v1/imports/:id/people	D	D	D	D	D	A	A	D	D
+POST	/v1/imports/:id/subjects	D	D	D	D	D	A	D	D	D
+POST	/v1/imports/:id/commit	D	D	D	D	D	A	A	D	D
+POST	/v1/imports/:id/discard	D	D	D	D	D	A	A	D	D

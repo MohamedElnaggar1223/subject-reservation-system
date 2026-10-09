@@ -10,7 +10,7 @@
 import { useEffect } from 'react';
 import { api } from '~/lib/hono';
 import { apiResponse, type SessionMoneyQueryType } from '@repo/validations';
-import { Badge, type Tone } from '~/components/ui/tone';
+import { Badge, Notice, type Tone } from '~/components/ui/tone';
 import { cn } from '~/lib/utils';
 import { InstantText } from '~/app/(app)/exams/exams-shared';
 
@@ -138,6 +138,26 @@ export function Drawer({ title, subtitle, onClose, children }: { title: string; 
         <div className="space-y-6 px-6 py-5">{children}</div>
       </div>
     </div>
+  );
+}
+
+/**
+ * What a copy of another session's subjects brought across closed — no teacher left to teach it, no
+ * course fee (MO-9) — and what came across self-study only at a course fee of 0, its reason recorded
+ * (the Copy dialog and the New session screen; F7's review of 2ca07a4's round, item 3).
+ */
+export function CopySummary({ copied }: { copied: { offers: number; closedNoTeacher: number; closedNoFee: string[]; zeroFeeSelfStudy: { subject: string }[] } }) {
+  if (!copied.closedNoTeacher && !copied.closedNoFee.length && !copied.zeroFeeSelfStudy.length) return null;
+  return (
+    <Notice tone="warning" title="Copied; some subjects need a look">
+      {copied.closedNoTeacher > 0 && <p><span>Closed, no teacher to teach them:</span> <span className="tabular-nums">{copied.closedNoTeacher}</span></p>}
+      {copied.closedNoFee.length > 0 && (
+        <p><span>Closed, no course fee (open them once it is set):</span> <bdi data-i18n-skip="true">{copied.closedNoFee.join(', ')}</bdi></p>
+      )}
+      {copied.zeroFeeSelfStudy.length > 0 && (
+        <p><span>Self-study only at a course fee of 0, priced at the board fee alone:</span> <bdi data-i18n-skip="true">{copied.zeroFeeSelfStudy.map((z) => z.subject).join(', ')}</bdi></p>
+      )}
+    </Notice>
   );
 }
 

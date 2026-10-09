@@ -767,9 +767,15 @@ export async function pauseAtAudits(actions: string[]) {
   };
   let done = false;
   return {
-    /** Until a transaction waits at this action's write (an advisory wait on its key). */
+    /**
+     * Until a transaction waits at this action's write (an advisory wait on its key) — in this
+     * database: an advisory key is per database, and another suite run side by side on the same
+     * server (local time and TZ=UTC) waits on the same key in its own (F7's race test proceeded
+     * before its import paused, on the other suite's wait).
+     */
     paused: (action: string, ms = 5000) => waitFor(async () => {
-      const [r] = await sql<{ n: string }>(`select count(*) as n from pg_locks where locktype = 'advisory' and not granted and classid = 0 and objid = $1 and objsubid = 1`, [keys.get(action)!]);
+      const [r] = await sql<{ n: string }>(`select count(*) as n from pg_locks where locktype = 'advisory' and not granted and classid = 0 and objid = $1 and objsubid = 1
+        and database = (select oid from pg_database where datname = current_database())`, [keys.get(action)!]);
       return Number(r?.n ?? 0) > 0 || null;
     }, ms),
     release,

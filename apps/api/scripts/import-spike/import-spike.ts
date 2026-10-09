@@ -18,9 +18,11 @@
  * The database is `igcse_spike_test` on the test container, dropped and
  * migrated on every run (the same setup as the suite, test/global-setup.ts).
  */
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import type { AppType } from '../../src/app';
-import { readWorkbook } from './xlsx';
+// The spike's reader became the import's (src/lib/xlsx.ts, hardened for uploads).
+import { readWorkbook as readWorkbookBytes } from '../../src/lib/xlsx';
+const readWorkbook = (path: string) => readWorkbookBytes(readFileSync(path));
 
 const args = process.argv.slice(2);
 const option = (name: string) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };

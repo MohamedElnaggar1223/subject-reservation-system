@@ -21,6 +21,7 @@ import { fetchBoardSeries, fetchTeachers, useCatalogue } from '~/app/(app)/exams
 import {
   fetchOffers, fetchAddable, fetchSessions, offersKey, SESSIONS_KEY, Money, Modal, Drawer, Field, INPUT_CLASS, ErrorLine, errorText,
   AVAILABILITY_SHORT, type SessionDetail, type OfferRow, type ItemRow,
+  CopySummary,
 } from '../sessions-shared';
 
 const WARNING_LABEL: Record<string, string> = {
@@ -190,6 +191,10 @@ function OfferDrawer({ session, offer, canEdit, onClose }: { session: SessionDet
   const [courseStartsOn, setCourseStartsOn] = useState(offer.courseStartsOn ?? '');
   const [grade10Core, setGrade10Core] = useState(offer.grade10Core);
   const [notes, setNotes] = useState(offer.notes ?? '');
+  const [zeroReason, setZeroReason] = useState('');
+  // MO-9: self-study only at a course fee of 0 says why, once (an offer already so keeps its reason).
+  const asksZeroReason = availability === 'self_study_only' && courseFee !== '' && Number(courseFee) === 0
+    && !(offer.availability === 'self_study_only' && !(Number(offer.courseFee) > 0));
   const [teachers, setTeachers] = useState(offer.teachers.map((t) => ({ teacherId: t.teacherId, mode: (t.mode === 'online' ? 'online' : 'in_school') as 'in_school' | 'online' })));
   const [replacing, setReplacing] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -197,7 +202,10 @@ function OfferDrawer({ session, offer, canEdit, onClose }: { session: SessionDet
   const save = useMutation({
     mutationFn: async () => apiResponse(api.v1.sessions[':id'].offers[':offerId'].$put({
       param: { id: session.id, offerId: offer.id },
-      json: { availability, courseFee: Number(courseFee), courseStartsOn: courseStartsOn || null, grade10Core, notes: notes.trim() || null, teachers },
+      json: {
+        availability, courseFee: Number(courseFee), courseStartsOn: courseStartsOn || null, grade10Core, notes: notes.trim() || null, teachers,
+        ...(asksZeroReason ? { zeroFeeReason: zeroReason.trim() } : {}),
+      },
     })),
     onSuccess: refresh,
   });
@@ -221,6 +229,11 @@ function OfferDrawer({ session, offer, canEdit, onClose }: { session: SessionDet
           <Field label="Course fee" htmlFor="od-fee">
             <input id="od-fee" className={INPUT_CLASS} type="number" min={0} inputMode="decimal" value={courseFee} disabled={!canEdit} onChange={(e) => setCourseFee(e.target.value)} />
           </Field>
+          {asksZeroReason && (
+            <Field label="Why the course fee is 0" htmlFor="od-zero" hint="Self-study only at 0: its lines are priced at the board fee alone.">
+              <input id="od-zero" className={INPUT_CLASS} value={zeroReason} disabled={!canEdit} onChange={(e) => setZeroReason(e.target.value)} />
+            </Field>
+          )}
           <Field label="Course starts (if not the session's)" htmlFor="od-start">
             <input id="od-start" className={INPUT_CLASS} type="date" value={courseStartsOn} disabled={!canEdit} onChange={(e) => setCourseStartsOn(e.target.value)} />
           </Field>
@@ -243,7 +256,7 @@ function OfferDrawer({ session, offer, canEdit, onClose }: { session: SessionDet
               {offer.teachers.length > 0 && <Button variant="outline" size="sm" onClick={() => setReplacing(true)}>Replace teacher</Button>}
               <Button variant="outline" size="sm" onClick={() => setRemoving(true)}>Remove subject</Button>
             </div>
-            <Button onClick={() => save.mutate()} disabled={save.isPending || !courseFee}>{save.isPending ? 'Saving…' : 'Save'}</Button>
+            <Button onClick={() => save.mutate()} disabled={save.isPending || !courseFee || (asksZeroReason && zeroReason.trim().length < 5)}>{save.isPending ? 'Saving…' : 'Save'}</Button>
           </div>
         )}
       </section>
@@ -547,6 +560,8 @@ function AddSubject({ session, onClose }: { session: SessionDetail; onClose: () 
   const [teachers, setTeachers] = useState<{ teacherId: string; mode: 'in_school' | 'online' }[]>([]);
   const [courseFee, setCourseFee] = useState('');
   const [availability, setAvailability] = useState<Availability>('open');
+  const [zeroReason, setZeroReason] = useState('');
+  const asksZeroReason = availability === 'self_study_only' && courseFee !== '' && Number(courseFee) === 0;
   const picked = (addable ?? []).find((a) => a.id === subjectId);
   const matches = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -554,7 +569,7 @@ function AddSubject({ session, onClose }: { session: SessionDetail; onClose: () 
   }, [addable, search]);
   const add = useMutation({
     mutationFn: async () => apiResponse(api.v1.sessions[':id'].offers.$post({
-      param: { id: session.id }, json: { subjectId, courseFee: Number(courseFee), availability, teachers },
+      param: { id: session.id }, json: { subjectId, courseFee: Number(courseFee), availability, teachers, ...(asksZeroReason ? { zeroFeeReason: zeroReason.trim() } : {}) },
     })),
     onSuccess: async () => {
       await Promise.all([queryClient.invalidateQueries({ queryKey: offersKey(session.id) }), queryClient.invalidateQueries({ queryKey: SESSIONS_KEY })]);
@@ -573,7 +588,7 @@ function AddSubject({ session, onClose }: { session: SessionDetail; onClose: () 
             {matches.length === 0 && <p className="p-3 text-sm text-muted-foreground">Every active subject is already in this session.</p>}
             {matches.map((a) => (
               <button key={a.id} type="button" role="option" aria-selected={a.id === subjectId}
-                onClick={() => { setSubjectId(a.id); setCourseFee(String(a.courseFee)); setTeachers(a.teachers.length === 1 ? [{ teacherId: a.teachers[0]!.teacherId, mode: 'in_school' }] : []); }}
+                onClick={() => { setSubjectId(a.id); setCourseFee(a.courseFee > 0 ? String(a.courseFee) : ''); setTeachers(a.teachers.length === 1 ? [{ teacherId: a.teachers[0]!.teacherId, mode: 'in_school' }] : []); }}
                 className={`flex w-full items-center justify-between gap-2 border-b border-border px-3 py-2 text-start text-sm last:border-0 ${a.id === subjectId ? 'bg-primary/10' : 'hover:bg-muted/40'}`}>
                 <span><bdi data-i18n-skip="true">{a.name}</bdi> <span className="font-mono text-xs text-muted-foreground"><bdi data-i18n-skip="true">{a.code}</bdi></span></span>
                 {!a.mapped && <Badge tone="warning">Map on the Catalogue</Badge>}
@@ -591,6 +606,11 @@ function AddSubject({ session, onClose }: { session: SessionDetail; onClose: () 
                 </select>
               </Field>
             </div>
+            {asksZeroReason && (
+              <Field label="Why the course fee is 0" htmlFor="as-zero" hint="Self-study only at 0: its lines are priced at the board fee alone.">
+                <input id="as-zero" className={INPUT_CLASS} value={zeroReason} onChange={(e) => setZeroReason(e.target.value)} />
+              </Field>
+            )}
             <Field label="Teachers" hint={availability === 'open' ? 'An open subject names who teaches it.' : undefined}>
               <TeacherPicker value={teachers} onChange={setTeachers} pool={picked.teachers.map((t) => t.teacherId)} />
             </Field>
@@ -599,7 +619,7 @@ function AddSubject({ session, onClose }: { session: SessionDetail; onClose: () 
         )}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={!picked || courseFee === '' || add.isPending}>{add.isPending ? 'Adding…' : 'Add subject'}</Button>
+          <Button type="submit" disabled={!picked || courseFee === '' || (asksZeroReason && zeroReason.trim().length < 5) || add.isPending}>{add.isPending ? 'Adding…' : 'Add subject'}</Button>
         </div>
       </form>
     </Modal>
@@ -613,16 +633,18 @@ function CopyFrom({ session, onClose }: { session: SessionDetail; onClose: () =>
   const [from, setFrom] = useState('');
   const go = useMutation({
     mutationFn: async () => apiResponse(api.v1.sessions[':id']['copy-from'].$post({ param: { id: session.id }, json: { fromSessionId: from || choices[0]!.id } })),
-    onSuccess: async () => {
+    onSuccess: async (r) => {
       await Promise.all([queryClient.invalidateQueries({ queryKey: offersKey(session.id) }), queryClient.invalidateQueries({ queryKey: SESSIONS_KEY })]);
-      onClose();
+      if (!r.closedNoTeacher && !r.closedNoFee.length && !r.zeroFeeSelfStudy.length) onClose();
     },
   });
+  const done = go.data && (go.data.closedNoTeacher > 0 || go.data.closedNoFee.length > 0 || go.data.zeroFeeSelfStudy.length > 0) ? go.data : null;
   return (
     <Modal title="Copy subjects from another session" onClose={onClose}>
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">Its subjects, teachers, items and course fees come across (the subjects this session has are kept); its board fees come across provisional.</p>
         <ErrorLine message={go.error ? errorText(go.error) : null} />
+        {done && <CopySummary copied={done} />}
         {choices.length === 0 ? <Notice tone="neutral">No other session of this kind to copy from.</Notice> : (
           <Field label="From" htmlFor="cf-from">
             <select id="cf-from" className={INPUT_CLASS} value={from || choices[0]!.id} onChange={(e) => setFrom(e.target.value)}>
@@ -632,7 +654,7 @@ function CopyFrom({ session, onClose }: { session: SessionDetail; onClose: () =>
         )}
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => go.mutate()} disabled={!choices.length || go.isPending}>Copy</Button>
+          {done ? <Button onClick={onClose}>Done</Button> : <Button onClick={() => go.mutate()} disabled={!choices.length || go.isPending}>Copy</Button>}
         </div>
       </div>
     </Modal>

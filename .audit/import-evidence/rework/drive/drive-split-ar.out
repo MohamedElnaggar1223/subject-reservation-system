@@ -1,0 +1,231 @@
+signed in → http://localhost:3090/admin/dashboard
+staged fe45c23d-90bf-4b9a-b6c2-15e4b6263a60
+series selects: 2
+rows for "Mathematics (P1 & P2)": 1
+shot 01-split-row
+SPLIT ROW:
+Nov 2026، السطر 3
+إغلاق
+المشكلات
+المادة غير موجودة في الدليل — "Mathematics (P1 & P2)" A.S.
+طابقها مع صف في الدليل (أو أضفه): حتى ذلك يحفظ السجل السابق كلمات الجدول ولا يُنشأ لها التحاق. ويُعثر على سطر الجلسة في مواد الجلسة بكلماته.
+سطر واحد في الجدول، وعدة سطور في الجلسة — p1: P1 · p2: P2
+يذكر السطر عدة وحدات أو أوراق تقدّمها الجلسة بنودًا منفصلة: فيُنشئ سطرًا لكل بند، يُسعَّر كلٌّ على حدة.
+السطور في الجلسة
+
+يذكر هذا السطر من الجدول عدة وحدات أو أوراق: فيُنشئ سطرًا لكل واحدة، يُسعَّر كلٌّ على حدة.
+
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Mathematics A.S./A.L. — P1 (p1)
+دورات المجالس
+Pearson Edexcel November 2026
+القيد
+قيد أول، في المدرسة
+الدورة التي يتبعها
+—
+معلم
+Teacher Demo A
+السعر
+جنيه 14,140
+التدريس 9,000 × 100% + المجلس 5,140 × 100%
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Mathematics A.S./A.L. — P2 (p2)
+دورات المجالس
+Pearson Edexcel November 2026
+القيد
+قيد أول، في المدرسة
+الدورة التي يتبعها
+—
+معلم
+Teacher Demo A
+السعر
+جنيه 14,140
+التدريس 9,000 × 100% + المجلس 5,140 × 100%
+بند كل وحدة أو ورقة يذكرها السطر
+p1
+كما تجده كلمات الجدول: P1
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History — Whole subject · Cambridge International نوفمبر 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P2 · Pearson Edexcel نوفمبر 2026
+Demo Physics — Whole subject · Cambridge International نوفمبر 202
+rows for "Mathematics (P1 & P5)": 1
+shot 02-code-unclear
+UNCLEAR ROW:
+Nov 2026، السطر 4
+إغلاق
+المشكلات
+المادة غير موجودة في الدليل — "Mathematics (P1 & P5)" A.S.
+طابقها مع صف في الدليل (أو أضفه): حتى ذلك يحفظ السجل السابق كلمات الجدول ولا يُنشأ لها التحاق. ويُعثر على سطر الجلسة في مواد الجلسة بكلماته.
+أي بند من المادة؟ — Demo Mathematics A.S./A.L.: اختر البند لـ p5 (M1 · P1 · P2)
+لا تطابق كلمات السطر أيًّا من بنود المادة، أو تطابق أكثر من بند (المادة كاملة، أو وحدة، أو مسار، أو إعادة ورقة واحدة). اختر البند في السطر — وفي سطر يذكر عدة وحدات أو أوراق، بند كل واحدة لا تحددها الكلمات.
+السطر في الجلسة
+
+لا سطر بعد: انظر المشكلات أعلاه.
+
+بند كل وحدة أو ورقة يذكرها السطر
+p1
+كما تجده كلمات الجدول: P1
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History — Whole subject · Cambridge International نوفمبر 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P2 · Pearson Edexcel نوفمبر 2026
+Demo Physics — Whole subject · Cambridge International نوفمبر 2026
+p5
+اختر بندها
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History — Whole subject · Cambridge International نوفمبر 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P2 ·
+p5 options: اختر بندها | Demo Biology — Whole subject · Cambridge International نوفمبر 2026 | Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026 | Demo Geography — Whole subject · Cambridge International نوفمبر 2026 | Demo History — Whole subject · Cambridge International نوفمبر 2026 | Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel نوفمبر 2026 | Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel نوفمبر 2026 | Demo Mathematics A.S./A.L. — P2 · Pearson Edexcel نوفمبر 2026 | Demo Physics — Whole subject · Cambridge International نوفمبر 2026
+shot 03-code-chosen
+CHOSEN ROW:
+Nov 2026، السطر 4
+إغلاق
+المشكلات
+المادة غير موجودة في الدليل — "Mathematics (P1 & P5)" A.S.
+طابقها مع صف في الدليل (أو أضفه): حتى ذلك يحفظ السجل السابق كلمات الجدول ولا يُنشأ لها التحاق. ويُعثر على سطر الجلسة في مواد الجلسة بكلماته.
+سطر واحد في الجدول، وعدة سطور في الجلسة — p1: P1 · p5: M1
+يذكر السطر عدة وحدات أو أوراق تقدّمها الجلسة بنودًا منفصلة: فيُنشئ سطرًا لكل بند، يُسعَّر كلٌّ على حدة.
+السطور في الجلسة
+
+يذكر هذا السطر من الجدول عدة وحدات أو أوراق: فيُنشئ سطرًا لكل واحدة، يُسعَّر كلٌّ على حدة.
+
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Mathematics A.S./A.L. — P1 (p1)
+دورات المجالس
+Pearson Edexcel November 2026
+القيد
+قيد أول، في المدرسة
+الدورة التي يتبعها
+—
+معلم
+Teacher Demo A
+السعر
+جنيه 14,140
+التدريس 9,000 × 100% + المجلس 5,140 × 100%
+الجلسة
+نوفمبر 2026 – يناير 2027
+المادة والبند
+Demo Mathematics A.S./A.L. — M1 (p5) مختار في السطر
+دورات المجالس
+Pearson Edexcel November 2026
+القيد
+قيد أول، في المدرسة
+الدورة التي يتبعها
+—
+معلم
+Teacher Demo A
+السعر
+جنيه 14,140
+التدريس 9,000 × 100% + المجلس 5,140 × 100%
+بند كل وحدة أو ورقة يذكرها السطر
+p1
+كما تجده كلمات الجدول: P1
+Demo Biology — Whole subject · Cambridge International نوفمبر 2026
+Demo Chemistry — Whole subject · Cambridge International نوفمبر 2026
+Demo Geography — Whole subject · Cambridge International نوفمبر 2026
+Demo History — Whole subject · Cambridge International نوفمبر 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel نوفمبر 2026
+Demo Mathematics A.S./A.L. — P2 · Pearson Edexcel نوفمبر 2026
+Demo Physics — Whole subject · Cambridge Internati
+DIALOG:
+اعتماد 3 أسر؟
+
+تُنشأ كل أسرة دفعة واحدة: إذا رُفض أي شيء فيها لا يُنشأ منها شيء، وتذكر أسطرها السبب.
+
+3 حسابات طلاب جديدة
+3 حسابات أولياء أمور جديدة
+3 روابط أولياء أمور بأبناء
+3 طلاب يوضعون في فصول
+1 حالات التحاق بالمقررات
+5 سطور بانتظار الدفع
+إلغاء
+اعتماد
+shot 04-result
+RESULT:
+استيراد بدء التشغيل
+split-sheet-ar.xlsx
+
+جدول التسجيل الخاص بالمدرسة
+معتمد
+·
+رُفع
+8 أكتوبر 2026
+بواسطة
+School Admin
+·
+معتمدة
+8 أكتوبر 2026
+بواسطة
+School Admin
+
+الأسطر
+
+3
+
+3 للاستيراد · 0 مستبعدة
+
+أسر جاهزة
+
+0
+
+3 معتمدة
+
+أسر موقوفة
+
+0
+
+0 أسطر للتصحيح
+
+سينشئ الاعتماد
+
+لا شيء جديد
+عن هذا الملف: لا توجد أموال في هذا الملف
+المشكلات
+الأسطر
+3
+الأشخاص والتعارضات
+المطابقة
+النتيجة
+
+3 أسر معتمدة
+
+3 حسابات طلاب
+3 حسابات أولياء أمور
+3 روابط أولياء أمور بأبناء
+3 أماكن في الفصول
+1 حالات التحاق بالمقررات
+5 سطور بانتظار الدفع
+
+سطور الجدول المقسّمة سطرًا لكل وحدة أو ورقة: Nov 2026 row 3 (2 أسطر), Nov 2026 row 4 (2 أسطر)
+
+كل سجل أُنشئ يشير إلى سطره في الملف. شاهدها في الطلاب, الفصول و الالتحاق بالمقررات. الحسابات المنشأة هنا بلا كلمة مرور بعد: تعيّن كل أسرة كلمة مرور من "نسيت كلمة المرور" في صفحة تسجيل الدخول، بالبريد المسجل في الحساب.
+
+اعرض الأسطر المعتمدة
+IMPORT fe45c23d-90bf-4b9a-b6c2-15e4b6263a60
+ERRORS: 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 
+pageerror: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed 

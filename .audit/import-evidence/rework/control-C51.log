@@ -1,0 +1,45 @@
+# C51: item 3: a dropped course in the system's history is not a sitting
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13402ms
+   × F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > a course the student dropped is not a sitting: a self-study line after it is a first entry, refused without the exception — history in the system as in the file (the review of 8 Oct, item 3) 108ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 passed (68)
+   Duration  15.15s (transform 721ms, setup 2ms, collect 299ms, tests 13.40s, environment 0ms, prepare 33ms)
+ ❯ test/08n-import.test.ts:884:30
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the interim retake rule: imported history is a sitting only if its series had ended when it was committed > a course the student dropped is not a sitting: a self-study line after it is a first entry, refused without the exception — history in the system as in the file (the review of 8 Oct, item 3)
+AssertionError: expected [ Array(1) ] to match object [ { attempt: 'first', …(2) } ]
+(20 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  [
+    {
+-     "attempt": "first",
++     "attempt": "retake",
+      "mode": "self_study",
+-     "priorSitting": null,
++     "priorSitting": {
++       "from": "history",
++       "month": "november",
++       "source": "legacy",
++       "year": 2026,
++     },
+    },
+  ]
+
+ ❯ test/08n-import.test.ts:884:30
+    882|       for (const n of [3, 4]) {
+    883|         const r = rowAt(v, 'Later drop', n);
+    884|         expect(r.plan.lines).toMatchObject([{ attempt: 'first', mode: …
+       |                              ^
+    885|         expect(r.problems.find((p) => p.code === 'self_study_on_taught…
+    886|           code: 'self_study_on_taught', severity: 'error', detail: 'Se…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

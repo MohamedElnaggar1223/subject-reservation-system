@@ -1,0 +1,35 @@
+# C28: flag 3: a possible duplicate of an account already in the system holds its family (duplicate_account)
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 14516ms
+   × F7: the day-one import > a re-run of the same file changes nothing > a child under a new email who is already an account in the system holds the family until staff say which 46ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 passed (68)
+   Duration  16.23s (transform 736ms, setup 2ms, collect 291ms, tests 14.52s, environment 0ms, prepare 32ms)
+ ❯ test/08n-import.test.ts:518:70
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a re-run of the same file changes nothing > a child under a new email who is already an account in the system holds the family until staff say which
+AssertionError: expected undefined to match object { severity: 'error', …(1) }
+
+- Expected: 
+{
+  "detail": "Karim Lotfy (karim.lotfy@import.test.local): the same name and parent",
+  "severity": "error",
+}
+
++ Received: 
+undefined
+
+ ❯ test/08n-import.test.ts:518:70
+    516|       let v = await fetchView(coordinator, id);
+    517|       const k = person(v, 'student', `karim.lotfy2${D}`);
+    518|       expect(k.problems.find((p) => p.code === 'duplicate_account')).t…
+       |                                                                      ^
+    519|       expect(k.possibleAccounts.map((a) => a.email)).toEqual([`karim.l…
+    520|       expect(v.families.find((f) => f.students.includes(`karim.lotfy2$…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

@@ -118,6 +118,11 @@ export const ROLE_GRANTS: Record<GrantedRole, Grant[]> = {
     // and handler still decide: the national ID is the coordinator's and
     // the admin's alone, a family's own records the family's).
     '* /v1/exams/*',
+    // F7: the day-one import (registering in a window and adding catalogue
+    // rows stay the admin's: the handlers refuse them).
+    'GET /v1/imports',
+    'POST /v1/imports',
+    '* /v1/imports/*',
   ],
   teacher: [
     ...SELF_SERVICE,

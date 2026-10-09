@@ -1,0 +1,73 @@
+# C47: item 2: a row naming several units or papers is split, one item per code (findItemsByCode)
+# undone in apps/api/src/services/import/view.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13602ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper 78ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines 32ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 66 passed (68)
+   Duration  15.46s (transform 729ms, setup 2ms, collect 302ms, tests 13.60s, environment 0ms, prepare 30ms)
+ ❯ test/08n-import.test.ts:992:30
+ ❯ test/08n-import.test.ts:1023:28
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > P1 finds the IAL Mathematics offer and its P1 item; P2 is refused as the session refuses it (retakes only); a paper set ("Paper 1 & Paper 2") splits into one line per paper
+AssertionError: expected null to deeply equal [ { code: 'paper 1', …(2) }, …(1) ]
+
+- Expected: 
+  {
+    "code": "paper 1",
+    "itemLabel": "Paper 1",
+    "offerItemId": "dfccf961-8496-49be-93b8-3e74ea2224d2",
+  },
+  {
+    "code": "paper 2",
+    "itemLabel": "Paper 2",
+    "offerItemId": "40280faa-6983-4682-8cca-86b2a1b0ebf5",
+  },
+]
+
++ Received: 
+null
+
+ ❯ test/08n-import.test.ts:992:30
+    990|       // One line of the sheet, two papers the session offers as two i…
+    991|       const set = rowAt(v, 'Units', 5);
+    992|       expect(set.plan.split).toEqual([
+       |                              ^
+    993|         { code: 'paper 1', offerItemId: items['Paper 1'], itemLabel: '…
+    994|         { code: 'paper 2', offerItemId: items['Paper 2'], itemLabel: '…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a line naming two units where one cannot be told is held until staff choose the item for that code only; then it makes both lines
+AssertionError: expected null to deeply equal [ { code: 'p1', …(2) }, …(1) ]
+
+- Expected: 
+  {
+    "code": "p1",
+    "itemLabel": "P1",
+    "offerItemId": "a40c2a9f-a709-4c61-8cc2-871ee44b0f0c",
+  },
+  {
+    "code": "p5",
+    "itemLabel": null,
+    "offerItemId": null,
+  },
+]
+
++ Received: 
+null
+
+ ❯ test/08n-import.test.ts:1023:28
+    1021|       expect((await putSettings(adm, id, { series: { [`november-${Y}-a…
+    1022|       let r = rowAt(await fetchView(adm, id), 'Two units', 3);
+    1023|       expect(r.plan.split).toEqual([{ code: 'p1', offerItemId: items.P…
+       |                            ^
+    1024|       expect(r.plan.lines).toEqual([]);
+    1025|       expect(r.problems.find((p) => p.code === 'item_unclear')).toEqua…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+

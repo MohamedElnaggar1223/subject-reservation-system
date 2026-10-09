@@ -1,0 +1,40 @@
+# The migration order proven on a copy (the final merge of origin/main 2d95638 into feature/import, 9 Oct)
+# igcse_import_order_copy made from igcse_template_dev (34 migrations, through 0033), then migrated with
+# main's migrations alone (origin/main 2d95638's packages/db/drizzle, extracted), then with the branch's
+# (main's 0000-0057 and F7's 0058_import, journal stamp 1791504474468 after 0057's 1791486725177).
+
+## before: the template copy
+migrations|last_when
+34|1790557902648
+has_import_tables
+f
+
+## drizzle-kit migrate with main's migrations only
+Reading config file '/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/agent-acf43230a4e06e8b4/packages/db/drizzle.main-only.config.ts'
+Using 'pg' driver for database querying
+    [✓] migrations applied successfully!
+
+## after main's migrations
+migrations|last_when
+58|1791486725177
+(1 row)
+has_import_tables
+f
+(1 row)
+
+## drizzle-kit migrate with the branch's migrations (0058_import is the only one left)
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/Users/mohamedelnaggar/Coding/subject-reservation-system/.claude/worktrees/agent-acf43230a4e06e8b4/packages/db/drizzle.config.ts'
+Using 'pg' driver for database querying
+ [✓] migrations applied successfully!
+
+## after the branch's migrations
+migrations|last_when
+59|1791504474468
+(1 row)
+has_import_tables
+t
+(1 row)
+
+## 0058_import.sql against the old 0050_import.sql: the same statements (sorted, breakpoints removed)
+SAME-DDL (diff empty); 0058_snapshot.json prevId = 0057_snapshot.json id (4c76eabc…)

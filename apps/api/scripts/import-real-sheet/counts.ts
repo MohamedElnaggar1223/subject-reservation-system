@@ -1,0 +1,214 @@
+/**
+ * The day-one import (F7) run on the school's real sheet, privately — the
+ * import spike's successor (IMPORT_SPIKE.md §4). It stages the file through
+ * the API exactly as staff would (upload, stage), reports every problem the
+ * review finds by count and sheet row number, adds the missing catalogue rows
+ * the way the admin would from the review, commits every family that is
+ * ready, stages the same file again and commits it (a re-run must change
+ * nothing), and reports the counts.
+ *
+ * The sheet holds real families. It is read from wherever the owner keeps it
+ * and never copied into the repository; the report cites counts and sheet row
+ * numbers only — never a name, an email or a phone — and is written outside
+ * the repository's tracked files. Staff appear as a count; ids are hidden; an
+ * error's emails are masked — all before anything is written. The database
+ * (`igcse_import_real_test`) and the uploaded copy (in a directory the run
+ * makes itself) are dropped at the end, even when the run fails.
+ *
+ *   pnpm --filter @repo/api exec tsx scripts/import-real-sheet/counts.ts <sheet.xlsx> [--out <report.md>]
+ */
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import type { AppType } from '../../src/app';
+
+const args = process.argv.slice(2);
+const option = (name: string) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
+const file = args.find((a, i) => !a.startsWith('--') && !args[i - 1]?.startsWith('--'));
+if (!file) throw new Error('Usage: counts.ts <sheet.xlsx> [--out <report.md>]');
+const outPath = option('--out') ?? '/tmp/import-real-sheet-report.md';
+
+process.env.TEST_DB_NAME = 'igcse_import_real_test';
+// The uploaded copy goes to a directory this script makes under a fixed scratch root, and only that
+// directory is deleted at the end: never $LOCAL_UPLOAD_DIR as the shell has it (a shell exporting the
+// dev value would otherwise lose the dev upload store).
+const SCRATCH_ROOT = path.join(realpathSync(tmpdir()), 'igcse-import-real-sheet-');
+const uploadDir = mkdtempSync(SCRATCH_ROOT);
+process.env.LOCAL_UPLOAD_DIR = uploadDir;
+const { TEST_DB_NAME, TEST_DATABASE_URL, TEST_PG_ADMIN_URL } = await import('../../test/env');
+{
+  const { default: pg } = await import('pg');
+  const m = new pg.Client({ connectionString: TEST_PG_ADMIN_URL });
+  await m.connect();
+  await m.query(`DROP DATABASE IF EXISTS ${TEST_DB_NAME} WITH (FORCE)`);
+  await m.query(`CREATE DATABASE ${TEST_DB_NAME}`);
+  await m.end();
+  const { execFileSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  execFileSync('pnpm', ['db:migrate'], { cwd: fileURLToPath(new URL('../../../../packages/db', import.meta.url)), env: { ...process.env, DATABASE_URL: TEST_DATABASE_URL }, stdio: 'pipe' });
+}
+const lines: string[] = [];
+try {
+  const { appWithRoutes } = await import('../../src/app');
+  const { hc } = await import('hono/client');
+  const { apiResponse, academicYearStartOf } = await import('@repo/validations');
+  const { db, sql } = await import('@repo/db');
+  const ORIGIN = 'http://localhost:3000';
+  const PASSWORD = 'ImportRun1';
+  const client = (cookie?: string) => hc<AppType>('http://localhost', {
+    fetch: ((input: RequestInfo | URL, init?: RequestInit) => appWithRoutes.request(input, init)) as typeof fetch,
+    headers: { Origin: ORIGIN, ...(cookie ? { Cookie: cookie } : {}) },
+  });
+  const auth = async (path: string, json: Record<string, unknown>) => {
+    const res = await appWithRoutes.request(path, { method: 'POST', headers: { Origin: ORIGIN, 'Content-Type': 'application/json' }, body: JSON.stringify(json) });
+    if (res.status !== 200) throw new Error(`${path} answered ${res.status}`);
+    return res;
+  };
+  const signIn = async (email: string) => {
+    const res = await auth('/api/auth/sign-in/email', { email, password: PASSWORD });
+    return client((res.headers as unknown as { getSetCookie(): string[] }).getSetCookie().map((c) => c.split(';')[0]).join('; '));
+  };
+  await auth('/api/auth/sign-up/email', { name: 'Run Admin', email: 'admin@import-run.local', password: PASSWORD });
+  await db.execute(sql`update "user" set role = 'admin' where email = 'admin@import-run.local'`);
+  const adm = await signIn('admin@import-run.local');
+  await apiResponse(adm.v1.users.$post({ json: { name: 'Run Coordinator', email: 'coordinator@import-run.local', password: PASSWORD, role: 'coordinator' } }));
+  const coord = await signIn('coordinator@import-run.local');
+  // The academic year the live tab's classes are in, as the school would have set it up.
+  const Y = academicYearStartOf();
+  await apiResponse(coord.v1.academic.years.$post({ json: { startYear: Y, startsOn: `${Y}-09-06`, endsOn: `${Y + 1}-06-25` } }));
+
+  const bytes = readFileSync(file);
+  const stage = async () => {
+    const f = await apiResponse(coord.v1.files.upload.$post({ form: { file: new File([new Uint8Array(bytes)], 'sheet.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), purpose: 'import_file' } }));
+    return (await apiResponse(coord.v1.imports.$post({ json: { fileId: f.id, kind: 'school_sheet' } }))).id;
+  };
+  const view = (id: string) => apiResponse(coord.v1.imports[':id'].$get({ param: { id } }));
+  type View = Awaited<ReturnType<typeof view>>;
+  const ref = (r: { tab: string; rowNumber: number }) => `${r.tab}!${r.rowNumber}`;
+  const report = (title: string, v: View) => {
+    lines.push(`## ${title}`, '');
+    lines.push(`Rows ${v.summary.rows}; importing ${v.summary.importing}; left out ${v.summary.skipped}. Families ${v.summary.families}: ready ${v.summary.readyFamilies}, held back ${v.summary.heldFamilies}, committed ${v.summary.committedFamilies}. Rows with an error ${v.summary.rowsWithErrors}.`, '');
+    // Session tabs by name ("2024", "Sheet1"); any other tab only as a count: a hand-made roster tab may be named after a person.
+    lines.push('Tabs: ' + v.mapping.tabs.filter((t) => t.kind === 'session').map((t) => `${t.name} (${t.kind}, ${t.lines} lines${t.mainSeries ? `, ${t.mainSeries}` : ''})`).join('; ')
+      + `; other tabs: ${v.mapping.tabs.filter((t) => t.kind !== 'session').length}`, '');
+    lines.push('Notes: ' + v.notes.map((n) => n.code).join(', '), '');
+    lines.push('Series groups: ' + v.mapping.series.map((s) => `${s.key} ${s.rows} rows, boards ${s.boards.join('+') || '-'}`).join('; '), '');
+    lines.push('What a commit would make: ' + JSON.stringify(v.summary.plan), '');
+    lines.push('| Problem | Severity | Rows or people | First sheet rows |', '|---|---|---|---|');
+    const by = new Map<string, { sev: string; rows: string[]; people: number }>();
+    for (const r of v.rows) for (const p of r.problems) {
+      const g = by.get(p.code) ?? { sev: p.severity, rows: [], people: 0 };
+      g.rows.push(ref(r));
+      by.set(p.code, g);
+    }
+    for (const p of v.people) for (const pr of p.problems) {
+      if (pr.severity === 'error') continue;
+      const g = by.get(pr.code) ?? { sev: pr.severity, rows: [], people: 0 };
+      g.people++;
+      if (!g.rows.length) for (const id of p.rowIds.slice(0, 1)) { const r = v.rows.find((x) => x.id === id); if (r) g.rows.push(ref(r)); }
+      by.set(pr.code, g);
+    }
+    for (const [code, g] of [...by.entries()].sort((a, b) => a[1].sev.localeCompare(b[1].sev) || b[1].rows.length - a[1].rows.length)) {
+      lines.push(`| ${code} | ${g.sev} | ${g.people ? `${g.people} people` : `${g.rows.length} rows`} | ${g.rows.slice(0, 12).join(', ')} |`);
+    }
+    lines.push('');
+  };
+
+  lines.push('# The day-one import on the school\'s sheet — counts and row numbers only', '', `Run ${new Date().toISOString()} on a throwaway database, dropped at the end. No names, emails or phones.`, '');
+  const first = await stage();
+  let v = await view(first);
+  report('Staged, before any review', v);
+
+  // The admin adds the missing catalogue rows from the review, with today's assumptions (board, level, taught), no prices.
+  const missing = v.mapping.subjects.filter((s) => !s.subjectId);
+  if (missing.length) {
+    await apiResponse(adm.v1.imports[':id'].subjects.$post({ param: { id: first }, json: { subjects: missing.map((s, i) => ({
+      key: s.key, name: s.subject, code: `RUN-${String(i + 1).padStart(3, '0')}`, qualificationLevel: (s.levelSuggested ?? 'igcse') as 'igcse' | 'as_level' | 'a_level',
+      council: (s.isUnit ? 'pearson_edexcel' : 'cambridge') as 'pearson_edexcel' | 'cambridge', isOfferedAtSchool: s.taughtInSchool,
+    })) } }));
+  }
+  v = await view(first);
+  report(`After the admin added ${missing.length} catalogue rows (no other review)`, v);
+
+  // Review flag 7: how each self-study line was read — the yes/no answer, the fee note, or a note against an explicit "No".
+  {
+    const sheetRows = v.rows.filter((r) => r.data.kind === 'sheet' && r.decision === 'import') as (View['rows'][number] & { data: { kind: 'sheet'; selfStudy: boolean; selfStudyAnswer: string | null; feeNote: string | null } })[];
+    const self = sheetRows.filter((r) => r.data.selfStudy);
+    const noteSays = (r: (typeof self)[number]) => !!r.data.feeNote && /self\s*study|external/i.test(r.data.feeNote);
+    const groups: [string, (typeof self)][] = [
+      ['answer Yes', self.filter((r) => r.data.selfStudyAnswer === 'yes')],
+      ['no answer, the fee note says self-study', self.filter((r) => r.data.selfStudyAnswer === null && noteSays(r))],
+      ['answer No, the fee note says self-study (flagged)', self.filter((r) => r.data.selfStudyAnswer === 'no' && noteSays(r))],
+    ];
+    lines.push('## Self-study lines by how they were read (review flag 7)', '', `Self-study lines importing: ${self.length}.`, '');
+    for (const [label, rs] of groups) lines.push(`- ${label}: ${rs.length} (${[...new Set(rs.map((r) => r.tab))].map((t) => `${t} ${rs.filter((r) => r.tab === t).length}`).join(', ')}) rows ${rs.slice(0, 20).map(ref).join(', ')}`);
+    lines.push(`- self_study_contradiction flagged: ${v.rows.filter((r) => r.problems.some((p) => p.code === 'self_study_contradiction')).length} rows`, '');
+  }
+
+  // The reservations rework: the live tab's series mapped to its session (the admin's), with no subject offered yet —
+  // what the school's links sheet must offer before any line can be made. Then back to history (the coordinator's default).
+  {
+    const main = v.mapping.tabs.find((t) => t.kind === 'session' && t.mainSeries && /November|October|January/.test(t.mainSeries));
+    const winterYear = main?.mainSeries ? Number(/\d{4}/.exec(main.mainSeries)![0]) - (/January/.test(main.mainSeries) ? 1 : 0) : Y;
+    const sess = await apiResponse(adm.v1.sessions.$post({ json: {
+      type: 'winter', year: winterYear, startDate: new Date(Date.now() - 86_400_000).toISOString(), endDate: new Date(Date.now() + 60 * 86_400_000).toISOString(),
+      courseStartsOn: new Date().toISOString().slice(0, 10), paymentDueAt: new Date(Date.now() + 60 * 86_400_000).toISOString(),
+    } }));
+    const groups = (await view(first)).mapping.series.filter((g) => g.windows.some((w) => w.id === sess.id));
+    await apiResponse(adm.v1.imports[':id'].settings.$put({ param: { id: first }, json: { series: Object.fromEntries(groups.map((g) => [g.key, { mode: 'window' as const, sessionId: sess.id }])) } }));
+    const live = await view(first);
+    const liveRows = live.rows.filter((r) => r.plan.registration === 'live' || r.plan.registration === 'live_exists');
+    const byCode = new Map<string, number>();
+    for (const r of liveRows) for (const p of r.problems) if (p.severity === 'error') byCode.set(p.code, (byCode.get(p.code) ?? 0) + 1);
+    const notOffered = new Set(liveRows.filter((r) => r.problems.some((p) => p.code === 'not_offered')).map((r) => r.subjectKey));
+    // The split (the review of 8 Oct, item 2): the lines whose words name two or more units or papers — each
+    // becomes one line per item once the session offers them as items (a "one paper" note is one line).
+    const { namedCodes } = await import('../../src/services/offer.services');
+    const several = liveRows.filter((r) => { const d = r.data as { subject?: string; noteOnePaper?: boolean }; return !d.noteOnePaper && namedCodes(d.subject ?? '').length > 1; });
+    const bySeries = new Map<string, number>();
+    for (const r of several) bySeries.set(r.seriesKey ?? 'none', (bySeries.get(r.seriesKey ?? 'none') ?? 0) + 1);
+    const byCount = new Map<number, number>();
+    for (const r of several) { const n = namedCodes((r.data as { subject?: string }).subject ?? '').length; byCount.set(n, (byCount.get(n) ?? 0) + 1); }
+    lines.push('## The live series mapped to its session, nothing offered yet (the rework)', '',
+      `Series groups mapped: ${groups.map((g) => g.key).join(', ') || 'none'}. Lines that would be lines in the session: ${liveRows.length}.`, '',
+      `Errors on them: ${JSON.stringify(Object.fromEntries(byCode))}. Distinct subjects (as the sheet writes them, with level) the session must offer first: ${notOffered.size}.`, '',
+      `Lines naming two or more units or papers (split, one line per item, once offered): ${several.length}; by series ${JSON.stringify(Object.fromEntries(bySeries))}; by the number named ${JSON.stringify(Object.fromEntries(byCount))}; the lines they make: ${several.reduce((n, r) => n + namedCodes((r.data as { subject?: string }).subject ?? '').length, 0)}.`, '');
+    await apiResponse(adm.v1.imports[':id'].settings.$put({ param: { id: first }, json: { series: Object.fromEntries(groups.map((g) => [g.key, { mode: 'history' as const, sessionId: null }])) } }));
+  }
+  v = await view(first);
+
+  const out = await apiResponse(coord.v1.imports[':id'].commit.$post({ param: { id: first } }));
+  // Staff names and ids are people too: only their count is reported.
+  const shown = { ...out, result: { ...out.result, by: '<id>', teachersCreated: `${out.result.teachersCreated.length} teachers`,
+    failed: out.result.failed.map((f) => ({ family: '<hidden>', error: (f.error ?? '').replace(/[\w.+-]+@[\w.-]+/g, '<email>') })) } };
+  lines.push('## Commit (every ready family; the held ones wait for their fixes)', '', '```', JSON.stringify(shown, null, 1).replace(/"family": "[^"]*"/g, '"family": "<hidden>"'), '```', '');
+  const counts = async () => Object.fromEntries(await Promise.all(['user', 'parent_student_link', 'section_membership', 'course_enrolment', 'registration_history', 'money_history', 'registration', 'payment', 'teacher', 'section'].map(async (t) => [t, Number(((await db.execute(sql.raw(`select count(*) as n from "${t}"`))).rows[0] as { n: string }).n)])));
+  const before = await counts();
+  lines.push('Tables after the commit: ' + JSON.stringify(before), '');
+
+  const again = await stage();
+  v = await view(again);
+  report('The same file staged again (its review carried over)', v);
+  const out2 = await apiResponse(coord.v1.imports[':id'].commit.$post({ param: { id: again } }).then((r) => r));
+  lines.push('## The re-run committed', '', '```', JSON.stringify(out2.result.created), '```', '');
+  const after = await counts();
+  lines.push(`Tables after the re-run: ${JSON.stringify(after)}`, '', `Changed by the re-run: ${JSON.stringify(Object.fromEntries(Object.entries(after).filter(([k, n]) => n !== before[k])))}`, '');
+  writeFileSync(outPath, lines.join('\n') + '\n');
+  console.log(`[real-sheet] report: ${outPath}`);
+  await (db as unknown as { $client: { end(): Promise<void> } }).$client.end();
+} catch (err) {
+  writeFileSync(outPath, lines.join('\n') + `\n\nFAILED: ${err instanceof Error ? err.message.replace(/[\w.+-]+@[\w.-]+/g, '<email>') : 'unknown'}\n`);
+  console.error('[real-sheet] failed; see the report');
+} finally {
+  const { default: pg } = await import('pg');
+  const m = new pg.Client({ connectionString: TEST_PG_ADMIN_URL });
+  await m.connect();
+  await m.query(`DROP DATABASE IF EXISTS ${TEST_DB_NAME} WITH (FORCE)`);
+  await m.end();
+  if (!uploadDir.startsWith(SCRATCH_ROOT) || process.env.LOCAL_UPLOAD_DIR !== uploadDir) {
+    throw new Error('[real-sheet] the upload directory is not the one this run made: not deleting it');
+  }
+  rmSync(uploadDir, { recursive: true, force: true });
+  console.log(`[real-sheet] dropped ${TEST_DB_NAME} and the uploaded copy`);
+}
+process.exit(0);

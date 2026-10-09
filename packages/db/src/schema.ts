@@ -4108,3 +4108,238 @@ export const examCertificateRelations = relations(examCertificate, ({ one }) => 
   student: one(user, { fields: [examCertificate.studentId], references: [user.id] }),
   boardSeries: one(boardSeries, { fields: [examCertificate.boardSeriesId], references: [boardSeries.id] }),
 }));
+
+/**
+ * ============================================
+ * F7 — THE DAY-ONE IMPORT
+ * ============================================
+ *
+ * A file the school gives (its registration sheet, SCL's grade-9 roster, the
+ * money record) is staged row by row, reviewed by staff — fix, merge, skip,
+ * and the mapping settings the coordinator's pending answers decide — then
+ * committed one family per transaction (FEATURES_PLAN.md F7). Every row keeps
+ * the line it came from; what a commit made points back to it. The review's
+ * picture (people, families, problems, what a commit would do) is worked out
+ * from the rows, the staff's fixes and the database each time it is read, so
+ * it is never stale; only staff decisions and commit outcomes are stored.
+ */
+export const importBatch = pgTable(
+  "import_batch",
+  {
+    id: text("id").primaryKey(),
+    // 'school_sheet' | 'scl_roster' | 'money_record'
+    kind: text("kind").notNull(),
+    fileId: text("file_id").notNull().references(() => file.id, { onDelete: "restrict" }),
+    fileName: text("file_name").notNull(),
+    // SHA-256 of the file's bytes: the same file staged again is recognised.
+    fileHash: text("file_hash").notNull(),
+    // 'staged' | 'committing' | 'committed' | 'partial' | 'discarded'
+    status: text("status").notNull().default("staged"),
+    // What the file is, as read: its tabs (title, header row, columns, how many lines, a session tab or a roster).
+    source: jsonb("source").$type<Record<string, unknown>>().notNull().default({}),
+    // The review's mapping settings (@repo/validations ImportSettings).
+    settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
+    // The last look's counts, for the list of imports.
+    summary: jsonb("summary").$type<Record<string, unknown>>().notNull().default({}),
+    // What the last commit did, family by family.
+    result: jsonb("result").$type<Record<string, unknown>>(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+    // The commit is claimed before it starts: a second one at the same moment is refused.
+    commitStartedBy: text("commit_started_by").references(() => user.id, { onDelete: "set null" }),
+    commitStartedAt: timestamp("commit_started_at", { withTimezone: true }),
+    committedBy: text("committed_by").references(() => user.id, { onDelete: "set null" }),
+    committedAt: timestamp("committed_at", { withTimezone: true }),
+    discardedBy: text("discarded_by").references(() => user.id, { onDelete: "set null" }),
+    discardedAt: timestamp("discarded_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("importBatch_status_idx").on(table.status),
+    index("importBatch_fileHash_idx").on(table.fileHash),
+    check("import_batch_kind_valid", sql`${table.kind} IN ('school_sheet', 'scl_roster', 'money_record')`),
+    check("import_batch_status_valid", sql`${table.status} IN ('staged', 'committing', 'committed', 'partial', 'discarded')`),
+  ]
+);
+
+/** One line of the file, as read, with the staff's fixes and what its commit made. */
+export const importRow = pgTable(
+  "import_row",
+  {
+    id: text("id").primaryKey(),
+    batchId: text("batch_id").notNull().references(() => importBatch.id, { onDelete: "cascade" }),
+    // Where it came from: the tab (a CSV file has one) and its row number as the sheet shows it.
+    tab: text("tab").notNull(),
+    rowNumber: integer("row_number").notNull(),
+    // The source line as read: [header, cell text] for every cell with something in it.
+    raw: jsonb("raw").$type<[string, string][]>().notNull(),
+    // Staff fixes: a field as the line should have had it (ImportRowEdits).
+    edits: jsonb("edits").$type<Record<string, unknown>>().notNull().default({}),
+    // 'import' | 'skip'; null: the review's own default (a duplicate row is left out).
+    decision: text("decision"),
+    decisionNote: text("decision_note"),
+    decidedBy: text("decided_by").references(() => user.id, { onDelete: "set null" }),
+    // 'pending' | 'committed' | 'failed'
+    status: text("status").notNull().default("pending"),
+    // What the commit made from this line (accounts, link, section, enrolment, history, registration, money history).
+    outcome: jsonb("outcome").$type<Record<string, unknown>>(),
+    error: text("error"),
+    committedAt: timestamp("committed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("importRow_batchId_idx").on(table.batchId),
+    uniqueIndex("importRow_line_idx").on(table.batchId, table.tab, table.rowNumber),
+    check("import_row_decision_valid", sql`${table.decision} IS NULL OR ${table.decision} IN ('import', 'skip')`),
+    check("import_row_status_valid", sql`${table.status} IN ('pending', 'committed', 'failed')`),
+  ]
+);
+
+/**
+ * A person the file names (a student or a parent, keyed by email in the
+ * batch): the staff's decisions about them — a chosen name, email or phone, a
+ * merge into another, "different people", skip — and the account the commit
+ * made or matched.
+ */
+export const importPerson = pgTable(
+  "import_person",
+  {
+    id: text("id").primaryKey(),
+    batchId: text("batch_id").notNull().references(() => importBatch.id, { onDelete: "cascade" }),
+    // 'student' | 'parent'
+    role: text("role").notNull(),
+    key: text("key").notNull(),
+    edits: jsonb("edits").$type<Record<string, unknown>>().notNull().default({}),
+    mergedInto: text("merged_into"),
+    // Staff say a flagged look-alike is a different person / a shared email is one child.
+    distinct: boolean("distinct").notNull().default(false),
+    oneChild: boolean("one_child").notNull().default(false),
+    // 'import' | 'skip'
+    decision: text("decision").notNull().default("import"),
+    // 'pending' | 'committed' | 'failed'
+    status: text("status").notNull().default("pending"),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    error: text("error"),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("importPerson_key_idx").on(table.batchId, table.role, table.key),
+    check("import_person_role_valid", sql`${table.role} IN ('student', 'parent')`),
+    check("import_person_decision_valid", sql`${table.decision} IN ('import', 'skip')`),
+  ]
+);
+
+/**
+ * A registration the school recorded before the system (its sheet), kept as
+ * history: what the student sat or meant to sit, in which series, taught or
+ * self-study, with the sheet's own words for the subject and level. Never a
+ * live registration, never money. A registration's retake rule reads it (a
+ * subject sat before the system is a retake), and F4/F5 read it as sittings
+ * from before the system.
+ */
+export const registrationHistory = pgTable(
+  "registration_history",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    // The catalogue row, when staff mapped the sheet's subject to one.
+    subjectId: text("subject_id").references(() => subject.id, { onDelete: "restrict" }),
+    // The sheet's words: "Pure Mathematics 1 (P1)", "A.S./A.2.".
+    subjectLabel: text("subject_label").notNull(),
+    levelCode: text("level_code"),
+    sessionType: text("session_type").notNull(),
+    seriesYear: integer("series_year").notNull(),
+    // 'in_school' | 'self_study'
+    mode: text("mode").notNull(),
+    teacherId: text("teacher_id").references(() => teacher.id, { onDelete: "set null" }),
+    teacherName: text("teacher_name"),
+    // 'registered' | 'dropped' | 'drop_intended'
+    outcome: text("outcome").notNull(),
+    // "Carry forward on June 2022" as the review read it: { reading, from, note }.
+    carriedForward: jsonb("carried_forward").$type<Record<string, unknown>>(),
+    note: text("note"),
+    // One per student, series and subject: the same line imported twice makes one row.
+    fingerprint: text("fingerprint").notNull(),
+    importBatchId: text("import_batch_id").references(() => importBatch.id, { onDelete: "set null" }),
+    importRowId: text("import_row_id"),
+    // "<file> — <tab> row <n>": traceable to the line, whatever happens to the batch.
+    sourceRef: text("source_ref").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("registrationHistory_fingerprint_idx").on(table.studentId, table.fingerprint),
+    index("registrationHistory_studentId_idx").on(table.studentId),
+    index("registrationHistory_subjectId_idx").on(table.subjectId),
+    check("registration_history_mode_valid", sql`${table.mode} IN ('in_school', 'self_study')`),
+    check("registration_history_outcome_valid", sql`${table.outcome} IN ('registered', 'dropped', 'drop_intended')`),
+    check("registration_history_series_valid", sql`${table.sessionType} IN ('january', 'june', 'october', 'november') AND ${table.seriesYear} BETWEEN 2000 AND 2100`),
+  ]
+);
+
+/**
+ * Money from before the system (DISCOVERY.md F-01; the fee notes of the
+ * school's sheet, IS-08), kept as history: what was paid, refunded or dropped
+ * and at what percentage. It never moves money — no payment, receipt, escrow
+ * balance or takings reads it, and it references none of them.
+ */
+export const moneyHistory = pgTable(
+  "money_history",
+  {
+    id: text("id").primaryKey(),
+    studentId: text("student_id").notNull().references(() => user.id, { onDelete: "restrict" }),
+    // 'payment' | 'refund' | 'drop' | 'self_study_rate' | 'external_rate' | 'carried_forward' | 'other'
+    kind: text("kind").notNull(),
+    // 'in' (paid to the school) | 'out' (paid back); null for a note with no amount.
+    direction: text("direction"),
+    amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }),
+    percent: numeric("percent", { precision: 5, scale: 2, mode: "number" }),
+    happenedOn: date("happened_on", { mode: "string" }),
+    method: text("method"),
+    receiptNumber: text("receipt_number"),
+    seriesLabel: text("series_label"),
+    subjectLabel: text("subject_label"),
+    note: text("note"),
+    fingerprint: text("fingerprint").notNull(),
+    importBatchId: text("import_batch_id").references(() => importBatch.id, { onDelete: "set null" }),
+    importRowId: text("import_row_id"),
+    sourceRef: text("source_ref").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("moneyHistory_fingerprint_idx").on(table.studentId, table.fingerprint),
+    index("moneyHistory_studentId_idx").on(table.studentId),
+    check("money_history_kind_valid", sql`${table.kind} IN ('payment', 'refund', 'drop', 'self_study_rate', 'external_rate', 'carried_forward', 'other')`),
+    check("money_history_direction_valid", sql`${table.direction} IS NULL OR ${table.direction} IN ('in', 'out')`),
+    check("money_history_amount_nonneg", sql`${table.amount} IS NULL OR ${table.amount} >= 0`),
+    check("money_history_percent_range", sql`${table.percent} IS NULL OR (${table.percent} >= 0 AND ${table.percent} <= 100)`),
+  ]
+);
+
+export const importBatchRelations = relations(importBatch, ({ one, many }) => ({
+  file: one(file, { fields: [importBatch.fileId], references: [file.id] }),
+  rows: many(importRow),
+  people: many(importPerson),
+}));
+
+export const importRowRelations = relations(importRow, ({ one }) => ({
+  batch: one(importBatch, { fields: [importRow.batchId], references: [importBatch.id] }),
+}));
+
+export const importPersonRelations = relations(importPerson, ({ one }) => ({
+  batch: one(importBatch, { fields: [importPerson.batchId], references: [importBatch.id] }),
+}));
+
+export const registrationHistoryRelations = relations(registrationHistory, ({ one }) => ({
+  student: one(user, { fields: [registrationHistory.studentId], references: [user.id] }),
+  subject: one(subject, { fields: [registrationHistory.subjectId], references: [subject.id] }),
+  teacher: one(teacher, { fields: [registrationHistory.teacherId], references: [teacher.id] }),
+}));
+
+export const moneyHistoryRelations = relations(moneyHistory, ({ one }) => ({
+  student: one(user, { fields: [moneyHistory.studentId], references: [user.id] }),
+}));

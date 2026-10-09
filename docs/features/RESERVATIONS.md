@@ -733,6 +733,42 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
   `reserveLines` passes its `requestedBy` to `verifyDeclaredAtDeclarationInTx`: the one declaring
   answers a sitting the school's results show.
 
+Added by F7 (the day-one import, 8 Oct; docs/features/IMPORT.md §4.5, §14):
+
+- **`findOffer(executor, sessionId, term, { subjectId?, levels? })` and `findItem(executor, offerId, label,
+  { month?, year? })`** (`offer.services.ts`; RESERVATIONS_REWORK.md §10's F7 row): the offer and
+  item the school's words name in a session — the mapped catalogue row's offer, else the subject
+  named by name or code at the line's level (`levels`; one at another level is no fit, two are
+  ambiguous), else the one offer with an item entering every unit the words name, or any of them
+  when none enters all; the item labelled so, else the one entering exactly the units or paper
+  named, else the whole subject, preferring the sheet's month and year; `candidates` when none or
+  several fit. Nothing on main served them (`resolveItem` gives a subject's whole item only); no
+  existing path changes.
+- **`findItemsByCode(executor, offerId, label, { month?, year?, chosen? })`** (the F7 review of
+  8 Oct, item 2): a line naming several units or papers that no single item enters gets one item
+  per code (staff's choice for a code first, else `findItem` on the code alone), or null for a code
+  no item of its own fits; the import makes one line per item.
+- **`assertLineRules(…, { lockExceptions: false })`**: the rules read the one-shot exception rows
+  without `FOR UPDATE` — only for a check that is rolled back and makes nothing (the import's
+  review, a GET); every path that makes lines keeps the lock.
+- **An open or retakes-only offer takes a course fee above 0** (MO-9; the F7 review of 8 Oct,
+  item 6, and the lead's call on the review of 2ca07a4, item 2): `createOffer` and `updateOffer`
+  refuse a course fee of 0 on an open or retake-only offer with "<subject> has no course fee: set the
+  school's course fee before it is open in this session (a line is never priced without one)". A
+  **self-study-only offer may carry 0 with a reason** (`zeroFeeReason` on CreateOffer and UpdateOffer,
+  as a board fee of 0 says why; kept on the offer's audit row): the school may price a subject it does
+  not teach at the board fee alone; without a reason "<subject> is self-study only at a course fee of
+  0: say why (its lines are priced at the board fee alone)"; an offer already self-study only at 0 is
+  edited without giving it again. A closed offer may wait for its fee. **`copyOffersFrom`** applies
+  the same rule: an offer it would open at 0 that is not self-study only comes across closed, named
+  in the copy's summary (`closedNoFee`, also on `SESSION_COPIED`); a self-study-only offer at 0
+  comes across as it is with its reason recorded in the summary and on `SESSION_COPIED`
+  (`zeroFeeSelfStudy`: "converted from <session>; priced at the board fee alone" for an offer a
+  conversion closed, "copied from …" otherwise). The Copy dialog and the New session screen show
+  both, and the subjects closed for want of a teacher, before the session opens (`CopySummary`). The
+  Add subject dialog shows the field empty for a catalogue row with no fee, never 0, and asks the
+  reason when self-study only at 0, as the offer's drawer does.
+
 ## 3. As built (step 1)
 
 Commits on `feature/rework-sessions`: 7e83d60 (schema, migrations, services), d56ef27 (the F0b

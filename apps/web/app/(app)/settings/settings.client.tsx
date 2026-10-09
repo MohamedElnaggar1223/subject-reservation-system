@@ -26,6 +26,8 @@ const GROUPS: { id: string; title: string; hint: string }[] = [
   { id: 'eligibility', title: 'Who may register', hint: 'Which students may register for which exam series.' },
   { id: 'school_fee', title: 'School fee', hint: 'When the annual school fee gates registration.' },
   { id: 'calendar', title: 'Calendar', hint: 'The school week the calendar and the day’s lists build on.' },
+  { id: 'catalogue', title: 'Exam catalogue', hint: 'How the school’s level codes are read from the units each entry covers.' },
+  { id: 'import', title: 'Day-one import', hint: 'The coordinator’s answers every import’s review starts from.' },
   { id: 'verification', title: 'Declared sittings', hint: 'What happens to a retake a family declared when the school has not verified it by the board’s deadline.' },
   { id: 'pricing', title: 'Prices', hint: 'How a line’s price is made from the course fee and the board’s fee.' },
   { id: 'payment', title: 'Payment', hint: 'When a line’s money is due.' },

@@ -1,0 +1,833 @@
+signed in → http://localhost:3090/admin/dashboard
+shot 01-imports
+staged c5325f8e-a87b-4aa6-bb56-f2430ad87ff8
+shot 02-review-problems
+REVIEW:
+Day-one import
+demo-sheet-3.xlsx
+
+The school's registration sheet
+Waiting for review
+·
+Staged
+8 Oct 2026
+by
+School Admin
+
+Put this file aside
+Commit
+0
+families
+
+ROWS
+
+10
+
+10 to import · 0 left out
+
+FAMILIES READY
+
+0
+
+0 committed
+
+FAMILIES HELD BACK
+
+4
+
+4 rows to fix
+
+A COMMIT WOULD MAKE
+
+4 new student accounts
+4 new parent accounts
+4 parent–child links
+4 students placed in sections
+7 course enrolments
+1 registrations kept as history
+9 lines awaiting payment
+2 money history notes
+About this file: No money in this file · Academic year not set up
+Problems
+4
+Rows
+10
+People and conflicts
+Mapping
+No board fee in the series’ grid
+Must be fixed
+1 line
+Self-study on a first entry of a subject the sch
+series selects: 2
+shot 03-mapping
+MAPPING:
+Day-one import
+demo-sheet-3.xlsx
+
+The school's registration sheet
+Waiting for review
+·
+Staged
+8 Oct 2026
+by
+School Admin
+
+Put this file aside
+Commit
+0
+families
+
+ROWS
+
+10
+
+10 to import · 0 left out
+
+FAMILIES READY
+
+0
+
+0 committed
+
+FAMILIES HELD BACK
+
+4
+
+4 rows to fix
+
+A COMMIT WOULD MAKE
+
+4 new student accounts
+4 new parent accounts
+4 parent–child links
+4 students placed in sections
+7 course enrolments
+1 registrations kept as history
+9 lines awaiting payment
+2 money history notes
+About this file: No money in this file · Academic year not set up
+Problems
+4
+Rows
+10
+People and conflicts
+Mapping
+The file's tabs
+
+Each tab is read by its own headers. Its classes and grades are those of one academic year: the year of the tab's main series.
+
+Nov 2026
+Import it
+9 lines · November 2026
+Classes are in
+2026/27
+June 2026
+Import it
+1 lines · June 2026
+Classes are in
+2025/26 (not set up)
+2026/27
+Year not set up: no sections or enrolments
+Series and levels
+
+History records what each student registered for before the system; nothing is owed. The session of the same series takes the lines as reservations awaiting payment — each on the subject and item the sheet names, priced from the session's fee grids — and the family then pays through the app or the desk. That choice is the admin's.
+
+June 2026 · IGCSE
+academic year 2025/26 · 1 lines
+History only
+Lines awaiting payment in June 2026 — IGCSE (closed)
+Leave these rows out
+Boards: Cambridge International
+November 2026 · IGCSE
+academic year 2026/27 · 7 lines
+History only
+Lines awaiting payment in November 2026 – January 2027 — November IGCSE (cl
+shot 04-problems-mapped
+PROBLEMS:
+Day-one import
+demo-sheet-3.xlsx
+
+The school's registration sheet
+Waiting for review
+·
+Staged
+8 Oct 2026
+by
+School Admin
+
+Put this file aside
+Commit
+0
+families
+
+ROWS
+
+10
+
+10 to import · 0 left out
+
+FAMILIES READY
+
+0
+
+0 committed
+
+FAMILIES HELD BACK
+
+4
+
+4 rows to fix
+
+A COMMIT WOULD MAKE
+
+4 new student accounts
+4 new parent accounts
+4 parent–child links
+4 students placed in sections
+7 course enrolments
+1 registrations kept as history
+9 lines awaiting payment
+2 money history notes
+About this file: No money in this file · Academic year not set up
+Problems
+4
+Rows
+10
+People and conflicts
+Mapping
+No board fee in the series’ grid
+Must be fixed
+1 line
+Self-study on a first entry of a subject the school teaches
+IS-03
+Must be fixed
+1 line
+A retake that names no earlier sitting
+Must be fixed
+1 line
+Which item of the subject?
+Must be fixed
+1 line
+Subject not in the catalogue
+Check it
+2 lines
+Self-study on a retake
+IS-03
+For information
+2 lines
+A fee note
+IS-08
+For information
+2 lines
+The board fee is provisional
+For information
+1 line
+A unit or paper set registered on its own
+IS-01
+For information
+1 line
+rows for "Demo Biology" Demo Student 10+Nov 2026: 1
+shot 05-line-legacy
+ROW 6:
+Nov 2026, row 6
+Close
+Problems
+Self-study on a retake — a retake of June 2026 (the student’s history)
+A sitting before is known (the student’s history) or named on the line: a retake in self-study, at the self-study share.
+The line in the session
+Session
+November 2026 – January 2027
+Subject and item
+Demo Biology — Whole subject
+Board series
+Cambridge International November 2026
+Entry
+Retake, self-study
+Sitting it follows
+June 2026 From the student’s history (legacy)
+Teacher
+None (self-study)
+Price
+EGP 16,850
+course 12,000 × 50% + board 10,850 × 100%
+Item
+As the sheet’s words find it
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International November 2026
+Demo Geography — Whole subject · Cambridge International November 2026
+Demo History — Whole subject · Cambridge International November 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel November 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel November 2026
+Demo Mathematics A.S./A.L. — P2 · Pearson Edexcel November 2026
+Demo Physics — Whole subject · Cambridge International November 2026
+Entry
+First entry
+Retake
+As the sheet says
+The sitting a retake follows (the desk’s declaration, verified on To verify)
+January
+June
+October
+November
+Name this sitting
+As read — fix any field, Enter saves
+Student name
+Student email
+Student phone
+Parent name
+Parent emai
+rows for "Demo Chemistry" : 1
+shot 06-line-declared
+ROW 7:
+Nov 2026, row 7
+Close
+Problems
+A fee note — Retake Self Study 50% fees (All Papers) From June 2026
+Kept as money history (a percentage, never a payment).
+Self-study on a retake — a retake of June 2026 (named on the sheet or the line, to verify)
+A sitting before is known (the student’s history) or named on the line: a retake in self-study, at the self-study share.
+The line in the session
+Session
+November 2026 – January 2027
+Subject and item
+Demo Chemistry — Whole subject
+Board series
+Cambridge International November 2026
+Entry
+Retake, self-study
+Sitting it follows
+June 2026 Declared by the desk — listed to verify
+Teacher
+None (self-study)
+Price
+EGP 16,850
+course 12,000 × 50% + board 10,850 × 100%
+Item
+As the sheet’s words find it
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International November 2026
+Demo Geography — Whole subject · Cambridge International November 2026
+Demo History — Whole subject · Cambridge International November 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel November 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel November 2026
+Demo Mathematics A.S./A.L. — P2 · Pearson Edexcel November 2026
+Demo Physics — Whole subject · Cambridge International November 2026
+Entry
+First entry
+Retake
+As the sheet says
+The sitting a retake follows (the desk’s declaration, verified on To verify)
+
+rows for "Demo Physics" Demo Student 10: 1
+shot 07-self-study-first-entry
+ROW 8:
+Nov 2026, row 8
+Close
+Problems
+Self-study on a first entry of a subject the school teaches — Self-study on a first entry needs the exception: grant it on the Exceptions page or make it a retake with its sitting
+Self-study on a first entry needs the exception: grant it on the Exceptions page or make it a retake with its sitting. Or choose on the line: in school, or enrol only; or change the Self-study setting when the coordinator answers.
+The line in the session
+Session
+November 2026 – January 2027
+Subject and item
+Demo Physics — Whole subject
+Board series
+Cambridge International November 2026
+Entry
+First entry, self-study
+Sitting it follows
+—
+Teacher
+None (self-study)
+Price
+EGP 16,850
+course 12,000 × 50% + board 10,850 × 100%
+Item
+As the sheet’s words find it
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International Nove
+shot 07b-taught-instead
+rows for "Demo History" : 1
+shot 08-line-provisional
+ROW 4:
+Nov 2026, row 4
+Close
+Problems
+The board fee is provisional — board fee 9850 in Cambridge International November 2026
+The series’ grid holds a provisional fee: the line is reserved at that price, marked provisional, and is paid once the school confirms the board’s fee.
+The line in the session
+Session
+November 2026 – January 2027
+Subject and item
+Demo History — Whole subject
+Board series
+Cambridge International November 2026
+Entry
+First entry, in school
+Sitting it follows
+—
+Teacher
+Teacher Demo A
+Price
+EGP 20,850
+course 11,000 × 100% + board 9,850 × 100%
+Board fee provisional
+Item
+As the sheet’s words find it
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International November 2026
+Demo Geography — Whole subject · Cambridge International November 2026
+Demo History — Whole subject · Cambridge International November 2026
+Demo
+rows for "Demo Geography" : 1
+shot 09-fee-missing
+ROW 5:
+Nov 2026, row 5
+Close
+Problems
+No board fee in the series’ grid — Whole subject has no board fee in Cambridge International November 2026 yet — set one on the session's Fees tab
+The item has no fee row in its board series yet (the grid is named). Set it on the session’s Fees tab — provisional until the board publishes is fine — and the line is priced from it; nothing is ever priced at 0 for want of a fee.
+The line in the session
+Session
+November 2026 – January 2027
+Subject and item
+Demo Geography — Whole subject
+Board series
+Cambridge International November 2026
+Entry
+First entry, in school
+Sitting it follows
+—
+Teacher
+Teacher Demo A
+Price
+Not priced: the series’ grid has no fee for it
+Item
+As the sheet’s words find it
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International November 2026
+Demo Geography — Whole subject 
+rows for "Demo Physics" Demo Student 11: 1
+shot 10-retake-no-sitting
+ROW 9:
+Nov 2026, row 9
+Close
+Problems
+A fee note — Retake in School 100% fees (All Papers)
+Kept as money history (a percentage, never a payment).
+A retake that names no earlier sitting — "Retake in School 100% fees (All Papers)": name the sitting it follows on the line, or make it a first entry
+The sheet says a retake (or a second entry), and neither the student’s history nor the line names the sitting it follows. Name the sitting on the line (it is then the desk’s declaration, verified on the session’s To verify tab), or make it a first entry.
+The line in the session
+Session
+November 2026 – January 2027
+Subject and item
+Demo Physics — Whole subject
+Board series
+Cambridge International November 2026
+Entry
+Retake, in school
+Sitting it follows
+—
+Teacher
+Teacher Demo A
+Price
+EGP 22,850
+course 12,000 × 100% + board 10,850 × 100%
+Item
+As the sheet’s words find it
+Demo Biology — Whole subject · Cambr
+shot 10b-sitting-named
+ROW 9 after:
+Nov 2026, row 9
+Close
+Problems
+A fee note — Retake in School 100% fees (All Papers)
+Kept as money history (a percentage, never a payment).
+The line in the session
+Session
+November 2026 – January 2027
+Subject and item
+Demo Physics — Whole subject
+Board series
+Cambridge International November 2026
+Entry
+Retake, in school
+Sitting it follows
+June 2026 Declared by the desk — listed to verify
+Teacher
+Teacher Demo A
+Price
+EGP 22,850
+course 12,000 × 100% + board 10,850 × 100%
+Item
+As the sheet’s words find it
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International November 2026
+Demo Geography — Whole subject · Cambridge International November 2026
+Demo History — Whole subject · Cambridge International November 2026
+Demo Mathematics A.S./A.L. — M1 · Pearson Edexcel November 2026
+Demo Mathematics A.S./A.L. — P1 · Pearson Edexcel
+rows for "Pure Mathematics" : 1
+shot 11-unit-line
+ROW 10:
+Nov 2026, row 10
+Close
+Problems
+A unit or paper set registered on its own
+The sheet registers A-Level units and paper sets one by one (P1, M1, Biology Paper 3). The catalogue holds them as registrable rows entering units (F0b); nothing to do.
+Subject not in the catalogue — "Pure Mathematics 1 (P1)" A.S.
+Map it to a catalogue row (or add it): until then history keeps the sheet’s words and no enrolment is made for it. A line in a session is still found on the session’s subjects by its words.
+The line in the session
+Session
+November 2026 – January 2027
+Subject and item
+Demo Mathematics A.S./A.L. — P1
+Board series
+Pearson Edexcel November 2026
+Entry
+First entry, in school
+Sitting it follows
+—
+Teacher
+Teacher Demo A
+Price
+EGP 14,140
+course 9,000 × 100% + board 5,140 × 100%
+Item
+As the sheet’s words find it
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — W
+rows for "Mathematics (P1" : 1
+shot 12-item-unclear
+ROW 11:
+Nov 2026, row 11
+Close
+Problems
+Subject not in the catalogue — "Mathematics (P1 & P2)" A.S.
+Map it to a catalogue row (or add it): until then history keeps the sheet’s words and no enrolment is made for it. A line in a session is still found on the session’s subjects by its words.
+Which item of the subject? — Demo Mathematics A.S./A.L.: M1 · P1 · P2
+The line’s words fit none, or more than one, of the subject’s items (the whole subject, a unit, a route, a one-paper retake). Choose the item on the line.
+The line in the session
+
+No line yet: see the problems above.
+
+Item
+As the sheet’s words find it
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International November 2026
+Demo Geography — Whole subject · Cambridge International November 2026
+Demo History — Whole subject · Cambridge International November 2026
+Demo Mathematics
+shot 12b-item-chosen
+ROW 11 after:
+Nov 2026, row 11
+Close
+Problems
+Subject not in the catalogue — "Mathematics (P1 & P2)" A.S.
+Map it to a catalogue row (or add it): until then history keeps the sheet’s words and no enrolment is made for it. A line in a session is still found on the session’s subjects by its words.
+The line in the session
+Session
+November 2026 – January 2027
+Subject and item
+Demo Mathematics A.S./A.L. — P2 Chosen on the line
+Board series
+Pearson Edexcel November 2026
+Entry
+First entry, in school
+Sitting it follows
+—
+Teacher
+Teacher Demo A
+Price
+EGP 14,140
+course 9,000 × 100% + board 5,140 × 100%
+Item
+Fixed
+As the sheet’s words find it
+Demo Biology — Whole subject · Cambridge International November 2026
+Demo Chemistry — Whole subject · Cambridge International November 2026
+Demo Geography — Whole subject · Cambridge International November 2026
+Demo History — Whole subject · Cambridge International November 
+shot 13-commit-dialog
+DIALOG:
+Commit 4 families?
+
+Each family is made in one go: if anything in it is refused, nothing of it is made and its rows say why.
+
+4 new student accounts
+4 new parent accounts
+4 parent–child links
+4 students placed in sections
+6 course enrolments
+1 registrations kept as history
+8 lines awaiting payment
+2 money history notes
+Cancel
+Commit
+shot 14-result
+RESULT:
+Day-one import
+demo-sheet-3.xlsx
+
+The school's registration sheet
+Committed
+·
+Staged
+8 Oct 2026
+by
+School Admin
+·
+committed
+8 Oct 2026
+by
+School Admin
+
+ROWS
+
+10
+
+9 to import · 1 left out
+
+FAMILIES READY
+
+0
+
+4 committed
+
+FAMILIES HELD BACK
+
+0
+
+0 rows to fix
+
+A COMMIT WOULD MAKE
+
+Nothing new
+About this file: No money in this file · Academic year not set up
+Problems
+Rows
+10
+People and conflicts
+Mapping
+Result
+
+4 families committed
+
+4 student accounts
+4 parent accounts
+4 parent–child links
+4 section places
+6 course enrolments
+1 history rows
+8 lines awaiting payment
+2 money history notes
+
+Every record made points back to its line of the file. See them on Students, Sections and Course enrolment. Accounts made here have no password yet: each family sets one with “Forgot password” on the sign-in page, using the email on the account.
+
+Show the committed rows
+shot 15-session-money
+MONEY:
+← Sessions
+November 2026 – January 2027
+Open
+
+Reserve 7 Oct 2026 12:59 – 7 Nov 2026 11:59
+Course starts 8 Oct 2026
+Due 7 Nov 2026 11:59
+
+Refunds: 100% to week 2 · 50% in weeks 3–6 · 0% from week 7 · fixed: a family has agreed to it
+
+Edit
+Close
+Correct the series
+Deadlines
+Cambridge International November 2026
+17 Nov 2026
+Pearson Edexcel November 2026
+17 Nov 2026
+Subjects
+Fees
+Money
+To verify
+
+LINES
+
+24
+
+PAID
+
+0 · EGP 0
+
+UNPAID
+
+24 · EGP 454,140
+
+12 families
+
+OVERDUE
+
+0 · EGP 0
+
+3 provisional (not payable yet)
+
+All
+Unpaid
+Overdue
+Provisional
+Paid
+Every subject
+Demo Biology
+Demo Chemistry
+Demo History
+Demo Mathematics A.S./A.L.
+Demo Physics
+Remind
+Export
+STUDENT	SUBJECT	SERIES	PRICE	DUE	STATUS
+
+Demo Student 1
+STU-20261008-B3D73 · 11A
+	Demo Biology
+First entry · In school
+	Cambridge International November 2026	EGP 22,850
+EGP 12,000 + EGP 10,850
+	7 Nov 2026	Unpaid
+
+Demo Student 1
+STU-20261008-B3D73 · 11A
+	Demo History
+First entry · In school
+	Cambridge International November 2026	EGP 20,850
+EGP 11,000 + EGP 9,850
+provisional	7 Nov 2026	Unpaid
+
+Demo Student 10
+STU-20261008-4E1D8 · 11A
+	Demo Biology
+Retake · Self-study
+	Cambridge International November 2026	EGP 16,850
+EGP 6,000 + EGP 10,850
+	7 Nov 2026	Unpaid
+
+Demo Student 10
+STU-20261008-4E1D8 · 11A
+	Demo Chemistry
+Retake · Self-study
+	Cambridge International November 2026	EGP 16,850
+EGP 6,000 + EGP 10,850
+	7 Nov 2026	Unpaid
+
+Demo Student 10
+STU-20261008-4E1D8 · 11A
+	Demo Physics
+First entry · In school
+	Cambridge International November 2026	EGP 22,850
+EGP 12,000 + EGP 10,850
+	7 Nov 2026	Unpaid
+
+Demo Student 11
+STU-20261008-527B
+shot 16-to-verify
+VERIFY:
+← Sessions
+November 2026 – January 2027
+Open
+
+Reserve 7 Oct 2026 12:59 – 7 Nov 2026 11:59
+Course starts 8 Oct 2026
+Due 7 Nov 2026 11:59
+
+Refunds: 100% to week 2 · 50% in weeks 3–6 · 0% from week 7 · fixed: a family has agreed to it
+
+Edit
+Close
+Correct the series
+Deadlines
+Cambridge International November 2026
+17 Nov 2026
+Pearson Edexcel November 2026
+17 Nov 2026
+Subjects
+Fees
+Money
+To verify
+
+Retakes and carried sittings declared by a family or at the desk. Verified, the line stands. Not confirmed: a line not yet paid ends and the family may reserve a first entry; a paid line stands as a first entry before the board's first-entry deadline, and is dropped with its refund after it.
+
+To verify
+Answered
+STUDENT	LINE	DECLARED SITTING	DECLARED BY	PAID	ANSWER BY	
+
+Demo Student 10
+STU-20261008-4E1D8 · 11A
+	Demo Chemistry
+Retake · self-study · EGP 16,850
+	Cambridge International June 2026	The desk
+School Admin · 8 Oct 2026
+	not yet	17 Nov 2026
+40 days left
+	Verify Not confirmed
+
+Demo Student 11
+STU-20261008-527BF · 11A
+	Demo Physics
+Retake · in school · EGP 22,850
+	Cambridge International June 2026	The desk
+School Admin · 8 Oct 2026
+	not yet	17 Nov 2026
+40 days left
+	Verify Not confirmed
+
+D
+student id found: true
+shot 17-statement
+STATEMENT:
+Statement
+
+Every line with its price and why, what is paid and what is still owed, and the payments — one per exam board deadline.
+
+Show ended lines (expired, rejected)
+Demo Student 10
+
+Grade 11 · 11A · STU-20261008-4E1D8
+
+Price
+
+EGP 56,550
+
+Paid
+
+EGP 0
+
+Outstanding
+
+EGP 56,550
+
+Escrow
+
+EGP 0
+
+November 2026 – January 2027
+LINE	PRICE	PAID	OUTSTANDING	DUE	RECEIPT	STATUS	
+
+Demo Biology
+Retake, self-study · Cambridge International November 2026
+from Cambridge International June 2026 (before the system)
+	EGP 16,850
+course 12,000 × 50% + board 10,850 × 100%
+	EGP 0	EGP 16,850	7 Nov 2026	—	Pending Payment	Teacher
+
+Demo Chemistry
+Retake, self-study · Cambridge International November 2026
+from Cambridge International June 2026 (declared at the desk) to be verified by the school
+	EGP 16,850
+course 12,000 × 50% + board 10,850 × 100%
+	EGP 0	EGP 16,850	7 Nov 2026	—	Pending Payment	Teacher
+
+Demo Physics
+First entry, in school · Teacher Demo A · Cambridge International November 2026
+	EGP 22,850
+course 12,000 × 100% + board 10,850 × 100%
+	EGP 0	EGP 22,850	7 Nov 2026	—	Pending Payment	Teacher
+IMPORT c5325f8e-a87b-4aa6-bb56-f2430ad87ff8
+ERRORS: none

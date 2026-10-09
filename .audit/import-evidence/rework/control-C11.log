@@ -1,0 +1,32 @@
+# C11: the family's rows re-read under the lock (re-run on the new base)
+# undone in apps/api/src/services/import/commit.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13586ms
+   × F7: the day-one import > a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder > the re-read under the lock: a family the other commit made while this one waited for its rows is not made again 444ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 passed (68)
+   Duration  15.32s (transform 724ms, setup 2ms, collect 298ms, tests 13.59s, environment 0ms, prepare 30ms)
+ ❯ test/08n-import.test.ts:1878:120
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a commit left behind is taken over after 15 minutes, and the one taken over never undoes the new holder > the re-read under the lock: a family the other commit made while this one waited for its rows is not made again
+AssertionError: expected [ Array(2) ] to have a length of 1 but got 2
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/08n-import.test.ts:1878:120
+    1876|         releaseRow = null;
+    1877|         const [a, b] = await Promise.all([refused(first), refused(seco…
+    1878|         expect(await sql(`select 1 from audit_log where action = 'IMPO…
+       |                                                                                                                        ^
+    1879|         // The line still says what the first commit made for it (the …
+    1880|         const made = await sql<{ id: string }>(`select id from registr…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

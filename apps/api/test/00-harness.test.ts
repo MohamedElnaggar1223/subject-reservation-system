@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { apiResponse } from '@repo/validations';
-import { clientFor, admin, staff, refused, one } from './helpers';
+import { clientFor, admin, staff, refused, one, pauseAtAudits } from './helpers';
 
 /**
  * Proves the harness itself: the typed client reaches the in-process app,
@@ -15,6 +15,31 @@ describe('harness', () => {
     const api = await clientFor();
     expect(await (await api.v1.health.$get()).json()).toEqual({ status: 'ok', version: 'v1' });
     expect(await (await api.v1.health.ready.$get()).json()).toEqual({ ready: true });
+  });
+
+  it('pauseAtAudits waits for a transaction of this database: another suite on the same server waiting on the same key does not count', async () => {
+    // Two suites run side by side (local time and TZ=UTC) on one server; an advisory key is per
+    // database. A wait on the key in another database must not release a test's race early.
+    const { default: pg } = await import('pg');
+    const { TEST_PG_ADMIN_URL } = await import('./env');
+    const holder = new pg.Client({ connectionString: TEST_PG_ADMIN_URL });
+    const waiter = new pg.Client({ connectionString: TEST_PG_ADMIN_URL });
+    await holder.connect();
+    await waiter.connect();
+    const pause = await pauseAtAudits(['HARNESS_PROBE']);
+    try {
+      await holder.query('select pg_advisory_lock(40400)');
+      await waiter.query('begin');
+      const waiting = waiter.query('select pg_advisory_xact_lock(40400)');
+      await expect(pause.paused('HARNESS_PROBE', 800)).rejects.toThrow('waitFor: timed out');
+      await holder.query('select pg_advisory_unlock(40400)');
+      await waiting;
+      await waiter.query('rollback');
+    } finally {
+      await pause.releaseAll();
+      await holder.end().catch(() => {});
+      await waiter.end().catch(() => {});
+    }
   });
 
   it('runs against the test database with all migrations applied', async () => {

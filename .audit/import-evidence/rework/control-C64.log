@@ -1,0 +1,34 @@
+# C64: 2ca07a4 item 2: a copy brings an offer it would open at 0 (not self-study only) across closed, named
+# undone in apps/api/src/services/offer.services.ts
+# summary
+ ❯ test/08n-import.test.ts (68 tests | 1 failed) 13857ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2) 153ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 67 passed (68)
+   Duration  15.84s (transform 840ms, setup 2ms, collect 430ms, tests 13.86s, environment 0ms, prepare 47ms)
+ ❯ test/08n-import.test.ts:1681:34
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the catalogue from the review, and a file put aside > MO-9's course fee on the offer: open or retakes-only at 0 refused; self-study only at 0 with a reason; a copy brings an offer it would open at 0 across closed, named (the review of 2ca07a4, item 2)
+AssertionError: expected [] to deeply equal [ 'Fee Rule Taught (imp)' ]
+
+- Expected
++ Received
+
+- [
+-   "Fee Rule Taught (imp)",
+- ]
++ []
+
+ ❯ test/08n-import.test.ts:1681:34
+    1679|       const next = await session(adm, 'Winter session (import, course …
+    1680|       const copied = await apiResponse(adm.api.v1.sessions[':id']['cop…
+    1681|       expect(copied.closedNoFee).toEqual(['Fee Rule Taught (imp)']);
+       |                                  ^
+    1682|       expect(await sql(`select s.name, o.availability, o.course_fee::f…
+    1683|         where o.session_id = $1 and s.code in ('IMP-FEE-T', 'IMP-FEE-U…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

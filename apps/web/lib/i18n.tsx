@@ -11,6 +11,7 @@ import {
 import { foundationArabic } from './i18n-foundation';
 import { catalogueArabic, translateCatalogueText } from './i18n-catalogue';
 import { examsArabic, translateExamsText } from './i18n-exams';
+import { importArabic, translateImportText } from './i18n-import';
 import { sessionsArabic, translateSessionsText } from './i18n-sessions';
 import { moneyArabic, translateMoneyText } from './i18n-money';
 import { reservationsArabic, translateReservationsText } from './i18n-reservations';
@@ -102,6 +103,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.forecasts': 'Forecast Grades',
     'nav.invigilation': 'Invigilation',
     'nav.myExams': 'My Exams',
+    'nav.import': 'Day-one Import',
     'nav.boardServices': 'Board Services',
     'nav.charges': 'Charges',
     'nav.chargesDue': 'Charges & Instalments',
@@ -215,6 +217,7 @@ const translations: Record<Language, Record<string, string>> = {
     'nav.forecasts': 'الدرجات المتوقعة',
     'nav.invigilation': 'المراقبة',
     'nav.myExams': 'امتحاناتي',
+    'nav.import': 'استيراد بدء التشغيل',
     'nav.boardServices': 'خدمات المجالس',
     'nav.charges': 'الرسوم الأخرى',
     'nav.chargesDue': 'الرسوم والأقساط',
@@ -1530,6 +1533,8 @@ Object.assign(autoArabicText, foundationArabic);
 // F0b screens (lib/i18n-catalogue.ts): only words the app does not already
 // translate, so a shared word keeps the Arabic the other screens use.
 for (const [en, ar] of Object.entries(catalogueArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
+// F7 screens (lib/i18n-import.ts), the same way.
+for (const [en, ar] of Object.entries(importArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // The reservations rework's screens (lib/i18n-sessions.ts): the same rule.
 for (const [en, ar] of Object.entries(sessionsArabic)) if (!(en in autoArabicText)) autoArabicText[en] = ar;
 // Step C's money screens (lib/i18n-money.ts): the same rule.
@@ -1632,6 +1637,9 @@ function translateDynamicText(text: string): string | null {
   // F0b: the catalogue's, the series' and the enrolment's sentences with names in them.
   const f0bText = translateCatalogueText(text);
   if (f0bText) return f0bText;
+  // F7: the import's sentences with a name, a number or a year in them.
+  const f7Text = translateImportText(text);
+  if (f7Text) return f7Text;
   // The reservations rework: session names, refund sentences, the refusals of its screens.
   const reworkText = translateSessionsText(text);
   if (reworkText) return reworkText;

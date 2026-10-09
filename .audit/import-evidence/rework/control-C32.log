@@ -1,0 +1,84 @@
+# C32: flag 1b on the new model: the shared refusal of an item with no fee row on every path (priceLine, A's)
+# undone in apps/api/src/services/pricing.services.ts
+# summary
+ ❯ test/03-v3-flows.test.ts (6 tests | 1 failed | 1 skipped) 2577ms
+   × V3 flows > an item with no fee row in its series cannot be reserved on any path — the student's request, the parent's direct reservation, the desk — and the refusal names the grid (F7 review flag 1) 51ms
+ ❯ test/08n-import.test.ts (68 tests | 2 failed) 13210ms
+   × F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is 175ms
+   × F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not 158ms
+ Test Files  2 failed (2)
+      Tests  3 failed | 70 passed | 1 todo (74)
+   Duration  17.87s (transform 735ms, setup 3ms, collect 382ms, tests 15.79s, environment 0ms, prepare 65ms)
+ ❯ test/03-v3-flows.test.ts:215:113
+ ❯ test/08n-import.test.ts:635:44
+ ❯ test/08n-import.test.ts:1625:83
+
+# failures (messages)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/03-v3-flows.test.ts > V3 flows > an item with no fee row in its series cannot be reserved on any path — the student's request, the parent's direct reservation, the desk — and the refusal names the grid (F7 review flag 1)
+AssertionError: expected { status: 201, error: '""' } to deeply equal { status: 400, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "error": "Whole subject has no board fee in Cambridge International June 2027 (t1-8u7v) yet — set one on the session's Fees tab",
+-   "status": 400,
++   "error": "\"\"",
++   "status": 201,
+  }
+
+ ❯ test/03-v3-flows.test.ts:215:113
+    213|     const lines = await reservationOf(juneA, [unpriced.id]);
+    214|     const before = await sql(`select id from registration where subjec…
+    215|     expect(await refused(student.api.v1.registrations.request.$post({ …
+       |                                                                                                                 ^
+    216|     expect(await refused(parent.api.v1.registrations.direct.$post({ js…
+    217|     expect(await refused(officer.api.v1.registrations.desk.$post({ jso…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > lines in a session, on the offers and items the sheet names, priced from the fee grids (the admin's) > the series is offered its session; mapped there by the admin, each line finds its offer and item and is checked as a reservation is
+AssertionError: expected [] to deeply equal [ { code: 'fee_missing', …(2) } ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "code": "fee_missing",
+-     "detail": "Whole subject has no board fee in Pearson Edexcel November 2026 (t1-e2wg) yet — set one on the session's Fees tab",
+-     "severity": "error",
+-   },
+- ]
++ []
+
+ ❯ test/08n-import.test.ts:635:44
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/08n-import.test.ts > F7: the day-one import > the catalogue from the review, and a file put aside > the admin adds the sheet's missing subjects in one step, active and with no price (a line is priced from its offer and the fee grid); the coordinator may not
+AssertionError: expected undefined to deeply equal { code: 'fee_missing', …(2) }
+
+- Expected: 
+{
+  "code": "fee_missing",
+  "detail": "Whole subject has no board fee in Cambridge International November 2026 (t6-e2wg) yet — set one on the session's Fees tab",
+  "severity": "error",
+}
+
++ Received: 
+undefined
+
+ ❯ test/08n-import.test.ts:1625:83
+    1623|       expect((await putSettings(adm, id, { series: { [`november-${Y}-i…
+    1624|       v = await fetchView(adm, id);
+    1625|       expect(rowAt(v, 'Extra', 3).problems.find((p) => p.code === 'fee…
+       |                                                                                   ^
+    1626|         code: 'fee_missing', severity: 'error', detail: `Whole subject…
+    1627|       });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

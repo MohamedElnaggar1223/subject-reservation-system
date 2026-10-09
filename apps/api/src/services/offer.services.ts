@@ -392,6 +392,25 @@ async function sessionForChange(tx: Tx, sessionId: string, lock: 'share' | 'upda
   return s;
 }
 
+/**
+ * MO-9: a line is never priced from a course fee nobody set. An open or retakes-only offer has a
+ * course fee above 0 (F7's review of 8 Oct, item 6: a catalogue row the day-one import adds carries no
+ * fee, and the Add subject dialog read it). A self-study-only offer may carry 0 with a reason, as a
+ * board fee may: the school may price a subject it does not teach at the board fee alone (the lead's
+ * call on F7's review of 2ca07a4, item 2). A closed offer may keep 0 until it opens. `wasZeroSelfStudy`:
+ * the offer is already self-study only at 0, its reason given then.
+ */
+function assertCourseFeeFor(availability: string, courseFee: number, subjectName: string, zeroFeeReason?: string | null, wasZeroSelfStudy = false) {
+  if (availability === 'closed' || courseFee > 0) return;
+  if (availability === 'self_study_only') {
+    if (!wasZeroSelfStudy && !zeroFeeReason?.trim()) {
+      throw new OfferError(`${subjectName} is self-study only at a course fee of 0: say why (its lines are priced at the board fee alone)`);
+    }
+    return;
+  }
+  throw new OfferError(`${subjectName} has no course fee: set the school's course fee before it is open in this session (a line is never priced without one)`);
+}
+
 function assertTeachersFor(availability: string, teacherCount: number, subjectName: string) {
   if (availability === 'open' && teacherCount === 0) {
     throw new OfferError(`Who teaches ${subjectName}? An open subject names its teachers — or make it self-study only`);
@@ -413,6 +432,7 @@ export async function createOffer(sessionId: string, data: CreateOfferType, acto
       if (dup) throw new OfferError(`${s.name} is already in this session`, 409);
       const teachers = await resolveTeachers(tx, s.id, data.teachers, actorId);
       assertTeachersFor(data.availability, teachers.length, s.name);
+      assertCourseFeeFor(data.availability, data.courseFee, s.name, data.zeroFeeReason);
       const offerId = randomUUID();
       const [{ n }] = await tx.select({ n: sql<number>`count(*)::int` }).from(sessionOffer).where(eq(sessionOffer.sessionId, sessionId)) as [{ n: number }];
       await tx.insert(sessionOffer).values({
@@ -426,7 +446,8 @@ export async function createOffer(sessionId: string, data: CreateOfferType, acto
       const itemIds: string[] = [];
       for (const d of drafts) itemIds.push(await insertItem(tx, session, { id: offerId, subjectId: s.id }, s, d, actorId));
       await logAction(actorId, 'SESSION_OFFER_CREATED', 'session_offer', offerId, null,
-        { sessionId, subjectId: s.id, availability: data.availability, courseFee: data.courseFee, teachers, items: itemIds, grade10Core: data.grade10Core }, ctx, tx);
+        { sessionId, subjectId: s.id, availability: data.availability, courseFee: data.courseFee, teachers, items: itemIds, grade10Core: data.grade10Core,
+          ...(data.courseFee > 0 ? {} : { zeroFeeReason: data.zeroFeeReason ?? null }) }, ctx, tx);
       return { id: offerId, items: itemIds };
     });
   } catch (err) {
@@ -470,11 +491,16 @@ export async function updateOffer(sessionId: string, offerId: string, data: Upda
     }
     const availability = data.availability ?? offer.availability;
     assertTeachersFor(availability, teachers.length, subjectRow.name);
-    const { reason, teachers: _t, ...fields } = data;
+    // Checked when the change sets the fee or opens the offer (an offer converted with 0 keeps its other edits).
+    if (data.courseFee !== undefined || data.availability !== undefined) {
+      assertCourseFeeFor(availability, data.courseFee ?? offer.courseFee, subjectRow.name, data.zeroFeeReason,
+        offer.availability === 'self_study_only' && !(Number(offer.courseFee) > 0));
+    }
+    const { reason, teachers: _t, zeroFeeReason, ...fields } = data;
     const [updated] = await tx.update(sessionOffer).set({ ...fields, updatedAt: new Date() }).where(eq(sessionOffer.id, offerId)).returning();
     await logAction(actorId, 'SESSION_OFFER_UPDATED', 'session_offer', offerId,
       { availability: offer.availability, courseFee: offer.courseFee, grade10Core: offer.grade10Core, teachers: current.map((t) => t.teacherId) },
-      { ...fields, teachers: teachers.map((t) => t.teacherId), reason: reason ?? null }, ctx, tx);
+      { ...fields, teachers: teachers.map((t) => t.teacherId), reason: reason ?? null, ...(zeroFeeReason ? { zeroFeeReason } : {}) }, ctx, tx);
     return updated!;
   });
 }
@@ -771,6 +797,11 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
   let feesCopied = 0;
   const feesToCopy: { seriesId: string; src: typeof boardFee.$inferSelect }[] = [];
   let closedNoTeacher = 0;
+  const closedNoFee: string[] = [];
+  // Self-study only at a course fee of 0 comes across as it is, with the reason the rule asks for
+  // recorded on the copy's audit row (the review of 2ca07a4's round, item 3): an offer converted while
+  // closed never had one asked.
+  const zeroFeeSelfStudy: { subject: string; reason: string }[] = [];
   for (const o of offers) {
     if (have.has(o.subjectId)) continue;
     const [s] = await tx.select().from(subject).where(eq(subject.id, o.subjectId));
@@ -782,8 +813,16 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
     const wanted = closedByConversion(o) ? (s.isOfferedAtSchool ? 'open' : 'self_study_only') : o.availability;
     // "Who teaches it?" (§3.2): an open subject with no active teacher comes across closed, to be
     // opened once it names one — never open with nobody to teach it.
-    const availability = wanted === 'open' && keep.length === 0 ? 'closed' : wanted;
-    if (availability !== wanted) closedNoTeacher++;
+    const taught = wanted === 'open' && keep.length === 0 ? 'closed' : wanted;
+    if (taught !== wanted) closedNoTeacher++;
+    // MO-9 (the lead's call on F7's review of 2ca07a4, item 2): an offer it would open at a course fee of
+    // 0 that is not self-study only comes across closed, named in the summary, to be opened once the
+    // school sets its fee.
+    const availability = taught !== 'closed' && taught !== 'self_study_only' && !(Number(o.courseFee) > 0) ? 'closed' : taught;
+    if (availability !== taught) closedNoFee.push(s.name);
+    if (availability === 'self_study_only' && !(Number(o.courseFee) > 0)) {
+      zeroFeeSelfStudy.push({ subject: s.name, reason: `${closedByConversion(o) ? 'converted' : 'copied'} from ${from.name}; priced at the board fee alone` });
+    }
     await tx.insert(sessionOffer).values({
       id: offerId, sessionId: session.id, subjectId: o.subjectId, availability, courseFee: o.courseFee,
       grade10Core: o.grade10Core, notes: o.notes, sortOrder: o.sortOrder, createdBy: actorId,
@@ -829,8 +868,9 @@ export async function copyOffersFrom(tx: Tx, session: SessionRow, fromSessionId:
     }).onConflictDoNothing().returning({ id: boardFee.id });
     feesCopied += made.length;
   }
-  await logAction(actorId, 'SESSION_COPIED', 'session', session.id, null, { fromSessionId: from.id, from: from.name, offers: copied, feesCopiedProvisional: feesCopied, closedNoTeacher }, undefined, tx);
-  return { offers: copied, feesCopied, closedNoTeacher };
+  await logAction(actorId, 'SESSION_COPIED', 'session', session.id, null,
+    { fromSessionId: from.id, from: from.name, offers: copied, feesCopiedProvisional: feesCopied, closedNoTeacher, closedNoFee, zeroFeeSelfStudy }, undefined, tx);
+  return { offers: copied, feesCopied, closedNoTeacher, closedNoFee, zeroFeeSelfStudy };
 }
 
 // ─── Reading ─────────────────────────────────────────────────────────────────
@@ -853,6 +893,172 @@ export async function resolveItem(executor: Executor, sessionId: string, subject
   const item = items[0];
   if (!item) throw new OfferError(`${o.subjectName} is reserved by unit or route in this session: choose them on the reservation page`);
   return { item, offer: o.offer, subjectName: o.subjectName };
+}
+
+// ─── Finding what a sheet's words name (F7's contract, RESERVATIONS_REWORK.md §10) ───
+
+const words = (t: string) => t.replace(/\s+/g, ' ').trim().toLowerCase();
+/** "Unit 3" and "Paper 3" are one name (the school writes Pearson's units as papers). */
+const paperName = (n: string) => `paper ${n.toLowerCase()}`;
+/**
+ * The codes a sheet's words name, each once, in order: in brackets ("Pure Mathematics 1 (P1)",
+ * "Biology (Paper 3 & Paper 4)") or on their own ("P1", "WMA11", "Paper 4", "Unit 3", "1H"); a paper
+ * or a unit named by its number reads as "paper N".
+ */
+export function namedCodes(term: string): string[] {
+  const t = words(term);
+  const out: string[] = [];
+  const add = (c: string) => {
+    const m = /^(?:paper|unit)\s*(\d+[a-z]?)$/.exec(c);
+    const code = m ? paperName(m[1]!) : c;
+    if (code && !out.includes(code)) out.push(code);
+  };
+  for (const m of t.matchAll(/\(([^)]+)\)/g)) for (const part of m[1]!.split(/\s*(?:&|\band\b|,|\/|\+)\s*/)) if (part.trim()) add(part.trim());
+  for (const m of t.matchAll(/\b((?:p|m|s|d|fp)\d|w[a-z]{2}\d{2}|\d[a-z]{1,3}\d[a-z]?)\b/g)) add(m[1]!);
+  for (const m of t.matchAll(/\b(?:paper|unit)s?\s*(\d+[a-z]?)\b/g)) add(paperName(m[1]!));
+  // "Papers 3 & 4", "Units 1, 2": the numbers after the word.
+  for (const m of t.matchAll(/\b(?:papers|units)\s+((?:\d+[a-z]?\s*(?:&|\band\b|,|\+)\s*)+\d+[a-z]?)\b/g)) for (const n of m[1]!.split(/\s*(?:&|\band\b|,|\+)\s*/)) add(paperName(n));
+  return out;
+}
+/** What a unit is called: its code, the school's short code, and "paper N" for a paper or unit numbered so. */
+function unitNames(u: { code: string; shortCode: string | null }): string[] {
+  const out = [u.code.toLowerCase()];
+  const short = (u.shortCode ?? '').toLowerCase().trim();
+  if (short) out.push(short);
+  const numbered = /^(?:paper|unit)\s*(\d+[a-z]?)$/.exec(short);
+  if (numbered) out.push(paperName(numbered[1]!));
+  const component = /\/(\d+)$/.exec(u.code);
+  if (component) out.push(paperName(component[1]!));
+  return out;
+}
+
+/**
+ * The session's offer a sheet's words name (F7, the day-one import): the offer of the catalogue
+ * row the import's mapping chose; else the offer whose subject is named exactly (name or code),
+ * or by its name without a bracket ("Biology (Paper 3 & Paper 4)" → Biology), at the line's level
+ * (`levels`: the qualification levels its code reads as; more than one fitting is ambiguous, none
+ * chosen); else the one offer with an item entering a unit the words name ("Pure Mathematics 1
+ * (P1)" → the IAL Mathematics offer whose P1 item enters it) — every unit they name, else any of
+ * them. Null when nothing, or more than one offer, fits: a name at another level is not a fit.
+ */
+export async function findOffer(executor: Executor, sessionId: string, term: string, opts: { subjectId?: string | null; levels?: string[] | null } = {}) {
+  const offers = await executor.select({ id: sessionOffer.id, subjectId: sessionOffer.subjectId, availability: sessionOffer.availability, name: subject.name, code: subject.code, level: subject.qualificationLevel })
+    .from(sessionOffer).innerJoin(subject, eq(subject.id, sessionOffer.subjectId)).where(eq(sessionOffer.sessionId, sessionId));
+  const pick = (xs: typeof offers, how: 'subject' | 'name' | 'unit') => (xs.length === 1 ? { offer: xs[0]!, how } : null);
+  if (opts.subjectId) {
+    const hit = pick(offers.filter((o) => o.subjectId === opts.subjectId), 'subject');
+    if (hit) return hit;
+  }
+  const t = words(term);
+  const bare = words(term.replace(/\s*\([^)]*\)\s*$/, ''));
+  const atLevel = (xs: typeof offers) => (opts.levels?.length ? xs.filter((o) => opts.levels!.includes(o.level)) : xs);
+  const byName = pick(atLevel(offers.filter((o) => words(o.name) === t || words(o.code) === t)), 'name')
+    ?? (bare !== t ? pick(atLevel(offers.filter((o) => words(o.name) === bare)), 'name') : null);
+  if (byName) return byName;
+  const codes = namedCodes(term);
+  if (!codes.length || !offers.length) return null;
+  const units = await executor.select({ offerId: sessionOfferItem.offerId, code: examUnit.code, shortCode: examUnit.shortCode })
+    .from(sessionOfferItem).innerJoin(sessionOfferItemUnit, eq(sessionOfferItemUnit.itemId, sessionOfferItem.id)).innerJoin(examUnit, eq(examUnit.id, sessionOfferItemUnit.unitId))
+    .where(eq(sessionOfferItem.sessionId, sessionId));
+  // The offer whose items enter a unit of each code the words name ("Biology (Paper 3 & Paper 4)": units 3 and 4 of one subject);
+  // when none enters them all, the one offer entering any of them ("Mathematics (P1 & P5)": the line is
+  // split and the code no item enters is left for staff to choose, findItemsByCode).
+  const covering = (all: boolean) => {
+    const enters = (offerId: string, c: string) => units.some((u) => u.offerId === offerId && unitNames(u).includes(c));
+    const ids = new Set(units.map((u) => u.offerId).filter((offerId) => (all ? codes.every((c) => enters(offerId, c)) : codes.some((c) => enters(offerId, c)))));
+    const xs = offers.filter((o) => ids.has(o.id));
+    return xs.length > 1 ? atLevel(xs) : xs;
+  };
+  const every = covering(true);
+  return pick(every.length ? every : covering(false), 'unit');
+}
+
+/**
+ * The item of an offer a sheet's words name (F7): the item labelled so; else the one item entering
+ * exactly the units or paper the words name (P1, WMA11, "Paper 3" → the item entering unit 3,
+ * "Paper 4" → "Paper 4 only (retake)"); else the whole subject, as resolveItem picks it; an offer of
+ * one item, that item. Among several that fit, the one in the series of the sheet's month and year.
+ * `candidates` lists them when none or more than one fit, for staff to choose on the line.
+ */
+export async function findItem(executor: Executor, offerId: string, label: string, opts: { month?: string | null; year?: number | null } = {}) {
+  const items = await executor.select({ item: sessionOfferItem, month: boardSeries.month, year: boardSeries.year })
+    .from(sessionOfferItem).leftJoin(boardSeries, eq(boardSeries.id, sessionOfferItem.boardSeriesId))
+    .where(eq(sessionOfferItem.offerId, offerId))
+    .orderBy(sql`${sessionOfferItem.availability} = 'closed'`, sql`${sessionOfferItem.boardSeriesId} is null`, sessionOfferItem.sortOrder, sessionOfferItem.label, sessionOfferItem.id);
+  const units = items.length
+    ? await executor.select({ itemId: sessionOfferItemUnit.itemId, code: examUnit.code, shortCode: examUnit.shortCode })
+        .from(sessionOfferItemUnit).innerJoin(examUnit, eq(examUnit.id, sessionOfferItemUnit.unitId))
+        .where(inArray(sessionOfferItemUnit.itemId, items.map((i) => i.item.id)))
+    : [];
+  const candidates = items.map((i) => ({ id: i.item.id, label: i.item.label, kind: i.item.kind }));
+  const inSeries = (xs: typeof items) => {
+    const here = xs.filter((x) => opts.month && x.month === opts.month && x.year === opts.year);
+    return here.length ? here : xs;
+  };
+  const pick = (xs: typeof items, how: 'label' | 'unit' | 'paper' | 'whole' | 'only') => {
+    const narrowed = inSeries(xs);
+    // The same thing in two series (a converted window, or an item moved): the open one first, as ordered.
+    const distinct = new Set(narrowed.map((x) => `${x.item.kind}|${words(x.item.label)}`));
+    return narrowed.length && distinct.size === 1 ? { item: narrowed[0]!.item, how, candidates } : null;
+  };
+  if (items.length === 1) return { item: items[0]!.item, how: 'only' as const, candidates };
+  const t = words(label);
+  // The label as written, or the one code it names written another way ("Paper 3" for an item labelled "Unit 3").
+  const one = namedCodes(label);
+  const sameCode = (itemLabel: string) => one.length === 1 && namedCodes(itemLabel).length === 1 && namedCodes(itemLabel)[0] === one[0];
+  const byLabel = pick(items.filter((i) => words(i.item.label) === t || sameCode(i.item.label)), 'label');
+  if (byLabel) return byLabel;
+  const codes = namedCodes(label);
+  if (codes.length) {
+    // An item fits when the units it enters are exactly the ones named (by code or by what the school calls them).
+    const fits = items.filter((i) => {
+      const own = units.filter((u) => u.itemId === i.item.id).map(unitNames);
+      return own.length > 0 && own.every((u) => u.some((c) => codes.includes(c))) && codes.every((c) => own.some((u) => u.includes(c)));
+    });
+    const hit = pick(fits, 'unit');
+    if (hit) return hit;
+    // A paper named in the label of a one-paper retake ("Paper 4" → "Paper 4 only (retake)").
+    const papers = codes.filter((c) => c.startsWith('paper ')).map((c) => c.slice(6));
+    if (papers.length === 1) {
+      const byPaper = pick(items.filter((i) => i.item.kind === 'one_paper' && new RegExp(`\\b(?:paper\\s*)?${papers[0]}\\b`).test(words(i.item.label))), 'paper');
+      if (byPaper) return byPaper;
+    }
+    if (codes.length > 1 || fits.length) return { item: null, how: null, candidates };
+  }
+  const whole = pick(items.filter((i) => i.item.kind === 'whole'), 'whole');
+  return whole ?? { item: null, how: null, candidates };
+}
+
+/**
+ * A line naming several units or papers ("Mathematics (P1 & P2)", "Biology (Paper 3 & Paper 4)")
+ * that no single item enters (F7, the review of 8 Oct, item 2): one item per code the words name —
+ * staff's choice for a code first (`chosen`), else findItem on the code alone — or null for a code
+ * no single item, or an item another code already took, fits. Null when the words name fewer than
+ * two codes.
+ */
+export async function findItemsByCode(
+  executor: Executor, offerId: string, label: string,
+  opts: { month?: string | null; year?: number | null; chosen?: Record<string, string> | null } = {},
+) {
+  const codes = namedCodes(label);
+  if (codes.length < 2) return null;
+  const parts: { code: string; item: typeof sessionOfferItem.$inferSelect | null; candidates: { id: string; label: string; kind: string }[] }[] = [];
+  for (const code of codes) {
+    const chosenId = opts.chosen?.[code];
+    if (chosenId) {
+      const [it] = await executor.select().from(sessionOfferItem).where(and(eq(sessionOfferItem.id, chosenId), eq(sessionOfferItem.offerId, offerId)));
+      const all = await findItem(executor, offerId, code, opts);
+      parts.push({ code, item: it ?? null, candidates: all.candidates });
+      continue;
+    }
+    const r = await findItem(executor, offerId, code, opts);
+    // A code that falls back to the whole subject, or to the offer's only item, names no item of its own.
+    const own = r.item && r.how !== 'whole' && r.how !== 'only' ? r.item : null;
+    parts.push({ code, item: own, candidates: r.candidates });
+  }
+  // Two codes on one item: neither is that item's alone.
+  for (const p of parts) if (p.item && parts.filter((q) => q.item?.id === p.item!.id).length > 1 && !opts.chosen?.[p.code]) p.item = null;
+  return parts;
 }
 
 /** The Subjects tab (§4.2): every offer with its board, teachers, items, their series, fees and lines. */

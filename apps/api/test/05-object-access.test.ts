@@ -511,6 +511,38 @@ describe('object-level access between families', () => {
     }
   });
 
+  // ─── F7 ──────────────────────────────────────────────────────────────────
+
+  it("F7 a staged file is staff-only: the families it names, the desk, a teacher and the gate reach neither the review nor the file", async () => {
+    const coordinator = await staff(adm, 'coordinator', 'oa-imp');
+    const [teacher, gate] = [await staff(adm, 'teacher', 'oa-imp'), await staff(adm, 'gate', 'oa-imp')];
+    // SCL's roster naming family A's student and parent (and B's): other families' names, emails and phones.
+    const csv = [
+      'student_name,student_email,student_phone,scl_student_id,grade,grade10_section,parent_name,parent_email,parent_phone,second_parent_name,second_parent_email,second_parent_phone',
+      `Student oa-a,student.oa-a@test.local,01111111111,,12,,Parent oa-a,parent.oa-a@test.local,01000000000,,,`,
+      `Student oa-b,student.oa-b@test.local,01111111111,,12,,Parent oa-b,parent.oa-b@test.local,01000000000,,,`,
+    ].join('\n');
+    const f = await apiResponse(coordinator.api.v1.files.upload.$post({ form: { file: new File([new TextEncoder().encode(csv)], 'roster.csv', { type: 'text/csv' }), purpose: 'import_file' } }));
+    const { id } = await apiResponse(coordinator.api.v1.imports.$post({ json: { fileId: f.id, kind: 'scl_roster' } }));
+    const rowId = (await one<{ id: string }>(`select id from import_row where batch_id = $1 order by row_number limit 1`, [id])).id;
+    const state = () => sql(`select b.status, b.settings, (select json_agg(r.edits order by r.row_number) from import_row r where r.batch_id = b.id) as edits from import_batch b where b.id = $1`, [id]);
+    const before = await state();
+    for (const [who, label] of [[parentA, 'parentA'], [studentA, 'studentA'], [parentB, 'parentB'], [studentB, 'studentB'], [officer, 'officer'], [finadmin, 'finance admin'], [teacher, 'teacher'], [gate, 'gate']] as const) {
+      expect(await refusedAs(`${label} reads the staged file's review`, who.api.v1.imports[':id'].$get({ param: { id } }))).toBe(403);
+      expect(await refusedAs(`${label} lists imports`, who.api.v1.imports.$get())).toBe(403);
+      expect(await refusedAs(`${label} fixes a row`, who.api.v1.imports[':id'].rows.$put({ param: { id }, json: { rowIds: [rowId], edits: { studentName: 'changed' } } }))).toBe(403);
+      expect(await refusedAs(`${label} merges a person`, who.api.v1.imports[':id'].people.$put({ param: { id }, json: { role: 'student', key: 'student.oa-a@test.local', decision: 'skip' } }))).toBe(403);
+      expect(await refusedAs(`${label} commits it`, who.api.v1.imports[':id'].commit.$post({ param: { id } }))).toBe(403);
+      expect(await refusedAs(`${label} discards it`, who.api.v1.imports[':id'].discard.$post({ param: { id } }))).toBe(403);
+      // The file itself: not found (its existence is not told).
+      expect(await refusedAs(`${label} reads the uploaded file`, who.api.v1.files[':id'].content.$get({ param: { id: f.id }, query: {} }))).toBe(404);
+    }
+    expect(await state()).toEqual(before);
+    // The school's own staff who import: the admin and any coordinator.
+    expect((await adm.api.v1.imports[':id'].$get({ param: { id } })).status).toBe(200);
+    expect((await (await staff(adm, 'coordinator', 'oa-imp2')).api.v1.imports[':id'].$get({ param: { id } })).status).toBe(200);
+  });
+
   it("the reservations rework, step C: B cannot read, ask for, pay or refund A's charges; an exception for B cannot reach A's line", async () => {
     // A's charge (finance adds it).
     const charge = await apiResponse(finadmin.api.v1.charges.$post({ json: { studentId: studentAId, kind: 'custom', amount: 250, reason: 'a lost library book' } }));

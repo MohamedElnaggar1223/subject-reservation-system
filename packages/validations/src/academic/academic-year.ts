@@ -100,6 +100,35 @@ export function seriesLabel(sessionType: string, seriesYear: number): string {
   return `${SERIES_MONTH[sessionType] ?? sessionType} ${seriesYear}`;
 }
 
+const SERIES_MONTH_INDEX: Record<string, number> = { january: 0, june: 5, october: 9, november: 10 };
+
+/**
+ * A series' place in time: an earlier series has a smaller number. F7: a
+ * subject recorded before the system is a sitting before a window only when
+ * its series is earlier than the window's (the same series is the same
+ * sitting; a later one has not happened yet).
+ */
+export function seriesOrder(sessionType: string, seriesYear: number): number {
+  return seriesYear * 12 + (SERIES_MONTH_INDEX[sessionType] ?? 11);
+}
+
+/**
+ * The last day a series can still be sitting: the last day of its month
+ * ("YYYY-MM-DD"). Every board's January, June, October and November papers end
+ * within the month the series is named for, so a series is over once its
+ * month is (a conservative end: never before the board's own last paper).
+ */
+export function seriesEndsOn(sessionType: string, seriesYear: number): string {
+  const month = SERIES_MONTH_INDEX[sessionType] ?? 11;
+  const last = new Date(Date.UTC(seriesYear, month + 1, 0)).getUTCDate();
+  return `${seriesYear}-${String(month + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
+}
+
+/** Whether a series had ended by an instant, in the school's day (Africa/Cairo). */
+export function seriesEndedBy(sessionType: string, seriesYear: number, instant: Date): boolean {
+  return schoolDateString(instant) > seriesEndsOn(sessionType, seriesYear);
+}
+
 /**
  * Series a student who has finished grade 12 may still sit (A-12): the
  * October, November and January series of the academic year right after
