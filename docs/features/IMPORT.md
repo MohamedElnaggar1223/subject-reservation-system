@@ -69,14 +69,16 @@ inflated; at most 2000 parts and 128 MB inflated in total — review flag 10). T
 - **Carry forward.** "Carry forward on June 2022" in the Signature column, with its series.
 - **Column drift.** A value in another value's column is read by what it says, and flagged (IS-11).
 
-## 2. Data model (migration 0050_import)
+## 2. Data model (migration 0058_import)
 
 All in `packages/db/src/schema.ts`. The migration is generated DDL only. It was 0041 on the frozen
-branch; at the merge of main it was deleted and generated again on main's journal (review flag 8,
-FEATURES_PLAN §3) as `0050_import`, the same statements, its journal time after 0049's; the order was
-proven on a copy of the dev template migrated with main's migrations first (50 rows, no import
-tables), then with the branch's (51 rows). Step D (messages and reminders) lands its own migrations
-first, so the import's is generated once more at its merge.
+branch, then `0050_import` after the rework's steps A to C (8 Oct); at the final merge (9 Oct, main at
+2d95638 with step D's 0050-0055 and F4's 0056-0057) it was deleted and generated again on main's
+journal (review flag 8, FEATURES_PLAN §3) as **`0058_import`**: the same statements, its journal stamp
+1791504474468 after 0057's 1791486725177, its snapshot chained to 0057's. The order was proven on a
+copy of the dev template (34 migrations) migrated with main's migrations alone (58 rows, no import
+tables), then with the branch's (59 rows, the import tables there):
+`.audit/import-evidence/rework/migration-order-0058.log`.
 
 | Table | What it holds | Rules |
 |---|---|---|
@@ -753,7 +755,7 @@ records it.
 - 19:56Z — pushed e79cb88 (one push from a89674c); CI 37834602612 green (569 passed, 1 todo).
 - 20:02–20:04Z — the review of 7fb133a (confirmed: merge after F4): "and" left out of the one-paper
   gap; C74 red; the real sheet's counts unchanged; held for the final-merge push.
-- Next: the reviewer confirms items 1 and 2 on the diff; the final merge waits for F4 on main (main
-  has D at c2d7a78, its migrations to 0054): origin/main merged as its own commit, 0050_import
-  regenerated after main's last migration with a later stamp and its snapshot chained, the order
-  proven on a copy migrated at main then at the branch, the proof log kept in the evidence (item 11).
+- 2026-10-09 00:01Z–00:11Z — **the final merge**: origin/main 2d95638 (step D, F4, A's follow-up)
+  merged as its own commit, 13 conflicts resolved by hand (the merge commit's message lists each);
+  0050_import regenerated as 0058_import after main's 0057, the same DDL, the order proven on a copy.
+- Next: the lead merges feature/import into main.

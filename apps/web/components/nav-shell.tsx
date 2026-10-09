@@ -80,16 +80,39 @@ const ACADEMIC_ITEMS: NavItem[] = [
   { labelKey: 'nav.rooms', href: '/academic/rooms', icon: 'rooms' },
 ];
 
-/** The exam catalogue and the boards' series (F0b): the coordinator's and admin's. */
+/**
+ * Exams: F4's exam-entry management — the deadlines first (what is due), then
+ * the work in the order of a series — candidates, entries, the boards' lists,
+ * the timetable, exam days, results, certificates — and F0b's catalogue and
+ * board series. The coordinator's and admin's.
+ */
 const EXAMS_SECTION: NavSection = {
   titleKey: 'nav.exams',
   items: [
-    { labelKey: 'nav.catalogue', href: '/exams/catalogue', icon: 'documents' },
-    { labelKey: 'nav.boardSeries', href: '/exams/series', icon: 'calendar' },
+    { labelKey: 'nav.examDeadlines', href: '/exams/deadlines', icon: 'history' },
+    { labelKey: 'nav.candidates', href: '/exams/candidates', icon: 'students' },
+    { labelKey: 'nav.entries', href: '/exams/entries', icon: 'registrations' },
+    { labelKey: 'nav.entryLists', href: '/exams/entry-lists', icon: 'approvals' },
+    { labelKey: 'nav.forecasts', href: '/exams/forecasts', icon: 'reports' },
+    { labelKey: 'nav.examTimetable', href: '/exams/timetable', icon: 'calendar' },
+    { labelKey: 'nav.examDays', href: '/exams/days', icon: 'rooms' },
+    { labelKey: 'nav.examResults', href: '/exams/results', icon: 'reports' },
+    { labelKey: 'nav.certificates', href: '/exams/certificates', icon: 'documents' },
+    { labelKey: 'nav.catalogue', href: '/exams/catalogue', icon: 'subjects' },
+    { labelKey: 'nav.boardSeries', href: '/exams/series', icon: 'sessions' },
     // The reservations rework, step C (§3.6): the boards' services, their fees and deadlines per series.
     { labelKey: 'nav.boardServices', href: '/exams/services', icon: 'audit' },
   ],
 };
+
+/** F4: what a teacher does for exams — their candidates' forecasts, their invigilation. */
+const TEACHER_EXAM_ITEMS: NavItem[] = [
+  { labelKey: 'nav.forecasts', href: '/exams/forecasts', icon: 'approvals' },
+  { labelKey: 'nav.invigilation', href: '/exams/invigilation', icon: 'rooms' },
+];
+
+/** F4: a family's statement of entry, exam timetable and results. */
+const MY_EXAMS_ITEM: NavItem = { labelKey: 'nav.myExams', href: '/exams/my', icon: 'calendar' };
 
 const ACCOUNT_SECTION: NavSection = {
   titleKey: 'nav.account',
@@ -103,7 +126,7 @@ const ACCOUNT_SECTION: NavSection = {
 const TEACHING_ITEM: NavItem = { labelKey: 'nav.myTeaching', href: '/teaching', icon: 'subjects' };
 
 function getNavSections(role: string | null | undefined, teaches = false): NavSection[] {
-  const teaching = teaches ? [TEACHING_ITEM] : [];
+  const teaching = teaches ? [TEACHING_ITEM, ...TEACHER_EXAM_ITEMS] : [];
 
   if (role === 'coordinator') {
     return [
@@ -120,7 +143,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
 
   if (role === 'teacher') {
     return [
-      { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, TEACHING_ITEM] },
+      { items: [{ labelKey: 'nav.today', href: '/today', icon: 'today' }, TEACHING_ITEM, ...TEACHER_EXAM_ITEMS] },
       ACCOUNT_SECTION,
     ];
   }
@@ -168,7 +191,8 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
         items: [
           { labelKey: 'nav.reports', href: '/admin/reports', icon: 'reports' },
           { labelKey: 'nav.auditLog', href: '/admin/audit', icon: 'audit' },
-          { labelKey: 'nav.announcements', href: '/admin/notifications', icon: 'notifications' },
+          // Step D (RESERVATIONS_REWORK.md §4.8): messages and reminders replaced the announcement form.
+          { labelKey: 'nav.messages', href: '/admin/messages', icon: 'notifications' },
         ],
       },
       {
@@ -193,9 +217,13 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
           { labelKey: 'nav.charges', href: '/charges', icon: 'checkout' },
           // The reservations rework (§4.2, §4.6): the sessions' fees and money.
           { labelKey: 'nav.sessions', href: '/admin/sessions', icon: 'sessions' },
+          // Step D (§3.8, §5): finance sends the payment reminders to a session's unpaid families.
+          { labelKey: 'nav.messages', href: '/admin/messages', icon: 'notifications' },
           { labelKey: 'nav.dailyTakings', href: '/takings', icon: 'escrow' },
           { labelKey: 'nav.remarksDesk', href: '/remarks-desk', icon: 'audit' },
           { labelKey: 'nav.resultsEntry', href: '/results-entry', icon: 'reports' },
+          // F4: certificates are handed over at the desk.
+          { labelKey: 'nav.certificates', href: '/exams/certificates', icon: 'documents' },
         ],
       },
       ...(role === 'finance_admin'
@@ -236,6 +264,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
           { labelKey: 'nav.history', href: '/registrations/history', icon: 'history' },
           { labelKey: 'nav.approvals', href: '/approvals', icon: 'approvals' },
           { labelKey: 'nav.remarks', href: '/remarks', icon: 'audit' },
+          MY_EXAMS_ITEM,
         ],
       },
       {
@@ -275,6 +304,7 @@ function getNavSections(role: string | null | undefined, teaches = false): NavSe
         { labelKey: 'nav.history', href: '/registrations/history', icon: 'history' },
         { labelKey: 'nav.browseSubjects', href: '/subjects', icon: 'subjects' },
         { labelKey: 'nav.remarks', href: '/remarks', icon: 'audit' },
+        MY_EXAMS_ITEM,
       ],
     },
     {

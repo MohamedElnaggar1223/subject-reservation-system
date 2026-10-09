@@ -1,0 +1,107 @@
+# C10: results import: every line new (the latest report not compared)
+# undone in: apps/api/src/services/exam-result.services.ts
+# ran: test/08x2-exam-days-results.test.ts
+# expected red: ['every attempt kept']
+# result: RED as expected
+
+ ❯ test/08x2-exam-days-results.test.ts (14 tests | 5 failed) 3782ms
+   × F4: exam days, results and certificates > results > a results file read through a mapping; every attempt kept — an earlier series' and a board's revised report beside the first 49ms
+     → expected { series: { …(2) }, …(13) } to match object { mappingFrom: 'saved', …(2) }
+   × F4: exam days, results and certificates > results > publication shows results to families and gives each registration the board's grade, keeping one already recorded 16ms
+     → expected { published: 10, candidates: 3, …(2) } to match object { published: 6, candidates: 3, …(1) }
+   × F4: exam days, results and certificates > certificates > received for the candidates with published results; the families are told to collect 4ms
+   × F4: exam days, results and certificates > certificates > collected once at the desk, with the collector and a slip to sign; a second hand-over is told who took it 2ms
+   × F4: exam days, results and certificates > certificates > an unclaimed certificate is kept for the retention period, then may be destroyed with a reason 2ms
+     → expected '""' to match /^Keep this certificate until \d{4}-\d…/
+ Test Files  1 failed (1)
+      Tests  5 failed | 9 passed (14)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x2-exam-days-results.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x2-exam-days-results.test.ts > F4: exam days, results and certificates > results > a results file read through a mapping; every attempt kept — an earlier series' and a board's revised report beside the first
+AssertionError: expected { series: { …(2) }, …(13) } to match object { mappingFrom: 'saved', …(2) }
+(25 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "mappingFrom": "saved",[22m
+[2m    "mappingName": "Pearson results file",[22m
+[2m    "summary": {[22m
+[32m-     "new": 0,[39m
+[32m-     "unchanged": 5,[39m
+[31m+     "new": 5,[39m
+[31m+     "unchanged": 0,[39m
+[2m    },[22m
+[2m  }[22m
+
+ ❯ test/08x2-exam-days-results.test.ts:283:21
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/08x2-exam-days-results.test.ts > F4: exam days, results and certificates > results > publication shows results to families and gives each registration the board's grade, keeping one already recorded
+AssertionError: expected { published: 10, candidates: 3, …(2) } to match object { published: 6, candidates: 3, …(1) }
+(1 matching property omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "candidates": 3,[22m
+[2m    "gradesRecorded": 2,[22m
+[32m-   "published": 6,[39m
+[31m+   "published": 10,[39m
+[2m  }[22m
+
+ ❯ test/08x2-exam-days-results.test.ts:327:19
+    325|       await apiResponse(w.officer.api.v1.remarks.results.$post({ json:…
+    326|       const pub = await apiResponse(coord.api.v1.exams.results.publish…
+    327|       expect(pub).toMatchObject({ published: 6, candidates: 3, gradesR…
+       |                   ^
+    328|       expect(pub.gradesKept).toEqual([{ id: w.regs.c[w.subjects.sp1], …
+    329|       const grade = async (id: string) => (await one<{ g: string | nul…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/08x2-exam-days-results.test.ts > F4: exam days, results and certificates > certificates > received for the candidates with published results; the families are told to collect
+Error: Cambridge International November 2026 (exams xd) has no published award results: publish them, or name the candidates
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08x2-exam-days-results.test.ts:348:23
+    346| 
+    347|     it('received for the candidates with published results; the famili…
+    348|       const preview = await apiResponse(coord.api.v1.exams.certificate…
+       |                       ^
+    349|       expect(preview.toReceive.map((x) => x.studentId).sort()).toEqual…
+    350|       expect(preview.toReceive[0]!.description).toBe(`Cambridge Intern…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/08x2-exam-days-results.test.ts > F4: exam days, results and certificates > certificates > collected once at the desk, with the collector and a slip to sign; a second hand-over is told who took it
+Error: 404 Not Found
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08x2-exam-days-results.test.ts:361:19
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/08x2-exam-days-results.test.ts > F4: exam days, results and certificates > certificates > an unclaimed certificate is kept for the retention period, then may be destroyed with a reason
+AssertionError: expected '""' to match /^Keep this certificate until \d{4}-\d…/
+
+[32m- Expected:[39m 
+/^Keep this certificate until \d{4}-\d{2}-\d{2} \(12 months after it arrived\) before destroying it$/
+
+[31m+ Received:[39m 
+"\"\""
+
+ ❯ test/08x2-exam-days-results.test.ts:383:10
+    381|     it('an unclaimed certificate is kept for the retention period, the…
+    382|       expect((await refused(coord.api.v1.exams.certificates[':id'].dis…
+    383|         .toMatch(/^Keep this certificate until \d{4}-\d{2}-\d{2} \(12 …
+       |          ^
+    384|       expect((await apiResponse(coord.api.v1.exams.certificates.$get({…
+    385|       await sql(`update exam_certificate set received_on = received_on…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+

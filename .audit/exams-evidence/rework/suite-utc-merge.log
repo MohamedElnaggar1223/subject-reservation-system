@@ -1,0 +1,39 @@
+# Full API suite, TZ=UTC, worktree agent-ae3ddd804d82aff1d, the final merge's tree
+ ✓ test/00-harness.test.ts (4 tests) 1743ms
+ ✓ test/01-desk.test.ts (8 tests) 1584ms
+ ✓ test/02-money.test.ts (4 tests) 1655ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 2049ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 5759ms
+ ✓ test/05-object-access.test.ts (17 tests) 6294ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3479ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1687ms
+ ✓ test/08-money-rules.test.ts (51 tests) 12615ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 11786ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 6539ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 7593ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 5991ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5471ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 8526ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2554ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4161ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 3913ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4382ms
+ ✓ test/08l-board-change.test.ts (7 tests) 3551ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 5966ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 22656ms
+ ✓ test/08o-reservation-lines.test.ts (23 tests) 15995ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 7984ms
+ ✓ test/08q-charges.test.ts (46 tests) 28861ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 8758ms
+ ✓ test/08s-messages-reminders.test.ts (36 tests) 48916ms
+ ✓ test/08t-rework-races.test.ts (41 tests) 38056ms
+ ✓ test/08x1-exam-entries.test.ts (17 tests) 3757ms
+ ✓ test/08x2-exam-days-results.test.ts (14 tests) 3714ms
+ ✓ test/08x3-exam-races.test.ts (8 tests) 3916ms
+ ✓ test/08x4-exam-entries-rework.test.ts (56 tests) 27541ms
+ ✓ test/09-money-invariants.test.ts (59 tests) 1176ms
+ Test Files  33 passed (33)
+      Tests  647 passed | 1 todo (648)
+   Start at  19:36:46
+   Duration  328.71s (transform 1.19s, setup 52ms, collect 4.33s, tests 318.63s, environment 3ms, prepare 1.08s)
+exit 0

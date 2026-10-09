@@ -233,6 +233,28 @@ changes nothing elsewhere in this section (fee rows already came before lines).
 id order, before the charges — not its own lines first and the plan lines after, which deadlocked
 against a fee re-price or a series move taking both in id order (08t).
 
+**The reminder step: the sessions, then the lines and charges** (step D, RESERVATIONS_MESSAGES.md
+§2, the review of 5c2f2bf). Its claim row has a foreign key to the line's session, which takes the
+session `FOR KEY SHARE` at the insert; the step therefore takes each group's sessions `FOR KEY SHARE`
+in id order **before** its lines and charges (`FOR SHARE`), as this order puts the session before
+its lines. Taken after the lines, it waited behind `updateSession` / `correctSessionSeries` (the
+session `FOR UPDATE`, then its waiting lines) while holding those lines: a deadlock (08t forces it).
+
+**F4's entries come after their lines** (docs/features/EXAM_ENTRIES.md §7; the reviews of 093dbd1,
+426d565 and 54c225f). "Mark as sent" (`submitEntries`) takes the entries' lines `FOR SHARE` in id
+order, then their cash-ins (`charge`) `FOR SHARE` in id order, then the entries `FOR UPDATE` in id
+order, then their series `FOR SHARE`. A derivation, and an entry added by hand, takes the series
+`FOR SHARE`, then the series' paid lines `FOR SHARE` in id order, then the entries it brings up to
+date or links `FOR UPDATE` in one statement in id order (never one by one in its rows' order: that
+deadlocked against a send, 08t). Every path that ends a paid line (the drops, the swaps, a
+request's approval, a reversal, B's two system drops) and every path that moves one (the admin's
+move, an item's series change, a board change, the series correction) takes the receipt and the
+line first (`FOR UPDATE`), then the line's entries `FOR UPDATE` in id order (`withdrawEntriesOfLineInTx`,
+`entriesFollowMoveInTx`); the family's drops and swaps price their refund only once the line is
+held. So a send and a drop serialize on the line (the send's share against the drop's update), a
+derivation waits for a drop holding a line and plans nothing on it, and a derivation and a send
+never wait on entries in a circle.
+
 **A payment, then the student, for a pushed school fee** (step C, RESERVATIONS_MONEY.md §2).
 `settlePushInTx` runs inside a school-fee payment's confirmation, which holds the payment
 `FOR UPDATE`, and then takes the student `FOR NO KEY UPDATE` to settle the open push of that year
@@ -606,6 +628,14 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
   the first entry's date later than the retake deadline. And the approval's deadline check (the
   line's student) and `getAvailableSubjects` (the student) pass the student, so a late entry is
   read there.
+- **A change whose students keep changing answers 409** *(changed, the review of F1)*: the writers
+  that lock the students of the lines they move first (`withStudentsFirst`: an item's series
+  change, a board change from the Subjects form or the Catalogue, the session's series correction,
+  and replace-teacher once F1 lands) retry three times when a reservation lands meanwhile; a fourth
+  newcomer throws `StudentsKeptChanging` (`lib/student-locks.ts`), which every such route answers
+  with 409 and "The students with lines here changed while this change was running (new
+  reservations kept arriving): nothing was changed. Try again." (Arabic in `i18n-sessions.ts`). The
+  admin's move does not run the pattern: the students of the lines it is given cannot change.
 - **A swap takes the new line's locks before the old line** *(changed, the review of B)*: §2.1.
   `holdNewLines(tx, { studentId, sessionId, lines })` is exported for any path that holds a line
   before it makes new ones; every reservation's `insertLines` now takes the series' fee grid
@@ -659,6 +689,49 @@ After the review of 40c1447 (its follow-ups, and B's and C's findings in A's hoo
 - **Replace teacher moves the enrolment per unit** *(changed)*: each replaced line's enrolment in
   each unit its item enters (or in the subject for an item entering none), not the student's other
   units of the subject taught through another session (§2.11).
+- **Provided by F4 on resuming (8 Oct 2026, `feature/exam-entries`; docs/features/EXAM_ENTRIES.md
+  §7)** — the §10 F4 row's contracts that were not on main under their names:
+  `lineItemsFor(registrationIds, executor?)` (`line.services.ts`): per line what its **item** enters
+  (an award, an option with its components, units — the item's award or a Cambridge component's
+  syllabus beside them — or, for a `subject` item, the subject row's own catalogue mapping), its
+  series with both deadlines, the attempt F4 enters (`first` after a rejected declaration) beside
+  the attempt reserved, the mode, the prior sitting with its source, answer, previous centre and
+  candidate number, the student's grade and level code. F0b's `entryItemsFor` stays for its
+  endpoint and now reads the same rows (the subject row's units were wrong for an item since the
+  rework). `teacherOf(student, subject, year, unitId?)` and `pickEnrolment` (`enrolment.services.ts`):
+  the unit's own open enrolment, else the subject's, else the one teacher of all its units.
+  `exam_board.carry_forward_months` is edited through F4's board rules (`PUT
+  /v1/exams/board-rules/:boardCode`, audited); F4's own column on `exam_board_rule` is gone.
+- **Changed by F4 after the review of 093dbd1 (8 Oct 2026; docs/features/EXAM_ENTRIES.md §2a,
+  §7)** — the smallest call in each path that ends a paid line, so no entry stays live with the
+  board after its line ends: `swap.services.ts` `executeDirectDrop`, `approveChangeRequest` (a drop
+  or a swap request) and `executeDirectSwap` take the line's receipt (`lockReceiptOf`), then the
+  line `FOR UPDATE`, and only then price the refund with `refundFor(tx, …)` — "mark as sent" takes
+  the line `FOR SHARE`, so a mark landing meanwhile counts (item 4) — and after the drop leg call
+  F4's `withdrawEntriesOfLineInTx(tx, line, reason, parent)` ('the family dropped the subject' /
+  'the family swapped the subject'), `tellWithdrawn` after the commit (item 1). In step B's
+  files: `reservation.services.ts` `reserveLines` calls F4's `verifyDeclaredAtDeclarationInTx(tx,
+  declared lines)` after the consents (a declared sitting with a real grade on record is verified
+  at once, item 3); `verification.services.ts` exports `recordVerifiedInTx` (the verified answer,
+  used by `verifyPriorSitting` and that call), its rejection after the first-entry deadline and its
+  `hold` drop withdraw the line's entries, and the hold drop passes `neverSent` only when
+  `sentEntriesOf` is empty (item 5; the family's notice says the board fee stays when the entry had
+  gone). In step C's: `desk-drop.services.ts` prices with `refundFor(tx, …)` after the receipt and
+  the line; `payment.services.ts` `reversePayment` withdraws the entries of each reverted line (id
+  order), its answer unchanged; `refund.services.ts` loses the stand-in `entrySentAt`
+  (`sentEntriesOf` is the seam). B's To verify tab gains "Check against the results on record" (`POST
+  /v1/exams/results/verify-declared`, admin and coordinator). Each is proved in 08x4 with a control.
+- **Changed by F4 after the review of 426d565 (8 Oct 2026; EXAM_ENTRIES.md §2a, §7)** — a line that
+  moves to another series takes F4's entries with it or refuses: `series.services.ts`
+  `moveRegistrations`, `offer.services.ts` `changeItemSeries`, `catalogue.services.ts`
+  `applyBoardChange` and `session.services.ts` `correctSessionSeries` each call
+  `entriesFollowMoveInTx(tx, the moving lines, reason, actor)` after their lines are locked (§2.1:
+  entries after lines): a line with an entry already sent refuses the move with the path's own
+  error ("… has already gone to the board in …: withdraw its entries first"); otherwise its drafts are
+  withdrawn with it and derived again in the series it goes to. F4's derivation and its entry by
+  hand take the series, then the lines FOR SHARE (id order), so a drop holding a line finishes first.
+  `reserveLines` passes its `requestedBy` to `verifyDeclaredAtDeclarationInTx`: the one declaring
+  answers a sitting the school's results show.
 
 Added by F7 (the day-one import, 8 Oct; docs/features/IMPORT.md §4.5, §14):
 

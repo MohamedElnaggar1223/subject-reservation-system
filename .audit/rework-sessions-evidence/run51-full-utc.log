@@ -1,0 +1,104 @@
+# run51-full-utc.log: the proof of this run, as vitest reported it (the full log, 181084 lines, 18762695 bytes,
+# was the API request log of the suite; kept outside the repo). Per test file, failed tests, failures, summary.
+
+## Test files
+ ✓ test/00-harness.test.ts (4 tests) 1729ms
+ ✓ test/01-desk.test.ts (8 tests) 1860ms
+ ✓ test/02-money.test.ts (4 tests) 1847ms
+ ✓ test/03-v3-flows.test.ts (5 tests | 1 skipped) 2206ms
+ ✓ test/04-authz-matrix.test.ts (1 test) 5645ms
+ ✓ test/05-object-access.test.ts (16 tests) 4256ms
+ ✓ test/06-auth-surface.test.ts (19 tests) 3600ms
+ ✓ test/07-audit-trail.test.ts (6 tests) 1859ms
+ ✓ test/08-money-rules.test.ts (51 tests) 13636ms
+ ✓ test/08b-state-and-time.test.ts (23 tests) 12922ms
+ ✓ test/08c-audit-in-transaction.test.ts (18 tests) 6708ms
+ ✓ test/08d-foundation-grade.test.ts (28 tests) 8965ms
+ ✓ test/08e-foundation-eligibility-changes.test.ts (10 tests) 6519ms
+ ✓ test/08f-foundation-structure.test.ts (20 tests) 5981ms
+ ✓ test/08g-foundation-races.test.ts (14 tests) 8723ms
+ ✓ test/08h-catalogue.test.ts (10 tests) 2593ms
+ ✓ test/08i-board-series.test.ts (10 tests) 4293ms
+ ✓ test/08j-course-enrolment.test.ts (15 tests) 4006ms
+ ✓ test/08k-catalogue-races.test.ts (5 tests) 4572ms
+ ✓ test/08l-board-change.test.ts (7 tests) 4065ms
+ ✓ test/08m-checkout-per-series.test.ts (10 tests) 6019ms
+ ✓ test/08n-session-offers.test.ts (38 tests) 24585ms
+ ✓ test/08o-reservation-lines.test.ts (23 tests) 17100ms
+ ✓ test/08p-pricing-policies.test.ts (10 tests) 8267ms
+ ✓ test/08q-charges.test.ts (46 tests) 29105ms
+ ✓ test/08r-exceptions-registry.test.ts (15 tests) 8923ms
+ ✓ test/08s-messages-reminders.test.ts (36 tests) 54465ms
+ ❯ test/08t-rework-races.test.ts (44 tests | 4 failed) 40748ms
+ ❯ test/09-money-invariants.test.ts (51 tests | 1 failed) 771ms
+
+## Failed tests
+   × 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change 878ms
+   × 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction 1027ms
+   × 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form 868ms
+   × 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue 847ms
+   × money invariants over the whole database > every delivery belongs to a message; an in-app delivery is the notification it wrote, a notification a message wrote has its delivery; nothing scheduled or cancelled was delivered (§3.8) 85ms
+
+## Failures
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > an item's series change
+TypeError: Body is unusable: Body has already been read
+ ❯ refusal test/08t-rework-races.test.ts:1040:59
+    1038|       [studentId, sessionId, subjectId, studentId, itemId, seriesId],
+    1039|     ];
+    1040|     const refusal = async (r: Res) => [r.status, (await r.json() as { …
+       |                                                           ^
+    1041|     const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel'…
+    1042|       (await apiResponse(adm.api.v1['board-series'].$post({ json: { bo…
+ ❯ test/08t-rework-races.test.ts:1069:20
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > the session's series correction
+TypeError: Body is unusable: Body has already been read
+ ❯ refusal test/08t-rework-races.test.ts:1040:59
+    1038|       [studentId, sessionId, subjectId, studentId, itemId, seriesId],
+    1039|     ];
+    1040|     const refusal = async (r: Res) => [r.status, (await r.json() as { …
+       |                                                           ^
+    1041|     const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel'…
+    1042|       (await apiResponse(adm.api.v1['board-series'].$post({ json: { bo…
+ ❯ test/08t-rework-races.test.ts:1089:20
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Subjects form
+
+ FAIL  test/08t-rework-races.test.ts > 08t: the rework races > a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed > a board change from the Catalogue
+TypeError: Body is unusable: Body has already been read
+ ❯ refusal test/08t-rework-races.test.ts:1040:59
+    1038|       [studentId, sessionId, subjectId, studentId, itemId, seriesId],
+    1039|     ];
+    1040|     const refusal = async (r: Res) => [r.status, (await r.json() as { …
+       |                                                           ^
+    1041|     const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel'…
+    1042|       (await apiResponse(adm.api.v1['board-series'].$post({ json: { bo…
+ ❯ test/08t-rework-races.test.ts:1115:22
+
+ FAIL  test/09-money-invariants.test.ts > money invariants over the whole database > every delivery belongs to a message; an in-app delivery is the notification it wrote, a notification a message wrote has its delivery; nothing scheduled or cancelled was delivered (§3.8)
+Error: Failed query: select d.id from message_delivery d left join notification n on n.id = d.notification_id
+      where d.channel = 'in_app' and d.status = 'sent' and (n.id is null or n.user_id <> d.recipient_id or n.title <> d.title or n.body <> d.body)
+params: 
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:73:11
+ ❯ sql test/helpers.ts:63:18
+     61|     q = s`${q}${params[i - 1]}${s.raw(parts[i] ?? '')}`;
+     62|   }
+     63|   const result = await db.execute(q);
+       |                  ^
+     64|   return result.rows as T[];
+     65| }
+ ❯ test/09-money-invariants.test.ts:1045:12
+Caused by: error: could not resize shared memory segment "/PostgreSQL.283991012" to 8388608 bytes: No space left on device
+ ❯ ../../node_modules/.pnpm/pg-pool@3.10.1_pg@8.16.3/node_modules/pg-pool/index.js:45:11
+ ❯ ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:71:12
+ ❯ sql test/helpers.ts:63:18
+ ❯ test/09-money-invariants.test.ts:1045:12
+
+## Summary
+[clock] database minus host: 0.3 ms (measured within 1 ms)
+ Test Files  2 failed | 27 passed (29)
+      Tests  5 failed | 541 passed | 1 todo (547)
+   Start at  23:11:44
+   Duration  305.64s (transform 1.11s, setup 44ms, collect 3.88s, tests 295.97s, environment 2ms, prepare 976ms)
+utc exit 1

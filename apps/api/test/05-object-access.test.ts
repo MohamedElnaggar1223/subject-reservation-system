@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { apiResponse, academicYearStartOf } from '@repo/validations';
 import { admin, staff, onboard, subject, session, one, sql, notified, money, openWindow, futureWindow, type Client, reservationOf, swapTo } from './helpers';
+import { examWorld } from './exam-helpers';
 
 /**
  * Object-level access (security audit, Phase 1.1).
@@ -433,6 +434,83 @@ describe('object-level access between families', () => {
     expect(await snapshot()).toEqual(before);
   });
 
+  // ─── F4 ──────────────────────────────────────────────────────────────────
+
+  it("F4 exam entries: another family reads none of A's exams; a teacher reaches only their own candidates and room; the gate nothing", async () => {
+    const x = await examWorld('oa4', { enrol: false });
+    try {
+      const coord = x.coordinator;
+      const [fa, fb] = [x.families.a, x.families.b];
+      const A = fa.studentId;
+      await apiResponse(coord.api.v1.exams.entries.derive.$post({ json: { boardSeriesId: x.series.cambridgeNov, commit: true } }));
+      const entryA = (await one<{ id: string }>(`select id from exam_entry where student_id = $1 and board_series_id = $2`, [A, x.series.cambridgeNov])).id;
+      const entryB = (await one<{ id: string }>(`select id from exam_entry where student_id = $1 and board_series_id = $2`, [fb.studentId, x.series.cambridgeNov])).id;
+      await apiResponse(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [entryA, entryB] } }));
+      await apiResponse(coord.api.v1.exams.candidates[':studentId'].identity.$put({ param: { studentId: A }, json: { documentType: 'passport', documentNumber: 'A1234567' } }));
+      const day = new Date(Date.now() + 50 * 86_400_000).toISOString().slice(0, 10);
+      const paper = (await apiResponse(coord.api.v1.exams.papers.$post({ json: {
+        boardSeriesId: x.series.cambridgeNov, code: 'OA497/12', title: 'Paper 1', unitId: x.catalogue.cp1, examDate: day, session: 'am', startTime: '09:00', durationMinutes: 60,
+      } }))).id;
+      await apiResponse(coord.api.v1.exams.timetable.publish.$post({ json: { boardSeriesId: x.series.cambridgeNov } }));
+      const [roomA, roomB] = [
+        (await apiResponse(coord.api.v1.academic.rooms.$post({ json: { name: 'OA4 Hall', capacity: 30, type: 'hall', features: [] } }))).id,
+        (await apiResponse(coord.api.v1.academic.rooms.$post({ json: { name: 'OA4 Room', capacity: 10, type: 'classroom', features: [] } }))).id,
+      ];
+      await apiResponse(coord.api.v1.exams.sittings.rooms.$put({ json: { examDate: day, session: 'am', rooms: [{ roomId: roomA, seatRows: 1, seatColumns: 1 }, { roomId: roomB, seatRows: 1, seatColumns: 1 }] } }));
+      await apiResponse(coord.api.v1.exams.seats.$put({ json: { examDate: day, session: 'am', studentId: A, roomId: roomA, seatLabel: 'A1' } }));
+      await apiResponse(coord.api.v1.exams.seats.$put({ json: { examDate: day, session: 'am', studentId: fb.studentId, roomId: roomB, seatLabel: 'A1' } }));
+      await apiResponse(coord.api.v1.exams.invigilation.$put({ json: { examDate: day, session: 'am', roomId: roomA, teacherIds: [x.teacherId] } }));
+      await apiResponse(coord.api.v1.exams.invigilation.$put({ json: { examDate: day, session: 'am', roomId: roomB, teacherIds: [x.teacher2Id] } }));
+      const snapshot = async () => ({
+        entries: await sql(`select id, status, forecast_grade, option_code from exam_entry where student_id in ($1, $2) order by id`, [A, fb.studentId]),
+        attendance: await sql(`select paper_id, student_id, status from exam_attendance where paper_id = $1 order by student_id`, [paper]),
+      });
+      const before = await snapshot();
+
+      // Another family: A's exams are "not found" to B's parent and student; the staff screens are refused.
+      for (const [who, label] of [[fb.parent, 'parentB'], [fb.student, 'studentB']] as const) {
+        expect(await refusedAs(`${label} reads A statement`, who.api.v1.exams.students[':studentId'].statement.$get({ param: { studentId: A }, query: { boardSeriesId: x.series.cambridgeNov } }))).toBe(404);
+        expect(await refusedAs(`${label} reads A timetable`, who.api.v1.exams.students[':studentId'].timetable.$get({ param: { studentId: A }, query: {} }))).toBe(404);
+        expect(await refusedAs(`${label} reads A day of exams`, who.api.v1.exams.students[':studentId'].exams.$get({ param: { studentId: A }, query: { date: day } }))).toBe(404);
+        expect(await refusedAs(`${label} reads A results`, who.api.v1.exams.students[':studentId'].results.$get({ param: { studentId: A } }))).toBe(404);
+        expect(await refusedAs(`${label} reads A sittings`, who.api.v1.exams.students[':studentId'].sittings.$get({ param: { studentId: A } }))).toBe(404);
+        expect(await refusedAs(`${label} reads A series`, who.api.v1.exams.students[':studentId'].series.$get({ param: { studentId: A } }))).toBe(404);
+        await refusedAs(`${label} reads A candidate`, who.api.v1.exams.candidates[':studentId'].$get({ param: { studentId: A } }));
+        await refusedAs(`${label} reads A ID document`, who.api.v1.exams.candidates[':studentId'].identity.$get({ param: { studentId: A } }));
+        await refusedAs(`${label} lists A entries`, who.api.v1.exams.entries.$get({ query: { studentId: A } }));
+        await refusedAs(`${label} withdraws A entry`, who.api.v1.exams.entries[':id'].withdraw.$post({ param: { id: entryA }, json: { reason: 'not theirs' } }));
+        await refusedAs(`${label} sets A forecast`, who.api.v1.exams.entries[':id'].forecast.$put({ param: { id: entryA }, json: { grade: 'A' } }));
+      }
+      // A's own family reads them.
+      expect((await apiResponse(fa.parent.api.v1.exams.students[':studentId'].statement.$get({ param: { studentId: A }, query: { boardSeriesId: x.series.cambridgeNov } }))).entries).toHaveLength(1);
+      expect((await apiResponse(fa.student.api.v1.exams.students[':studentId'].exams.$get({ param: { studentId: A }, query: { date: day } }))).map((p) => p.code)).toEqual(['OA497/12']);
+
+      // Another class: a teacher gives forecasts only to candidates they teach, and keeps only their own room's register.
+      expect(await refusedAs("teacher sets B's forecast", x.teacher.api.v1.exams.entries[':id'].forecast.$put({ param: { id: entryB }, json: { grade: 'A' } }))).toBe(403);
+      expect(await refusedAs("teacher2 sets A's forecast", x.teacher2.api.v1.exams.entries[':id'].forecast.$put({ param: { id: entryA }, json: { grade: 'A' } }))).toBe(403);
+      expect(await apiResponse(x.teacher.api.v1.exams.forecasts.$get({ query: { boardSeriesId: x.series.cambridgeNov } }))).toEqual([]); // they teach no one here
+      expect(await refusedAs("teacher reads room B's register", x.teacher.api.v1.exams.registers.$get({ query: { paperId: paper, roomId: roomB } }))).toBe(403);
+      expect(await refusedAs("teacher marks B in room B", x.teacher.api.v1.exams.registers.$put({ json: { paperId: paper, marks: [{ studentId: fb.studentId, status: 'absent' }] } }))).toBe(403);
+      expect((await apiResponse(x.teacher.api.v1.exams.registers.$get({ query: { paperId: paper } }))).rows.map((r) => r.studentId)).toEqual([A]);
+      await refusedAs('teacher reads A ID document', x.teacher.api.v1.exams.candidates[':studentId'].identity.$get({ param: { studentId: A } }));
+      await refusedAs('teacher lists candidates', x.teacher.api.v1.exams.candidates.$get({ query: {} }));
+      await refusedAs('teacher lists entries', x.teacher.api.v1.exams.entries.$get({ query: { studentId: A } }));
+      await refusedAs('teacher reads A statement', x.teacher.api.v1.exams.students[':studentId'].statement.$get({ param: { studentId: A }, query: { boardSeriesId: x.series.cambridgeNov } }));
+
+      // The gate: nothing of the exams.
+      await refusedAs('gate reads forecasts', x.gate.api.v1.exams.forecasts.$get({ query: {} }));
+      await refusedAs('gate reads the register', x.gate.api.v1.exams.registers.$get({ query: { paperId: paper } }));
+      await refusedAs('gate reads duties', x.gate.api.v1.exams.invigilation.mine.$get());
+      await refusedAs('gate reads A day of exams', x.gate.api.v1.exams.students[':studentId'].exams.$get({ param: { studentId: A }, query: { date: day } }));
+      await refusedAs('gate reads certificates', x.gate.api.v1.exams.certificates.$get({ query: {} }));
+      await refusedAs('gate reads A ID document', x.gate.api.v1.exams.candidates[':studentId'].identity.$get({ param: { studentId: A } }));
+
+      expect(await snapshot()).toEqual(before);
+    } finally {
+      await x.close();
+    }
+  });
+
   // ─── F7 ──────────────────────────────────────────────────────────────────
 
   it("F7 a staged file is staff-only: the families it names, the desk, a teacher and the gate reach neither the review nor the file", async () => {
@@ -529,5 +607,34 @@ describe('object-level access between families', () => {
     await refusedAs('parentB teacher of A', parentB.api.v1.registrations[':id'].teacher.$put({ param: { id: bioA }, json: { teacherId: null, reason: 'not my child at all' } }));
     await refusedAs('studentB teacher of A', studentB.api.v1.registrations[':id'].teacher.$put({ param: { id: bioA }, json: { teacherId: null, reason: 'not my child at all' } }));
     expect(await one(`select status, teacher_id, prior_sitting_verified_outcome, updated_at from registration where id = $1`, [bioA])).toEqual(before);
+  });
+  it("step D: B cannot read or mark A's copy of a message, reach a message's deliveries or send one; finance reads only the money lists' messages", async () => {
+    // The school writes to A's family (the parent and the student), as the Messages screen does.
+    const sent = await apiResponse(adm.api.v1.messages.$post({ json: {
+      audience: { definition: { kind: 'direct', userIds: [parentA.id, studentAId] } }, title: 'A word to family A', body: 'This message is for family A only.', language: 'en', channels: ['in_app'],
+    } }));
+    const copies = await sql<{ id: string; user_id: string }>(`select id, user_id from notification where data->>'messageId' = $1 order by user_id`, [sent.id]);
+    expect(copies).toHaveLength(2);
+    for (const c of copies) {
+      await refusedAs('parentB mark message copy of A read', parentB.api.v1.notifications[':id'].read.$put({ param: { id: c.id } }));
+      await refusedAs('studentB mark message copy of A read', studentB.api.v1.notifications[':id'].read.$put({ param: { id: c.id } }));
+    }
+    expect(await sql(`select 1 from notification where data->>'messageId' = $1 and read_at is not null`, [sent.id])).toEqual([]);
+    // B's own notifications never list A's copy.
+    for (const who of [parentB, studentB]) {
+      const mine = await apiResponse(who.api.v1.notifications.$get({ query: {} }));
+      expect(mine.some((n) => (n.data as { messageId?: string } | null)?.messageId === sent.id)).toBe(false);
+    }
+    // The deliveries, the log, an audience naming A's student and a send are the school's.
+    await refusedAs('parentB deliveries of A message', parentB.api.v1.messages.deliveries.$get({ query: { messageId: sent.id } }));
+    await refusedAs('studentB deliveries of A message', studentB.api.v1.messages.deliveries.$get({ query: { messageId: sent.id } }));
+    await refusedAs('parentB message log', parentB.api.v1.messages.$get({ query: {} }));
+    await refusedAs('parentB resolve A family', parentB.api.v1.messages.audiences.resolve.$post({ json: { audience: { definition: { kind: 'batch', list: 'session_unpaid', sessionId, include: 'both', filter: 'unpaid', studentIds: [studentAId], who: 'families' } } } }));
+    await refusedAs('parentB message to A', parentB.api.v1.messages.$post({ json: { audience: { definition: { kind: 'direct', userIds: [parentA.id] } }, title: 'From another family', body: 'A family may not message another family.', channels: ['in_app'] } }));
+    await refusedAs('studentB message to A', studentB.api.v1.messages.$post({ json: { audience: { definition: { kind: 'direct', userIds: [studentAId] } }, title: 'From another family', body: 'A family may not message another family.', channels: ['in_app'] } }));
+    // Finance passes the role gate but reads only money lists: a direct message's deliveries are refused.
+    await refusedAs('officer deliveries of a direct message', officer.api.v1.messages.deliveries.$get({ query: { messageId: sent.id } }));
+    await refusedAs('officer direct message', officer.api.v1.messages.$post({ json: { audience: { definition: { kind: 'direct', userIds: [parentA.id] } }, title: 'From the finance office', body: 'Finance sends to the money lists only.', channels: ['in_app'] } }));
+    expect(await sql(`select 1 from message m where m.created_by = $1`, [officer.id])).toEqual([]);
   });
 });

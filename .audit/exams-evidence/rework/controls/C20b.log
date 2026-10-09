@@ -1,0 +1,183 @@
+# C20b: carry forward not taken from the line's prior sitting (the suggest flow only)
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['a sitting at another centre, verified with its centre and candidate number', 'a sitting here, verified without another centre']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 7 failed) 26640ms
+   × F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting at another centre, verified with its centre and candidate number, is carried forward with them 82ms
+     → expected [ [ 'XW9700', 'BY', 'none', …(4) ] ] to deeply equal [ [ 'XW9700', 'BY', …(5) ] ]
+   × F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting here, verified without another centre, is carried forward with the school's centre and the candidate's number then 81ms
+     → expected [ [ 'none', null, null ] ] to deeply equal [ [ 'confirmed', 'EG123', '0777' ] ]
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a carry forward declared and not verified is derived as suggested, not confirmed 15ms
+     → expected [ 'BY', 'none', null, null, null ] to deeply equal [ 'BY', 'suggested', 'june', …(2) ]
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number 25ms
+     → expected [ 'missing_candidate_number', …(4) ] to include 'carry_forward_differs_from_line'
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified here after derivation: the next derivation confirms the suggested carry forward 14ms
+     → expected 'none' to be 'suggested' // Object.is equality
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > rejected after derivation: the draft loses the carry forward and its option; a sent entry keeps them and is flagged 32ms
+     → expected [ 'BY', 'none', 'BY', 'none' ] to deeply equal [ Array(4) ]
+   × F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > another centre's candidate number typed by hand on a draft stays: the next derivation does not overwrite it 330ms
+     → expected [ 'none', null, null ] to deeply equal [ 'confirmed', 'EG997', '0454' ]
+ Test Files  1 failed (1)
+      Tests  7 failed | 49 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 81f38f9b-d323-4479-be00-9c3a1a8cfcde: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting at another centre, verified with its centre and candidate number, is carried forward with them
+AssertionError: expected [ [ 'XW9700', 'BY', 'none', …(4) ] ] to deeply equal [ [ 'XW9700', 'BY', …(5) ] ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    [[22m
+[2m      "XW9700",[22m
+[2m      "BY",[22m
+[32m-     "confirmed",[39m
+[32m-     "june",[39m
+[32m-     2026,[39m
+[32m-     "EG999",[39m
+[32m-     "0452",[39m
+[31m+     "none",[39m
+[31m+     null,[39m
+[31m+     null,[39m
+[31m+     null,[39m
+[31m+     null,[39m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:211:10
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > carry forward from the line's verified prior sitting > a sitting here, verified without another centre, is carried forward with the school's centre and the candidate's number then
+AssertionError: expected [ [ 'none', null, null ] ] to deeply equal [ [ 'confirmed', 'EG123', '0777' ] ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    [[22m
+[32m-     "confirmed",[39m
+[32m-     "EG123",[39m
+[32m-     "0777",[39m
+[31m+     "none",[39m
+[31m+     null,[39m
+[31m+     null,[39m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:225:10
+    223|       await derive(w.series.cambridgeNov, fam.cf2!.studentId);
+    224|       expect((await entriesOf(w.series.cambridgeNov, fam.cf2!.studentI…
+    225|         .toEqual([['confirmed', 'EG123', '0777']]);
+       |          ^
+    226|     });
+    227| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > a carry forward declared and not verified is derived as suggested, not confirmed
+AssertionError: expected [ 'BY', 'none', null, null, null ] to deeply equal [ 'BY', 'suggested', 'june', …(2) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    "BY",[22m
+[32m-   "suggested",[39m
+[32m-   "june",[39m
+[32m-   2026,[39m
+[32m-   "EG123",[39m
+[31m+   "none",[39m
+[31m+   null,[39m
+[31m+   null,[39m
+[31m+   null,[39m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:711:101
+    709|       await derive(nov(), af.ca!.studentId);
+    710|       const e = await only('ca');
+    711|       expect([e.option_code, e.carry_forward, e.cf_from_month, e.cf_fr…
+       |                                                                                                     ^
+    712|       const row = await rowOf(e.id);
+    713|       expect(row.problems).toContain('carry_forward_to_confirm');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified at another centre after derivation: flagged, then the draft is brought up to date with that centre and candidate number
+AssertionError: expected [ 'missing_candidate_number', …(4) ] to include 'carry_forward_differs_from_line'
+ ❯ test/08x4-exam-entries-rework.test.ts:720:44
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > verified here after derivation: the next derivation confirms the suggested carry forward
+AssertionError: expected 'none' to be 'suggested' // Object.is equality
+
+Expected: [32m"suggested"[39m
+Received: [31m"none"[39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:732:31
+    730|       await derive(nov(), af.cc!.studentId);
+    731|       const e = await only('cc');
+    732|       expect(e.carry_forward).toBe('suggested');
+       |                               ^
+    733|       await verify(al.cc!, { outcome: 'verified', reason: 'our own Jun…
+    734|       const row = await rowOf(e.id);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > rejected after derivation: the draft loses the carry forward and its option; a sent entry keeps them and is flagged
+AssertionError: expected [ 'BY', 'none', 'BY', 'none' ] to deeply equal [ Array(4) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    "BY",[22m
+[32m-   "suggested",[39m
+[31m+   "none",[39m
+[2m    "BY",[22m
+[32m-   "suggested",[39m
+[31m+   "none",[39m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:754:94
+    752|       const draft = await only('ce');
+    753|       const sent = await only('cs');
+    754|       expect([draft.option_code, draft.carry_forward, sent.option_code…
+       |                                                                                              ^
+    755|       await send(sent.id);
+    756|       for (const k of ['ce', 'cs']) expect(await verify(al[k]!, { outc…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > an entry follows its line's answer given after it was made (the review of 093dbd1, item 2) > another centre's candidate number typed by hand on a draft stays: the next derivation does not overwrite it
+AssertionError: expected [ 'none', null, null ] to deeply equal [ 'confirmed', 'EG997', '0454' ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[32m-   "confirmed",[39m
+[32m-   "EG997",[39m
+[32m-   "0454",[39m
+[31m+   "none",[39m
+[31m+   null,[39m
+[31m+   null,[39m
+[2m  ][22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:800:79
+    798|       await derive(nov(), ht.studentId);
+    799|       const [e] = await entriesOf(nov(), ht.studentId);
+    800|       expect([e!.carry_forward, e!.cf_centre_number, e!.cf_candidate_n…
+       |                                                                               ^
+    801|       // The statement had it wrong: the coordinator types the number …
+    802|       await apiResponse(coord.api.v1.exams.entries[':id'].$put({ param…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+

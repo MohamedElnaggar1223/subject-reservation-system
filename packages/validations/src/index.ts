@@ -44,6 +44,7 @@ export * from './exception/policies'
 export * from './charge/charge.validations'
 export * from './remark/remark.validations'
 export * from './desk/desk.validations'
+export * from './message/message.validations'
 
 /**
  * F0a — core foundation: the academic year and grade rules, the academic
@@ -61,6 +62,11 @@ export * from './catalogue/catalogue.validations'
 export * from './catalogue/level-code'
 export * from './catalogue/board-series.validations'
 export * from './enrolment/enrolment.validations'
+/**
+ * F4 — exam-entry management: candidates, entries, entry lists, the exam
+ * timetable and exam days, results and certificates.
+ */
+export * from './exams/exam-entry.validations'
 /**
  * F7 — the day-one import.
  */

@@ -1,0 +1,116 @@
+# C35: the family's direct drop leaves the line's entries live
+# undone in: apps/api/src/services/swap.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['a two-unit line with one unit sent', 'the same line with none sent', "the family's direct drop"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 3 failed) 27541ms
+   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when 42ms
+     → expected [ [ 'submitted', false, null ], …(1) ] to deeply equal [ [ 'withdrawn', true, …(1) ], …(1) ]
+   × F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > the same line with none sent: the board fee comes back in full 25ms
+     → expected [ [ 'draft', false, null ], …(1) ] to deeply equal [ [ 'withdrawn', true, …(1) ], …(1) ]
+   × F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct drop 252ms
+     → expected { …(6) } to match object { status: 'withdrawn', …(1) }
+ Test Files  1 failed (1)
+      Tests  3 failed | 53 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 33b3a1c8-d9f1-4564-8631-6e94cdaed4f5: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > a two-unit line with one unit sent: the board fee stays, the course part by the policy; the preview names what was sent and when
+AssertionError: expected [ [ 'submitted', false, null ], …(1) ] to deeply equal [ [ 'withdrawn', true, …(1) ], …(1) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    [[22m
+[32m-     "withdrawn",[39m
+[32m-     true,[39m
+[32m-     "the family dropped the subject",[39m
+[31m+     "submitted",[39m
+[31m+     false,[39m
+[31m+     null,[39m
+[2m    ],[22m
+[2m    [[22m
+[32m-     "withdrawn",[39m
+[32m-     true,[39m
+[32m-     "the family dropped the subject",[39m
+[31m+     "draft",[39m
+[31m+     false,[39m
+[31m+     null,[39m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ withdrawnWithLine test/08x4-exam-entries-rework.test.ts:75:85
+     73|     const rows = await entriesOfLine(lineId);
+     74|     expect(rows.length).toBeGreaterThan(0);
+     75|     expect(rows.map((r) => [r.status, r.withdrawn_with_line, r.withdra…
+       |                                                                                     ^
+     76|     await audited(rows.map((r) => r.id), rows.map(() => 'EXAM_ENTRY_WI…
+     77|     return rows;
+ ❯ test/08x4-exam-entries-rework.test.ts:464:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > "mark as sent" is what makes a line's board fee sent for its refund (step C's refundFor) > the same line with none sent: the board fee comes back in full
+AssertionError: expected [ [ 'draft', false, null ], …(1) ] to deeply equal [ [ 'withdrawn', true, …(1) ], …(1) ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  [[22m
+[2m    [[22m
+[32m-     "withdrawn",[39m
+[32m-     true,[39m
+[32m-     "the family dropped the subject",[39m
+[31m+     "draft",[39m
+[31m+     false,[39m
+[31m+     null,[39m
+[2m    ],[22m
+[2m    [[22m
+[32m-     "withdrawn",[39m
+[32m-     true,[39m
+[32m-     "the family dropped the subject",[39m
+[31m+     "draft",[39m
+[31m+     false,[39m
+[31m+     null,[39m
+[2m    ],[22m
+[2m  ][22m
+
+ ❯ withdrawnWithLine test/08x4-exam-entries-rework.test.ts:75:85
+     73|     const rows = await entriesOfLine(lineId);
+     74|     expect(rows.length).toBeGreaterThan(0);
+     75|     expect(rows.map((r) => [r.status, r.withdrawn_with_line, r.withdra…
+       |                                                                                     ^
+     76|     await audited(rows.map((r) => r.id), rows.map(() => 'EXAM_ENTRY_WI…
+     77|     return rows;
+ ❯ test/08x4-exam-entries-rework.test.ts:478:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a refund is priced after the line is locked: "mark as sent" landing meanwhile keeps the board fee (the review of 093dbd1, item 4) > the family's direct drop
+AssertionError: expected { …(6) } to match object { status: 'withdrawn', …(1) }
+(4 matching properties omitted from actual)
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "status": "withdrawn",[39m
+[32m-   "withdrawn_with_line": true,[39m
+[31m+   "status": "submitted",[39m
+[31m+   "withdrawn_with_line": false,[39m
+[2m  }[22m
+
+ ❯ sendDuring test/08x4-exam-entries-rework.test.ts:625:18
+    623|       expect(await credited(lineId)).toBe(before.coursePart);
+    624|       const [w1] = await entriesOfLine(lineId);
+    625|       expect(w1).toMatchObject({ status: 'withdrawn', withdrawn_with_l…
+       |                  ^
+    626|       expect(w1!.submitted_at).not.toBeNull();
+    627|       expect(await sql<{ n: Record<string, unknown> }>(`select new_dat…
+ ❯ test/08x4-exam-entries-rework.test.ts:631:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+

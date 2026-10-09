@@ -1,0 +1,38 @@
+# C60: a session's series correction leaves its lines' entries in the series they leave
+# undone in: apps/api/src/services/session.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ["a session's series correction: refused while a line has a sent entry"]
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 1 failed) 27640ms
+   × F4 on the reservations rework > a line moved to another series takes its drafts with it, and a sent entry refuses the move (the review of 426d565, item 2) > a session's series correction: refused while a line has a sent entry; once that is withdrawn, the lines go to the corrected series and the drafts are withdrawn 734ms
+     → expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+ Test Files  1 failed (1)
+      Tests  1 failed | 55 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 2c39a120-db7c-4a59-b1f8-0abda87c160c: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > a line moved to another series takes its drafts with it, and a sent entry refuses the move (the review of 426d565, item 2) > a session's series correction: refused while a line has a sent entry; once that is withdrawn, the lines go to the corrected series and the drafts are withdrawn
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 409, …(1) }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "error": "XW97 Biology XW for Student x-xw-crs has already gone to the board in Cambridge International June 2027 (exams xw corr): withdraw its entries first",[39m
+[32m-   "status": 409,[39m
+[31m+   "error": "\"\"",[39m
+[31m+   "status": 200,[39m
+[2m  }[22m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:1123:40
+    1121|         param: { id: sess }, json: { sessionType: 'june', seriesYear: …
+    1122|       });
+    1123|       expect(await refused(correct())).toEqual({ status: 409, error: r…
+       |                                        ^
+    1124|       expect(await seriesOfLine(p.ld)).toBe(from);
+    1125|       await byHand(p.sent.id);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

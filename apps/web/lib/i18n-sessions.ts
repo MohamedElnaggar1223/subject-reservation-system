@@ -300,6 +300,10 @@ export const sessionsArabic: Record<string, string> = {
   'Past it, every payment still unconfirmed for this series closes on its own (wallet money returned, families told) and every registration still waiting expires. It may fall while a session is still open: what is entered in this series stops at it, and the rest of the session goes on. A retake of the board\'s previous sitting runs to the retake date where the board gives one (Cambridge). Leave the deadline empty and the exams\' start is the cut-off.':
     'بعده تُغلق تلقائيًا كل دفعة غير مؤكدة لهذه الدورة (ويعود مال المحفظة وتُبلَّغ الأسر) وينتهي كل تسجيل ما زال منتظرًا. ويمكن أن يقع والجلسة مفتوحة: ما يُقيَّد في هذه الدورة يتوقف عنده ويستمر باقي الجلسة. وإعادة الدورة السابقة للمجلس تمتد حتى موعد الإعادات حين يحدده المجلس (كامبريدج). وإن تُرك الموعد فارغًا فبداية الامتحانات هي الحد.',
 
+  // ── A change refused because its students kept changing (lib/student-locks.ts) ──
+  'The students with lines here changed while this change was running (new reservations kept arriving): nothing was changed. Try again.':
+    'تغيّر الطلاب الذين لهم سطور هنا أثناء تنفيذ هذا التغيير (استمرت حجوزات جديدة في الوصول): لم يتغيّر شيء. حاول مرة أخرى.',
+
   // ── Fees tab: lines provisional on confirmed fees ──
   'Lines still provisional on confirmed fees': 'سطور ما زالت مؤقتة على رسوم مؤكدة',
   'These waiting lines read only confirmed fees here but are still marked provisional, so they cannot be paid.':

@@ -1,0 +1,39 @@
+# C27: the desk's drop does not withdraw the line's entries (the seam withdrawEntry)
+# undone in: apps/api/src/services/desk-drop.services.ts
+# ran: test/08x4-exam-entries-rework.test.ts
+# expected red: ['the desk drops a paid line past its deadline']
+# result: RED as expected
+
+ ❯ test/08x4-exam-entries-rework.test.ts (56 tests | 1 failed) 27328ms
+   × F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > the desk drops a paid line past its deadline: its entries are withdrawn with it, the board fee kept (sent), the notice naming what was sent 16ms
+     → expected [] to deeply equal [ [ 'XW97', true ] ]
+ Test Files  1 failed (1)
+      Tests  1 failed | 55 passed (56)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x4-exam-entries-rework.test.ts
+[results] Could not verify the declared sitting of line 2d7e79b8-e824-4a50-aa35-a91d3d4c90a7: DrizzleQueryError: Failed query: insert into "audit_log" ("id", "user_id", "action", "entity_type", "entity_id", "previous_data", "new_data", "ip_address", "user_agent", "created_at") values ($1, $2, $3, $4, $5, $6, $7, $8, $9, default)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x4-exam-entries-rework.test.ts > F4 on the reservations rework > each line cut off at its own deadline; the desk's drop past it withdraws the entries > the desk drops a paid line past its deadline: its entries are withdrawn with it, the board fee kept (sent), the notice naming what was sent
+AssertionError: expected [] to deeply equal [ [ 'XW97', true ] ]
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- [[39m
+[32m-   [[39m
+[32m-     "XW97",[39m
+[32m-     true,[39m
+[32m-   ],[39m
+[32m- ][39m
+[31m+ [][39m
+
+ ❯ test/08x4-exam-entries-rework.test.ts:993:74
+    991|       expect(done).toMatchObject({ boardSent: true, refundBoardPart: 0…
+    992|       expect(done.boardNote).toBe(`The board fee stays with the board:…
+    993|       expect(done.entriesWithdrawn.map((x) => [x.entryCode, x.wasSent]…
+       |                                                                          ^
+    994|       const e = await one<{ id: string; status: string; withdrawal_rea…
+    995|       expect(e).toMatchObject({ status: 'withdrawn', withdrawal_reason…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

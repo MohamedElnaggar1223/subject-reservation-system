@@ -1,6 +1,8 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { apiResponse, academicYearStartOf, type LineInputType } from '@repo/validations';
-import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLock, pauseAtAudit, pauseAtAudits, session, openWindow, runPaymentDeadlines, type Client, reservationOf, CONSENT } from './helpers';
+import { admin, staff, onboard, subject, one, sql, money, lockWaiters, holdRowLock, pauseAtAudit, pauseAtAudits, session, openWindow, runPaymentDeadlines, waitFor, type Client, reservationOf, CONSENT } from './helpers';
+import { examWorld, type ExamWorld } from './exam-helpers';
+import { STUDENTS_KEPT_CHANGING } from '../src/lib/student-locks';
 
 /**
  * The reservations rework, step 1 — races (RESERVATIONS_REWORK.md §6, §8; FEATURES_PLAN.md §5:
@@ -985,6 +987,138 @@ describe('08t: the rework races', () => {
     });
   });
 
+  describe('a change whose students keep changing (the review of F1): after three retries, a 409 with its sentence, nothing changed', () => {
+    /**
+     * Four reservations landing one after another while a change that locks its students first
+     * runs (lib/student-locks.ts). The change's first run waits for its first student (held by the
+     * test). Each round: the next newcomer's own row is held (so the change's next run, which locks
+     * it, waits there), the newcomer's line is committed, then the student the change is waiting
+     * for is let go: that run reads the lines, meets the newcomer, and runs again — until the
+     * fourth newcomer, which is the refusal. Each wait is checked with pg_blocking_pids.
+     */
+    const fourNewcomers = async (o: { first: string; newcomers: string[]; line: (studentId: string) => [string, unknown[]]; fire: () => Promise<Res> }) => {
+      const { default: pg } = await import('pg');
+      const open: InstanceType<typeof pg.Client>[] = [];
+      const holdStudent = async (id: string) => {
+        const c = new pg.Client({ connectionString: process.env.DATABASE_URL });
+        await c.connect();
+        open.push(c);
+        await c.query('BEGIN');
+        await c.query(`select id from "user" where id = $1 for no key update`, [id]);
+        return c;
+      };
+      const blockedBy = (c: InstanceType<typeof pg.Client>) => waitFor(async () =>
+        Number((await sql<{ n: string }>(`select count(*) as n from pg_stat_activity a where $1 = any(pg_blocking_pids(a.pid))`,
+          [(c as unknown as { processID: number }).processID]))[0]?.n) > 0 || null);
+      const made: string[] = [];
+      try {
+        let held = await holdStudent(o.first);
+        const firing = o.fire();
+        for (let k = 0; k < 4; k++) {
+          // The change waits for the held student — unless it answered first (then say what it answered).
+          const early = await Promise.race([blockedBy(held).then(() => null), firing.then((r) => `answered ${r.status}`)]);
+          if (early) throw new Error(`the change did not wait for its student (round ${k}): ${early}`);
+          const next = k < 3 ? await holdStudent(o.newcomers[k]!) : undefined;
+          const [text, params] = o.line(o.newcomers[k]!);
+          made.push((await one<{ id: string }>(`${text} returning id`, params)).id);
+          await held.query('COMMIT');
+          if (next) held = next;
+        }
+        return { res: await firing, made };
+      } finally {
+        for (const c of open) {
+          await c.query('ROLLBACK').catch(() => undefined);
+          await c.end().catch(() => undefined);
+        }
+      }
+    };
+    /** A waiting line of a student on an item, as a reservation that landed would leave it. */
+    const lineOn = (sessionId: string, subjectId: string, itemId: string, seriesId: string) => (studentId: string): [string, unknown[]] => [
+      `insert into registration (id, student_id, session_id, subject_id, price_at_registration, status, requested_by, offer_item_id, board_series_id, due_at)
+       values (gen_random_uuid()::text, $1, $2, $3, 0, 'pending_payment', $4, $5, $6, now() + interval '30 days')`,
+      [studentId, sessionId, subjectId, studentId, itemId, seriesId],
+    ];
+    const refusal = async (r: Res) => [r.status, (await r.json() as { error?: string }).error ?? null];
+    const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel', year: number, label: string, entryDeadline: Date) =>
+      (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode, month: 'june', year, label, entryDeadline } })))!.id;
+    let newcomers: string[];
+    const made: string[] = [];
+
+    beforeAll(async () => {
+      newcomers = [];
+      for (let i = 1; i <= 4; i++) newcomers.push((await onboard(officer, `t08-nc${i}-${RUN}`, 11)).studentId);
+    });
+    afterAll(async () => {
+      // The newcomers' lines stood for reservations that landed; nothing else reads them.
+      if (made.length) await sql(`delete from registration where id in $1`, [made]);
+    });
+
+    it("an item's series change", async () => {
+      const sub = await subject(adm, `RWT-NI-${RUN}`, `Newcomers item (08t ${RUN})`, { course: 1000, registration: 500 });
+      const from = await mkSeries('cambridge', Y + 1, `t08-ni-a-${RUN}`, new Date(Date.now() + days(50)));
+      const to = await mkSeries('cambridge', Y + 1, `t08-ni-b-${RUN}`, new Date(Date.now() + days(50)));
+      await feeFor(from, sub);
+      await feeFor(to, sub);
+      const o = await offerOf(s1, sub, [whole(from)]);
+      const f = await onboard(officer, `t08-ni-${RUN}`, 11);
+      const [line] = await reserveAtDesk(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
+      const r = await fourNewcomers({
+        first: f.studentId, newcomers, line: lineOn(s1, sub, o.items[0]!, from),
+        fire: () => adm.api.v1.sessions[':id'].offers[':offerId'].items[':itemId'].$put({ param: { id: s1, offerId: o.id, itemId: o.items[0]! }, json: { boardSeriesId: to, reason: 'race: sat later' } }),
+      });
+      made.push(...r.made);
+      expect(await refusal(r.res)).toEqual([409, STUDENTS_KEPT_CHANGING]);
+      expect(await one(`select board_series_id as s from session_offer_item where id = $1`, [o.items[0]])).toEqual({ s: from });
+      expect(await one(`select board_series_id as s from registration where id = $1`, [line!.id])).toEqual({ s: from });
+    });
+
+    it("the session's series correction", async () => {
+      const sc = await mkSession(`t08-nc-${RUN}`);
+      const sub = await subject(adm, `RWT-NC-${RUN}`, `Newcomers correction (08t ${RUN})`, { course: 1000, registration: 500 });
+      const from = await mkSeries('cambridge', Y + 1, `t08-nc-${RUN}`, new Date(Date.now() + days(50)));
+      const to = await mkSeries('cambridge', Y + 2, `t08-nc-${RUN}`, new Date(Date.now() + days(50)));
+      await feeFor(from, sub);
+      await feeFor(to, sub);
+      const o = await offerOf(sc, sub, [whole(from)]);
+      const f = await onboard(officer, `t08-ncs-${RUN}`, 11);
+      await reserveAtDesk(f.studentId, sc, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
+      const r = await fourNewcomers({
+        first: f.studentId, newcomers, line: lineOn(sc, sub, o.items[0]!, from),
+        fire: () => adm.api.v1.sessions[':id'].series.$put({ param: { id: sc }, json: { sessionType: 'june', seriesYear: Y + 2, reason: 'race: the next June' } }),
+      });
+      made.push(...r.made);
+      expect(await refusal(r.res)).toEqual([409, STUDENTS_KEPT_CHANGING]);
+      expect(await one(`select series_year as y from registration_session where id = $1`, [sc])).toEqual({ y: Y + 1 });
+    });
+
+    for (const via of ['the Subjects form', 'the Catalogue'] as const) {
+      it(`a board change from ${via}`, async () => {
+        const tag = via === 'the Subjects form' ? 'S' : 'C';
+        const sub = await subject(adm, `RWT-NB${tag}-${RUN}`, `Newcomers board ${tag} (08t ${RUN})`, { course: 1000, registration: 500 }, { council: 'cambridge' });
+        const deadline = new Date(Date.now() + days(50));
+        const cam = await mkSeries('cambridge', Y + 1, `t08-nb${tag}-${RUN}`, deadline);
+        await mkSeries('pearson_edexcel', Y + 1, `t08-nb${tag}-${RUN}`, deadline);
+        await feeFor(cam, sub);
+        const o = await offerOf(s1, sub, [whole(cam)]);
+        const f = await onboard(officer, `t08-nb${tag}-${RUN}`, 11);
+        await reserveAtDesk(f.studentId, s1, [{ offerItemId: o.items[0]!, attempt: 'first', mode: 'in_school', teacherId }]);
+        // The Catalogue maps a subject to an award (or units) of its new board.
+        const award = (await apiResponse(adm.api.v1.catalogue.qualifications.$post({
+          json: { boardCode: 'pearson_edexcel', code: `T08NB${tag}-${RUN}`, title: `Newcomers award ${tag} (08t ${RUN})`, level: 'igcse', suite: 'Pearson Edexcel International GCSE', subjectArea: 'Test', entryMethod: 'qualification' },
+        })))!.id;
+        const r = await fourNewcomers({
+          first: f.studentId, newcomers, line: lineOn(s1, sub, o.items[0]!, cam),
+          fire: () => via === 'the Subjects form'
+            ? adm.api.v1.subjects[':id'].$put({ param: { id: sub }, json: { council: 'pearson_edexcel' } })
+            : adm.api.v1.catalogue.registrable[':subjectId'].$put({ param: { subjectId: sub }, json: { boardCode: 'pearson_edexcel', qualificationId: award, unitIds: [], reason: 'race: the board moved' } }),
+        });
+        made.push(...r.made);
+        expect(await refusal(r.res)).toEqual([409, STUDENTS_KEPT_CHANGING]);
+        expect(await one(`select council from subject where id = $1`, [sub])).toEqual({ council: 'cambridge' });
+      });
+    }
+  });
+
   describe("a Confirm landing inside a move (the review of 40c1447): the move holds the new series' fee rows before its lines, so the Confirm waits and reaches the moved line", () => {
     const mkSeries = async (boardCode: 'cambridge' | 'pearson_edexcel', year: number, label: string, entryDeadline: Date) =>
       (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode, month: 'june', year, label, entryDeadline } })))!.id;
@@ -1333,5 +1467,210 @@ describe('08t: the rework races — money (step C)', () => {
       expect(await t.wallet()).toEqual({ free: money(settled.released), held: 0 });
       expect(await sql(`select 1 from payment_registration where registration_id = $1`, [t.line])).toEqual([]);
     });
+  });
+});
+
+/**
+ * Step D (RESERVATIONS_REWORK.md §3.8, docs/features/RESERVATIONS_MESSAGES.md): the reminder step
+ * reads a line as unpaid and claims its reminder; a payment can be confirmed at the same moment. The
+ * step locks the line FOR SHARE and reads it again (a statement of its own) before it claims, and the
+ * desk's payment locks it FOR UPDATE, so one waits for the other, both orders: a payment taken first
+ * means no reminder (the line has a payment open, then is paid);
+ * a reminder claimed first goes out and the payment confirms after it (09: no reminder claimed after
+ * its line was paid). (Two schedulers claiming one reminder at once: 08s.)
+ */
+describe('08t: the rework races — reminders (step D)', () => {
+  // (afterAll for this block is imported with the others.)
+  let adm: Client, officer: Client, teacherId: string, itemId: string, sessionId: string, dueDay: string;
+  const RUN_D = Math.random().toString(36).slice(2, 6);
+  const DAY = 86_400_000;
+  const cairoDay = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(d);
+  // 09:30 Cairo on a Cairo day (UTC+2 or +3: the one that reads back right).
+  const cairoNineThirty = (day: string) => {
+    const [y, m, d] = day.split('-').map(Number) as [number, number, number];
+    for (const off of [2, 3]) {
+      const t = new Date(Date.UTC(y, m - 1, d, 9 - off, 30));
+      if (new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(t) === '09:30') return t;
+    }
+    throw new Error('no Cairo 09:30');
+  };
+  const minusDays = (day: string, n: number) => { const [y, m, d] = day.split('-').map(Number) as [number, number, number]; return new Date(Date.UTC(y, m - 1, d - n)).toISOString().slice(0, 10); };
+  const step = async (now: Date) => (await import('../src/services/messages-step.services')).runMessagesStep(now);
+  const claims = (lineId: string) => sql<{ offset_days: number; sent_at: string }>(`select offset_days, sent_at from reminder_sent where target_id = $1 and kind = 'payment_due'`, [lineId]);
+  const reminders = (email: string) => sql(`select 1 from notification n join "user" u on u.id = n.user_id where u.email = $1 and n.type = 'PAYMENT_REMINDER'`, [email]);
+
+  beforeAll(async () => {
+    adm = await admin(`t08d-${RUN_D}`);
+    officer = await staff(adm, 'finance_officer', `t08d-${RUN_D}`);
+    teacherId = (await apiResponse(adm.api.v1.teachers.$post({ json: { name: `Teacher (08t D ${RUN_D})` } })))!.id;
+    dueDay = cairoDay(new Date(Date.now() + 20 * DAY));
+    sessionId = (await apiResponse(adm.api.v1.sessions.$post({
+      json: {
+        type: 'june', year: academicYearStartOf() + 1, label: `t08d-${RUN_D}`, startDate: new Date(Date.now() - DAY).toISOString(), endDate: new Date(Date.now() + 60 * DAY).toISOString(),
+        courseStartsOn: cairoDay(new Date()), paymentDueAt: new Date(`${dueDay}T10:00:00Z`).toISOString(),
+      },
+    })))!.id;
+    const series = (await apiResponse(adm.api.v1['board-series'].$post({ json: { boardCode: 'cambridge', month: 'june', year: academicYearStartOf() + 1, label: `t08d-${RUN_D}`, entryDeadline: new Date(Date.now() + 50 * DAY) } })))!.id;
+    const subjectId = (await apiResponse(adm.api.v1.subjects.$post({ json: { name: `Physics (08t D ${RUN_D})`, code: `T08D-${RUN_D}`, council: 'cambridge', courseFee: 1000, registrationFee: 500, isOfferedAtSchool: true, isCore: false } })))!.id;
+    await apiResponse(adm.api.v1['board-fees'].$put({ query: { seriesId: series }, json: { rows: [{ keyKind: 'subject', keyId: subjectId, amount: 500, provisional: false }] } }));
+    itemId = (await apiResponse(adm.api.v1.sessions[':id'].offers.$post({
+      param: { id: sessionId }, json: { subjectId, courseFee: 1000, teachers: [{ teacherId, mode: 'in_school' }], items: [{ label: 'Whole subject', kind: 'whole', enters: { kind: 'subject' }, boardSeriesId: series, availability: 'open', requiredInSeries: false }] },
+    })))!.items[0]!;
+    // Reminders are off when the system is installed: on for these races, off again after.
+    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'reminders.enabled' }, json: { value: true, reason: 'the races need the step' } }));
+  });
+
+  afterAll(async () => {
+    await apiResponse(adm.api.v1.settings[':key'].$put({ param: { key: 'reminders.enabled' }, json: { value: false, reason: 'back to as installed' } }));
+  });
+
+  const familyWithALine = async (tag: string) => {
+    const f = await onboard(officer, `t08d-${tag}-${RUN_D}`, 11);
+    const line = (await apiResponse(officer.api.v1.registrations.desk.$post({ json: { studentId: f.studentId, sessionId, lines: [{ offerItemId: itemId, attempt: 'first', mode: 'in_school', teacherId }], consent: CONSENT } }))).registrations[0]!.id;
+    return { f, line };
+  };
+  const collect = (studentId: string, lineId: string) => apiResponse(officer.api.v1.registrations.desk.collect.$post({ json: { studentId, registrationIds: [lineId], instrumentUsed: 'cash', escrowAmountToApply: 0 } }));
+
+  it('a payment taken while the reminder step reads the line: the step waits for the line, reads it being paid, and reminds nothing', async () => {
+    const { f, line } = await familyWithALine('pay-first');
+    // The desk holds the line (FOR UPDATE) while it writes the payment, paused at its creation row.
+    const p = await pauseAtAudits(['PAYMENT_INITIATED']);
+    try {
+      const paying = collect(f.studentId, line);
+      await p.paused('PAYMENT_INITIATED');
+      const reminding = step(cairoNineThirty(minusDays(dueDay, 7)));
+      // The step queues behind the desk on the line (or, were the line not locked, would run to its end).
+      await Promise.race([lockWaiters(2), reminding]);
+      await p.releaseAll();
+      await Promise.all([paying, reminding]);
+    } finally {
+      await p.releaseAll();
+    }
+    expect((await one<{ status: string }>(`select status from registration where id = $1`, [line])).status).toBe('confirmed');
+    expect(await claims(line)).toEqual([]);
+    expect(await reminders(f.parent.email)).toEqual([]);
+  });
+
+  it('a reminder claimed while the payment is taken: the payment waits for the line, the reminder goes out once, before the payment confirms', async () => {
+    const { f, line } = await familyWithALine('remind-first');
+    const p = await pauseAtAudits(['REMINDERS_SENT']);
+    try {
+      const reminding = step(cairoNineThirty(minusDays(dueDay, 7)));
+      await p.paused('REMINDERS_SENT');
+      const paying = collect(f.studentId, line);
+      await lockWaiters(2);
+      await p.releaseAll();
+      await Promise.all([reminding, paying]);
+    } finally {
+      await p.releaseAll();
+    }
+    expect((await one<{ status: string }>(`select status from registration where id = $1`, [line])).status).toBe('confirmed');
+    const c = await claims(line);
+    expect(c.map((x) => Number(x.offset_days))).toEqual([-7]);
+    expect(await reminders(f.parent.email)).toHaveLength(1);
+    const paidAt = (await one<{ at: string }>(`select p.confirmed_at as at from payment p join payment_registration pr on pr.payment_id = p.id where pr.registration_id = $1 and p.status = 'completed'`, [line])).at;
+    expect(new Date(c[0]!.sent_at).getTime()).toBeLessThan(new Date(paidAt).getTime());
+  });
+  it('two senders of the same queued email: each claims it before sending (queued → sending), so it is sent once', async () => {
+    const f = await onboard(officer, `t08d-mail-${RUN_D}`, 11);
+    const when = new Date(Date.now() + 6 * 3_600_000);
+    const s = await apiResponse(adm.api.v1.messages.$post({ json: {
+      audience: { definition: { kind: 'direct', userIds: [f.parent.id] } }, title: 'Two senders, one email', body: 'Two senders pick up this email at once.', language: 'en', channels: ['in_app', 'email'], scheduledAt: when,
+    } }));
+    const svc = await import('../src/services/message.services');
+    await svc.dispatchScheduledMessages(new Date(when.getTime() + 1000));
+    const email = (await one<{ id: string }>(`select id from message_delivery where message_id = $1 and channel = 'email'`, [s.id])).id;
+    const release = await holdRowLock('message_delivery', email);
+    let sends: { sent: number; failed: number }[] = [];
+    try {
+      const a = svc.dispatchQueuedEmails({ messageId: s.id });
+      const b = svc.dispatchQueuedEmails({ messageId: s.id });
+      await lockWaiters(2);
+      await release();
+      sends = await Promise.all([a, b]);
+    } finally {
+      await release().catch(() => {});
+    }
+    expect(sends.reduce((n, x) => n + x.sent, 0)).toBe(1);
+    expect(await one(`select status, attempts from message_delivery where id = $1`, [email])).toEqual({ status: 'sent', attempts: 1 });
+  });
+  it("the reminder step and the admin's change of the session's payment date at once: the step takes the session before its lines (A's order), so neither waits on the other in a cycle (the review of 5c2f2bf, item 3)", async () => {
+    const { line } = await familyWithALine('session-change');
+    // The session's own rule, so the step's group for this line is its own; its row held, so the step
+    // stops there, inside its transaction, after it has taken what it takes before the message.
+    const rule = await apiResponse(adm.api.v1.reminders.rules.$put({ json: { kind: 'payment_due', sessionId, offsetsDays: [-7], repeatEveryDays: null, channels: ['in_app'], templateId: 'tpl-payment-due', active: true, reason: 'this session, seven days ahead' } }));
+    const release = await holdRowLock('reminder_rule', rule.id);
+    const moved = new Date(new Date(`${dueDay}T10:00:00Z`).getTime() + 5 * DAY);
+    let put: { status: number; body: string } | null = null;
+    try {
+      const reminding = step(cairoNineThirty(minusDays(dueDay, 7)));
+      await lockWaiters(1);
+      const changing = adm.api.v1.sessions[':id'].$put({ param: { id: sessionId }, json: { paymentDueAt: moved, reason: 'the payment date moves five days' } })
+        .then(async (r) => ({ status: r.status, body: await r.text() }));
+      // The change queues behind the step (on the session), or — the order before the fix — takes the
+      // session and queues on the line the step holds.
+      await lockWaiters(2);
+      await release();
+      [, put] = await Promise.all([reminding, changing]);
+    } finally {
+      await release().catch(() => {});
+    }
+    expect(put, put?.body).toMatchObject({ status: 200 });
+    // The reminder went out on the date it was claimed for; then the line's date moved.
+    expect((await claims(line)).map((c) => Number(c.offset_days))).toEqual([-7]);
+    expect(new Date((await one<{ d: string }>(`select due_at as d from registration where id = $1`, [line])).d).getTime()).toBe(moved.getTime());
+  });
+});
+
+/**
+ * F4's derivation against "mark as sent" on the same entries (the review of 426d565, item 5). A
+ * derivation that brings drafts up to date (or links a paid cash-in to its award) locks them all in
+ * one statement in id order, as "mark as sent" and every withdrawal lock entries (RESERVATIONS.md
+ * §2.1), so the two never wait on each other in a circle. Forced: the derivation held at its first
+ * audit row with its entries locked, the send queued behind it; before the fix the derivation took
+ * them one by one in its rows' order (by student name), and the send, holding the lower id, deadlocked
+ * with it. The world is F4's own (exam-helpers.ts, tag 'xt').
+ */
+describe('08t: F4 — a derivation bringing drafts up to date while they are marked as sent', () => {
+  let w: ExamWorld;
+  beforeAll(async () => { w = await examWorld('xt'); }, 180_000);
+  afterAll(async () => { await w.close(); });
+
+  it('two drafts brought up to date as both are sent: the send waits for the derivation, nothing deadlocks', async () => {
+    const coord = w.coordinator;
+    const derive = () => apiResponse(coord.api.v1.exams.entries.derive.$post({ json: { boardSeriesId: w.series.cambridgeNov, commit: true } }));
+    const lines: string[] = [];
+    for (const k of ['r1', 'r2']) {
+      const f = await onboard(w.officer, `x-xt-${k}`, 12);
+      const [l] = await w.reserve(f, [{ offerItemId: w.items.sc, attempt: 'retake', mode: 'in_school', teacherId: w.teacherId, priorSitting: { month: 'june', year: Y } }]);
+      lines.push(l!.id);
+    }
+    await derive();
+    // Both declarations rejected: each retake draft is to be brought up to date as a first entry.
+    for (const id of lines) {
+      await apiResponse(coord.api.v1.registrations[':id']['verify-prior'].$post({ param: { id }, json: { outcome: 'rejected', reason: 'race: no such sitting on the statement' } }));
+    }
+    const [low, high] = await sql<{ id: string; student_id: string }>(
+      `select id, student_id from exam_entry where registration_id in ($1, $2) and status = 'draft' order by id`, [lines[0], lines[1]]);
+    // The derivation's rows go by student name: the student of the higher id first, so its order
+    // and the send's (by id) cross.
+    await sql(`update "user" set name = 'Aaa race x-xt' where id = $1`, [high!.student_id]);
+    await sql(`update "user" set name = 'Zzz race x-xt' where id = $1`, [low!.student_id]);
+    const p = await pauseAtAudits(['EXAM_ENTRY_UPDATED']);
+    let results: [Awaited<ReturnType<typeof derive>>, unknown] | null = null;
+    try {
+      const deriving = derive();
+      await p.paused('EXAM_ENTRY_UPDATED');
+      const sending = apiResponse(coord.api.v1.exams.entries.submit.$post({ json: { entryIds: [low!.id, high!.id] } }));
+      await lockWaiters(2);
+      await p.release('EXAM_ENTRY_UPDATED');
+      results = await Promise.all([deriving, sending]);
+    } finally {
+      await p.releaseAll();
+    }
+    expect(results![0]).toMatchObject({ updated: 2 });
+    expect(results![1]).toEqual({ submitted: 2, skipped: 0 });
+    expect(await sql(`select is_retake, status from exam_entry where id in ($1, $2)`, [low!.id, high!.id]))
+      .toEqual([{ is_retake: false, status: 'submitted' }, { is_retake: false, status: 'submitted' }]);
   });
 });

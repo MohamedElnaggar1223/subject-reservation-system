@@ -1,0 +1,110 @@
+# C17: the entry list sorted by a column Cambridge's list does not have
+# undone in: apps/api/src/services/exam-entry.services.ts
+# ran: test/08x1-exam-entries.test.ts
+# expected red: ['a candidate with two entries in a Cambridge series lists both']
+# result: RED as expected
+
+ ❯ test/08x1-exam-entries.test.ts (17 tests | 5 failed) 3753ms
+   × F4: candidates and entries > the entry list and its check > a candidate with two entries in a Cambridge series lists both, in code order (Cambridge's columns carry no entry code) 21ms
+   × F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > entries go to the board with the fee tier of the day (information only) 8ms
+     → expected { submitted: 3, skipped: +0 } to deeply equal { submitted: 2, skipped: +0 }
+   × F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > past the deadline a new entry is refused, and a draft cannot be sent; a withdrawal is allowed with the board's fee shown 4ms
+   × F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after 4ms
+     → expected 2 to be 1 // Object.is equality
+   × F4: candidates and entries > national IDs > are read only by the coordinator and the admin, each read audited without the number; never in a list, a log or an audit row 39ms
+ Test Files  1 failed (1)
+      Tests  5 failed | 12 passed (17)
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run test/08x1-exam-entries.test.ts
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > the entry list and its check > a candidate with two entries in a Cambridge series lists both, in code order (Cambridge's columns carry no entry code)
+Error: Cannot read properties of undefined (reading 'localeCompare')
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08x1-exam-entries.test.ts:206:20
+    204|     it("a candidate with two entries in a Cambridge series lists both,…
+    205|       const extra = await apiResponse(coord.api.v1.exams.entries.$post…
+    206|       const list = await apiResponse(coord.api.v1.exams['entry-lists']…
+       |                    ^
+    207|       expect(list.rows.filter((r) => r.studentId === a).map((r) => r.v…
+    208|       await apiResponse(coord.api.v1.exams.entries[':id'].withdraw.$po…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > entries go to the board with the fee tier of the day (information only)
+AssertionError: expected { submitted: 3, skipped: +0 } to deeply equal { submitted: 2, skipped: +0 }
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[2m    "skipped": 0,[22m
+[32m-   "submitted": 2,[39m
+[31m+   "submitted": 3,[39m
+[2m  }[22m
+
+ ❯ test/08x1-exam-entries.test.ts:234:103
+    232|     it('entries go to the board with the fee tier of the day (informat…
+    233|       const ids = [...(await entriesOf(w.series.cambridgeNov, a)), ...…
+    234|       expect(await apiResponse(coord.api.v1.exams.entries.submit.$post…
+       |                                                                                                       ^
+    235|       const rows = await sql<{ status: string; fee_tier_at_submission:…
+    236|       expect(rows).toEqual([{ status: 'submitted', fee_tier_at_submiss…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > MO-10's hard stop, withdrawals and amendments > past the deadline a new entry is refused, and a draft cannot be sent; a withdrawal is allowed with the board's fee shown
+Error: Failed query: update exam_entry set status = 'withdrawn', withdrawn_at = now(), withdrawal_reason = 'set aside for the scenario' where id = 
+params: 
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:73:11
+ ❯ sql test/helpers.ts:63:18
+     61|     q = s`${q}${params[i - 1]}${s.raw(parts[i] ?? '')}`;
+     62|   }
+     63|   const result = await db.execute(q);
+       |                  ^
+     64|   return result.rows as T[];
+     65| }
+ ❯ test/08x1-exam-entries.test.ts:251:7
+
+Caused by: error: syntax error at end of input
+ ❯ ../../node_modules/.pnpm/pg-pool@3.10.1_pg@8.16.3/node_modules/pg-pool/index.js:45:11
+ ❯ ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache ../../node_modules/.pnpm/drizzle-orm@0.45.1_@types+pg@8.16.0_kysely@0.28.9_pg@8.16.3/node_modules/src/pg-core/session.ts:71:12
+ ❯ sql test/helpers.ts:63:18
+ ❯ test/08x1-exam-entries.test.ts:251:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { length: 92, severity: 'ERROR', code: '42601', detail: undefined, hint: undefined, position: '127', internalPosition: undefined, internalQuery: undefined, where: undefined, schema: undefined, table: undefined, dataType: undefined, constraint: undefined, file: 'scan.l', routine: 'scanner_yyerror' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > forecast grades go to the board once > Cambridge fixes a forecast once sent: the teacher's change is refused after
+AssertionError: expected 2 to be 1 // Object.is equality
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 2[39m
+
+ ❯ test/08x1-exam-entries.test.ts:324:24
+    322|     it("Cambridge fixes a forecast once sent: the teacher's change is …
+    323|       const r = await apiResponse(coord.api.v1.exams.forecasts.submit.…
+    324|       expect(r.locked).toBe(1); // A's (B's entry was withdrawn)
+       |                        ^
+    325|       const [ea] = await entriesOf(w.series.cambridgeNov, a);
+    326|       expect(await refused(w.teacher.api.v1.exams.entries[':id'].forec…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  test/08x1-exam-entries.test.ts > F4: candidates and entries > national IDs > are read only by the coordinator and the admin, each read audited without the number; never in a list, a log or an audit row
+Error: Cannot read properties of undefined (reading 'localeCompare')
+ ❯ apiResponse ../../packages/validations/src/api-response.ts:49:11
+ ❯ test/08x1-exam-entries.test.ts:361:33
+    359|         expect(detail.idDocument).toMatchObject({ documentType: 'natio…
+    360|         for (const s of [w.series.cambridgeNov, w.series.pearsonJan]) {
+    361|           expect(JSON.stringify(await apiResponse(coord.api.v1.exams['…
+       |                                 ^
+    362|         }
+    363|         expect(await sql(`select 1 from audit_log where coalesce(previ…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
