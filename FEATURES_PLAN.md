@@ -129,7 +129,7 @@ and reminders) launched 8 Oct 06:40Z** on `feature/rework-messages`; then step 4
 check done (8 Oct 08:04Z, main 9edefbb):** every flow driven from a bare template with no errors; the
 counts measured against RESERVATIONS_REWORK.md §11 (`.audit/school-forms-evidence/step4/`); seven
 observations queued under F6. **F4 and F7 resumed (08:20Z)** on the new model; F1 next, F2 after it,
-F8 last. **F4 landed (9 Oct 2026, 00:00Z, 2d95638)** with A's StudentsKeptChanging 409; F7 then F1 follow. **Step 3 complete (8 Oct 2026, 13:03Z):** D's branch landed at c2d7a78 after three Opus 5.5
+F8 last. **F4 landed (9 Oct 2026, 00:00Z, 2d95638)** with A's StudentsKeptChanging 409; **F7 landed (01:45Z, 384c5a2)**; F1's final merge next, then D's switch to F1's groups, B's desk display of the follow-up outcome, and F2. **Step 3 complete (8 Oct 2026, 13:03Z):** D's branch landed at c2d7a78 after three Opus 5.5
 passes ("confirmed: merge"); migrations 0050–0054. Landing order now F4 → F7 → F1 → F2 → F8, each
 renumbering its migrations after main's journal at its merge.
 
@@ -666,7 +666,7 @@ API and web ports):
 | F2 Campus leave | | | | |
 | F5 Pathway advisor | | | | |
 | F3 Attendance | | | | |
-| F7 Day-one import | frozen 7 Oct at e58324b; **resumed 8 Oct 2026 08:20Z** on the rework's model (§9's F7 list) in worktree `agent-acf43230a4e06e8b4`; built and reviewed through four Opus 5.5 passes (the split of multi-paper rows, every one-paper wording of the school's forms, the course-fee rule, the lock order, a test-harness fix); **confirmed 20:02Z, lands after F4** with 0050_import regenerated | Opus 5.5 implementer and reviewer | | |
+| F7 Day-one import | frozen 7 Oct at e58324b; **resumed 8 Oct 2026 08:20Z** on the rework's model (§9's F7 list) in worktree `agent-acf43230a4e06e8b4`; built and reviewed through four Opus 5.5 passes (the split of multi-paper rows, every one-paper wording of the school's forms, the course-fee rule, the lock order, a test-harness fix); **merged to main 9 Oct 2026 01:45Z (384c5a2)** after four passes, 0050_import regenerated as 0058 | Opus 5.5 implementer and reviewer | | |
 | F6 UI audit | | | | |
 | F8 Demo school and walkthrough | | | | owner's request, 30 Sep 2026; after F6 |
 
