@@ -76,7 +76,7 @@ unverified) or `hold`.
 
 | The page sends | The line gets | `prior_sitting_source` |
 |---|---|---|
-| a retake (or a carry-forward item, `needs_prior_series`) naming nothing, and the student has a confirmed line for what the item enters in another session | the latest such sitting | `known` |
+| a retake (or a carry-forward item, `needs_prior_series`) naming nothing, and the student has a known sitting of what the item enters before its series — a confirmed line in another session, a result on record (F4), or an entry sent to the board (F4) | the latest such sitting | `known` |
 | a retake naming `priorSittingSeriesId` (a series on record) or `priorSitting { month, year }` | that series; for a month and year not on record, a `board_series` row with no dates and an empty label is created (`findOrCreateSeries`, audited `BOARD_SERIES_CREATED` with the reason "Created when a family (or the desk) declared a sitting not on record") | `known` when it is one of the student's known sittings, else `declared_by_family` (app paths) or `declared_by_desk` (staff paths) |
 | a retake with no sitting and nothing known | refused by A's `gate.retakeDeclared` sentence | — |
 | a first entry naming a sitting | refused (a first entry follows no sitting) unless its item carries one forward | — |
@@ -85,11 +85,25 @@ The named sitting must be of the item's board and before the item's series; `gat
 (A) checks the carry-forward period. A family declares a sitting of the board's last two years
 (24 months before the item's series), as its picker offers (`declarableSittings` on A's offers
 read); an older one is refused with "… is declared at the finance desk, with the board's
-statement", and the desk may declare it. A **known** sitting is one the student sat: a confirmed
-line only — a dropped line was never sat, so naming it is a declaration, listed to verify (the
-review, 8 Oct; the Reserve page and the swap pickers read the offers read's `knownSittings` the
-same way, by their status). An F4 result as a `known` source is not built: there is no F4
-results table yet (§9).
+statement", and the desk may declare it. A **known** sitting is one the school knows the student
+sat or was entered for (RESERVATIONS_REWORK.md §3.5: "an earlier line or an F4 result"), before
+the item's own series:
+- a **confirmed line** in another session (a dropped line was never sat, so naming it is a
+  declaration, listed to verify: the review of 8 Oct);
+- an **F4 result** on record for what the item enters, with a real grade (F4's `isRealGrade`:
+  absent, pending or withheld is no sitting), the latest report;
+- an **F4 entry sent to the board** for it and not withdrawn (submitted or amended; a draft never
+  went, a withdrawn one was taken back).
+F4's two are read through F4's `getSittings` (`examSittingsOf` in reservation.services) and
+matched to what the item enters (`examKeysOf`: its award, its units, or for a `subject` item its
+subject row's mapping). The one addition to F4's code: `getSittings` returns each sitting's
+`unitId` and `qualificationId` (the catalogue ids it already read), which the match needs. The
+offers read (`GET /registrations/offers`, A's file) lists the same known sittings with their
+`source` (`line`, `result`, `entry`), month, year and grade, so the family's Reserve page and the
+desk pre-set the retake with its series ("sat … (result on record)", "entered for …") and ask for
+no declaration; `knownSittingsOf` fills it in on the server. Such a line is `known`, priced as the
+retake it is, and runs to the series' retake deadline when the sitting is the board's previous one
+(08o; control `known-from-f4`, and `known-f4-sent-only` for the sent rule).
 
 ### 3.2 The To verify list
 
@@ -398,14 +412,11 @@ right.
 
 ## 9. Deferred, and why
 
-- **An F4 result as a `known` sitting**: no F4 results table exists; `knownSittingsOf` reads
-  earlier lines only. F4 adds its source there. *(F4, after the review of 093dbd1: a declared
-  sitting with a real grade on record is verified at declaration inside `reserveLines`, the
-  one declaring answering through `recordVerifiedInTx` when staff — a family's own declaration names
-  no person and is marked answered from the results on record, which 09's "by someone" rule
-  accepts (the reviews of 426d565 and 54c225f; the reason names the result's importer) — and the To
-  verify tab checks the awaiting ones;
-  `knownSittingsOf` reading F4's results and sent entries stays B's — EXAM_ENTRIES.md §7.)*
+- *(Done 9 Oct, after F4 landed: `knownSittingsOf` and the offers read take F4's results and
+  sent entries as known sittings — §3.1. F4's own: a declared sitting with a real grade on record
+  is verified at declaration inside `reserveLines` and the To verify tab checks the awaiting
+  ones.)*
+- **F1's follow-up outcome on the desk (`groupsFollowed`)**: waits for F1 (the lead).
 - **`refundFor`** is C's; `refundForSystemDrop` is the seam (§3.5).
 - **The statement's charges** are C's (`charges: []`).
 - **Remind** on the Money tab and the coordinator's "declared retakes to verify" reminder rule are
@@ -591,3 +602,10 @@ Times UTC, from the trail (`.audit/rework-reservations.tsv`), which holds each e
   09 rule tightened; the late entry on the first-entry deadline; the warning Notice; the terms'
   loading and failure states; four proof screenshots (the dates sentence in English and Arabic,
   the grade-10 checkout's terms, the slip's mark). Eight controls red.
+- 2026-10-09 00:05Z–00:40Z — main (2d95638, with F4) fast-forwarded into the branch (B's tip was in
+  main); the dev copy migrated to 0057. F4's results and sent entries are known sittings (§3.1):
+  `examSittingsOf` through F4's `getSittings` (which now returns each sitting's `unitId` and
+  `qualificationId`), `knownSittingsOf` and the offers read; the page shows where a sitting is known
+  from. 08o: a result and a sent entry pre-set the retake, priced as one, to the retake deadline; a
+  withdrawn and a draft entry do not; two controls red. The Reserve page's school-fee notice is one
+  sentence now (its "The" stayed English in Arabic). Driven in English and Arabic.

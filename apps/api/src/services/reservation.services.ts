@@ -36,7 +36,7 @@ import { findOrCreateSeries, OfferError } from './offer.services';
 import { PRICE_CHANGED_REFUSAL, round2 } from './pricing.services';
 import { schoolMonthIndex } from './series.services';
 import { academicYearForDate } from './school-fee.services';
-import { verifyDeclaredAtDeclarationInTx } from './exam-result.services';
+import { verifyDeclaredAtDeclarationInTx, getSittings, isRealGrade } from './exam-result.services';
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = typeof db | Tx;
@@ -59,6 +59,8 @@ type ItemFacts = {
   id: string; label: string; kind: string; sessionId: string; offerId: string; subjectId: string; subjectName: string;
   subjectActive: boolean; entersKind: string; qualificationId: string | null; needsPriorSeries: boolean;
   seriesId: string | null; boardCode: string | null; month: string | null; year: number | null; boardName: string | null; units: string[];
+  /** A `subject` item enters its subject row's own mapping (the catalogue's award, or its units). */
+  subjectQualificationId: string | null; subjectUnits: string[];
 };
 
 async function itemFacts(executor: Executor, itemIds: string[]): Promise<Map<string, ItemFacts>> {
@@ -68,7 +70,9 @@ async function itemFacts(executor: Executor, itemIds: string[]): Promise<Map<str
       s.is_active as "subjectActive", i.enters_kind as "entersKind", i.qualification_id as "qualificationId",
       i.needs_prior_series as "needsPriorSeries", i.board_series_id as "seriesId",
       coalesce(bs.board_code, s.council) as "boardCode", bs.month, bs.year, b.name as "boardName",
-      coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i.id), '{}') as units
+      coalesce((select array_agg(u.unit_id order by u.unit_id) from session_offer_item_unit u where u.item_id = i.id), '{}') as units,
+      s.qualification_id as "subjectQualificationId",
+      coalesce((select array_agg(su.unit_id order by su.unit_id) from subject_unit su where su.subject_id = s.id), '{}') as "subjectUnits"
     from session_offer_item i
     join session_offer o on o.id = i.offer_id
     join subject s on s.id = o.subject_id
@@ -86,10 +90,43 @@ function entryKeys(x: { entersKind: string; qualificationId: string | null; subj
 }
 
 /**
- * The student's known sittings of what an item enters — their confirmed lines in other sessions
- * (sat: a dropped line was never sat, so naming it is a declaration the school verifies), in a
- * series, entering the same award, unit or row, or of the same subject — latest first. The
- * Reserve page reads the offers read's `knownSittings` the same way (its confirmed ones).
+ * What an item enters, as F4 records a sitting of it: `q:` an award, `u:` a unit. A `subject` item
+ * enters its subject row's mapping (the award, or the row's units).
+ */
+export function examKeysOf(x: { entersKind: string; qualificationId: string | null; units: string[]; subjectQualificationId?: string | null; subjectUnits?: string[] }) {
+  if (x.entersKind === 'award' || x.entersKind === 'option') return x.qualificationId ? [`q:${x.qualificationId}`] : [];
+  if (x.entersKind === 'units') return x.units.map((u) => `u:${u}`);
+  return [...(x.subjectQualificationId ? [`q:${x.subjectQualificationId}`] : []), ...(x.subjectUnits ?? []).map((u) => `u:${u}`)];
+}
+
+/**
+ * F4's sittings of a student that the school knows of (RESERVATIONS_REWORK.md §3.5: "known — an
+ * earlier line or an F4 result"), read through F4's `getSittings`: a result with a real grade on
+ * record (the latest report; absent, pending or withheld is no sitting), or an entry sent to the
+ * board and not withdrawn (submitted or amended; a draft never went, a withdrawn one was taken
+ * back). Each with the key of what it entered (`q:` award, `u:` unit) and its series.
+ */
+export async function examSittingsOf(studentId: string) {
+  const rows = await getSittings(studentId);
+  return rows.flatMap((s) => {
+    const result = isRealGrade(s.grade);
+    const sent = s.entryStatus === 'submitted' || s.entryStatus === 'amended';
+    if (!result && !sent) return [];
+    const key = s.kind === 'unit' ? (s.unitId ? `u:${s.unitId}` : null) : (s.qualificationId ? `q:${s.qualificationId}` : null);
+    if (!key) return [];
+    return [{
+      source: (result ? 'result' : 'entry') as 'result' | 'entry', key, seriesId: s.boardSeriesId,
+      month: s.series.month, year: s.series.year, series: s.series.name, code: s.code, grade: result ? s.grade : null,
+    }];
+  });
+}
+
+/**
+ * The student's known sittings of what an item enters, latest first: their confirmed lines in
+ * other sessions (sat: a dropped line was never sat, so naming it is a declaration the school
+ * verifies) entering the same award, unit or row, or of the same subject; and F4's results and
+ * sent entries for what the item enters (`examSittingsOf`). Only sittings before the item's own
+ * series. The Reserve page reads the offers read's `knownSittings`, built the same way.
  */
 export async function knownSittingsOf(executor: Executor, studentId: string, sessionId: string, item: ItemFacts) {
   const r = await executor.execute(sql`
@@ -100,10 +137,19 @@ export async function knownSittingsOf(executor: Executor, studentId: string, ses
     where r.student_id = ${studentId} and r.session_id <> ${sessionId} and r.status = 'confirmed'
     order by bs.year desc, r.created_at desc, r.id desc`);
   const keys = entryKeys(item);
-  return (r.rows as { id: string; seriesId: string; subjectId: string; entersKind: string; qualificationId: string | null; units: string[]; year: number; month: string }[])
+  const lines = (r.rows as { id: string; seriesId: string; subjectId: string; entersKind: string; qualificationId: string | null; units: string[]; year: number; month: string }[])
     .filter((h) => entryKeys(h).some((k) => keys.includes(k)) || h.subjectId === item.subjectId)
+    .map((h) => ({ registrationId: h.id as string | null, seriesId: h.seriesId, source: 'line' as 'line' | 'result' | 'entry', year: Number(h.year), month: h.month }));
+  const examKeys = examKeysOf(item);
+  const exams = examKeys.length
+    ? (await examSittingsOf(studentId)).filter((e) => examKeys.includes(e.key))
+      .map((e) => ({ registrationId: null as string | null, seriesId: e.seriesId, source: e.source as 'line' | 'result' | 'entry', year: e.year, month: e.month as string }))
+    : [];
+  const here = item.year && item.month ? item.year * 12 + schoolMonthIndex(item.month) : null;
+  return [...lines, ...exams]
+    .filter((k) => here === null || k.year * 12 + schoolMonthIndex(k.month) < here)
     .sort((a, b) => (b.year * 12 + schoolMonthIndex(b.month)) - (a.year * 12 + schoolMonthIndex(a.month)))
-    .map((h) => ({ registrationId: h.id, seriesId: h.seriesId }));
+    .map(({ registrationId, seriesId, source }) => ({ registrationId, seriesId, source }));
 }
 
 /** The teachers who may be named on a line of an item: the item's own, else the offer's. */

@@ -26,7 +26,7 @@ const ENTRY: Record<string, string> = {
 };
 
 /** A swap's retake follows a sitting the student sat (a confirmed line); a declared one goes through the Reserve page. */
-const sat = (it: { knownSittings: { status: string }[] }) => it.knownSittings.some((k) => k.status === 'confirmed');
+const sat = (it: { knownSittings: { status: string; source: string }[] }) => it.knownSittings.some((k) => k.source !== 'line' || k.status === 'confirmed');
 
 export function useSwapChoices(sessionId: string, studentId: string, currentItemId: string | null) {
   const q = useQuery({ queryKey: reserveOffersKey(sessionId, studentId), queryFn: () => fetchReserveOffers(sessionId, studentId), retry: false });
