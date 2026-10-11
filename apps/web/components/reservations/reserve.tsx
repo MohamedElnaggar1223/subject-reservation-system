@@ -485,6 +485,14 @@ export function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittin
                       {sittings.map((s) => <option key={sittingValue(s)} value={sittingValue(s)}>{sittingName(s)}</option>)}
                     </select>
                   )}
+                  {/* The preview lists every entry with its price, as the Google Form lists its options. */}
+                  {preview && options.length > 0 && (
+                    <ul className="space-y-0.5 text-xs text-muted-foreground">
+                      {options.map((x) => (
+                        <li key={entryKey(x)}><span>{entryLabel(x, isKnown(it))}</span> · <Money amount={x.total} />{x.provisional && ' ⓟ'}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
             </td>

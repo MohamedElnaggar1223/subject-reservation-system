@@ -195,7 +195,7 @@ function EmptySheet({ session, canEdit, isAdmin, onAdd }: { session: SessionDeta
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           {isAdmin && last && (
             <Button onClick={() => copy.mutate()} disabled={copy.isPending}>
-              <span>Copy from</span> <bdi>{last.name}</bdi>
+              <span>Copy from</span><bdi>{last.name}</bdi>
             </Button>
           )}
           <Button variant={isAdmin && last ? 'outline' : 'default'} onClick={onAdd}>Add subjects</Button>
@@ -237,7 +237,7 @@ function FormPhrases({ o, shares }: { o: OfferRow; shares: Shares }) {
     parts.push(
       <span key="whole">
         <span>All papers:</span>{' '}
-        {ssOnly ? <><span>retake self study</span> <span dir="ltr">{ssShare}</span></> : (
+        {ssOnly ? <><span>self study</span> <span dir="ltr">{ssShare}</span></> : (
           <>
             {!retakeOnly && <><span>first entry</span> <span dir="ltr">100%</span> · </>}
             <span>retake in school</span> <span dir="ltr">{pct(shares.retakeTaughtCoursePercent)}</span> · <span>retake self study</span> <span dir="ltr">{ssShare}</span>
@@ -327,7 +327,8 @@ function TeacherPicker({ value, onChange, pool, compact }: {
   value: TeacherPick[]; onChange: (v: TeacherPick[]) => void; pool: string[]; compact?: boolean;
 }) {
   const { data: teachers } = useQuery({ queryKey: ['teachers'], queryFn: fetchTeachers });
-  const [showAll, setShowAll] = useState(false);
+  // A subject nobody has taught yet has an empty pool: every teacher is shown at once (one click fewer).
+  const [showAll, setShowAll] = useState(pool.length === 0);
   const list = (teachers ?? []).filter((t) => t.isActive !== false);
   const shown = showAll ? list : list.filter((t) => pool.includes(t.id) || value.some((v) => v.teacherId === t.id));
   return (
@@ -915,7 +916,7 @@ function PreviewFamilyForm({ session, offer, onClose }: { session: SessionDetail
   const terms = useRefundTerms(session.id);
   const shown = data?.offers.find((o) => o.id === offer.id) ?? null;
   return (
-    <Modal title="The family's form" onClose={onClose} wide>
+    <Modal title="The family's form" onClose={onClose} wide="xl">
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
           <span>What a family sees for</span> <bdi data-i18n-skip="true" className="font-medium text-foreground">{offer.subject.name}</bdi> <span>on the Reserve page, every choice open. Nothing is reserved from here.</span>

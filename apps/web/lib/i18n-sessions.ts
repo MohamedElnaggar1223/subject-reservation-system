@@ -473,6 +473,8 @@ export function translateSessionsText(text: string): string | null {
     [/^(.+) has (\d+) reservations?: (?:it stands|they stand) when it is not offered this cycle, and no new one is taken\. Tick "Its (?:reservation stands|\d+ reservations stand)" to save$/,
       (m) => `${m[1]} لها ${m[2]} ${Number(m[2]) === 1 ? 'حجز' : 'حجوزات'}: ${Number(m[2]) === 1 ? 'يبقى' : 'تبقى'} حين لا تُعرض هذه الدورة، ولا يُقبل حجز جديد. ضع علامة "${Number(m[2]) === 1 ? 'يبقى حجزها' : `تبقى ${m[2]} حجوزات لها`}" للحفظ`],
     [/^(.+) is a retake of one paper: it takes no first entry$/, (m) => `${m[1]} إعادة ورقة واحدة: لا تقبل قيدًا أول`],
+    // generateItems' label for a one-paper retake ("Paper 4 only (retake)"): the paper's name is data.
+    [/^(Paper \S+|Theory paper|\S+) only \(retake\)$/, (m) => `${m[1]} فقط (إعادة)`],
     [/^(January|June|October|November) is not a sitting of this session$/, (m) => `${MONTHS_AR[m[1]!]} ليست دورة من دورات هذه الجلسة`],
     [/^Copy from a session of the same kind \(June from June, winter from winter\)$/, () => 'انسخ من جلسة من النوع نفسه (يونيو من يونيو، والشتاء من الشتاء)'],
     [/^IGCSE sits neither October nor January: an IGCSE item is entered in a June or November series$/, () => 'لا تُعقد IGCSE في أكتوبر ولا يناير: يُقيَّد بند IGCSE في دورة يونيو أو نوفمبر'],

@@ -1,0 +1,36 @@
+{
+ "measured_on": "2026-10-11",
+ "branch": "feature/session-words",
+ "system": "session-words worktree, igcse_words_dev from igcse_template_dev migrated to main 1b6a216's journal, ports 3151/3150; the catalogue and sessions set up through the API (docs/features/SESSION_WORDS.md §7)",
+ "method": "headless Chrome (playwright-core, channel chrome), drive-measure.mjs; as step 4: an input is a field filled or a control picked, a click is a button or row pressed; sign-in and page navigation are not counted",
+ "baseline": ".audit/school-forms-evidence/step4/measure-counts.json (main 9edefbb, 8 Oct 2026)",
+ "tasks": [
+  {
+   "task": "An O.L. subject set up open with a teacher (Economics: no papers on the Catalogue, its pool empty)",
+   "target": "3 inputs and 3 clicks or fewer",
+   "baseline": { "inputs": 3, "clicks": 3, "note": "row, availability, fee, Show every teacher, the teacher, Save" },
+   "measured": { "inputs": 3, "clicks": 2 },
+   "note": "Add subject, the subject picked, the teacher ticked, the course fee typed, Add subject. Every teacher is listed at once when the subject's pool is empty (Show every teacher was a click before)"
+  },
+  {
+   "task": "A one-paper retake opened (Computer Science added, then Paper 2 only: retake in school or self study at EGP 3,000)",
+   "target": "at most 3 more inputs and no extra screen",
+   "baseline": null,
+   "measured": { "moreInputs": 2, "moreClicks": 1, "extraScreens": 0, "total": { "inputs": 5, "clicks": 3 } },
+   "note": "after Add subject the same form stays open with 'One paper only'; the paper's choice and its fee, Save. Before F6a the paper was an item card under 'What can be entered' with its own Save, and a paper the Catalogue gained later could not be opened at all"
+  },
+  {
+   "task": "A series' deadlines (Pearson Edexcel June 2027: entry deadline, exams start, the reason)",
+   "target": "no page change",
+   "baseline": { "inputs": 6, "clicks": 2, "note": "on the Board Series page under the academic-year filter, the reason under 'Why it changes'" },
+   "measured": { "inputs": 3, "clicks": 2, "pageChanges": 0 },
+   "note": "the series' line on the session's header ('Pearson Edexcel June 2027: Dates not set'), the dates dialog in place (the Board Series page's own form, its reason labelled 'Reason'), Save the dates; the header then reads 'entries by 25 Feb 2027'. The baseline counted the academic-year filter and five dates; here two dates and the reason"
+  },
+  {
+   "task": "A family reserves (point 5: the only child and the only open session preselected)",
+   "baseline": { "note": "child and session picked by hand: 2 answers" },
+   "measured": { "preselected": ["child", "session"], "answersSaved": 2 },
+   "note": "parent.hany (one child) with June 2027 open and two sessions upcoming (preregistration): the child and June 2027 preselected (before: the session showed Choose...)"
+  }
+ ]
+}

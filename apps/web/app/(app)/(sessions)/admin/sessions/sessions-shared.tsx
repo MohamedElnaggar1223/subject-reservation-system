@@ -99,7 +99,7 @@ export function Field({ label, htmlFor, hint, children }: { label: string; htmlF
 }
 
 /** A dialog over the page; Escape closes it. */
-export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
+export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean | 'xl' }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -107,7 +107,7 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label={title}>
-      <div className={cn('max-h-[90vh] w-full overflow-y-auto rounded-xl border border-border bg-card shadow-xl', wide ? 'max-w-3xl' : 'max-w-lg')}>
+      <div className={cn('max-h-[90vh] w-full overflow-y-auto rounded-xl border border-border bg-card shadow-xl', wide === 'xl' ? 'max-w-5xl' : wide ? 'max-w-3xl' : 'max-w-lg')}>
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 className="font-display text-lg font-semibold text-foreground">{title}</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
