@@ -313,7 +313,7 @@ export const sessionsArabic: Record<string, string> = {
 
   // ── F6a: the session in the school's words (docs/features/SESSION_WORDS.md; the mapping table §2) ──
   // The links sheet.
-  'What the form offers': 'ما يعرضه النموذج',
+  'Entry options': 'خيارات القيد',
   'Reservations': 'الحجوزات',
   'reservation': 'حجز',
   'reservations': 'حجوزات',

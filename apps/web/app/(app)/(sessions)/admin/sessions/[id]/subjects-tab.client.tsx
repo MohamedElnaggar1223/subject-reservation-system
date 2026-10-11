@@ -146,7 +146,7 @@ export default function SubjectsTab({ session, viewerRole }: { session: SessionD
                       <th className="w-48 px-3 py-2 text-start font-medium">Subject</th>
                       <th className="w-28 px-3 py-2 text-start font-medium">Board</th>
                       <th className="w-44 px-3 py-2 text-start font-medium">Teachers</th>
-                      <th className="px-3 py-2 text-start font-medium">What the form offers</th>
+                      <th className="px-3 py-2 text-start font-medium">Entry options</th>
                       <th className="w-36 px-3 py-2 text-end font-medium">Course fee</th>
                       <th className="w-28 px-3 py-2 text-end font-medium">Board fee</th>
                       <th className="w-20 px-3 py-2 text-end font-medium">Reservations</th>
@@ -221,7 +221,7 @@ function TeacherNames({ teachers }: { teachers: { teacherId: string; name: strin
   );
 }
 
-/** "All papers: first entry 100% · retake in school 100% · retake self study 50%", and the rest of the row's entry options. */
+/** The row's entry options as the forms phrase them: "All papers: first entry 100% · retake in school 100% · retake self study 50%", the papers, routes, units, qualifications. */
 function FormPhrases({ o, shares }: { o: OfferRow; shares: Shares }) {
   if (o.availability === 'closed') {
     return o.teachers.length ? <span className="text-muted-foreground">Not offered this cycle</span> : <Badge tone="warning">Who teaches it?</Badge>;
@@ -476,7 +476,8 @@ function SubjectForm({ session, shares, offer, addable, canEdit, onSaved, onPrev
       itemId: i.id, availability: st.availability, courseFee: st.courseFee === '' ? null : Number(st.courseFee),
     };
     if (withTeachers) out.teachers = st.teachers;
-    if (withSitting && st.seriesMonth) out.seriesMonth = st.seriesMonth;
+    // The sitting only when it was changed here (an item in a series outside the session's months keeps it).
+    if (withSitting && st.seriesMonth && st.seriesMonth !== ((i.series?.month as string | undefined) ?? '')) out.seriesMonth = st.seriesMonth;
     return out;
   };
   const body = () => ({

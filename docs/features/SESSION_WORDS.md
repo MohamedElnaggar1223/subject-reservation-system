@@ -26,7 +26,7 @@ API and the documents. §2 is the table the reviewer checks every string against
 
 | # | Point | Built |
 |---|---|---|
-| 1 | The Subjects tab is the links sheet | `subjects-tab.client.tsx` rewritten: the subjects added or copied, grouped O.L. and A.S./A.L.; per row the subject, its board, its teachers ("(ONLINE ONLY)", "(External)"), what its form offers in the forms' words, the course fee with the self-study share ("EGP 12,000 · self study 50%: EGP 6,000", the share from `pricing.selfStudyCoursePercent`), the board fee ("not published yet" when provisional, "not set yet" when missing), its reservations, and "Preview the family's form". "Who teaches it?" for a subject not offered with nobody teaching it (what a copy brings across closed); "Retake (Self Study ONLY)" and "Not offered this cycle" where set. The empty sheet offers "Copy from <last session of this kind>" first (one click) and "Add subjects" second |
+| 1 | The Subjects tab is the links sheet | `subjects-tab.client.tsx` rewritten: the subjects added or copied, grouped O.L. and A.S./A.L.; per row the subject, its board, its teachers ("(ONLINE ONLY)", "(External)"), its entry options in the forms' words, the course fee with the self-study share ("EGP 12,000 · self study 50%: EGP 6,000", the share from `pricing.selfStudyCoursePercent`), the board fee ("not published yet" when provisional, "not set yet" when missing), its reservations, and "Preview the family's form". "Who teaches it?" for a subject not offered with nobody teaching it (what a copy brings across closed); "Retake (Self Study ONLY)" and "Not offered this cycle" where set. The empty sheet offers "Copy from <last session of this kind>" first (one click) and "Add subjects" second |
 | 2 | One form per subject, in the form's order, one Save | The drawer is one form: (a) Teachers this cycle (the pool, a tick each, "online only" per teacher, "Show every teacher", an external team by name), (b) Offered as (four choices), (c) Course fee with "Self Study 50% School fees: EGP …", (d) One paper only (each paper the Catalogue gives an IGCSE subject: Not offered · Retake in school or self study · Retake self study only, with its fee; "Set this subject's papers on the Catalogue" with the link when it gives none), (e) Components (a Cambridge A level's A.S. · A.2. (carry forward on an earlier June or November) · A.L.), Units (an IAL subject's units with the board's codes: Taught by (its teachers, online) · Self study only · Not this cycle, its fee and its sitting) and Qualifications (Arabic A Level, Edexcel: each with its teacher), (f) Grade 10 core (June only), (g) Course starts, (h) Notes; Replace teacher and Remove subject as before. One request: `PUT /v1/sessions/:id/offers/:offerId/form` (§3). "Add subject" opens the same form; once added it stays open so the papers can be set (§5). The old item endpoints stay |
 | 3 | Dates where she expects them | The header's "Deadlines" line: each series a button reading "Cambridge International June 2027: entries by 20 Feb 2027 · retakes by 20 Mar 2027" or "…: Dates not set", opening the Board Series page's own dates form (`DatesForm`, now exported) in a dialog; its reason is labelled "Reason" (on the Board Series page too); it writes through `PUT /v1/board-series/:id`. Admin and coordinator (the entry deadline stays the admin's, as on that page); finance reads the line |
 | 4 | Preview as the family's form | "Preview the family's form" per row (and in the form's footer) renders the Reserve page's own rows (`OfferRows`, exported from `components/reservations/reserve.tsx`, with a `preview` flag the family's page never passes) from `GET /v1/registrations/offers/preview?sessionId=` (§4): the subject with its teacher choice, the entry choices with their prices, the sitting it follows, the price; the refund policy sentence and the declaration; read-only, in the viewer's language |
@@ -50,7 +50,7 @@ plan carries, which has no item kind; they keep it (deferred, §11).
 | Screen phrase (EN) | Arabic | Model |
 |---|---|---|
 | O.L. / A.S. / A.L. (the groups) | O.L. / A.S. / A.L. | `subject.qualification_level` `igcse` / `as_level`, `a_level` |
-| Subject · Board · Teachers · What the form offers · Course fee · Board fee · Reservations | المادة · المجلس · المعلمون · ما يعرضه النموذج · رسوم التدريس · رسوم المجلس · الحجوزات | the offer's subject; `exam_board.name`; `session_offer_teacher`; its items; `session_offer.course_fee`; the item's `board_fee` rows; live lines |
+| Subject · Board · Teachers · Entry options · Course fee · Board fee · Reservations | المادة · المجلس · المعلمون · خيارات القيد · رسوم التدريس · رسوم المجلس · الحجوزات | the offer's subject; `exam_board.name`; `session_offer_teacher`; its items; `session_offer.course_fee`; the item's `board_fee` rows; live lines |
 | (ONLINE ONLY) after a teacher | (أونلاين فقط) | `session_offer_teacher.mode = 'online'` |
 | (External) after a teacher | (خارجي) | `teacher.kind = 'provider'` |
 | All papers: first entry 100% · retake in school 100% · retake self study 50% | كل الأوراق: قيد أول 100% · إعادة في المدرسة 100% · إعادة دراسة ذاتية 50% | the whole item (`kind = 'whole'`) under an offer `availability = 'open'`; the percents are `pricing.retakeTaughtCoursePercent` and `pricing.selfStudyCoursePercent` |
@@ -299,9 +299,17 @@ family's form previewed from the row instead of built.
 
 ## 9. Gates
 
-API check-types, web check-types, the suite in local time and with `TZ=UTC` on `igcse_words_test`
-(the summaries in `.audit/session-words-evidence/suite-*.log`); the commit each ran on is in the
-progress log and the trail. CI on the pushed branch: see the progress log.
+| Gate | Commit | Result | Evidence |
+|---|---|---|---|
+| API check-types (source and tests) | 0252b82, and again on the push | green | session log |
+| web check-types | 0252b82, and again on the push | green | session log |
+| API suite, local time (Africa/Cairo) | 0252b82 | 35 files, 735 passed, 1 todo | `.audit/session-words-evidence/suite-local-0252b82.log` |
+| API suite, `TZ=UTC` | 0252b82 | 35 files, 735 passed, 1 todo | `suite-utc-0252b82.log` |
+| `useQuery<` generics in apps/web/app | — | 19 (ceiling 35) | — |
+
+The commit after 0252b82 changes only the web (a unit's sitting sent only when changed; the sheet's
+column "Entry options"), the Arabic dictionary, this document and the evidence: the API and its suite
+are 0252b82's. CI on the pushed branch: the progress log.
 
 ## 10. Decisions and why
 
@@ -366,4 +374,9 @@ progress log and the trail. CI on the pushed branch: see the progress log.
 - 13:16Z — first commit 4659d59 (API, 08u, the web's first version).
 - 13:33Z — measured; after shots EN and AR as admin, coordinator, parent, finance officer.
 - 13:35Z — nine controls red, all back green.
-- Next: the document, RESERVATIONS.md §2.12, the gates on the final commit, push, CI.
+- 13:40Z — commit 0252b82 (the dates in place, the preview's entry list, point 5, the document, evidence).
+- 13:44Z / 13:50Z — the suite green in local time and with TZ=UTC on 0252b82 (735 passed each).
+- 13:52Z — a unit's sitting sent only when changed (an item in a series outside the session's months
+  keeps it; the winter form saved unchanged says "Nothing to change."); the sheet's column renamed
+  "Entry options" (no "offers" on the screen); the sheet re-shot in EN and AR.
+- Next: commit, push feature/session-words, CI.
