@@ -285,7 +285,11 @@ function SeriesRow({ s, open, onToggle, isAdmin }: { s: BoardSeriesRow; open: bo
   );
 }
 
-function DatesForm({ s, isAdmin, onDone }: { s: BoardSeriesRow; isAdmin: boolean; onDone: () => void }) {
+/**
+ * A series' dates (the entry deadline, the retake date, the board's other dates, notes). Also opened in
+ * place from a session's header (F6a: "Dates where she expects them"), through the same endpoint.
+ */
+export function DatesForm({ s, isAdmin, onDone }: { s: BoardSeriesRow; isAdmin: boolean; onDone: () => void }) {
   const queryClient = useQueryClient();
   const [dates, setDates] = useState<Record<BoardSeriesDateField, string>>(
     () => Object.fromEntries(BOARD_SERIES_DATE_FIELDS.map((f) => [f, (s[f] as string | null) ?? ''])) as Record<BoardSeriesDateField, string>,
@@ -339,7 +343,7 @@ function DatesForm({ s, isAdmin, onDone }: { s: BoardSeriesRow; isAdmin: boolean
             </div>
             {(deadlineChanged || retakeChanged) && (
               <div className="min-w-72 flex-1">
-                <Label htmlFor={`reason-${s.id}`} className="mb-1 text-xs text-muted-foreground">Why it changes</Label>
+                <Label htmlFor={`reason-${s.id}`} className="mb-1 text-xs text-muted-foreground">Reason</Label>
                 <Input id={`reason-${s.id}`} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Pearson key dates 2026/27 published" maxLength={500} />
               </div>
             )}

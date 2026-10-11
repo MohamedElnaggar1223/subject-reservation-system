@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, policySentence, type PolicyScope, type RegistryPolicyKey } from '@repo/validations';
+import { apiResponse, itemDisplayLabel, policySentence, type PolicyScope, type RegistryPolicyKey } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Notice } from '~/components/ui/tone';
 import { Field, INPUT_CLASS, Money, fetchSessions, SESSIONS_KEY } from '~/app/(app)/(sessions)/admin/sessions/sessions-shared';
@@ -271,7 +271,7 @@ export function GrantForm({ data, viewerRole, prefill = {} }: { data: PoliciesDa
               <Field label={data.scopeLabels.item} htmlFor="exc-scope-item">
                 <select id="exc-scope-item" value={scope.offerItemId ?? ''} disabled={!offer} onChange={(e) => setScopeField('offerItemId', e.target.value)} className={INPUT_CLASS}>
                   <option value="">Any</option>
-                  {(offer?.items ?? []).map((i) => <option key={i.id} value={i.id}>{i.label}</option>)}
+                  {(offer?.items ?? []).map((i) => <option key={i.id} value={i.id}>{itemDisplayLabel(i)}</option>)}
                 </select>
               </Field>
             )}

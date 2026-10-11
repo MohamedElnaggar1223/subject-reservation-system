@@ -17,12 +17,13 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
-import { apiResponse, refundPolicySentence, ROLES, type RefundPolicy } from '@repo/validations';
+import { apiResponse, refundPolicySentence, seriesAcademicYearStart, ROLES, type RefundPolicy } from '@repo/validations';
 import { Button } from '~/components/ui/button';
 import { Badge, Notice } from '~/components/ui/tone';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { ReasonModal } from '~/components/ui/reason-modal';
-import { InstantText, SeriesName } from '~/app/(app)/exams/exams-shared';
+import { InstantText, SeriesName, fetchBoardSeries, SERIES_KEY } from '~/app/(app)/exams/exams-shared';
+import { DatesForm } from '~/app/(app)/exams/series/series.client';
 import {
   fetchSession, sessionKey, SESSIONS_KEY, StatusBadge, Day, Modal, Field, INPUT_CLASS, ErrorLine, errorText, toLocalInput, type SessionDetail,
 } from '../sessions-shared';
@@ -70,7 +71,7 @@ export default function SessionClient({ id, viewerRole }: { id: string; viewerRo
     <div className="mx-auto max-w-7xl px-6 py-8">
       <Link href="/admin/sessions" className="text-sm text-muted-foreground hover:text-foreground">← <span>Sessions</span></Link>
       <Header s={s} viewerRole={viewerRole} />
-      <Deadlines s={s} />
+      <Deadlines s={s} viewerRole={viewerRole} />
       <div className="mt-6 flex flex-wrap gap-1 border-b border-border" role="tablist" aria-label="Session">
         {tabs.map((t) => (
           <button key={t} type="button" role="tab" aria-selected={current === t} onClick={() => choose(t)}
@@ -200,24 +201,63 @@ function EditHeader({ s, onClose }: { s: SessionDetail; onClose: () => void }) {
   );
 }
 
-/** "Deadlines:" — every series the session's subjects are entered in, with its dates. */
-function Deadlines({ s }: { s: SessionDetail }) {
+/**
+ * "Deadlines:" — every series the session's subjects are entered in, each a line in the school's
+ * words ("Cambridge International June 2027: entries by 20 Feb 2027 · retakes by …", or "Dates not
+ * set"). For the admin and the coordinator each line is a button opening the Board Series page's
+ * dates form in place (F6a): the board's deadlines are set from the session, no page change.
+ */
+function Deadlines({ s, viewerRole }: { s: SessionDetail; viewerRole: string }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const canSet = viewerRole === ROLES.ADMIN || viewerRole === ROLES.COORDINATOR;
   if (!s.series.length) {
-    return <p className="mt-3 text-sm text-muted-foreground">{"No series yet: a subject's series is attached when it is added."}</p>;
+    return <p className="mt-3 text-sm text-muted-foreground">{"No sittings yet: a subject's sitting is added with the subject."}</p>;
   }
+  const chosen = s.series.find((b) => b.id === open) ?? null;
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
       <span className="font-medium text-foreground">Deadlines</span>
-      {s.series.map((b) => (
-        <span key={b.id} className="inline-flex flex-wrap items-center gap-1.5">
-          <SeriesName boardName={b.boardName} month={b.month} year={b.year} label={b.label} />
-          {b.entryDeadline
-            ? <Badge tone={b.entryDeadlinePassed ? 'danger' : 'success'}><InstantText iso={b.entryDeadline} time={false} />{b.entryDeadlinePassed && <>&nbsp;<span>passed</span></>}</Badge>
-            : b.examsStart ? <Badge tone="neutral"><span>exams</span>&nbsp;<Day iso={b.examsStart} /></Badge> : <Badge tone="warning">Dates not set</Badge>}
-          {b.retakeDeadline && <Badge tone="info"><span>retakes</span>&nbsp;<InstantText iso={b.retakeDeadline} time={false} /></Badge>}
-        </span>
-      ))}
+      {s.series.map((b) => {
+        const line = (
+          <span>
+            <SeriesName boardName={b.boardName} month={b.month} year={b.year} label={b.label} /><span>:</span>{' '}
+            {b.entryDeadline
+              ? <span className={b.entryDeadlinePassed ? 'text-destructive' : 'text-foreground'}><span>entries by</span> <InstantText iso={b.entryDeadline} time={false} />{b.entryDeadlinePassed && <> (<span>passed</span>)</>}</span>
+              : b.examsStart ? <span><span>exams</span> <Day iso={b.examsStart} /></span> : <span className="font-medium text-amber-700 dark:text-amber-400">Dates not set</span>}
+            {b.retakeDeadline && <> · <span><span>retakes by</span> <InstantText iso={b.retakeDeadline} time={false} /></span></>}
+          </span>
+        );
+        return canSet ? (
+          <button key={b.id} type="button" onClick={() => setOpen(b.id)}
+            className="rounded-lg border border-border bg-card px-2.5 py-1 text-start hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+            {line}
+          </button>
+        ) : <span key={b.id} className="rounded-lg border border-border px-2.5 py-1">{line}</span>;
+      })}
+      {chosen && <SeriesDates s={s} seriesId={chosen.id} isAdmin={viewerRole === ROLES.ADMIN} onClose={() => setOpen(null)} />}
     </div>
+  );
+}
+
+/** The Board Series page's dates form, in a dialog over the session (its own endpoint, its required reason). */
+function SeriesDates({ s, seriesId, isAdmin, onClose }: { s: SessionDetail; seriesId: string; isAdmin: boolean; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const ay = seriesAcademicYearStart(s.sessionType, s.seriesYear);
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: [...SERIES_KEY, ay], queryFn: () => fetchBoardSeries(ay) });
+  const row = (data ?? []).find((b) => b.id === seriesId) ?? null;
+  const done = () => {
+    queryClient.invalidateQueries({ queryKey: SESSIONS_KEY });
+    onClose();
+  };
+  return (
+    <Modal title="The board's dates" onClose={onClose} wide>
+      {isLoading ? <LoadingState /> : isError ? <ErrorState onRetry={() => refetch()} /> : !row ? <Notice tone="neutral">This sitting was not found.</Notice> : (
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-foreground"><SeriesName boardName={row.boardName} month={row.month} year={row.year} label={row.label} /></p>
+          <DatesForm s={row} isAdmin={isAdmin} onDone={done} />
+        </div>
+      )}
+    </Modal>
   );
 }
 

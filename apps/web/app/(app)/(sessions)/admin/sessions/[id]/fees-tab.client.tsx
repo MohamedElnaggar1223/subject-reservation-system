@@ -24,7 +24,7 @@ import {
 
 export default function FeesTab({ session, viewerRole }: { session: SessionDetail; viewerRole: string }): React.JSX.Element {
   const canEdit = viewerRole === ROLES.ADMIN || viewerRole === ROLES.FINANCE_ADMIN;
-  if (!session.series.length) return <EmptyState title="No series yet" message="A series appears here when a subject's item is entered in it." />;
+  if (!session.series.length) return <EmptyState title="No sittings yet" message="A sitting appears here once a subject on the sheet is entered in it." />;
   return (
     <div className="space-y-6">
       {!canEdit && <Notice tone="neutral">Finance and the admin set the board fees; you can read them here.</Notice>}

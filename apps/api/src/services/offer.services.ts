@@ -23,7 +23,7 @@ import { randomUUID } from 'crypto';
 import {
   IGCSE_NEVER_MONTHS, IGCSE_NEVER_MESSAGE, SERIES_MONTH_LABELS, sessionSeriesMonths,
   type CreateOfferType, type UpdateOfferType, type OfferItemInputType, type UpdateOfferItemType, type ReplaceOfferTeacherType,
-  type OfferTeacherInputType, type FeeKeyInputType, type Availability, type SeriesMonth,
+  type OfferTeacherInputType, type FeeKeyInputType, type Availability, type SeriesMonth, type OfferFormType,
 } from '@repo/validations';
 import { logAction, logActions, type AuditContext } from './audit.services';
 import { entriesFollowMoveInTx } from './exam-entry.services';
@@ -31,6 +31,7 @@ import { boardSeriesName, seriesRuleSentence, openCheckoutsSpanningDeadlines } f
 import { effectiveDeadlineFor, effectiveDeadlinesOf, deadlinePassedSentence, redateLines } from './deadline.services';
 import { itemBoardFees } from './pricing.services';
 import { schoolDate } from './window.services';
+import { getSetting } from './settings.services';
 import { lockStudents, assertStudentsLocked, withStudentsFirst } from '../lib/student-locks';
 import { lockFeeGrids } from '../lib/fee-grid-lock';
 import { lockMoveFeeRows, repriceMovedLines, tellPriceChanged, type RepricedLine } from './line-moves.services';
@@ -480,29 +481,37 @@ export async function updateOffer(sessionId: string, offerId: string, data: Upda
   return db.transaction(async (tx) => {
     await sessionForChange(tx, sessionId);
     const { offer, subjectRow } = await offerForChange(tx, sessionId, offerId);
-    const current = await tx.select().from(sessionOfferTeacher).where(eq(sessionOfferTeacher.offerId, offerId));
-    let teachers = current.map((t) => ({ teacherId: t.teacherId, mode: t.mode as 'in_school' | 'online' }));
-    if (data.teachers) {
-      teachers = await resolveTeachers(tx, offer.subjectId, data.teachers, actorId);
-      await tx.delete(sessionOfferTeacher).where(eq(sessionOfferTeacher.offerId, offerId));
-      if (teachers.length) {
-        await tx.insert(sessionOfferTeacher).values(teachers.map((t, i) => ({ id: randomUUID(), offerId, teacherId: t.teacherId, mode: t.mode, sortOrder: i })));
-      }
-    }
-    const availability = data.availability ?? offer.availability;
-    assertTeachersFor(availability, teachers.length, subjectRow.name);
-    // Checked when the change sets the fee or opens the offer (an offer converted with 0 keeps its other edits).
-    if (data.courseFee !== undefined || data.availability !== undefined) {
-      assertCourseFeeFor(availability, data.courseFee ?? offer.courseFee, subjectRow.name, data.zeroFeeReason,
-        offer.availability === 'self_study_only' && !(Number(offer.courseFee) > 0));
-    }
-    const { reason, teachers: _t, zeroFeeReason, ...fields } = data;
-    const [updated] = await tx.update(sessionOffer).set({ ...fields, updatedAt: new Date() }).where(eq(sessionOffer.id, offerId)).returning();
-    await logAction(actorId, 'SESSION_OFFER_UPDATED', 'session_offer', offerId,
-      { availability: offer.availability, courseFee: offer.courseFee, grade10Core: offer.grade10Core, teachers: current.map((t) => t.teacherId) },
-      { ...fields, teachers: teachers.map((t) => t.teacherId), reason: reason ?? null, ...(zeroFeeReason ? { zeroFeeReason } : {}) }, ctx, tx);
-    return updated!;
+    return changeOfferInTx(tx, offer, subjectRow, data, actorId, ctx);
   });
+}
+
+/** updateOffer's change of an offer the caller holds FOR UPDATE (the offer endpoint and the form). */
+async function changeOfferInTx(
+  tx: Tx, offer: typeof sessionOffer.$inferSelect, subjectRow: typeof subject.$inferSelect, data: UpdateOfferType, actorId: string, ctx?: AuditContext,
+) {
+  const offerId = offer.id;
+  const current = await tx.select().from(sessionOfferTeacher).where(eq(sessionOfferTeacher.offerId, offerId));
+  let teachers = current.map((t) => ({ teacherId: t.teacherId, mode: t.mode as 'in_school' | 'online' }));
+  if (data.teachers) {
+    teachers = await resolveTeachers(tx, offer.subjectId, data.teachers, actorId);
+    await tx.delete(sessionOfferTeacher).where(eq(sessionOfferTeacher.offerId, offerId));
+    if (teachers.length) {
+      await tx.insert(sessionOfferTeacher).values(teachers.map((t, i) => ({ id: randomUUID(), offerId, teacherId: t.teacherId, mode: t.mode, sortOrder: i })));
+    }
+  }
+  const availability = data.availability ?? offer.availability;
+  assertTeachersFor(availability, teachers.length, subjectRow.name);
+  // Checked when the change sets the fee or opens the offer (an offer converted with 0 keeps its other edits).
+  if (data.courseFee !== undefined || data.availability !== undefined) {
+    assertCourseFeeFor(availability, data.courseFee ?? offer.courseFee, subjectRow.name, data.zeroFeeReason,
+      offer.availability === 'self_study_only' && !(Number(offer.courseFee) > 0));
+  }
+  const { reason, teachers: _t, zeroFeeReason, ...fields } = data;
+  const [updated] = await tx.update(sessionOffer).set({ ...fields, updatedAt: new Date() }).where(eq(sessionOffer.id, offerId)).returning();
+  await logAction(actorId, 'SESSION_OFFER_UPDATED', 'session_offer', offerId,
+    { availability: offer.availability, courseFee: offer.courseFee, grade10Core: offer.grade10Core, teachers: current.map((t) => t.teacherId) },
+    { ...fields, teachers: teachers.map((t) => t.teacherId), reason: reason ?? null, ...(zeroFeeReason ? { zeroFeeReason } : {}) }, ctx, tx);
+  return updated!;
 }
 
 /** Remove a subject the session has no line for (any status); one with lines is closed instead. */
@@ -528,14 +537,22 @@ export async function createItem(sessionId: string, offerId: string, data: Offer
     return await db.transaction(async (tx) => {
       const session = await sessionForChange(tx, sessionId);
       const { offer, subjectRow } = await offerForChange(tx, sessionId, offerId);
-      const id = await insertItem(tx, session, offer, subjectRow, toDraft(data), actorId);
-      await logAction(actorId, 'OFFER_ITEM_CREATED', 'offer_item', id, null, { offerId, ...data }, ctx, tx);
-      return { id };
+      return { id: await createItemInTx(tx, session, offer, subjectRow, toDraft(data), { offerId, ...data }, actorId, ctx) };
     });
   } catch (err) {
     if (err instanceof OfferError) throw err;
     rethrow(err);
   }
+}
+
+/** createItem's making of an item under an offer the caller holds FOR UPDATE, with its audit row. */
+async function createItemInTx(
+  tx: Tx, session: SessionRow, offer: { id: string; subjectId: string }, subjectRow: typeof subject.$inferSelect, draft: ItemDraft,
+  audit: Record<string, unknown>, actorId: string, ctx?: AuditContext,
+) {
+  const id = await insertItem(tx, session, offer, subjectRow, draft, actorId);
+  await logAction(actorId, 'OFFER_ITEM_CREATED', 'offer_item', id, null, audit, ctx, tx);
+  return id;
 }
 
 async function itemForChange(tx: Tx, offerId: string, itemId: string) {
@@ -563,17 +580,12 @@ export async function updateItem(sessionId: string, offerId: string, itemId: str
       const session = await sessionForChange(tx, sessionId);
       const { offer, subjectRow } = await offerForChange(tx, sessionId, offerId);
       const item = await itemForChange(tx, offerId, itemId);
-      const { reason, teachers, feeKeys, boardSeriesId, ...fields } = data;
+      const { boardSeriesId } = data;
       const { lines: moved, repriced } = boardSeriesId && boardSeriesId !== item.boardSeriesId
-        ? await changeItemSeries(tx, session, subjectRow, item, boardSeriesId, actorId, reason ?? null, locked, ctx)
+        ? await changeItemSeries(tx, session, subjectRow, item, boardSeriesId, actorId, data.reason ?? null, locked, ctx)
         : { lines: [], repriced: [] as RepricedLine[] };
-      if (teachers !== undefined) await writeItemTeachers(tx, itemId, teachers?.length ? await resolveTeachers(tx, offer.subjectId, teachers, actorId) : []);
-      if (feeKeys) await writeFeeKeys(tx, itemId, feeKeys);
-      const [updated] = await tx.update(sessionOfferItem).set({ ...fields, updatedAt: new Date() }).where(eq(sessionOfferItem.id, itemId)).returning();
-      await logAction(actorId, 'OFFER_ITEM_UPDATED', 'offer_item', itemId,
-        { label: item.label, availability: item.availability, courseFee: item.courseFee, boardSeriesId: item.boardSeriesId, exclusiveGroup: item.exclusiveGroup, requiredInSeries: item.requiredInSeries },
-        { ...fields, ...(boardSeriesId ? { boardSeriesId } : {}), ...(feeKeys ? { feeKeys } : {}), ...(teachers !== undefined ? { teachers } : {}), linesMoved: moved.length, reason: reason ?? null }, ctx, tx);
-      return { item: { ...updated!, linesMoved: moved.length, linesRepriced: repriced.length }, repriced };
+      const updated = await changeItemInTx(tx, offer, item, data, moved.length, actorId, ctx);
+      return { item: { ...updated, linesMoved: moved.length, linesRepriced: repriced.length }, repriced };
     }));
     await tellPriceChanged(out.repriced, 'The subject is now entered in another exam series, with its own board fee');
     return out.item;
@@ -583,24 +595,67 @@ export async function updateItem(sessionId: string, offerId: string, itemId: str
   }
 }
 
+/**
+ * updateItem's change of an item the caller holds FOR UPDATE, after any series move (the item
+ * endpoint and the form): its own teachers, fee keys and fields, with its audit row.
+ */
+async function changeItemInTx(
+  tx: Tx, offer: { subjectId: string }, item: typeof sessionOfferItem.$inferSelect, data: UpdateOfferItemType, linesMoved: number,
+  actorId: string, ctx?: AuditContext,
+) {
+  const itemId = item.id;
+  const { reason, teachers, feeKeys, boardSeriesId, ...fields } = data;
+  if (teachers !== undefined) await writeItemTeachers(tx, itemId, teachers?.length ? await resolveTeachers(tx, offer.subjectId, teachers, actorId) : []);
+  if (feeKeys) await writeFeeKeys(tx, itemId, feeKeys);
+  const [updated] = await tx.update(sessionOfferItem).set({ ...fields, updatedAt: new Date() }).where(eq(sessionOfferItem.id, itemId)).returning();
+  await logAction(actorId, 'OFFER_ITEM_UPDATED', 'offer_item', itemId,
+    { label: item.label, availability: item.availability, courseFee: item.courseFee, boardSeriesId: item.boardSeriesId, exclusiveGroup: item.exclusiveGroup, requiredInSeries: item.requiredInSeries },
+    { ...fields, ...(boardSeriesId ? { boardSeriesId } : {}), ...(feeKeys ? { feeKeys } : {}), ...(teachers !== undefined ? { teachers } : {}), linesMoved, reason: reason ?? null }, ctx, tx);
+  return updated!;
+}
+
 /** Move an item to another series of its board, with its live lines (in the caller's transaction). */
 async function changeItemSeries(
   tx: Tx, session: SessionRow, subjectRow: typeof subject.$inferSelect, item: typeof sessionOfferItem.$inferSelect,
   targetId: string, actorId: string | null, reason: string | null, locked: Set<string>, ctx?: AuditContext,
 ) {
-  const level = await levelOf(tx, subjectRow.qualificationLevel, {
-    kind: item.entersKind, qualificationId: item.qualificationId, optionId: item.qualificationOptionId,
-    unitIds: (await tx.select({ id: sessionOfferItemUnit.unitId }).from(sessionOfferItemUnit).where(eq(sessionOfferItemUnit.itemId, item.id))).map((u) => u.id),
-  });
-  const ids = [targetId, ...(item.boardSeriesId ? [item.boardSeriesId] : [])].sort();
+  return changeItemsSeries(tx, session, subjectRow, [{ item, targetId }], actorId, reason, locked, ctx);
+}
+
+type ItemMove = { item: typeof sessionOfferItem.$inferSelect; targetId: string };
+
+/**
+ * Move items of one subject to other series of its board, with their live lines, in the caller's
+ * transaction — every move of one save at once (F6a's form; the item endpoint passes one), so the
+ * order of RESERVATIONS.md §2.1 holds across them: the caller has taken the students, the session,
+ * the offer and the items; then the series rows (FOR SHARE, id order), the fee grids of the target
+ * series (shared) and the fee rows the items will read there (FOR SHARE, carried provisional where
+ * finance has none) once for all moves, then every moving line in one statement (FOR UPDATE, id
+ * order), then their entries (F4). Each item and each moved line keeps its own audit row.
+ */
+async function changeItemsSeries(
+  tx: Tx, session: SessionRow, subjectRow: typeof subject.$inferSelect, moves: ItemMove[],
+  actorId: string | null, reason: string | null, locked: Set<string>, ctx?: AuditContext,
+) {
+  if (!moves.length) return { lines: [] as (typeof registration.$inferSelect)[], repriced: [] as RepricedLine[] };
+  const levels = new Map<string, string>();
+  for (const m of moves) {
+    levels.set(m.item.id, await levelOf(tx, subjectRow.qualificationLevel, {
+      kind: m.item.entersKind, qualificationId: m.item.qualificationId, optionId: m.item.qualificationOptionId,
+      unitIds: (await tx.select({ id: sessionOfferItemUnit.unitId }).from(sessionOfferItemUnit).where(eq(sessionOfferItemUnit.itemId, m.item.id))).map((u) => u.id),
+    }));
+  }
+  const ids = [...new Set(moves.flatMap((m) => [m.targetId, ...(m.item.boardSeriesId ? [m.item.boardSeriesId] : [])]))].sort();
   await tx.select({ id: boardSeries.id }).from(boardSeries).where(inArray(boardSeries.id, ids)).orderBy(boardSeries.id).for('share');
-  const target = await assertItemSeriesFits(tx, session, subjectRow, level, targetId);
-  // The fee rows the item will read there (carried provisional from the series it is in where
-  // finance has none), FOR SHARE before its lines — Confirm's order, so a Confirm of one either
+  const targets = new Map<string, typeof boardSeries.$inferSelect>();
+  for (const m of moves) targets.set(m.item.id, await assertItemSeriesFits(tx, session, subjectRow, levels.get(m.item.id)!, m.targetId));
+  // The fee rows the items will read there (carried provisional from the series they are in where
+  // finance has none), FOR SHARE before their lines — Confirm's order, so a Confirm of one either
   // lands first or waits for this move and then reaches the moved lines (the review of 40c1447).
-  await lockMoveFeeRows(tx, [{ itemId: item.id, fromSeriesId: item.boardSeriesId, toSeriesId: targetId }], actorId, 'Its item moved to another series');
+  await lockMoveFeeRows(tx, moves.map((m) => ({ itemId: m.item.id, fromSeriesId: m.item.boardSeriesId, toSeriesId: m.targetId })), actorId, 'Its item moved to another series');
+  const moveOf = new Map(moves.map((m) => [m.item.id, m]));
   const lines = await tx.select().from(registration)
-    .where(and(eq(registration.offerItemId, item.id), inArray(registration.status, [...LIVE])))
+    .where(and(inArray(registration.offerItemId, moves.map((m) => m.item.id)), inArray(registration.status, [...LIVE])))
     .orderBy(registration.id).for('update');
   // A line committed while this change waited for the item: its student was not locked first.
   assertStudentsLocked(locked, lines.map((l) => l.studentId));
@@ -609,22 +664,25 @@ async function changeItemSeries(
   // The entries already made stand: a line past its own deadline does not move.
   const current = await effectiveDeadlinesOf(tx, lines.map((l) => l.id));
   for (const l of lines) {
+    const m = moveOf.get(l.offerItemId)!;
     const d = current.get(l.id)!;
     if (d.at && d.at <= now) {
-      throw new OfferError(`${item.label} has lines past their deadline in the series it is entered in (${schoolDate(d.at)}): its entries stand`, 409);
+      throw new OfferError(`${m.item.label} has lines past their deadline in the series it is entered in (${schoolDate(d.at)}): its entries stand`, 409);
     }
-    const there = await effectiveDeadlineFor(tx, { boardSeriesId: targetId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId, declarationRejected: l.declarationRejected });
+    const there = await effectiveDeadlineFor(tx, { boardSeriesId: m.targetId, attempt: l.attempt, priorSittingSeriesId: l.priorSittingSeriesId, declarationRejected: l.declarationRejected });
     if (there.at && there.at <= now) {
-      throw new OfferError(`${boardSeriesName(names, target)} is past a line's deadline: ${deadlinePassedSentence(there, schoolDate)}`, 409);
+      throw new OfferError(`${boardSeriesName(names, targets.get(m.item.id)!)} is past a line's deadline: ${deadlinePassedSentence(there, schoolDate)}`, 409);
     }
   }
   // F4's entries of the lines (after the lines, §2.1): a sent one refuses the change, the drafts are
   // withdrawn with it and made again in the target series (the review of 426d565, item 2).
   const sent = await entriesFollowMoveInTx(tx, lines.map((l) => l.id), "the line's item moved to another series", actorId, ctx);
   if (sent) throw new OfferError(sent, 409);
-  await attachSeries(tx, session.id, targetId, actorId);
-  await tx.update(sessionOfferItem).set({ boardSeriesId: targetId, updatedAt: now }).where(eq(sessionOfferItem.id, item.id));
-  for (const l of lines) await tx.update(registration).set({ boardSeriesId: targetId, updatedAt: now }).where(eq(registration.id, l.id));
+  for (const m of moves) {
+    await attachSeries(tx, session.id, m.targetId, actorId);
+    await tx.update(sessionOfferItem).set({ boardSeriesId: m.targetId, updatedAt: now }).where(eq(sessionOfferItem.id, m.item.id));
+  }
+  for (const l of lines) await tx.update(registration).set({ boardSeriesId: moveOf.get(l.offerItemId)!.targetId, updatedAt: now }).where(eq(registration.id, l.id));
   // Each student's lines checked again where they now are (§6): the same entry once in the target
   // series (any entry key, an unmapped row's too), its required items, the carry-forward period.
   await moveRules(() => recheckLines(tx, lines.map((l) => l.id)));
@@ -634,11 +692,13 @@ async function changeItemSeries(
   if (spanning > 0) {
     throw new OfferError(`${spanning} checkout${spanning === 1 ? '' : 's'} still open would pay for two deadlines after this move — confirm or cancel ${spanning === 1 ? 'it' : 'them'} first`, 409);
   }
-  await logAction(actorId, 'OFFER_ITEM_SERIES_CHANGED', 'offer_item', item.id, { boardSeriesId: item.boardSeriesId },
-    { boardSeriesId: targetId, linesMoved: lines.length, reason }, undefined, tx);
+  for (const m of moves) {
+    await logAction(actorId, 'OFFER_ITEM_SERIES_CHANGED', 'offer_item', m.item.id, { boardSeriesId: m.item.boardSeriesId },
+      { boardSeriesId: m.targetId, linesMoved: lines.filter((l) => l.offerItemId === m.item.id).length, reason }, undefined, tx);
+  }
   await logActions(lines.map((l) => ({
     userId: actorId, action: 'LINE_SERIES_MOVED' as const, entityType: 'registration' as const, entityId: l.id,
-    previousData: { boardSeriesId: l.boardSeriesId }, newData: { boardSeriesId: targetId, offerItemId: item.id, reason },
+    previousData: { boardSeriesId: l.boardSeriesId }, newData: { boardSeriesId: moveOf.get(l.offerItemId)!.targetId, offerItemId: l.offerItemId, reason },
   })), tx);
   await redateLines(tx, lines.map((l) => l.id), actorId, 'its item moved to another series');
   await detachUnusedSeries(tx, session.id);
@@ -655,6 +715,21 @@ async function moveRules<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+/** How many of these lines (counted per status) are live: not rejected, expired or dropped. */
+function liveOf(counts: { status: string; n: number }[]) {
+  return counts.filter((c) => !(DONE as readonly string[]).includes(c.status)).reduce((a, c) => a + c.n, 0);
+}
+
+/** The live lines of each item (deleteItem's count; the form's "Its N reservations stand"). */
+async function liveLinesByItem(tx: Tx, itemIds: string[]) {
+  const out = new Map<string, number>();
+  if (!itemIds.length) return out;
+  const rows = await tx.select({ itemId: registration.offerItemId, status: registration.status, n: sql<number>`count(*)::int` }).from(registration)
+    .where(inArray(registration.offerItemId, itemIds)).groupBy(registration.offerItemId, registration.status);
+  for (const id of itemIds) out.set(id, liveOf(rows.filter((r) => r.itemId === id)));
+  return out;
+}
+
 /**
  * Untick an item: refused while it has live lines; with only history it is closed (kept for the
  * history); with none it is removed.
@@ -666,7 +741,7 @@ export async function deleteItem(sessionId: string, offerId: string, itemId: str
     const item = await itemForChange(tx, offerId, itemId);
     const counts = await tx.select({ status: registration.status, n: sql<number>`count(*)::int` }).from(registration)
       .where(eq(registration.offerItemId, itemId)).groupBy(registration.status);
-    const live = counts.filter((c) => !(DONE as readonly string[]).includes(c.status)).reduce((a, c) => a + c.n, 0);
+    const live = liveOf(counts);
     if (live) throw new OfferError(`${item.label} has ${live} live line${live === 1 ? '' : 's'}: move or drop ${live === 1 ? 'it' : 'them'} first`, 409);
     if (counts.length) {
       await tx.update(sessionOfferItem).set({ availability: 'closed', updatedAt: new Date() }).where(eq(sessionOfferItem.id, itemId));
@@ -678,6 +753,173 @@ export async function deleteItem(sessionId: string, offerId: string, itemId: str
     await logAction(actorId, 'OFFER_ITEM_DELETED', 'offer_item', itemId, { offerId, label: item.label, boardSeriesId: item.boardSeriesId }, null, ctx, tx);
     return { deleted: itemId };
   });
+}
+
+// ─── One subject's form (F6a, docs/features/SESSION_WORDS.md) ───────────────
+
+/** A set of teachers as the form names it, each with its mode, in order: equal when every id and mode match. */
+function sameTeachers(a: { teacherId: string; mode: string }[], b: { teacherId: string; mode: string }[]) {
+  return a.length === b.length && a.every((t, i) => t.teacherId === b[i]!.teacherId && t.mode === b[i]!.mode);
+}
+
+/**
+ * The teachers a form names, read without writing: an external team named for the first time has
+ * no id yet (null: a change). Duplicates collapse as resolveTeachers collapses them.
+ */
+async function readTeachers(tx: Tx, inputs: OfferTeacherInputType[]): Promise<{ teacherId: string; mode: string }[] | null> {
+  const out: { teacherId: string; mode: string }[] = [];
+  for (const t of inputs) {
+    let id: string | undefined;
+    if ('teacherId' in t) id = t.teacherId;
+    else {
+      const [p] = await tx.select({ id: teacher.id }).from(teacher).where(and(eq(teacher.kind, 'provider'), sql`lower(${teacher.name}) = lower(${t.providerName})`));
+      if (!p) return null;
+      id = p.id;
+    }
+    if (!out.some((o) => o.teacherId === id)) out.push({ teacherId: id, mode: t.mode });
+  }
+  return out;
+}
+
+/** "Its N reservations stand": the refusal of a close that would stop a subject, paper or unit with reservations. */
+export function linesStandRefusal(name: string, live: number) {
+  return `${name} has ${live} reservation${live === 1 ? '' : 's'}: ${live === 1 ? 'it stands' : 'they stand'} when it is not offered this cycle, and no new one is taken. Tick "Its ${live === 1 ? 'reservation stands' : `${live} reservations stand`}" to save`;
+}
+
+/**
+ * Save one subject's form (F6a; PUT /sessions/:id/offers/:offerId/form): the teachers, how it is
+ * offered, the course fee, its papers, routes, units and qualifications (each offered or not, its
+ * fee, its teachers, its sitting), the grade-10 core, the course start and the notes — in one
+ * transaction, through the offer and item services' own logic (changeOfferInTx is updateOffer's,
+ * changeItemInTx updateItem's, changeItemsSeries the series move's, createItemInTx createItem's, the
+ * live count deleteItem's), refusing what they refuse, in RESERVATIONS.md §2.1's order:
+ *
+ *   1. the students of the lines a sitting change moves (FOR NO KEY UPDATE, id order), first;
+ *   2. the session FOR SHARE; 3. the offer FOR UPDATE; 4. the subject's items FOR UPDATE, id order;
+ *   5. a sitting change: the series rows FOR SHARE, the target fee grids shared and fee rows
+ *      FOR SHARE, then the moving lines FOR UPDATE (changeItemsSeries).
+ *
+ * Only what differs is written, each change with its audit row in this transaction; a form that
+ * changes nothing writes nothing (no audit row). Closing a subject, paper or unit that has
+ * reservations is refused unless `linesStand` says they stand.
+ */
+export async function saveOfferForm(sessionId: string, offerId: string, form: OfferFormType, actorId: string, ctx?: AuditContext) {
+  const ids = form.items.map((i) => i.itemId).filter((x): x is string => !!x);
+  if (new Set(ids).size !== ids.length) throw new OfferError('A paper or unit is named twice in the form');
+  try {
+    const out = await withStudentsFirst((extra) => db.transaction(async (tx) => {
+      // 1. The students of the lines a sitting change would move, read before the locks and checked
+      //    again under them (changeItemsSeries refuses a student it finds unlocked: run again).
+      const [pre] = await tx.select({ sessionType: registrationSession.sessionType, seriesYear: registrationSession.seriesYear })
+        .from(registrationSession).where(eq(registrationSession.id, sessionId));
+      const sitting = (month: SeriesMonth) => (pre ? sessionSeriesMonths(pre.sessionType, pre.seriesYear).find((m) => m.month === month) ?? null : null);
+      const preItems = ids.length
+        ? await tx.select({ id: sessionOfferItem.id, month: boardSeries.month, year: boardSeries.year }).from(sessionOfferItem)
+            .leftJoin(boardSeries, eq(boardSeries.id, sessionOfferItem.boardSeriesId))
+            .where(and(eq(sessionOfferItem.offerId, offerId), inArray(sessionOfferItem.id, ids)))
+        : [];
+      const mayMove = form.items.filter((f) => {
+        if (!f.itemId || !f.seriesMonth) return false;
+        const it = preItems.find((x) => x.id === f.itemId);
+        const want = sitting(f.seriesMonth);
+        return !!it && !!want && !(it.month === want.month && it.year === want.year);
+      }).map((f) => f.itemId!);
+      const students = mayMove.length
+        ? await tx.selectDistinct({ id: registration.studentId }).from(registration)
+            .where(and(inArray(registration.offerItemId, mayMove), inArray(registration.status, [...LIVE])))
+        : [];
+      const locked = await lockStudents(tx, [...students.map((x) => x.id), ...extra]);
+      // 2–4. The session, the offer, its items.
+      const session = await sessionForChange(tx, sessionId);
+      const { offer, subjectRow } = await offerForChange(tx, sessionId, offerId);
+      const items = await tx.select().from(sessionOfferItem).where(eq(sessionOfferItem.offerId, offerId)).orderBy(sessionOfferItem.id).for('update');
+      const byId = new Map(items.map((i) => [i.id, i]));
+      for (const id of ids) if (!byId.has(id)) throw new OfferError('That paper or unit is not under this subject', 404);
+      const live = await liveLinesByItem(tx, items.map((i) => i.id));
+      const done = { offer: false, itemsChanged: 0, itemsCreated: 0, linesMoved: 0 };
+
+      // (a)–(c), (f)–(h): the subject's own answers, only those that differ (updateOffer's logic).
+      const change: UpdateOfferType = {};
+      const currentTeachers = await tx.select().from(sessionOfferTeacher).where(eq(sessionOfferTeacher.offerId, offerId)).orderBy(sessionOfferTeacher.sortOrder);
+      const named = await readTeachers(tx, form.teachers);
+      if (!named || !sameTeachers(named, currentTeachers)) change.teachers = form.teachers;
+      if (form.availability !== offer.availability) change.availability = form.availability;
+      if (form.courseFee !== Number(offer.courseFee)) change.courseFee = form.courseFee;
+      if (form.grade10Core !== offer.grade10Core) change.grade10Core = form.grade10Core;
+      if ((form.courseStartsOn ?? null) !== (offer.courseStartsOn ?? null)) change.courseStartsOn = form.courseStartsOn;
+      const notes = form.notes?.trim() || null;
+      if (notes !== (offer.notes ?? null)) change.notes = notes;
+      if (Object.keys(change).length) {
+        // "Not offered this cycle" while it has reservations: said, not silent.
+        const reserved = [...live.values()].reduce((a, n) => a + n, 0);
+        if (change.availability === 'closed' && reserved > 0 && !form.linesStand) throw new OfferError(linesStandRefusal(subjectRow.name, reserved), 409);
+        if (form.zeroFeeReason) change.zeroFeeReason = form.zeroFeeReason;
+        if (form.reason) change.reason = form.reason;
+        await changeOfferInTx(tx, offer, subjectRow, change, actorId, ctx);
+        done.offer = true;
+      }
+
+      // (d), (e): each paper, route, unit or qualification the form shows.
+      const moves: ItemMove[] = [];
+      const itemChanges: { item: typeof sessionOfferItem.$inferSelect; data: UpdateOfferItemType }[] = [];
+      for (const f of form.items.filter((x) => x.itemId)) {
+        const item = byId.get(f.itemId!)!;
+        const data: UpdateOfferItemType = {};
+        if (f.availability !== item.availability) data.availability = f.availability;
+        if ((f.courseFee ?? null) !== (item.courseFee === null ? null : Number(item.courseFee))) data.courseFee = f.courseFee;
+        if (f.teachers !== undefined) {
+          const own = await tx.select().from(sessionOfferItemTeacher).where(eq(sessionOfferItemTeacher.itemId, item.id)).orderBy(sessionOfferItemTeacher.sortOrder);
+          const want = await readTeachers(tx, f.teachers ?? []);
+          if (!want || !sameTeachers(want, own)) data.teachers = f.teachers?.length ? f.teachers : null;
+        }
+        if (data.availability === 'closed' && (live.get(item.id) ?? 0) > 0 && !form.linesStand) {
+          throw new OfferError(linesStandRefusal(`${subjectRow.name} — ${item.label}`, live.get(item.id)!), 409);
+        }
+        if (f.seriesMonth) {
+          // The session as locked (a series correction may have committed since the read above).
+          const want = sessionSeriesMonths(session.sessionType, session.seriesYear).find((m) => m.month === f.seriesMonth) ?? null;
+          if (!want) throw new OfferError(`${SERIES_MONTH_LABELS[f.seriesMonth]} is not a sitting of this session`);
+          const [now] = item.boardSeriesId ? await tx.select().from(boardSeries).where(eq(boardSeries.id, item.boardSeriesId)) : [];
+          if (!now || now.month !== want.month || now.year !== want.year) {
+            const target = await findOrCreateSeries(tx, subjectRow.council, want.month, want.year, '', actorId);
+            moves.push({ item, targetId: target.id });
+            data.boardSeriesId = target.id;
+          }
+        }
+        if (Object.keys(data).length) itemChanges.push({ item, data: form.reason ? { ...data, reason: form.reason } : data });
+      }
+      // A sitting change moves the items with their reservations, every move at once (§2.1).
+      const { lines: moved, repriced } = await changeItemsSeries(tx, session, subjectRow, moves, actorId, form.reason ?? null, locked, ctx);
+      done.linesMoved = moved.length;
+      for (const c of itemChanges) {
+        await changeItemInTx(tx, offer, c.item, c.data, moved.filter((l) => l.offerItemId === c.item.id).length, actorId, ctx);
+        done.itemsChanged++;
+      }
+
+      // (d) A paper the catalogue gives the subject that is not on the sheet yet: made when offered (createItem's logic).
+      const papers = form.items.filter((x) => x.paperUnitId);
+      if (papers.length) {
+        const drafts = (await generateItems(tx, subjectRow.id)).filter((d) => d.kind === 'one_paper' && d.enters.kind === 'units');
+        const units = await tx.select().from(sessionOfferItemUnit).where(inArray(sessionOfferItemUnit.itemId, items.map((i) => i.id).concat('__none__')));
+        for (const f of papers) {
+          const draft = drafts.find((d) => d.enters.kind === 'units' && d.enters.unitIds.length === 1 && d.enters.unitIds[0] === f.paperUnitId);
+          if (!draft) throw new OfferError("That paper is not one of this subject's papers on the Catalogue", 404);
+          // Already on the sheet (the same form sent twice): nothing to make.
+          const has = items.find((i) => i.kind === 'one_paper' && units.filter((u) => u.itemId === i.id).map((u) => u.unitId).join() === f.paperUnitId);
+          if (has || f.availability === 'closed') continue;
+          await createItemInTx(tx, session, offer, subjectRow, { ...draft, availability: f.availability, courseFee: f.courseFee },
+            { offerId, label: draft.label, kind: draft.kind, enters: draft.enters, availability: f.availability, courseFee: f.courseFee, via: 'form' }, actorId, ctx);
+          done.itemsCreated++;
+        }
+      }
+      return { done, repriced };
+    }));
+    await tellPriceChanged(out.repriced, 'The subject is now entered in another exam series, with its own board fee');
+    return { ...out.done, changed: out.done.offer || out.done.itemsChanged > 0 || out.done.itemsCreated > 0 };
+  } catch (err) {
+    if (err instanceof OfferError) throw err;
+    rethrow(err);
+  }
 }
 
 // ─── Replace a teacher (§4.2) ────────────────────────────────────────────────
@@ -1061,7 +1303,12 @@ export async function findItemsByCode(
   return parts;
 }
 
-/** The Subjects tab (§4.2): every offer with its board, teachers, items, their series, fees and lines. */
+/**
+ * The Subjects tab (§4.2): every offer with its board, teachers, items, their series, fees and lines.
+ * For the links sheet's form (F6a): each item's qualification (code, title, level), each IGCSE
+ * subject's papers on the Catalogue that are not on the sheet yet (`papersToAdd`, what withOnePaper
+ * would give), and the shares the fees read (`shares`: the settings' percentages).
+ */
 export async function listOffers(sessionId: string) {
   const [session] = await db.select().from(registrationSession).where(eq(registrationSession.id, sessionId));
   if (!session) throw new OfferError('Session not found', 404);
@@ -1079,10 +1326,15 @@ export async function listOffers(sessionId: string) {
       ])
     : [[], []];
   const itemIds = items.map((i) => i.id);
+  const qualificationIds = [...new Set(items.map((i) => i.qualificationId).filter((x): x is string => !!x))];
+  const quals = qualificationIds.length
+    ? await db.select({ id: qualification.id, code: qualification.code, title: qualification.title, level: qualification.level }).from(qualification).where(inArray(qualification.id, qualificationIds))
+    : [];
   const [itemTeachers, itemUnits, seriesRows, lineCounts, fees] = itemIds.length
     ? await Promise.all([
         db.select({ itemId: sessionOfferItemTeacher.itemId, teacherId: teacher.id, name: teacher.name, kind: teacher.kind, mode: sessionOfferItemTeacher.mode })
-          .from(sessionOfferItemTeacher).innerJoin(teacher, eq(teacher.id, sessionOfferItemTeacher.teacherId)).where(inArray(sessionOfferItemTeacher.itemId, itemIds)),
+          .from(sessionOfferItemTeacher).innerJoin(teacher, eq(teacher.id, sessionOfferItemTeacher.teacherId)).where(inArray(sessionOfferItemTeacher.itemId, itemIds))
+          .orderBy(sessionOfferItemTeacher.sortOrder),
         db.select({ itemId: sessionOfferItemUnit.itemId, unitId: examUnit.id, code: examUnit.code, shortCode: examUnit.shortCode, level: examUnit.unitLevel })
           .from(sessionOfferItemUnit).innerJoin(examUnit, eq(examUnit.id, sessionOfferItemUnit.unitId)).where(inArray(sessionOfferItemUnit.itemId, itemIds)),
         db.select().from(boardSeries).where(inArray(boardSeries.id, [...new Set(items.map((i) => i.boardSeriesId).filter((x): x is string => !!x)), '__none__'])),
@@ -1104,6 +1356,20 @@ export async function listOffers(sessionId: string) {
       reservable: !!(s.entryDeadline || s.examsStart),
     };
   };
+  // The papers the Catalogue gives an IGCSE subject (withOnePaper's) that are not on the sheet yet.
+  const papersToAdd = new Map<string, { unitId: string; label: string; code: string; shortCode: string | null }[]>();
+  for (const { offer, subject: s } of offers.filter((o) => o.subject.qualificationLevel === 'igcse')) {
+    const drafts = (await generateItems(db, s.id)).filter((d) => d.kind === 'one_paper' && d.enters.kind === 'units' && d.enters.unitIds.length === 1);
+    const onSheet = new Set(itemUnits.filter((u) => items.some((i) => i.id === u.itemId && i.offerId === offer.id && i.kind === 'one_paper')).map((u) => u.unitId));
+    const missing = drafts.filter((d) => d.enters.kind === 'units' && !onSheet.has(d.enters.unitIds[0]!));
+    if (!missing.length) continue;
+    const units = await db.select({ id: examUnit.id, code: examUnit.code, shortCode: examUnit.shortCode }).from(examUnit)
+      .where(inArray(examUnit.id, missing.map((d) => (d.enters as { unitIds: string[] }).unitIds[0]!)));
+    papersToAdd.set(offer.id, missing.map((d) => {
+      const u = units.find((x) => x.id === (d.enters as { unitIds: string[] }).unitIds[0])!;
+      return { unitId: u.id, label: d.label, code: u.code, shortCode: u.shortCode };
+    }));
+  }
   const rows = offers.map(({ offer, subject: s }) => {
     const its = items.filter((i) => i.offerId === offer.id).map((i) => {
       const f = fees.get(i.id);
@@ -1111,6 +1377,7 @@ export async function listOffers(sessionId: string) {
       const live = counts.filter((c) => !(DONE as readonly string[]).includes(c.status)).reduce((a, c) => a + c.n, 0);
       return {
         ...i,
+        qualification: quals.find((q) => q.id === i.qualificationId) ?? null,
         series: seriesView(i.boardSeriesId),
         teachers: itemTeachers.filter((t) => t.itemId === i.id),
         units: itemUnits.filter((u) => u.itemId === i.id),
@@ -1132,15 +1399,20 @@ export async function listOffers(sessionId: string) {
       },
       teachers: offerTeachers,
       items: its,
+      papersToAdd: papersToAdd.get(offer.id) ?? [],
       lines: its.reduce((a, i) => a + i.lines.live, 0),
       warnings,
     };
   });
+  const [selfStudyCoursePercent, retakeTaughtCoursePercent, onePaperCoursePercent] = await Promise.all([
+    getSetting('pricing.selfStudyCoursePercent'), getSetting('pricing.retakeTaughtCoursePercent'), getSetting('pricing.onePaperCoursePercent'),
+  ]);
   // The deadlines line under the header: every attached series with its dates (§4.2).
   const links = await db.select({ series: boardSeries }).from(sessionBoardSeries).innerJoin(boardSeries, eq(boardSeries.id, sessionBoardSeries.boardSeriesId))
     .where(eq(sessionBoardSeries.sessionId, sessionId));
   return {
     session,
+    shares: { selfStudyCoursePercent, retakeTaughtCoursePercent, onePaperCoursePercent },
     offers: rows,
     series: links.map((l) => ({ ...seriesView(l.series.id) ?? { id: l.series.id, name: boardSeriesName(names, l.series), boardCode: l.series.boardCode, month: l.series.month, year: l.series.year, label: l.series.label, entryDeadline: l.series.entryDeadline, retakeDeadline: l.series.retakeDeadline, examsStart: l.series.examsStart, entryDeadlinePassed: !!l.series.entryDeadline && l.series.entryDeadline <= now, reservable: !!(l.series.entryDeadline || l.series.examsStart) } }))
       .sort((a, b) => (a.entryDeadline?.getTime() ?? Infinity) - (b.entryDeadline?.getTime() ?? Infinity) || a.name.localeCompare(b.name)),
