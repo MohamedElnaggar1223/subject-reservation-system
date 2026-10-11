@@ -309,7 +309,7 @@ family's form previewed from the row instead of built.
 
 The commit after 0252b82 changes only the web (a unit's sitting sent only when changed; the sheet's
 column "Entry options"), the Arabic dictionary, this document and the evidence: the API and its suite
-are 0252b82's. CI on the pushed branch: the progress log.
+are 0252b82's. CI on the pushed branch: run 38144972830 green on 9646092 (the progress log).
 
 ## 10. Decisions and why
 
@@ -379,4 +379,7 @@ are 0252b82's. CI on the pushed branch: the progress log.
 - 13:52Z — a unit's sitting sent only when changed (an item in a series outside the session's months
   keeps it; the winter form saved unchanged says "Nothing to change."); the sheet's column renamed
   "Entry options" (no "offers" on the screen); the sheet re-shot in EN and AR.
-- Next: commit, push feature/session-words, CI.
+- 13:53Z — commit 9646092 pushed (feature/session-words: 4659d59, 0252b82, 9646092 on main 1b6a216).
+- 14:06Z — CI run 38144972830 green on 9646092 (gate 0, both type-checks, the suite: 35 files).
+- Next: the lead's review and the reviewer (Opus 5.5); the owner's acceptance test (the preview beside
+  the Google Form of the same subject).
