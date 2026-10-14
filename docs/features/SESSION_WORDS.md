@@ -452,4 +452,5 @@ are 0252b82's. CI on the pushed branch: run 38144972830 green on 9646092 (the pr
   copy dialog, "Subject · papers", in EN and AR); the dates measured like for like (5 inputs, 2 clicks, no
   page change); findings 2 and 8 in §8, §10, §11, §12 and measure-counts.json.
 - 21:09Z / 21:14Z — the suite green in local time and with TZ=UTC on 717475e (737 passed each).
-- Next: push, CI; the reviewer confirms the fix diff.
+- 21:15Z — 190db19 pushed; 21:28Z CI run 38638884585 green on it.
+- Next: the reviewer confirms the fix diff (b9f3090..190db19); the lead merges.
