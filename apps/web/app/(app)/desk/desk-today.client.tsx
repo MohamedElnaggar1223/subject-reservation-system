@@ -69,7 +69,15 @@ export default function DeskToday(): React.JSX.Element | null {
   const dueTodayCount = perSession.reduce((a, p) => a + p.dueToday.n, 0) + chargesToday.length;
   const overdueAmount = round2(perSession.reduce((a, p) => a + p.overdue.amount, 0) + chargesOverdue.reduce((a, c) => a + c.outstanding, 0));
   const overdueCount = perSession.reduce((a, p) => a + p.overdue.n, 0) + chargesOverdue.length;
-  const loading = takings.isLoading || sessions.isLoading || charges.isLoading || money.some((m) => m.isLoading);
+  // What falls due next after today, so a quiet day still says what is coming.
+  const ahead = [
+    ...owing.flatMap((_, i) => (money[i]?.data?.lines ?? []).filter((l) => l.unpaid).map((l) => ({ due: l.dueAt, amount: l.outstanding }))),
+    ...chargeRows.map((c) => ({ due: c.dueAt, amount: c.outstanding })),
+  ].filter((x) => x.due && schoolDateString(new Date(x.due)) > today);
+  const nextDay = ahead.map((x) => schoolDateString(new Date(x.due!))).sort()[0] ?? null;
+  const nextAmount = nextDay ? round2(ahead.filter((x) => schoolDateString(new Date(x.due!)) === nextDay).reduce((a, x) => a + x.amount, 0)) : 0;
+  const moneyTab = perSession.length === 1 ? `/admin/sessions/${perSession[0]!.s.id}#money` : '/charges';
+  const loading =takings.isLoading || sessions.isLoading || charges.isLoading || money.some((m) => m.isLoading);
 
   return (
     <section className="mb-6 rounded-xl border border-border bg-card p-4 shadow-sm" aria-label="Today at the desk">
@@ -85,12 +93,17 @@ export default function DeskToday(): React.JSX.Element | null {
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <Tile href="/takings" label="Collected today" amount={collected}
           detail={<><span>{payments}</span> <span>{payments === 1 ? 'payment' : 'payments'}</span></>} cta="Daily takings" />
-        <Tile href={perSession.length === 1 ? `/admin/sessions/${perSession[0]!.s.id}#money` : '/charges'} label="Due today" amount={dueTodayAmount}
-          detail={<><span>{dueTodayCount}</span> <span>{dueTodayCount === 1 ? 'item due today' : 'items due today'}</span></>}
+        <Tile href={moneyTab} label="Due today" amount={dueTodayAmount}
+          detail={
+            <>
+              <span>{dueTodayCount}</span> <span>{dueTodayCount === 1 ? 'item due today' : 'items due today'}</span>
+              {nextDay && <span className="block"><span>Next due</span> <DateText date={nextDay} /><span>:</span> <Money amount={nextAmount} /></span>}
+            </>
+          }
           cta={perSession.length === 1 ? 'Open the Money tab' : 'Charges'} tone={dueTodayCount ? 'warning' : 'neutral'} />
-        <Tile href={perSession.length === 1 ? `/admin/sessions/${perSession[0]!.s.id}#money` : '/charges'} label="Overdue" amount={overdueAmount}
+        <Tile href={moneyTab} label="Overdue" amount={overdueAmount}
           detail={<><span>{overdueCount}</span> <span>{overdueCount === 1 ? 'item past its due date' : 'items past their due date'}</span></>}
-          cta={perSession.length === 1 ? 'Remind them' : 'Charges'} tone={overdueCount ? 'danger' : 'neutral'} />
+          cta={perSession.length === 1 ? (overdueCount ? 'Remind them' : 'Open the Money tab') : 'Charges'} tone={overdueCount ? 'danger' : 'neutral'} />
       </div>
       {perSession.length > 1 && (
         <ul className="mt-3 space-y-1 text-sm">

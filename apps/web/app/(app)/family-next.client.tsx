@@ -17,7 +17,7 @@
  */
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { api } from '~/lib/hono';
 import { apiResponse, gradeLabel } from '@repo/validations';
 import { Button } from '~/components/ui/button';
@@ -29,6 +29,8 @@ import { Day, Money } from '~/app/(app)/(sessions)/admin/sessions/sessions-share
 const fetchHome = () => apiResponse(api.v1.users.me['home-summary'].$get());
 const fetchActive = () => apiResponse(api.v1.sessions.active.$get());
 const fetchUpcoming = () => apiResponse(api.v1.sessions.upcoming.$get());
+const fetchEligibility = (studentId: string, sessionId: string) =>
+  apiResponse(api.v1.registrations.eligibility.$get({ query: { studentId, sessionId } }));
 
 type Row = { key: string; tone: Tone; body: React.ReactNode; action?: { label: string; href: string } };
 
@@ -49,6 +51,22 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
   const upcoming = useQuery({ queryKey: ['sessions', 'upcoming'], queryFn: fetchUpcoming, enabled: isParent });
   const q = isParent ? {} : { studentId: viewerId };
   const statement = useQuery({ queryKey: statementKey(q), queryFn: () => fetchStatement(q) });
+
+  // What can be reserved now: the open sessions, and for a parent the ones about to open (preregistration).
+  const reservable = [
+    ...(active.data ?? []).map((s) => ({ id: s.id, name: s.name, opens: null as string | null, closes: String(s.endDate) })),
+    ...(isParent ? (upcoming.data ?? []) : []).map((s) => ({ id: s.id, name: s.name, opens: String(s.startDate), closes: String(s.endDate) })),
+  ];
+  // Whether each child may reserve in each of them (grade, leaving, graduation): the Reserve page's own check.
+  const pairs = (home.data?.children ?? []).flatMap((c) => reservable.map((s) => ({ studentId: c.student.id, sessionId: s.id })));
+  const verdicts = useQueries({
+    queries: pairs.map((p) => ({
+      queryKey: ['registrations', 'eligibility', p.studentId, p.sessionId],
+      queryFn: () => fetchEligibility(p.studentId, p.sessionId),
+    })),
+  });
+  const verdictOf = (studentId: string, sessionId: string) =>
+    verdicts[pairs.findIndex((p) => p.studentId === studentId && p.sessionId === sessionId)]?.data ?? null;
 
   if (home.isLoading || statement.isLoading || active.isLoading) {
     return (
@@ -74,12 +92,6 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
     );
   }
 
-  // What can be reserved now: the open sessions, and for a parent the ones about to open (preregistration).
-  const reservable = [
-    ...(active.data ?? []).map((s) => ({ id: s.id, name: s.name, opens: null as string | null, closes: String(s.endDate) })),
-    ...(isParent ? (upcoming.data ?? []) : []).map((s) => ({ id: s.id, name: s.name, opens: String(s.startDate), closes: String(s.endDate) })),
-  ];
-
   const perChild = children.map((c) => {
     const st = statement.data?.students.find((x) => x.student.id === c.student.id);
     const rows: Row[] = [];
@@ -96,10 +108,19 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
         : { key: `fee-${who}`, tone: 'warning', body: <span>The school fee is not paid yet: ask your parent.</span> });
     }
 
-    // 2. Reserve, in each session open now (or opening soon, for a parent) with nothing reserved in it yet.
+    // 2. Reserve, in each session open now (or opening soon, for a parent) with nothing reserved in it
+    //    yet — where the child may reserve in it; where not, the school's reason, once.
     for (const s of reservable) {
       const mine = st?.sessions.find((x) => x.id === s.id)?.lines.filter((l) => LIVE.includes(l.status)) ?? [];
       if (mine.length > 0 || !mayReserve) continue;
+      const verdict = verdictOf(who, s.id);
+      if (verdict && !verdict.allowed) {
+        rows.push({
+          key: `cannot-${who}-${s.id}`, tone: 'neutral',
+          body: <span><bdi>{s.name}</bdi><span>:</span> <span>{verdict.reason ?? 'Not open to this student.'}</span></span>,
+        });
+        continue;
+      }
       rows.push({
         key: `reserve-${who}-${s.id}`, tone: 'info',
         body: s.opens
@@ -124,27 +145,39 @@ export default function FamilyNext({ viewerRole, viewerId, mayReserve }: { viewe
     }
 
     // 4. Pay, session by session, with the due date: the reminder in front of them.
+    //    A line on a board fee not published yet is reserved, not payable (unless the school's
+    //    setting says so): it is named apart, so the amount shown is the amount "Pay now" takes.
     for (const sess of st?.sessions ?? []) {
       const owed = sess.lines.filter((l) => l.outstanding > 0);
       if (!owed.length) continue;
-      const amount = Math.round(owed.reduce((a, l) => a + l.outstanding, 0) * 100) / 100;
-      const due = owed.map((l) => l.dueAt).filter((d): d is NonNullable<typeof d> => !!d).map(String).sort()[0] ?? null;
-      const overdue = owed.some((l) => l.overdueDays > 0);
-      const payable = owed.map((l) => l.id).filter((id) => c.owingRegistrationIds.includes(id));
-      const provisionalOnly = payable.length === 0 && owed.every((l) => l.provisional);
+      const sum = (ls: typeof owed) => Math.round(ls.reduce((a, l) => a + l.outstanding, 0) * 100) / 100;
+      const payable = owed.filter((l) => c.owingRegistrationIds.includes(l.id));
+      const waitingFee = owed.filter((l) => !c.owingRegistrationIds.includes(l.id) && l.provisional);
+      const now = owed.filter((l) => !waitingFee.includes(l));
+      const due = now.map((l) => l.dueAt).filter((d): d is NonNullable<typeof d> => !!d).map(String).sort()[0] ?? null;
+      const overdue = now.some((l) => l.overdueDays > 0);
       rows.push({
-        key: `pay-${who}-${sess.id}`, tone: overdue ? 'danger' : 'warning',
-        body: (
+        key: `pay-${who}-${sess.id}`, tone: overdue ? 'danger' : now.length ? 'warning' : 'info',
+        body: now.length ? (
           <span>
-            <bdi>{sess.name}</bdi><span>:</span> <Money amount={amount} /> <span>to pay</span>
+            <bdi>{sess.name}</bdi><span>:</span> <Money amount={sum(now)} /> <span>to pay</span>
             {due && (overdue
               ? <> — <span className="font-medium text-red-700 dark:text-red-400"><span>overdue since</span> <Day iso={due} /></span></>
               : <> — <span><span>due by</span> <Day iso={due} /></span></>)}
-            {provisionalOnly && <span className="block text-xs text-muted-foreground">Payable once the board publishes its fee.</span>}
+            {waitingFee.length > 0 && (
+              <span className="block text-xs text-muted-foreground">
+                <span>Plus</span> <Money amount={sum(waitingFee)} /> <span>once the board publishes its fee.</span>
+              </span>
+            )}
+          </span>
+        ) : (
+          <span>
+            <bdi>{sess.name}</bdi><span>:</span> <Money amount={sum(waitingFee)} /> <span>to pay</span>
+            <span className="block text-xs text-muted-foreground">Payable once the board publishes its fee.</span>
           </span>
         ),
         action: isParent && payable.length > 0
-          ? { label: 'Pay now', href: `/checkout?ids=${payable.join(',')}` }
+          ? { label: 'Pay now', href: `/checkout?ids=${payable.map((l) => l.id).join(',')}` }
           : { label: isParent ? 'See the statement' : 'Ask your parent: see the statement', href: '/statement' },
       });
     }
