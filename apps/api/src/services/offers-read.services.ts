@@ -7,6 +7,15 @@
  * sittings of what it enters, whether the student already holds a live line on it, and the price
  * of each allowed (attempt, mode), provisional or not. Plus the board's sittings of the last two
  * years for a declared retake. Step B's Reserve pages read it; nothing here writes.
+ *
+ * Staff's preview of the family's form (F6a, `GET /v1/registrations/offers/preview`, admin and
+ * coordinator) is the same read with no student: no eligibility, no earlier sittings, no held line,
+ * the deadlines of the series alone, and each price without any family's exception (a first entry
+ * in school, a retake in school, a retake in self-study at the settings' shares). Nothing in it is a
+ * student's.
+ *
+ * A one-paper item ("One paper ONLY" on the forms) is always a retake: it offers no first entry
+ * (the lead's decision of 11 Oct 2026; assertLineRules refuses one too).
  */
 
 import { db, sql } from '@repo/db';
@@ -19,7 +28,23 @@ import { examSittingsOf, examKeysOf } from './reservation.services';
 
 const MONTH_ORDER: Record<string, number> = { january: 1, june: 6, october: 10, november: 11 };
 
+/** What a student can reserve in a session (the family's and the desk's read). */
 export async function offersForStudent(studentId: string, sessionId: string) {
+  const read = await readOffers(sessionId, studentId);
+  if (!read) return null;
+  const { preview: _p, ...rest } = read;
+  return { ...rest, eligibility: read.eligibility! };
+}
+
+/** What a family sees in a session, with no student (staff's preview; F6a). */
+export async function offersPreview(sessionId: string) {
+  const read = await readOffers(sessionId, null);
+  if (!read) return null;
+  const { eligibility: _e, ...rest } = read;
+  return rest;
+}
+
+async function readOffers(sessionId: string, studentId: string | null) {
   const [session] = await db.execute(sql`
     select id, name, session_type as "sessionType", series_year as "seriesYear", status, start_date as "startDate", end_date as "endDate",
       payment_due_at as "paymentDueAt", refund_policy as "refundPolicy", course_starts_on as "courseStartsOn"
@@ -28,7 +53,7 @@ export async function offersForStudent(studentId: string, sessionId: string) {
       paymentDueAt: Date; refundPolicy: unknown; courseStartsOn: string;
     }[]);
   if (!session) return null;
-  const eligibility = await mayRegisterFor(studentId, sessionId);
+  const eligibility = studentId ? await mayRegisterFor(studentId, sessionId) : null;
   const offers = await db.execute(sql`
     select o.id, o.availability, o.grade10_core as "grade10Core", o.course_fee as "courseFee", o.notes,
       s.id as "subjectId", s.name as "subjectName", s.code as "subjectCode", s.council as "boardCode", b.name as "boardName",
@@ -59,8 +84,8 @@ export async function offersForStudent(studentId: string, sessionId: string) {
     select null, it.item_id, t.id, t.name, t.kind, it.mode, it.sort_order from session_offer_item_teacher it join teacher t on t.id = it.teacher_id
     join session_offer_item i on i.id = it.item_id
     where i.offer_id in (${sql.join(offerIds.map((id) => sql`${id}`), sql`, `)}) and t.is_active`).then((r) => r.rows as { offerId: string | null; itemId: string | null; id: string; name: string; kind: string; mode: string; sortOrder: number }[]) : [];
-  // The student's lines, every session: what they hold here and what they sat before.
-  const history = await db.execute(sql`
+  // The student's lines, every session: what they hold here and what they sat before (none in a preview).
+  const history = !studentId ? [] : await db.execute(sql`
     select r.id, r.session_id as "sessionId", r.offer_item_id as "itemId", r.status, r.board_series_id as "seriesId", r.subject_id as "subjectId",
       i.enters_kind as "entersKind", i.qualification_id as "qualificationId", rs.name as "sessionName",
       coalesce((select array_agg(u.unit_id) from session_offer_item_unit u where u.item_id = i.id), '{}') as units,
@@ -76,7 +101,7 @@ export async function offersForStudent(studentId: string, sessionId: string) {
       ? (x.qualificationId ? [`q:${x.qualificationId}`] : [`s:${x.subjectId}`])
       : x.entersKind === 'units' ? x.units.map((u) => `u:${u}`) : [`s:${x.subjectId}`];
   // F4's results and sent entries of this student (step B's known sittings, RESERVATIONS_LINES.md §3.1).
-  const exams = await examSittingsOf(studentId);
+  const exams = studentId ? await examSittingsOf(studentId) : [];
   const now = new Date();
   const outOffers = [];
   for (const o of offers) {
@@ -109,16 +134,20 @@ export async function offersForStudent(studentId: string, sessionId: string) {
         .sort((a, b) => (b.year * 12 + (MONTH_ORDER[b.month] ?? 0)) - (a.year * 12 + (MONTH_ORDER[a.month] ?? 0)));
       const held = history.find((h) => h.itemId === i.id && h.sessionId === sessionId && !['rejected', 'expired', 'dropped'].includes(h.status));
       const combos: { attempt: 'first' | 'retake'; mode: 'in_school' | 'self_study' }[] = [];
+      // A one-paper item is a retake only (the forms' "One paper ONLY").
+      const firstEntries = !c.retakeOnly && i.kind !== 'one_paper';
       if (!c.closed) {
-        if (!c.retakeOnly && !c.selfStudyOnly) combos.push({ attempt: 'first', mode: 'in_school' });
-        if (!c.retakeOnly && c.selfStudyOnly) combos.push({ attempt: 'first', mode: 'self_study' });
+        if (firstEntries && !c.selfStudyOnly) combos.push({ attempt: 'first', mode: 'in_school' });
+        if (firstEntries && c.selfStudyOnly) combos.push({ attempt: 'first', mode: 'self_study' });
         if (!c.selfStudyOnly) combos.push({ attempt: 'retake', mode: 'in_school' });
         combos.push({ attempt: 'retake', mode: 'self_study' });
       }
       // Open per attempt (the review of 977848d): a first entry until the entry deadline (or the
       // exams' start with none); a retake of the board's previous sitting until the retake deadline
       // where the board gives one. A retake of an older sitting is a first entry's date.
-      const firstDeadline = seriesId ? await effectiveDeadlineFor(db, { boardSeriesId: seriesId, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false, studentId }) : { at: null, kind: null };
+      const firstDeadline = seriesId
+        ? await effectiveDeadlineFor(db, { boardSeriesId: seriesId, attempt: 'first', priorSittingSeriesId: null, declarationRejected: false, ...(studentId ? { studentId } : {}) })
+        : { at: null, kind: null };
       // The later of the retake deadline and a first entry's (a late board entry, Q-20, can be later).
       const retakeDeadline = i.retakeDeadline ? new Date(i.retakeDeadline as string) : null;
       const retakeUntil = retakeDeadline && (!firstDeadline.at || retakeDeadline > firstDeadline.at) ? retakeDeadline : firstDeadline.at;
@@ -126,7 +155,10 @@ export async function offersForStudent(studentId: string, sessionId: string) {
       const prices = [];
       for (const k of combos) {
         try {
-          const p = await priceLine(db, { item: { id: i.id as string }, attempt: k.attempt, mode: k.mode, studentId, sessionId });
+          // A preview prices for no family: no exception applies (exceptionIds: none).
+          const p = studentId
+            ? await priceLine(db, { item: { id: i.id as string }, attempt: k.attempt, mode: k.mode, studentId, sessionId })
+            : await priceLine(db, { item: { id: i.id as string }, attempt: k.attempt, mode: k.mode, studentId: '', sessionId }, { exceptionIds: [] });
           prices.push({ ...k, open: openFor[k.attempt], total: p.total, courseFee: p.courseFee, registrationFee: p.registrationFee, provisional: p.provisional, noFee: false });
         } catch {
           prices.push({ ...k, open: openFor[k.attempt], total: null, courseFee: null, registrationFee: null, provisional: false, noFee: true });
@@ -164,7 +196,8 @@ export async function offersForStudent(studentId: string, sessionId: string) {
     });
   }
   // The boards' sittings of the last two years, for a declared retake (step B creates a series
-  // row with no dates when the family names one not on record).
+  // row with no dates when the family names one not on record). A preview lists them too: they are
+  // the sitting choices the family's form shows, not the student's.
   const boards = [...new Set(offers.map((o) => o.boardCode))];
   const boardRows = boards.length ? await db.execute(sql`select code, name, series_months from exam_board where code in (${sql.join(boards.map((b) => sql`${b}`), sql`, `)})`)
     .then((r) => r.rows as { code: string; name: string; series_months: string[] }[]) : [];
@@ -183,5 +216,5 @@ export async function offersForStudent(studentId: string, sessionId: string) {
     }
     return out.sort((x, y) => (y.year * 12 + MONTH_ORDER[y.month]!) - (x.year * 12 + MONTH_ORDER[x.month]!));
   });
-  return { session, eligibility, offers: outOffers, declarableSittings: declarable };
+  return { session, eligibility, preview: !studentId, offers: outOffers, declarableSittings: declarable };
 }

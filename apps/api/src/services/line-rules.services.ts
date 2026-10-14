@@ -122,6 +122,11 @@ export async function assertLineRules(
     } else if (c.closed) await gate('gate.availability', scopeOf(it), `${name} is closed in this session`);
     else if (c.retakeOnly && l.attempt !== 'retake') await gate('gate.availability', scopeOf(it), `${name} takes retakes only this cycle`);
     else if (c.selfStudyOnly && l.mode !== 'self_study') await gate('gate.availability', scopeOf(it), `${name} is self-study only: the school does not teach it this cycle`);
+    // "One paper ONLY" is always a retake (the lead's decision of 11 Oct 2026, F6a): a one-paper
+    // item takes no first entry, whatever its availability. A rule, not a gate: no exception lifts it.
+    if (!recheck && it.kind === 'one_paper' && l.attempt === 'first') {
+      throw new LineRuleError(`${name} is a retake of one paper: it takes no first entry`, 'gate.availability');
+    }
     if (!recheck && l.mode === 'self_study' && l.attempt === 'first' && !c.selfStudyOnly) {
       // The forms' "Self Study … (ONLY 2nd entry)" (G-09); the old sentence kept.
       await gate('gate.selfStudyFirstEntry', scopeOf(it), 'Subjects can only be taken outside school when retaking or when the school does not offer them');

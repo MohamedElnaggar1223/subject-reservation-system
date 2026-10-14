@@ -16,6 +16,7 @@
  * - GET  /sessions/:id/board-series    — the series its items are entered in (derived, read only)
  * - GET  /sessions/:id/offers, /offers/addable; POST /offers; PUT/DELETE /offers/:offerId;
  *   POST /offers/:offerId/replace-teacher; POST /offers/:offerId/items; PUT/DELETE …/items/:itemId
+ * - PUT  /sessions/:id/offers/:offerId/form — one subject's whole form, one transaction (F6a)
  * - POST /sessions/:id/grade10/preview, /commit
  * Admin and finance:
  * - GET  /sessions/:id/money           — lines only (§4.6)
@@ -34,6 +35,7 @@ import {
   MoveRegistrationsToSeries,
   CreateOffer,
   UpdateOffer,
+  OfferForm,
   UpdateOfferItem,
   OfferItemInput,
   ReplaceOfferTeacher,
@@ -338,6 +340,27 @@ export const sessions = new Hono<HonoEnv>()
         return success(c, await offerService.updateOffer(id, offerId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
       } catch (err) {
         const f = failure(err, 'Failed to update the subject');
+        return error(c, f.message, f.status);
+      }
+    }
+  )
+
+  /**
+   * PUT /sessions/:id/offers/:offerId/form (F6a, docs/features/SESSION_WORDS.md) — one subject's
+   * form on the links sheet, saved whole in one transaction: who teaches it, how it is offered, the
+   * course fee, its papers, routes, units and qualifications, the grade-10 core, the course start
+   * and the notes. Only what differs is written; the same form twice changes nothing.
+   */
+  .put('/:id/offers/:offerId/form',
+    requireRole(...LINKS_SHEET),
+    zValidator('param', OfferParam),
+    zValidator('json', OfferForm),
+    async (c) => {
+      const { id, offerId } = c.req.valid('param');
+      try {
+        return success(c, await offerService.saveOfferForm(id, offerId, c.req.valid('json'), c.get('user')!.id, extractAuditContext(c)));
+      } catch (err) {
+        const f = failure(err, 'Failed to save the subject');
         return error(c, f.message, f.status);
       }
     }

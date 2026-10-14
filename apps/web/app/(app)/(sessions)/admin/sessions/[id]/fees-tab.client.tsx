@@ -24,7 +24,7 @@ import {
 
 export default function FeesTab({ session, viewerRole }: { session: SessionDetail; viewerRole: string }): React.JSX.Element {
   const canEdit = viewerRole === ROLES.ADMIN || viewerRole === ROLES.FINANCE_ADMIN;
-  if (!session.series.length) return <EmptyState title="No series yet" message="A series appears here when a subject's item is entered in it." />;
+  if (!session.series.length) return <EmptyState title="No sittings yet" message="A sitting appears here once a subject on the sheet is entered in it." />;
   return (
     <div className="space-y-6">
       {!canEdit && <Notice tone="neutral">Finance and the admin set the board fees; you can read them here.</Notice>}
@@ -174,7 +174,7 @@ function SeriesGrid({ session, series, canEdit }: { session: SessionDetail; seri
                 </tr>
               ))}
               {grid.rows.length === 0 && grid.missing.length === 0 && (
-                <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">No subject of this session reads a fee from this series yet.</td></tr>
+                <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">No subject on this sheet reads a fee from this sitting yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -265,9 +265,9 @@ function CopyFees({ grid, seriesId, onDone, onClose }: { grid: FeeGrid; seriesId
     onSuccess: onDone,
   });
   return (
-    <Modal title="Copy fees from an earlier series" onClose={onClose}>
+    <Modal title="Copy fees from an earlier sitting" onClose={onClose}>
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">Every row comes across provisional (the rows this series has are kept): families can reserve, not pay, until the board publishes and you confirm.</p>
+        <p className="text-sm text-muted-foreground">Every row comes across provisional (the rows this sitting has are kept): families can reserve, not pay, until the board publishes and you confirm.</p>
         <ErrorLine message={go.error ? errorText(go.error) : null} />
         <Field label="From" htmlFor="cpf-from">
           <select id="cpf-from" className={INPUT_CLASS} value={from} onChange={(e) => setFrom(e.target.value)}>

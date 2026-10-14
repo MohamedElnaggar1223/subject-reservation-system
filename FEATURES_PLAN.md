@@ -131,7 +131,7 @@ counts measured against RESERVATIONS_REWORK.md §11 (`.audit/school-forms-eviden
 observations queued under F6. **F4 and F7 resumed (08:20Z)** on the new model; F1 next, F2 after it,
 F8 last. **F4 landed (9 Oct 2026, 00:00Z, 2d95638)** with A's StudentsKeptChanging 409; **F7 landed (01:45Z, 384c5a2)**; F1's final merge next, then D's switch to F1's groups, B's desk display of the follow-up outcome, and F2. **Step 3 complete (8 Oct 2026, 13:03Z):** D's branch landed at c2d7a78 after three Opus 5.5
 passes ("confirmed: merge"); migrations 0050–0054. Landing order now F4 → F7 → F1 → F2 → F8, each
-renumbering its migrations after main's journal at its merge. **The weekly limit stopped F1 mid-merge (11 Oct 2026, 11:58Z);** the owner paused the agents. **F6a launched (11 Oct 2026):** after the owner's critique of the Session screen ("they would feel so lost") and the lead's analysis against every form, the session in the school's words (§1 F6a) goes first, before F1's final merge resumes; then D's switch, B's desk display, F2, F6, F8.
+renumbering its migrations after main's journal at its merge. **The weekly limit stopped F1 mid-merge (11 Oct 2026, 11:58Z);** the owner paused the agents. **F6a launched (11 Oct 2026):** after the owner's critique of the Session screen ("they would feel so lost") and the lead's analysis against every form, the session in the school's words (§1 F6a) goes first, before F1's final merge resumes; then D's switch, B's desk display, F2, F6, F8. **F6a built (11 Oct 2026, feature/session-words b9f3090, CI green)**; its Opus 5.5 review was stopped by the weekly limit and relaunched 14 Oct 20:20Z. **The owner's direction (14 Oct 2026):** only the reservation system and its complete cycle for now — everything outside it hidden, never removed, by one Opus 5.5 agent end to end (§1 F6b); and the standard for every screen quoted there: the forms' author is the admin, the forms' fillers are the families, the UI a flow where the next step is already in front of the user. Order: F6a's review and merge → F6b → F1's final merge → D's switch, B's desk display → F2 → F6 → F8. **F6a merged (14 Oct 2026, fd436de)** after its second Opus 5.5 pass ("confirmed: merge") and the lead's two drives; F6b is building.
 
 ## 1. The features and their full scope
 
@@ -477,7 +477,7 @@ forms with two Save buttons; "Dates not set" on a session is not a link to the B
 "Why it changes" while a Notes field sits below; the family's Reserve page should preselect the
 only child and the only open session; the desk's parent-consent tick shows for lines the family
 reserved itself; the Arabic hydration warning on every page (pre-existing; F1 traced it to `i18n.tsx`'s language initialiser, there since 2c3d27f of 30 May; it shows on /sign-in, /academic/years, /academic/rooms and /today too). Also
-from C: three hand-cast API responses in `desk.client.tsx` that predate the rework.
+from C: three hand-cast API responses in `desk.client.tsx` that predate the rework. **From F6a's review (14 Oct 2026):** F7's import review screen (`review-rows.tsx` about lines 407–410) still offers "First entry" on a one-paper line, which the plan now always makes a retake (the button selects while the line stays a retake) — hide it there; F4's Arabic refusal sentence reads "للمرشح the candidate" when the candidate's name is missing; Next's dev overlay shows "1 Issue" on the Arabic drawer pages (the same hydration warning). The Session screen's capabilities that F6a's form does not offer (adding or unticking an item, a labelled sitting per item, the exclusive group, fee keys, "required in a first entry", the carry-forward flag) are API-only until the owner says which the coordinator needs back (SESSION_WORDS §12, question 4).
 
 ### F6a — The session in the school's words (the links sheet and the forms, before the UI audit)
 
@@ -577,6 +577,68 @@ inputs and no extra screen; the deadlines of a series cost no page change.
 **Review.** The reviewer (Opus 5.5) checks every screen string against SCHOOL_FORMS.md §2.5 and the
 mapping table, drives the preview of each of the six form shapes in English and Arabic, and reads
 the endpoint's transaction and lock order against RESERVATIONS.md §2.1.
+
+### F6b — The reservation cycle only: hide what is outside it (one agent, end to end)
+
+**Why (14 Oct 2026).** The owner, after F6a was built: "we are currently purely focusing and
+prioritizing the reservation system only and its complete cycle and that's what we should focus on
+and make our UI focus on. Meaning, if any items in the sidebar, any items that do not belong in this
+lifecycle should just be hidden for now and we will work on them later after we finalize and perfect
+the reservation system." One Opus 5.5 agent does this end to end; the owner is told when it is done.
+
+**The standard for every screen (the owner's words, 14 Oct 2026; it governs F6b, F6 and every screen
+of the cycle after them).** "The exact same person who created the forms is the one who will be the
+Admin, the parents/students who dealt with the form will be the people who use the system so our
+system should make the process much much more easy while staying being familiar and so easy to use,
+it should be like a flow, like every piece of the puzzle is falling together without any of them
+having to think about that much, like the UI and the flow should feel like 'That was exactly what I
+was going to do next and it's here in front of me', of course while maintaining a usable and good
+UI/UX without overwhelming the user, quite the opposite, it should be very simple, yet offer all the
+complexity needed, and connecting the 2 worlds through how flowy and smart the UI actually is."
+
+**The cycle** (what stays visible), as the school lives it: the admin sets up the cycle (the session:
+its sheet, the teachers it names, the subjects' papers on the Catalogue, the fees, the boards' dates;
+the settings behind them; the day-one import of the sheet) → families reserve (the app's Reserve
+page, or the desk on their behalf, with the onboarding of a new family) → they pay (the desk, the
+checkout, instalments, receipts, the wallet) → the school verifies declared sittings, lifts a rule
+for a family (exceptions), reminds and messages (payment lists, reminders), pushes a charge or the
+school fee → drops and refunds → money is known (the session's Money tab, the finance workbench,
+daily takings, the family's statement and payment detail) → the entries go to the board (the exam
+entries and entry lists derived from the lines, the series' deadlines). Everything else is outside
+it for now: the school's day (Today), sections, course enrolment, academic years, the calendar,
+bell schedules, rooms, teaching, candidates, forecasts, the exam timetable and days, invigilation,
+results, certificates, remarks and the remarks desk, results entry, reports, the audit log, the
+students' subject browse, and any dashboard that is not the cycle's next step.
+
+**Scope.**
+1. **Hide, never remove.** One list in one place (`apps/web/components/nav-shell.tsx` or a module it
+   reads) names what is outside the cycle, per role, behind one constant (`RESERVATION_CYCLE_ONLY`);
+   flipping it shows everything again. No page is deleted, no route removed, no API changed; every
+   hidden screen stays reachable by its URL. The agent writes the kept/hidden table per role
+   (admin, coordinator, finance admin, finance officer, teacher, gate, parent, student) in its
+   document with the reason for each line, and the sidebar's order follows the cycle's order.
+2. **The landing is the next step.** After sign-in and on the sidebar's first item, each role lands
+   on the cycle's current stage with the next action in front of them, from existing endpoints only:
+   the admin and the coordinator on the open (or next) session's sheet with what it still needs (a
+   subject with no teacher, a fee not published, a series' dates not set, sittings to verify) and
+   what families are doing (reserved, unpaid, overdue); finance on the desk with today's due and
+   collected; a parent on what is next for their children (reserve — the open session preselected —,
+   pay, a reminder due, the statement); a student on their reservations and requests. A role with
+   nothing in the cycle (teacher, gate) sees its notifications and profile and the sentence that
+   its screens come later. If a new summary endpoint is unavoidable it has its authz row and test;
+   prefer the endpoints that exist.
+3. **Links that lead outside the cycle** from a kept screen (a tab, a button, a "see also") are
+   hidden by the same constant; a link that is a step of the cycle stays. The Student 360, the desk
+   and the session keep every tab that belongs to the cycle.
+4. **Nothing else changes.** No wording, layout or behaviour change on the kept screens beyond
+   points 2 and 3; the F6 audit does the rest. Arabic for every new string; right-to-left checked.
+
+**Tests and proof.** `pnpm --filter web check-types` and `pnpm --filter @repo/api check-types`; the
+suite unchanged and green (no API change expected); a drive in headless Chrome of every role's
+sidebar and landing, in English and Arabic, before and after, with the screenshots in
+`.audit/reservation-focus-evidence/`; the kept/hidden table checked against the screenshots. F6b has
+no separate reviewer (the owner's instruction: one agent end to end); the lead reads the diff, runs
+the gates, drives every role and merges on a green CI run after F6a.
 
 ### F8 — The demo school and the walkthrough (last, after F6)
 
@@ -752,6 +814,7 @@ API and web ports):
 | F7 Day-one import | `feature/import` | `import` | 3091 / 3090 |
 | F6 UI audit | `feature/ui-audit` | `ui` | 3071 / 3070 |
 | F6a The session in the school's words (before F6) | `feature/session-words` | `words` | 3151 / 3150 |
+| F6b The reservation cycle only (before F6; one agent end to end) | `feature/reservation-focus` | `focus` | 3161 / 3160 |
 | Rework A — sessions, offers, fees (RESERVATIONS_REWORK.md §9 step 1); merged to main 8 Oct 2026 (b438976) | `feature/rework-sessions` | `rwa` | 3121 / 3120 |
 | Rework B — reservations (step 2); merged to main 8 Oct 2026 (88c8d5a) | `feature/rework-reservations` | `rwb` | 3111 / 3110 |
 | Rework C — money changes, charges, exceptions (step 2); merged to main 8 Oct 2026 (b76eae4) | `feature/rework-money` | `rwc` | 3141 / 3140 (A's servers took 3121/3120 because 3101/3100 were held by an older worktree's dev servers) |
@@ -767,7 +830,8 @@ API and web ports):
 | F5 Pathway advisor | | | | |
 | F3 Attendance | | | | |
 | F7 Day-one import | frozen 7 Oct at e58324b; **resumed 8 Oct 2026 08:20Z** on the rework's model (§9's F7 list) in worktree `agent-acf43230a4e06e8b4`; built and reviewed through four Opus 5.5 passes (the split of multi-paper rows, every one-paper wording of the school's forms, the course-fee rule, the lock order, a test-harness fix); **merged to main 9 Oct 2026 01:45Z (384c5a2)** after four passes, 0050_import regenerated as 0058 | Opus 5.5 implementer and reviewer | | |
-| F6a The session in the school's words | **launched 11 Oct 2026** in worktree `.claude/worktrees/session-words` from main 1b6a216, after the owner's critique of the Session screen and the lead's analysis (trail row 12:27:56Z) | Opus 5.5 implementer and reviewer | | the owner's acceptance test: the per-subject preview next to the Google Form |
+| F6a The session in the school's words | yes — docs/features/SESSION_WORDS.md (built 11 Oct 2026 in worktree `.claude/worktrees/session-words` from main 1b6a216 after the owner's critique and the lead's analysis, trail row 12:27:56Z; the review stopped by the weekly limit 11 Oct, relaunched 14 Oct) | Opus 5.5, two passes: 'merge after fixes 1' (a paper added later not exclusive with All papers, plus seven smaller findings), then 'confirmed: merge' on a7a17d0; the lead's two drives clean | **14 Oct 2026, merge commit fd436de** (branch tip a7a17d0; CI 38640622417 green on the branch) | owner questions in SESSION_WORDS §12 (a first entry in self-study on a 'Retake (Self Study ONLY)' subject; November for IAL units in winter; Q-16; which API-only tools the coordinator needs back); the owner's acceptance test: the per-subject preview next to the Google Form |
+| F6b The reservation cycle only | **launched 14 Oct 2026** in worktree `.claude/worktrees/reservation-focus` from main b6857cb (the owner's direction, trail row 20:21:49Z) | none: one Opus 5.5 agent end to end, the lead's read, gates and drive | | merges after F6a |
 | F6 UI audit | | | | |
 | F8 Demo school and walkthrough | | | | owner's request, 30 Sep 2026; after F6 |
 

@@ -1,0 +1,8 @@
+ ❯ test/08n-import.test.ts (69 tests | 1 failed) 13057ms
+   × F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a one-paper line is always a retake (F6a; the review of F6a, finding 3): neither the coordinator's "in school" answer for a self-study note with no sitting nor staff's "first" on the line 
+     → expected [ Array(1) ] to match object [ { …(5) } ]
+ Test Files  1 failed (1)
+      Tests  1 failed | 68 passed (69)
+ FAIL  test/08n-import.test.ts > F7: the day-one import > a unit line finds the IAL subject's item; a line naming several is split, one line per item; staff choose an item the words cannot tell; the rules on lines are asked in the review > a one-paper line is always a retake (F6a; the review of F6a, finding 3): neither the coordinator's "in school" answer for a self-study note with no sitting nor 
+AssertionError: expected [ Array(1) ] to match object [ { …(5) } ]
+ ❯ test/08n-import.test.ts:1184:28
