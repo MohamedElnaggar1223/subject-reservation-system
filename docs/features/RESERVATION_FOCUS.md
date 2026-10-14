@@ -349,7 +349,7 @@ The Session screen (F6a's files) has no link that leads outside; nothing there w
 | `pnpm --filter @repo/api check-types` | green (e8f9619) |
 | API suite, local time, `igcse_focus_test` | 34 files, 725 passed, 1 todo — e8f9619 (`suite-local-e8f9619.log`) |
 | API suite, `TZ=UTC` | 34 files, 725 passed, 1 todo — e8f9619 (`suite-utc-e8f9619.log`) |
-| CI (`.github/workflows/ci.yml`) | run 38637562968 green on bbd3708; later runs in the trail |
+| CI (`.github/workflows/ci.yml`) | run 38637562968 green on bbd3708; run 38641932643 green on 00cbbdf (all four gates: evidence size, API type-check, web type-check, the suite) |
 | `useQuery<` count in `apps/web/app` | 19 (the limit is 35); a probe showed the home-summary, sessions and statement responses typed, not `any` |
 
 **The drive** (headless Chrome, `playwright-core` in `/tmp/rf/pw`, `channel: 'chrome'`; every role signs
@@ -395,6 +395,11 @@ number appears in this branch.
   says, each with a question below; nothing else on those screens was changed.
 - **Merging main.** F6a was not on main when this was done (main 362b589 carries only the plan's F6b
   text, a trail and an 08s timing change); the lead merges `origin/main` after F6a (the brief).
+  `git merge-tree --write-tree` shows no conflict between this branch and `origin/feature/session-words`
+  (b9f3090), nor `origin/main` (362b589). After the merge: F6a's Session screen keeps the `#subjects`,
+  `#fees`, `#money`, `#verify` tabs the landing links to, and its header's dates dialog is where "Set the
+  dates" lands; F6a's i18n-sessions.ts also translates "reservation(s)" and "entries by" the same way as
+  this branch (whichever merges first keeps its Arabic; both say the same).
 
 ---
 
@@ -433,6 +438,14 @@ number appears in this branch.
 - 21:21Z — the suite in local time green on e8f9619; 21:23Z — the switch proved off and on, every hidden
   screen opened by URL; 21:28Z — §4's link check; 21:29Z — the suite with `TZ=UTC` green, both
   type-checks green; 21:32Z — June 2028 closed through the API, the closed stage driven; 21:33Z — this
-  document.
+  document (73e7515).
+- 21:36Z — the family's landing waits for the statement too (40745c2); 21:39Z — every new string checked
+  against the dictionaries, the landings' own loading and error sentences (00cbbdf); both type-checks
+  green on 00cbbdf; no file under `apps/api` or `packages` differs from b6857cb, so the suite's runs on
+  e8f9619 stand for the branch; CI on each push (runs superseded by a newer push are cancelled by the
+  workflow's concurrency rule).
+- Dev servers left running for the lead's drive: API on 3161 (pnpm pid 84853, node 84876), web on 3160
+  (pnpm pid 84878, node 84888), database `igcse_focus_dev` with June 2028 closed and the placeholder
+  family.
 - Next if interrupted: the final commit of this document and the evidence, push, CI; F6a's merge is the
   lead's (or this branch's, when told).
