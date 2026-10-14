@@ -76,7 +76,7 @@ export default function CycleLanding({ viewerRole, userName }: { viewerRole: str
         <p className="mt-1 text-sm text-muted-foreground">The reservation cycle: where each session stands, and what comes next.</p>
       </div>
 
-      {isLoading ? <LoadingState /> : isError || !data ? <ErrorState onRetry={() => refetch()} /> : (() => {
+      {isLoading ? <LoadingState label="Reading the sessions…" /> : isError || !data ? <ErrorState message="The sessions did not load; nothing is lost. Try again." onRetry={() => refetch()} /> : (() => {
         const { shown, noneRunning, fallback } = current(data);
         return (
           <div className="space-y-5">

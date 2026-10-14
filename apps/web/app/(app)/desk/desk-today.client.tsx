@@ -85,7 +85,7 @@ export default function DeskToday(): React.JSX.Element | null {
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <span>Today</span> · <DateText date={today} />
         </h2>
-        {loading && <span className="text-xs text-muted-foreground">Loading…</span>}
+        {loading && <span className="text-xs text-muted-foreground">Reading today…</span>}
         {(takings.isError || sessions.isError || charges.isError || money.some((m) => m.isError)) && (
           <span className="text-xs text-destructive">Part of today could not be read.</span>
         )}

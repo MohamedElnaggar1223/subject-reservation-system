@@ -43,7 +43,7 @@ export default function LaterLanding({ viewerRole, userName }: { viewerRole: str
           <h2 className="font-display text-lg font-semibold text-foreground">Notifications</h2>
           <Button asChild variant="outline" size="sm"><Link href="/notifications">See every notification</Link></Button>
         </div>
-        {latest.isLoading ? <LoadingState /> : latest.isError || !latest.data ? <ErrorState onRetry={() => latest.refetch()} /> : latest.data.length === 0 ? (
+        {latest.isLoading ? <LoadingState label="Reading your notifications…" /> : latest.isError || !latest.data ? <ErrorState message="Your notifications did not load. Try again." onRetry={() => latest.refetch()} /> : latest.data.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No notifications yet.</p>
         ) : (
           <ul className="mt-2 divide-y divide-border">

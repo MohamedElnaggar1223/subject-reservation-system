@@ -62,6 +62,11 @@ export const focusArabic: Record<string, string> = {
   'entries by': 'القيد حتى',
   'no entry deadline yet': 'لم يُحدَّد موعد القيد بعد',
   'Part of this session could not be read. Open the sheet to see it.': 'تعذّرت قراءة جزء من هذه الجلسة. افتح الكشف لرؤيته.',
+  'Reading the sessions…': 'جارٍ قراءة الجلسات…',
+  'The sessions did not load; nothing is lost. Try again.': 'لم تُحمَّل الجلسات، ولم يضِع شيء. حاول مرة أخرى.',
+  'Reading your notifications…': 'جارٍ قراءة إشعاراتك…',
+  'Your notifications did not load. Try again.': 'لم تُحمَّل إشعاراتك. حاول مرة أخرى.',
+  'Reading today…': 'جارٍ قراءة بيانات اليوم…',
 
   // ── The teacher's and the gate's landing ──
   'Your screens come later': 'شاشاتك لاحقًا',
