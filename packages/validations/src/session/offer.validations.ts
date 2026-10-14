@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { DateOnlySchema } from '../academic/structure.validations';
+import { SeriesMonthSchema } from './session.validations';
 
 export const AVAILABILITIES = ['open', 'retake_only', 'self_study_only', 'closed'] as const;
 export const AvailabilitySchema = z.enum(AVAILABILITIES);
@@ -29,6 +30,23 @@ export const ITEM_KIND_LABELS: Record<ItemKind, string> = {
   route: 'Route',
   qualification: 'Qualification',
 };
+
+/**
+ * The label generateItems gives a subject's whole item. It stays stored (F7's findItem matches
+ * labels, and the suites read it); every screen shows the forms' words instead (F6a).
+ */
+export const WHOLE_ITEM_LABEL = 'Whole subject';
+/** The forms' words for a whole item: "All papers" (SCHOOL_FORMS.md §2.5). */
+export const ALL_PAPERS = 'All papers';
+
+/**
+ * What a screen shows for an item (F6a, docs/features/SESSION_WORDS.md): the school's own label as
+ * stored, except the generated "Whole subject", which the forms call "All papers". The one place
+ * this display word is decided; its Arabic is in the web's sessions dictionary.
+ */
+export function itemDisplayLabel(item: { kind: string; label: string }): string {
+  return item.kind === 'whole' && item.label.trim().toLowerCase() === WHOLE_ITEM_LABEL.toLowerCase() ? ALL_PAPERS : item.label;
+}
 
 export const FEE_KEY_KINDS = ['unit', 'option', 'qualification', 'subject'] as const;
 export const FeeKeyKindSchema = z.enum(FEE_KEY_KINDS);
@@ -136,6 +154,49 @@ export const ReplaceOfferTeacher = z.object({
   reason: z.string().trim().min(5, 'Say why (at least 5 characters)').max(500),
 });
 export type ReplaceOfferTeacherType = z.infer<typeof ReplaceOfferTeacher>;
+
+/**
+ * One subject's form on the links sheet (F6a, docs/features/SESSION_WORDS.md §3): the whole form,
+ * saved at once by PUT /sessions/:id/offers/:offerId/form in one transaction. The screen speaks the
+ * forms' words; the body carries the model's values (the mapping table in that document).
+ *
+ * A row of `items`: one of the subject's items (a paper, a route, a unit, a qualification) by its
+ * id, or a paper the catalogue gives the subject that is not on the sheet yet (`paperUnitId`, made
+ * only when it is offered). `teachers`: an item's own teachers (an IAL unit); empty or null — the
+ * subject's. `seriesMonth`: the sitting, one of the session's months the board sits.
+ */
+export const OfferFormItem = z.object({
+  itemId: z.string().min(1).optional(),
+  paperUnitId: z.string().min(1).optional(),
+  availability: AvailabilitySchema,
+  // Null: the subject's course fee.
+  courseFee: z.number().min(0).max(10_000_000).nullable(),
+  teachers: z.array(OfferTeacherInput).max(10).nullable().optional(),
+  seriesMonth: SeriesMonthSchema.optional(),
+}).refine((i) => !!i.itemId !== !!i.paperUnitId, { message: 'Name the paper or unit (one of itemId, paperUnitId)' });
+export type OfferFormItemType = z.infer<typeof OfferFormItem>;
+
+export const OfferForm = z.object({
+  // (a) Teachers this cycle: the whole set, each in school or online; an external team by name.
+  teachers: z.array(OfferTeacherInput).max(10),
+  // (b) Offered as.
+  availability: AvailabilitySchema,
+  // (c) Course fee; why it is 0 when self-study only at 0 (MO-9).
+  courseFee: z.number().min(0).max(10_000_000),
+  zeroFeeReason: ZeroFeeReason.optional(),
+  // (d) One paper only, (e) components: the rows the form shows.
+  items: z.array(OfferFormItem).max(40).default([]),
+  // (f) Grade 10 core, (g) course starts (null: the session's), (h) notes.
+  grade10Core: z.boolean(),
+  courseStartsOn: DateOnlySchema.nullable(),
+  notes: z.string().trim().max(1000).nullable(),
+  // "Its N reservations stand": setting the subject, a paper or a unit to not offered while it has
+  // reservations is refused unless the form says so (they stand; no new one is taken).
+  linesStand: z.boolean().optional(),
+  // Kept with the change; a paper or unit moved to another sitting with its reservations.
+  reason: z.string().trim().max(500).optional(),
+});
+export type OfferFormType = z.infer<typeof OfferForm>;
 
 export const OfferParam = z.object({ id: z.string().min(1), offerId: z.string().min(1) });
 export const OfferItemParam = z.object({ id: z.string().min(1), offerId: z.string().min(1), itemId: z.string().min(1) });

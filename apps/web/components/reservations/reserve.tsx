@@ -24,6 +24,7 @@ import type { InferRequestType } from 'hono/client';
 import { api } from '~/lib/hono';
 import {
   apiResponse,
+  itemDisplayLabel,
   refundConsentText,
   DECLARATION_TEXT,
   DESK_CONSENT_TEXT,
@@ -329,7 +330,7 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
           <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="w-8 px-3 py-2" />
-              <th className="px-3 py-2 text-start font-medium">Subject · what is entered</th>
+              <th className="px-3 py-2 text-start font-medium">Subject · papers</th>
               <th className="px-3 py-2 text-start font-medium">Teacher</th>
               <th className="px-3 py-2 text-start font-medium">Entry</th>
               <th className="px-3 py-2 text-end font-medium">Price</th>
@@ -416,9 +417,15 @@ export function Reserve({ viewer, studentId, sessionId, onDone, deskExtras }: {
   );
 }
 
-function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings }: {
+/**
+ * One subject's rows on the Reserve page. `preview` (the Session screen's "Preview the family's form",
+ * F6a): every choice shown open — each item with its entry, teacher and sitting choices and the price
+ * of the chosen entry — read-only, nothing to tick; the family's page passes none and is unchanged.
+ */
+export function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings, preview = false }: {
   o: Offer; desk: boolean; coreLocked: boolean; sittings: Sitting[];
   pickOf: (it: Item) => Pick; setPick: (it: Item, patch: Partial<Pick>) => void; toggle: (o: Offer, it: Item, on: boolean) => void;
+  preview?: boolean;
 }) {
   return (
     <>
@@ -432,8 +439,9 @@ function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings }: {
       </tr>
       {o.items.map((it) => {
         const p = pickOf(it);
-        const options = it.prices.filter(usable);
-        const unavailable = !reservable(it) || !!it.held || options.length === 0;
+        // The preview lists every entry the item takes, open now or not (the series may have no dates yet).
+        const options = preview ? it.prices.filter((x) => !x.noFee) : it.prices.filter(usable);
+        const unavailable = !preview && (!reservable(it) || !!it.held || options.length === 0);
         const [attempt, mode] = (p.entry ?? '|').split('|');
         const price = it.prices.find((x) => entryKey(x) === p.entry && !x.noFee) ?? null;
         const needsSitting = p.on && (attempt === 'retake' || it.needsPriorSeries) && !isKnown(it);
@@ -441,11 +449,11 @@ function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings }: {
         return (
           <tr key={it.id} className={unavailable ? 'text-muted-foreground' : ''}>
             <td className="px-3 py-2 align-top">
-              <input type="checkbox" className="h-4 w-4" aria-label={`${o.subject.name}: ${it.label}`}
-                checked={p.on} disabled={unavailable || (coreLocked && p.on)} onChange={(e) => toggle(o, it, e.target.checked)} />
+              <input type="checkbox" className="h-4 w-4" aria-label={`${o.subject.name}: ${itemDisplayLabel(it)}`}
+                checked={preview ? false : p.on} disabled={preview || unavailable || (coreLocked && p.on)} onChange={(e) => toggle(o, it, e.target.checked)} />
             </td>
             <td className="px-3 py-2 align-top">
-              <span>{it.label}</span>
+              <span>{itemDisplayLabel(it)}</span>
               {it.availability !== 'open' && AVAILABILITY[it.availability] && <> <Badge tone="warning">{AVAILABILITY[it.availability]}</Badge></>}
               {isKnown(it) && <> <Badge tone="info"><span>{KNOWN_WORD[knownOf(it)[0]!.source] ?? 'sat'}</span>&nbsp;<bdi data-i18n-skip="true">{knownOf(it)[0]!.series}</bdi>{knownOf(it)[0]!.source === 'result' && <>&nbsp;<span>(result on record)</span></>}</Badge></>}
               {it.held && <> <Badge tone="success">already reserved</Badge></>}
@@ -477,6 +485,14 @@ function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings }: {
                       {sittings.map((s) => <option key={sittingValue(s)} value={sittingValue(s)}>{sittingName(s)}</option>)}
                     </select>
                   )}
+                  {/* The preview lists every entry with its price, as the Google Form lists its options. */}
+                  {preview && options.length > 0 && (
+                    <ul className="space-y-0.5 text-xs text-muted-foreground">
+                      {options.map((x) => (
+                        <li key={entryKey(x)}><span>{entryLabel(x, isKnown(it))}</span> · <Money amount={x.total} />{x.provisional && ' ⓟ'}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
             </td>
@@ -491,6 +507,53 @@ function OfferRows({ o, desk, coreLocked, pickOf, setPick, toggle, sittings }: {
         );
       })}
     </>
+  );
+}
+
+/**
+ * One subject's part of the family's form as staff preview it (F6a: the Session screen's "Preview the
+ * family's form"): the Reserve page's own rows, from the family read with no student
+ * (`GET /registrations/offers/preview`), every item open with its entry, teacher and sitting choices
+ * and the price of the chosen entry, then the refund policy sentence and the declaration. Read-only:
+ * the choices can be looked through, nothing is ticked and nothing is reserved from here.
+ */
+export function ReservePreview({ offer, sittings, terms }: { offer: Offer; sittings: Sitting[]; terms: RefundTermsState }) {
+  const [picks, setPicks] = useState<Record<string, Pick>>({});
+  const firstEntry = (it: Item) => {
+    const p = it.prices.find((x) => !x.noFee);
+    return p ? entryKey(p) : null;
+  };
+  const pickOf = (it: Item): Pick => picks[it.id] ?? { on: true, entry: firstEntry(it), teacherId: undefined, sitting: '' };
+  const setPick = (it: Item, patch: Partial<Pick>) => setPicks((prev) => ({ ...prev, [it.id]: { ...pickOf(it), ...patch } }));
+  return (
+    <div className="space-y-4">
+      <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <th className="w-8 px-3 py-2" />
+              <th className="px-3 py-2 text-start font-medium">Subject · papers</th>
+              <th className="px-3 py-2 text-start font-medium">Teacher</th>
+              <th className="px-3 py-2 text-start font-medium">Entry</th>
+              <th className="px-3 py-2 text-end font-medium">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            <OfferRows o={offer} desk={false} coreLocked={false} pickOf={pickOf} setPick={setPick} toggle={() => undefined} sittings={sittings} preview />
+          </tbody>
+        </table>
+      </div>
+      <div className="space-y-2 rounded-xl border border-border bg-card p-4 text-sm shadow-sm">
+        <label className="flex items-start gap-2">
+          <input type="checkbox" className="mt-0.5 h-4 w-4" disabled checked={false} readOnly />
+          <RefundTermsSentence state={terms} />
+        </label>
+        <label className="flex items-start gap-2">
+          <input type="checkbox" className="mt-0.5 h-4 w-4" disabled checked={false} readOnly />
+          <span>{DECLARATION_TEXT}</span>
+        </label>
+      </div>
+    </div>
   );
 }
 

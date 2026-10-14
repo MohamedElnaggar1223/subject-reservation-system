@@ -93,3 +93,7 @@ export const OffersQuery = z.object({
   studentId: z.string().min(1).optional(),
 });
 export type OffersQueryType = z.infer<typeof OffersQuery>;
+
+/** Staff's preview of what a family sees in a session, with no student (F6a: admin, coordinator). */
+export const OffersPreviewQuery = z.object({ sessionId: z.string().min(1) });
+export type OffersPreviewQueryType = z.infer<typeof OffersPreviewQuery>;

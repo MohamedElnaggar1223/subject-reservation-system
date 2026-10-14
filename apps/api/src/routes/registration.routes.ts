@@ -4,6 +4,7 @@
  * Handles the full subject registration lifecycle:
  *
  * GET  /registrations/offers        - What a student can reserve in a session (the Reserve pages, §4.3–§4.4)
+ * GET  /registrations/offers/preview - What a family sees in a session, no student (admin, coordinator; F6a)
  * GET  /registrations/pending       - Pending approval requests for a parent's children (parent/admin)
  * GET  /registrations/history       - Full registration history across all sessions (own or child)
  * GET  /registrations               - Registrations with optional filters (role-aware)
@@ -40,6 +41,7 @@ import {
   STUDENT_RECORD_ROLES,
   EligibilityQuery,
   OffersQuery,
+  OffersPreviewQuery,
   hasRole,
 } from '@repo/validations';
 import { success, error, clientMessage } from '../lib/response';
@@ -51,6 +53,7 @@ import {
   requireStudentOrParent,
   requireAdminOrParent,
   requireFinance,
+  requireRole,
 } from '../middleware/access-control.middleware';
 import type { HonoEnv } from '../lib/types';
 import * as registrationService from '../services/registration.services';
@@ -58,7 +61,7 @@ import * as preregService from '../services/prereg.services';
 import * as deskService from '../services/desk.services';
 import * as linkService from '../services/link.services';
 import { mayRegisterFor } from '../services/eligibility.services';
-import { offersForStudent } from '../services/offers-read.services';
+import { offersForStudent, offersPreview } from '../services/offers-read.services';
 import { logAction, extractAuditContext } from '../services/audit.services';
 
 /**
@@ -132,6 +135,28 @@ export const registrations = new Hono<HonoEnv>()
       } catch (err) {
         const message = clientMessage(err, 'Failed to load the offers');
         return error(c, message, message.includes('not found') ? 404 : 400);
+      }
+    }
+  )
+
+  /**
+   * GET /registrations/offers/preview?sessionId= (F6a, docs/features/SESSION_WORDS.md)
+   *
+   * What a family sees for each subject of a session, for the Session screen's "Preview the
+   * family's form": the same read as /offers with no student — no eligibility, no earlier sittings,
+   * no held lines, each price with no family's exception. Admin and coordinator only: it is the links
+   * sheet's preview, not a family's read.
+   */
+  .get('/offers/preview',
+    requireRole(ROLES.ADMIN, ROLES.COORDINATOR),
+    zValidator('query', OffersPreviewQuery),
+    async (c) => {
+      try {
+        const offers = await offersPreview(c.req.valid('query').sessionId);
+        if (!offers) return error(c, 'Session not found', 404);
+        return success(c, offers);
+      } catch (err) {
+        return error(c, clientMessage(err, 'Failed to load the preview'), 400);
       }
     }
   )

@@ -31,6 +31,10 @@ export type ItemRow = OfferRow['items'][number];
 export const fetchAddable = (id: string) => apiResponse(api.v1.sessions[':id'].offers.addable.$get({ param: { id } }));
 export type AddableRow = Awaited<ReturnType<typeof fetchAddable>>[number];
 
+/** The family's form as staff preview it (F6a): the family read with no student. */
+export const fetchPreview = (sessionId: string) => apiResponse(api.v1.registrations.offers.preview.$get({ query: { sessionId } }));
+export type PreviewData = Awaited<ReturnType<typeof fetchPreview>>;
+
 export const fetchFeeGrid = (seriesId: string) => apiResponse(api.v1['board-fees'].$get({ query: { seriesId } }));
 export type FeeGrid = Awaited<ReturnType<typeof fetchFeeGrid>>;
 export type FeeRow = FeeGrid['rows'][number];
@@ -42,6 +46,7 @@ export type MoneyData = Awaited<ReturnType<typeof fetchMoney>>;
 export const SESSIONS_KEY = ['sessions'] as const;
 export const sessionKey = (id: string) => ['sessions', id] as const;
 export const offersKey = (id: string) => ['sessions', id, 'offers'] as const;
+export const previewKey = (id: string) => ['sessions', id, 'preview'] as const;
 export const moneyKey = (id: string) => ['sessions', id, 'money'] as const;
 export const feesKey = (seriesId: string) => ['board-fees', seriesId] as const;
 
@@ -94,7 +99,7 @@ export function Field({ label, htmlFor, hint, children }: { label: string; htmlF
 }
 
 /** A dialog over the page; Escape closes it. */
-export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
+export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean | 'xl' }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -102,7 +107,7 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label={title}>
-      <div className={cn('max-h-[90vh] w-full overflow-y-auto rounded-xl border border-border bg-card shadow-xl', wide ? 'max-w-3xl' : 'max-w-lg')}>
+      <div className={cn('max-h-[90vh] w-full overflow-y-auto rounded-xl border border-border bg-card shadow-xl', wide === 'xl' ? 'max-w-5xl' : wide ? 'max-w-3xl' : 'max-w-lg')}>
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 className="font-display text-lg font-semibold text-foreground">{title}</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground">

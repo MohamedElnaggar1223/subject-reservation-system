@@ -1,0 +1,8 @@
+ ❯ test/08u-session-form.test.ts (11 tests | 1 failed) 4336ms
+   × 08u: the session in the school's words — one form per subject, the preview > a paper the Catalogue gains after the subject is on the sheet: the form lists it and makes it once it is offered; the same form again makes nothing 89ms
+     → expected { status: 200, error: '""' } to deeply equal { status: 400, …(1) }
+ Test Files  1 failed (1)
+      Tests  1 failed | 10 passed (11)
+ FAIL  test/08u-session-form.test.ts > 08u: the session in the school's words — one form per subject, the preview > a paper the Catalogue gains after the subject is on the sheet: the form lists it and makes it once it is offered; the same form again makes nothing
+AssertionError: expected { status: 200, error: '""' } to deeply equal { status: 400, …(1) }
+ ❯ test/08u-session-form.test.ts:153:8
