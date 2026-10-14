@@ -1,0 +1,420 @@
+{
+  "admin": {
+    "email": "admin@igcse.local",
+    "landingAfterSignIn": "/",
+    "sidebarFirstItem": "/",
+    "firstItemResolvesTo": null,
+    "count": 24,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "section": "Set up",
+        "label": "Sessions",
+        "href": "/admin/sessions"
+      },
+      {
+        "section": "Set up",
+        "label": "Exam Catalogue",
+        "href": "/exams/catalogue"
+      },
+      {
+        "section": "Set up",
+        "label": "Subjects",
+        "href": "/admin/subjects"
+      },
+      {
+        "section": "Set up",
+        "label": "Board Series",
+        "href": "/exams/series"
+      },
+      {
+        "section": "Set up",
+        "label": "Board Services",
+        "href": "/exams/services"
+      },
+      {
+        "section": "Set up",
+        "label": "School Fees",
+        "href": "/admin/school-fees"
+      },
+      {
+        "section": "Set up",
+        "label": "Settings",
+        "href": "/settings"
+      },
+      {
+        "section": "Set up",
+        "label": "Day-one Import",
+        "href": "/imports"
+      },
+      {
+        "section": "Set up",
+        "label": "Team",
+        "href": "/admin/team"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "The Desk",
+        "href": "/desk"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "Students",
+        "href": "/students"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "Charges",
+        "href": "/charges"
+      },
+      {
+        "section": "Reserve and pay",
+        "label": "Payments",
+        "href": "/admin/payments"
+      },
+      {
+        "section": "Follow up",
+        "label": "Exceptions",
+        "href": "/admin/exceptions"
+      },
+      {
+        "section": "Follow up",
+        "label": "Messages",
+        "href": "/admin/messages"
+      },
+      {
+        "section": "Follow up",
+        "label": "Escrow",
+        "href": "/admin/escrow"
+      },
+      {
+        "section": "Money",
+        "label": "Finance Workbench",
+        "href": "/finance"
+      },
+      {
+        "section": "Money",
+        "label": "Daily Takings",
+        "href": "/takings"
+      },
+      {
+        "section": "Entries to the board",
+        "label": "Exam Deadlines",
+        "href": "/exams/deadlines"
+      },
+      {
+        "section": "Entries to the board",
+        "label": "Exam Entries",
+        "href": "/exams/entries"
+      },
+      {
+        "section": "Entries to the board",
+        "label": "Entry Lists",
+        "href": "/exams/entry-lists"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "الرئيسية",
+      "الجلسات",
+      "دليل الامتحانات",
+      "المواد",
+      "دورات المجالس",
+      "خدمات المجالس",
+      "المصاريف الدراسية",
+      "الإعدادات",
+      "استيراد بدء التشغيل",
+      "الفريق",
+      "المكتب",
+      "الطلاب",
+      "الرسوم الأخرى",
+      "المدفوعات",
+      "الاستثناءات",
+      "الرسائل",
+      "الرصيد",
+      "مكتب المالية",
+      "إيرادات اليوم",
+      "مواعيد الامتحانات",
+      "قيود الامتحانات",
+      "قوائم القيد",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "stage-open-admin-landing-en.jpg",
+      "stage-open-admin-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  },
+  "parent": {
+    "email": "parent.hany@igcse.local",
+    "landingAfterSignIn": "/",
+    "sidebarFirstItem": "/",
+    "firstItemResolvesTo": null,
+    "count": 12,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "section": "Registration",
+        "label": "Reserve Subjects",
+        "href": "/register"
+      },
+      {
+        "section": "Registration",
+        "label": "My Registrations",
+        "href": "/registrations"
+      },
+      {
+        "section": "Registration",
+        "label": "History",
+        "href": "/registrations/history"
+      },
+      {
+        "section": "Registration",
+        "label": "Approvals",
+        "href": "/approvals"
+      },
+      {
+        "section": "Financial",
+        "label": "Statement",
+        "href": "/statement"
+      },
+      {
+        "section": "Financial",
+        "label": "School Fee",
+        "href": "/school-fee"
+      },
+      {
+        "section": "Financial",
+        "label": "Charges & Instalments",
+        "href": "/charges-due"
+      },
+      {
+        "section": "Financial",
+        "label": "Escrow Balance",
+        "href": "/escrow"
+      },
+      {
+        "section": "Account",
+        "label": "Linked Children",
+        "href": "/links"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "الرئيسية",
+      "حجز المواد",
+      "تسجيلاتي",
+      "السجل",
+      "الموافقات",
+      "كشف الحساب",
+      "المصاريف الدراسية",
+      "الرسوم والأقساط",
+      "رصيد الحساب",
+      "الأبناء المرتبطون",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "stage-open-parent-landing-en.jpg",
+      "stage-open-parent-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  },
+  "parent2": {
+    "email": "parent.focus@igcse.local",
+    "landingAfterSignIn": "/",
+    "sidebarFirstItem": "/",
+    "firstItemResolvesTo": null,
+    "count": 12,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "section": "Registration",
+        "label": "Reserve Subjects",
+        "href": "/register"
+      },
+      {
+        "section": "Registration",
+        "label": "My Registrations",
+        "href": "/registrations"
+      },
+      {
+        "section": "Registration",
+        "label": "History",
+        "href": "/registrations/history"
+      },
+      {
+        "section": "Registration",
+        "label": "Approvals",
+        "href": "/approvals"
+      },
+      {
+        "section": "Financial",
+        "label": "Statement",
+        "href": "/statement"
+      },
+      {
+        "section": "Financial",
+        "label": "School Fee",
+        "href": "/school-fee"
+      },
+      {
+        "section": "Financial",
+        "label": "Charges & Instalments",
+        "href": "/charges-due"
+      },
+      {
+        "section": "Financial",
+        "label": "Escrow Balance",
+        "href": "/escrow"
+      },
+      {
+        "section": "Account",
+        "label": "Linked Children",
+        "href": "/links"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "الرئيسية",
+      "حجز المواد",
+      "تسجيلاتي",
+      "السجل",
+      "الموافقات",
+      "كشف الحساب",
+      "المصاريف الدراسية",
+      "الرسوم والأقساط",
+      "رصيد الحساب",
+      "الأبناء المرتبطون",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "stage-open-parent2-landing-en.jpg",
+      "stage-open-parent2-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  },
+  "student2": {
+    "email": "student.focus@igcse.local",
+    "landingAfterSignIn": "/",
+    "sidebarFirstItem": "/",
+    "firstItemResolvesTo": null,
+    "count": 9,
+    "sidebar": [
+      {
+        "section": "",
+        "label": "Home",
+        "href": "/"
+      },
+      {
+        "section": "Registration",
+        "label": "Reserve Subjects",
+        "href": "/register"
+      },
+      {
+        "section": "Registration",
+        "label": "My Registrations",
+        "href": "/registrations"
+      },
+      {
+        "section": "Registration",
+        "label": "Statement",
+        "href": "/statement"
+      },
+      {
+        "section": "Registration",
+        "label": "History",
+        "href": "/registrations/history"
+      },
+      {
+        "section": "Requests",
+        "label": "Pending Requests",
+        "href": "/pending-requests"
+      },
+      {
+        "section": "Account",
+        "label": "Linked Parents",
+        "href": "/links"
+      },
+      {
+        "section": "Account",
+        "label": "Notifications",
+        "href": "/notifications"
+      },
+      {
+        "section": "Account",
+        "label": "Profile",
+        "href": "/profile"
+      }
+    ],
+    "sidebarAr": [
+      "الرئيسية",
+      "حجز المواد",
+      "تسجيلاتي",
+      "كشف الحساب",
+      "السجل",
+      "الطلبات المعلقة",
+      "أولياء الأمور المرتبطون",
+      "الإشعارات",
+      "الملف الشخصي"
+    ],
+    "dirInArabic": "rtl",
+    "files": [
+      "stage-open-student2-landing-en.jpg",
+      "stage-open-student2-landing-ar.jpg"
+    ],
+    "pageErrors": [
+      "Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:\n\n- A server/client branch `if (typeof window !== 'undefined')`.\n- Variable input such as `Date.now()` or `Math"
+    ]
+  }
+}

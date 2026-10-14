@@ -19,6 +19,7 @@ import { apiResponse, ROLES } from '@repo/validations';
 import { api } from '~/lib/hono';
 import { ErrorState, LoadingState } from '~/components/ui/query-state';
 import { StudentAcademicPanel, studentRecordKey } from '~/components/student-academic-panel';
+import { leadsOutsideTheCycle } from '~/lib/reservation-focus';
 
 // The panel's own fetcher, under the panel's key: one request serves both.
 const fetchStudentRecord = (id: string) => apiResponse(api.v1.students[':id'].$get({ param: { id } }));
@@ -71,15 +72,17 @@ export default function StudentClient({ studentId, viewerRole }: { studentId: st
                 )}
               </dl>
             </div>
-            {/* F4: the student's exams — statement of entry, timetable, results. */}
+            {/* F4: the student's exams — statement of entry, timetable, results. F6b: each button
+                hidden while its screen is outside the reservation cycle (lib/reservation-focus.ts). */}
+            {(!leadsOutsideTheCycle('/exams/my') || ((viewerRole === ROLES.COORDINATOR || viewerRole === ROLES.ADMIN) && !leadsOutsideTheCycle('/exams/candidates'))) && (
             <div className="flex flex-wrap gap-2">
-              <Link
+              {!leadsOutsideTheCycle('/exams/my') && <Link
                 href={`/exams/my?student=${studentId}` as never}
                 className="inline-flex h-10 items-center rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 Exams: entries, timetable, results
-              </Link>
-              {(viewerRole === ROLES.COORDINATOR || viewerRole === ROLES.ADMIN) && (
+              </Link>}
+              {(viewerRole === ROLES.COORDINATOR || viewerRole === ROLES.ADMIN) && !leadsOutsideTheCycle('/exams/candidates') && (
                 <Link
                   href={`/exams/candidates?student=${studentId}&q=${encodeURIComponent(r.student.name)}` as never}
                   className="inline-flex h-10 items-center rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -88,6 +91,7 @@ export default function StudentClient({ studentId, viewerRole }: { studentId: st
                 </Link>
               )}
             </div>
+            )}
             {MONEY_ROLES.includes(viewerRole) && (
               <Link
                 href="/desk"

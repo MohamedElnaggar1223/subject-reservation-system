@@ -1,0 +1,609 @@
+{
+  "outsideList": [
+    "/admin/dashboard",
+    "/today",
+    "/teaching",
+    "/exams/forecasts",
+    "/exams/invigilation",
+    "/academic/sections",
+    "/academic/enrolment",
+    "/academic/years",
+    "/academic/calendar",
+    "/academic/bells",
+    "/academic/rooms",
+    "/exams/candidates",
+    "/exams/timetable",
+    "/exams/days",
+    "/exams/results",
+    "/exams/certificates",
+    "/exams/my",
+    "/remarks-desk",
+    "/results-entry",
+    "/admin/reports",
+    "/admin/audit",
+    "/remarks",
+    "/subjects"
+  ],
+  "result": {
+    "admin": {
+      "screens": [
+        {
+          "screen": "/",
+          "links": 8,
+          "outside": []
+        },
+        {
+          "screen": "/admin/sessions",
+          "links": 12,
+          "outside": []
+        },
+        {
+          "screen": "/exams/catalogue",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/admin/subjects",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/exams/series",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/exams/services",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/admin/school-fees",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/settings",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/imports",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/admin/team",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/desk",
+          "links": 3,
+          "outside": []
+        },
+        {
+          "screen": "/students",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/charges",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/admin/payments",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/admin/exceptions",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/admin/messages",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/admin/escrow",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/finance",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/takings",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/exams/deadlines",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/exams/entries",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/exams/entry-lists",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/notifications",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/profile",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/students/tHxdFE7YEd9OiopMXaQQBqR1fNEUAur3",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/admin/sessions/c7924a0b-3c64-4b42-b9fd-6331fe85c87e#subjects",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/admin/sessions/c7924a0b-3c64-4b42-b9fd-6331fe85c87e#fees",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/admin/sessions/c7924a0b-3c64-4b42-b9fd-6331fe85c87e#money",
+          "links": 5,
+          "outside": []
+        },
+        {
+          "screen": "/admin/sessions/c7924a0b-3c64-4b42-b9fd-6331fe85c87e#verify",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/exams/entries?series=40c6fcc9-5074-434c-ab39-5d43f48253fa",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/exams/entry-lists?series=40c6fcc9-5074-434c-ab39-5d43f48253fa",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "desk:Student Placeholder",
+          "links": 8,
+          "outside": []
+        }
+      ],
+      "outside": []
+    },
+    "coordinator": {
+      "screens": [
+        {
+          "screen": "/",
+          "links": 7,
+          "outside": []
+        },
+        {
+          "screen": "/admin/sessions",
+          "links": 8,
+          "outside": []
+        },
+        {
+          "screen": "/exams/catalogue",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/exams/series",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/exams/services",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/settings",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/imports",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/students",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/admin/exceptions",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/exams/deadlines",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/exams/entries",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/exams/entry-lists",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/notifications",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/profile",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/students/tHxdFE7YEd9OiopMXaQQBqR1fNEUAur3",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/admin/sessions/c7924a0b-3c64-4b42-b9fd-6331fe85c87e#subjects",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/exams/entries?series=40c6fcc9-5074-434c-ab39-5d43f48253fa",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/exams/entry-lists?series=40c6fcc9-5074-434c-ab39-5d43f48253fa",
+          "links": 2,
+          "outside": []
+        }
+      ],
+      "outside": []
+    },
+    "finance_admin": {
+      "screens": [
+        {
+          "screen": "/desk",
+          "links": 3,
+          "outside": []
+        },
+        {
+          "screen": "/admin/sessions",
+          "links": 12,
+          "outside": []
+        },
+        {
+          "screen": "/exams/services",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/admin/school-fees",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/settings",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/students",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/charges",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/admin/exceptions",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/admin/messages",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/finance",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/takings",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/notifications",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/profile",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/students/tHxdFE7YEd9OiopMXaQQBqR1fNEUAur3",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/admin/sessions/c7924a0b-3c64-4b42-b9fd-6331fe85c87e#money",
+          "links": 5,
+          "outside": []
+        },
+        {
+          "screen": "desk:Student Placeholder",
+          "links": 8,
+          "outside": []
+        }
+      ],
+      "outside": []
+    },
+    "finance_officer": {
+      "screens": [
+        {
+          "screen": "/desk",
+          "links": 3,
+          "outside": []
+        },
+        {
+          "screen": "/students",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/charges",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/admin/sessions",
+          "links": 12,
+          "outside": []
+        },
+        {
+          "screen": "/admin/messages",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/finance",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/takings",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/notifications",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/profile",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/students/tHxdFE7YEd9OiopMXaQQBqR1fNEUAur3",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/admin/sessions/c7924a0b-3c64-4b42-b9fd-6331fe85c87e#money",
+          "links": 5,
+          "outside": []
+        },
+        {
+          "screen": "desk:Student Placeholder",
+          "links": 4,
+          "outside": []
+        }
+      ],
+      "outside": []
+    },
+    "teacher": {
+      "screens": [
+        {
+          "screen": "/",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/notifications",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/profile",
+          "links": 2,
+          "outside": []
+        }
+      ],
+      "outside": []
+    },
+    "gate": {
+      "screens": [
+        {
+          "screen": "/",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/notifications",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/profile",
+          "links": 2,
+          "outside": []
+        }
+      ],
+      "outside": []
+    },
+    "parent": {
+      "screens": [
+        {
+          "screen": "/",
+          "links": 9,
+          "outside": []
+        },
+        {
+          "screen": "/register",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/registrations",
+          "links": 3,
+          "outside": []
+        },
+        {
+          "screen": "/registrations/history",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/approvals",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/statement",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/school-fee",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/charges-due",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/escrow",
+          "links": 3,
+          "outside": []
+        },
+        {
+          "screen": "/links",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/notifications",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/profile",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/register",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/checkout",
+          "links": 3,
+          "outside": []
+        }
+      ],
+      "outside": []
+    },
+    "student": {
+      "screens": [
+        {
+          "screen": "/",
+          "links": 8,
+          "outside": []
+        },
+        {
+          "screen": "/register",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/registrations",
+          "links": 3,
+          "outside": []
+        },
+        {
+          "screen": "/statement",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/registrations/history",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/pending-requests",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/links",
+          "links": 1,
+          "outside": []
+        },
+        {
+          "screen": "/notifications",
+          "links": 0,
+          "outside": []
+        },
+        {
+          "screen": "/profile",
+          "links": 2,
+          "outside": []
+        },
+        {
+          "screen": "/register",
+          "links": 0,
+          "outside": []
+        }
+      ],
+      "outside": []
+    }
+  }
+}

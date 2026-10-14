@@ -34,6 +34,7 @@ import { cn } from '~/lib/utils';
 import { DateText, MONTHS } from '../../academic/calendar/academic-shared';
 import { EXAMS_KEY, fetchDeadlines, BoardText, PrintButton, type DeadlinesData } from '../exam-f4-shared';
 import { SeriesWords } from '../candidates/series-words';
+import { leadsOutsideTheCycle } from '~/lib/reservation-focus';
 
 type Item = DeadlinesData['items'][number];
 type Field = Item['field'];
@@ -280,7 +281,9 @@ function DeadlineRow({ item }: { item: Item }) {
         ) : (
           <Badge tone="success">Nothing outstanding</Badge>
         )}
-        {fix && (item.outstanding.length > 0 || !item.passed) && (
+        {/* F6b: a date whose work is outside the reservation cycle (forecasts, candidates, the timetable,
+            results, certificates) keeps its row, not its link (lib/reservation-focus.ts). */}
+        {fix && !leadsOutsideTheCycle(fix.path) && (item.outstanding.length > 0 || !item.passed) && (
           <Link
             href={`${fix.path}?series=${encodeURIComponent(item.boardSeriesId)}` as Route}
             className="mt-1 block w-fit text-xs font-semibold text-primary underline-offset-4 hover:underline print:hidden"
